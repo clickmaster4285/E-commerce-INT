@@ -146,7 +146,7 @@ const BrandCountryDropdown = ({ value, onChange, disabled = false, allCountries 
   );
 };
 
-const blankForm = () => ({ category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [], variants: [], topup: "0", isPerishable: false, expiryDuration: "", expiryUnit: "days" });
+const blankForm = () => ({ category_id: "", brand_id: "", name: "", description: "", status: "active", tag_names: [], variants: [], topup: "0", isPerishable: false, expiryDuration: "", expiryUnit: "days" });
 
 /* Shared product create/edit form used by the Products and Purchase Orders pages. */
 export default function ProductFormModal({ open, initialProduct = null, onClose, onCreated, onUpdated, zIndex = "z-50" }) {
@@ -180,7 +180,7 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
       const isPerishable = initialProduct?.isPerishable === true;
       setFormData({
         category_id: normalizeId(initialProduct?.category_id), brand_id: normalizeId(initialProduct?.brand_id),
-        name: initialProduct?.name || "", description: initialProduct?.description || "", tax: String(initialProduct?.tax ?? 0),
+        name: initialProduct?.name || "", description: initialProduct?.description || "",
         status: initialProduct?.status || "active", tag_names: currentTagNames, variants: [],
         isPerishable,
         expiryDuration: isPerishable ? String(initialProduct?.expiryDuration ?? "") : "",
@@ -243,7 +243,6 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
     data.append("brand_id", formData.brand_id);
     data.append("name", formData.name.trim());
     data.append("description", formData.description || "");
-    data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
     data.append("tag_names", JSON.stringify(formData.tag_names || []));
     data.append("isPerishable", String(formData.isPerishable));
@@ -402,9 +401,6 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
                   <Field label="Product Name *"><input required type="text" placeholder="e.g. Cotton T-Shirt" value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} /></Field>
                   <Field label="Description"><textarea rows={3} placeholder="Enter product description..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} className="w-full resize-none rounded-md px-3 py-2 text-sm" style={inputStyle} /></Field>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <Field label="Tax (%)">
-                      <input type="number" min="0" max="100" step="0.01" placeholder="%" value={formData.tax} onChange={e => { const v = e.target.value; if (v === "") { setFormData(p => ({ ...p, tax: "" })); return; } let n = Number(v); if (!Number.isFinite(n)) n = 0; n = Math.min(100, Math.max(0, n)); setFormData(p => ({ ...p, tax: String(n) })); }} className="h-9 w-full rounded-md px-3 text-sm" style={inputStyle} />
-                    </Field>
                     <Field label="Status">
                       <select value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value }))} className="h-9 w-full appearance-none rounded-md px-3 text-sm outline-none" style={inputStyle}>
                         <option value="active">Active</option>

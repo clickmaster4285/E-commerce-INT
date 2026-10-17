@@ -177,6 +177,7 @@ export default function PODetailPage({ params }) {
               <div className="space-y-2 p-4 text-[13px]">
                 <div className="flex justify-between"><span style={muted}>Subtotal</span><span style={primary}>{money(po.subtotal)}</span></div>
                 <div className="flex justify-between"><span style={muted}>Tax ({taxPercent.toLocaleString()}%)</span><span style={primary}>{money(po.tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>Overall Tax</span><span style={primary}>{money(po.overall_tax)}</span></div>
                 <div className="flex justify-between"><span style={muted}>Shipping</span><span style={primary}>{money(po.shipping)}</span></div>
                 <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>{money(po.discount)}</span></div>
                 <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Total</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>

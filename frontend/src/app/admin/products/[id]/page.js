@@ -1070,7 +1070,7 @@ export default function ProductDetailPage() {
   });
 
   const [formData, setFormData] = useState({
-    category_id: "", brand_id: "", name: "", description: "", tax: "0", status: "active", tag_names: [],
+    category_id: "", brand_id: "", name: "", description: "", status: "active", tag_names: [],
     variants: [createEmptyVariant()],
   });
   const [tagInput, setTagInput] = useState("");
@@ -1328,7 +1328,7 @@ export default function ProductDetailPage() {
       category_id: prod.category_id?._id || prod.category_id || "",
       brand_id: prod.brand_id?._id || prod.brand_id || "",
       name: prod.name || "", description: prod.description || "",
-      tax: String(prod.tax ?? 0), status: prod.status || "active",
+      status: prod.status || "active",
       tag_names: currentTagNames, variants,
     };
   };
@@ -1538,7 +1538,6 @@ export default function ProductDetailPage() {
     data.append("brand_id", formData.brand_id);
     data.append("name", formData.name.trim());
     data.append("description", formData.description);
-    data.append("tax", formData.tax || "0");
     data.append("status", formData.status);
     data.append("tag_names", JSON.stringify(formData.tag_names || []));
 
@@ -3063,12 +3062,6 @@ export default function ProductDetailPage() {
                         className="px-3 py-2.5 rounded-lg text-[12px] w-full outline-none resize-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Tax (%)</label>
-                        <input type="number" min="0" placeholder="e.g. 18" value={formData.tax}
-                          onChange={(e) => setFormData({ ...formData, tax: e.target.value })}
-                          className="h-9 px-3 rounded-lg text-[12px] w-full outline-none" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
-                      </div>
                       <div>
                         <label className="block text-[11px] font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Status</label>
                         <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}

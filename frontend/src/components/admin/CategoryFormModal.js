@@ -377,7 +377,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   const renderAttributeSelectModal = () => {
     if (!showAttrSelectModal) return null;
     return createPortal(
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
           <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
             <div>
@@ -495,7 +495,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   const renderCreateAttrInline = () => {
     if (!showCreateAttrModal) return null;
     return createPortal(
-      <div className="fixed inset-0 z-[61] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="w-full max-w-sm bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
           <div className="px-5 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)]">Create Attribute</h3>
@@ -562,7 +562,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-[580px] max-h-[85vh] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden">
         <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">

@@ -39,6 +39,10 @@ const buildItems = async (rawItems) => {
     if (!variant) throw new Error("Variant not found");
     const product = await Product.findById(variant.product_id).lean();
     if (!product || product.is_deleted) throw new Error("Product not found or deleted");
+    const sellPrice = Math.max(0, Number(r.sell_price ?? variant.selling_price) || 0);
+    if (cost > sellPrice) {
+      throw new Error(`Cost price cannot exceed sell price for ${product.name} (${variant.title || variant.sku || "variant"}). Please correct the price.`);
+    }
     const expiryAfterDelivery = r.expiry_after_delivery === undefined
       ? Math.max(0, Number(variant.expiry_after_delivery) || 0)
       : Number(r.expiry_after_delivery);
@@ -56,7 +60,7 @@ const buildItems = async (rawItems) => {
     items.push({
       product_id: product._id, variant_id: variant._id, name: product.name,
       sku: variant.sku || "", variantTitle: variant.title || "", image: variant.images?.[0]?.img_url || "",
-      cost_price: cost, sell_price: Math.max(0, Number(r.sell_price ?? variant.selling_price) || 0),
+      cost_price: cost, sell_price: sellPrice,
       qty_ordered: qty, received_qty: 0, line_total, tax_rate: taxRate,
       batch_no: String(r.batch_no || ""), mfg_date: r.mfg_date || null, expiry_date: r.expiry_date || null,
       expiry_after_delivery: expiryAfterDelivery, expiry_after_delivery_unit: expiryUnit,
@@ -68,20 +72,20 @@ const buildItems = async (rawItems) => {
 
 const createPO = async (req, res) => {
   try {
-    const { vendor_id, items: rawItems, shipping = 0, discount = 0, expected_date, due_date, notes } = req.body;
+    const { vendor_id, items: rawItems, shipping = 0, discount = 0, overall_tax = 0, expected_date, due_date, notes } = req.body;
     const vendor = await Vendor.findOne({ _id: vendor_id, is_deleted: false });
     if (!vendor) return res.status(400).json({ success: false, message: "Vendor not found" });
     if (!vendor.is_active) return res.status(400).json({ success: false, message: "Vendor is inactive" });
     const { items, subtotal, tax } = await buildItems(rawItems);
-    const ship = Math.max(0, Number(shipping) || 0), disc = Math.max(0, Number(discount) || 0);
-    const total = Math.max(0, Math.round(subtotal + tax + ship - disc));
+    const ship = Math.max(0, Number(shipping) || 0), disc = Math.max(0, Number(discount) || 0), extraTax = Math.max(0, Number(overall_tax) || 0);
+    const total = Math.max(0, Math.round(subtotal + tax + extraTax + ship - disc));
     let po = null;
     for (let i = 0; i < 5; i++) {
       try {
         po = await PurchaseOrder.create({
           po_number: await generateNextPONumber(), vendor_id: vendor._id,
           vendor_snapshot: { name: vendor.name, company_name: vendor.company_name, phone: vendor.phone, email: vendor.email, address: vendor.address, city: vendor.city },
-          items, subtotal, tax, shipping: ship, discount: disc, total,
+          items, subtotal, tax, overall_tax: extraTax, shipping: ship, discount: disc, total,
           status: "pending", payment_status: "unpaid", paid_amount: 0, due_amount: total,
           expected_date: expected_date || null, due_date: due_date || null, notes: notes || "",
           createdby: req.user?._id || null,
@@ -139,14 +143,15 @@ const updatePO = async (req, res) => {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     if (po.status !== "pending") return res.status(400).json({ success: false, message: "Only pending POs can be edited" });
-    const { items: rawItems, shipping, discount, expected_date, due_date, notes } = req.body;
+    const { items: rawItems, shipping, discount, overall_tax, expected_date, due_date, notes } = req.body;
     if (rawItems) {
       const { items, subtotal, tax } = await buildItems(rawItems);
       po.items = items; po.subtotal = subtotal; po.tax = tax;
     }
     if (shipping !== undefined) po.shipping = Math.max(0, Number(shipping) || 0);
     if (discount !== undefined) po.discount = Math.max(0, Number(discount) || 0);
-    po.total = Math.max(0, Math.round(po.subtotal + po.tax + po.shipping - po.discount));
+    if (overall_tax !== undefined) po.overall_tax = Math.max(0, Number(overall_tax) || 0);
+    po.total = Math.max(0, Math.round(po.subtotal + po.tax + po.overall_tax + po.shipping - po.discount));
     po.due_amount = Math.max(0, po.total - po.paid_amount);
     if (expected_date !== undefined) po.expected_date = expected_date || null;
     if (due_date !== undefined) po.due_date = due_date || null;

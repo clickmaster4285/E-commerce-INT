@@ -71,6 +71,7 @@ const ALLOWED_PERMISSIONS = {
   attribute: { label: "Attribute", default: true },
   vendors: { label: "Vendors", default: true },
   purchaseOrders: { label: "Purchase Orders", default: true },
+  leads: { label: "Leads", default: false },
 };
 
 // ==========================================

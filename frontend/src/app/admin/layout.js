@@ -37,6 +37,9 @@ const ROUTE_PERMISSIONS = {
   '/admin/manage-stock': 'manageStock',
   '/admin/vendors': 'vendors',
   '/admin/purchase-orders': 'purchaseOrders',
+  '/admin/customers': 'customers',
+  '/admin/leads': 'leads',
+  '/admin/pos': 'pos',
 };
 
 // ==========================================
@@ -685,8 +688,8 @@ export default function AdminLayout({ children }) {
         />
 
         {/* Page */}
-        <main className="flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        <main className={`flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] ${pathname === '/admin/pos' ? 'px-1 pt-1 pb-3' : 'px-3 py-4 sm:px-5 sm:py-6'}`}>
+          <div className={pathname === '/admin/pos' ? 'w-full' : 'mx-auto w-full max-w-[1600px]'}>{children}</div>
         </main>
 
       </div>

@@ -1,0 +1,432 @@
+E-commerce-INT
+Complete User Guide
+Storefront and Administration User Manual
+Prepared For: [TO BE FILLED BY USER]
+Prepared By: [TO BE FILLED BY USER]
+Date: [TO BE FILLED BY USER]
+
+# Table of Contents
+1. System Overview
+2. Getting Started (First-Time Login)
+3. Initial / Company Setup
+4. Settings / Administration Module
+5. Catalog Module
+6. Sales and Marketing Module
+7. Operations Module
+8. Purchasing Module
+9. Point of Sale and Customers Module
+10. Storefront Customer Guide
+11. Notifications System
+12. Permission and Access Control
+13. How Modules Link Together
+14. Troubleshooting and FAQ
+15. Quick Reference: All Module URLs
+16. Technical Notes
+17. Verification Notes
+
+# 1. System Overview
+E-commerce-INT is a single-store online shop with a customer storefront and an employee-facing administration area. Customers browse products, manage their account and cart, check out, and view orders. Employees maintain catalog data, promotions, fulfillment, purchasing, store details, and point-of-sale records.
+
+Base URL: <BASE_URL> (No deployment URL is configured in the files examined. The frontend README gives http://localhost:3000 for local frontend use.)
+
+Major areas:
+- Storefront: product discovery, cart, checkout, customer profile, orders, and wishlist.
+- Catalog: brands, categories, attributes, products, variants, and featured products.
+- Sales and marketing: discounts, deals, bundles, and banners.
+- Operations: stock management, order handling, shipping configuration, and reviews.
+- Purchasing: vendors, purchase orders, receiving, and vendor payments.
+- POS and customers: counter sales, sale returns, and customer records.
+- Administration: employee accounts and permissions, store profile, and personal profile.
+- Dashboard: aggregate business statistics.
+
+## 1.1 Technology Stack
+| Layer | Details |
+|---|---|
+| Backend | Node.js, Express 5 |
+| Frontend | Next.js 16 App Router, React 19 |
+| Database | MongoDB through Mongoose |
+| Cache | Redis client is installed; in-process/public cache helpers are used by selected routes. Production cache topology: UNCLEAR. |
+| Authentication | JWT-related packages, cookie parser, bcrypt password hashing, Google OAuth integration. |
+| Realtime | Socket.IO server and browser client; event coverage varies by feature. |
+| Background jobs | node-cron banner schedule evaluator; every minute. |
+| Deployment | No Docker or deployment manifest was found. Frontend scripts offer build/start; backend scripts offer start. |
+
+# 2. Getting Started (First-Time Login)
+WARNING: Change any environment-provided initial administrator password after the first successful login. Never share login credentials or OTP codes.
+
+## 2.1 Default Credentials
+No literal default email or password is present in the seed code. At server startup, an administrator employee may be created when DEFAULT_STORE_NAME, DEFAULT_ADMIN_EMAIL, and DEFAULT_ADMIN_PASSWORD are supplied in the backend environment. Other account values are environment-provided and are not reproduced here. The employee receives the role from DEFAULT_ADMIN_ROLE and a preset permission map. This is an environment-driven account, not a public demo credential.
+
+## 2.2 First Login
+1. Open /admin/login.
+2. Enter the administrator email and password supplied by the system operator.
+3. Submit the form. On success, the admin area loads; on failure, check the displayed error, account status, and credentials.
+4. Open /admin/profile to review profile details and change the password if the page offers that action. A backend password-change endpoint exists; a forced first-login change requirement is NOT FOUND IN CODE.
+5. Storefront customers use /login or the account/login flow; admin login is at /admin/login.
+
+## 2.3 First-Time Setup Checklist
+The source does not enforce a setup wizard. Suggested order follows references found in schemas/forms:
+1. Verify store name, contact, address, currency, and tax details at /admin/store-info.
+2. Add employee accounts and permissions at /admin/employees.
+3. Define attributes at /admin/attributes, then assign category attributes.
+4. Create brands at /admin/brands and categories at /admin/categories.
+5. Add products and variants at /admin/products; products require category and brand references.
+6. Add vendors at /admin/vendors if purchasing is used.
+7. Set shipping methods, rules, and configuration at /admin/shipping.
+8. Create promotions and storefront content at /admin/discounts, /admin/deals, /admin/banners, and /admin/featured-products as needed.
+9. Review stock at /admin/manage-stock and process business transactions.
+
+# 3. Initial / Company Setup
+## 3.1 Settings
+| Setting | Description |
+|---|---|
+| Store name | Store document uses store_name; also used in startup seed and email display. |
+| Contact and support | Store schema includes email, phone, support_email, support_phone. |
+| Address | Country, state, city, zip_code, and address fields are stored. |
+| Currency | Store has a currency field; display formatting depends on frontend usage. |
+| Tax rate | Store has tax_rate; products and transactions also store tax rates/amounts. Universal tax precedence is UNCLEAR. |
+| Weight unit | Store has weight_unit. |
+| Store status | Store has store_status. A confirmed allowed-value list is NOT FOUND IN CODE. |
+| Brand/category/product setup | Required references for products and display. |
+| Shipping | Config, rules, and methods determine available delivery methods and quotes. |
+
+## 3.2 Why This Matters
+- Products require category and brand references, so create these first.
+- Category attribute assignments control product specifications and filtering fields.
+- Store currency and tax settings inform commercial presentation, but code also stores per-product and order values; review checkout totals.
+- Shipping settings are consumed by checkout quote behavior.
+- Employee permissions control access to protected admin features.
+
+# 4. Settings / Administration Module
+Module path: /admin. The sidebar groups Dashboard, Catalog, Sales & Marketing, Operations, Purchasing, POS & Customers, Store, and Team & Account. There is no general Settings menu or separate roles/permissions editor; employee permissions are managed through employee records.
+
+## 4.1 Employees and Access
+URLs: /admin/employees and /admin/employees/[id]. Purpose: maintain internal employee accounts and access. Create/update/delete and status-toggle endpoints exist. Employee fields include name, username, email, password, phone, role (user/admin/staff/manager), status (active/inactive), store, address, employeeCode, department, permissions, and audit information. Activity entries include action, category, actor, details, and timestamp. Exact form required markers and validation limits: NOT FOUND IN CODE in this review.
+
+How It Works:
+1. Open Employees and choose the create action.
+2. Enter identity and account information and set role/access values shown by the form.
+3. Save; use list or detail page to inspect and update a record.
+4. Toggle active/inactive as appropriate. Login enforcement for inactive users is controlled by backend behavior.
+
+Related permissions: employees and per-resource flags. Employee list/read routes do not visibly apply auth middleware in the route file, while create/update/delete/status changes use checkPermission("employees").
+
+## 4.2 Store Profile
+URL: /admin/store-info. Store data includes store name, tagline, email, phone, support email/phone, country/state/city/postal code/address, currency, tax rate, weight unit, status, and logo/image data where supported. Store API includes public and admin operations; exact form validation should be confirmed in the page/controller. Permission: store for admin operations.
+
+## 4.3 Account Profile
+URL: /admin/profile. Backend provides profile read/update and password change endpoints. Sidebar permission key is profile. Exact editable fields and password rules depend on page/controller; no forced first-login workflow was found.
+
+# 5. Catalog Module
+Sidebar order: Brands, Categories, Attributes, Products, Featured Products, Reviews.
+
+## 5.1 Brands
+URLs: /admin/brands; /admin/brands/[id]. Purpose: organize products by manufacturer/brand. Required fields: brand_code and name. Optional data: description, logo metadata, country, is_active. Codes are unique among non-deleted records; deletion is soft in the model. Logo upload is supported. Admin can list, create, update, delete; public endpoints expose brand lists and brand/product details.
+
+How It Works:
+1. Open Brands and choose add.
+2. Enter code and name; optionally add description/country and upload a logo.
+3. Save and open a brand to update details.
+4. Choose delete to soft-delete where available.
+
+Related permission: brands. Products reference brands. No confirmed export UI.
+
+## 5.2 Categories
+URLs: /admin/categories; /admin/categories/[id]. Purpose: organize products hierarchically and set specification/filter rules. Fields: required category_code and name; description; optional parent category; attributes array. Each attribute assignment contains attribute reference, required/visible/filterable/searchable/variant-option flags, sort_order, and default value. is_active and soft-delete fields are stored. Category code generation endpoint exists.
+
+How It Works:
+1. Create parent category first if needed.
+2. Add category and set code/name/description and optional parent.
+3. Assign attributes and set their behavior.
+4. Save; choose the category when creating products.
+
+Category code uniqueness applies with deletion state. Route permission is products, despite category naming. Public category listing exists. No export confirmed.
+
+## 5.3 Attributes
+URL: /admin/attributes. Purpose: define reusable product specifications. Fields: required name/code; category text; data_type default text; unit; values containing required label/value, sort order, active flag; variant_allowed, is_active. Codes are lowercased and unique with deletion state. Startup seed script seeds attributes.
+
+How It Works:
+1. Open Attributes and create an attribute.
+2. Enter its name, code, type and optional unit/choice values.
+3. Save, then assign the attribute to a category.
+4. Set category-specific required, visibility, filtering, search, and variant-option behavior.
+
+Permission: attribute. No import/export confirmed.
+
+## 5.4 Products and Variants
+URLs: /admin/products, /admin/products/[id], /admin/products/[id]/add-variant. Purpose: maintain catalog items and inventory-bearing variants. Product fields: name; required category and brand; has_variants; tag_ids; description; tax (0–100, default 0); isPerishable; expiryDuration; expiryUnit (days/months/years); specifications; status (active/inactive); is_featured; audit/deletion fields. Variant model stores SKU, options/specifications, price/cost/stock and related product fields; exact full variant input inventory is reflected in the variant form/schema. SKU helper exists.
+
+How It Works:
+1. Select a category and brand.
+2. Enter product details, tax, perishable/expiry data, tags and specifications.
+3. Save the product.
+4. Add variants when applicable, then set variant pricing and inventory values.
+5. Change active status or featured status using the relevant controls.
+
+Product create/edit/toggle/delete and bulk-featured endpoints exist. Product references feed search, cart, checkout, POS, purchase orders, deals, bundles, and reviews. Permission: products; featured toggles use featuredProducts. Product stats/facets/category tiles endpoints exist; no confirmed export/PDF.
+
+Business rules: tax is between 0 and 100. Active/inactive and deletion status affect availability. Exact rounding rule is NOT FOUND IN CODE in this review.
+
+## 5.5 Featured Products
+URL: /admin/featured-products. Purpose: select products highlighted in storefront. Backend supports individual and bulk toggle. Featured products order by featured_at newest first, with ID tie-break. Permission: featuredProducts; sidebar can fall back to products permission for legacy data. Storefront reads product featured flag. No separate featured record exists.
+
+## 5.6 Tags
+No dedicated sidebar page found. Backend has tag CRUD endpoints and product.tag_ids references. Routes require authentication but do not show checkPermission. A tag management page is NOT FOUND IN CODE. This is an API-supported feature without a dedicated page.
+
+# 6. Sales and Marketing Module
+## 6.1 Discounts
+URLs: /admin/discounts; /admin/discounts/[id]. Purpose: configure discounts used in storefront pricing. Discount model/controller define fields and application logic; UI utility/modal files exist. Routes include list/create/read/update/delete and public discounts. Permission checks are not present on discount routes (authMiddleware only); sidebar key is discounts. Exact types, eligibility, status and rounding values should follow editor/controller; they are NOT FOUND IN CODE in this review. No export confirmed.
+
+## 6.2 Deals
+URLs: /admin/deals; /admin/deals/[id]. Types: percentage, fixed_amount, buy_x_get_y, bundle, free_shipping. Target scope: all, product, category, brand, collection. Related product/category/brand references are arrays. discountValue is required for percentage/fixed_amount, >=0, and percentage <=100. Buy/get quantities default 0; getDiscountValue defaults 100 and ranges 0–100. Bundle rule mode all/limit; reward type percentage/fixed_amount/free_product; percentage value <=100; free quantity defaults 1. Start/end dates required and end must follow start. Deal image optional.
+
+How It Works:
+1. Choose deal type and target scope.
+2. Select target products/categories/brands and enter offer values required for that type.
+3. Set start and end dates and any bundle reward rules.
+4. Save; activate or deactivate with the status control.
+
+Public active endpoints exist; admin create/update/delete/toggle exist. Permission: deals. Exact application order and stacking with discounts is UNCLEAR. Monetary rounding is not established.
+
+## 6.3 Bundles
+Public URL: /bundles; admin API exists but no dedicated sidebar route. Bundle fields: required name (max 120), description, at least two product entries with quantity >=1, required image, bundlePrice >=0, isActive default true. Active bundles display in storefront. Product inventory and bundle price are linked. Admin bundle UI page is NOT FOUND IN CODE.
+
+## 6.4 Banners
+URLs: /admin/banners; /admin/banners/[id]. Purpose: manage storefront promotional imagery and links. Required title, bannerType (homepage_hero/promotional/product/collection/popup), desktopImage. Status: draft/active/inactive/scheduled/expired. Other fields include position, eyebrow, heading, description, primary-button text/link type and destination IDs, start/end dates, store. Link types: custom_url/product/category/brand/collection/campaign/deal/none. Display rules support homepage/category/product/cart/checkout pages, categories, and desktop/tablet/mobile devices.
+
+How It Works:
+1. Create a banner with title, type, and desktop image.
+2. Add text/button destination and optional dates/display rules.
+3. Save and set status or schedule dates.
+4. Duplicate or edit an existing banner as needed.
+
+Every minute, scheduler promotes scheduled/draft banners with a reached start date and future/no end date to active; active/scheduled banners with passed end dates become expired. Permission: banners. Public active banners are cached briefly.
+
+# 7. Operations Module
+## 7.1 Stock
+URL: /admin/manage-stock. Purpose: review and adjust inventory and stock history. Backend stock routes cover stock listing, adjustments and history; permission: manageStock. Product variants hold stock; purchase receiving increases stock and POS sale/return logic affects stock. Exact adjustment labels/reasons and validations must follow page/controller. No confirmed stocktake export.
+
+## 7.2 Orders
+Customer URLs: /orders, /orders/[id]. Admin URLs: /admin/orders, /admin/orders/[id]. Order stores user, line snapshots, address snapshot/reference, shipping method, payment, subtotal/shipping/tax/total, notes/cancel reason, deals/bundles and savings. Payment method enum: cod/bank/card; payment status pending/paid/failed. Order status: pending/confirmed/processing/shipped/delivered/cancelled.
+
+How It Works:
+1. Customer places order from checkout.
+2. Staff opens order list and detail to review contents and totals.
+3. Staff updates order status or payment status using available controls.
+4. Customer checks order history/detail.
+
+Permission: order for admin list/actions. Admin product-summary endpoint exists. Exact transition restrictions and inventory deduction/restocking triggers are controller-specific and not asserted here. Review model comment says delivered orders only.
+
+## 7.3 Shipping
+URL: /admin/shipping. Public/admin resources include config, rules, methods, quote. Rules and methods can be listed, created, updated, deleted, and toggled; config can be updated. Checkout requests a quote. Exact charge formula depends on configured fields and is NOT FOUND IN CODE here. Permission: shipping. Checkout address uses name, country, street lines, city, state, postal code and phone. No carrier tracking integration found.
+
+## 7.4 Reviews
+URLs: /admin/reviews; /admin/reviews/[id]. Customer reviews appear on product pages and account. Rating 1–5; title/comment optional; media may include images/video. Store response stores message, time, and respondent name. Admin can view, set status, respond/delete response. Customer can list/create/update/delete subject to ownership/business checks. Permission: reviews; sidebar fallback to products. Exact moderation status choices are NOT FOUND IN CODE in this review. Media stored under uploads/reviews.
+
+# 8. Purchasing Module
+## 8.1 Vendors
+URLs: /admin/vendors; /admin/vendors/[id]. Vendor records include vendor code and contact/company/address data, soft-delete and audit fields. Admin list/detail/create/update/delete and restore endpoints exist; code-generation endpoint exists. Permission: vendors. Purchase orders reference vendors and snapshot details. No export confirmed.
+
+## 8.2 Purchase Orders
+URLs: /admin/purchase-orders, /admin/purchase-orders/new, /admin/purchase-orders/[id]. Purpose: request/receive stock and track payment. PO requires vendor and at least one line. Items include product/variant, name/SKU, cost and sale price, quantity ordered >=1, received quantity, line total, tax rate 0–100, batch, manufacture/expiry dates, expiry-after-delivery amount and unit (days/months/years). Header fields: subtotal, tax, overall tax, shipping, discount, total; status pending/confirmed/delivered/closed/cancelled; payment_status unpaid/partial/paid; paid/due amounts; expected/due dates; notes/cancel reason; receiving records. Receiving has invoice, explanation, per-variant quantities, actor and timestamp. Payment methods: bank/cash/cod/credit/advance_adjust; amount >0.
+
+How It Works:
+1. Select a vendor and add product variants.
+2. Enter quantities, costs, taxes, dates and other values shown.
+3. Save the PO and confirm it when ready.
+4. Record delivery/receiving quantities and invoice/explanation.
+5. Record vendor payments; close the PO when appropriate.
+
+Permission: purchaseOrders; delivery/receiving also require manageStock. Receiving links to inventory. Exact PO total formula and rounding are NOT FOUND IN CODE in this review; confirm controller calculations before relying on totals.
+
+# 9. Point of Sale and Customers Module
+## 9.1 POS Sales
+URLs: /admin/pos, /admin/pos/history, /admin/pos/history/[id]. Purpose: record counter sales and returns. Sale requires at least one item. Each item has product/variant, unit price >=0, integer quantity >=1, discounts, tax rate 0–100 and line total. Header subtotal, discount, tax and total. Payment: cash/card/mobile_wallet/bank_transfer; amount received >=0, change >=0, optional reference. Status completed/cancelled. Sale stores customer/cashier snapshots. Return includes reason (max 300 chars), refund method cash/card/mobile_wallet/bank_transfer/store_credit, refund total and item quantities/refunds.
+
+How It Works:
+1. Open POS and select products/variants and quantities.
+2. Optionally select a customer and apply available discounts/tax.
+3. Choose payment method and enter amount received/reference.
+4. Complete the sale and find it in history.
+5. For returns, choose items/quantities, enter reason and refund method, then submit.
+
+Permission: pos. Sales and returns connect to variant stock and customer history. Exact rounding and return eligibility are controller-driven; no accounting ledger was found.
+
+## 9.2 Customers
+URLs: /admin/customers; /admin/customers/[id]. Fields: required name; optional phone/email/address/notes; soft-delete and audit fields. Admin list/search/read/create/update/delete. Permission: customers. POS can attach a customer and display history. Storefront User and Customer are separate models; a universal mapping is NOT FOUND IN CODE.
+
+# 10. Storefront Customer Guide
+## 10.1 Account and Authentication
+URLs: /login and /account. Customer can register, log in, verify email by OTP, use Google customer login, request password-reset OTP and reset password. Passwords and OTPs are bcrypt-hashed. Pending registration is not promoted to User until OTP verification succeeds. Profile data includes name, username, email, phone, avatar, date of birth and preferences (emailNotifications, smsNotifications, productRecommendations). Access/refresh tokens support renewal; exact expiry duration is not stated here. SMTP is needed for email delivery; development may log OTP/email content, production does not.
+
+## 10.2 Browse, Search, and Product Details
+URLs: /, /shop, /search, /filtering-product, /brand/[id], /product/[id], /deals/[id]. Browse home sections, categories, brands, featured items and deals. Product details show item/variant information and reviews, with cart/quick-buy actions. Search/facets/category-tiles public APIs exist. Exact ranking and filter semantics are not assumed.
+
+## 10.3 Cart and Checkout
+URLs: /cart and /checkout. Cart is saved per signed-in user; cart items may include deal data. Checkout drafts store selected items, address, shipping/payment method, step and estimates. Addresses are user-owned and include name, country (default Pakistan), street lines, city, state, postal code, phone and default flag. Order payment choices: cod/bank/card. Checkout requests shipping quote. Exact tax/discount stacking and rounding are UNCLEAR. Check displayed totals and delivery address before placing order.
+
+## 10.4 Orders and Reviews
+URLs: /orders and /orders/[id]. Customers can view order list and detail. Review operations are tied to product and user; rating 1–5. Schema comment indicates delivered orders only; controller is authoritative.
+
+## 10.5 Wishlist and Bundles
+URLs: /wishlist and /bundles. Wishlist is per authenticated user and toggled through API. Active bundles are publicly displayed and contain multiple products at an advertised price. Bundle purchase behavior and stock validation should be confirmed at checkout.
+
+# 11. Notifications System
+No persistent notification model, bell/panel route, read/unread/favorite/delete/clear API, or push notification integration was found. Socket.IO is used for profile/permission synchronization and feature data refresh hooks. Email supports verification and password-reset OTP via Nodemailer/SMTP. Browser push and a centralized notification panel are NOT FOUND IN CODE. Realtime delivery depends on an active socket connection and feature handlers.
+
+# 12. Permission and Access Control
+Backend uses checkPermission(resource) middleware and employee/user permission data. Admin role bypass is implemented in permission middleware. Permission values are resource flags, not a documented resource.action matrix. Frontend sidebar hides menu items by permission key; some pages/actions may add checks. Backend checks are authoritative when present. Some routes rely only on authentication or have no visible auth middleware; see Verification Notes.
+
+| Permission | Description |
+|---|---|
+| dashboard | Dashboard menu/data area; stats endpoint visibly requires authentication. |
+| brands | Manage brands. |
+| categories | Category menu concept; category API currently checks products. |
+| attribute | Manage attributes. |
+| products | Manage products and category operations. |
+| featuredProducts | Toggle one or many featured products. |
+| reviews | Moderate reviews and store responses. |
+| employees | Create/update/delete/toggle employee accounts. |
+| discounts | Sidebar access; discount API lacks explicit resource permission check. |
+| deals | Manage deals. |
+| banners | Manage banners. |
+| manageStock | View/adjust stock; also required for PO receiving/delivery. |
+| order | Admin order management. |
+| shipping | Manage shipping config/rules/methods. |
+| vendors | Manage vendors. |
+| purchaseOrders | Manage purchase orders/payments. |
+| customers | Manage customer records. |
+| pos | Manage POS sales and returns. |
+| store | Store administration. |
+| profile | Personal profile. |
+
+Built-in employee roles: user, admin, staff, manager. There is no separate role-definition model or role editor page. Admin default permissions are seeded in server.js from a fixed map; dashboard is not in that map.
+
+# 13. How Modules Link Together
+## 13.1 Connections
+| Connection | Description |
+|---|---|
+| Categories → Products | Product requires category; category may define attribute behavior. |
+| Attributes → Categories → Products | Attribute definitions are assigned to categories and product specifications. |
+| Brands → Products | Product requires brand. |
+| Products/Variants → Cart/Orders | Cart and order lines reference sellable products/variants. |
+| Products/Variants → POS | POS items require product and variant; sales/returns affect stock. |
+| Products/Variants → Purchase Orders | Purchase lines identify products/variants; receiving updates stock. |
+| Vendors → Purchase Orders/Payments | PO references vendor and snapshots vendor details; payments reference PO/vendor. |
+| Shipping → Checkout/Orders | Checkout requests quotes; order stores shipping method/amount. |
+| Deals/Discounts/Bundles → Storefront/Orders | Offers affect promotions; orders retain deal/bundle IDs and savings fields. |
+| Banners → Storefront | Active banners display in page/device contexts and link to content. |
+| Users → Addresses/Cart/Wishlist/Orders/Reviews | Customer-owned records link by user ID. |
+| Customers → POS | POS may attach customer and provide sale history. |
+| Employees → Admin actions | Employee identity, permissions, audit data and cashier attribution support administration. |
+| Reviews → Products/Users | Review belongs to a product/user, with optional media and store response. |
+
+## 13.2 Data Flow Examples
+1. Customer order: browse active catalog → choose product/variant → add to cart → sign in → select/add address → request shipping quote → choose payment method → place order → order stores line/address snapshots and totals → staff reviews and updates status/payment → customer views history. Exact stock deduction timing is NOT FOUND IN CODE here.
+2. Purchase and receiving: create vendor → create PO with product variants/quantities → confirm PO → record delivery/receiving quantities and invoice/explanation → backend updates stock → record vendor payments and payment status → close PO when complete. Receiving requires purchaseOrders and manageStock.
+3. POS sale and return: open POS → select products/variants/quantities → optionally select customer → apply displayed discounts/tax → choose payment type and amount → complete sale → history stores cashier/customer snapshots → select returned items/quantities and enter reason/refund method → submit return. Stock effects are handled in backend.
+4. Catalog setup: create attributes → assign to category and set behavior → create brand/category → create product with references/specifications → add variant stock/prices → product becomes discoverable according to status and public queries.
+
+# 14. Troubleshooting and FAQ
+| Question | Answer |
+|---|---|
+| I cannot open an admin page. | Check employee active status, relevant permission flag and session validity. |
+| A menu item disappeared. | Sidebar visibility follows permission values/profile synchronization; ask an administrator to inspect employee permissions. |
+| Login fails. | Check whether you are using /admin/login or customer /login; employee and customer records are distinct. |
+| I did not receive a verification code. | Email needs SMTP configuration; check spam/address. Development may log OTP data instead. |
+| Password reset code is rejected. | Request a fresh code and use it before expiry; attempts are tracked and codes are single-use. |
+| Product save fails. | Product requires existing category and brand; check required values and references. |
+| Duplicate code error appears. | Codes have uniqueness rules; choose another or inspect existing/soft-deleted records. |
+| Product does not show in storefront. | Check active status, category/brand, variant availability and public query filters. |
+| Variant stock or price is wrong. | Review variant data and stock history; sellable values may be variant-specific. |
+| Shipping method is unavailable. | Check that method/rule is active and quote inputs match conditions. |
+| Checkout total differs from expectation. | Review item prices, promotion eligibility, shipping quote and tax. Stacking/rounding precedence is UNCLEAR. |
+| Order status cannot be changed. | Check order permission, current status and server-side transition validation. |
+| Purchase order cannot be received. | Check PO state and both purchaseOrders and manageStock permissions. |
+| PO shows unpaid/partial. | Record a payment; status follows payment data and due amount logic. |
+| POS refuses a quantity. | POS quantities must be whole numbers and at least one; confirm variant availability. |
+| Return amount looks incorrect. | Review returned quantity/refund inputs; calculations are controller-driven. |
+| Customer record differs from online account. | Customer and User are separate models; universal linking was not found. |
+| Banner has not started or expired unexpectedly. | Status is evaluated every minute using startDate/endDate; check dates and status. |
+| Changes are not updating live. | Reconnect or reload; socket events require active connection. |
+| Store logo or upload is missing. | Check upload completion, validation and image URL reachability. |
+| I need an export or print button. | No general export/PDF feature was confirmed in reviewed pages; inspect the specific page controls. |
+
+# 15. Quick Reference: All Module URLs
+Base URL: <BASE_URL> (deployment URL not configured in source)
+| Module | Submodule | URL |
+|---|---|---|
+| Storefront | Home | / |
+| Storefront | Login | /login |
+| Storefront | Account | /account |
+| Storefront | Brand | /brand/[id] |
+| Storefront | Bundles | /bundles |
+| Storefront | Cart | /cart |
+| Storefront | Checkout | /checkout |
+| Storefront | Deal | /deals/[id] |
+| Storefront | Product filtering | /filtering-product |
+| Storefront | Orders | /orders |
+| Storefront | Order detail | /orders/[id] |
+| Storefront | Product | /product/[id] |
+| Storefront | Search | /search |
+| Storefront | Shop | /shop |
+| Storefront | Wishlist | /wishlist |
+| Admin | Access denied | /admin/access-denied |
+| Admin | Attributes | /admin/attributes |
+| Admin | Banners | /admin/banners |
+| Admin | Banner detail | /admin/banners/[id] |
+| Admin | Brands | /admin/brands |
+| Admin | Brand detail | /admin/brands/[id] |
+| Admin | Categories | /admin/categories |
+| Admin | Category detail | /admin/categories/[id] |
+| Admin | Customers | /admin/customers |
+| Admin | Customer detail | /admin/customers/[id] |
+| Admin | Dashboard | /admin/dashboard |
+| Admin | Deals | /admin/deals |
+| Admin | Deal detail | /admin/deals/[id] |
+| Admin | Discounts | /admin/discounts |
+| Admin | Discount detail | /admin/discounts/[id] |
+| Admin | Employees | /admin/employees |
+| Admin | Employee detail | /admin/employees/[id] |
+| Admin | Featured products | /admin/featured-products |
+| Admin | Login | /admin/login |
+| Admin | Manage stock | /admin/manage-stock |
+| Admin | Orders | /admin/orders |
+| Admin | Order detail | /admin/orders/[id] |
+| Admin | POS | /admin/pos |
+| Admin | POS history | /admin/pos/history |
+| Admin | POS sale detail | /admin/pos/history/[id] |
+| Admin | Products | /admin/products |
+| Admin | Product detail | /admin/products/[id] |
+| Admin | Add variant | /admin/products/[id]/add-variant |
+| Admin | Profile | /admin/profile |
+| Admin | Purchase orders | /admin/purchase-orders |
+| Admin | New purchase order | /admin/purchase-orders/new |
+| Admin | Purchase order detail | /admin/purchase-orders/[id] |
+| Admin | Reviews | /admin/reviews |
+| Admin | Review detail | /admin/reviews/[id] |
+| Admin | Shipping | /admin/shipping |
+| Admin | Store info | /admin/store-info |
+| Admin | Vendors | /admin/vendors |
+| Admin | Vendor detail | /admin/vendors/[id] |
+
+# 16. Technical Notes
+Project structure: backend contains Express server, config, controllers, middleware, models, routes, scripts and utilities. frontend contains Next.js App Router pages, API clients, components, hooks, Redux state and public images. No mobile app, separate worker, Docker files or migrations were found.
+
+Run commands in package scripts: root npm run dev; backend npm run dev or npm start; frontend npm run dev, npm run build, npm start. Environment variable names referenced (values omitted): PORT, HOST, CLIENT_URL, API_PREFIX, NODE_ENV, BCRYPT_SALT_ROUNDS, REQUEST_SIZE_LIMIT, UPLOAD_CACHE_MAX_AGE, UPLOAD_DIR, STORE_UPLOAD_SUBDIR, DEFAULT_ADMIN_ROLE, SERVER_STARTUP_MESSAGE, TRUST_PROXY, ALLOWED_ORIGINS, ALLOW_LOCAL_NETWORK, DEFAULT_STORE_NAME, DEFAULT_STORE_TAGLINE, DEFAULT_STORE_EMAIL, DEFAULT_STORE_PHONE, DEFAULT_STORE_SUPPORT_EMAIL, DEFAULT_STORE_SUPPORT_PHONE, DEFAULT_STORE_COUNTRY, DEFAULT_STORE_STATE, DEFAULT_STORE_CITY, DEFAULT_STORE_ZIP_CODE, DEFAULT_STORE_ADDRESS, DEFAULT_STORE_CURRENCY, DEFAULT_STORE_TAX_RATE, DEFAULT_STORE_WEIGHT_UNIT, DEFAULT_STORE_STATUS, DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD, DEFAULT_ADMIN_NAME, DEFAULT_ADMIN_USERNAME, SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT, SMTP_SECURE, SMTP_FROM, Mongo connection variable(s) used by config/db.js, NEXT_PUBLIC_SERVERURL, NEXT_PUBLIC_SOCKET_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID.
+
+API paths mount under configured API_PREFIX: /categories, /brands, /products, /users, /variants, /store, /employees, /discounts, /deals, /bundles, /tags, /addresses, /banners, /orders, /cart, /stock, /reviews, /attributes, /shipping, /dashboard, /vendors, /purchase-orders, /customers, /pos. Uploads are served from /uploads. MongoDB is required. Redis client is installed but exact active use/configuration is UNCLEAR. Integrations: Google OAuth, SMTP email, Socket.IO. Banner status job runs every minute. No standalone cron worker or migration scripts found.
+
+# 17. Verification Notes
+- All 53 page.js route files are listed in Section 15; loading.js is not a separate route.
+- Backend has tag and bundle APIs but no admin sidebar/page for either; UI is missing or unclear.
+- Backend also exposes checkout drafts, wishlist, addresses, OTP/auth and public APIs; these support storefront pages rather than separate admin items.
+- No centralized notification model/panel, push service, report export suite, migrations, Docker configuration, mobile app, or separate worker process was found.
+- No literal seeded admin credentials exist; startup seed depends on environment variables.
+- Permission naming is inconsistent: category routes check products; discount endpoints authenticate but lack discounts resource check; employee list/read routes have no visible auth middleware; some public/admin details do not follow a uniform middleware pattern.
+- Admin seed permission map includes products, brands, categories, users, orders, settings, profile, employees, discounts, deals, bundles, store, banners, manageStock, shipping, order, attribute, vendors, purchaseOrders, customers and pos; it omits dashboard, featuredProducts and reviews. Sidebar provides fallback for featuredProducts/reviews in some cases.
+- Exact checkout and PO monetary formulas/rounding/stacking are distributed across controllers/UI helpers and were not established in this review. They are marked UNCLEAR rather than invented.
+- Naming varies: repository E-commerce-INT; package names inventory-frontend and inventory-backend; sidebar footer ClickMaster; store name is environment-provided. No authoritative customer-facing product name is defined.
+- README is the default Next.js starter README and says local frontend URL http://localhost:3000. It does not document business modules or deployment.
+- No terms/preferences administration module or roles editor page was found. User preferences exist in User schema; store-level terms are NOT FOUND IN CODE.
+- Reviewed source locations: frontend/src/app, frontend/src/components/adminComponents/Sidebar.js, frontend/src/apis, backend/server.js, backend/models, backend/routes, backend/controllers, backend/middleware, backend/utils, backend/config, backend/scripts, package manifests, frontend/README.md, frontend/next.config.mjs. Environment file values were not read or copied.

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowDown,
@@ -784,7 +785,18 @@ const RANK_STYLES = [
 ];
 
 function TopProducts({ data }) {
+  const router = useRouter();
   const products = data?.topProducts || [];
+
+  // ✅ Product history dekhne ke liye Orders page pe filtered view kholo.
+  //    productId (id) bhejte hain — name sirf chip display ke liye.
+  const openProductOrders = (p) => {
+    if (!p?.id) return;
+    router.push(
+      `/admin/orders?productId=${encodeURIComponent(String(p.id))}` +
+        `&productName=${encodeURIComponent(p.name || "Product")}`
+    );
+  };
 
   return (
     <div className="card animate-slide-up rounded-2xl p-5 shadow-[var(--shadow-sm)] sm:p-6">
@@ -824,7 +836,12 @@ function TopProducts({ data }) {
                 return (
                   <tr
                     key={String(p.id) || i}
-                    className="transition-colors hover:bg-[var(--bg-tertiary)]/70"
+                    onClick={() => openProductOrders(p)}
+                    title={p.id ? `View all orders containing ${p.name}` : "Product id missing"}
+                    aria-label={p.id ? `View orders containing ${p.name}` : undefined}
+                    className={`group transition-colors hover:bg-[var(--bg-tertiary)]/70 ${
+                      p.id ? "cursor-pointer" : "cursor-default"
+                    }`}
                   >
                     <td className="py-2.5 pr-2">
                       <span
@@ -848,7 +865,7 @@ function TopProducts({ data }) {
                         </span>
 
                         <span
-                          className="max-w-[220px] truncate font-medium text-[var(--text-primary)]"
+                          className="max-w-[220px] truncate font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors"
                           title={p.name}
                         >
                           {p.name}
