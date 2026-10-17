@@ -33,8 +33,9 @@ const SlidersIcon = ({ className = "w-4 h-4" }) => (
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function AttributeRowsSkeleton({ rows = ATTRS_PER_PAGE }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading attributes">
+    <tbody aria-busy="true" aria-label={t("common.loading")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`attr-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
           {/* attribute name — icon + name + code */}
@@ -120,10 +121,10 @@ const ATTRS_PER_PAGE = 15;
 // ==================== RIGHT SIDE DETAIL PANEL ====================
 function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isAddingOption = false }) {
   // DB-sourced values (attribute name + option labels) — locale ke hisaab se.
-  const { nameOf, optionLabelOf } = useLocalized();
+  const { nameOf, descriptionOf, optionLabelOf } = useLocalized();
   // Static UI labels — `t()` se.
   const { t: __t } = useTranslation();
-  const t = (k, p) => __t("admin.attributes." + k, p);
+  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
   // ✅ Slide-in/out animation — mount par drawer right se smoothly slide hota hai,
   //    close par pehle slide-out animation, phir parent se unmount hota hai.
   const [visible, setVisible] = useState(false);
@@ -257,7 +258,17 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          
+          {descriptionOf(attr) && (
+            <section className="space-y-2">
+              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {t("admin.categories.form.description")}
+              </h4>
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {descriptionOf(attr)}
+              </p>
+            </section>
+          )}
+
           {/* Summary Section — Code / Data Type / Status / Options Count */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("detailPanel.summary")}</h4>
@@ -327,7 +338,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
               ) : (
                 <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
                   <TagIcon className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)] opacity-50" />
-                  <p className="text-sm text-[var(--text-muted)]">No options defined yet.</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t("detailPanel.noOptions")}</p>
                 </div>
               )}
             </div>
@@ -369,21 +380,21 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
             <button
               type="button"
               onClick={handleAddAttribute}
-              title="Add a new attribute"
-              aria-label="Add new attribute"
+              title={t("form.createTitle")}
+              aria-label={t("form.createTitle")}
               className="flex-1 h-10 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
             >
               <PlusIcon className="w-4 h-4" />
-              <span>Add Attribute</span>
+              <span>{t("form.create")}</span>
             </button>
             <button
               type="button"
               onClick={requestClose}
-              title="Close panel"
-              aria-label="Close panel"
+              title={t("detailPanel.close")}
+              aria-label={t("detailPanel.close")}
               className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
             >
-              <span>Close Panel</span>
+              <span>{t("detailPanel.closePanel")}</span>
             </button>
           </div>
         </div>
@@ -396,9 +407,10 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
 function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
   const isEdit = mode === "edit";
   const { t: __t } = useTranslation();
-  const t = (key, params) => __t(`admin.attributes.${key}`, params);
+  const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.attributes.${key}`, params);
   const [form, setForm] = useState({
     name: "",
+    description: "",
     data_type: "multi_select",
     values: [],
     value: isEdit ? false : "",
@@ -430,6 +442,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           .filter(Boolean);
         setForm({
           name: initialData.name || "",
+          description: initialData.description || "",
           data_type: dataType,
           values,
           value: booleanValue,
@@ -440,6 +453,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
       } else {
         setForm({
           name: "",
+          description: "",
           data_type: "multi_select",
           values: [],
           value: "",
@@ -472,6 +486,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
       : [];
     const payload = {
       name: form.name.trim(),
+      description: form.description.trim(),
       data_type: form.data_type,
       values: valuesPayload,
       is_active: form.is_active !== false,
@@ -539,7 +554,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
         </div>
         <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: "min(640px, 85vh)" }}>
           <div className="space-y-3">
-            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.basicInformation")}</p>
+            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("admin.categories.detail.basicInformation")}</p>
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                 {t("form.name")} <span className="text-red-500">*</span>
@@ -551,6 +566,17 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                 autoFocus
                 className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                 placeholder={t("form.namePlaceholder")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {t("admin.categories.form.description")}
+              </label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 text-sm outline-none resize-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
               />
             </div>
           </div>
@@ -699,7 +725,7 @@ export default function AttributesPage() {
   // Static UI labels (headers, stats, buttons, toasts) — database ke nahi,
   // is liye `t()` se aati hain. Nahi milne par English fallback rehta hai.
   const { t: __t } = useTranslation();
-  const t = (k, p) => __t("admin.attributes." + k, p);
+  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
   // `code` aur har option ka raw `value` kabhi translate nahi hote (variant
   // matching unhi par chalti hai) — sirf `name` + option `label` localized.
   const { nameOf, attributeOf, optionLabelOf, text } = useLocalized();
@@ -965,7 +991,7 @@ export default function AttributesPage() {
         <div className="flex items-center gap-2">
           <button onClick={() => go(current - 1)} disabled={current === 1}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page">
+            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.prev")}>
             <ChevronLeftIcon className="w-4 h-4" />
           </button>
           <span className="hidden sm:inline-flex items-center gap-1">
@@ -982,7 +1008,7 @@ export default function AttributesPage() {
           </span>
           <button onClick={() => go(current + 1)} disabled={current === total}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page">
+            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.next")}>
             <ChevronRightIcon className="w-4 h-4" />
           </button>
         </div>
@@ -1034,10 +1060,10 @@ export default function AttributesPage() {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open ? setOpen(false) : openMenu(); } }}
           className="w-8 h-8 inline-flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
-          aria-label="More actions"
+          aria-label={t("action.more")}
           aria-haspopup="true"
           aria-expanded={open}
-          title="More actions"
+          title={t("action.more")}
         >
           <DotsVerticalIcon className="w-[18px] h-[18px]" />
         </button>
@@ -1065,7 +1091,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Options
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> {t("action.viewOptions")}
             </button>
             <button
               type="button"
@@ -1075,7 +1101,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> {t("action.edit")}
             </button>
             <button
               type="button"
@@ -1089,7 +1115,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Disable" : "Enable"}
+              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? t("action.disable") : t("action.enable")}
             </button>
             <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <button
@@ -1100,7 +1126,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <TrashIcon className="w-4 h-4 shrink-0" /> Delete
+              <TrashIcon className="w-4 h-4 shrink-0" /> {t("action.delete")}
             </button>
           </div>,
           document.body
@@ -1134,8 +1160,8 @@ export default function AttributesPage() {
             <button
               type="button"
               onClick={() => setShowAttributeModal(true)}
-              title="Add a new attribute"
-              aria-label="Add attribute"
+              title={t("form.createTitle")}
+              aria-label={t("form.createTitle")}
               className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 shadow-sm transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
             >
@@ -1235,7 +1261,7 @@ export default function AttributesPage() {
                         key={attr._id}
                         tabIndex={0}
                         aria-label={`View options for ${nameOf(attr)}`}
-                        title="Click to view options"
+                        title={t("action.viewOptions")}
                         onClick={() => setDetailAttr(attr)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailAttr(attr); }
@@ -1323,6 +1349,7 @@ export default function AttributesPage() {
         mode="edit"
         initialData={editingAttribute ? {
           name: editingAttribute.name || "",
+          description: editingAttribute.description || "",
           data_type: editingAttribute.data_type || "multi_select",
           values: (editingAttribute.values || []).map((v) => {
             const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
@@ -1361,6 +1388,7 @@ export default function AttributesPage() {
             : [];
           editAttributeMutation.mutate({
             name: payload.name.trim(),
+            description: payload.description,
             data_type: payload.data_type,
             values: valuesPayload,
             is_active: payload.is_active !== false,
@@ -1377,20 +1405,20 @@ export default function AttributesPage() {
                 <TrashIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete &quot;{deleteTarget.name}&quot;?</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The attribute will be permanently removed.</p>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("delete.titleOne", { name: deleteTarget.name })}</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
               <button onClick={() => setDeleteTarget(null)} disabled={deleteAttributeMutation.isPending}
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Cancel
+                {t("delete.cancel")}
               </button>
               <button onClick={handleDeleteAttribute} disabled={deleteAttributeMutation.isPending}
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                {deleteAttributeMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                {deleteAttributeMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> {t("delete.deleting")}</> : t("delete.confirm")}
               </button>
             </div>
           </div>

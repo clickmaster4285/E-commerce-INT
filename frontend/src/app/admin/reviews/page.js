@@ -22,6 +22,7 @@ import {
 import { adminReviewApi } from "@/apis/admin/reviewApi";
 import { useReviewSocketSync } from "../../../hooks/admin/useReviewSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -164,6 +165,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
 
 export default function AdminReviewsPage() {
   const { t, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const router = useRouter();
   const queryClient = useQueryClient();
   // ✅ Baqi pages ki tarah live socket sync —
@@ -359,6 +361,7 @@ export default function AdminReviewsPage() {
                   reviews.map((r) => {
                     const user = r.user_id && typeof r.user_id === "object" ? r.user_id : {};
                     const product = r.product_id && typeof r.product_id === "object" ? r.product_id : {};
+                    const productName = productNameOf(product);
                     const hidden = r.status === "hidden";
                     const comment = String(r.comment || "").trim();
                     const commentWords = comment.split(/\s+/).filter(Boolean);
@@ -379,7 +382,7 @@ export default function AdminReviewsPage() {
                           }
                         }}
                         tabIndex={0}
-                        aria-label={t("admin.reviews.ui.openReview", { customer: user?.name || t("admin.reviews.ui.customer"), product: product?.name || t("admin.reviews.ui.productFallback") })}
+                        aria-label={t("admin.reviews.ui.openReview", { customer: user?.name || t("admin.reviews.ui.customer"), product: productName || t("admin.reviews.ui.productFallback") })}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
@@ -407,8 +410,8 @@ export default function AdminReviewsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="block max-w-[150px] truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }} title={product?.name || r.product_id}>
-                            {product?.name || t("admin.reviews.ui.productFallback")}
+                          <span className="block max-w-[150px] truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }} title={productName || r.product_id}>
+                            {productName || t("admin.reviews.ui.productFallback")}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -523,7 +526,6 @@ export default function AdminReviewsPage() {
     </div>
   );
 }
-
 
 
 

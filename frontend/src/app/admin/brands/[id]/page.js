@@ -351,6 +351,18 @@ export default function BrandDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
+  const localizedCountryName = (value) => {
+    const country = Country.getAllCountries().find(
+      (item) => item.name === value || item.isoCode === value
+    );
+    if (!country) return value;
+    try {
+      const countryLocale = locale === "ur" ? "ur-PK" : locale;
+      return new Intl.DisplayNames([countryLocale], { type: "region" }).of(country.isoCode) || value;
+    } catch {
+      return value;
+    }
+  };
 
   // Form State for Edit Modal
   const [form, setForm] = useState({
@@ -535,7 +547,7 @@ export default function BrandDetailPage() {
           onClick={() => router.push(backPath)}
           className="transition-colors hover:text-[var(--text-primary)]"
         >
-          {t("admin.brands.list.title", "Brands")}
+          {t("admin.brands.page.title")}
         </button>
         <Ico d={D.chevron} className="h-3 w-3" />
         <span className="font-medium" style={{ color: "var(--text-primary)" }}>
@@ -601,7 +613,7 @@ export default function BrandDetailPage() {
               </span>
               {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{descriptionOf(brand)}</p>}
               <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.country")}</span><strong style={{ ...dynamicTextStyle, color: "var(--text-primary)" }}>{brand.country || "—"}</strong></span>
+                <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.country")}</span><strong style={{ ...dynamicTextStyle, color: "var(--text-primary)" }}>{localizedCountryName(brand.country) || "—"}</strong></span>
                 <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.createdAt")}</span><strong style={{ ...ltrTextStyle, color: "var(--text-primary)" }}>{formatDateTime(brand.created_at, locale)}</strong></span>
                 <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.createdBy")}</span><strong style={{ color: "var(--text-primary)" }}>{brand.createdby?.name || "—"}</strong></span>
               </div>
@@ -635,8 +647,8 @@ export default function BrandDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-x-3 px-3 py-1">
               <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono compact dir="ltr" />
-              <InfoRow label={t("admin.brands.detail.country")} value={brand.country || "—"} compact dir={isRtl ? "rtl" : "ltr"} />
-              <InfoRow label={t("admin.brands.detail.logoSize", "Logo Size")} value={fileSize(brand.logo?.img_size, locale)} compact dir="ltr" />
+              <InfoRow label={t("admin.brands.detail.country")} value={localizedCountryName(brand.country) || "—"} compact dir={isRtl ? "rtl" : "ltr"} />
+              <InfoRow label={t("admin.brands.detail.logoSize")} value={fileSize(brand.logo?.img_size, locale)} compact dir="ltr" />
               <InfoRow label={t("admin.brands.detail.status")} value={brand.is_active ? t("common.active") : t("common.inactive")} green={brand.is_active} isLast compact dir={isRtl ? "rtl" : "ltr"} />
             </div>
           </div>
@@ -703,7 +715,7 @@ export default function BrandDetailPage() {
                 <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                   <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono dir="ltr" />
                   <InfoRow label={t("admin.brands.detail.brandName")} value={nameOf(brand)} dir={isRtl ? "rtl" : "ltr"} />
-                  <InfoRow label={t("admin.brands.detail.country")} value={brand.country || "—"} dir={isRtl ? "rtl" : "ltr"} />
+                  <InfoRow label={t("admin.brands.detail.country")} value={localizedCountryName(brand.country) || "—"} dir={isRtl ? "rtl" : "ltr"} />
                   <InfoRow
                     label={t("admin.brands.detail.status")}
                     value={brand.is_active ? t("common.active") : t("common.inactive")}
@@ -920,7 +932,7 @@ export default function BrandDetailPage() {
             {/* 6. RECENT ACTIVITY */}
             <Card>
               <CardHeader
-                title={t("admin.brands.detail.recentActivity", "Recent Activity")}
+                title={t("admin.dashboard.recentActivity.title")}
                 icon={<Ico d={D.activity} className="h-4 w-4" />}
                 action={
                   <button
@@ -1070,7 +1082,7 @@ export default function BrandDetailPage() {
               />
               <div className="px-4 pb-4">
                 <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono dir="ltr" />
-                <InfoRow label={t("admin.brands.detail.country")} value={brand.country || "—"} dir={isRtl ? "rtl" : "ltr"} />
+                <InfoRow label={t("admin.brands.detail.country")} value={localizedCountryName(brand.country) || "—"} dir={isRtl ? "rtl" : "ltr"} />
                 <InfoRow
                   label={t("admin.brands.detail.status")}
                   value={brand.is_active ? t("common.active") : t("common.inactive")}
@@ -1181,7 +1193,7 @@ export default function BrandDetailPage() {
                             className="mt-1 font-mono text-[10px]"
                             style={{ color: "var(--text-muted)" }}
                           >
-                            {product.product_code || product.sku || t("admin.brands.detail.noCode", "No code")}
+                            {product.product_code || product.sku || t("admin.brands.detail.noCode")}
                           </p>
                         </td>
                         <td className="max-w-[280px] align-top px-2 py-3">
@@ -1471,7 +1483,7 @@ export default function BrandDetailPage() {
                 >
                   {logoPreview ? (
                     <div className="relative w-full h-full flex items-center justify-center p-2">
-                       <img src={logoPreview} alt="Preview" className="max-h-full max-w-full object-contain rounded-md" />
+                       <img src={logoPreview} alt={t("detail.brandLogo")} className="max-h-full max-w-full object-contain rounded-md" />
                        {/* Remove Button Overlay */}
                        <button 
                         type="button"

@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { productApi } from "@/apis/admin/productApi";
 import { useProductSocketSync } from "../../../hooks/admin/useProductSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const PER_PAGE = 20;
 const MODAL_PER_PAGE = 8;
@@ -139,10 +140,12 @@ function GridSkeleton({ cards = 8 }) {
    ========================================================== */
 function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
   const { t, locale } = useTranslation();
+  const { nameOf, productNameOf } = useLocalized();
   const variant = product?.variants?.[0];
   const img = variant?.images?.[0]?.img_url;
   const price = Number(variant?.selling_price) || Number(product?.price) || 0;
   const listPrice = Number(variant?.price) || 0;
+  const productName = productNameOf(product);
 
   return (
     <tr
@@ -156,7 +159,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
         <div className="flex items-center gap-2.5">
           {img ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={getImageUrl(img)} alt={product.name} className="h-8 w-8 shrink-0 rounded object-cover" />
+            <img src={getImageUrl(img)} alt={productName} className="h-8 w-8 shrink-0 rounded object-cover" />
           ) : (
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded"
@@ -166,7 +169,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold">{product.name}</p>
+            <p className="truncate text-[13px] font-semibold">{productName}</p>
             <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{variant?.sku || "—"}</p>
           </div>
           <span
@@ -179,8 +182,8 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
           </span>
         </div>
       </td>
-      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{product?.category_id?.name || "—"}</td>
-      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{product?.brand_id?.name || "—"}</td>
+      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{nameOf(product?.category_id) || "—"}</td>
+      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{nameOf(product?.brand_id) || "—"}</td>
       <td className="px-4 py-2.5">
         <div className="flex items-baseline gap-1.5">
           <span className="font-semibold tabular-nums">{fmtCurrency(price, locale)}</span>
@@ -199,7 +202,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
             type="button"
             onClick={onOpen}
             title={t("admin.featuredProducts.page.viewProduct")}
-            aria-label={t("admin.featuredProducts.ui.viewProductAria", { name: product.name })}
+            aria-label={t("admin.featuredProducts.ui.viewProductAria", { name: productName })}
             className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
           >
@@ -210,7 +213,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
             disabled={isRemoving}
             onClick={onRemove}
             title={t("admin.featuredProducts.page.removeFromFeatured")}
-            aria-label={t("admin.featuredProducts.ui.removeAria", { name: product.name })}
+            aria-label={t("admin.featuredProducts.ui.removeAria", { name: productName })}
             className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
           >
@@ -227,9 +230,11 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
    ========================================================== */
 function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
   const { t, locale } = useTranslation();
+  const { nameOf, productNameOf } = useLocalized();
   const variant = product?.variants?.[0];
   const img = variant?.images?.[0]?.img_url;
   const price = Number(variant?.selling_price) || Number(product?.price) || 0;
+  const productName = productNameOf(product);
 
   return (
     <div
@@ -240,7 +245,7 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
       <div className="flex items-start justify-between">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={getImageUrl(img)} alt={product.name} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+          <img src={getImageUrl(img)} alt={productName} className="h-10 w-10 shrink-0 rounded-full object-cover" />
         ) : (
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
@@ -263,10 +268,10 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
       </div>
 
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold">{product.name}</p>
+        <p className="truncate text-[13px] font-semibold">{productName}</p>
         {variant?.sku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{variant.sku}</p>}
         <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-          {[product?.category_id?.name, product?.brand_id?.name].filter(Boolean).join(" · ") || "—"}
+          {[nameOf(product?.category_id), nameOf(product?.brand_id)].filter(Boolean).join(" · ") || "—"}
         </p>
         <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
           {fmtCurrency(price, locale)} · {t("admin.featuredProducts.ui.stock")}: {fmt(variant?.quantity, locale)}
@@ -282,7 +287,7 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
           type="button"
           onClick={onOpen}
           title={t("admin.featuredProducts.page.viewProduct")}
-          aria-label={t("admin.featuredProducts.ui.viewProductAria", { name: product.name })}
+          aria-label={t("admin.featuredProducts.ui.viewProductAria", { name: productName })}
           className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80"
           style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
         >
@@ -293,7 +298,7 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
           disabled={isRemoving}
           onClick={onRemove}
           title={t("admin.featuredProducts.page.removeFromFeatured")}
-          aria-label={t("admin.featuredProducts.ui.removeAria", { name: product.name })}
+          aria-label={t("admin.featuredProducts.ui.removeAria", { name: productName })}
           className="flex h-7 w-7 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
         >
@@ -335,6 +340,7 @@ function ModalSkeleton({ rows = MODAL_PER_PAGE }) {
    ========================================================== */
 function ManageFeaturedModal({ open, onClose, onSaved }) {
   const { t, dir, locale } = useTranslation();
+  const { nameOf, productNameOf } = useLocalized();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -584,7 +590,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
 
                     {img ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={getImageUrl(img)} alt={p.name} className="h-9 w-9 shrink-0 rounded object-cover" />
+                      <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-9 w-9 shrink-0 rounded object-cover" />
                     ) : (
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
                         <Package className="h-4 w-4" />
@@ -592,9 +598,9 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
                     )}
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold">{p.name}</p>
+                      <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p>
                       <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        {variant?.sku || "—"} · {p?.category_id?.name || "—"} · {p?.brand_id?.name || "—"}
+                        {variant?.sku || "—"} · {nameOf(p?.category_id) || "—"} · {nameOf(p?.brand_id) || "—"}
                       </p>
                     </div>
 

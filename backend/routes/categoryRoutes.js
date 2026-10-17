@@ -87,7 +87,7 @@ const CATEGORY_LIST_SELECT =
 // Populated attribute ke liye bhi — attribute ka `name` translate hota hai,
 // aur options ke labels `values[].label_translations` me hote hain.
 const ATTRIBUTE_POPULATE_SELECT =
-  "name code data_type values variant_allowed is_active translations translation_source translation_status";
+  "name code description data_type values variant_allowed is_active translations translation_source translation_status";
 
 router.get("/admin/all", authMiddleware, async (req, res) => {
   try {

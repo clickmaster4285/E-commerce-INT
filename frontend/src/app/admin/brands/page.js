@@ -87,13 +87,15 @@ const getLogoUrl = (brand) => {
 };
 
 const Avatar = ({ brand, size = "w-8 h-8" }) => {
+  const { nameOf } = useLocalized();
+  const brandName = nameOf(brand);
   const logoUrl = getLogoUrl(brand);
   if (logoUrl) {
-    return <img src={logoUrl} alt={brand.name} className={`${size} rounded-full object-cover shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
+    return <img src={logoUrl} alt={brandName} className={`${size} rounded-full object-cover shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
   }
   return (
     <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
-      {getInitials(brand.name)}
+      {getInitials(brandName)}
     </div>
   );
 };

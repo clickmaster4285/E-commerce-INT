@@ -34,13 +34,15 @@ HOST = os.environ.get("ARGOS_HOST", "127.0.0.1")
 MAX_BODY_BYTES = 4 * 1024 * 1024
 SOURCE_LANG = os.environ.get("TRANSLATE_SOURCE_LANG", "en")
 
-PREWARM = [
-    item.strip().lower()
-    for item in os.environ.get(
-        "TRANSLATE_TARGET_LOCALES", "ur,ar,es,fr,de,hi,zh,pt,tr"
-    ).split(",")
-    if item.strip()
-]
+REQUIRED_TARGETS = {"ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"}
+PREWARM = sorted(
+    REQUIRED_TARGETS
+    | {
+        item.strip().lower()
+        for item in os.environ.get("TRANSLATE_TARGET_LOCALES", "").split(",")
+        if item.strip()
+    }
+)
 
 LANGUAGE_NAMES = {
     "en": "English",
@@ -60,6 +62,10 @@ LANGUAGE_NAMES = {
 
 import ctranslate2
 import sentencepiece
+try:
+    import argostranslate.translate as argos_translate
+except ImportError:
+    argos_translate = None
 
 _LOCK = threading.Lock()
 MODEL_REPOSITORY = "JustFrederik/m2m_100_418m_ct2_int8"
@@ -93,6 +99,7 @@ if SOURCE_LANG != "en":
 PAIRS = [("en", target) for target in sorted(set(PREWARM))]
 _TRANSLATOR = None
 _TOKENIZER = None
+_ARGOS_TRANSLATIONS = {}
 
 
 def _sha256(path):
@@ -160,9 +167,22 @@ def _download_model_file(name, expected_size, expected_hash):
 
 
 def _load_model():
-    global _TRANSLATOR, _TOKENIZER
-    if _TRANSLATOR is not None:
+    global _TRANSLATOR, _TOKENIZER, _ARGOS_TRANSLATIONS
+    if _TRANSLATOR is not None or _ARGOS_TRANSLATIONS:
         return
+
+    if argos_translate is not None:
+        try:
+            installed = {
+                pair: argos_translate.get_translation_from_codes(*pair)
+                for pair in PAIRS
+            }
+        except Exception:
+            installed = {}
+        if PAIRS and all(installed.values()):
+            _ARGOS_TRANSLATIONS = installed
+            print("  [model] using installed Argos Translate packages", flush=True)
+            return
 
     for name, (expected_size, expected_hash) in MODEL_FILES.items():
         print(f"  [model] checking {name}", flush=True)
@@ -192,6 +212,9 @@ def _translate_one(src, tgt, text):
         return ""
     if (src, tgt) not in PAIRS:
         raise LookupError(f"no {src}->{tgt} model")
+    argos_translation = _ARGOS_TRANSLATIONS.get((src, tgt))
+    if argos_translation is not None:
+        return argos_translation.translate(text).strip()
 
     source_tokens = ["__en__", *_TOKENIZER.encode(text, out_type=str), "</s>"]
     result = _TRANSLATOR.translate_batch(
@@ -205,6 +228,109 @@ def _translate_one(src, tgt, text):
         output_tokens = output_tokens[1:]
     output_tokens = [token for token in output_tokens if token not in ("</s>", "<s>")]
     return _TOKENIZER.decode(output_tokens).strip()
+
+
+def _translate_many(src, tgt, texts):
+    if (src, tgt) not in PAIRS:
+        raise LookupError(f"no {src}->{tgt} model")
+
+    if src == "en" and (src, tgt) in _ARGOS_TRANSLATIONS:
+        argos_translation = _ARGOS_TRANSLATIONS[(src, tgt)]
+        package_translation = getattr(argos_translation, "underlying", None)
+        package = getattr(package_translation, "pkg", None)
+        translator = getattr(package_translation, "translator", None)
+        sentencizer = getattr(package_translation, "sentencizer", None)
+        if package is None or translator is None or sentencizer is None:
+            return [_translate_one(src, tgt, text) for text in texts]
+
+        paragraph_records = []
+        sentences = []
+        paragraph_counts = [0] * len(texts)
+        for text_index, text in enumerate(texts):
+            for paragraph_index, paragraph in enumerate(
+                argos_translate.ITranslation.split_into_paragraphs(text)
+            ):
+                paragraph_sentences = sentencizer.split_sentences(paragraph)
+                sentence_indexes = list(
+                    range(len(sentences), len(sentences) + len(paragraph_sentences))
+                )
+                sentences.extend(paragraph_sentences)
+                paragraph_records.append(
+                    (text_index, paragraph_index, sentence_indexes)
+                )
+                paragraph_counts[text_index] += 1
+
+        if not sentences:
+            return ["" for _ in texts]
+
+        tokenized = [package.tokenizer.encode(sentence) for sentence in sentences]
+        target_prefix = (
+            [[package.target_prefix]] * len(tokenized)
+            if package.target_prefix
+            else None
+        )
+        translated = translator.translate_batch(
+            tokenized,
+            target_prefix=target_prefix,
+            replace_unknowns=True,
+            max_batch_size=argos_translate.settings.batch_size,
+            batch_type="tokens",
+            beam_size=max(1, argos_translate.settings.beam_size),
+            num_hypotheses=1,
+            length_penalty=0.2,
+            return_scores=True,
+        )
+
+        paragraphs = {}
+        for text_index, paragraph_index, sentence_indexes in paragraph_records:
+            output_tokens = []
+            for sentence_index in sentence_indexes:
+                output_tokens.extend(translated[sentence_index].hypotheses[0])
+            output = package.tokenizer.decode(output_tokens)
+            if package.target_prefix and output.startswith(package.target_prefix):
+                output = output[len(package.target_prefix) :]
+            if output.startswith(" "):
+                output = output[1:]
+            paragraphs[(text_index, paragraph_index)] = output
+
+        results = []
+        for text_index, paragraph_count in enumerate(paragraph_counts):
+            output = ""
+            for paragraph_index in range(paragraph_count):
+                output = argos_translate.ITranslation.combine_paragraphs(
+                    [output, paragraphs.get((text_index, paragraph_index), "")]
+                )
+            results.append(output.strip())
+        return results
+
+    nonempty = [
+        (index, text)
+        for index, text in enumerate(texts)
+        if text
+    ]
+    if not nonempty:
+        return ["" for _ in texts]
+
+    source_tokens = [
+        ["__en__", *_TOKENIZER.encode(text, out_type=str), "</s>"]
+        for _, text in nonempty
+    ]
+    translated = _TRANSLATOR.translate_batch(
+        source_tokens,
+        target_prefix=[[f"__{tgt}__"]] * len(source_tokens),
+        beam_size=4,
+        max_decoding_length=256,
+    )
+    results = ["" for _ in texts]
+    for (index, _), result in zip(nonempty, translated):
+        output_tokens = result.hypotheses[0]
+        if output_tokens and output_tokens[0] == f"__{tgt}__":
+            output_tokens = output_tokens[1:]
+        output_tokens = [
+            token for token in output_tokens if token not in ("</s>", "<s>")
+        ]
+        results[index] = _TOKENIZER.decode(output_tokens).strip()
+    return results
 
 
 def prewarm():
@@ -319,26 +445,27 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": "q must be a string or a list of strings"})
             return
 
-        results = []
         with _LOCK:
-            for item in query:
-                try:
-                    results.append({"text": _translate_one(src, tgt, str(item or ""))})
-                except Exception as exc:
-                    self._send(500, {"error": f"translation failed: {exc}"})
-                    return
+            try:
+                results = _translate_many(src, tgt, [str(item or "") for item in query])
+            except Exception as exc:
+                self._send(500, {"error": f"translation failed: {exc}"})
+                return
 
-        self._send(200, {"translations": results})
+        self._send(200, {"translations": [{"text": text} for text in results]})
 
 
 def main():
     print("=" * 60, flush=True)
-    print("  Local M2M100 translation bridge (LibreTranslate-compatible)", flush=True)
+    print("  Local Argos translation bridge (LibreTranslate-compatible)", flush=True)
     print("=" * 60, flush=True)
     print(f"  Listening: http://{HOST}:{PORT}", flush=True)
-    print(f"  Model: {MODEL_REPOSITORY} ({MODEL_REVISION})", flush=True)
     print(f"  Targets: {', '.join(PREWARM)}", flush=True)
     _load_model()
+    if _ARGOS_TRANSLATIONS:
+        print("  Engine: installed Argos Translate packages", flush=True)
+    else:
+        print(f"  Engine: M2M100 CTranslate2 ({MODEL_REVISION})", flush=True)
     prewarm()
     print("=" * 60, flush=True)
     print("  Ready. Ctrl+C se band karein.", flush=True)

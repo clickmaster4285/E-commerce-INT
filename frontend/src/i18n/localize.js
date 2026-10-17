@@ -14,10 +14,8 @@
 // English kabhi overwrite nahi hota — wo backend me source of truth hai, aur
 // frontend bhi `en` par wahi original field padhta hai.
 //
-// Product ka `name` (model number) translate
-// nahi hote — backend unhe `skipped` mark karta hai aur unka translation map
-// khali rehta hai, is liye `nameOf()` unke liye automatically English wapas
-// de deta hai. Category aur Attribute ke descriptive names translate hote hain.
+// Product ke descriptive names translate ho sakte hain; model/code names
+// backend par `skipped` rehte hain. `nameOf()` har case me source ko safe rakhta hai.
 
 import { useMemo } from "react";
 import { useTranslation } from "./LanguageProvider";
@@ -29,13 +27,47 @@ export function localizedField(source, translations, locale) {
   return (typeof translated === "string" && translated.trim()) || source;
 }
 
+function hasUntranslatedProductWords(source, translation) {
+  const sourceWords = String(source ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
+  const translatedWords = String(translation ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
+  const firstSourceWord = sourceWords[0]?.toLocaleLowerCase();
+
+  return translatedWords.some((word, index) => {
+    if (/\d/.test(word)) return false;
+    if (sourceWords.some((sourceWord) => sourceWord === word && /^[A-Z]{1,6}$/.test(sourceWord))) {
+      return false;
+    }
+    if (index === 0 && word.toLocaleLowerCase() === firstSourceWord) return false;
+    return sourceWords.some(
+      (sourceWord) => sourceWord.toLocaleLowerCase() === word.toLocaleLowerCase()
+    );
+  });
+}
+
+/** Product names can retain a brand/code, but not untranslated source words. */
+export function localizedProductNameOf(product, locale) {
+  const translated = localizedField(
+    product?.name,
+    product?.translations?.name,
+    locale
+  );
+  if (
+    locale !== "en" &&
+    translated !== product?.name &&
+    hasUntranslatedProductWords(product?.name, translated)
+  ) {
+    return product?.name;
+  }
+  return translated;
+}
+
 /**
  * Hook form — pages me zyada use hota hai.
  *
  *   const { text, nameOf, descriptionOf, attributeNameOf, optionLabelOf } =
  *     useLocalized();
  *
- *   {nameOf(brand)}              // Brand: trademark → English
+ *   {nameOf(brand)}              // Brand: localized display name
  *   {descriptionOf(brand)}       // Urdu translate hui (agar generated ho)
  */
 export function useLocalized() {
@@ -44,6 +76,9 @@ export function useLocalized() {
   return useMemo(() => {
     /** Brand / Category / Product doc se localized name. */
     const nameOf = (doc) => localizedField(doc?.name, doc?.translations?.name, locale);
+
+    /** Product name with stale mixed-language translations rejected. */
+    const productNameOf = (product) => localizedProductNameOf(product, locale);
 
     /** Brand / Category / Product doc se localized description. */
     const descriptionOf = (doc) =>
@@ -57,6 +92,11 @@ export function useLocalized() {
     const attributeOf = (attr) => ({
       ...attr,
       name: localizedField(attr?.name, attr?.translations?.name, locale),
+      description: localizedField(
+        attr?.description,
+        attr?.translations?.description,
+        locale
+      ),
       values: Array.isArray(attr?.values)
         ? attr.values.map((value) => ({
             ...value,
@@ -72,7 +112,7 @@ export function useLocalized() {
     /** Generic raw text helper (already-extracted strings ke liye). */
     const text = (source, translations) => localizedField(source, translations, locale);
 
-    return { locale, text, nameOf, descriptionOf, attributeOf, optionLabelOf };
+    return { locale, text, nameOf, productNameOf, descriptionOf, attributeOf, optionLabelOf };
   }, [locale]);
 }
 

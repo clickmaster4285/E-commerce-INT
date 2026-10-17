@@ -35,10 +35,14 @@ const MAX_RETRIES = Number(process.env.TRANSLATE_MAX_RETRIES) || 3;
 const BATCH_SIZE = Number(process.env.TRANSLATE_BATCH_SIZE) || 10;
 
 const SOURCE_LANG = "en";
-const TARGET_LOCALES = String(process.env.TRANSLATE_TARGET_LOCALES || "ur,ar,es,fr,de,hi,zh,pt,tr")
+const REQUIRED_TARGET_LOCALES = ["ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"];
+const TARGET_LOCALES = [...new Set([
+  ...REQUIRED_TARGET_LOCALES,
+  ...String(process.env.TRANSLATE_TARGET_LOCALES || "")
   .split(",")
   .map((l) => l.trim().toLowerCase())
-  .filter(Boolean);
+  .filter(Boolean),
+])];
 
 // ✅ Serial queue — ek waqt me sirf ek request jaari ho.
 let queue = Promise.resolve();

@@ -500,7 +500,7 @@ function AttributeOptionsPanel({ attr, onClose }) {
         {/* Footer Actions */}
         <div className="p-5 border-t border-[var(--border-color)]">
            <Button primary onClick={onClose} className="w-full justify-center">
-             Close Panel
+             {t("admin.attributes.detailPanel.closePanel")}
            </Button>
         </div>
       </div>
@@ -704,7 +704,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
 
           {form.data_type === "multi_select" && (
             <div className="space-y-2.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.categories.detail.options")}</label>
               {(form.values || []).length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {(form.values || []).map((val, idx) => (
@@ -733,14 +733,14 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                     }
                   }}
                   className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                  placeholder="Add an option (e.g. 8 GB)"
+                  placeholder={t("admin.categories.addAttr.optionPlaceholder")}
                 />
                 <button
                   type="button"
                   onClick={addOption}
                   className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
                 >
-                  <ModalPlusIcon className="w-3 h-3" /> Add
+                  <ModalPlusIcon className="w-3 h-3" /> {t("admin.categories.addAttr.addOption")}
                 </button>
               </div>
             </div>
@@ -749,12 +749,12 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           {form.data_type === "boolean" && (
             <div className="space-y-2.5">
               <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                Default Value
+                {t("admin.attributes.form.defaultValue")}
               </label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: "yes", label: "Yes" },
-                  { id: "no", label: "No" },
+                  { id: "yes", label: t("admin.categories.addAttr.yes") },
+                  { id: "no", label: t("admin.categories.addAttr.no") },
                 ].map((opt) => {
                   const isActive = (opt.id === "yes" && form.value === true) || (opt.id === "no" && form.value === false);
                   return (
@@ -790,7 +790,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
             onClick={onClose}
             className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
           >
-            Cancel
+            {t("admin.categories.addAttr.cancel")}
           </button>
           <button
             type="button"
@@ -1297,6 +1297,11 @@ export default function CategoryDetailPage() {
                                     </span>
                                   )}
                                 </div>
+                                {localizedAttr.description && (
+                                  <p className="mt-0.5 text-[10px] text-[var(--text-muted)] truncate">
+                                    {localizedAttr.description}
+                                  </p>
+                                )}
                                 <p className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.code}</p>
                               </div>
                             </div>
@@ -1804,6 +1809,9 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
       : undefined;
   const localizeParentMessage = (message) => {
     const messages = {
+      "Already a parent": t("parent.badgeAlreadyParent"),
+      "This category": t("parent.badgeThis"),
+      "Subcategory": t("parent.badgeSubcategory"),
       [PARENT_ALREADY_PARENT_TEXT]: t("lock.alreadyParentText"),
       [PARENT_ALREADY_PARENT_MESSAGE]: t("lock.alreadyParentMessage"),
       [NAME_PARENT_LOCK_TEXT]: t("lock.nameLockText"),
@@ -1965,11 +1973,11 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
             <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0"><div className="flex items-start gap-3 min-w-0"><div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0"><ModalLayersIcon className="w-4 h-4" /></div><div className="min-w-0 pt-0.5"><h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("addAttr.title")}</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("addAttr.subtitle")}</p></div></div><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
             <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               <div className="space-y-1.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.name")} <span className="text-red-500">*</span></label><input type="text" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} autoFocus className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder={t("addAttr.namePlaceholder")} /></div>
-              <div className="space-y-2"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label><div className="grid grid-cols-2 gap-3">{[{ id: "multi_select", label: "Multi Options" }, { id: "boolean", label: "Yes / No" }].map((type) => { const isActive = newAttrType === type.id; return (<button key={type.id} type="button" onClick={() => { setNewAttrType(type.id); setNewAttrValues([]); setNewAttrValueInput(""); if (type.id === "boolean") setNewAttrDefaultValue("yes"); }} className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${isActive ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span>{type.label}</span></button>); })}</div></div>
+              <div className="space-y-2"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.categories.addAttr.type")}</label><div className="grid grid-cols-2 gap-3">{[{ id: "multi_select", label: t("admin.categories.addAttr.typeMulti") }, { id: "boolean", label: t("admin.categories.addAttr.typeYesNo") }].map((type) => { const isActive = newAttrType === type.id; return (<button key={type.id} type="button" onClick={() => { setNewAttrType(type.id); setNewAttrValues([]); setNewAttrValueInput(""); if (type.id === "boolean") setNewAttrDefaultValue("yes"); }} className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${isActive ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span>{type.label}</span></button>); })}</div></div>
               {newAttrType === "multi_select" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.options")}</label>{newAttrValues.length > 0 && (<div className="flex flex-wrap gap-1.5">{newAttrValues.map((val, idx) => (<span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"><span className="w-4 h-4 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">{idx + 1}</span>{val}<button type="button" onClick={() => setNewAttrValues((p) => p.filter((_, i) => i !== idx))} className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ms-0.5"><Ico d={D.close} className="w-2.5 h-2.5" /></button></span>))}</div>)}<div className="flex gap-2"><input type="text" value={newAttrValueInput} onChange={(e) => setNewAttrValueInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error(t("addAttr.optionExists")); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); } }} className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder={t("addAttr.optionPlaceholder")} /><button type="button" onClick={() => { const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error(t("addAttr.optionExists")); setNewAttrValueInput(""); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); }} className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"><ModalPlusIcon className="w-3 h-3" /> {t("addAttr.addOption")}</button></div></div>)}
-              {newAttrType === "boolean" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label><div className="grid grid-cols-2 gap-3">{[{ id: "yes", label: "Yes" }, { id: "no", label: "No" }].map((opt) => { const isActive = newAttrDefaultValue === opt.id; return (<button key={opt.id} type="button" onClick={() => setNewAttrDefaultValue(opt.id)} className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive ? opt.id === "yes" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10" : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]" : "border-[var(--border-color)] bg-transparent"}`} />{opt.label}</button>); })}</div></div>)}
+              {newAttrType === "boolean" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.categories.addAttr.defaultValue")}</label><div className="grid grid-cols-2 gap-3">{[{ id: "yes", label: t("admin.categories.addAttr.yes") }, { id: "no", label: t("admin.categories.addAttr.no") }].map((opt) => { const isActive = newAttrDefaultValue === opt.id; return (<button key={opt.id} type="button" onClick={() => setNewAttrDefaultValue(opt.id)} className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive ? opt.id === "yes" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10" : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]" : "border-[var(--border-color)] bg-transparent"}`} />{opt.label}</button>); })}</div></div>)}
             </div>
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0"><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">Cancel</button><button type="button" onClick={handleCreateAttribute} disabled={!newAttrName.trim() || creatingAttribute} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{creatingAttribute ? <span className="flex items-center gap-1.5"><ModalSpinner className="w-3.5 h-3.5" /> Adding...</span> : "Add Attribute"}</button></div>
+            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0"><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">{t("admin.categories.addAttr.cancel")}</button><button type="button" onClick={handleCreateAttribute} disabled={!newAttrName.trim() || creatingAttribute} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{creatingAttribute ? <span className="flex items-center gap-1.5"><ModalSpinner className="w-3.5 h-3.5" /> {t("admin.categories.addAttr.creating")}</span> : t("admin.categories.addAttr.create")}</button></div>
           </div>
         </div>, document.body
       )}

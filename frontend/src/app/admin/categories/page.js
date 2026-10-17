@@ -266,7 +266,7 @@ export default function CategoriesPage() {
   useCategorySocketSync();
   // Admin-panel i18n. English is the fallback for any missing key.
   const { t: __t } = useTranslation();
-  const t = (k, p) => __t("admin.categories." + k, p);
+  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.categories.${k}`, p);
   // Database-sourced content (category / attribute names + descriptions) —
   // active locale me render hota hai, English fallback helper ke andar hai.
   const { nameOf, descriptionOf, attributeOf } = useLocalized();
@@ -1084,9 +1084,10 @@ const [viewMode, setViewMode] = useState(() => {
       excludeId: editingId,
     });
     const parentLockedByName = Boolean(nameMatchLockId);
-    const matchedName = parentLockedByName
-      ? categoryOptions.find((c) => String(c._id) === String(nameMatchLockId))?.name || formData.name
-      : "";
+    const matchedParent = parentLockedByName
+      ? categoryOptions.find((c) => String(c._id) === String(nameMatchLockId))
+      : null;
+    const matchedName = matchedParent ? nameOf(matchedParent) : formData.name;
     const parentDropdownDisabled = editingHasChildren || parentLockedByName;
     const parentDropdownTitle = parentLockedByName
       ? t("lock.nameLockText")
@@ -1849,7 +1850,7 @@ const [viewMode, setViewMode] = useState(() => {
                       }}
                       className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
                     >
-                      <PlusIcon className="w-3 h-3" /> Add
+                      <PlusIcon className="w-3 h-3" /> {t("admin.categories.addAttr.addOption")}
                     </button>
                   </div>
                 </div>

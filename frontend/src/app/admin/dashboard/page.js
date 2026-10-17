@@ -333,7 +333,7 @@ function StatCards({ data }) {
                 <TrendIcon size={11} />
                 {Math.abs(c.trend)}%
               </span>
-              <span className="truncate text-[11px] text-[var(--text-muted)]">vs previous period</span>
+              <span className="truncate text-[11px] text-[var(--text-muted)]">{t("stat.vsPreviousPeriod")}</span>
             </div>
           </div>
         );
@@ -667,6 +667,22 @@ function RecentActivity({ data }) {
               { icon: "system", classes: "bg-slate-200 text-slate-500 dark:bg-slate-500/15 dark:text-slate-400" };
             const Icon = ICONS[meta.icon] || Cog;
             const isLast = i === items.length - 1;
+            const activityTitleKeys = {
+              "New order received": "recentActivity.orderReceived",
+              "Product created": "recentActivity.productCreated",
+              "Discount created": "recentActivity.discountCreated",
+              "Brand created": "recentActivity.brandCreated",
+            };
+            const orderSubtitle = a.category === "Order Management"
+              ? a.subtitle.match(/^#(.+?) from (.+)$/)
+              : null;
+            const activitySubtitle = orderSubtitle
+              ? `#${orderSubtitle[1]} ${t("recentActivity.from")} ${
+                  orderSubtitle[2] === "a customer"
+                    ? t("recentActivity.customer")
+                    : orderSubtitle[2]
+                }`
+              : a.subtitle;
 
             return (
               <li key={a.key} className="relative flex gap-3 pb-3.5 last:pb-0">
@@ -687,10 +703,10 @@ function RecentActivity({ data }) {
                   <span className="flex items-start justify-between gap-2">
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">
-                        {a.title}
+                        {activityTitleKeys[a.title] ? t(activityTitleKeys[a.title]) : a.title}
                       </span>
                       <span className="mt-0.5 block truncate text-[11.5px] text-[var(--text-muted)]">
-                        {a.subtitle}
+                        {activitySubtitle}
                       </span>
                     </span>
 
@@ -1158,14 +1174,14 @@ export default function Dashboard() {
           </span>
 
           <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Failed to load dashboard</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">{t("state.loadFailed")}</p>
             <p className="mt-1 text-xs text-[var(--text-muted)]">
-              Something went wrong while fetching your store stats.
+              {t("state.loadFailedBody")}
             </p>
           </div>
 
           <button type="button" onClick={() => refetch()} className="btn-primary mt-1">
-            Try again
+            {t("state.retry")}
           </button>
         </div>
       ) : (

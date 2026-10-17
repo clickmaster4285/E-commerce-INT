@@ -46,9 +46,8 @@ const productSchema = new mongoose.Schema(
     // `translation_source` me us English text ka hash rehta hai jisse stale
     // translation detect hoti hai (English edit → hash badla → regenerate).
     //
-    // `name` yahan `skipped` rehta hai — product ka naam model number hai
-    // ("iPhone 15 Pro Max", "SM-S918B") jise translate karna galat hoga;
-    // sirf `description` translate hoti hai.
+    // Product names containing model/code digits stay in English; descriptive
+    // names and descriptions use the sidecar map without changing source data.
     translations: {
       name: { type: Map, of: String, default: () => ({}) },
       description: { type: Map, of: String, default: () => ({}) },
@@ -61,7 +60,7 @@ const productSchema = new mongoose.Schema(
       name: {
         type: String,
         enum: ["pending", "done", "failed", "skipped"],
-        default: "skipped",
+        default: "pending",
       },
       description: {
         type: String,

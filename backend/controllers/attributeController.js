@@ -301,7 +301,7 @@ const getAttributeCategories = async (req, res) => {
       is_deleted: false,
       "attributes.attribute_id": attribute._id,
     })
-      .select("name category_code category_type attributes")
+      .select("name category_code category_type attributes translations")
       .lean();
 
     const result = categories.map((cat) => {
@@ -311,6 +311,7 @@ const getAttributeCategories = async (req, res) => {
       return {
         _id: cat._id,
         name: cat.name,
+        translations: cat.translations,
         category_code: cat.category_code,
         category_type: cat.category_type,
         config: attrConfig

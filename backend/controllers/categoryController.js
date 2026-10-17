@@ -13,7 +13,7 @@ const { queueTranslationSync } = require("../utils/translationService");
 // translate hota hai aur options ke labels `values[].label_translations` me
 // hote hain. Inke bina frontend hamesha English fallback dikha raha hota.
 const ATTRIBUTE_POPULATE_SELECT =
-  "name code data_type values variant_allowed is_active translations translation_source translation_status";
+  "name code description data_type values variant_allowed is_active translations translation_source translation_status";
 
 // createdby/updatedby creator User ya Employee dono ho sakta hai.
 // Model ref Employee hai, isliye populate fail hone par User se resolve karo.
@@ -436,7 +436,7 @@ const getCategories = async (req, res) => {
     // ✅ FIX: Fetch all categories globally
     const categories = await Category.find({ is_deleted: false })
       .select("-__v")
-      .populate("parent_category_id", "name category_code")
+      .populate("parent_category_id", "name category_code translations")
       .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
@@ -457,7 +457,7 @@ const getCategoryById = async (req, res) => {
       is_deleted: false,
     })
       .select("-__v")
-      .populate("parent_category_id", "name category_code")
+      .populate("parent_category_id", "name category_code translations")
       .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")

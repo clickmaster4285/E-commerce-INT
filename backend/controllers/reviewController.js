@@ -515,7 +515,7 @@ const getAdminReviews = async (req, res) => {
     const total = await Review.countDocuments(filter);
     const reviews = await Review.find(filter)
       .select("-helpfulCount -helpfulBy")
-      .populate("product_id", "name")
+      .populate("product_id", "name translations")
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
@@ -571,7 +571,7 @@ const getAdminReviewById = async (req, res) => {
     }
     const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
       .select("-helpfulCount -helpfulBy")
-      .populate("product_id", "name")
+      .populate("product_id", "name translations")
       .lean();
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
     await hydrateReviewCustomers([review]);
@@ -583,7 +583,7 @@ const getAdminReviewById = async (req, res) => {
           is_deleted: { $ne: true },
         })
           .select("product_id rating title comment status created_at")
-          .populate("product_id", "name")
+          .populate("product_id", "name translations")
           .sort({ created_at: -1 })
           .limit(3)
           .lean()

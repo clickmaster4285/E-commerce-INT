@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const mediaUrl = (value) =>
@@ -129,6 +130,7 @@ function buildSuggestedReply(review, customerName) {
 export default function AdminReviewDetailPage() {
   const { id } = useParams();
   const { t, dir, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const queryClient = useQueryClient();
   const [responseDraft, setResponseDraft] = useState("");
   const [isEditingResponse, setIsEditingResponse] = useState(false);
@@ -563,7 +565,7 @@ export default function AdminReviewDetailPage() {
                       className="flex flex-wrap items-center justify-between gap-2.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 transition hover:border-[var(--accent)]/30"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{relatedProduct.name || t("admin.reviews.detail.productUnavailable")}</p>
+                        <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(relatedProduct) || t("admin.reviews.detail.productUnavailable")}</p>
                         <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">
                           {customerReview.title || customerReview.comment || t("admin.reviews.ui.ratingOnly")}
                         </p>
@@ -645,7 +647,7 @@ export default function AdminReviewDetailPage() {
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{product.name || t("admin.reviews.detail.productUnavailable")}</p>
+                  <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(product) || t("admin.reviews.detail.productUnavailable")}</p>
                   <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">ID: {productId || "—"}</p>
                 </div>
               </div>

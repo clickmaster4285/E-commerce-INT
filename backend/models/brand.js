@@ -46,7 +46,7 @@
         name: {
           type: String,
           enum: ["pending", "done", "failed", "skipped"],
-          default: "skipped",
+          default: "pending",
         },
         description: {
           type: String,
