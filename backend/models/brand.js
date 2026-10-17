@@ -20,6 +20,41 @@
         default: "",
       },
 
+      // ==========================================
+      // 🌍 AUTOMATIC TRANSLATIONS (LibreTranslate)
+      // ------------------------------------------
+      // English `name`/`description` upar hi source of truth hain — inme kabhi
+      // koi write nahi hota. Translation alag `translations` map me jaata hai,
+      // is liye original English kabhi overwrite/delete nahi hota.
+      //
+      //   translations.name.ur      → translated text
+      //   translation_source.name   → us English text ka hash (staleness)
+      //   translation_status.name   → pending | done | failed | skipped
+      //
+      // `name` bhi translate hota hai kyun ke ye user-facing display naam hai,
+      // aur `description` bhi translate hota hai. English source text hamesha
+      // original field me rehta hai, Urdu/Arabic translations alag map me.
+      translations: {
+        name: { type: Map, of: String, default: () => ({}) },
+        description: { type: Map, of: String, default: () => ({}) },
+      },
+      translation_source: {
+        name: { type: String, default: "" },
+        description: { type: String, default: "" },
+      },
+      translation_status: {
+        name: {
+          type: String,
+          enum: ["pending", "done", "failed", "skipped"],
+          default: "pending",
+        },
+        description: {
+          type: String,
+          enum: ["pending", "done", "failed", "skipped"],
+          default: "pending",
+        },
+      },
+
       logo: {
         img_url: { type: String, default: "" },
         img_size: { type: Number, default: 0 },

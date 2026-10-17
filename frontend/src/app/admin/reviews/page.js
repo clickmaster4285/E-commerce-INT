@@ -20,7 +20,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
-import { useReviewSocketSync } from "@/hooks/useReviewSocketSync";
+import { useReviewSocketSync } from "../../../hooks/admin/useReviewSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -48,8 +50,11 @@ function buildPageList(currentPage, totalPages, MID = 5) {
 const EMPTY_STATS = { total: 0, visible: 0, hidden: 0, five: 0, avg: 0 };
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-const Stars = ({ value = 0, size = 13 }) => (
-  <span className="inline-flex items-center gap-0.5" aria-label={`${value} out of 5 stars`}>
+const Stars = ({ value = 0, size = 13 }) => {
+  const { t, locale } = useTranslation();
+  const formattedValue = new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale).format(value);
+  return (
+  <span className="inline-flex items-center gap-0.5" aria-label={t("admin.reviews.ui.starsCount", { value: formattedValue })}>
     {[1, 2, 3, 4, 5].map((i) => (
       <Star
         key={i}
@@ -58,12 +63,14 @@ const Stars = ({ value = 0, size = 13 }) => (
       />
     ))}
   </span>
-);
+  );
+};
 
 // ==========================================
 // 3-DOT (KEBAB) ROW ACTION MENU
 // ==========================================
 function RowActions({ review, hidden, isToggling, onToggle }) {
+  const { t, dir, locale } = useTranslation();
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
@@ -97,7 +104,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
     };
   }, [open]);
 
-  const itemClass = "w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors duration-150 text-left";
+  const itemClass = "w-full px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors duration-150 text-start";
   const hoverOn = (e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; };
   const hoverOff = (e) => { e.currentTarget.style.backgroundColor = "transparent"; };
 
@@ -106,7 +113,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
       <button
         ref={btnRef}
         type="button"
-        aria-label="Review actions"
+        aria-label={t("admin.reviews.ui.actionsAria")}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
@@ -120,6 +127,8 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
             <div
               ref={menuRef}
               role="menu"
+              dir={dir}
+              lang={locale}
               className="fixed z-[100] w-[190px] rounded-lg border py-1 shadow-2xl"
               style={{ top: pos.top, left: pos.left, backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}
             >
@@ -131,7 +140,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
                 onMouseEnter={hoverOn}
                 onMouseLeave={hoverOff}
               >
-                <Eye size={15} style={{ color: "var(--text-muted)" }} /> View full review
+                <Eye size={15} style={{ color: "var(--text-muted)" }} /> {t("admin.reviews.ui.viewFull")}
               </Link>
               <button
                 type="button"
@@ -144,7 +153,7 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
                 onMouseLeave={hoverOff}
               >
                 {hidden ? <Eye size={15} style={{ color: "var(--success-text)" }} /> : <EyeOff size={15} style={{ color: "var(--warning-text)" }} />}
-                {hidden ? "Show review" : "Hide review"}
+                {hidden ? t("admin.reviews.ui.showReview") : t("admin.reviews.ui.hideReview")}
               </button>
             </div>,
             document.body
@@ -155,6 +164,8 @@ function RowActions({ review, hidden, isToggling, onToggle }) {
 }
 
 export default function AdminReviewsPage() {
+  const { t, locale } = useTranslation();
+  const { productNameOf, reviewTextOf } = useLocalized();
   const router = useRouter();
   const queryClient = useQueryClient();
   // ✅ Baqi pages ki tarah live socket sync —
@@ -192,10 +203,10 @@ export default function AdminReviewsPage() {
   const statusMutation = useMutation({
     mutationFn: ({ id, next }) => adminReviewApi.setStatus(id, next),
     onSuccess: (_d, v) => {
-      toast.success(v.next === "hidden" ? "Review hidden" : "Review visible");
+      toast.success(v.next === "hidden" ? t("admin.reviews.ui.hiddenToast") : t("admin.reviews.ui.visibleToast"));
       invalidate();
     },
-    onError: (e) => toast.error(e?.response?.data?.message || "Status update failed"),
+    onError: () => toast.error(t("admin.reviews.ui.statusFailed")),
   });
 
   const selectClass =
@@ -207,11 +218,11 @@ export default function AdminReviewsPage() {
   };
 
   const statCards = [
-    { key: "total", label: "Total Reviews", icon: MessageSquareText, value: stats.total, color: "var(--accent)", soft: "var(--accent-soft)" },
-    { key: "visible", label: "Visible", icon: Eye, value: stats.visible, color: "var(--success)", soft: "var(--success-soft)" },
-    { key: "hidden", label: "Hidden", icon: EyeOff, value: stats.hidden, color: "var(--danger)", soft: "var(--danger-soft)" },
-    { key: "avg", label: "Average Rating", icon: Star, value: stats.avg, color: "var(--warning)", soft: "var(--warning-soft)" },
-    { key: "five", label: "5-Star", icon: Sparkles, value: stats.five, color: "var(--purple)", soft: "var(--purple-soft)" },
+    { key: "total", label: t("admin.reviews.ui.totalReviews"), icon: MessageSquareText, value: stats.total, color: "var(--accent)", soft: "var(--accent-soft)" },
+    { key: "visible", label: t("admin.reviews.ui.visible"), icon: Eye, value: stats.visible, color: "var(--success)", soft: "var(--success-soft)" },
+    { key: "hidden", label: t("admin.reviews.ui.hidden"), icon: EyeOff, value: stats.hidden, color: "var(--danger)", soft: "var(--danger-soft)" },
+    { key: "avg", label: t("admin.reviews.ui.averageRating"), icon: Star, value: stats.avg, color: "var(--warning)", soft: "var(--warning-soft)" },
+    { key: "five", label: t("admin.reviews.ui.fiveStar"), icon: Sparkles, value: stats.five, color: "var(--purple)", soft: "var(--purple-soft)" },
   ];
 
   return (
@@ -220,8 +231,8 @@ export default function AdminReviewsPage() {
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Review Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Moderate customer reviews — hide, unhide, or delete. Only delivered-order buyers can write reviews.</p>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("admin.reviews.ui.managementTitle")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.reviews.ui.managementSubtitle")}</p>
           </div>
           <button
             type="button"
@@ -230,7 +241,7 @@ export default function AdminReviewsPage() {
             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
           >
             <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
-            Refresh
+            {t("admin.reviews.ui.refresh")}
           </button>
         </div>
 
@@ -256,20 +267,20 @@ export default function AdminReviewsPage() {
         {/* ===== Toolbar ===== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="relative w-full md:w-[400px]">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+            <Search size={15} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
             <input
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search review title or comment…"
-              className="h-9 w-full rounded-lg pl-9 pr-9 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
+              placeholder={t("admin.reviews.ui.searchPlaceholder")}
+              className="h-9 w-full rounded-lg ps-9 pe-9 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
               style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
             />
             {searchInput ? (
               <button
                 type="button"
-                aria-label="Clear search"
+                aria-label={t("admin.reviews.ui.clearSearch")}
                 onClick={() => handleSearchChange("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 transition hover:opacity-70"
+                className="absolute end-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 transition hover:opacity-70"
                 style={{ color: "var(--text-muted)" }}
               >
                 <X size={15} />
@@ -277,37 +288,33 @@ export default function AdminReviewsPage() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <select value={rating} onChange={(e) => { setRating(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label="Filter by rating">
-              <option value="all">All ratings</option>
-              <option value="5">5 star</option>
-              <option value="4">4 star</option>
-              <option value="3">3 star</option>
-              <option value="2">2 star</option>
-              <option value="1">1 star</option>
+            <select value={rating} onChange={(e) => { setRating(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label={t("admin.reviews.ui.filterRating")}>
+              <option value="all">{t("admin.reviews.ui.allRatings")}</option>
+              {[5, 4, 3, 2, 1].map((n) => <option key={n} value={String(n)}>{t("admin.reviews.ui.star", { count: n })}</option>)}
             </select>
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label="Filter by status">
-              <option value="all">All status</option>
-              <option value="active">Visible</option>
-              <option value="hidden">Hidden</option>
+            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label={t("admin.reviews.ui.filterStatus")}>
+              <option value="all">{t("admin.reviews.ui.allStatus")}</option>
+              <option value="active">{t("admin.reviews.ui.visible")}</option>
+              <option value="hidden">{t("admin.reviews.ui.hidden")}</option>
             </select>
-            <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label="Sort reviews">
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="high">Highest rated</option>
-              <option value="low">Lowest rated</option>
+            <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1); }} className={selectClass} style={selectStyle} aria-label={t("admin.reviews.ui.sort")}>
+              <option value="newest">{t("admin.reviews.ui.newest")}</option>
+              <option value="oldest">{t("admin.reviews.ui.oldest")}</option>
+              <option value="high">{t("admin.reviews.ui.highest")}</option>
+              <option value="low">{t("admin.reviews.ui.lowest")}</option>
             </select>
           </div>
         </div>
         {/* ===== Table ===== */}
         <div className="overflow-hidden rounded-lg" style={cardStyle}>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] border-collapse text-left">
+            <table className="w-full min-w-[880px] border-collapse text-start">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                  {["Reviewer", "Product", "Rating", "Review", "Visibility", "Submitted", "Actions"].map((h) => (
+                  {[t("admin.reviews.ui.reviewer"), t("admin.reviews.page.product"), t("admin.reviews.page.rating"), t("admin.reviews.ui.review"), t("admin.reviews.ui.visibility"), t("admin.reviews.ui.submitted"), t("admin.reviews.page.actions")].map((h) => (
                     <th
                       key={h}
-                      className={`px-4 py-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap ${h === "Actions" ? "text-right" : "text-left"}`}
+                      className={`px-4 py-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap ${h === t("admin.reviews.page.actions") ? "text-end" : "text-start"}`}
                       style={{ color: "var(--text-muted)" }}
                     >
                       {h}
@@ -331,14 +338,14 @@ export default function AdminReviewsPage() {
                 ) : isError ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-12 text-center">
-                      <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Could not load reviews</p>
+                      <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.reviews.ui.loadFailed")}</p>
                       <button
                         type="button"
                         onClick={() => refetch()}
                         className="mt-2 h-9 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90"
                         style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                       >
-                        Retry
+                        {t("admin.reviews.ui.retry")}
                       </button>
                     </td>
                   </tr>
@@ -346,16 +353,18 @@ export default function AdminReviewsPage() {
                   <tr>
                     <td colSpan={7} className="px-4 py-14 text-center">
                       <MessageSquareText size={28} className="mx-auto" style={{ color: "var(--text-muted)" }} />
-                      <p className="mt-2 text-sm font-bold" style={{ color: "var(--text-primary)" }}>No reviews found</p>
-                      <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>Try changing or clearing the filters.</p>
+                      <p className="mt-2 text-sm font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.reviews.ui.noReviews")}</p>
+                      <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{t("admin.reviews.ui.changeFilters")}</p>
                     </td>
                   </tr>
                 ) : (
                   reviews.map((r) => {
                     const user = r.user_id && typeof r.user_id === "object" ? r.user_id : {};
                     const product = r.product_id && typeof r.product_id === "object" ? r.product_id : {};
+                    const productName = productNameOf(product);
                     const hidden = r.status === "hidden";
-                    const comment = String(r.comment || "").trim();
+                    const reviewTitle = String(reviewTextOf(r, "title") || "").trim();
+                    const comment = String(reviewTextOf(r, "comment") || "").trim();
                     const commentWords = comment.split(/\s+/).filter(Boolean);
                     const canExpandComment = commentWords.length > 5;
                     const isCommentExpanded = expandedReviews.has(r._id);
@@ -374,7 +383,7 @@ export default function AdminReviewsPage() {
                           }
                         }}
                         tabIndex={0}
-                        aria-label={`Open review by ${user?.name || "Customer"} for ${product?.name || "product"}`}
+                        aria-label={t("admin.reviews.ui.openReview", { customer: user?.name || t("admin.reviews.ui.customer"), product: productName || t("admin.reviews.ui.productFallback") })}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
@@ -386,24 +395,24 @@ export default function AdminReviewsPage() {
                             >
                               {user?.avatar ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={mediaUrl(user.avatar) || user.avatar} alt={user?.name || "user"} className="h-full w-full object-cover" />
+                                <img src={mediaUrl(user.avatar) || user.avatar} alt={user?.name || t("admin.reviews.ui.customer")} className="h-full w-full object-cover" />
                               ) : (
                                 String(user?.name || "U").charAt(0).toUpperCase()
                               )}
                             </span>
                             <span className="min-w-0">
                               <span className="block max-w-[140px] truncate text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>
-                                {user?.name || "Customer"}
+                                {user?.name || t("admin.reviews.ui.customer")}
                               </span>
-                              <span className="mt-0.5 block max-w-[165px] truncate text-[11px]" style={{ color: "var(--text-muted)" }} title={user?.email || "Email unavailable"}>
-                                {user?.email || "Email unavailable"}
+                              <span className="mt-0.5 block max-w-[165px] truncate text-[11px]" style={{ color: "var(--text-muted)" }} title={user?.email || t("admin.reviews.ui.emailUnavailable")}>
+                                {user?.email || t("admin.reviews.ui.emailUnavailable")}
                               </span>
                             </span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="block max-w-[150px] truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }} title={product?.name || r.product_id}>
-                            {product?.name || "Product"}
+                          <span className="block max-w-[150px] truncate text-[13px] font-semibold" style={{ color: "var(--text-primary)" }} title={productName || r.product_id}>
+                            {productName || t("admin.reviews.ui.productFallback")}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -412,13 +421,13 @@ export default function AdminReviewsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="max-w-[300px]">
-                            <Link href={`/admin/reviews/${r._id}`} className="block text-left">
-                            {r.title ? (
-                              <span className="block truncate text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{r.title}</span>
+                            <Link href={`/admin/reviews/${r._id}`} className="block text-start">
+                            {reviewTitle ? (
+                              <span className="block truncate text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{reviewTitle}</span>
                             ) : null}
                             </Link>
                             <span className="mt-0.5 block text-[12.5px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                              {comment ? (isCommentExpanded || !canExpandComment ? comment : `${commentWords.slice(0, 5).join(" ")}…`) : "Rating only"}
+                              {comment ? (isCommentExpanded || !canExpandComment ? comment : `${commentWords.slice(0, 5).join(" ")}…`) : t("admin.reviews.ui.ratingOnly")}
                             </span>
                             {canExpandComment ? (
                               <button type="button" onClick={() => setExpandedReviews((current) => {
@@ -427,11 +436,11 @@ export default function AdminReviewsPage() {
                                 else next.add(r._id);
                                 return next;
                               })} className="mt-0.5 rounded-sm text-[11px] font-semibold transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--accent)" }} aria-expanded={isCommentExpanded}>
-                                {isCommentExpanded ? "Read less" : "Read more"}
+                                {isCommentExpanded ? t("admin.reviews.ui.readLess") : t("admin.reviews.ui.readMore")}
                               </button>
                             ) : null}                            {(r.images?.length || r.videos?.length) ? (
                               <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
-                                {(r.images?.length || 0) + (r.videos?.length || 0)} media
+                                {(r.images?.length || 0) + (r.videos?.length || 0)} {t("admin.reviews.ui.media")}
                               </span>
                             ) : null}
                           </div>
@@ -444,11 +453,11 @@ export default function AdminReviewsPage() {
                               : { backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                           >
                             {hidden ? <EyeOff size={11} /> : <Eye size={11} />}
-                            {hidden ? "Hidden" : "Visible"}
+                            {hidden ? t("admin.reviews.ui.hidden") : t("admin.reviews.ui.visible")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
-                          {r.created_at ? new Date(r.created_at).toLocaleDateString("en-PK", { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "—"}
                         </td>
                         <td className="px-4 py-3">
                           <RowActions
@@ -470,7 +479,7 @@ export default function AdminReviewsPage() {
           {pagination.pages > 1 ? (
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderTop: "1px solid var(--border-color)" }}>
               <span className="text-[12px] font-semibold" style={{ color: "var(--text-muted)" }}>
-                Page {pagination.page} of {pagination.pages} — {pagination.total} total
+                {t("admin.reviews.ui.pageTotal", { page: pagination.page, pages: pagination.pages, total: pagination.total })}
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -479,7 +488,7 @@ export default function AdminReviewsPage() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-40"
                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                  aria-label="Previous page"
+                  aria-label={t("admin.reviews.ui.previousPage")}
                 >
                   <ChevronLeft size={14} />
                 </button>
@@ -506,7 +515,7 @@ export default function AdminReviewsPage() {
                   onClick={() => setPage((p) => p + 1)}
                   className="flex h-8 w-8 items-center justify-center rounded-lg disabled:opacity-40"
                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-                  aria-label="Next page"
+                  aria-label={t("admin.reviews.ui.nextPage")}
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -518,7 +527,4 @@ export default function AdminReviewsPage() {
     </div>
   );
 }
-
-
-
 

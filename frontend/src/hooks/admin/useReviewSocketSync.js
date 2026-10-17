@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSocket } from "./useSocket";
+import { useAdminSocket } from "./useAdminSocket";
 
 /**
  * ✅ Reviews — admin panels ka live socket sync (baqi modules ki tarah).
@@ -13,7 +13,7 @@ import { useSocket } from "./useSocket";
  */
 export function useReviewSocketSync() {
   const queryClient = useQueryClient();
-  const { socket, isConnected } = useSocket();
+  const { socket, isConnected } = useAdminSocket();
 
   useEffect(() => {
     if (!socket || !isConnected) return;

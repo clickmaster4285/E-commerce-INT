@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
-import useScrollFade from "@/hooks/useScrollFade";
+import useScrollFade from "../../hooks/user/useScrollFade";
 
 function getCategoryImage(category) {
   return category?.image || null;

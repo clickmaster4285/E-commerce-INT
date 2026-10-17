@@ -21,7 +21,7 @@ import ProductCard from "./ProductCard";
 import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
 import { STOCK_STATES, formatPrice, idOf } from "@/utils/homeCatalog";
-import { useShopProducts, scrollToListTop } from "@/hooks/useShopProducts";
+import { useShopProducts, scrollToListTop } from "../../hooks/user/useShopProducts";
 
 // ✅ 24 per page — xl par grid 6 columns hai, 24 = 4 poore rows (20 par
 // teesra row adhoora rehta tha).

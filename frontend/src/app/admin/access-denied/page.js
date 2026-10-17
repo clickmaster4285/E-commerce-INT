@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { ShieldX, Mail, Lock, AlertTriangle, LogOut } from 'lucide-react';
 import adminHttp from '@/apis/axiosInstance';
 import { toast } from 'sonner';
+import { useTranslation } from '@/i18n/LanguageProvider';
 
 export default function AccessDeniedPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [countdown, setCountdown] = useState(20);
@@ -34,8 +36,8 @@ export default function AccessDeniedPage() {
     } catch (err) {
       console.error('Logout error:', err);
     }
-    toast.info('Logged out', {
-      description: 'Please contact your admin for access.',
+    toast.info(t('admin.accessDenied.loggedOut'), {
+      description: t('admin.accessDenied.loggedOutBody'),
       duration: 3000,
     });
     setTimeout(() => {
@@ -50,7 +52,7 @@ export default function AccessDeniedPage() {
     >
       {/* Background glow */}
       <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full blur-[150px] opacity-[0.07] pointer-events-none"
+        className="absolute top-1/3 start-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full blur-[150px] opacity-[0.07] pointer-events-none"
         style={{ backgroundColor: 'var(--danger)' }}
       />
       {/* Grid */}
@@ -79,7 +81,7 @@ export default function AccessDeniedPage() {
         >
           {/* Top accent line */}
           <div
-            className="absolute top-0 left-1/4 right-1/4 h-[2px] rounded-full"
+            className="absolute top-0 start-1/4 end-1/4 h-[2px] rounded-full"
             style={{
               background: 'linear-gradient(90deg, transparent, var(--danger), transparent)',
               opacity: 0.5,
@@ -114,7 +116,7 @@ export default function AccessDeniedPage() {
                 className="text-[11px] font-bold uppercase tracking-[0.12em]"
                 style={{ color: 'var(--danger-text)' }}
               >
-                403 — Forbidden
+              {t('admin.accessDenied.forbidden')}
               </span>
             </div>
           </div>
@@ -124,7 +126,7 @@ export default function AccessDeniedPage() {
             className="text-[2rem] sm:text-[2.25rem] font-bold mb-3 tracking-tight"
             style={{ color: '#fff' }}
           >
-            Access Denied
+            {t('admin.accessDenied.title')}
           </h1>
 
           {/* Description */}
@@ -132,25 +134,24 @@ export default function AccessDeniedPage() {
             className="text-[14px] leading-relaxed mb-1.5 max-w-[440px] mx-auto"
             style={{ color: 'rgba(255,255,255,0.4)' }}
           >
-            You don&apos;t have any permissions enabled for your account.
+            {t('admin.accessDenied.noPermissions')}
           </p>
           <p
             className="text-[13px] leading-relaxed mb-8 max-w-[480px] mx-auto"
             style={{ color: 'rgba(255,255,255,0.28)' }}
           >
-            Please contact your{' '}
-            <span style={{ color: 'var(--success)', fontWeight: 600 }}>administrator</span> or{' '}
-            <span style={{ color: 'var(--success)', fontWeight: 600 }}>staff manager</span> to
-            request access. They can enable permissions from{' '}
+            {t('admin.accessDenied.contactLead')}{' '}
+            <span style={{ color: 'var(--success)', fontWeight: 600 }}>{t('admin.accessDenied.administrator')}</span> {t('admin.accessDenied.or')}{' '}
+            <span style={{ color: 'var(--success)', fontWeight: 600 }}>{t('admin.accessDenied.staffManager')}</span> {t('admin.accessDenied.requestAccess')}{' '}
             <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500 }}>
-              Employee Settings → Access Permissions
+              {t('admin.accessDenied.employeeSettings')}
             </span>
             .
           </p>
 
           {/* Info Box */}
           <div
-            className="rounded-xl p-5 mb-8 text-left max-w-[520px] mx-auto"
+            className="rounded-xl p-5 mb-8 text-start max-w-[520px] mx-auto"
             style={{
               backgroundColor: 'rgba(16, 185, 129, 0.03)',
               border: '1px solid var(--success-soft)',
@@ -171,13 +172,13 @@ export default function AccessDeniedPage() {
                   className="text-[13px] font-semibold mb-2"
                   style={{ color: 'rgba(255,255,255,0.75)' }}
                 >
-                  What can you do?
+                  {t('admin.accessDenied.whatCanYouDo')}
                 </p>
                 <ul className="space-y-1.5">
                   {[
-                    'Ask your admin to grant you the required permissions',
-                    'Once enabled, log in again to access the dashboard',
-                    'Your account is active — you just need permission access',
+                    t('admin.accessDenied.step1'),
+                    t('admin.accessDenied.step2'),
+                    t('admin.accessDenied.step3'),
                   ].map((item, i) => (
                     <li
                       key={i}
@@ -219,13 +220,13 @@ export default function AccessDeniedPage() {
               }}
             >
               <LogOut size={15} />
-              {isLoggingOut ? 'Logging out...' : 'Logout & Go to Login'}
+              {isLoggingOut ? t('admin.accessDenied.loggingOut') : t('admin.accessDenied.logoutAndLogin')}
             </button>
 
             <button
               onClick={() => {
-                toast.info('Contact your admin', {
-                  description: 'Ask them to enable permissions from Employee Settings.',
+                toast.info(t('admin.accessDenied.contactAdmin'), {
+                  description: t('admin.accessDenied.enableHelp'),
                   duration: 4000,
                 });
               }}
@@ -247,7 +248,7 @@ export default function AccessDeniedPage() {
               }}
             >
               <Mail size={15} />
-              How to Get Access?
+              {t('admin.accessDenied.howToGetAccess')}
             </button>
           </div>
 
@@ -267,7 +268,7 @@ export default function AccessDeniedPage() {
               />
             </div>
             <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.18)' }}>
-              Auto logout in{' '}
+              {t('admin.accessDenied.autoLogout')}{' '}
               <span className="font-semibold tabular-nums" style={{ color: 'rgba(239, 68, 68, 0.5)' }}>
                 {countdown}s
               </span>
@@ -279,7 +280,7 @@ export default function AccessDeniedPage() {
         <div className="flex items-center justify-center gap-2 mt-5">
           <Lock size={11} style={{ color: 'rgba(255,255,255,0.1)' }} />
           <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.12)' }}>
-            This action has been logged for security purposes
+            {t('admin.accessDenied.securityLog')}
           </p>
         </div>
       </div>

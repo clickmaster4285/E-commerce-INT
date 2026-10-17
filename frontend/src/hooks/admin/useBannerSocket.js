@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSocket } from "./useSocket";
+import { getAdminSocket as getSocket } from "./useAdminSocket";
 
 export default function useBannerSocketSync() {
   const queryClient = useQueryClient();

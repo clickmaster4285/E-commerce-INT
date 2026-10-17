@@ -3,6 +3,16 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// ==========================================
+// I18N
+// ------------------------------------------
+// ⚠️ NO locale ROUTING is configured on purpose.
+//    The app keeps its existing URLs and the language is carried in a plain
+//    `lang` cookie (see src/i18n/config.js) that covers both the admin panel
+//    and the storefront. Translations live in src/i18n/translations.js and are
+//    consumed client-side through src/i18n/LanguageProvider.js — no next-intl
+//    plugin, no route rewriting.
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [

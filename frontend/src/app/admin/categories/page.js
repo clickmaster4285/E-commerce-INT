@@ -7,7 +7,9 @@ import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import { useCategorySocketSync } from "@/hooks/useCategorySocketSync";
+import { useCategorySocketSync } from "../../../hooks/admin/useCategorySocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 // ================= ICONS =================
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -78,16 +80,16 @@ const getCategoryName = (categoryId, categories) => {
   return category?.name || "None";
 };
 
+// Same lookup, but returns the parent CATEGORY OBJECT — `nameOf()` ko poora doc
+// chahiye (translations map `name` ke saath hi), plain name string nahi.
+const getCategoryDoc = (categoryId, categories) => {
+  if (!categoryId) return null;
+  return (categories || []).find((item) => String(item._id) === String(categoryId)) || null;
+};
+
 /* ================= Parent category restriction helpers =================
    Ye sab helpers existing category data (`parent_category_id`) hi reuse karte
    hain — koi naya API call / schema change nahi. */
-
-// Parent category ban chuki category ko kisi doosri category ke under assign
-// nahi kiya ja sakta.
-const PARENT_ALREADY_PARENT_TEXT =
-  "This category already contains child categories and cannot be assigned as a child of another category.";
-const PARENT_ALREADY_PARENT_MESSAGE =
-  "Cannot assign this category as a child because it is already a parent category.";
 
 // Parent Category dropdown ke liye SIRF root categories (parent = None) — child
 // categories (Mobile, Laptop, ...) kabhi parent option nahi ban sakti.
@@ -108,11 +110,6 @@ const getParentIdsWithChildren = (categories = []) => {
 // se match karta hai (case-insensitive) jiske apne child categories hain, to ye
 // category root (Parent = None) honi chahiye. Rule hardcode nahi hai — har
 // existing category par lagta hai (Electronics, Clothing, ...).
-const NAME_PARENT_LOCK_TEXT =
-  "A category with this name already contains subcategories, so Parent Category is locked to None.";
-const NAME_PARENT_LOCK_MESSAGE =
-  "Parent category must be None because a category with this name already exists with subcategories.";
-
 /* Parent Category lock hone ki wajah professional alert ke roop mein —
    dropdown disabled kyun hai ye user ko turant clear ho jata hai. */
 const ParentLockNotice = ({ title, children }) => (
@@ -174,6 +171,7 @@ const getParentOptionState = ({
   editingHasChildren,
   descendantIds,
   parentIdsWithChildren,
+  t,
 }) => {
   const id = getId(optionId);
   const isSelf = Boolean(editingId) && id === String(editingId);
@@ -182,24 +180,24 @@ const getParentOptionState = ({
     return parentIdsWithChildren.has(id)
       ? {
           disabled: true,
-          badge: "Already a parent",
-          hint: PARENT_ALREADY_PARENT_TEXT,
-          message: PARENT_ALREADY_PARENT_MESSAGE,
+          badge: t("parent.badgeAlreadyParent"),
+          hint: t("lock.alreadyParentText"),
+          message: t("lock.alreadyParentMessage"),
         }
       : {
           disabled: true,
-          badge: "This category",
-          hint: "A category cannot be selected as its own parent.",
-          message: "A category cannot be its own parent.",
+          badge: t("parent.badgeThis"),
+          hint: t("parent.selfHint"),
+          message: t("parent.selfMessage"),
         };
   }
 
   if (descendantIds.has(id)) {
     return {
       disabled: true,
-      badge: "Subcategory",
-      hint: "This is a subcategory of the category being edited, so it cannot become its parent.",
-      message: "Cannot create a circular category hierarchy.",
+      badge: t("parent.badgeSubcategory"),
+      hint: t("parent.circularHint"),
+      message: t("parent.circularMessage"),
     };
   }
 
@@ -208,9 +206,9 @@ const getParentOptionState = ({
   if (editingHasChildren) {
     return {
       disabled: true,
-      badge: "Already a parent",
-      hint: PARENT_ALREADY_PARENT_TEXT,
-      message: PARENT_ALREADY_PARENT_MESSAGE,
+      badge: t("parent.badgeAlreadyParent"),
+      hint: t("lock.alreadyParentText"),
+      message: t("lock.alreadyParentMessage"),
     };
   }
 
@@ -221,7 +219,7 @@ const getParentOptionState = ({
 
 // Submit se pehle ki validation — UI bypass na ho sake (backend bhi same rule
 // apply karta hai).
-const getParentAssignmentError = ({ categories = [], editingCategory = null, nextParentId, name = "" }) => {
+const getParentAssignmentError = ({ categories = [], editingCategory = null, nextParentId, name = "", t }) => {
   const next = getId(nextParentId);
   const editingId = getId(editingCategory?._id);
 
@@ -231,7 +229,7 @@ const getParentAssignmentError = ({ categories = [], editingCategory = null, nex
   const nameMatchId = getExistingParentNameMatchId({ categories, name, excludeId: editingId });
   if (nameMatchId && !next) {
     const matchedName = (categories || []).find((category) => getId(category?._id) === nameMatchId)?.name;
-    return `${matchedName || String(name || "").trim()} already has child categories and cannot be assigned under another category.`;
+    return t("lock.childAssignmentError", { name: matchedName || String(name || "").trim() });
   }
 
   if (!next) return "";
@@ -241,23 +239,23 @@ const getParentAssignmentError = ({ categories = [], editingCategory = null, nex
   const parentChanged = next !== currentParentId;
 
   // Sabse pehle self-parent (sab se specific error)
-  if (editingId && next === editingId) return "A category cannot be its own parent.";
+  if (editingId && next === editingId) return t("parent.selfMessage");
 
   // ✅ NEW: Naam match (children wali existing category) → parent selection allowed nahi
   // (Create aur Edit dono par apply hota hai — UI bypass ho to bhi yahan block)
   if (nameMatchId) {
-    return NAME_PARENT_LOCK_MESSAGE;
+    return t("lock.nameLockMessage");
   }
 
   if (!editingCategory || !editingId) return "";
 
   if (getDescendantIds(categories, editingId).has(next)) {
-    return "Cannot create a circular category hierarchy.";
+    return t("parent.circularMessage");
   }
 
   // Jo category already children rakhti hai use kisi parent ke under nahi ja sakti
   if (parentChanged && withChildren.has(editingId)) {
-    return PARENT_ALREADY_PARENT_MESSAGE;
+    return t("lock.alreadyParentMessage");
   }
 
   return "";
@@ -266,6 +264,12 @@ const getParentAssignmentError = ({ categories = [], editingCategory = null, nex
 /* ================= MAIN PAGE COMPONENT ================= */
 export default function CategoriesPage() {
   useCategorySocketSync();
+  // Admin-panel i18n. English is the fallback for any missing key.
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.categories.${k}`, p);
+  // Database-sourced content (category / attribute names + descriptions) —
+  // active locale me render hota hai, English fallback helper ke andar hai.
+  const { nameOf, descriptionOf, attributeOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -322,6 +326,14 @@ const [viewMode, setViewMode] = useState(() => {
     attributes: [],
   });
 
+  // ✅ DIRTY-FLAG: admin ne is modal me "Status" control ko chhua ya nahi.
+  // Pehle har save poora payload (is_active samet) bhejta tha — to modal
+  // kholne ke baad agar kisi doosre tab/window se category DISABLE ho jati,
+  // ye stale modal ka Save usse dobara ENABLE kar deta tha (wahi bug jo
+  // storefront par "disabled category phir bhi dikhti thi" ki wajah tha).
+  // Ab `is_active` sirf tab jata hai jab user ne status khud change kiya ho.
+  const [statusTouched, setStatusTouched] = useState(false);
+
   const [autoCode, setAutoCode] = useState("");
   const [loadingCode, setLoadingCode] = useState(false);
 
@@ -355,10 +367,10 @@ const [viewMode, setViewMode] = useState(() => {
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       setSelectedIds([]);
-      toast.success("Category deleted successfully");
+      toast.success(t("toast.deleted"));
       setDeleteTarget(null);
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Category delete failed"),
+    onError: (error) => toast.error(error.response?.data?.message || error.message || t("toast.deleteFailed")),
   });
 
    const toggleStatusMutation = useMutation({
@@ -376,11 +388,11 @@ const [viewMode, setViewMode] = useState(() => {
         queryClient.invalidateQueries({ queryKey: ["categories"] }),
       ]);
       
-      toast.success(variables.newStatus === "active" ? "Category enabled" : "Category disabled");
+      toast.success(variables.newStatus === "active" ? t("toast.enabled") : t("toast.disabled"));
     },
     onError: (error) => {
       console.error("Toggle error:", error);
-      toast.error(error.response?.data?.message || "Failed to update status");
+      toast.error(error.response?.data?.message || t("toast.statusFailed"));
     },
   });
 
@@ -426,11 +438,11 @@ const [viewMode, setViewMode] = useState(() => {
         queryClient.refetchQueries({ queryKey: ["admin-categories"] }),
         queryClient.invalidateQueries({ queryKey: ["categories"] }),
       ]);
-      toast.success("Category created successfully");
+      toast.success(t("toast.created"));
       setShowCreateModal(false);
       resetForm();
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Create failed"),
+    onError: (error) => toast.error(error.response?.data?.message || error.message || t("toast.createFailed")),
   });
 
   const updateMutation = useMutation({
@@ -465,12 +477,12 @@ const [viewMode, setViewMode] = useState(() => {
         queryClient.refetchQueries({ queryKey: ["admin-categories"] }),
         queryClient.invalidateQueries({ queryKey: ["categories"] }),
       ]);
-      toast.success("Category updated successfully");
+      toast.success(t("toast.updated"));
       setShowEditModal(false);
       setEditingCategory(null);
       resetForm();
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Update failed"),
+    onError: (error) => toast.error(error.response?.data?.message || error.message || t("toast.updateFailed")),
   });
 
   // ================= FORM HELPERS =================
@@ -484,6 +496,7 @@ const [viewMode, setViewMode] = useState(() => {
       attributes: [],
     });
     setAutoCode("");
+    setStatusTouched(false);
     setOpenAttributeKey(null);
     setShowCreateAttrModal(false);
     setNewAttrName("");
@@ -549,12 +562,16 @@ const [viewMode, setViewMode] = useState(() => {
     });
     setEditingCategory(category);
     setAutoCode(category.category_code || "");
+    // Har naye Edit modal me status "clean" — tab tak admin usse chua nahi,
+    // is liye save par `is_active` nahi jayega (stale value se dobara enable
+    // hone se protected).
+    setStatusTouched(false);
     setShowEditModal(true);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name?.trim()) { toast.error("Category name is required"); return; }
+    if (!formData.name?.trim()) { toast.error(t("form.nameRequired")); return; }
 
     // ✅ NEW: Parent category restriction — submit se pehle frontend validation
     // (backend bhi same rule enforce karta hai).
@@ -563,17 +580,29 @@ const [viewMode, setViewMode] = useState(() => {
       editingCategory: showEditModal ? editingCategory : null,
       nextParentId: formData.parent_category_id,
       name: formData.name,
+      t,
     });
     if (parentError) { toast.error(parentError); return; }
 
-    const payload = { 
-      ...formData, 
+    // ⚠️ `status` field hamesha payload me mat bhejo — wo sirf UI state hai.
+    // Edit par `is_active` kehte hi bhejo AUR wo tabhi jab admin ne Status
+    // control actually chhua ho (statusTouched). Warna ek purana/stale modal
+    // (jismein category tabhi Active thi) kisi baad ki DISABLE ko save karte
+    // waqt usse wapas Active bana deta tha.
+    const { status: _statusField, ...formFields } = formData;
+    const payload = {
+      ...formFields,
       parent_category_id: formData.parent_category_id || null,
-      is_active: formData.status === "active"
     };
+
     if (showEditModal && editingCategory) {
+      // Sirf status chhua gaya ho tabhi `is_active` bhejo — warna backend
+      // existing value ko as-is chhodega (field absent = no change).
+      if (statusTouched) payload.is_active = formData.status === "active";
       updateMutation.mutate({ id: editingCategory._id, data: payload });
     } else {
+      // Create par status hamesha relevant hai (new record).
+      payload.is_active = formData.status === "active";
       createMutation.mutate(payload);
     }
   };
@@ -656,7 +685,7 @@ const [viewMode, setViewMode] = useState(() => {
   const handleCreateAttribute = async () => {
     if (!newAttrName.trim() || creatingAttribute) return;
     if (newAttrType === "multi_select" && newAttrValues.length === 0) {
-      toast.error("At least one option is required for Multi Options type");
+      toast.error(t("attrs.multiRequired"));
       return;
     }
     setCreatingAttribute(true);
@@ -698,9 +727,9 @@ const [viewMode, setViewMode] = useState(() => {
       setNewAttrValueInput("");
       setNewAttrDefaultValue("yes");
       setAttrSearch("");
-      toast.success(`Attribute "${created?.name}" created`);
+      toast.success(t("addAttr.created", { name: created?.name }));
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to create attribute");
+      toast.error(err.response?.data?.message || t("addAttr.createFailed"));
     } finally {
       setCreatingAttribute(false);
     }
@@ -876,7 +905,7 @@ const [viewMode, setViewMode] = useState(() => {
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const SortHeader = ({ label, sortKey }) => (
-    <th className="px-4 py-3 text-left">
+    <th className="px-4 py-3 text-start">
       <button type="button" onClick={() => handleSort(sortKey)} className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
         {label} <SortIndicator active={sortConfig.key === sortKey} direction={sortConfig.direction} />
       </button>
@@ -885,10 +914,10 @@ const [viewMode, setViewMode] = useState(() => {
 
   const SelectFilter = ({ value, onChange, children }) => (
     <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] ps-3 pe-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
         {children}
       </select>
-      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+      <span className="absolute end-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
     </div>
   );
 
@@ -938,10 +967,10 @@ const [viewMode, setViewMode] = useState(() => {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open ? setOpen(false) : openMenu(); } }}
           className="w-8 h-8 inline-flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
-          aria-label="More actions"
+          aria-label={t("action.more")}
           aria-haspopup="true"
           aria-expanded={open}
-          title="More actions"
+          title={t("action.more")}
         >
           <DotsVerticalIcon className="w-[18px] h-[18px]" />
         </button>
@@ -965,7 +994,7 @@ const [viewMode, setViewMode] = useState(() => {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Details
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> {t("action.viewDetails")}
             </button>
             <button
               type="button"
@@ -975,7 +1004,7 @@ const [viewMode, setViewMode] = useState(() => {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> {t("action.edit")}
             </button>
             <button
               type="button"
@@ -994,7 +1023,7 @@ const [viewMode, setViewMode] = useState(() => {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
+              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? t("action.deactivate") : t("action.activate")}
             </button>
             <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <button
@@ -1005,7 +1034,7 @@ const [viewMode, setViewMode] = useState(() => {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <TrashIcon className="w-4 h-4 shrink-0" /> Delete
+              <TrashIcon className="w-4 h-4 shrink-0" /> {t("action.delete")}
             </button>
           </div>,
           document.body
@@ -1037,10 +1066,14 @@ const [viewMode, setViewMode] = useState(() => {
         editingHasChildren,
         descendantIds,
         parentIdsWithChildren,
+        t,
       }),
     }));
-    const selectedParentName = formData.parent_category_id
-      ? categoryOptions.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None"
+    // Selected parent ka poora doc chahiye — `nameOf()` translations map ke
+    // saath kaam karta hai (plain `.name` sirf English deta hai).
+    const selectedParentCategoryDoc = getCategoryDoc(formData.parent_category_id, categoryOptions);
+    const selectedParentName = selectedParentCategoryDoc
+      ? nameOf(selectedParentCategoryDoc)
       : "None";
 
     // ✅ NEW: Category Name kisi existing (children wali) category se match karta
@@ -1051,14 +1084,15 @@ const [viewMode, setViewMode] = useState(() => {
       excludeId: editingId,
     });
     const parentLockedByName = Boolean(nameMatchLockId);
-    const matchedName = parentLockedByName
-      ? categoryOptions.find((c) => String(c._id) === String(nameMatchLockId))?.name || formData.name
-      : "";
+    const matchedParent = parentLockedByName
+      ? categoryOptions.find((c) => String(c._id) === String(nameMatchLockId))
+      : null;
+    const matchedName = matchedParent ? nameOf(matchedParent) : formData.name;
     const parentDropdownDisabled = editingHasChildren || parentLockedByName;
     const parentDropdownTitle = parentLockedByName
-      ? NAME_PARENT_LOCK_TEXT
+      ? t("lock.nameLockText")
       : editingHasChildren
-        ? PARENT_ALREADY_PARENT_TEXT
+        ? t("lock.alreadyParentText")
         : undefined;
 
     return createPortal(
@@ -1071,13 +1105,13 @@ const [viewMode, setViewMode] = useState(() => {
                 <FolderIcon className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{isEdit ? "Edit Category" : "Create Category"}</h2>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Define category details, attributes, and hierarchy.</p>
+                <h2 className="text-[14px] font-bold text-[var(--text-primary)]">{isEdit ? t("form.editTitle") : t("form.createTitle")}</h2>
+                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("form.subtitle")}</p>
               </div>
             </div>
             <button type="button" onClick={() => { setShowCreateModal(false); setShowEditModal(false); setEditingCategory(null); resetForm(); }}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
-              aria-label="Close modal">
+              aria-label={t("form.close")}>
               <CloseIcon className="w-4 h-4" />
             </button>
           </div>
@@ -1087,19 +1121,19 @@ const [viewMode, setViewMode] = useState(() => {
             <div className="p-5 space-y-4">
               {/* ── SECTION 1: BASIC INFORMATION ── */}
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.basicInfo")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Code</label>
+                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.code")}</label>
                     <div className="relative">
                       <input type="text" value={formData.category_code} onChange={(e) => setFormData({ ...formData, category_code: e.target.value })} readOnly={isEdit}
                         className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                        placeholder="AUTO-GENERATED" />
+                        placeholder={t("form.codePlaceholder")} />
                       {loadingCode && <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)]" />}
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Name <span className="text-red-500">*</span></label>
+                    <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.name")} <span className="text-red-500">*</span></label>
                     <input type="text" value={formData.name} required autoFocus
                       onChange={(e) => {
                         const name = e.target.value;
@@ -1116,22 +1150,22 @@ const [viewMode, setViewMode] = useState(() => {
                         }));
                       }}
                       className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                      placeholder="e.g. Smartphones" />
+                      placeholder={t("form.namePlaceholder")} />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Description</label>
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.description")}</label>
                   <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2}
                     className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                    placeholder="Briefly describe what products belong in this category..." />
+                    placeholder={t("form.descriptionPlaceholder")} />
                 </div>
               </div>
 
               {/* ── SECTION 2: CATEGORY HIERARCHY ── */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Category Hierarchy</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.hierarchy")}</p>
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.parentCategory")}</label>
                   <div className="relative">
                     <button ref={parentDropdownRef} type="button"
                       disabled={parentDropdownDisabled}
@@ -1148,25 +1182,25 @@ const [viewMode, setViewMode] = useState(() => {
                       title={parentDropdownTitle}
                       className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
                       <span className="flex items-center gap-2 min-w-0">
-                        <span className="truncate text-left">{parentLockedByName ? "None" : selectedParentName}</span>
+                        <span className="truncate text-start">{parentLockedByName ? t("parent.none") : selectedParentName}</span>
                         {parentLockedByName && (
-                          <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Locked to None</span>
+                          <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("lock.badgeLockedToNone")}</span>
                         )}
                         {!parentLockedByName && editingHasChildren && (
-                          <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Already a parent</span>
+                          <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("parent.badgeAlreadyParent")}</span>
                         )}
                       </span>
                       <ChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
                     </button>
                   </div>
                   {parentLockedByName && !editingHasChildren && (
-                    <ParentLockNotice title="Parent Category locked to None">
-                      <span className="font-semibold text-[var(--text-primary)]">{matchedName}</span> already contains subcategories, so it can only stay a top-level category. To keep the hierarchy valid, Parent Category is locked to <span className="font-semibold text-[var(--text-primary)]">None</span>.
+                    <ParentLockNotice title={t("lock.lockedToNone")}>
+                      {t("lock.nameLockedBody", { name: matchedName, value: t("parent.none") })}
                     </ParentLockNotice>
                   )}
                   {editingHasChildren && (
-                    <ParentLockNotice title="Already used as a parent category">
-                      <span className="font-semibold text-[var(--text-primary)]">{editingCategory?.name}</span> already contains subcategories, so it cannot be assigned under another category.
+                    <ParentLockNotice title={t("lock.alreadyUsedTitle")}>
+                      {t("lock.alreadyUsedBody", { name: editingCategory?.name })}
                     </ParentLockNotice>
                   )}
                 </div>
@@ -1174,28 +1208,28 @@ const [viewMode, setViewMode] = useState(() => {
 
               {/* ── SECTION 3: PRODUCT ATTRIBUTES ── */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Product Attributes</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.productAttributes")}</p>
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Attributes</label>
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.attributes")}</label>
                   <button type="button" onClick={openAttrSelectModal}
-                    className="w-full min-h-[38px] px-3 py-2 text-[12px] text-left outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-3">
+                    className="w-full min-h-[38px] px-3 py-2 text-[12px] text-start outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-3">
                     <span className="flex items-center gap-2 min-w-0">
                       <LayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                       {formData.attributes.length === 0 ? (
-                        <span className="text-[var(--text-muted)]">Select Attributes</span>
+                        <span className="text-[var(--text-muted)]">{t("form.selectAttributes")}</span>
                       ) : (
-                        <span className="text-[var(--text-secondary)]">{formData.attributes.length} attribute{formData.attributes.length !== 1 ? "s" : ""} selected</span>
+                        <span className="text-[var(--text-secondary)]">{t("form.attributesSelected", { count: formData.attributes.length })}</span>
                       )}
                     </span>
                     <span className="text-[var(--text-muted)] text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0">
-                      Browse
+                      {t("form.browse")}
                     </span>
                   </button>
                   {formData.attributes.length > 0 && (
                     <div className="flex flex-wrap gap-[6px] pt-1.5">
                       {formData.attributes.map((attr, i) => (
                         <span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 pl-[10px] pr-[8px] py-[3px] text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-[5px] border border-[var(--border-color)] h-[28px]">
-                          {attr.seed_name || `Attribute ${i + 1}`}
+                          {attr.seed_name || t("form.attributeFallback", { n: i + 1 })}
                           <button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))}
                             className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-[var(--bg-card)] transition-colors ml-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
                             <CloseIcon className="w-[10px] h-[10px]" />
@@ -1209,12 +1243,12 @@ const [viewMode, setViewMode] = useState(() => {
 
               {/* ── SECTION 4: STATUS ── */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Status</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.status")}</p>
                 <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 h-[38px] max-w-xs">
-                  {[{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }].map((opt) => {
+                  {[{ id: "active", label: t("status.active") }, { id: "inactive", label: t("status.inactive") }].map((opt) => {
                     const isActive = formData.status === opt.id;
                     return (
-                      <button key={opt.id} type="button" onClick={() => setFormData({ ...formData, status: opt.id })}
+                      <button key={opt.id} type="button" onClick={() => { setStatusTouched(true); setFormData({ ...formData, status: opt.id }); }}
                         className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
                         {opt.label}
@@ -1237,14 +1271,14 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="overflow-y-auto" style={{ maxHeight: "240px", flexShrink: 1 }}>
                   <button type="button"
                     onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }}
-                    className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
-                    <span>None</span>
+                    className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
+                    <span>{t("parent.none")}</span>
                     {!formData.parent_category_id && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)]" />}
                   </button>
                   {categoriesLoading ? (
-                    <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">Loading categories...</div>
+                    <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">{t("parent.loading")}</div>
                   ) : rootCategories.length === 0 ? (
-                    <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">No categories available</div>
+                    <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">{t("parent.noCategories")}</div>
                   ) : (
                     rootCategories.map((cat) => {
                       const state = cat.parentState || { disabled: false, badge: "", hint: "", message: "" };
@@ -1254,7 +1288,7 @@ const [viewMode, setViewMode] = useState(() => {
                           onClick={() => {
                             if (state.disabled) {
                               // Invalid selection — silent fail ke bajaye clear reason do
-                              toast.error(state.message || "This parent category is not available.");
+                              toast.error(state.message || t("form.parentUnavailable"));
                               setParentRestrictionHint(state.hint || "");
                               return;
                             }
@@ -1271,7 +1305,7 @@ const [viewMode, setViewMode] = useState(() => {
                               ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]"
                               : "hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"}`}>
                           <span className="flex items-center gap-2 min-w-0">
-                            <span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{cat.name}</span>
+                            <span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{nameOf(cat)}</span>
                             {state.badge && (
                               <span className={`text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] border shrink-0 whitespace-nowrap ${state.disabled
                                 ? "bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-[var(--border-color)]"
@@ -1298,12 +1332,12 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
             <button type="button" onClick={() => { setShowCreateModal(false); setShowEditModal(false); setEditingCategory(null); resetForm(); }}
               className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
-              Cancel
+              {t("form.cancel")}
             </button>
             <button type="submit" form="category-modal-form" disabled={isSaving}
               className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
               {isSaving ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />}
-              {isEdit ? "Update Category" : "Create Category"}
+              {isEdit ? t("form.update") : t("form.create")}
             </button>
           </div>
         </div>
@@ -1325,12 +1359,12 @@ const [viewMode, setViewMode] = useState(() => {
           {/* Header - Fixed */}
           <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
             <div>
-              <h3 className="text-[13px] font-bold text-[var(--text-primary)]">Select Attributes</h3>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Select attributes to use for products in this category.</p>
+              <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{t("attrs.title")}</h3>
+              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("attrs.subtitle")}</p>
             </div>
             <button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }}
               className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
-              aria-label="Close attribute selector">
+              aria-label={t("attrs.close")}>
               <CloseIcon className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -1339,16 +1373,17 @@ const [viewMode, setViewMode] = useState(() => {
           {tempSelectedAttrIds.length > 0 && (
             <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Selected Attributes</span>
+                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">{t("attrs.selectedTitle")}</span>
                 <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
               </div>
               <div className="flex flex-wrap gap-1.5 max-h-[72px] overflow-y-auto">
                 {tempSelectedAttrIds.map((attrId) => {
                   const attr = allAttributes.find((a) => String(a._id) === String(attrId));
                   if (!attr) return null;
+                  const localizedAttr = attributeOf(attr);
                   return (
                     <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
-                      {attr.name}
+                      {localizedAttr.name}
                       <button type="button" onClick={() => toggleTempAttribute(attrId)}
                         className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                         <CloseIcon className="w-2.5 h-2.5" />
@@ -1363,10 +1398,10 @@ const [viewMode, setViewMode] = useState(() => {
           {/* Search - Fixed */}
           <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><SearchIcon className="w-3.5 h-3.5" /></span>
-              <input type="text" placeholder="Search attributes..." value={attrSearch}
+              <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><SearchIcon className="w-3.5 h-3.5" /></span>
+              <input type="text" placeholder={t("attrs.searchPlaceholder")} value={attrSearch}
                 onChange={(e) => setAttrSearch(e.target.value)}
-                className="w-full h-9 pl-8 pr-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                className="w-full h-9 ps-8 pe-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                 autoFocus />
             </div>
           </div>
@@ -1378,21 +1413,22 @@ const [viewMode, setViewMode] = useState(() => {
                 {filteredAllAttributes.length > 0 ? (
                   filteredAllAttributes.map((attr) => {
                     const isChecked = tempSelectedAttrIds.includes(attr._id);
+                    const localizedAttr = attributeOf(attr);
                     return (
                       <button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)}
-                        className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}>
+                        className={`w-full px-5 py-2.5 flex items-center gap-3 text-start transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}>
                         {/* Checkbox */}
                         <div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>
                           {isChecked && <CheckIcon className="w-3 h-3 text-white" />}
                         </div>
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attr.name}</p>
+                          <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{localizedAttr.name}</p>
                           <p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {attr.data_type || "text"}</p>
                         </div>
                         {/* Values count */}
                         {attr.values && attr.values.length > 0 && (
-                          <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{attr.values.length} values</span>
+                          <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{t("attrs.valuesCount", { count: attr.values.length })}</span>
                         )}
                       </button>
                     );
@@ -1400,8 +1436,8 @@ const [viewMode, setViewMode] = useState(() => {
                 ) : (
                   /* No matching results when searching */
                   <div className="px-5 py-6 text-center">
-                    <p className="text-[12px] text-[var(--text-muted)] mb-1">No matching attributes found</p>
-                    <p className="text-[11px] text-[var(--text-muted)]">We couldn&apos;t find an attribute matching &quot;{attrSearch}&quot;</p>
+                    <p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noMatch")}</p>
+                    <p className="text-[11px] text-[var(--text-muted)]">{t("attrs.noMatchFor", { term: attrSearch })}</p>
                   </div>
                 )}
 
@@ -1409,8 +1445,8 @@ const [viewMode, setViewMode] = useState(() => {
             ) : (
               /* Empty State: No attributes in system at all */
               <div className="px-5 py-8 text-center">
-                <p className="text-[12px] text-[var(--text-muted)] mb-1">No attributes available yet</p>
-                <p className="text-[11px] text-[var(--text-muted)] mb-3">Create an attribute to start defining product specifications.</p>
+                <p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noneYet")}</p>
+                <p className="text-[11px] text-[var(--text-muted)] mb-3">{t("attrs.noneYetBody")}</p>
               </div>
             )}
           </div>
@@ -1421,9 +1457,9 @@ const [viewMode, setViewMode] = useState(() => {
               {attrSearch.trim() && filteredAllAttributes.length === 0 ? (
                 <div className="px-5 py-2.5">
                   <button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }}
-                    className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
+                    className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-[12px] font-medium">Create &quot;{attrSearch.trim()}&quot;</span>
+                    <span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span>
                   </button>
                 </div>
               ) : !attrSearch.trim() ? (
@@ -1431,7 +1467,7 @@ const [viewMode, setViewMode] = useState(() => {
                   <button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(""); }}
                     className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-[12px] font-medium">Create new attribute</span>
+                    <span className="text-[12px] font-medium">{t("attrs.createNewGeneric")}</span>
                   </button>
                 </div>
               ) : null}
@@ -1442,11 +1478,11 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
             <button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }}
               className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
-              Cancel
+              {t("attrs.cancel")}
             </button>
             <button type="button" onClick={applyAttributeSelection}
               className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">
-              Apply{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}
+              {t("attrs.apply")}{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}
             </button>
           </div>
         </div>
@@ -1461,24 +1497,24 @@ const [viewMode, setViewMode] = useState(() => {
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Category Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage category hierarchy and dynamic attributes</p>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("page.title")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("page.subtitle")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="List view"><ListIcon /></button>
-              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title="Grid view"><GridIcon /></button>
+              <button type="button" onClick={() => setViewMode("list")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("action.listView")}><ListIcon /></button>
+              <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("action.gridView")}><GridIcon /></button>
             </div>
-            <button onClick={handleCreate} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><PlusIcon /> Add Category</button>
+            <button onClick={handleCreate} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><PlusIcon /> {t("page.addCategory")}</button>
           </div>
         </div>
 
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Total Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{allCategories}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Parent Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{rootCategoriesCount}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Child Categories</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{childCategoriesCount}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>With Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{categoriesWithAttributes}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.total")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{allCategories}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.parent")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{rootCategoriesCount}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.child")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{childCategoriesCount}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.withAttributes")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{categoriesWithAttributes}</p></div>
         </div>
 
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
@@ -1486,13 +1522,13 @@ const [viewMode, setViewMode] = useState(() => {
           
           {/* Wider Search Bar (Left Side) */}
           <div className="relative w-full md:w-[400px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+            <span className="absolute start-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
             <input 
               type="text" 
-              placeholder="Search categories..." 
+              placeholder={t("search.placeholder")} 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              className="w-full h-9 ps-9 pe-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
               style={inputStyle} 
             />
           </div>
@@ -1500,9 +1536,9 @@ const [viewMode, setViewMode] = useState(() => {
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
             <SelectFilter value={filterParent} onChange={(e) => { setFilterParent(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
-              <option value="all">All Categories</option>
-              <option value="root">Root Categories</option>
-              <option value="child">Child Categories</option>
+              <option value="all">{t("filter.all")}</option>
+              <option value="root">{t("filter.root")}</option>
+              <option value="child">{t("filter.child")}</option>
             </SelectFilter>
           </div>
         </div>
@@ -1510,21 +1546,21 @@ const [viewMode, setViewMode] = useState(() => {
         {/* ===== Bulk selection bar ===== */}
         {selectedIds.length > 0 && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0 rounded-lg p-2.5 sm:p-0 sm:px-4 sm:h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
+            <p className="text-sm font-semibold px-1.5 sm:px-0" style={{ color: "var(--success-text)" }}>{t("bulk.selected", { count: selectedIds.length })}</p>
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
+              <button onClick={() => setSelectedIds([])} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("bulk.clear")}</button>
+              <button onClick={handleBulkDelete} disabled={isDeleting} className="flex-1 sm:flex-none h-9 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> {t("bulk.deleteSelected")}</button>
             </div>
           </div>
         )}
 
         {/* ===== Loading / Empty / Table / Grid ===== */}
         {categoriesLoading ? (
-          <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading categories...</span></div>
+          <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("table.loading")}</span></div>
         ) : paginatedCategories.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterParent !== "all" ? "No categories match your filters" : "No categories yet"}</p>
-            {!search && filterParent === "all" && <button onClick={handleCreate} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ Add your first category</button>}
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterParent !== "all" ? t("table.emptyFiltered") : t("table.empty")}</p>
+            {!search && filterParent === "all" && <button onClick={handleCreate} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{t("empty.addFirst")}</button>}
           </div>
         ) : viewMode === "list" ? (
           <>
@@ -1534,18 +1570,19 @@ const [viewMode, setViewMode] = useState(() => {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    <SortHeader label="Category Code" sortKey="code" />
-                    <SortHeader label="Category Name" sortKey="name" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Description</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Parent</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
+                    <SortHeader label={t("table.code")} sortKey="code" />
+                    <SortHeader label={t("table.name")} sortKey="name" />
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("table.description")}</th>
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.parent")}</th>
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.status")}</th>
+                    <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedCategories.map((category, index) => {
                     const isSelected = selectedIds.includes(category._id);
                     const parentName = getCategoryName(category.parent_category_id, categoryOptions);
+                    const parentDoc = getCategoryDoc(category.parent_category_id, categoryOptions);
                     const isActive = category.is_active !== false;
                     return (
                       <tr key={category._id} className="transition cursor-pointer" style={{ borderBottom: index < paginatedCategories.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }}
@@ -1557,20 +1594,20 @@ const [viewMode, setViewMode] = useState(() => {
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
-                            <span className="font-medium text-[13px] truncate max-w-[140px]">{category.name}</span>
+                            <span className="font-medium text-[13px] truncate max-w-[140px]">{nameOf(category)}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{category.description || "—"}</p></td>
-                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentName}</td>
+                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(category) || "—"}</p></td>
+                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentDoc ? nameOf(parentDoc) : "—"}</td>
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={isActive
                               ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }
                               : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-                            {isActive ? "Active" : "Inactive"}
+                            {isActive ? t("status.active") : t("status.inactive")}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-right"><ActionButtons category={category} /></td>
+                        <td className="px-4 py-2.5 text-end"><ActionButtons category={category} /></td>
                       </tr>
                     );
                   })}
@@ -1584,6 +1621,7 @@ const [viewMode, setViewMode] = useState(() => {
             {paginatedCategories.map((category) => {
               const isMobileSelected = selectedIds.includes(category._id);
               const parentName = getCategoryName(category.parent_category_id, categoryOptions);
+              const parentDoc = getCategoryDoc(category.parent_category_id, categoryOptions);
               const isMobileActive = category.is_active !== false;
               return (
                 <div key={category._id} onClick={() => handleViewDetail(category)} className="rounded-lg p-3 space-y-2.5 transition cursor-pointer"
@@ -1592,13 +1630,13 @@ const [viewMode, setViewMode] = useState(() => {
                     <input type="checkbox" checked={isMobileSelected} onChange={() => toggleSelect(category._id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded cursor-pointer shrink-0" style={{ accentColor: "var(--accent)" }} />
                     <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate leading-tight">{category.name}</p>
+                      <p className="text-[13px] font-medium truncate leading-tight">{nameOf(category)}</p>
                       <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{category.category_code || "—"}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
-                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? "None" : parentName}</span>
-                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{isMobileActive ? "Active" : "Inactive"}</span>
+                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : nameOf(parentDoc)}</span>
+                    <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{isMobileActive ? t("status.active") : t("status.inactive")}</span>
                   </div>
                   <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                     <ActionButtons category={category} />
@@ -1612,17 +1650,18 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
             {paginatedCategories.map((category) => {
               const parentName = getCategoryName(category.parent_category_id, categoryOptions);
+              const parentDoc = getCategoryDoc(category.parent_category_id, categoryOptions);
               return (
                 <div key={category._id} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle} onClick={() => handleViewDetail(category)}>
                   <div className="flex items-start justify-between">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-5 h-5" /></div>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-[12px] sm:text-[13px] truncate">{category.name}</p>
+                    <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(category)}</p>
                     <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
                   </div>
                   <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? "None" : parentName}</span>
+                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : nameOf(parentDoc)}</span>
                     <ActionButtons category={category} />
                   </div>
                 </div>
@@ -1635,12 +1674,12 @@ const [viewMode, setViewMode] = useState(() => {
         {totalCategories > 20 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
             <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              Showing {startIndex + 1}-{Math.min(endIndex, totalCategories)} of {totalCategories} categories
-              {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+              {t("page.showingRange", { from: startIndex + 1, to: Math.min(endIndex, totalCategories), total: totalCategories })}
+              {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>{t("page.updating")}</span> : null}
             </p>
             <div className="flex items-center gap-2">
-              <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {currentPage} of {totalPages}</span>
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page"><ChevronLeftIcon className="w-4 h-4" /></button>
+              <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("page.pageOf", { page: currentPage, total: totalPages })}</span>
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("page.prev")}><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
@@ -1650,14 +1689,14 @@ const [viewMode, setViewMode] = useState(() => {
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page"><ChevronRightIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("page.next")}><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
         )}
         {paginatedCategories.length > 0 && totalCategories <= 20 && (
           <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            Showing {paginatedCategories.length} of {totalCategories} categories
-            {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>Updating...</span> : null}
+            {t("page.showingCount", { count: paginatedCategories.length, total: totalCategories })}
+            {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>{t("page.updating")}</span> : null}
           </p>
         )}
       </div>
@@ -1668,11 +1707,11 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="w-full max-w-sm rounded-lg p-6" style={cardStyle}>
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--danger-soft)" }}><svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div>
-              <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? `Delete "${deleteTarget.categories[0].name}"?` : `Delete ${deleteTarget.categories.length} categories?`}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The category(ies) will be permanently removed.</p></div>
+              <div className="flex-1 min-w-0"><h3 className="text-sm font-semibold">{deleteTarget.categories.length === 1 ? t("delete.titleOne", { name: nameOf(deleteTarget.categories[0]) }) : t("delete.titleMany", { count: deleteTarget.categories.length })}</h3><p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p></div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
-              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-medium disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-              <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-semibold text-white disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>{isDeleting ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}</button>
+              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-medium disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("delete.cancel")}</button>
+              <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 h-10 rounded-md text-sm font-semibold text-white disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>{isDeleting ? <><Spinner className="w-3.5 h-3.5" /> {t("delete.deleting")}</> : t("delete.confirm")}</button>
             </div>
           </div>
         </div>
@@ -1695,15 +1734,15 @@ const [viewMode, setViewMode] = useState(() => {
                   <LayersIcon className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 pt-0.5">
-                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Add New Attribute</h3>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure properties for products in this category.</p>
+                  <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("addAttr.title")}</h3>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("addAttr.subtitle")}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }}
                 className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
-                aria-label="Close"
+                aria-label={t("addAttr.close")}
               >
                 <CloseIcon className="w-3.5 h-3.5" />
               </button>
@@ -1713,24 +1752,24 @@ const [viewMode, setViewMode] = useState(() => {
             <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
               {/* Attribute Name */}
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label>
+                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.name")} <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={newAttrName}
                   onChange={(e) => setNewAttrName(e.target.value)}
                   autoFocus
                   className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                  placeholder="e.g. Color, Size, RAM"
+                  placeholder={t("addAttr.namePlaceholder")}
                 />
               </div>
 
               {/* Attribute Type */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label>
+                <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.type")}</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: "multi_select", label: "Multi Options" },
-                    { id: "boolean", label: "Yes / No" },
+                    { id: "multi_select", label: t("addAttr.typeMulti") },
+                    { id: "boolean", label: t("addAttr.typeYesNo") },
                   ].map((type) => {
                     const isActive = newAttrType === type.id;
                     return (
@@ -1758,7 +1797,7 @@ const [viewMode, setViewMode] = useState(() => {
               {/* Multi Options Section */}
               {newAttrType === "multi_select" && (
                 <div className="space-y-2.5">
-                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.options")}</label>
                   {newAttrValues.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {newAttrValues.map((val, idx) => (
@@ -1786,7 +1825,7 @@ const [viewMode, setViewMode] = useState(() => {
                           const val = newAttrValueInput.trim();
                           if (!val) return;
                           if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) {
-                            toast.error("Option already exists");
+                            toast.error(t("addAttr.optionExists"));
                             return;
                           }
                           setNewAttrValues((p) => [...p, val]);
@@ -1794,7 +1833,7 @@ const [viewMode, setViewMode] = useState(() => {
                         }
                       }}
                       className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                      placeholder="Add an option (e.g. 8 GB)"
+                      placeholder={t("addAttr.optionPlaceholder")}
                     />
                     <button
                       type="button"
@@ -1802,7 +1841,7 @@ const [viewMode, setViewMode] = useState(() => {
                         const val = newAttrValueInput.trim();
                         if (!val) return;
                         if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) {
-                          toast.error("Option already exists");
+                          toast.error(t("addAttr.optionExists"));
                           setNewAttrValueInput("");
                           return;
                         }
@@ -1811,7 +1850,7 @@ const [viewMode, setViewMode] = useState(() => {
                       }}
                       className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
                     >
-                      <PlusIcon className="w-3 h-3" /> Add
+                      <PlusIcon className="w-3 h-3" /> {t("admin.categories.addAttr.addOption")}
                     </button>
                   </div>
                 </div>
@@ -1820,11 +1859,11 @@ const [viewMode, setViewMode] = useState(() => {
               {/* Yes / No Section */}
               {newAttrType === "boolean" && (
                 <div className="space-y-2.5">
-                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
+                  <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.defaultValue")}</label>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { id: "yes", label: "Yes" },
-                      { id: "no", label: "No" },
+                      { id: "yes", label: t("addAttr.yes") },
+                      { id: "no", label: t("addAttr.no") },
                     ].map((opt) => {
                       const isActive = newAttrDefaultValue === opt.id;
                       return (
@@ -1859,7 +1898,7 @@ const [viewMode, setViewMode] = useState(() => {
                 onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }}
                 className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
               >
-                Cancel
+                {t("addAttr.cancel")}
               </button>
               <button
                 type="button"
@@ -1868,8 +1907,8 @@ const [viewMode, setViewMode] = useState(() => {
                 className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creatingAttribute ? (
-                  <span className="flex items-center gap-1.5"><Spinner className="w-3.5 h-3.5" /> Adding...</span>
-                ) : "Add Attribute"}
+                  <span className="flex items-center gap-1.5"><Spinner className="w-3.5 h-3.5" /> {t("addAttr.creating")}</span>
+                ) : t("addAttr.create")}
               </button>
             </div>
           </div>

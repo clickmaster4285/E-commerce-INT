@@ -29,8 +29,9 @@ import {
   MailCheck,
   MapPinCheck,
 } from "lucide-react";
-import { useSocket } from "@/hooks/useSocket";
+import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { toast } from "sonner";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ══════════════════════════════════════════════
    REUSABLE COMPONENTS
@@ -136,7 +137,8 @@ const cardStyle = {
    ═══════════════════════════════════════════════ */
 
 export default function ProfilePage() {
-  const { socket, isConnected } = useSocket();
+  const { t, locale } = useTranslation();
+  const { socket, isConnected } = useAdminSocket();
 
   const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);
@@ -165,7 +167,7 @@ export default function ProfilePage() {
       (hasStoreData(user.storeId) && user.storeId) ||
       {};
     return {
-      name: user.name || "Admin User",
+      name: user.name || t("admin.profile.adminUser"),
       username: user.username || "admin",
       email: user.email || store.email || "",
       phone: user.phone || store.phone || "",
@@ -173,7 +175,7 @@ export default function ProfilePage() {
       avatar: user.avatar || null,
       memberSince:
         user.createdAt || user.created_at
-          ? new Date(user.createdAt || user.created_at).toLocaleDateString("en-US", {
+          ? new Date(user.createdAt || user.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
               year: "numeric",
               month: "long",
               day: "numeric",
@@ -181,20 +183,20 @@ export default function ProfilePage() {
           : "N/A",
       joinDate:
         user.createdAt || user.created_at
-          ? new Date(user.createdAt || user.created_at).toLocaleDateString("en-US", {
+          ? new Date(user.createdAt || user.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
               year: "numeric",
               month: "short",
               day: "numeric",
             })
           : "N/A",
-      lastLogin: user.last_login || user.lastLogin || "Today",
+      lastLogin: user.last_login || user.lastLogin || t("admin.profile.today"),
       storeName:
         store.store_name || user.store_name || user.storeName || "My Store",
       address: user.address || store.address || "",
-      storeStatus: store.store_status || "Active",
+      storeStatus: store.store_status || t("admin.profile.active"),
       permissions: user.permissions || {},
     };
-  }, []);
+  }, [locale, t]);
 
   /* ── fetch profile via socket ── */
   const fetchProfile = useCallback(() => {
@@ -217,7 +219,7 @@ export default function ProfilePage() {
         return;
       }
       if (res.success === false) {
-        setError(res.message || "Failed to load profile.");
+        setError(t("admin.profile.loadFailed"));
         setProfileLoaded(true);
         return;
       }
@@ -251,7 +253,7 @@ export default function ProfilePage() {
         if (data) {
           setProfile(data);
           setEditForm(data);
-          toast.success("Profile synced!");
+          toast.success(t("admin.profile.toast.synced"));
         }
       }
       if (res?.store) {
@@ -298,7 +300,7 @@ export default function ProfilePage() {
     socket.on("profileUpdated", handleProfileUpdated);
     socket.on("storeInfoChangedForProfile", (d) => {
       handleStoreInfoChanged(d);
-      toast.info("Store info synced from Store page!");
+      toast.info(t("admin.profile.toast.storeSynced"));
     });
     socket.on("storeInfo", handleStoreInfoFallback);
     socket.on("profileError", handleProfileError);
@@ -310,7 +312,7 @@ export default function ProfilePage() {
       socket.off("storeInfo", handleStoreInfoFallback);
       socket.off("profileError", handleProfileError);
     };
-  }, [socket, isConnected, buildData, fetchProfile]);
+  }, [socket, isConnected, buildData, fetchProfile, t]);
 
   /* Handle loading state when socket disconnects */
   useEffect(() => {
@@ -326,9 +328,9 @@ export default function ProfilePage() {
     }
 
     if (!hasProfilePermission) {
-      toast.error("You don't have permission to edit profile.", {
+      toast.error(t("admin.profile.toast.permission"), {
         duration: 6000,
-        description: "Contact an administrator to grant you profile access.",
+        description: t("admin.profile.toast.permissionDescription"),
       });
       return;
     }
@@ -345,7 +347,7 @@ export default function ProfilePage() {
     }
     socket.emit("updateProfile", payload, (res) => {
       if (res?.success) {
-        toast.success(res.storeSkipped ? res.message : "Profile updated successfully!");
+        toast.success(t("admin.profile.toast.storeUpdated"));
         setIsEditing(false);
         const userData = res.data || res.user || res;
         if (userData && (userData.name || userData._id)) {
@@ -359,11 +361,11 @@ export default function ProfilePage() {
           window.dispatchEvent(new CustomEvent("storeUpdated", { detail: res.store }));
         }
       } else {
-        const msg = res?.message || "Failed to update profile";
+        const msg = t("admin.profile.toast.updateFailed");
         if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
           toast.error(msg, {
             duration: 6000,
-            description: "Contact an administrator to grant you profile access.",
+            description: t("admin.profile.toast.permissionDescription"),
           });
         } else {
           toast.error(msg);
@@ -379,28 +381,28 @@ export default function ProfilePage() {
   /* ── CHANGE PASSWORD ── */
   const handleChangePassword = () => {
     if (!socket || !isConnected) {
-      toast.error("Server connection lost.");
+      toast.error(t("admin.profile.toast.connectionLost"));
       return;
     }
 
     if (!hasProfilePermission) {
-      toast.error("You don't have permission to change password.", {
+      toast.error(t("admin.profile.passwordPermission"), {
         duration: 6000,
-        description: "Contact an administrator to grant you profile access.",
+        description: t("admin.profile.toast.permissionDescription"),
       });
       return;
     }
 
     if (!passwords.current || !passwords.new || !passwords.confirm) {
-      toast.error("Please fill all password fields");
+      toast.error(t("admin.profile.toast.fillPasswords"));
       return;
     }
     if (passwords.new !== passwords.confirm) {
-      toast.error("New passwords do not match");
+      toast.error(t("admin.profile.toast.passwordMismatch"));
       return;
     }
     if (passwords.current === passwords.new) {
-      toast.error("New password must differ from current");
+      toast.error(t("admin.profile.toast.passwordSame"));
       return;
     }
     setIsChangingPassword(true);
@@ -409,14 +411,14 @@ export default function ProfilePage() {
       { currentPassword: passwords.current, newPassword: passwords.new },
       (res) => {
         if (res?.success) {
-          toast.success("Password changed successfully!");
+          toast.success(t("admin.profile.toast.passwordChanged"));
           setPasswords({ current: "", new: "", confirm: "" });
         } else {
-          const msg = res?.message || "Failed to change password";
+          const msg = t("admin.profile.toast.passwordFailed");
           if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
             toast.error(msg, {
               duration: 6000,
-              description: "Contact an administrator to grant you profile access.",
+              description: t("admin.profile.toast.permissionDescription"),
             });
           } else {
             toast.error(msg);
@@ -435,7 +437,7 @@ export default function ProfilePage() {
       setError("");
       socket.emit("getProfile");
     } else {
-      setError("Socket not connected. Please refresh the page.");
+      setError(t("admin.profile.toast.connectionLost"));
     }
   };
 
@@ -472,7 +474,7 @@ export default function ProfilePage() {
           style={cardStyle}
         >
           <AlertCircle className="h-12 w-12 mx-auto mb-4" style={{ color: "var(--danger)" }} />
-          <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
+          <h2 className="text-lg font-semibold mb-2">{t("admin.profile.somethingWrong")}</h2>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             {error}
           </p>
@@ -481,7 +483,7 @@ export default function ProfilePage() {
             className="mt-4 inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-semibold transition hover:opacity-90"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
-            <RefreshCw size={14} /> Retry
+            <RefreshCw size={14} /> {t("admin.profile.retry")}
           </button>
         </div>
       </div>
@@ -522,7 +524,7 @@ export default function ProfilePage() {
                 }}
               >
                 {profile.avatar ? (
-                  <img src={profile.avatar} alt="avatar" className="h-full w-full object-cover" />
+                  <img src={profile.avatar} alt={t("admin.profile.title")} className="h-full w-full object-cover" />
                 ) : (
                   <span
                     className="text-3xl sm:text-4xl font-bold select-none"
@@ -593,12 +595,12 @@ export default function ProfilePage() {
                   className="text-[11px] font-bold uppercase tracking-wider"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Account Info
+                  {t("admin.profile.accountInfo")}
                 </h3>
               </div>
-              <InfoField icon={Calendar} label="Member Since" value={profile.joinDate} />
-              <InfoField icon={Clock} label="Last Login" value={profile.lastLogin} />
-              <InfoField icon={ShieldCheck} label="Status" value="Active & Verified" accent />
+              <InfoField icon={Calendar} label={t("admin.profile.memberSince")} value={profile.joinDate} />
+              <InfoField icon={Clock} label={t("admin.profile.lastLogin")} value={profile.lastLogin} />
+              <InfoField icon={ShieldCheck} label={t("common.status")} value={t("admin.profile.activeVerified")} accent />
             </div>
 
             {/* Security Card */}
@@ -614,44 +616,44 @@ export default function ProfilePage() {
                   className="text-[11px] font-bold uppercase tracking-wider"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Security
+                  {t("admin.profile.security")}
                 </h3>
               </div>
 
               {!hasProfilePermission && (
                 <div className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                   <AlertCircle size={13} style={{ color: "var(--danger-text)" }} />
-                  <p className="text-[11px]" style={{ color: "var(--danger-text)" }}>You don&apos;t have permission to change password</p>
+                  <p className="text-[11px]" style={{ color: "var(--danger-text)" }}>{t("admin.profile.passwordPermission")}</p>
                 </div>
               )}
 
               <div className="space-y-2.5">
                 <PasswordField
-                  label="Current Password"
+                  label={t("admin.profile.currentPassword")}
                   value={passwords.current}
                   onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
                   show={showPwd.current}
                   toggle={() => setShowPwd({ ...showPwd, current: !showPwd.current })}
                   disabled={!hasProfilePermission}
-                  placeholder="Enter current password"
+                  placeholder={t("admin.profile.enterCurrentPassword")}
                 />
                 <PasswordField
-                  label="New Password"
+                  label={t("admin.profile.newPassword")}
                   value={passwords.new}
                   onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
                   show={showPwd.new}
                   toggle={() => setShowPwd({ ...showPwd, new: !showPwd.new })}
                   disabled={!hasProfilePermission}
-                  placeholder="Enter new password"
+                  placeholder={t("admin.profile.enterNewPassword")}
                 />
                 <PasswordField
-                  label="Confirm Password"
+                  label={t("admin.profile.confirmPassword")}
                   value={passwords.confirm}
                   onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
                   show={showPwd.confirm}
                   toggle={() => setShowPwd({ ...showPwd, confirm: !showPwd.confirm })}
                   disabled={!hasProfilePermission}
-                  placeholder="Confirm new password"
+                  placeholder={t("admin.profile.confirmNewPassword")}
                 />
                 <div className="flex justify-end pt-1">
                   <button
@@ -665,7 +667,7 @@ export default function ProfilePage() {
                     ) : (
                       <Lock size={13} />
                     )}
-                    {isChangingPassword ? "Updating…" : "Update Password"}
+                    {isChangingPassword ? t("admin.profile.updating") : t("admin.profile.updatePassword")}
                   </button>
                 </div>
               </div>
@@ -692,7 +694,7 @@ export default function ProfilePage() {
                     className="text-[13px] font-bold"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    Profile Details
+                    {t("admin.profile.profileDetails")}
                   </h3>
                 </div>
 
@@ -708,7 +710,7 @@ export default function ProfilePage() {
                           color: "var(--text-primary)",
                         }}
                       >
-                        <Edit3 size={13} /> Edit
+                        <Edit3 size={13} /> {t("admin.profile.edit")}
                       </button>
                     ) : (
                       <button
@@ -719,9 +721,9 @@ export default function ProfilePage() {
                           border: "1px solid var(--border-color)",
                           color: "var(--text-muted)",
                         }}
-                        title="You don't have permission to edit profile"
+                        title={t("admin.profile.toast.permission")}
                       >
-                        <Edit3 size={13} /> Edit
+                        <Edit3 size={13} /> {t("admin.profile.edit")}
                       </button>
                     )
                   ) : (
@@ -737,7 +739,7 @@ export default function ProfilePage() {
                           border: "1px solid var(--border-color)",
                           color: "var(--text-muted)",
                         }}
-                        title="Cancel"
+                        title={t("admin.profile.cancel")}
                       >
                         <X size={13} />
                       </button>
@@ -752,7 +754,7 @@ export default function ProfilePage() {
                         ) : (
                           <Save size={13} />
                         )}
-                        {isSaving ? "Saving…" : "Save"}
+                        {isSaving ? t("admin.profile.saving") : t("admin.profile.save")}
                       </button>
                     </>
                   )}
@@ -764,49 +766,49 @@ export default function ProfilePage() {
                 {isEditing ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <InputField
-                      label="Full Name"
+                      label={t("admin.profile.fullName")}
                       value={editForm.name || ""}
                       onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                       icon={User}
-                      placeholder="Enter your name"
+                      placeholder={t("admin.profile.enterName")}
                     />
                     <InputField
-                      label="Username"
+                      label={t("admin.profile.username")}
                       value={editForm.username || ""}
                       onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
                       icon={User}
                       disabled
-                      placeholder="Username"
+                      placeholder={t("admin.profile.username")}
                     />
                     <InputField
-                      label="Email"
+                      label={t("admin.profile.email")}
                       value={editForm.email || ""}
                       onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                       icon={MailCheck}
-                      placeholder="Enter email"
+                      placeholder={t("admin.profile.enterEmail")}
                     />
                     <InputField
-                      label="Phone"
+                      label={t("admin.profile.phone")}
                       value={editForm.phone || ""}
                       onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                       icon={PhoneCall}
-                      placeholder="Enter phone"
+                      placeholder={t("admin.profile.enterPhone")}
                     />
                     <InputField
-                      label="Store Name"
+                      label={t("admin.profile.storeName")}
                       value={editForm.storeName || ""}
                       onChange={(e) => setEditForm({ ...editForm, storeName: e.target.value })}
                       icon={Building2}
                       disabled={!hasStorePermission}
-                      placeholder="Store name"
+                      placeholder={t("admin.profile.storeNamePlaceholder")}
                     />
                     <InputField
-                      label="Store Address"
+                      label={t("admin.profile.storeAddress")}
                       value={editForm.address || ""}
                       onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                       icon={MapPinCheck}
                       disabled={!hasStorePermission}
-                      placeholder="Store address"
+                      placeholder={t("admin.profile.storeAddressPlaceholder")}
                     />
                     {!hasStorePermission && (
                       <p className="text-[11px] sm:col-span-2" style={{ color: "var(--text-muted)" }}>
@@ -821,12 +823,12 @@ export default function ProfilePage() {
                         className="text-[11px] font-bold uppercase tracking-wider mb-2"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        Contact Information
+                        {t("admin.profile.contactInformation")}
                       </h4>
-                      <InfoField icon={PhoneCall} label="Phone" value={profile.phone} />
-                      <InfoField icon={MailCheck} label="Email" value={profile.email} isLink />
-                      <InfoField icon={Building2} label="Store" value={profile.storeName} accent />
-                      <InfoField icon={MapPinCheck} label="Address" value={profile.address} />
+                      <InfoField icon={PhoneCall} label={t("admin.profile.phone")} value={profile.phone} />
+                      <InfoField icon={MailCheck} label={t("admin.profile.email")} value={profile.email} isLink />
+                      <InfoField icon={Building2} label={t("admin.profile.store")} value={profile.storeName} accent />
+                      <InfoField icon={MapPinCheck} label={t("admin.profile.address")} value={profile.address} />
                     </div>
 
                     <div className="h-px mb-4" style={{ backgroundColor: "var(--border-color)" }} />
@@ -836,11 +838,11 @@ export default function ProfilePage() {
                         className="text-[11px] font-bold uppercase tracking-wider mb-2"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        Basic Information
+                        {t("admin.profile.basicInformation")}
                       </h4>
-                      <InfoField icon={User} label="Username" value={profile.username} />
-                      <InfoField icon={Calendar} label="Member Since" value={profile.memberSince} />
-                      <InfoField icon={ShieldCheck} label="Account" value="Active & Verified" accent />
+                      <InfoField icon={User} label={t("admin.profile.username")} value={profile.username} />
+                      <InfoField icon={Calendar} label={t("admin.profile.memberSince")} value={profile.memberSince} />
+                      <InfoField icon={ShieldCheck} label={t("admin.profile.account")} value={t("admin.profile.activeVerified")} accent />
                     </div>
                   </div>
                 )}

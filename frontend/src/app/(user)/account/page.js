@@ -29,6 +29,7 @@ import { userHttp } from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import { useWishlist } from "@/components/user/WishlistContext";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import dynamic from "next/dynamic";
 // ✅ country-state-city wala form alag chunk me (home bundle se bahar) — behavior same
 const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
@@ -432,6 +433,7 @@ function MobileTopBar({ title, onBack }) {
    ACCOUNT PAGE
    ========================================================== */
 export default function AccountPage() {
+  const { dir } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { count: wishlistCount } = useWishlist();
@@ -725,14 +727,14 @@ export default function AccountPage() {
       <style>{`@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }`}</style>
 
-      <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+      <div dir="ltr" className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
         {/* DESKTOP SIDEBAR — home page ki tara left edge ke sath attached */}
-        <aside className="hidden w-[16.375rem] shrink-0 lg:block lg:sticky lg:top-24 xl:w-[18rem] 2xl:w-[20rem]">
+        <aside dir={dir} className="hidden w-[16.375rem] shrink-0 lg:block lg:sticky lg:top-24 xl:w-[18rem] 2xl:w-[20rem]">
           <SidebarNav {...sidebarProps} />
         </aside>
 
         {/* CONTENT */}
-        <div className="w-full min-w-0 flex-1">
+        <div dir={dir} className="w-full min-w-0 flex-1">
           {showMobileMenu ? (
             <MobileMenu
               {...sidebarProps}

@@ -39,14 +39,21 @@ router.get("/", getProducts);
 //    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
 router.get("/stats", getProductStats);
 // ✅ Storefront shop facets + category tiles — "/:id" se PEHLE (warna id match ho jayega)
-// Master-data GETs: short public cache (60s) + ETag (express default).
-// User-specific/cart/orders par kabhi nahi — sirf ye do static-ish routes.
-const masterCache = (req, res, next) => {
-  res.set("Cache-Control", "public, max-age=60, must-revalidate");
-  next();
-};
-router.get("/facets", masterCache, publicCache(30 * 1000), getProductFacets);
-router.get("/category-tiles", masterCache, publicCache(60 * 1000), getCategoryTiles);
+//    Server-side memo (publicCache) hi caching layer hai — wo har admin mutation
+//    par `dropProductsCache` se drop ho jaata hai.
+//
+// ⚠️ Yahan PEHLE ek browser-level `Cache-Control: public, max-age=60` bhi tha.
+//    Wo ek alag, UNSYNCED cache layer tha: socket event aane par frontend cache
+//    patch karta hai, phir `invalidate()` refetch karta hai — lekin browser apne
+//    60s ke HTTP cache se purana response serve kar deta (server tak request jaata
+//    hi nahi) aur wahi stale data React Query cache ko wapas likh deta.
+//    Isiliye "Explore Our Categories" section rename/disable hone par purana data
+//    dikhata tha jabki sidebar (`/categories/public`, jis par ye header nahi tha)
+//    sahi update ho jata tha.
+//    Ab header hataya gaya hai — Express ka default ETag/304 unchanged data ke
+//    liye conditional GET deta hai (cheap), aur fresh data hamesha server se aata hai.
+router.get("/facets", publicCache(30 * 1000), getProductFacets);
+router.get("/category-tiles", publicCache(60 * 1000), getCategoryTiles);
 router.get("/:id", getProductById);
 
 // ==========================================

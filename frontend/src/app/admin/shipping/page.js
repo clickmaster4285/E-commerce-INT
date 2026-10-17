@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import { shippingApi } from "@/apis/admin/shippingApi";
-import { useShippingSocketSync } from "@/hooks/useShippingSocketSync.js";
+import { useShippingSocketSync } from "@/hooks/admin/useShippingSocketSync";
 
 /* ================= ICONS ================= */
 const TruckIcon = ({ className = "w-4 h-4" }) => (
@@ -59,6 +60,7 @@ const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid v
 
 /* ================= EDIT MODAL ================= */
 function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({ fee: 0, min_days: 0, max_days: 0 });
 
   useEffect(() => {
@@ -99,13 +101,13 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
               className="text-[15px] font-semibold"
               style={{ color: "var(--text-primary)" }}
             >
-              Edit {isStandard ? "Standard" : "Express"} Delivery
+              {t(`admin.shipping.form.editTitle`, { name: isStandard ? t("admin.shipping.page.standard") : t("admin.shipping.page.express") })}
             </h3>
             <p
               className="text-[12px] mt-0.5"
               style={{ color: "var(--text-muted)" }}
             >
-              Update shipping rates and delivery time
+              {t("admin.shipping.form.editSubtitle")}
             </p>
           </div>
           <button
@@ -134,7 +136,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
               className="block text-[12px] font-medium mb-1.5"
               style={{ color: "var(--text-secondary)" }}
             >
-              Shipping Fee (Rs)
+              {t("admin.shipping.form.shippingFee")}
             </label>
             <input
               type="number"
@@ -146,7 +148,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
               disabled={saving}
               className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
               style={inputStyle}
-              placeholder="e.g. 200"
+              placeholder={t("admin.shipping.form.feePlaceholder")}
             />
           </div>
 
@@ -156,7 +158,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
                 className="block text-[12px] font-medium mb-1.5"
                 style={{ color: "var(--text-secondary)" }}
               >
-                Min Days
+                {t("admin.shipping.form.minDays")}
               </label>
               <input
                 type="number"
@@ -175,7 +177,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
                 className="block text-[12px] font-medium mb-1.5"
                 style={{ color: "var(--text-secondary)" }}
               >
-                Max Days
+                {t("admin.shipping.form.maxDays")}
               </label>
               <input
                 type="number"
@@ -207,7 +209,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
                 color: "var(--text-primary)",
               }}
             >
-              Cancel
+              {t("admin.shared.action.cancel")}
             </button>
             <button
               type="submit"
@@ -220,11 +222,11 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
             >
               {saving ? (
                 <>
-                  <Spinner className="w-4 h-4" /> Saving...
+                  <Spinner className="w-4 h-4" /> {t("admin.shared.state.saving")}
                 </>
               ) : (
                 <>
-                  <CheckIcon className="w-4 h-4" /> Save Changes
+                  <CheckIcon className="w-4 h-4" /> {t("admin.shipping.form.saveChanges")}
                 </>
               )}
             </button>
@@ -237,6 +239,7 @@ function EditShippingModal({ open, type, config, onClose, onSave, saving }) {
 
 /* ================= CUSTOM METHOD MODAL (Add / Edit) ================= */
 function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({ name: "", fee: 0, min_days: 2, max_days: 4, is_active: true });
 
   useEffect(() => {
@@ -267,10 +270,10 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
         >
           <div>
             <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>
-              {method ? "Edit Shipping Method" : "Add New Shipping Method"}
+              {method ? t("admin.shipping.form.editShippingTitle") : t("admin.shipping.form.addTitle")}
             </h3>
             <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-              {method ? "Update this custom delivery method" : "Create your own shipping method"}
+              {method ? t("admin.shipping.form.editSubtitle") : t("admin.shipping.form.addSubtitle")}
             </p>
           </div>
           <button
@@ -294,7 +297,7 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
         >
           <div>
             <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              Method Name
+              {t("admin.shipping.form.methodName")}
             </label>
             <input
               type="text"
@@ -304,13 +307,13 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
               required
               className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
               style={inputStyle}
-              placeholder="e.g. Overnight, TCS Same Day, Cargo"
+              placeholder={t("admin.shipping.form.methodPlaceholder")}
             />
           </div>
 
           <div>
             <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              Shipping Fee (Rs)
+              {t("admin.shipping.form.shippingFee")}
             </label>
             <input
               type="number"
@@ -320,14 +323,14 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
               disabled={saving}
               className="h-10 px-3 rounded-lg text-[13px] w-full outline-none disabled:opacity-50"
               style={inputStyle}
-              placeholder="e.g. 300"
+              placeholder={t("admin.shipping.form.feePlaceholder")}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-                Min Days
+                {t("admin.shipping.form.minDays")}
               </label>
               <input
                 type="number"
@@ -341,7 +344,7 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
             </div>
             <div>
               <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-                Max Days
+                {t("admin.shipping.form.maxDays")}
               </label>
               <input
                 type="number"
@@ -366,7 +369,7 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
               style={{ accentColor: "var(--accent)" }}
             />
             <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
-              Active (visible to customers at checkout)
+              {t("admin.shipping.form.activeLabel")}
             </span>
           </label>
 
@@ -386,7 +389,7 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
                 color: "var(--text-primary)",
               }}
             >
-              Cancel
+              {t("admin.shared.action.cancel")}
             </button>
             <button
               type="submit"
@@ -396,11 +399,11 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
             >
               {saving ? (
                 <>
-                  <Spinner className="w-4 h-4" /> Saving...
+                  <Spinner className="w-4 h-4" /> {t("admin.shared.state.saving")}
                 </>
               ) : (
                 <>
-                  <CheckIcon className="w-4 h-4" /> {method ? "Save Changes" : "Add Method"}
+                  <CheckIcon className="w-4 h-4" /> {method ? t("admin.shared.action.saveChanges") : t("admin.shipping.form.addMethod")}
                 </>
               )}
             </button>
@@ -415,6 +418,7 @@ function ShippingMethodModal({ open, method, onClose, onSave, saving }) {
 export default function ShippingManagementPage() {
   useShippingSocketSync();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const [editType, setEditType] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -439,12 +443,12 @@ export default function ShippingManagementPage() {
     mutationFn: (data) => shippingApi.updateConfig(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminShippingConfig"] });
-      toast.success("Shipping settings updated");
+      toast.success(t("admin.shipping.toast.settingsUpdated"));
       setShowEditModal(false);
     },
     onError: (e) =>
       toast.error(
-        e?.response?.data?.message || e?.message || "Update failed"
+        e?.response?.data?.message || e?.message || t("admin.shipping.toast.updateFailed")
       ),
   });
 
@@ -459,12 +463,12 @@ export default function ShippingManagementPage() {
       id ? shippingApi.updateMethod(id, data) : shippingApi.createMethod(data),
     onSuccess: (_res, vars) => {
       queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
-      toast.success(vars.id ? "Shipping method updated" : "Shipping method added");
+      toast.success(vars.id ? t("admin.shipping.toast.methodUpdated") : t("admin.shipping.toast.methodAdded"));
       setMethodModalOpen(false);
       setEditingMethod(null);
     },
     onError: (e) =>
-      toast.error(e?.response?.data?.message || e?.message || "Save failed"),
+      toast.error(e?.response?.data?.message || e?.message || t("admin.shipping.toast.saveFailed")),
   });
 
   const methodDeleteMutation = useMutation({
@@ -472,11 +476,11 @@ export default function ShippingManagementPage() {
     onSuccess: (_res, id) => {
       queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
       const deletedName = methods.find((m) => String(m._id) === String(id))?.name || methodToDelete?.name;
-      toast.success(deletedName ? `Shipping method "${deletedName}" deleted successfully` : "Shipping method deleted successfully");
+      toast.success(deletedName ? t("admin.shipping.toast.methodDeleted", { name: deletedName }) : t("admin.shipping.toast.methodDeletedGeneric"));
       setMethodToDelete(null);
     },
     onError: (e) =>
-      toast.error(e?.response?.data?.message || e?.message || "Delete failed"),
+      toast.error(e?.response?.data?.message || e?.message || t("admin.shipping.toast.deleteFailed")),
   });
 
   const confirmDeleteMethod = () => {
@@ -488,10 +492,10 @@ export default function ShippingManagementPage() {
     mutationFn: (id) => shippingApi.toggleMethod(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminShippingMethods"] });
-      toast.success("Shipping method updated");
+      toast.success(t("admin.shipping.toast.methodUpdated"));
     },
     onError: (e) =>
-      toast.error(e?.response?.data?.message || e?.message || "Update failed"),
+      toast.error(e?.response?.data?.message || e?.message || t("admin.shipping.toast.updateFailed")),
   });
 
   const openAddMethod = () => {
@@ -540,8 +544,8 @@ export default function ShippingManagementPage() {
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Shipping Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Manage delivery methods and rates</p>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("admin.shipping.page.title")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.subtitle")}</p>
           </div>
           {/* ✅ Add New — custom shipping method */}
           <button
@@ -549,7 +553,7 @@ export default function ShippingManagementPage() {
             className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-[13px] font-semibold transition hover:opacity-90 active:scale-[0.98]"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
-            <PlusIcon className="w-4 h-4" /> Add New
+            <PlusIcon className="w-4 h-4" /> {t("admin.shipping.page.addNew")}
           </button>
         </div>
 
@@ -563,8 +567,8 @@ export default function ShippingManagementPage() {
                   <TruckIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>Standard</p>
-                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Details</p>
+                  <p className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>{t("admin.shipping.page.standard")}</p>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.details")}</p>
                 </div>
               </div>
               <button
@@ -577,11 +581,11 @@ export default function ShippingManagementPage() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Shipping Fee</span>
+                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.shippingFee")}</span>
                 <span className="text-[18px] sm:text-[20px] font-bold" style={{ color: "var(--text-primary)" }}>Rs. {config?.standard?.fee ?? 200}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Delivery Time</span>
+                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryTime")}</span>
                 <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
                   {config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} days
                 </span>
@@ -597,8 +601,8 @@ export default function ShippingManagementPage() {
                   <ZapIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>Express</p>
-                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Details</p>
+                  <p className="text-[13px] font-bold uppercase tracking-wide" style={{ color: "var(--text-primary)" }}>{t("admin.shipping.page.express")}</p>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.details")}</p>
                 </div>
               </div>
               <button
@@ -611,11 +615,11 @@ export default function ShippingManagementPage() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Shipping Fee</span>
+                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.shippingFee")}</span>
                 <span className="text-[18px] sm:text-[20px] font-bold" style={{ color: "var(--text-primary)" }}>Rs. {config?.express?.fee ?? 500}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>Delivery Time</span>
+                <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryTime")}</span>
                 <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
                   {config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} days
                 </span>
@@ -630,12 +634,12 @@ export default function ShippingManagementPage() {
             <table className="w-full text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                 <tr>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Method</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Shipping Fee</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Min Days</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>Max Days</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Delivery Window</th>
-                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Actions</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.method")}</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.shippingFee")}</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.minDays")}</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.maxDays")}</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryWindow")}</th>
+                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -648,7 +652,7 @@ export default function ShippingManagementPage() {
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
                         <TruckIcon className="w-4 h-4" />
                       </div>
-                      <span className="font-medium text-[13px]">Standard Delivery</span>
+                      <span className="font-medium text-[13px]">{t("admin.shipping.page.standardDelivery")}</span>
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {config?.standard?.fee ?? 200}</td>
@@ -677,7 +681,7 @@ export default function ShippingManagementPage() {
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple)" }}>
                         <ZapIcon className="w-4 h-4" />
                       </div>
-                      <span className="font-medium text-[13px]">Express Delivery</span>
+                      <span className="font-medium text-[13px]">{t("admin.shipping.page.expressDelivery")}</span>
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {config?.express?.fee ?? 500}</td>
@@ -709,7 +713,7 @@ export default function ShippingManagementPage() {
                         </div>
                         <span className="font-medium text-[13px]" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
                           {m.name}
-                          {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>Inactive</span>}
+                          {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                         </span>
                       </div>
                     </td>
@@ -722,11 +726,11 @@ export default function ShippingManagementPage() {
                         <button
                           onClick={() => methodToggleMutation.mutate(m._id)}
                           disabled={methodToggleMutation.isPending}
-                          title={m.is_active ? "Deactivate" : "Activate"}
+                          title={m.is_active ? t("admin.shared.action.deactivate") : t("admin.shared.action.activate")}
                           className="h-8 px-2.5 rounded-lg text-[11px] font-bold transition hover:opacity-80"
                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "var(--success)" : "var(--text-muted)" }}
                         >
-                          {m.is_active ? "ON" : "OFF"}
+                          {m.is_active ? t("admin.shipping.page.on") : t("admin.shipping.page.off")}
                         </button>
                         <button
                           onClick={() => openEditMethod(m)}
@@ -737,7 +741,7 @@ export default function ShippingManagementPage() {
                         </button>
                         <button
                           onClick={() => setMethodToDelete(m)}
-                          title={`Delete "${m.name}"`}
+                          title={t("admin.shipping.delete.title", { name: m.name })}
                           className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                         >
@@ -761,7 +765,7 @@ export default function ShippingManagementPage() {
                 <TruckIcon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium truncate leading-tight">Standard Delivery</p>
+                <p className="text-[13px] font-medium truncate leading-tight">{t("admin.shipping.page.standardDelivery")}</p>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} days</p>
               </div>
             </div>
@@ -786,7 +790,7 @@ export default function ShippingManagementPage() {
                 <ZapIcon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium truncate leading-tight">Express Delivery</p>
+                <p className="text-[13px] font-medium truncate leading-tight">{t("admin.shipping.page.expressDelivery")}</p>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} days</p>
               </div>
             </div>
@@ -814,7 +818,7 @@ export default function ShippingManagementPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate leading-tight" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
                     {m.name}
-                    {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>Inactive</span>}
+                    {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                   </p>
                   <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{m.min_days}-{m.max_days} days</p>
                 </div>
@@ -825,11 +829,11 @@ export default function ShippingManagementPage() {
                   <button
                     onClick={() => methodToggleMutation.mutate(m._id)}
                     disabled={methodToggleMutation.isPending}
-                    title={m.is_active ? "Deactivate" : "Activate"}
+                    title={m.is_active ? t("admin.shared.action.deactivate") : t("admin.shared.action.activate")}
                     className="h-8 px-2.5 rounded-lg text-[11px] font-bold transition hover:opacity-80"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: m.is_active ? "var(--success)" : "var(--text-muted)" }}
                   >
-                    {m.is_active ? "ON" : "OFF"}
+                    {m.is_active ? t("admin.shipping.page.on") : t("admin.shipping.page.off")}
                   </button>
                   <button
                     onClick={() => openEditMethod(m)}
@@ -840,7 +844,7 @@ export default function ShippingManagementPage() {
                   </button>
                   <button
                     onClick={() => setMethodToDelete(m)}
-                    title={`Delete "${m.name}"`}
+                    title={t("admin.shipping.delete.title", { name: m.name })}
                     className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                   >
@@ -863,8 +867,8 @@ export default function ShippingManagementPage() {
                 <TrashIcon className="w-5 h-5" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Delete &quot;{methodToDelete.name}&quot;?</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The shipping method will be permanently removed.</p>
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.shipping.delete.title", { name: methodToDelete.name })}</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.delete.body")}</p>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
@@ -874,7 +878,7 @@ export default function ShippingManagementPage() {
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
               >
-                Cancel
+                {t("admin.shared.action.cancel")}
               </button>
               <button
                 onClick={confirmDeleteMethod}
@@ -882,7 +886,7 @@ export default function ShippingManagementPage() {
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger)" }}
               >
-                {methodDeleteMutation.isPending ? (<><Spinner className="w-3.5 h-3.5" /> Deleting...</>) : "Delete"}
+                {methodDeleteMutation.isPending ? (<><Spinner className="w-3.5 h-3.5" /> {t("admin.shared.state.updating")}</>) : t("admin.shared.action.delete")}
               </button>
             </div>
           </div>

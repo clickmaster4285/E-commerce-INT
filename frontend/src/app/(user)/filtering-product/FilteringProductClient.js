@@ -27,7 +27,8 @@ import FilterResults from "@/components/user/FilterResults";
 import AllDealsResults from "@/components/user/AllDealsResults";
 import AllCategoriesResults from "@/components/user/AllCategoriesResults";
 import SectionHeading from "@/components/user/SectionHeading";
-import { useHomeCatalog } from "@/hooks/useHomeCatalog";
+import { useHomeCatalog } from "../../../hooks/user/useHomeCatalog";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* Mobile drawer: band ho to zero JS — sirf kholne par load. */
 const SidebarDrawer = dynamic(() => import("@/components/user/HomeSidebar"), {
@@ -58,7 +59,7 @@ export default function FilteringProductClient() {
         >
           <div className="sticky top-14 z-40 h-11 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16 lg:h-12" />
           <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
-            <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+            <div dir="ltr" className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
               <div className="hidden w-[16.375rem] shrink-0 lg:block xl:w-[18rem] 2xl:w-[20rem]">
                 <div className="space-y-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4">
                   {[...Array(8).keys()].map((i) => (
@@ -185,6 +186,7 @@ function FilteringParamsSync({
 }
 
 function FilteringContent() {
+  const { dir } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -507,7 +509,7 @@ function FilteringContent() {
           </span>
         </SectionHeading>
 
-        <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+        <div dir="ltr" className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
           {/* LEFT SIDEBAR — home wala same component */}
           <div
             className={`filters-sidebar-hover sticky top-[7.25rem] hidden min-w-0 shrink-0 self-start overflow-hidden ${
@@ -525,7 +527,7 @@ function FilteringContent() {
           </div>
 
           {/* MAIN COLUMN */}
-          <div className="w-full min-w-0 flex-1">
+          <div dir={dir} className="w-full min-w-0 flex-1">
             {/* MOBILE FILTER TRIGGER */}
             <div
               className={`mb-4 flex items-center justify-between gap-3 ${

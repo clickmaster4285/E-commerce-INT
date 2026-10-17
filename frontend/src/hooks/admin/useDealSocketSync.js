@@ -3,7 +3,7 @@
 
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSocket } from "./useSocket"; // Apne global socket helper ko import karein
+import { getAdminSocket as getSocket } from "./useAdminSocket"; // Apne global socket helper ko import karein
 
 export default function useDealSocketSync() {
   const queryClient = useQueryClient();

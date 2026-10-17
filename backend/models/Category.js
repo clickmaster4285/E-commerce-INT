@@ -39,6 +39,37 @@ const categorySchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     description: { type: String, trim: true, default: "" },
 
+    // ==========================================
+    // 🌍 AUTOMATIC TRANSLATIONS (LibreTranslate)
+    // ------------------------------------------
+    // English `name`/`description` source of truth hain — inme kabhi koi
+    // write nahi hota; translation alag `translations` map me chala jaata
+    // hai. `translation_source` har field ke English text ka hash rakhta
+    // hai, jisse pata chalta hai ke translation stale hai ya nahi (English
+    // edit hua → hash badla → dobara generate).
+    // Category ka `name` descriptive hai (Mobile Phones, Laptops) is liye
+    // woh translate hota hai.
+    translations: {
+      name: { type: Map, of: String, default: () => ({}) },
+      description: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      name: { type: String, default: "" },
+      description: { type: String, default: "" },
+    },
+    translation_status: {
+      name: {
+        type: String,
+        enum: ["pending", "done", "failed", "skipped"],
+        default: "pending",
+      },
+      description: {
+        type: String,
+        enum: ["pending", "done", "failed", "skipped"],
+        default: "pending",
+      },
+    },
+
     parent_category_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",

@@ -15,7 +15,10 @@ import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { DiscountFormModal, SelectionModal } from "../_components/discountModals";
 import { validateNonNegative } from "../_components/discountUtils";
-import useDiscountSocketSync from "../../../../hooks/useDiscountSocketSync";
+import useDiscountSocketSync from "../../../../hooks/admin/useDiscountSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
+import { translate } from "@/i18n/translations";
 
 /* =========================================================
    HELPERS
@@ -25,11 +28,11 @@ function ini(name) {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
-function fd(date) {
+function fd(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
-  });
+  }).format(new Date(date));
 }
 
 function tago(date) {
@@ -43,14 +46,14 @@ function tago(date) {
   return d < 30 ? `${d}d ago` : fd(date);
 }
 
-function formatTarget(value) {
-  if (!value) return "All Products";
+function formatTarget(value, locale = "en") {
+  if (!value) return translate(locale, "admin.discounts.page.allProducts");
   const map = {
-    all: "All Products", all_products: "All Products",
-    specific_products: "Specific Products", product: "Specific Products",
-    specific_categories: "Categories", category: "Categories",
-    specific_brands: "Brands", brand: "Brands",
-    price_range: "Price Range",
+    all: translate(locale, "admin.discounts.page.allProducts"), all_products: translate(locale, "admin.discounts.page.allProducts"),
+    specific_products: translate(locale, "admin.discounts.page.specificProducts"), product: translate(locale, "admin.discounts.page.specificProducts"),
+    specific_categories: translate(locale, "admin.discounts.page.categories"), category: translate(locale, "admin.discounts.page.categories"),
+    specific_brands: translate(locale, "admin.discounts.page.brands"), brand: translate(locale, "admin.discounts.page.brands"),
+    price_range: translate(locale, "admin.discounts.page.priceRange"),
   };
   return map[value] || String(value).replaceAll("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
@@ -74,12 +77,12 @@ function getDiscountStatus(discount) {
   return "active";
 }
 
-function formatDateTime(date) {
+function formatDateTime(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     month: "short", day: "numeric", year: "numeric",
     hour: "2-digit", minute: "2-digit",
-  });
+  }).format(new Date(date));
 }
 
 const toDateInput = (value) => {
@@ -185,8 +188,9 @@ function SkeletonDataRows({ rows = 4 }) {
 }
 
 function DiscountDetailSkeleton() {
+  const { t } = useTranslation();
   return (
-    <div className="w-full pb-8 space-y-3" aria-busy="true" aria-label="Loading discount details">
+    <div className="w-full pb-8 space-y-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.a50f7dc65c01")}>
       {/* HEADER */}
       <div>
         <div className="flex items-center gap-1.5 text-[10px] mb-2">
@@ -223,8 +227,8 @@ function DiscountDetailSkeleton() {
       {/* SECTIONS — real page jaise titles, sirf values shimmer */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr_0.9fr] gap-3 items-start">
         <div className="space-y-3">
-          <InfoCard icon={Tag} title="Basic Information"><SkeletonDataRows rows={7} /></InfoCard>
-          <InfoCard icon={Package} title="Applicable Products">
+          <InfoCard icon={Tag} title={t("admin.categories.form.basicInfo")}><SkeletonDataRows rows={7} /></InfoCard>
+          <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")}>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={`dk-product-${i}`} className="min-w-0">
@@ -237,12 +241,12 @@ function DiscountDetailSkeleton() {
           </InfoCard>
         </div>
         <div className="space-y-3">
-          <InfoCard icon={Calendar} title="Validity Period"><SkeletonDataRows rows={3} /></InfoCard>
-          <InfoCard icon={TrendingUp} title="Usage Limits"><SkeletonDataRows rows={4} /></InfoCard>
+          <InfoCard icon={Calendar} title={t("admin.discounts.detail.validityPeriod")}><SkeletonDataRows rows={3} /></InfoCard>
+          <InfoCard icon={TrendingUp} title={t("admin.discounts.detail.usageLimits")}><SkeletonDataRows rows={4} /></InfoCard>
         </div>
         <div className="space-y-3">
-          <InfoCard icon={Target} title="Targeting"><SkeletonDataRows rows={4} /></InfoCard>
-          <InfoCard icon={User} title="Created By">
+          <InfoCard icon={Target} title={t("admin.promotions.ui.generated.08d79bb915ec")}><SkeletonDataRows rows={4} /></InfoCard>
+          <InfoCard icon={User} title={t("admin.brands.detail.createdBy")}>
             <div className="flex items-center gap-2">
               <span className="skeleton h-9 w-9 shrink-0" style={SKELETON_ROUND} />
               <div className="min-w-0 flex-1">
@@ -258,11 +262,12 @@ function DiscountDetailSkeleton() {
 }
 
 function Avatar({ user, size = "md", color = "emerald" }) {
+  const { t } = useTranslation();
   const sizes = { sm: "w-7 h-7 text-[9px]", md: "w-9 h-9 text-[10px]", lg: "w-11 h-11 text-xs" };
   const colors = {
-    emerald: { bg: "var(--success-soft)", text: "var(--success)" },
-    blue: { bg: "var(--info-soft)", text: "var(--info)" },
-    purple: { bg: "var(--purple-soft)", text: "var(--purple)" },
+    emerald: { bg: "var(--success-soft)", text: t("admin.promotions.ui.generated.f41e0cb8441d") },
+    blue: { bg: "var(--info-soft)", text: t("admin.promotions.ui.generated.8e18505083bf") },
+    purple: { bg: "var(--purple-soft)", text: t("admin.promotions.ui.generated.8173ec56882e") },
   };
   const c = colors[color] || colors.emerald;
 
@@ -277,6 +282,8 @@ function Avatar({ user, size = "md", color = "emerald" }) {
    MAIN PAGE
 ========================================================= */
 export default function DiscountDetailPage() {
+  const { t, locale, dir } = useTranslation();
+  const { nameOf, productNameOf, descriptionOf } = useLocalized();
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
@@ -326,11 +333,11 @@ export default function DiscountDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("Discount deleted successfully");
+      toast.success(t("admin.discounts.toast.deleted"));
       router.push(backPath);
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount");
+      toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.deleteFailed"));
     },
   });
 
@@ -411,24 +418,24 @@ export default function DiscountDetailPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormErrors({});
-    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.discounts.validation.nameRequired"));
     const manualCode = String(formData.code || "").trim();
     if (!manualCode) {
-      setFormErrors({ code: "Discount code is required." });
+      setFormErrors({ code: t("admin.discounts.validation.codeRequired") });
       return;
     }
-    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
-    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
-    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error(t("admin.discounts.validation.valueRequired"));
+    if (Number(formData.value) < 0) return toast.error(t("admin.discounts.validation.valueNegative"));
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error(t("admin.discounts.validation.percentageMax"));
 
     // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
     const nonNegativeError = validateNonNegative([
-      ["Discount value", formData.value],
-      ["Minimum order amount", formData.min_order_amount],
-      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
-      ["Total usage limit", formData.usage_limit],
-      ["Per customer limit", formData.usage_per_customer],
-    ]);
+      [t("admin.discounts.form.discountValue"), formData.value],
+      [t("admin.discounts.form.minOrderAmount"), formData.min_order_amount],
+      [t("admin.discounts.form.minQuantity"), formData.has_min_quantity ? formData.min_quantity : ""],
+      [t("admin.discounts.form.totalUsageLimit"), formData.usage_limit],
+      [t("admin.discounts.form.perCustomerLimit"), formData.usage_per_customer],
+    ], t);
     if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
@@ -436,15 +443,15 @@ export default function DiscountDetailPage() {
     let payloadExtras = {};
     if (activeFormType === "product") {
       target_type = "specific_products"; applyTo = "specific_products";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectProduct"));
       payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "category") {
       target_type = "specific_categories"; applyTo = "specific_categories";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectCategory"));
       payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "brand") {
       target_type = "brand"; applyTo = "brand";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectBrand"));
       payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
     }
 
@@ -452,7 +459,7 @@ export default function DiscountDetailPage() {
     const fallbackEnd = new Date();
     fallbackEnd.setDate(fallbackEnd.getDate() + 30);
     const endDate = formData.end_at ? dateToISO(formData.end_at) : fallbackEnd.toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.discounts.validation.dateOrder"));
 
     const finalMinQuantity = formData.has_min_quantity && formData.min_quantity ? Number(formData.min_quantity) : null;
 
@@ -485,12 +492,12 @@ export default function DiscountDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["discount"] });
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success("Discount updated successfully");
+      toast.success(t("admin.discounts.toast.updated"));
       setShowEdit(false);
       resetForm();
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message || error?.message || "Failed to update discount");
+      toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.saveFailed"));
     },
   });
 
@@ -508,11 +515,10 @@ export default function DiscountDetailPage() {
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--danger-soft)" }}>
             <AlertTriangle className="w-7 h-7" style={{ color: "var(--danger)" }} />
           </div>
-          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Discount Not Found</h2>
-          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>This discount does not exist or has been deleted.</p>
+          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.discounts.detail.discountNotFound")}</h2>
+          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.discountNotFoundBody")}</p>
           <button onClick={() => router.push(backPath)} className="mt-4 h-10 px-5 rounded-lg text-[13px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-            <ArrowLeft className="w-4 h-4" /> Back to Discounts
-          </button>
+            <ArrowLeft className="w-4 h-4" />{" "}{t("admin.discounts.detail.backToDiscounts")}</button>
         </div>
       </div>
     );
@@ -523,24 +529,24 @@ export default function DiscountDetailPage() {
       {/* HEADER */}
       <div>
         <div className="flex items-center gap-1.5 text-[10px] mb-2" style={{ color: "var(--text-muted)" }}>
-          <button onClick={() => router.push(backPath)} className="hover:underline">Discounts</button>
-          <span>›</span><span style={{ color: "var(--text-primary)" }}>Discount Details</span>
+          <button onClick={() => router.push(backPath)} className="hover:underline">{t("admin.nav.item.discounts")}</button>
+          <span>›</span><span style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.7b989f1f6be4")}</span>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{discount.name || "Untitled Discount"}</h1>
+            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</h1>
             <div className="flex items-center gap-1.5 mt-1 text-[10px]" style={{ color: "var(--accent)" }}><Tag className="w-3 h-3" /> {discount.code || "—"}</div>
           </div>
           <div className="flex items-center gap-2">
-            <StatusBadge active={isActive} label={isActive ? "Active" : "Inactive"} />
-            <button type="button" onClick={openEdit} className="h-8 px-3 rounded-md text-[10px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Edit3 className="w-3.5 h-3.5" /> Edit</button>
-            <button type="button" disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)} className="h-8 px-3 rounded-md text-[10px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)", color: "var(--danger)" }}><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+            <StatusBadge active={isActive} label={isActive ? t("common.active") : t("common.inactive")} />
+            <button type="button" onClick={openEdit} className="h-8 px-3 rounded-md text-[10px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Edit3 className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.9ead47a82a0d")}</button>
+            <button type="button" disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)} className="h-8 px-3 rounded-md text-[10px] font-semibold flex items-center gap-1.5" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)", color: "var(--danger)" }}><Trash2 className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.9485989ff514")}</button>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 rounded-md overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        {[{ icon: Percent, label: "Discount Type", value: discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price" }, { icon: Calendar, label: "Valid Period", value: `${fd(discount.startDate)} - ${fd(discount.endDate)}` }, { icon: TrendingUp, label: "Usage Limit", value: discount.usageLimit ? String(discount.usageLimit) : "Unlimited" }, { icon: ShoppingCart, label: "Minimum Order Value", value: discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum" }].map(({ icon: Icon, label, value }) => (
+        {[{ icon: Percent, label: t("admin.discounts.detail.discountType"), value: discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price" }, { icon: Calendar, label: t("admin.discounts.detail.validPeriod"), value: `${fd(discount.startDate, locale)} - ${fd(discount.endDate, locale)}` }, { icon: TrendingUp, label: t("admin.discounts.detail.usageLimit"), value: discount.usageLimit ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(discount.usageLimit) : "Unlimited" }, { icon: ShoppingCart, label: t("admin.discounts.detail.minimumOrderValue"), value: discount.minOrderValue ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : "No minimum" }].map(({ icon: Icon, label, value }) => (
           <div key={label} className="flex items-center gap-2.5 px-3 py-3 border-b md:border-b-0 md:border-r last:border-0" style={{ borderColor: "var(--border-color)" }}><Icon className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} /><div className="min-w-0"><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{value}</p></div></div>
         ))}
       </div>
@@ -550,32 +556,32 @@ export default function DiscountDetailPage() {
 
       <div id="d-overview" className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr_0.9fr] gap-3 items-start scroll-mt-4">
         <div className="space-y-3">
-          <InfoCard icon={Tag} title="Basic Information" action={<button type="button" onClick={openEdit} className="text-[9px] font-semibold" style={{ color: "var(--accent)" }}><Edit3 className="w-3 h-3 inline mr-1" /> Edit</button>}>
-            <DataRow icon={Hash} label="Code" value={discount.code} mono />
-            <DataRow icon={Tag} label="Name" value={discount.name} />
-            <DataRow icon={Activity} label="Description" value={discount.description || "—"} />
-            <DataRow icon={Percent} label="Type" value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
-            <DataRow icon={DollarSign} label="Value" value={formatDiscountValue(discount)} highlight />
-            <DataRow icon={Target} label="Apply To" value={formatTarget(discount.applyTo)} />
-            <DataRow icon={Activity} label="Status" value={isActive ? "Active" : "Inactive"} highlight={isActive} />
+          <InfoCard icon={Tag} title={t("admin.categories.form.basicInfo")} action={<button type="button" onClick={openEdit} className="text-[9px] font-semibold" style={{ color: "var(--accent)" }}><Edit3 className="w-3 h-3 inline mr-1" />{" "}{t("admin.promotions.ui.generated.9ead47a82a0d")}</button>}>
+            <DataRow icon={Hash} label={t("admin.promotions.ui.generated.e6fb06210faf")} value={discount.code} mono />
+            <DataRow icon={Tag} label={t("admin.discounts.detail.name")} value={nameOf(discount)} />
+            <DataRow icon={Activity} label={t("admin.discounts.detail.description")} value={descriptionOf(discount) || "—"} />
+            <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.detail.fixedPrice")} />
+            <DataRow icon={DollarSign} label={t("admin.discounts.detail.value")} value={formatDiscountValue(discount)} highlight />
+            <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />
+            <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? "Active" : "Inactive"} highlight={isActive} />
           </InfoCard>
-          <InfoCard icon={Package} title="Applicable Products" action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
+          <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")} action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
             {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{product.name}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
-              : targetsCategories ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Not targeted by product — this discount targets {assignedCategories.length} selected categor{assignedCategories.length === 1 ? "y" : "ies"}.</p>
-              : targetsBrands ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Not targeted by product — this discount targets {assignedBrands.length} selected brand{assignedBrands.length === 1 ? "" : "s"}.</p>
-              : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>All products</p>}
+              : targetsCategories ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedCategories.length}{" "}{t("admin.promotions.ui.generated.c1c9bccd8a9c")}{assignedCategories.length === 1 ? "y" : "ies"}.</p>
+              : targetsBrands ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedBrands.length}{" "}{t("admin.promotions.ui.generated.064e2f5eddac")}{assignedBrands.length === 1 ? "" : "s"}.</p>
+              : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.allProducts")}</p>}
           </InfoCard>
         </div>
 
         <div className="space-y-3">
-          <InfoCard icon={Calendar} title="Validity Period"><DataRow label="Start Date" value={formatDateTime(discount.startDate)} /><DataRow label="End Date" value={formatDateTime(discount.endDate)} /><p className="text-[8px] text-right mt-2" style={{ color: "var(--text-muted)" }}>{Math.max(0, Math.ceil((new Date(discount.endDate) - new Date(discount.startDate)) / 86400000))} days</p></InfoCard>
-          <InfoCard icon={TrendingUp} title="Usage Limits"><DataRow label="Total Usage Limit" value={discount.usageLimit || "Unlimited"} /><DataRow label="Per User Limit" value={discount.perUserLimit || 1} /><DataRow label="Minimum Order Value" value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} /><DataRow label="Minimum Quantity" value={discount.minQuantity || "Not set"} /></InfoCard>
+          <InfoCard icon={Calendar} title={t("admin.discounts.detail.validityPeriod")}><DataRow label={t("admin.discounts.form.startDate")} value={formatDateTime(discount.startDate)} /><DataRow label={t("admin.promotions.ui.generated.269c8b374312")} value={formatDateTime(discount.endDate)} /><p className="text-[8px] text-right mt-2" style={{ color: "var(--text-muted)" }}>{Math.max(0, Math.ceil((new Date(discount.endDate) - new Date(discount.startDate)) / 86400000))}{" "}{t("admin.promotions.ui.generated.5548ae4f34cb")}</p></InfoCard>
+          <InfoCard icon={TrendingUp} title={t("admin.discounts.detail.usageLimits")}><DataRow label={t("admin.discounts.form.totalUsageLimit")} value={discount.usageLimit || "Unlimited"} /><DataRow label={t("admin.promotions.ui.generated.fdbbcd998612")} value={discount.perUserLimit || 1} /><DataRow label={t("admin.discounts.detail.minimumOrderValue")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} /><DataRow label={t("admin.promotions.ui.generated.e3f2be9ede5c")} value={discount.minQuantity || "Not set"} /></InfoCard>
         </div>
 
         <div className="space-y-3">
-          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title="Targeting"><DataRow icon={Globe} label="Apply To" value={formatTarget(discount.applyTo)} />{targetsProducts && <DataRow icon={Package} label="Selected Products" value={`${assignedProducts.length} products`} />}{targetsCategories && <DataRow icon={Layers} label="Selected Categories" value={`${assignedCategories.length} categories`} />}{targetsBrands && <DataRow icon={Tag} label="Selected Brands" value={`${assignedBrands.length} brands`} />}</InfoCard></div>
-          <InfoCard icon={User} title="Created By"><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Created {formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
-          {hasUpdates && <InfoCard icon={User} title="Updated By"><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>Updated {formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
+          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title={t("admin.promotions.ui.generated.08d79bb915ec")}><DataRow icon={Globe} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />{targetsProducts && <DataRow icon={Package} label={t("admin.promotions.ui.generated.73402e32460b")} value={`${assignedProducts.length} ${t("common.product")}${assignedProducts.length === 1 ? "" : "s"}`} />}{targetsCategories && <DataRow icon={Layers} label={t("admin.promotions.ui.generated.c107fd7d0b1c")} value={`${assignedCategories.length} ${t("common.category")}${assignedCategories.length === 1 ? "" : "s"}`} />}{targetsBrands && <DataRow icon={Tag} label={t("admin.promotions.ui.generated.796088a7739e")} value={`${assignedBrands.length} ${t("common.brand")}${assignedBrands.length === 1 ? "" : "s"}`} />}</InfoCard></div>
+          <InfoCard icon={User} title={t("admin.brands.detail.createdBy")}><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || t("admin.discounts.detail.system")}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.categories.detail.createdAt")}{" "}{formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
+          {hasUpdates && <InfoCard icon={User} title={t("admin.brands.detail.updatedBy")}><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || t("admin.discounts.detail.system")}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.updated")}{" "}{formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
         </div>
       </div>
 
@@ -583,26 +589,26 @@ export default function DiscountDetailPage() {
       {/* TARGETING & CONDITIONS */}
       <div id="d-targeting" className="scroll-mt-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div id="d-rules" className="scroll-mt-4 h-full"><InfoCard icon={Percent} title="Discount Rules">
+            <div id="d-rules" className="scroll-mt-4 h-full"><InfoCard icon={Percent} title={t("admin.discounts.detail.discountRules")}>
               <div className="space-y-1">
-                <DataRow icon={Percent} label="Discount Type" value={discount.type === "percentage" ? "Percentage (%)" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
-                <DataRow icon={DollarSign} label="Discount Value" value={formatDiscountValue(discount)} highlight />
-                <DataRow icon={DollarSign} label="Min Order Value" value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} />
-                <DataRow icon={Box} label="Min Quantity" value={discount.minQuantity ? String(discount.minQuantity) : "No minimum"} />
+                <DataRow icon={Percent} label={t("admin.discounts.detail.discountType")} value={discount.type === "percentage" ? "Percentage (%)" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
+                <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDiscountValue(discount)} highlight />
+                <DataRow icon={DollarSign} label={t("admin.promotions.ui.generated.7e9c655b729a")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} />
+                <DataRow icon={Box} label={t("admin.discounts.form.minQuantity")} value={discount.minQuantity ? String(discount.minQuantity) : "No minimum"} />
               </div>
             </InfoCard></div>
 
-            <div id="d-usage" className="scroll-mt-4 h-full"><InfoCard icon={Clock} title="Usage Limits">
+            <div id="d-usage" className="scroll-mt-4 h-full"><InfoCard icon={Clock} title={t("admin.discounts.detail.usageLimits")}>
               <div className="space-y-1">
-                <DataRow icon={TrendingUp} label="Total Usage Limit" value={discount.usageLimit ? String(discount.usageLimit) : "Unlimited"} />
-                <DataRow icon={User} label="Per User Limit" value={discount.perUserLimit ? String(discount.perUserLimit) : "1"} />
+                <DataRow icon={TrendingUp} label={t("admin.discounts.form.totalUsageLimit")} value={discount.usageLimit ? String(discount.usageLimit) : "Unlimited"} />
+                <DataRow icon={User} label={t("admin.promotions.ui.generated.fdbbcd998612")} value={discount.perUserLimit ? String(discount.perUserLimit) : "1"} />
               </div>
             </InfoCard></div>
           </div>
 
-          <InfoCard icon={Target} title="Applied Targets">
+          <InfoCard icon={Target} title={t("admin.discounts.detail.appliedTargets")}>
             <div className="p-4 rounded-lg mb-5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-              <p className="text-[11px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Applies To</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</p>
               <p className="text-[15px] font-bold" style={{ color: "var(--text-primary)" }}>
                 {formatTarget(discount.applyTo || discount.target_type)}
               </p>
@@ -610,15 +616,14 @@ export default function DiscountDetailPage() {
 
             {assignedProducts.length > 0 && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>
-                  Selected Products ({assignedProducts.length})
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a953deb1b78a")}{assignedProducts.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {assignedProducts.map((product) => (
                     <span key={product._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Box className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                      {product.name || "Product"}
+                      {productNameOf(product) || t("common.product")}
                       {product.sku && <span className="text-[9px] font-mono opacity-60">({product.sku})</span>}
                     </span>
                   ))}
@@ -628,15 +633,14 @@ export default function DiscountDetailPage() {
 
             {assignedCategories.length > 0 && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>
-                  Selected Categories ({assignedCategories.length})
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.214773db1630")}{assignedCategories.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {assignedCategories.map((cat) => (
                     <span key={cat._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Layers className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                      {cat.name || "Category"}
+                      {nameOf(cat) || t("common.category")}
                     </span>
                   ))}
                 </div>
@@ -645,15 +649,14 @@ export default function DiscountDetailPage() {
 
             {assignedBrands.length > 0 && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>
-                  Selected Brands ({assignedBrands.length})
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a48f90037d50")}{assignedBrands.length})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {assignedBrands.map((brand) => (
                     <span key={brand._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Tag className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                      {brand.name || "Brand"}
+                      {nameOf(brand) || t("common.brand")}
                     </span>
                   ))}
                 </div>
@@ -663,14 +666,14 @@ export default function DiscountDetailPage() {
             {targetsEverything && (
               <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                 <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: "var(--success)" }} />
-                <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>This discount applies to all products automatically.</span>
+                <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.appliesToAll")}</span>
               </div>
             )}
 
             {!targetsEverything && assignedProducts.length + assignedCategories.length + assignedBrands.length === 0 && (
               <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                 <AlertTriangle className="w-5 h-5 shrink-0" style={{ color: "var(--warning)" }} />
-                <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No target is currently assigned to this discount — it will not apply anywhere.</span>
+                <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.noTargetAssigned")}</span>
               </div>
             )}
           </InfoCard>
@@ -678,7 +681,7 @@ export default function DiscountDetailPage() {
 
       {/* ACTIVITY */}
       <div id="d-activity" className="scroll-mt-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
-          <InfoCard icon={Activity} title="Activity Timeline">
+          <InfoCard icon={Activity} title={t("admin.discounts.detail.activityTimeline")}>
             <div className="space-y-6">
               {/* Created Event */}
               <div className="flex gap-4">
@@ -691,12 +694,12 @@ export default function DiscountDetailPage() {
                 <div className="flex-1 pb-6">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
-                      <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Discount Created</h4>
-                      <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Added to the system</p>
+                      <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.discounts.detail.discountCreated")}</h4>
+                      <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.addedToSystem")}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        {fd(discount.created_at || discount.createdAt)}
+                        {fd(discount.created_at || discount.createdAt, locale)}
                       </p>
                       <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                         {tago(discount.created_at || discount.createdAt)}
@@ -728,12 +731,12 @@ export default function DiscountDetailPage() {
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div>
-                        <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>Discount Updated</h4>
-                        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Details were modified</p>
+                        <h4 className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.discounts.detail.discountUpdated")}</h4>
+                        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.detailsModified")}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-[11px] font-semibold" style={{ color: "var(--text-secondary)" }}>
-                          {fd(discount.updated_at || discount.updatedAt)}
+                          {fd(discount.updated_at || discount.updatedAt, locale)}
                         </p>
                         <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                           {tago(discount.updated_at || discount.updatedAt)}
@@ -756,16 +759,16 @@ export default function DiscountDetailPage() {
               ) : (
                 <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                   <Clock className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
-                  <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>No updates yet — discount has not been modified since creation.</span>
+                  <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.noUpdates")}</span>
                 </div>
               )}
             </div>
           </InfoCard>
 
-          <InfoCard icon={User} title="User Details">
+          <InfoCard icon={User} title={t("admin.promotions.ui.generated.c91a5c878ea6")}>
             <div className="space-y-5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Creator</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.creator")}</p>
                 {discount.createdBy ? (
                   <div className="flex items-center gap-3">
                     <Avatar user={discount.createdBy} size="md" color="emerald" />
@@ -777,13 +780,13 @@ export default function DiscountDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>System</p>
+                  <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.317f1e761f2f")}</p>
                 )}
               </div>
 
               {hasUpdates && (
                 <div className="pt-5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>Last Editor</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.2a507530b84e")}</p>
                   {discount.updatedBy ? (
                     <div className="flex items-center gap-3">
                       <Avatar user={discount.updatedBy} size="md" color="blue" />
@@ -795,7 +798,7 @@ export default function DiscountDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>System Admin</p>
+                    <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.cb0e0390da9a")}</p>
                   )}
                 </div>
               )}
@@ -847,16 +850,14 @@ export default function DiscountDetailPage() {
                 <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete &quot;{discount.name}&quot;?</h3>
-                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The discount will be permanently removed.</p>
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.discounts.page.deleteOne", { name: nameOf(discount) })}</h3>
+                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.delete.body")}</p>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
               <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(false)}
                 className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50"
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Cancel
-              </button>
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}
                 className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger)" }}>
@@ -865,11 +866,9 @@ export default function DiscountDetailPage() {
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    Deleting...
-                  </>
+                    </svg>{t("admin.promotions.ui.generated.30f6237868a6")}</>
                 ) : (
-                  <><Trash2 className="w-4 h-4" /> Delete Discount</>
+                  <><Trash2 className="w-4 h-4" />{" "}{t("admin.discounts.delete.confirm")}</>
                 )}
               </button>
             </div>

@@ -10,6 +10,8 @@ import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { disconnectSidebarSocket } from "./Sidebar";
+import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 // ✅ GLOBAL singleton socket for navbar
 let navbarSocket = null;
@@ -35,6 +37,7 @@ const profileOptions = [
 ];
 
 export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const isDark = theme === 'dark';
@@ -139,10 +142,10 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     
     try {
       await adminHttp.post("/users/logout");
-      toast.success("Logged out successfully!");
+      toast.success(t("admin.navbar.logoutSuccess"));
     } catch (e) {
       console.error("Logout error:", e);
-      toast.error("Logout failed. Please try again.");
+      toast.error(t("admin.navbar.logoutFailed"));
     } finally {
       // ✅ Step 1: Dono sockets disconnect karo
       if (navbarSocket) {
@@ -174,7 +177,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         <button
           type="button"
           onClick={onMenuClick}
-          aria-label="Open menu"
+          aria-label={t("admin.navbar.openMenu")}
           className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-95 md:hidden"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-soft)'}
@@ -191,8 +194,8 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         <button
           type="button"
           onClick={toggleTheme}
-          aria-label="Toggle theme"
-          title={isDark ? 'Light mode' : 'Dark mode'}
+          aria-label={t("admin.navbar.toggleTheme")}
+          title={isDark ? t("admin.navbar.lightMode") : t("admin.navbar.darkMode")}
           className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-95"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={(e) => {
@@ -206,6 +209,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         >
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
+
+        {/* Language Switcher (admin-only, cookie based) */}
+        <AdminLanguageSwitcher />
 
         {/* Divider */}
         <div
@@ -286,7 +292,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setIsOpen(false)} />
 
               <div
-                className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl"
+                className="absolute end-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border-card)',

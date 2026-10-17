@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { storeApi } from '@/apis/admin/storeApi';
 import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
 import { toast } from 'sonner';
+import { useTranslation } from '@/i18n/LanguageProvider';
 import {
   Mail,
   Lock,
@@ -30,23 +31,23 @@ import {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const validateEmail = (value) => {
+const validateEmail = (value, t) => {
   const email = value.trim();
-  if (!email) return 'Email address is required.';
-  if (!EMAIL_REGEX.test(email)) return 'Enter a valid email address.';
+  if (!email) return t('admin.login.emailRequired');
+  if (!EMAIL_REGEX.test(email)) return t('admin.login.invalidEmail');
   return '';
 };
 
-const validatePassword = (value) => {
-  if (!value) return 'Password is required.';
+const validatePassword = (value, t) => {
+  if (!value) return t('admin.login.passwordRequired');
   return '';
 };
 
 const PANEL_FEATURES = [
-  { icon: Users, title: 'User Management', desc: 'Admins, Staff & Customers' },
-  { icon: Package, title: 'Product Management', desc: 'Products, Variants & Inventory' },
-  { icon: ShoppingCart, title: 'Order Management', desc: 'Track & Manage Orders' },
-  { icon: Settings, title: 'Store Settings', desc: 'Configure Your Store' },
+  { icon: Users, title: 'admin.login.featureUsers', desc: 'admin.login.featureUsersDesc' },
+  { icon: Package, title: 'admin.login.featureProducts', desc: 'admin.login.featureProductsDesc' },
+  { icon: ShoppingCart, title: 'admin.login.featureOrders', desc: 'admin.login.featureOrdersDesc' },
+  { icon: Settings, title: 'admin.login.featureSettings', desc: 'admin.login.featureSettingsDesc' },
 ];
 
 // CHANGE THIS PATH TO YOUR DESIRED BACKGROUND IMAGE LATER
@@ -105,6 +106,7 @@ function StoreLogo({
 }
 
 export default function AdminLoginPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
 
@@ -133,7 +135,7 @@ export default function AdminLoginPage() {
     if (storeData) dispatch(setStoreInfo(storeData));
   }, [storeData, dispatch]);
 
-  const displayName = storeName || 'My Store';
+  const displayName = storeName || t('admin.login.defaultStoreName');
   const displayColor = 'var(--accent)';
   const firstLetter = displayName.charAt(0).toUpperCase() || 'S';
   const logoUrl = storeLogo?.img_url
@@ -167,13 +169,13 @@ export default function AdminLoginPage() {
       if (!data?.user || !['admin', 'staff', 'manager'].includes(role)) {
         axiosInstance.post('/users/logout').catch(() => {});
         toast.error(
-          'Access denied. Only administrators, managers and staff members can log in.'
+          t('admin.login.accessDenied')
         );
         return;
       }
 
       // ✅ Show success toast before redirect - professional UX
-      toast.success('Login successful', {
+      toast.success(t('admin.login.success'), {
         duration: 2000,
         icon: <CheckCircle2 className="h-5 w-5" />,
       });
@@ -189,16 +191,16 @@ export default function AdminLoginPage() {
 
     onError: (err) => {
       if (err.response?.data?.message) {
-        toast.error(err.response.data.message);
+        toast.error(t('admin.login.invalidCredentials'));
         return;
       }
       if (!err.response) {
         toast.error(
-          'Unable to reach the server. Please check your connection and try again.'
+          t('admin.login.serverUnavailable')
         );
         return;
       }
-      toast.error('Login failed. Please try again.');
+      toast.error(t('admin.login.loginFailed'));
     },
   });
 
@@ -223,8 +225,8 @@ export default function AdminLoginPage() {
     if (isSubmitting) return;
 
     const errors = {
-      email: validateEmail(email),
-      password: validatePassword(password),
+      email: validateEmail(email, t),
+      password: validatePassword(password, t),
     };
 
     setFieldErrors(errors);
@@ -275,7 +277,7 @@ export default function AdminLoginPage() {
                 </p>
                 <p className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.16em] text-blue-200/90">
                   <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
-                  E-commerce Admin Panel
+                  {t('admin.login.brand')}
                 </p>
               </div>
             </div>
@@ -283,11 +285,10 @@ export default function AdminLoginPage() {
             {/* Hero Text */}
             <div className="max-w-[440px]">
               <h1 className="text-[29px] font-semibold leading-[1.2] tracking-tight text-white/95 xl:text-[34px]">
-                Manage Your Store<br />with{' '}
-                <span className="text-blue-300">Confidence</span>
+                {t('admin.login.heroTitle')}<br />{t('admin.login.heroConfidence')}
               </h1>
               <p className="mt-3 text-[12.5px] leading-[1.6] text-indigo-100/75">
-                Control your products, categories, orders, users and more - all in one powerful admin panel.
+                {t('admin.login.heroDescription')}
               </p>
             </div>
 
@@ -307,8 +308,8 @@ export default function AdminLoginPage() {
                       <FeatureIcon size={14} className="text-blue-300" aria-hidden="true" />
                     </span>
                     <span>
-                      <span className="block text-[11px] font-medium text-white/95">{feature.title}</span>
-                      <span className="block text-[9px] text-indigo-200/60">{feature.desc}</span>
+                      <span className="block text-[11px] font-medium text-white/95">{t(feature.title)}</span>
+                      <span className="block text-[9px] text-indigo-200/60">{t(feature.desc)}</span>
                     </span>
                   </div>
                 );
@@ -321,13 +322,13 @@ export default function AdminLoginPage() {
       {/* ============ RIGHT - LOGIN FORM PANEL ============ */}
       <main className="relative flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-[var(--bg-primary)] px-6 py-10">
         {/* Soft decorative blobs */}
-        <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-28 h-96 w-96 rounded-full" style={{ background: 'radial-gradient(circle, rgba(37, 99, 235, 0.10), transparent 65%)' }} />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-24 h-80 w-80 rounded-full" style={{ background: 'radial-gradient(circle, rgba(37, 99, 235, 0.06), transparent 65%)' }} />
+        <div aria-hidden="true" className="pointer-events-none absolute -end-28 -top-28 h-96 w-96 rounded-full" style={{ background: 'radial-gradient(circle, rgba(37, 99, 235, 0.10), transparent 65%)' }} />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -start-24 h-80 w-80 rounded-full" style={{ background: 'radial-gradient(circle, rgba(37, 99, 235, 0.06), transparent 65%)' }} />
 
         {/* Admin portal context */}
-        <div className="absolute right-7 top-6 hidden items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]/90 px-3.5 py-2 text-[12px] font-medium text-[var(--text-secondary)] shadow-sm backdrop-blur-sm md:flex">
+        <div className="absolute end-7 top-6 hidden items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]/90 px-3.5 py-2 text-[12px] font-medium text-[var(--text-secondary)] shadow-sm backdrop-blur-sm md:flex">
           <ShieldCheck size={15} className="text-[var(--accent)]" aria-hidden="true" />
-          Admin portal
+          {t('admin.login.portal')}
         </div>
 
         <div className="relative w-full max-w-[360px]">
@@ -341,19 +342,19 @@ export default function AdminLoginPage() {
                 color={displayColor}
                 ringClass="ring-black/10"
               />
-              <span className="text-left">
+              <span className="text-start">
                 <span className="block text-[19px] font-semibold leading-tight tracking-tight text-[var(--text-secondary)]">
                   {displayName}
                 </span>
                 <span className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--text-muted)]">
                   <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: "var(--accent)" }} />
-                  E-commerce Admin Panel
+                  {t('admin.login.brand')}
                 </span>
               </span>
             </div>
 
-            <h2 className="mt-7 text-[26px] font-medium tracking-tight text-[var(--text-secondary)]">Welcome back</h2>
-            <p className="mt-1.5 text-[13.5px] text-[var(--text-muted)]">Sign in to your admin account</p>
+            <h2 className="mt-7 text-[26px] font-medium tracking-tight text-[var(--text-secondary)]">{t('admin.login.welcomeBack')}</h2>
+            <p className="mt-1.5 text-[13.5px] text-[var(--text-muted)]">{t('admin.login.panelSubtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-3.5">
@@ -364,7 +365,7 @@ export default function AdminLoginPage() {
                   <Mail size={15} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <label htmlFor="admin-email" className="block cursor-text text-[12px] font-medium text-[var(--text-secondary)]">Email address</label>
+                  <label htmlFor="admin-email" className="block cursor-text text-[12px] font-medium text-[var(--text-secondary)]">{t('admin.login.email')}</label>
                   <input
                     id="admin-email"
                     type="text"
@@ -372,7 +373,7 @@ export default function AdminLoginPage() {
                     spellCheck={false}
                     value={email}
                     onChange={handleEmailChange}
-                    placeholder="Enter your email"
+                    placeholder={t('admin.login.emailPlaceholder')}
                     autoComplete="email"
                     aria-invalid={Boolean(fieldErrors.email)}
                     className="w-full bg-transparent pt-0.5 text-[13px] font-normal text-[var(--text-secondary)] placeholder:font-normal placeholder:text-[var(--text-muted)] focus:outline-none"
@@ -389,7 +390,7 @@ export default function AdminLoginPage() {
                   <Lock size={15} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <label htmlFor="admin-password" className="block cursor-text text-[12px] font-medium text-[var(--text-secondary)]">Password</label>
+                  <label htmlFor="admin-password" className="block cursor-text text-[12px] font-medium text-[var(--text-secondary)]">{t('admin.login.password')}</label>
                   <input
                     id="admin-password"
                     type={showPassword ? 'text' : 'password'}
@@ -397,13 +398,13 @@ export default function AdminLoginPage() {
                     onChange={handlePasswordChange}
                     onKeyUp={(e) => setCapsLockOn(e.getModifierState?.('CapsLock') || false)}
                     onBlur={() => setCapsLockOn(false)}
-                    placeholder="Enter your password"
+                    placeholder={t('admin.login.passwordPlaceholder')}
                     autoComplete="current-password"
                     aria-invalid={Boolean(fieldErrors.password)}
                     className="w-full bg-transparent pt-0.5 pr-7 text-[13px] font-normal text-[var(--text-secondary)] placeholder:font-normal placeholder:text-[var(--text-muted)] focus:outline-none"
                   />
                 </span>
-                <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'} className="-ml-7 mt-4 h-6 w-6 shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none">
+                <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? t('admin.login.hidePassword') : t('admin.login.showPassword')} className="-ml-7 mt-4 h-6 w-6 shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none">
                   {showPassword ? <EyeOff size={15} className="mx-auto" aria-hidden="true" /> : <Eye size={15} className="mx-auto" aria-hidden="true" />}
                 </button>
               </div>
@@ -411,7 +412,7 @@ export default function AdminLoginPage() {
               {capsLockOn && !fieldErrors.password && (
                 <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-[var(--warning, #f59e0b)]">
                   <AlertCircle size={12} aria-hidden="true" />
-                  Caps Lock is on
+                  {t('admin.login.capsLock')}
                 </p>
               )}
             </div>
@@ -425,10 +426,10 @@ export default function AdminLoginPage() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="h-4 w-4 cursor-pointer rounded border-[var(--border-card)] accent-[var(--accent)]"
                 />
-                Remember me
+                {t('admin.login.rememberMe')}
               </label>
-              <button type="button" className="font-medium text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline" onClick={() => toast.info('Password resets are handled by your store administrator. Please contact them to reset your password.')}>
-                Forgot password?
+              <button type="button" className="font-medium text-[var(--accent)] transition-colors hover:text-[var(--accent-hover)] hover:underline" onClick={() => toast.info(t('admin.login.resetHelp'))}>
+                {t('admin.login.forgotPassword')}
               </button>
             </div>
 
@@ -442,12 +443,12 @@ export default function AdminLoginPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                  Signing in...
+                  {t('admin.login.signingIn')}
                 </>
               ) : (
                 <>
                   <LogIn size={15} aria-hidden="true" />
-                  Sign In
+                  {t('admin.login.signIn')}
                   <ArrowRight size={16} aria-hidden="true" />
                 </>
               )}
@@ -457,7 +458,7 @@ export default function AdminLoginPage() {
           {/* Secure Footer */}
           <p className="mt-6 flex items-center justify-center gap-1.5 text-[11.5px] font-normal text-[var(--text-muted)]">
             <Lock size={11} aria-hidden="true" />
-            Secure login - Your data is protected
+            {t('admin.login.secureFooter')}
           </p>
         </div>
       </main>

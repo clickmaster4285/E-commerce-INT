@@ -13,7 +13,9 @@ import { productApi } from "../../../../apis/admin/productApi";
 import { categoryApi } from "../../../../apis/admin/categoryApi";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { DealFormModal, SelectionModal } from "../_components/dealModals";
-import useDealSocketSync from "@/hooks/useDealSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import useDealSocketSync from "../../../../hooks/admin/useDealSocketSync";
+import { useLocalized } from "@/i18n/localize";
 
 /* =========================================================
    HELPERS
@@ -23,19 +25,19 @@ function ini(name) {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
-function fd(date) {
+function fd(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
-  });
+  }).format(new Date(date));
 }
 
-function fdt(date) {
+function fdt(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
-  });
+  }).format(new Date(date));
 }
 
 function getDealStatus(deal) {
@@ -121,13 +123,14 @@ const dateToISO = (value) => {
    UI COMPONENTS
 ========================================================= */
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   // ✅ Sirf Active/Inactive — purani values bhi inactive
   const config = {
-    active: { bg: "var(--success-soft)", color: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)", label: "ACTIVE" },
-    inactive: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
-    scheduled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
-    expired: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
-    disabled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: "INACTIVE" },
+    active: { bg: "var(--success-soft)", color: "var(--success)", border: "color-mix(in srgb, var(--success) 28%, transparent)", label: t("admin.banners.page.active") },
+    inactive: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: t("common.inactive") },
+    scheduled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: t("common.inactive") },
+    expired: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: t("common.inactive") },
+    disabled: { bg: "var(--danger-soft)", color: "var(--danger)", border: "color-mix(in srgb, var(--danger) 28%, transparent)", label: t("common.inactive") },
   };
   const c = config[status] || config.inactive;
   return (
@@ -139,10 +142,11 @@ function StatusBadge({ status }) {
 }
 
 function Avatar({ user, size = "md", color = "emerald" }) {
+  const { t } = useTranslation();
   const sizes = { sm: "w-6 h-6 text-[9px]", md: "w-8 h-8 text-[10px]", lg: "w-10 h-10 text-[12px]" };
   const colors = {
-    emerald: { bg: "var(--success-soft)", text: "var(--success)" },
-    blue: { bg: "var(--info-soft)", text: "var(--info)" },
+    emerald: { bg: "var(--success-soft)", text: t("admin.promotions.ui.generated.f41e0cb8441d") },
+    blue: { bg: "var(--info-soft)", text: t("admin.promotions.ui.generated.8e18505083bf") },
   };
   const c = colors[color] || colors.emerald;
   return (
@@ -205,8 +209,9 @@ function SkeletonDataRows({ rows = 4 }) {
 }
 
 function DealDetailSkeleton() {
+  const { t } = useTranslation();
   return (
-    <div className="w-full pb-8 space-y-3" aria-busy="true" aria-label="Loading deal details">
+    <div className="w-full pb-8 space-y-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.9345e7b88fd8")}>
       {/* HEADER CARD */}
       <div className="rounded-2xl p-5 md:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <span className="skeleton mb-4 block h-3 w-28 rounded" />
@@ -235,7 +240,7 @@ function DealDetailSkeleton() {
       {/* OVERVIEW — left: Deal Information card, right: Quick Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
         <div className="space-y-3 min-w-0">
-          <InfoCard icon={Tag} title="Deal Information">
+          <InfoCard icon={Tag} title={t("admin.promotions.ui.generated.a1aba9dcd635")}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
               {[0, 1, 2].map((col) => (
                 <div key={`dl-col-${col}`} className="space-y-4">
@@ -250,11 +255,11 @@ function DealDetailSkeleton() {
             </div>
           </InfoCard>
         </div>
-        <InfoCard icon={Activity} title="Quick Summary"><SkeletonDataRows rows={7} /></InfoCard>
+        <InfoCard icon={Activity} title={t("admin.promotions.ui.generated.220a5be56a5d")}><SkeletonDataRows rows={7} /></InfoCard>
       </div>
 
       {/* HISTORY */}
-      <InfoCard icon={Activity} title="Recently Updated History"><SkeletonDataRows rows={4} /></InfoCard>
+      <InfoCard icon={Activity} title={t("admin.promotions.ui.generated.d2f941596b92")}><SkeletonDataRows rows={4} /></InfoCard>
     </div>
   );
 }
@@ -272,6 +277,8 @@ function Field({ label, children }) {
    MAIN PAGE
 ========================================================= */
 export default function DealDetailPage() {
+  const { t, locale, dir } = useTranslation();
+  const { nameOf, productNameOf, descriptionOf } = useLocalized();
   const { markSelfAction } = useDealSocketSync();
   const router = useRouter();
   const params = useParams();
@@ -317,11 +324,11 @@ export default function DealDetailPage() {
     onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deal"] });
-      toast.success(variables.id ? "Deal updated successfully" : "Deal created successfully");
+      toast.success(variables.id ? t("admin.deals.toast.updated") : t("admin.deals.toast.created"));
       setShowModal(false);
       resetForm();
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to save deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.saveFailed")),
   });
 
   const deleteMutation = useMutation({
@@ -329,10 +336,10 @@ export default function DealDetailPage() {
     onMutate: () => markSelfAction("delete"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
-      toast.success("Deal deleted successfully");
+      toast.success(t("admin.deals.toast.deleted"));
       router.push(backPath);
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete deal"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.deleteFailed")),
   });
 
   const toggleMutation = useMutation({
@@ -345,9 +352,9 @@ export default function DealDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deal"] });
       const wasOn = deal ? getDealStatus(deal) === "active" : true;
-      toast.success(wasOn ? "Deal deactivated" : "Deal activated");
+      toast.success(wasOn ? t("admin.deals.toast.deactivated") : t("admin.deals.toast.activated"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.statusFailed")),
   });
 
   const resetForm = () => {
@@ -397,32 +404,32 @@ export default function DealDetailPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!String(formData.name || "").trim()) return toast.error("Deal name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.deals.validation.nameRequired"));
     if (formData.has_min_quantity) {
       const minQuantity = Number(formData.min_quantity);
       if (!Number.isInteger(minQuantity) || minQuantity < 1) {
-        return toast.error("Minimum quantity must be a whole number greater than 0");
+        return toast.error(t("admin.deals.validation.minQty"));
       }
     }
 
     const dealValue = formData.value === "" ? NaN : Number(formData.value);
     if (["percentage", "fixed_amount"].includes(formData.value_type)) {
-      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error("Please enter a valid deal value");
-      if (formData.value_type === "percentage" && dealValue > 100) return toast.error("Percentage cannot be greater than 100");
+      if (Number.isNaN(dealValue) || dealValue < 0) return toast.error(t("admin.deals.validation.value"));
+      if (formData.value_type === "percentage" && dealValue > 100) return toast.error(t("admin.deals.validation.percentage"));
     }
 
     if (formData.value_type === "buy_x_get_y") {
-      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error("Please enter a valid Buy Quantity");
-      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error("Please enter a valid Get Quantity");
+      if (!formData.buy_quantity || Number(formData.buy_quantity) <= 0) return toast.error(t("admin.deals.validation.buyQty"));
+      if (!formData.get_quantity || Number(formData.get_quantity) <= 0) return toast.error(t("admin.deals.validation.getQty"));
     }
 
-    if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error("Select at least one product");
-    if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error("Select at least one category");
-    if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error("Select at least one brand");
+    if (formData.target_type === "product" && formData.selected_product_ids.length === 0) return toast.error(t("admin.deals.validation.selectProduct"));
+    if (formData.target_type === "category" && formData.selected_category_ids.length === 0) return toast.error(t("admin.deals.validation.selectCategory"));
+    if (formData.target_type === "brand" && formData.selected_brand_ids.length === 0) return toast.error(t("admin.deals.validation.selectBrand"));
 
     const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.deals.validation.dateOrder"));
 
     const cleanProductIds = formData.selected_product_ids.map((id) => String(id?._id || id));
     const cleanCategoryIds = formData.selected_category_ids.map((id) => String(id?._id || id));
@@ -499,11 +506,10 @@ export default function DealDetailPage() {
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--danger-soft)" }}>
             <AlertTriangle className="w-7 h-7" style={{ color: "var(--danger)" }} />
           </div>
-          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Deal Not Found</h2>
-          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>This deal does not exist or has been removed.</p>
+          <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.deals.detail.dealNotFound")}</h2>
+          <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.cb7004fb5393")}</p>
           <button onClick={() => router.push(backPath)} className="mt-4 h-10 px-5 rounded-lg text-[13px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-            <ArrowLeft className="w-4 h-4" /> Back to Deals
-          </button>
+            <ArrowLeft className="w-4 h-4" />{" "}{t("admin.deals.detail.backToDeals")}</button>
         </div>
       </div>
     );
@@ -517,8 +523,7 @@ export default function DealDetailPage() {
       {/* HEADER */}
       <div className="rounded-2xl p-5 md:p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
         <button onClick={() => router.push(backPath)} className="flex items-center gap-2 text-[12px] font-medium mb-4 hover:opacity-80 transition" style={{ color: "var(--text-muted)" }}>
-          <ArrowLeft className="w-4 h-4" /> Back to Deals
-        </button>
+          <ArrowLeft className="w-4 h-4" />{" "}{t("admin.deals.detail.backToDeals")}</button>
 
         <div className="flex flex-col lg:flex-row gap-5">
           <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--accent-soft)", border: "1px solid var(--border-color)" }}>
@@ -527,31 +532,27 @@ export default function DealDetailPage() {
 
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-3 mb-1">
-              <h1 className="text-[22px] md:text-2xl font-bold truncate" style={{ color: "var(--text-primary)" }}>{deal.name}</h1>
+              <h1 className="text-[22px] md:text-2xl font-bold truncate" style={{ color: "var(--text-primary)" }}>{nameOf(deal)}</h1>
               <StatusBadge status={status} />
             </div>
             {deal.description ? (
-              <p className="text-[13px] mb-3" style={{ color: "var(--text-muted)" }}>{deal.description}</p>
+              <p className="text-[13px] mb-3" style={{ color: "var(--text-muted)" }}>{descriptionOf(deal)}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
               <span className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" /> Created by
-                <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{creator ? getUserLabel(creator) : "Admin"}</b>
+                <User className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.createdBy")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{creator ? getUserLabel(creator) : "Admin"}</b>
               </span>
               <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" /> Created at
-                <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt)}</b>
+                <Calendar className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.createdAt")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt, locale)}</b>
               </span>
               {hasUpdates && editor ? (
                 <span className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Updated by
-                  <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{editor.name || editor.email}</b>
+                  <User className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.updatedBy")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{editor.name || editor.email}</b>
                 </span>
               ) : null}
               {hasUpdates ? (
                 <span className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> Updated at
-                  <b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt)}</b>
+                  <Clock className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.updatedAt")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt, locale)}</b>
                 </span>
               ) : null}
             </div>
@@ -561,8 +562,7 @@ export default function DealDetailPage() {
             <button type="button" onClick={() => openEdit(deal)}
               className="h-9 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-              <Edit3 className="w-3.5 h-3.5" /> Edit
-            </button>
+              <Edit3 className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.9ead47a82a0d")}</button>
             <button type="button" disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate()}
               className="h-9 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: isActive ? "var(--bg-card)" : "var(--success-soft)", border: `1px solid ${isActive ? "var(--border-color)" : "color-mix(in srgb, var(--success) 28%, transparent)"}`, color: isActive ? "var(--text-primary)" : "var(--success)" }}>
@@ -571,8 +571,7 @@ export default function DealDetailPage() {
             <button type="button" disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
               className="h-9 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)", color: "var(--danger)" }}>
-              <Trash2 className="w-3.5 h-3.5" /> Delete
-            </button>
+              <Trash2 className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.9485989ff514")}</button>
           </div>
         </div>
       </div>
@@ -583,32 +582,31 @@ export default function DealDetailPage() {
       {/* OVERVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3 items-start">
         <div className="space-y-3 min-w-0">
-          <InfoCard icon={Tag} title="Deal Information" id="d-overview"
+          <InfoCard icon={Tag} title={t("admin.promotions.ui.generated.a1aba9dcd635")} id="d-overview"
             action={
               <button type="button" onClick={() => openEdit(deal)} className="text-[10px] font-bold flex items-center gap-1 transition hover:opacity-80" style={{ color: "var(--accent)" }}>
-                <Edit3 className="w-3 h-3" /> Edit
-              </button>
+                <Edit3 className="w-3 h-3" />{" "}{t("admin.promotions.ui.generated.9ead47a82a0d")}</button>
             }>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
               {/* COLUMN 1 — basic info */}
               <div className="space-y-4">
-                <Field label="Deal Name">{deal.name}</Field>
-                <Field label="Description">
-                  <span className="font-normal whitespace-pre-wrap break-words block">{deal.description || "—"}</span>
+                <Field label={t("admin.deals.form.dealName")}>{nameOf(deal)}</Field>
+                <Field label={t("common.description")}>
+                  <span className="font-normal whitespace-pre-wrap break-words block">{descriptionOf(deal) || "—"}</span>
                 </Field>
-                <Field label="Deal Type">
+                <Field label={t("admin.promotions.ui.generated.687fe75d1223")}>
                   <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold capitalize" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
                     {deal.type?.replace(/_/g, " ") || "—"}
                   </span>
                 </Field>
-                <Field label="Discount Value">
+                <Field label={t("admin.discounts.form.discountValue")}>
                   <span style={{ color: "var(--success)" }}>{formatDealValue(deal)}</span>
                 </Field>
               </div>
 
               {/* COLUMN 2 — targeting & schedule */}
               <div className="space-y-4">
-                <Field label="Apply To">
+                <Field label={t("admin.discounts.detail.applyTo")}>
                   <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
                     {formatTarget(deal.applyTo)}
                   </span>
@@ -616,44 +614,44 @@ export default function DealDetailPage() {
                 <Field label={deal.applyTo === "product" ? "Target Products" : deal.applyTo === "category" ? "Target Categories" : deal.applyTo === "brand" ? "Target Brands" : "Target"}>
                   {deal.applyTo === "product" && selectedProducts.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
-                      <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{selectedProducts[0]?.name || "Product"}</span>
+                      <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{productNameOf(selectedProducts[0]) || t("common.product")}</span>
                       {selectedProducts.length > 1 && (
                         <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{selectedProducts.length - 1}</span>
                       )}
                     </span>
                   ) : deal.applyTo === "category" && selectedCategories.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
-                      <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{selectedCategories[0]?.name || "Category"}</span>
+                      <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{nameOf(selectedCategories[0]) || t("common.category")}</span>
                       {selectedCategories.length > 1 && (
                         <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{selectedCategories.length - 1}</span>
                       )}
                     </span>
                   ) : deal.applyTo === "brand" && selectedBrands.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
-                      <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{selectedBrands[0]?.name || "Brand"}</span>
+                      <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{nameOf(selectedBrands[0]) || t("common.brand")}</span>
                       {selectedBrands.length > 1 && (
                         <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{selectedBrands.length - 1}</span>
                       )}
                     </span>
                   ) : deal.applyTo === "all" ? "All Products" : "—"}
                 </Field>
-                <Field label="Start Date">{fdt(deal.startDate)}</Field>
-                <Field label="End Date">{fdt(deal.endDate)}</Field>
+                <Field label={t("admin.discounts.form.startDate")}>{fdt(deal.startDate, locale)}</Field>
+                <Field label={t("admin.promotions.ui.generated.269c8b374312")}>{fdt(deal.endDate, locale)}</Field>
               </div>
 
               {/* COLUMN 3 — usage & flags (form fields only) */}
               <div className="space-y-4">
-                <Field label="Usage Limit">{deal.usageLimit ? String(deal.usageLimit) : "No limit"}</Field>
-                <Field label="Per User Limit">{deal.perUserLimit ? String(deal.perUserLimit) : "No limit"}</Field>
-                <Field label="Is Active">
+                <Field label={t("admin.discounts.detail.usageLimit")}>{deal.usageLimit ? String(deal.usageLimit) : "No limit"}</Field>
+                <Field label={t("admin.promotions.ui.generated.fdbbcd998612")}>{deal.perUserLimit ? String(deal.perUserLimit) : "No limit"}</Field>
+                <Field label={t("admin.promotions.ui.generated.19a010ebee80")}>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
                     style={{ backgroundColor: isActive ? "var(--success-soft)" : "var(--danger-soft)", color: isActive ? "var(--success)" : "var(--danger)" }}>
                     <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? "var(--success)" : "var(--danger)" }} />
                     {isActive ? "Active" : "Inactive"}
                   </span>
                 </Field>
-                <Field label="Min Quantity">{deal.minQuantity ? String(deal.minQuantity) : "—"}</Field>
-                <Field label="Is Featured">
+                <Field label={t("admin.discounts.form.minQuantity")}>{deal.minQuantity ? String(deal.minQuantity) : "—"}</Field>
+                <Field label={t("admin.promotions.ui.generated.fdb7fbfecdd5")}>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
                     style={{ backgroundColor: deal.isFeatured ? "var(--warning-soft)" : "var(--bg-tertiary)", color: deal.isFeatured ? "var(--warning)" : "var(--text-muted)" }}>
                     <Sparkles className="w-3 h-3" /> {deal.isFeatured ? "Yes" : "No"}
@@ -667,17 +665,17 @@ export default function DealDetailPage() {
               <div className="grid grid-cols-3 gap-3 mt-5 pt-5" style={{ borderTop: "1px solid var(--border-color)" }}>
                 <div className="p-3 rounded-lg text-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                   <Box className="w-4 h-4 mx-auto mb-1.5" style={{ color: "var(--accent)" }} />
-                  <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Buy Quantity</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.4ee9bbdde227")}</p>
                   <p className="text-[16px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.buyQuantity ?? "—"}</p>
                 </div>
                 <div className="p-3 rounded-lg text-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                   <Gift className="w-4 h-4 mx-auto mb-1.5" style={{ color: "var(--accent)" }} />
-                  <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Get Quantity</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.42218e32a31f")}</p>
                   <p className="text-[16px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.getQuantity ?? "—"}</p>
                 </div>
                 <div className="p-3 rounded-lg text-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                   <Percent className="w-4 h-4 mx-auto mb-1.5" style={{ color: "var(--accent)" }} />
-                  <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Get Discount</p>
+                  <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.1c1b9e4d6f8f")}</p>
                   <p className="text-[16px] font-bold" style={{ color: "var(--success)" }}>{deal.getDiscountValue ?? 100}%</p>
                 </div>
               </div>
@@ -689,14 +687,14 @@ export default function DealDetailPage() {
                     <Package className="w-5 h-5" style={{ color: "var(--accent)" }} />
                   </div>
                   <div>
-                    <h4 className="text-[14px] font-black" style={{ color: "var(--text-primary)", letterSpacing: "0.02em" }}>Bundle Offer Condition</h4>
-                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>Single offer rule — applies when quantity is met</p>
+                    <h4 className="text-[14px] font-black" style={{ color: "var(--text-primary)", letterSpacing: "0.02em" }}>{t("admin.promotions.ui.generated.9a058ded11dd")}</h4>
+                    <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.dc2db543ecbc")}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Requirement</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.15320ae28eb8")}</p>
                     <p className="text-[15px] font-black" style={{ color: "var(--text-primary)" }}>
                       {deal.bundleRule ? (
                         deal.bundleRule.mode === "limit"
@@ -706,32 +704,30 @@ export default function DealDetailPage() {
                     </p>
                   </div>
                   <div className="rounded-xl p-3.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>Reward</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a4402e79a5b6")}</p>
                     <p className="text-[15px] font-black" style={{ color: "var(--success)" }}>
                       {!deal.bundleRule ? (
                         "—"
                       ) : deal.bundleRule.rewardType === "free_product" ? (
-                        <>Free Gift: <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{deal.bundleRule.freeProduct?.name || "Gift"}</span> ({deal.bundleRule.freeQuantity || 1})</>
+                        <>{t("admin.deals.detail.freeGift")}: <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{productNameOf(deal.bundleRule.freeProduct) || t("common.product")}</span> ({deal.bundleRule.freeQuantity || 1})</>
                       ) : deal.bundleRule.rewardType === "percentage" ? (
-                        <>{deal.bundleRule.value || 0}% OFF</>
+                        <>{deal.bundleRule.value || 0}{t("admin.promotions.ui.generated.1d3e61873633")}</>
                       ) : (
-                        <>Rs. {deal.bundleRule.value || 0} OFF</>
+                        <>{t("admin.promotions.ui.generated.3a724f5b35f0")}{" "}{deal.bundleRule.value || 0}{" "}{t("admin.promotions.ui.generated.da7a68734367")}</>
                       )}
                     </p>
                   </div>
                 </div>
 
                 {deal.bundleRule?.mode === "limit" && deal.bundleRule?.buyQuantity > 0 && (
-                  <div className="rounded-lg px-3.5 py-2.5 text-[11px] font-semibold text-center" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)", border: "1px solid color-mix(in srgb, var(--info) 25%, transparent)" }}>
-                    Customer must add at least {deal.bundleRule.buyQuantity} item{Number(deal.bundleRule.buyQuantity) > 1 ? "s" : ""} to unlock this offer
-                  </div>
+                  <div className="rounded-lg px-3.5 py-2.5 text-[11px] font-semibold text-center" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)", border: "1px solid color-mix(in srgb, var(--info) 25%, transparent)" }}>{t("admin.promotions.ui.generated.445e18de72ed")}{" "}{deal.bundleRule.buyQuantity}{" "}{t("admin.promotions.ui.generated.3a7d9767b123")}{Number(deal.bundleRule.buyQuantity) > 1 ? "s" : ""}{" "}{t("admin.promotions.ui.generated.2523c3480a89")}</div>
                 )}
               </div>
             )}
             {deal.type === "free_shipping" && (
               <div className="p-4 rounded-lg mt-5 flex items-center gap-2.5" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                 <Truck className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                <span className="text-[12px] font-bold" style={{ color: "var(--success)" }}>Free Shipping</span>
+                <span className="text-[12px] font-bold" style={{ color: "var(--success)" }}>{t("admin.promotions.ui.generated.36abd54d7de4")}</span>
               </div>
             )}
           </InfoCard>
@@ -743,8 +739,8 @@ export default function DealDetailPage() {
                 <Globe className="w-4 h-4" style={{ color: "var(--accent)" }} />
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>All Products</p>
-                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>This deal applies to every product in the store.</p>
+                <p className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.brands.detail.allProducts")}</p>
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.3bfceeedcbba")}</p>
               </div>
             </div>
           ) : deal.applyTo === "product" ? (
@@ -752,7 +748,7 @@ export default function DealDetailPage() {
               <div className="flex items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                  <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>Targeted Products</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.07966f2a36ac")}</span>
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{selectedProducts.length}</span>
                 </div>
               </div>
@@ -765,7 +761,7 @@ export default function DealDetailPage() {
                         return (
                           <div key={p._id || p.id} className="w-[68px]">
                             <div className="w-[68px] h-[68px] rounded-lg overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                              {img ? <img src={img} alt={p.name || "Product"} className="w-full h-full object-cover" /> : <Box className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
+                              {img ? <img src={img} alt=                              {productNameOf(p) || t("common.product")} className="w-full h-full object-cover" /> : <Box className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
                             </div>
                             <p className="text-[9px] font-semibold mt-1 truncate text-center" style={{ color: "var(--text-primary)" }}>{p.name || "Product"}</p>
                           </div>
@@ -773,11 +769,11 @@ export default function DealDetailPage() {
                       })}
                     </div>
                     {selectedProducts.length > 8 && (
-                      <p className="text-[10px] font-semibold mt-2" style={{ color: "var(--accent)" }}>+{selectedProducts.length - 8} more</p>
+                      <p className="text-[10px] font-semibold mt-2" style={{ color: "var(--accent)" }}>+{selectedProducts.length - 8}{" "}{t("admin.promotions.ui.generated.e7c95b4c2824")}</p>
                     )}
                   </>
                 ) : (
-                  <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>No products selected yet.</p>
+                  <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.70ada614a1b6")}</p>
                 )}
               </div>
             </div>
@@ -786,7 +782,7 @@ export default function DealDetailPage() {
               <div className="flex items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                  <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>Targeted Categories</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.8798c94d30b6")}</span>
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{selectedCategories.length}</span>
                 </div>
               </div>
@@ -800,11 +796,11 @@ export default function DealDetailPage() {
                       </div>
                     ))}
                     {selectedCategories.length > 8 && (
-                      <p className="text-[10px] font-semibold pt-1" style={{ color: "var(--accent)" }}>+{selectedCategories.length - 8} more</p>
+                      <p className="text-[10px] font-semibold pt-1" style={{ color: "var(--accent)" }}>+{selectedCategories.length - 8}{" "}{t("admin.promotions.ui.generated.e7c95b4c2824")}</p>
                     )}
                   </>
                 ) : (
-                  <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>No categories selected yet.</p>
+                  <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.6218eb48312a")}</p>
                 )}
               </div>
             </div>
@@ -813,7 +809,7 @@ export default function DealDetailPage() {
               <div className="flex items-center justify-between gap-2 px-5 py-3" style={{ borderBottom: "1px solid var(--border-color)" }}>
                 <div className="flex items-center gap-2">
                   <Award className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                  <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>Targeted Brands</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.00347db82ed6")}</span>
                   <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{selectedBrands.length}</span>
                 </div>
               </div>
@@ -830,11 +826,11 @@ export default function DealDetailPage() {
                       );
                     })}
                     {selectedBrands.length > 8 && (
-                      <p className="text-[10px] font-semibold pt-1" style={{ color: "var(--accent)" }}>+{selectedBrands.length - 8} more</p>
+                      <p className="text-[10px] font-semibold pt-1" style={{ color: "var(--accent)" }}>+{selectedBrands.length - 8}{" "}{t("admin.promotions.ui.generated.e7c95b4c2824")}</p>
                     )}
                   </>
                 ) : (
-                  <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>No brands selected yet.</p>
+                  <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.818a8e89ab5f")}</p>
                 )}
               </div>
             </div>
@@ -843,24 +839,23 @@ export default function DealDetailPage() {
               <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--warning-soft)" }}>
                 <AlertTriangle className="w-4 h-4" style={{ color: "var(--warning)" }} />
               </div>
-              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Target is not set. Edit the deal to choose products, categories or brands.</p>
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.f3975a2d6b9c")}</p>
             </div>
           )}
         </div>
 
         {/* RIGHT SIDEBAR */}
         <div className="space-y-3">
-          <InfoCard icon={Activity} title="Quick Summary">
+          <InfoCard icon={Activity} title={t("admin.promotions.ui.generated.220a5be56a5d")}>
             <div className="space-y-0.5">
-              <DataRow icon={Percent} label="Deal Type" value={deal.type?.replace(/_/g, " ") || "—"} />
-              <DataRow icon={DollarSign} label="Discount Value" value={formatDealValue(deal)} highlight />
-              <DataRow icon={Target} label="Apply To" value={formatTarget(deal.applyTo)} />
-              <DataRow icon={Calendar} label="Start Date" value={fdt(deal.startDate)} />
-              <DataRow icon={Calendar} label="End Date" value={fdt(deal.endDate)} />
+              <DataRow icon={Percent} label={t("admin.promotions.ui.generated.687fe75d1223")} value={deal.type?.replace(/_/g, " ") || "—"} />
+              <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDealValue(deal)} highlight />
+              <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(deal.applyTo)} />
+              <DataRow icon={Calendar} label={t("admin.discounts.form.startDate")} value={fdt(deal.startDate, locale)} />
+              <DataRow icon={Calendar} label={t("admin.promotions.ui.generated.269c8b374312")} value={fdt(deal.endDate, locale)} />
               <div className="flex items-center justify-between gap-3 py-1.5">
                 <span className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                  <Activity className="w-3.5 h-3.5" /> Status
-                </span>
+                  <Activity className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.productTableStatus")}</span>
                 <StatusBadge status={status} />
               </div>
             </div>
@@ -870,14 +865,14 @@ export default function DealDetailPage() {
             <div className="rounded-2xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
               <div className="flex items-center gap-2 mb-1.5">
                 <TrendingUp className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Usage Limit</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.usageLimit")}</p>
               </div>
               <p className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.usageLimit ? String(deal.usageLimit) : "Unlimited"}</p>
             </div>
             <div className="rounded-2xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
               <div className="flex items-center gap-2 mb-1.5">
                 <User className="w-4 h-4" style={{ color: "var(--accent)" }} />
-                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Per User Limit</p>
+                <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.fdbbcd998612")}</p>
               </div>
               <p className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.perUserLimit ? String(deal.perUserLimit) : "No limit"}</p>
             </div>
@@ -886,7 +881,7 @@ export default function DealDetailPage() {
       </div>
 
       {/* HISTORY */}
-      <InfoCard icon={Activity} title="Recently Updated History" id="d-history">
+      <InfoCard icon={Activity} title={t("admin.promotions.ui.generated.d2f941596b92")} id="d-history">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -898,9 +893,9 @@ export default function DealDetailPage() {
             </thead>
             <tbody>
               <tr style={{ borderBottom: hasUpdates ? "1px solid var(--border-color)" : "none" }}>
-                <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt)}</td>
+                <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt, locale)}</td>
                 <td className="py-2.5 pr-4">
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>Created</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--success-soft)", color: "var(--success)" }}>{t("admin.categories.detail.createdAt")}</span>
                 </td>
                 <td className="py-2.5 pr-4">
                   <div className="flex items-center gap-2">
@@ -908,13 +903,13 @@ export default function DealDetailPage() {
                     <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{getUserLabel(creator)}</span>
                   </div>
                 </td>
-                <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>Deal created</td>
+                <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.0a9dcb3cf2ea")}</td>
               </tr>
               {hasUpdates && (
                 <tr>
-                  <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt)}</td>
+                  <td className="py-2.5 pr-4 text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fdt(deal.updated_at || deal.updatedAt, locale)}</td>
                   <td className="py-2.5 pr-4">
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>Updated</span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>{t("admin.discounts.detail.updated")}</span>
                   </td>
                   <td className="py-2.5 pr-4">
                     <div className="flex items-center gap-2">
@@ -922,7 +917,7 @@ export default function DealDetailPage() {
                       <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{editor ? getUserLabel(editor) : "—"}</span>
                     </div>
                   </td>
-                  <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>Deal details were modified</td>
+                  <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.44238ab8b809")}</td>
                 </tr>
               )}
             </tbody>
@@ -939,20 +934,18 @@ export default function DealDetailPage() {
                 <AlertTriangle className="w-6 h-6" style={{ color: "var(--danger)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>Delete &quot;{deal.name}&quot;?</h3>
-                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The deal will be permanently removed.</p>
+                <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.deals.page.deleteOne", { name: nameOf(deal) })}</h3>
+                <p className="text-[12px] mt-1.5" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.2a00f73b3398")}</p>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-3 mt-6">
               <button disabled={deleteMutation.isPending} onClick={() => setShowDelete(false)}
                 className="flex-1 h-10 rounded-lg text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50"
-                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Cancel
-              </button>
+                style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button disabled={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}
                 className="flex-1 h-10 rounded-lg text-[12px] font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? "Deleting..." : <><Trash2 className="w-4 h-4" /> Delete Deal</>}
+                {deleteMutation.isPending ? "Deleting..." : <><Trash2 className="w-4 h-4" />{" "}{t("admin.promotions.ui.generated.ac2530a3152d")}</>}
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ==================== ICONS ==================== */
 const ArrowLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
@@ -24,8 +25,9 @@ const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={classNa
 const ReceiptIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17h6M9 13h6M9 9h3m9 12V5a2 2 0 00-2-2H5a2 2 0 00-2 2v16l3-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5z" /></svg>);
 
 /* ==================== HELPERS ==================== */
-const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
-const formatDateTime = (d) => d ? new Date(d).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+const formatDate = (d, locale = "en") => d ? new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d)) : "—";
+const formatDateTime = (d, locale = "en") => d ? new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(d)) : "—";
+const formatCurrency = (value, locale = "en") => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(Number(value) || 0);
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (itemOrPath) => {
@@ -75,11 +77,12 @@ function itemLineSavings(item) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const item = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
   return (
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {status}
+      {t(`admin.orders.status.${status}`)}
     </span>
   );
 }
@@ -206,6 +209,7 @@ const ORDER_STEP_LABEL = {
 // (placed = created_at, current stage = updated_at). Other stages have no
 // stored timestamps, so no time is shown for them.
 function OrderTimeline({ order }) {
+  const { t, locale } = useTranslation();
   const cancelled = order.status === "cancelled";
   const effective = order.status === "processing" ? "confirmed" : order.status;
   const currentIdx = STATUS_FLOW.indexOf(effective);
@@ -213,8 +217,8 @@ function OrderTimeline({ order }) {
   const rows = [];
   if (cancelled) {
     rows.push({
-      key: "cancelled", label: "Cancelled", done: true, danger: true,
-      note: order.cancel_reason || "", time: `Cancelled ${formatDateTime(order.updated_at)}`,
+      key: "cancelled", label: t("admin.orders.status.cancelled"), done: true, danger: true,
+      note: order.cancel_reason || "", time: `${t("admin.orders.status.cancelled")} ${formatDateTime(order.updated_at, locale)}`,
     });
   } else {
     [...STATUS_FLOW].reverse().forEach((step) => {
@@ -227,8 +231,8 @@ function OrderTimeline({ order }) {
         done,
         current: isCurrent,
         time: step === "pending"
-          ? formatDateTime(order.created_at)
-          : isCurrent ? `Last update ${formatDateTime(order.updated_at)}` : "",
+          ? formatDateTime(order.created_at, locale)
+          : isCurrent ? `${t("admin.orders.detail.lastUpdate")} ${formatDateTime(order.updated_at, locale)}` : "",
       });
     });
   }
@@ -263,6 +267,7 @@ function OrderTimeline({ order }) {
 
 /* ==================== ACTION BUTTONS (Mobile Optimized) ==================== */
 function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending, isPaymentPending }) {
+  const { t } = useTranslation();
   const status = order.status;
   const payStatus = order.payment?.status || "pending";
 
@@ -271,7 +276,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
         style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
         <LockIcon className="w-4 h-4" style={{ color: "var(--danger-text)" }} />
-        <span className="text-xs font-semibold" style={{ color: "var(--danger-text)" }}>This order is cancelled</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--danger-text)" }}>{t("admin.orders.detail.cancelled")}</span>
       </div>
     );
   }
@@ -285,7 +290,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
           style={{ backgroundColor: "var(--success)", color: "#fff" }}>
           {isPaymentPending ? <Spinner className="w-4 h-4" /> : <BanknoteIcon className="w-4 h-4" />}
-          Payment Received
+          {t("admin.orders.detail.paymentReceived")}
         </button>
       );
     }
@@ -293,7 +298,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
         style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
         <CheckCircleIcon className="w-4 h-4" style={{ color: "var(--success-text)" }} />
-        <span className="text-xs font-semibold" style={{ color: "var(--success-text)" }}>Order completed & payment received</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--success-text)" }}>{t("admin.orders.detail.completed")}</span>
       </div>
     );
   }
@@ -305,7 +310,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/10"
           style={{ backgroundColor: "var(--info)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
-          Confirm Order
+          {t("admin.orders.detail.confirmOrder")}
         </button>
       )}
 
@@ -314,7 +319,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10"
           style={{ backgroundColor: "var(--indigo)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <TruckIcon className="w-4 h-4" />}
-          Mark as Shipped
+          {t("admin.orders.detail.markShipped")}
         </button>
       )}
 
@@ -339,6 +344,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
 
 /* ==================== MAIN PAGE ==================== */
 export default function OrderDetailPage({ params }) {
+  const { t, locale } = useTranslation();
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -360,10 +366,10 @@ export default function OrderDetailPage({ params }) {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success(`Order marked as ${variables.status}`);
+      toast.success(t("admin.orders.toast.markedStatus", { status: t(`admin.orders.status.${variables.status}`) }));
       setCancelConfirm(false);
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
+    onError: () => toast.error(t("admin.orders.toast.updateOrderFailed")),
   });
 
   const updatePaymentMutation = useMutation({
@@ -372,15 +378,15 @@ export default function OrderDetailPage({ params }) {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success("Payment marked as received");
+      toast.success(t("admin.orders.detail.paymentMarked"));
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update payment"),
+    onError: () => toast.error(t("admin.orders.detail.paymentFailed")),
   });
 
   const handlePaymentReceived = () => updatePaymentMutation.mutate({ id });
   const handleUpdate = (status) => updateStatusMutation.mutate({ id, status });
   const handleCancel = () => {
-    if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
+    if (!cancelReason.trim()) return toast.error(t("admin.orders.detail.cancelRequired"));
     updateStatusMutation.mutate({ id, status: "cancelled", cancel_reason: cancelReason.trim() });
   };
 
@@ -517,13 +523,13 @@ export default function OrderDetailPage({ params }) {
         <button onClick={() => router.push("/admin/orders")}
           className="mb-4 h-11 sm:h-9 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90"
           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-          <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" /> Back to Orders
+          <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" /> {t("admin.orders.detail.backToOrders")}
         </button>
         <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
           <XCircleIcon className="w-8 h-8 opacity-60" />
-          <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>Order not found or failed to load.</p>
+          <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.notFound")}</p>
           <button onClick={() => refetch()} className="h-11 sm:h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
-            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{t("admin.orders.detail.retry")}</button>
         </div>
       </div>
     );
@@ -537,21 +543,21 @@ export default function OrderDetailPage({ params }) {
         <nav className="flex items-center gap-1 text-[12px]" aria-label="Breadcrumb">
           <button type="button" onClick={() => router.push("/admin/orders")}
             className="font-medium hover:underline" style={{ color: "var(--text-muted)" }}>
-            Orders
+            {t("admin.orders.page.title")}
           </button>
           <ChevronRightIcon className="w-3.5 h-3.5" />
-          <span className="font-semibold">Order Details</span>
+          <span className="font-semibold">{t("admin.orders.detail.breadcrumb")}</span>
         </nav>
 
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">Order {order.order_number}</h1>
+              <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">{t("admin.orders.detail.orderPrefix", { number: order.order_number })}</h1>
               <StatusBadge status={order.status} />
             </div>
             <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-              {formatDateTime(order.created_at)}
+              {formatDateTime(order.created_at, locale)}
             </p>
           </div>
           <div className="w-full md:w-auto">
@@ -576,8 +582,8 @@ export default function OrderDetailPage({ params }) {
             accentSoft="var(--info-soft)"
             value={ORDER_STEP_LABEL[order.status] || order.status}
             sub={order.status === "cancelled"
-              ? `Cancelled ${formatDateTime(order.updated_at)}`
-              : `Updated ${formatDateTime(order.updated_at)}`}
+              ? `${t("admin.orders.status.cancelled")} ${formatDateTime(order.updated_at, locale)}`
+              : `${t("admin.orders.detail.lastUpdate")} ${formatDateTime(order.updated_at, locale)}`}
           />
           <StatCard
             label="Payment"
@@ -585,14 +591,14 @@ export default function OrderDetailPage({ params }) {
             accent="var(--success-text)"
             accentSoft="var(--success-soft)"
             value={(PAYMENT_STATUS_CONFIG[payStatus] || {}).label || "Unpaid"}
-            sub={`Via ${paymentMethodLabel(order.payment?.method)}`}
+            sub={t("admin.orders.detail.via", { method: t(`admin.orders.detail.${({ cod: "cashOnDelivery", bank: "bankTransfer", card: "cardPayment" })[order.payment?.method] || "paymentMethod"}`) })}
           />
           <StatCard
             label="Total Amount"
             icon={<ReceiptIcon className="w-5 h-5" />}
             accent="var(--warning-text)"
             accentSoft="var(--warning-soft)"
-            value={`Rs. ${Number(order.total || 0).toLocaleString()}`}
+            value={formatCurrency(order.total, locale)}
           />
         </div>
 
@@ -606,7 +612,7 @@ export default function OrderDetailPage({ params }) {
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
                 style={{ borderBottom: "1px solid var(--border-color)" }}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-[15px] font-bold">Order Items ({itemRows})</h2>
+                  <h2 className="text-[15px] font-bold">{t("admin.orders.detail.orderItems", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(itemRows) })}</h2>
                   {freeUnits > 0 && <PromoTag tone="success">{freeUnits} free unit{freeUnits === 1 ? "" : "s"}</PromoTag>}
                   {dealGroups.length > 0 && <PromoTag tone="warning">{dealGroups.length} deal applied</PromoTag>}
                   {bundleGroups.length > 0 && <PromoTag tone="info">{bundleGroups.length} bundle applied</PromoTag>}
@@ -620,11 +626,11 @@ export default function OrderDetailPage({ params }) {
                 <table className="w-full text-[13px] min-w-[760px]" style={{ tableLayout: "fixed" }}>
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
-                      <th className="w-[116px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
-                      <th className="w-[70px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Qty</th>
-                      <th className="w-[200px] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Deal Details</th>
-                      <th className="w-[124px] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Amount</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.product")}</th>
+                      <th className="w-[116px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.price")}</th>
+                      <th className="w-[70px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.qty")}</th>
+                      <th className="w-[200px] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.dealDetails")}</th>
+                      <th className="w-[124px] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.amount")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -641,10 +647,10 @@ export default function OrderDetailPage({ params }) {
                               <div className="min-w-0">
                                 <p className="font-semibold" title={item.name}>{item.name}</p>
                                 {item.brand && (
-                                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>Brand {item.brand}</p>
+                                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.brand", { brand: item.brand })}</p>
                                 )}
                                 {item.variantTitle && (
-                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>Variant: {item.variantTitle}</p>
+                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.variantLabel", { variant: item.variantTitle })}</p>
                                 )}
                               </div>
                             </div>
@@ -652,13 +658,13 @@ export default function OrderDetailPage({ params }) {
                           <td className="px-3 py-3 text-right align-top">
                             {Number(item.original_price) > Number(item.price) && (
                               <span className="block text-[11px] line-through whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                                Rs. {Number(item.original_price).toLocaleString()}
+                                {formatCurrency(item.original_price, locale)}
                               </span>
                             )}
-                            <span className="font-semibold whitespace-nowrap">Rs. {Number(item.price || 0).toLocaleString()}</span>
+                            <span className="font-semibold whitespace-nowrap">{formatCurrency(item.price, locale)}</span>
                             {Number(item.savings) > 0 && !isPromoLine(item) && (
                               <span className="block text-[10px] whitespace-nowrap" style={{ color: "var(--success-text)" }}>
-                                save Rs. {Number(item.savings).toLocaleString()}/unit
+                                {t("admin.orders.detail.savePerUnit", { amount: formatCurrency(item.savings, locale) })}
                               </span>
                             )}
                           </td>
@@ -688,7 +694,7 @@ export default function OrderDetailPage({ params }) {
                           </td>
                           <td className="px-4 py-3 text-right align-top">
                             <span className="font-bold whitespace-nowrap">
-                              Rs. {(Number(item.price || 0) * (Number(item.qty) || 0)).toLocaleString()}
+                              {formatCurrency(Number(item.price || 0) * (Number(item.qty) || 0), locale)}
                             </span>
                             {lineSaved > 0 && (
                               <span className="block text-[10px] font-semibold whitespace-nowrap" style={{ color: "var(--success-text)" }}>
@@ -712,21 +718,21 @@ export default function OrderDetailPage({ params }) {
                 then Subtotal + Shipping + Tax = Total Amount.
                 Savings are already adjusted in the prices — never deducted twice. */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Order Summary</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.orderSummary")}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <div className="space-y-1.5">
                   {totalSaved > 0 && (
                     <>
-                      <TotalRow label="Original price (before discounts)" value={`Rs. ${(Number(order.subtotal || 0) + totalSaved).toLocaleString()}`} />
-                      <TotalRow label="Less: total saved" value={`− Rs. ${totalSaved.toLocaleString()}`} accent="var(--success-text)" />
+                  <TotalRow label={t("admin.orders.detail.originalPrice")} value={formatCurrency(Number(order.subtotal || 0) + totalSaved, locale)} />
+                  <TotalRow label={t("admin.orders.detail.lessSaved")} value={`− ${formatCurrency(totalSaved, locale)}`} accent="var(--success-text)" />
                     </>
                   )}
-                  <TotalRow label="Subtotal (after discounts)" value={`Rs. ${Number(order.subtotal || 0).toLocaleString()}`} />
-                  <TotalRow label="+ Shipping Charges" value={`Rs. ${Number(order.shipping || 0).toLocaleString()}`} />
-                  <TotalRow label="+ Tax" value={`Rs. ${Number(order.tax || 0).toLocaleString()}`} />
+                  <TotalRow label={t("admin.orders.detail.subtotalAfter")} value={formatCurrency(order.subtotal, locale)} />
+                  <TotalRow label={t("admin.orders.detail.shippingCharges")} value={formatCurrency(order.shipping, locale)} />
+                  <TotalRow label={`+ ${t("admin.orders.detail.tax")}`} value={formatCurrency(order.tax, locale)} />
                   <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
-                    <span>Total Amount</span>
-                    <span>Rs. {Number(order.total || 0).toLocaleString()}</span>
+                    <span>{t("admin.orders.detail.totalAmount")}</span>
+                    <span>{formatCurrency(order.total, locale)}</span>
                   </div>
                 </div>
 
@@ -747,8 +753,8 @@ export default function OrderDetailPage({ params }) {
                   {totalSaved > 0 && (
                     <>
                       <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
-                        <span>Total Saved</span>
-                        <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
+                        <span>{t("admin.orders.detail.totalSaved")}</span>
+                        <span style={{ color: "var(--success-text)" }}>{formatCurrency(totalSaved, locale)}</span>
                       </div>
                     </>
                   )}
@@ -761,7 +767,7 @@ export default function OrderDetailPage({ params }) {
 
             {/* ---- Customer & Shipping Address ---- */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Customer &amp; Shipping Address</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.customerShippingAddress")}</h2>
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
                   style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
@@ -790,14 +796,14 @@ export default function OrderDetailPage({ params }) {
 
             {/* ---- Order Timeline ---- */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Order Timeline</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.orderTimeline")}</h2>
               <OrderTimeline order={order} />
             </div>
 
             {/* ---- Additional Information ----
                 (Order number / date already shown in the header — not repeated) */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Additional Information</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.additionalInformation")}</h2>
               <div className="space-y-1.5 text-[13px]">
                 <InfoRow label="Shipping Method" value={order.shipping_method ? String(order.shipping_method).replace(/_/g, " ") : "—"} capitalize />
                 {order.status === "cancelled" && order.cancel_reason && (
@@ -813,7 +819,7 @@ export default function OrderDetailPage({ params }) {
         {(dealGroups.length > 0 || bundleGroups.length > 0 || discountGroups.length > 0) && (
           <div className="rounded-lg p-4" style={cardStyle}>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <h2 className="text-[15px] font-bold">Deal &amp; Bundle Summary</h2>
+              <h2 className="text-[15px] font-bold">{t("admin.orders.detail.dealBundleSummary")}</h2>
             </div>
 
             <div className={promoGridClass}>
@@ -860,7 +866,7 @@ export default function OrderDetailPage({ params }) {
                 <AlertIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">Cancel Order {order.order_number}?</h3>
+                <h3 className="text-sm font-semibold">{t("admin.orders.detail.cancelOrderQuestion", { number: order.order_number })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   This will mark the order as cancelled and restore stock. This action cannot be undone.
                 </p>
@@ -872,7 +878,7 @@ export default function OrderDetailPage({ params }) {
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={3}
-                    placeholder="e.g. Stock unavailable, customer request..."
+                    placeholder={t("admin.orders.detail.cancelPlaceholder")}
                     className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                   />
@@ -888,7 +894,7 @@ export default function OrderDetailPage({ params }) {
               <button onClick={handleCancel} disabled={updateStatusMutation.isPending || !cancelReason.trim()}
                 className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                {updateStatusMutation.isPending ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel"}
+                {updateStatusMutation.isPending ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> {t("admin.orders.detail.cancelling")}</> : t("admin.orders.detail.confirmCancel")}
               </button>
             </div>
           </div>
@@ -950,7 +956,7 @@ function PromoGroupCard({ group }) {
 
       {group.items?.length > 0 && (
         <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: "var(--text-muted)" }}>
-          <span className="font-semibold">Products: </span>
+          <span className="font-semibold">{t("admin.orders.detail.productsCount")} </span>
           {group.items.map((it) => `${it.name} (×${it.qty}${Number(it.free_items) > 0 ? ` +${it.free_items} free` : ""})`).join(", ")}
         </p>
       )}

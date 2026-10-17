@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSocket } from "@/hooks/useSocket";
+import { useAdminSocket } from "./useAdminSocket";
 
 export function useShippingSocketSync() {
   const queryClient = useQueryClient();
-  const { socket } = useSocket();
+  const { socket } = useAdminSocket();
 
   useEffect(() => {
     if (!socket) return;
