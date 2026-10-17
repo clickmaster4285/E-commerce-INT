@@ -324,10 +324,10 @@ const getProductAttributes = (product) => {
 /* ==================== FORM MODAL ==================== */
 const DISCOUNT_TYPE_LABELS = { all: "All Products Discount", product: "Product Discount", category: "Category Discount", brand: "Brand Discount" };
 const DISCOUNT_TYPE_SUBTITLES = {
-  all: "This discount will apply to all products in your store automatically.",
-  product: "Select specific products to apply this discount to.",
-  category: "Apply this discount to entire categories.",
-  brand: "Apply this discount to specific brands.",
+  all: "admin.discounts.detail.appliesToAll",
+  product: "admin.discounts.page.applySpecificProducts",
+  category: "admin.discounts.page.applyCategories",
+  brand: "admin.discounts.page.applyBrands",
 };
 const DISCOUNT_TYPE_ICONS = { all: GlobeIcon, product: BoxIcon, category: FolderIcon, brand: AwardIcon };
 
@@ -396,7 +396,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                 {editingDiscount ? `Edit ${typeLabel}` : `Create ${typeLabel}`}
               </h3>
               <p className="text-[11px] sm:text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
-                {DISCOUNT_TYPE_SUBTITLES[formType]}
+                {t(DISCOUNT_TYPE_SUBTITLES[formType])}
               </p>
             </div>
           </div>

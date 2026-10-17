@@ -5,17 +5,17 @@ import { Check, Languages } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import LanguageTransition from "@/components/common/LanguageTransition";
 
-const LANGUAGE_KEYS = {
-  en: "common.english",
-  ar: "common.arabic",
-  ur: "common.urdu",
-  es: "common.spanish",
-  fr: "common.french",
-  de: "common.german",
-  hi: "common.hindi",
-  zh: "common.chinese",
-  pt: "common.portuguese",
-  tr: "common.turkish",
+const NATIVE_NAMES = {
+  en: "English",
+  ar: "Arabic",
+  ur: "Urdu",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  hi: "Hindi",
+  zh: "Chinese",
+  pt: "Portuguese",
+  tr: "Turkish",
 };
 
 export default function AdminLanguageSwitcher() {
@@ -24,6 +24,7 @@ export default function AdminLanguageSwitcher() {
   // Target locale while a switch is in flight — the curtain is mounted for it.
   const [switchingTo, setSwitchingTo] = useState(null);
   const ref = useRef(null);
+  const hoverTimer = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -43,10 +44,18 @@ export default function AdminLanguageSwitcher() {
     };
   }, [open]);
 
+  const handleMouseEnter = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setOpen(true);
+  };
+  const handleMouseLeave = () => {
+    hoverTimer.current = setTimeout(() => setOpen(false), 150);
+  };
+
   const currentLanguage = locales.find((item) => item.code === locale) || locales[0];
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -58,7 +67,7 @@ export default function AdminLanguageSwitcher() {
         style={{ color: "var(--text-muted)" }}
       >
         <Languages size={16} strokeWidth={2} />
-        <span className="hidden sm:inline">{t(LANGUAGE_KEYS[currentLanguage.code])}</span>
+        <span className="hidden sm:inline">Language</span>
       </button>
 
       {open && (
@@ -83,7 +92,7 @@ export default function AdminLanguageSwitcher() {
                 className="flex w-full items-center justify-between gap-3 px-3 py-2 text-start text-[13px] transition-colors hover:bg-[var(--bg-secondary)]"
                 style={{ color: active ? "var(--accent)" : "var(--text-primary)" }}
               >
-                <span>{t(LANGUAGE_KEYS[item.code])}</span>
+                <span>{NATIVE_NAMES[item.code] || item.nativeLabel || item.code}</span>
                 {active && <Check size={14} strokeWidth={2.5} className="shrink-0" />}
               </button>
             );

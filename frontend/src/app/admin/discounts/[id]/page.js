@@ -18,6 +18,7 @@ import { validateNonNegative } from "../_components/discountUtils";
 import useDiscountSocketSync from "../../../../hooks/admin/useDiscountSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { translate } from "@/i18n/translations";
 
 /* =========================================================
    HELPERS
@@ -45,14 +46,14 @@ function tago(date) {
   return d < 30 ? `${d}d ago` : fd(date);
 }
 
-function formatTarget(value) {
-  if (!value) return "All Products";
+function formatTarget(value, locale = "en") {
+  if (!value) return translate(locale, "admin.discounts.page.allProducts");
   const map = {
-    all: "All Products", all_products: "All Products",
-    specific_products: "Specific Products", product: "Specific Products",
-    specific_categories: "Categories", category: "Categories",
-    specific_brands: "Brands", brand: "Brands",
-    price_range: "Price Range",
+    all: translate(locale, "admin.discounts.page.allProducts"), all_products: translate(locale, "admin.discounts.page.allProducts"),
+    specific_products: translate(locale, "admin.discounts.page.specificProducts"), product: translate(locale, "admin.discounts.page.specificProducts"),
+    specific_categories: translate(locale, "admin.discounts.page.categories"), category: translate(locale, "admin.discounts.page.categories"),
+    specific_brands: translate(locale, "admin.discounts.page.brands"), brand: translate(locale, "admin.discounts.page.brands"),
+    price_range: translate(locale, "admin.discounts.page.priceRange"),
   };
   return map[value] || String(value).replaceAll("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
@@ -533,7 +534,7 @@ export default function DiscountDetailPage() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{nameOf(discount) || "Untitled Discount"}</h1>
+            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</h1>
             <div className="flex items-center gap-1.5 mt-1 text-[10px]" style={{ color: "var(--accent)" }}><Tag className="w-3 h-3" /> {discount.code || "—"}</div>
           </div>
           <div className="flex items-center gap-2">
@@ -559,9 +560,9 @@ export default function DiscountDetailPage() {
             <DataRow icon={Hash} label={t("admin.promotions.ui.generated.e6fb06210faf")} value={discount.code} mono />
             <DataRow icon={Tag} label={t("admin.discounts.detail.name")} value={nameOf(discount)} />
             <DataRow icon={Activity} label={t("admin.discounts.detail.description")} value={descriptionOf(discount) || "—"} />
-            <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
+            <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.detail.fixedPrice")} />
             <DataRow icon={DollarSign} label={t("admin.discounts.detail.value")} value={formatDiscountValue(discount)} highlight />
-            <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo)} />
+            <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />
             <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? "Active" : "Inactive"} highlight={isActive} />
           </InfoCard>
           <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")} action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
@@ -578,9 +579,9 @@ export default function DiscountDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title={t("admin.promotions.ui.generated.08d79bb915ec")}><DataRow icon={Globe} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo)} />{targetsProducts && <DataRow icon={Package} label={t("admin.promotions.ui.generated.73402e32460b")} value={`${assignedProducts.length} products`} />}{targetsCategories && <DataRow icon={Layers} label={t("admin.promotions.ui.generated.c107fd7d0b1c")} value={`${assignedCategories.length} categories`} />}{targetsBrands && <DataRow icon={Tag} label={t("admin.promotions.ui.generated.796088a7739e")} value={`${assignedBrands.length} brands`} />}</InfoCard></div>
-          <InfoCard icon={User} title={t("admin.brands.detail.createdBy")}><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.categories.detail.createdAt")}{" "}{formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
-          {hasUpdates && <InfoCard icon={User} title={t("admin.brands.detail.updatedBy")}><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || "System"}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.updated")}{" "}{formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
+          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title={t("admin.promotions.ui.generated.08d79bb915ec")}><DataRow icon={Globe} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />{targetsProducts && <DataRow icon={Package} label={t("admin.promotions.ui.generated.73402e32460b")} value={`${assignedProducts.length} ${t("common.product")}${assignedProducts.length === 1 ? "" : "s"}`} />}{targetsCategories && <DataRow icon={Layers} label={t("admin.promotions.ui.generated.c107fd7d0b1c")} value={`${assignedCategories.length} ${t("common.category")}${assignedCategories.length === 1 ? "" : "s"}`} />}{targetsBrands && <DataRow icon={Tag} label={t("admin.promotions.ui.generated.796088a7739e")} value={`${assignedBrands.length} ${t("common.brand")}${assignedBrands.length === 1 ? "" : "s"}`} />}</InfoCard></div>
+          <InfoCard icon={User} title={t("admin.brands.detail.createdBy")}><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || t("admin.discounts.detail.system")}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.categories.detail.createdAt")}{" "}{formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
+          {hasUpdates && <InfoCard icon={User} title={t("admin.brands.detail.updatedBy")}><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || t("admin.discounts.detail.system")}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.updated")}{" "}{formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
         </div>
       </div>
 

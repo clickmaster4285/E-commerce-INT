@@ -12,6 +12,7 @@ import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { translate } from "@/i18n/translations";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
 
@@ -482,7 +483,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { nameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -874,7 +875,7 @@ export default function DiscountsPage() {
               />
               <MenuItem
                 icon={<PowerIcon className="w-4 h-4" />}
-                label={getDiscountStatus(discount) === "active" ? "Deactivate" : "Activate"}
+                label={getDiscountStatus(discount) === "active" ? t("admin.brands.ui.deactivate") : t("admin.brands.ui.activate")}
                 danger={getDiscountStatus(discount) === "active"}
                 success={getDiscountStatus(discount) !== "active"}
                 onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
@@ -1054,12 +1055,12 @@ export default function DiscountsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || "Untitled Discount"}</p>
+                              <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount)}</span></td>
+                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, locale)}</td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, locale)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons discount={discount} /></td>
                       </tr>
@@ -1078,10 +1079,10 @@ export default function DiscountsPage() {
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{nameOf(discount) || "Untitled Discount"}</p>
+                  <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, locale)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>
