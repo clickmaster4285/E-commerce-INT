@@ -9,6 +9,13 @@ const LANGUAGE_KEYS = {
   en: "common.english",
   ar: "common.arabic",
   ur: "common.urdu",
+  es: "common.spanish",
+  fr: "common.french",
+  de: "common.german",
+  hi: "common.hindi",
+  zh: "common.chinese",
+  pt: "common.portuguese",
+  tr: "common.turkish",
 };
 
 export default function AdminLanguageSwitcher() {

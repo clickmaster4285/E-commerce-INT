@@ -69,7 +69,7 @@ const imageUrl = (raw) => {
   return `${API_ORIGIN}${s.startsWith("/") ? "" : "/"}${s}`;
 };
 
-const timeAgo = (date, t) => {
+const timeAgo = (date, t, locale) => {
   if (!date) return "";
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
@@ -79,7 +79,7 @@ const timeAgo = (date, t) => {
   if (hours < 24) return t("recentActivity.hoursAgo", { hours });
   const days = Math.floor(hours / 24);
   if (days < 7) return t("recentActivity.daysAgo", { days });
-  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(date));
 };
 
 const ORDER_STATUS_STYLES = {
@@ -648,7 +648,7 @@ function SalesDistribution({ data }) {
 
 /* ==================== RECENT ACTIVITY ==================== */
 function RecentActivity({ data }) {
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.dashboard." + k, p);
   const items = data?.activities || [];
   const ICONS = { cart: ShoppingCart, package: Package, tag: Tag, brand: Bookmark };
@@ -695,7 +695,7 @@ function RecentActivity({ data }) {
                     </span>
 
                     <span className="shrink-0 text-[10px] text-[var(--text-muted)]">
-                      {timeAgo(a.timestamp, t)}
+                      {timeAgo(a.timestamp, t, locale)}
                     </span>
                   </span>
                 </span>
@@ -710,7 +710,7 @@ function RecentActivity({ data }) {
 
 /* ==================== RECENT ORDERS ==================== */
 function RecentOrders({ data }) {
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.dashboard." + k, p);
   const orders = data?.recentOrders || [];
 
@@ -770,12 +770,12 @@ function RecentOrders({ data }) {
                         ORDER_STATUS_STYLES[o.status] || ""
                       }`}
                     >
-                      {o.status}
+                      {__t(`admin.orders.status.${o.status}`)}
                     </span>
                   </span>
 
                   <span className="mt-0.5 block text-end text-[10px] text-[var(--text-muted)]">
-                    {timeAgo(o.created_at, t)}
+                    {timeAgo(o.created_at, t, locale)}
                   </span>
                 </span>
 
@@ -1098,7 +1098,7 @@ export default function Dashboard() {
 
               {rangeOpen && (
                 <div className="animate-fade-in absolute end-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-lg)]">
-                  {RANGE_OPTIONS.map((r) => (
+                  {options.map((r) => (
                     <button
                       key={r.key}
                       type="button"

@@ -159,7 +159,13 @@ async function compressProductImage(file) {
   });
 }
 
-function handlePermissionError(error, defaultMessage, resource = "resource", t = null) {
+function localizedErrorMessage(error, fallback, locale) {
+  return locale === "en"
+    ? error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback
+    : fallback;
+}
+
+function handlePermissionError(error, defaultMessage, resource = "resource", t = null, locale = "en") {
   const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
   const normalized = String(message).toLowerCase();
   if (normalized.includes("permission") || normalized.includes("access denied") || normalized.includes("forbidden") || error?.response?.status === 403) {
@@ -168,7 +174,7 @@ function handlePermissionError(error, defaultMessage, resource = "resource", t =
     toast.error(title, { duration: 6000, description });
     return;
   }
-  toast.error(message || defaultMessage);
+  toast.error(localizedErrorMessage(error, defaultMessage, locale));
 }
 
 function normalizeId(value) {
@@ -227,7 +233,7 @@ MAIN COMPONENT
 
 export default function ProductsPage() {
   // Admin-panel i18n. English is the fallback for any missing key.
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const { nameOf, descriptionOf } = useLocalized();
   const t = (k, p) => __t("admin.products." + k, p);
   const ts = (k, p) => __t("admin.shared." + k, p);
@@ -472,7 +478,7 @@ const [viewMode, setViewMode] = useState(() => {
       }
     } catch (err) {
       console.error("Add value error:", err);
-      toast.error(err?.response?.data?.message || err?.message || t("toast.valueAddFailed"));
+      toast.error(localizedErrorMessage(err, t("toast.valueAddFailed"), locale));
       throw err;
     }
   };
@@ -504,7 +510,7 @@ const [viewMode, setViewMode] = useState(() => {
   /* Mutations */
   const [createLoading, setCreateLoading] = useState(false);
 
-  const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success(t("toast.deleted")); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, t("toast.deleteFailed"), t("entity.product"), t) });
+  const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success(t("toast.deleted")); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, t("toast.deleteFailed"), t("entity.product"), t, locale) });
   // ✅ Activate/deactivate OPTIMISTIC: click karte hi row + summary cards foran
   //    update ho jaate hain. Purana flow har click par PATCH + poori list/stats
   //    ka refetch (+ usi browser me socket echo ka dobara refetch) ka wait karta
@@ -544,7 +550,7 @@ const [viewMode, setViewMode] = useState(() => {
       ctx?.listSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
       ctx?.statsSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
       ctx?.detailSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      handlePermissionError(e, t("toast.statusFailed"), t("entity.product"), t);
+      handlePermissionError(e, t("toast.statusFailed"), t("entity.product"), t, locale);
     },
   });
   
@@ -590,7 +596,7 @@ const [viewMode, setViewMode] = useState(() => {
           try {
             await assignAttributeToCategoryMutation.mutateAsync({ categoryId, attributes: nextAttributes });
           } catch (e) {
-            handlePermissionError(e, t("toast.attributeAssignFailed"), t("entity.category"), t);
+            handlePermissionError(e, t("toast.attributeAssignFailed"), t("entity.category"), t, locale);
           }
         }
       }
@@ -599,7 +605,7 @@ const [viewMode, setViewMode] = useState(() => {
       resetAttributeForm();
       if (formData.category_id) fetchCategoryAttributes(formData.category_id);
     },
-    onError: (e) => handlePermissionError(e, t("toast.attributeCreateFailed"), t("entity.attribute"), t)
+    onError: (e) => handlePermissionError(e, t("toast.attributeCreateFailed"), t("entity.attribute"), t, locale)
   });
 
   /* Handlers */
@@ -681,7 +687,7 @@ const [viewMode, setViewMode] = useState(() => {
         return { ...prev, variants: v };
       });
       toast.success(t("toast.imagesUploaded", { count: images.length }));
-    } catch (e) { toast.error(e?.message || t("toast.imageProcessFailed")); }
+    } catch (e) { toast.error(localizedErrorMessage(e, t("toast.imageProcessFailed"), locale)); }
     event.target.value = "";
   };
 
@@ -847,7 +853,7 @@ const [viewMode, setViewMode] = useState(() => {
             : old
         );
       }
-      toast.error(e?.response?.data?.message || t("toast.featuredStatusFailed"));
+      toast.error(localizedErrorMessage(e, t("toast.featuredStatusFailed"), locale));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -871,7 +877,7 @@ const [viewMode, setViewMode] = useState(() => {
     }
     featuredMutation.mutate(product?._id, {
       onSuccess: (res) => {
-        toast.success(res?.message || (wasFeatured ? t("featured.removed") : t("featured.marked")));
+        toast.success(locale === "en" ? res?.message || (wasFeatured ? t("featured.removed") : t("featured.marked")) : (wasFeatured ? t("featured.removed") : t("featured.marked")));
       },
     });
   };

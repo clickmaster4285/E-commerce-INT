@@ -31,8 +31,9 @@
       //   translation_source.name   → us English text ka hash (staleness)
       //   translation_status.name   → pending | done | failed | skipped
       //
-      // `name` yahan `skipped` rehta hai (brand ek trademark hai — official
-      // naam English hi sahi hai); sirf `description` translate hota hai.
+      // `name` bhi translate hota hai kyun ke ye user-facing display naam hai,
+      // aur `description` bhi translate hota hai. English source text hamesha
+      // original field me rehta hai, Urdu/Arabic translations alag map me.
       translations: {
         name: { type: Map, of: String, default: () => ({}) },
         description: { type: Map, of: String, default: () => ({}) },

@@ -6,6 +6,7 @@ import { brandApi } from "../../../../apis/admin/brandApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
 import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { Country } from "country-state-city";
 import { toast } from "sonner";
 
@@ -63,28 +64,39 @@ function logoUrl(brand) {
   return "";
 }
 
-function formatDateTime(date) {
+function formatDateTime(date, locale = "en") {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", {
+  const intlLocale = locale === "ur" ? "ur-PK" : locale;
+  return new Intl.DateTimeFormat(intlLocale, {
     day: "numeric",
     month: "short",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    numberingSystem: locale === "ur" ? "latn" : undefined,
+  }).format(new Date(date));
 }
 
-function fileSize(bytes) {
+function formatNumber(value, locale = "en") {
+  const safe = Number(value || 0);
+  const intlLocale = locale === "ur" ? "ur-PK" : locale;
+  return new Intl.NumberFormat(intlLocale, {
+    maximumFractionDigits: 2,
+    numberingSystem: locale === "ur" ? "latn" : undefined,
+  }).format(safe);
+}
+
+function fileSize(bytes, locale = "en") {
   if (!bytes) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(2)} MB`;
+  if (bytes < 1024) return `${formatNumber(bytes, locale)} B`;
+  if (bytes < 1048576) return `${formatNumber(bytes / 1024, locale)} KB`;
+  return `${formatNumber(bytes / 1048576, locale)} MB`;
 }
 
 /* =========================================================
    UI COMPONENTS
 ========================================================= */
-function StatusPill({ active }) {
+function StatusPill({ active, t }) {
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
@@ -98,7 +110,7 @@ function StatusPill({ active }) {
         className="h-1.5 w-1.5 rounded-full"
         style={{ backgroundColor: active ? "var(--success-text)" : "var(--danger-text)" }}
       />
-      {active ? "Active" : "Inactive"}
+      {active ? t("common.active") : t("common.inactive")}
     </span>
   );
 }
@@ -172,17 +184,17 @@ function CardHeader({ icon, title, action }) {
   );
 }
 
-function InfoRow({ label, value, green = false, mono = false, isLast = false, compact = false }) {
+function InfoRow({ label, value, green = false, mono = false, isLast = false, compact = false, dir = "auto" }) {
   return (
     <div
       className={`flex min-w-0 flex-col gap-0.5 ${compact ? "py-1.5" : "py-2"}`}
     >
-      <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+      <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: "var(--text-muted)", unicodeBidi: "plaintext" }}>
         {label}
       </span>
       <span
         className={`max-w-full break-words text-[12px] font-medium ${mono ? "font-mono" : ""}`}
-        style={{ color: green ? "var(--success-text)" : "var(--text-primary)" }}
+        style={{ color: green ? "var(--success-text)" : "var(--text-primary)", unicodeBidi: "plaintext", direction: dir, letterSpacing: dir === "ltr" ? "0.01em" : undefined }}
       >
         {value || "—"}
       </span>
@@ -207,6 +219,8 @@ function Spin({ className = "w-4 h-4" }) {
    CUSTOM COUNTRY DROPDOWN (From Reference)
 ========================================================= */
 const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] }) => {
+  const { t: __t } = useTranslation();
+  const t = (key, params) => __t("admin.brands.ui." + key, params);
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const containerRef = useRef(null);
@@ -238,7 +252,10 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 
   useEffect(() => {
     if (isOpen && searchInputRef.current) setTimeout(() => searchInputRef.current?.focus(), 50);
-    if (!isOpen) setSearchTerm("");
+    if (!isOpen) {
+      const timer = setTimeout(() => setSearchTerm(""), 0);
+      return () => clearTimeout(timer);
+    }
   }, [isOpen]);
 
   const handleSelect = (countryName) => {
@@ -265,7 +282,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
           ) : (
             <span className="flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
               <Ico d={D.globe} className="w-3.5 h-3.5" />
-              <span className="text-[13px]">Select Country</span>
+              <span className="text-[13px]">{t("selectCountry")}</span>
             </span>
           )}
         </div>
@@ -282,11 +299,11 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
       {isOpen && (
         <div className="absolute z-50 bottom-full mb-1 w-full rounded-lg overflow-hidden shadow-2xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "0 -10px 40px rgba(0,0,0,0.5)" }}>
           <div className="px-3 py-1.5 text-center" style={{ borderBottom: "1px solid var(--border-color)" }}>
-            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{filteredCountries.length} of {allCountries.length} countries</p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("countryCount", { filtered: filteredCountries.length, total: allCountries.length })}</p>
           </div>
           <div className="max-h-[200px] overflow-y-auto py-1" style={{ scrollbarWidth: "thin" }}>
             {filteredCountries.length === 0 ? (
-              <div className="px-3 py-4 text-center"><p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No country found</p></div>
+              <div className="px-3 py-4 text-center"><p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("noCountry")}</p></div>
             ) : (
               filteredCountries.map((country) => {
                 const isSelected = country.name === value;
@@ -305,7 +322,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
           <div className="p-2" style={{ borderTop: "1px solid var(--border-color)" }}>
             <div className="relative">
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Ico d={D.search} className="w-3.5 h-3.5" /></span>
-              <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search country..." className="w-full h-10 md:h-8 pl-8 pr-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
+              <input ref={searchInputRef} type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder={t("searchCountry")} className="w-full h-10 md:h-8 pl-8 pr-3 rounded-md text-[16px] md:text-[12px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} />
             </div>
           </div>
         </div>
@@ -319,6 +336,8 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
 ========================================================= */
 export default function BrandDetailPage() {
   useBrandSocketSync();
+  const { t: __t, locale, dir } = useTranslation();
+  const t = (key, params) => __t(key.startsWith("common.") || key.startsWith("admin.") ? key : `admin.brands.${key}`, params);
   const { nameOf, descriptionOf } = useLocalized();
   const router = useRouter();
   const pathname = usePathname();
@@ -373,10 +392,10 @@ export default function BrandDetailPage() {
       setLogoPreview("");
       setRemoveLogo(false);
       setShowEdit(false);
-      toast.success("Brand updated successfully");
+      toast.success(t("admin.brands.toast.updated"));
     },
     onError: (err) => {
-      toast.error(err.message || "Failed to update brand");
+      toast.error(err.message || t("admin.brands.toast.saveFailed"));
     }
   });
 
@@ -385,7 +404,7 @@ export default function BrandDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries(["brands"]);
       router.push(backPath);
-      toast.success("Brand deleted successfully");
+      toast.success(t("admin.brands.toast.deleted"));
     },
   });
 
@@ -423,7 +442,7 @@ export default function BrandDetailPage() {
   // Logo Handlers
   const handleLogoChange = (file) => {
     if (file) {
-      if (file.size > 10 * 1024 * 1024) return toast.error("Image size must be less than 10MB");
+      if (file.size > 10 * 1024 * 1024) return toast.error(t("admin.brands.ui.imageTooLarge"));
       setLogoFile(file);
       setRemoveLogo(false);
       setLogoPreview(URL.createObjectURL(file));
@@ -436,7 +455,7 @@ export default function BrandDetailPage() {
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (!file.type.startsWith('image/')) return toast.error("Please drop an image file");
+      if (!file.type.startsWith('image/')) return toast.error(t("admin.brands.ui.imageTypes"));
       handleLogoChange(file);
     }
   };
@@ -459,6 +478,10 @@ export default function BrandDetailPage() {
     setRemoveLogo(true);
   };
 
+  const isRtl = dir === "rtl";
+  const dynamicTextStyle = { unicodeBidi: "plaintext", direction: isRtl ? "auto" : "ltr" };
+  const ltrTextStyle = { unicodeBidi: "plaintext", direction: "ltr" };
+
   const totalProducts = brandProducts.length;
   const activeProducts = brandProducts.filter((p) => p.status === "active").length;
   const inactiveProducts = totalProducts - activeProducts;
@@ -469,16 +492,21 @@ export default function BrandDetailPage() {
   // ✅ Naya logo upload/update hone par error flag reset karo — warna purana
   // 404 set hone ke baad "No logo uploaded" chip atak jata tha.
   useEffect(() => {
-    setLogoFailed(false);
+    if (!logoSrc) {
+      const timer = setTimeout(() => setLogoFailed(false), 0);
+      return () => clearTimeout(timer);
+    }
+    const timer = setTimeout(() => setLogoFailed(false), 0);
+    return () => clearTimeout(timer);
   }, [logoSrc]);
 
   if (loading) {
     return (
-      <div className="flex min-h-[500px] w-full items-center justify-center">
+      <div className="flex min-h-[500px] w-full items-center justify-center" dir={isRtl ? "rtl" : "ltr"}>
         <div className="flex items-center gap-2">
           <Spin className="h-5 w-5" />
           <span className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Loading brand details...
+            {t("common.loading")}
           </span>
         </div>
       </div>
@@ -487,11 +515,11 @@ export default function BrandDetailPage() {
 
   if (!brand) {
     return (
-      <div className="flex min-h-[500px] w-full items-center justify-center">
+      <div className="flex min-h-[500px] w-full items-center justify-center" dir={isRtl ? "rtl" : "ltr"}>
         <Card className="max-w-sm p-8 text-center">
-          <h2 className="mb-2 text-lg font-semibold">Brand Not Found</h2>
+          <h2 className="mb-2 text-lg font-semibold">{t("admin.brands.page.noBrands")}</h2>
           <Button primary onClick={() => router.push(backPath)}>
-            Back to Brands
+            {t("admin.brands.detail.backToBrands")}
           </Button>
         </Card>
       </div>
@@ -499,7 +527,7 @@ export default function BrandDetailPage() {
   }
 
   return (
-    <div className="w-full space-y-4 pb-8" style={{ color: "var(--text-primary)" }}>
+    <div className="w-full space-y-4 pb-8" dir={isRtl ? "rtl" : "ltr"} style={{ color: "var(--text-primary)" }}>
       {/* ===== BREADCRUMB ===== */}
       <nav className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
         <button
@@ -507,11 +535,11 @@ export default function BrandDetailPage() {
           onClick={() => router.push(backPath)}
           className="transition-colors hover:text-[var(--text-primary)]"
         >
-          Brands
+          {t("admin.brands.list.title", "Brands")}
         </button>
         <Ico d={D.chevron} className="h-3 w-3" />
         <span className="font-medium" style={{ color: "var(--text-primary)" }}>
-          Brand Details
+          {t("admin.brands.detail.pageTitle")}
         </span>
       </nav>
 
@@ -523,28 +551,28 @@ export default function BrandDetailPage() {
             onClick={() => router.push(backPath)}
             className="mt-0.5 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold transition hover:bg-[var(--bg-tertiary)]"
             style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
-            aria-label="Back to Brands"
+            aria-label={t("admin.brands.detail.backToBrands")}
           >
             <Ico d={D.back} className="h-3.5 w-3.5" />
-            <span>Back</span>
+            <span>{t("admin.brands.detail.back")}</span>
           </button>
           <div className="min-w-0">
-            <h1 className="text-[21px] leading-tight font-bold tracking-tight">Brand Details</h1>
+            <h1 className="text-[21px] leading-tight font-bold tracking-tight">{t("admin.brands.detail.pageTitle")}</h1>
             <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              View and manage brand information, status and related details.
+              {t("admin.brands.detail.subtitle")}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button primary onClick={openEdit}>
-            <Ico d={D.edit} className="h-3.5 w-3.5" /> Edit
+            <Ico d={D.edit} className="h-3.5 w-3.5" /> {t("common.edit")}
           </Button>
           <Button
             danger
             disabled={deleteMutation.isPending}
             onClick={() => setShowDelete(true)}
           >
-            <Ico d={D.trash} className="h-3.5 w-3.5" /> Delete
+            <Ico d={D.trash} className="h-3.5 w-3.5" /> {t("common.delete")}
           </Button>
         </div>
       </div>
@@ -556,7 +584,7 @@ export default function BrandDetailPage() {
           <div className="flex min-w-0 items-start gap-3.5 xl:pr-5">
             {hasLogo ? (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <img src={logoSrc} alt={brand.name} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
+                <img src={logoSrc} alt={nameOf(brand)} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
               </div>
             ) : (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
@@ -566,16 +594,16 @@ export default function BrandDetailPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
                 <h2 className="text-[17px] leading-tight font-bold">{nameOf(brand)}</h2>
-                <StatusPill active={brand.is_active} />
+                <StatusPill active={brand.is_active} t={t} />
               </div>
               <span className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>
                 {brand.brand_code || "—"}
               </span>
               {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{descriptionOf(brand)}</p>}
               <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                <span><span className="mr-1">Country</span><strong style={{ color: "var(--text-primary)" }}>{brand.country || "—"}</strong></span>
-                <span><span className="mr-1">Created At</span><strong style={{ color: "var(--text-primary)" }}>{formatDateTime(brand.created_at)}</strong></span>
-                <span><span className="mr-1">Created By</span><strong style={{ color: "var(--text-primary)" }}>{brand.createdby?.name || "—"}</strong></span>
+                <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.country")}</span><strong style={{ ...dynamicTextStyle, color: "var(--text-primary)" }}>{brand.country || "—"}</strong></span>
+                <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.createdAt")}</span><strong style={{ ...ltrTextStyle, color: "var(--text-primary)" }}>{formatDateTime(brand.created_at, locale)}</strong></span>
+                <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.createdBy")}</span><strong style={{ color: "var(--text-primary)" }}>{brand.createdby?.name || "—"}</strong></span>
               </div>
             </div>
           </div>
@@ -588,14 +616,14 @@ export default function BrandDetailPage() {
                   <Ico d={D.check} className="h-3.5 w-3.5" />
                 </span>
                 <div>
-                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Brand Status</p>
-                  <p className="text-[13px] font-bold" style={{ color: brand.is_active ? "var(--accent)" : "var(--danger)" }}>{brand.is_active ? "Active" : "Inactive"}</p>
+                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.brandStatus")}</p>
+                  <p className="text-[13px] font-bold" style={{ color: brand.is_active ? "var(--accent)" : "var(--danger)" }}>{brand.is_active ? t("common.active") : t("common.inactive")}</p>
                 </div>
               </div>
-              <p className="mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}>{brand.is_active ? "This brand is visible and available in the store." : "This brand is currently hidden from the store."}</p>
+              <p className="mt-2 text-[10px]" style={{ color: "var(--text-muted)" }}>{brand.is_active ? t("admin.brands.detail.visibilityActive") : t("admin.brands.detail.visibilityInactive")}</p>
             </div>
             <div className="rounded-lg p-2.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Total Products</p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.totalProducts")}</p>
               <p className="mt-1 text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{totalProducts}</p>
             </div>
           </div>
@@ -603,13 +631,13 @@ export default function BrandDetailPage() {
           {/* Quick information */}
           <div className="overflow-hidden rounded-lg xl:ml-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
             <div className="border-b px-3 py-2.5" style={{ borderColor: "var(--border-color)" }}>
-              <h3 className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>Quick Information</h3>
+              <h3 className="text-[11px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.brands.detail.quickInformation")}</h3>
             </div>
             <div className="grid grid-cols-2 gap-x-3 px-3 py-1">
-              <InfoRow label="Brand Code" value={brand.brand_code} mono compact />
-              <InfoRow label="Country" value={brand.country || "—"} compact />
-              <InfoRow label="Logo Size" value={fileSize(brand.logo?.img_size)} compact />
-              <InfoRow label="Status" value={brand.is_active ? "Active" : "Inactive"} green={brand.is_active} isLast compact />
+              <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono compact dir="ltr" />
+              <InfoRow label={t("admin.brands.detail.country")} value={brand.country || "—"} compact dir={isRtl ? "rtl" : "ltr"} />
+              <InfoRow label={t("admin.brands.detail.logoSize", "Logo Size")} value={fileSize(brand.logo?.img_size, locale)} compact dir="ltr" />
+              <InfoRow label={t("admin.brands.detail.status")} value={brand.is_active ? t("common.active") : t("common.inactive")} green={brand.is_active} isLast compact dir={isRtl ? "rtl" : "ltr"} />
             </div>
           </div>
         </div>
@@ -621,9 +649,9 @@ export default function BrandDetailPage() {
         style={{ borderColor: "var(--border-color)" }}
       >
         {[
-          { id: "overview", label: "Brand Information" },
-          { id: "products", label: "Products", badge: totalProducts },
-          { id: "activity", label: "History" },
+          { id: "overview", label: t("admin.brands.detail.brandInformation") },
+          { id: "products", label: t("admin.brands.detail.products"), badge: totalProducts },
+          { id: "activity", label: t("admin.brands.detail.history") },
         ].map((item) => {
           const active = tab === item.id;
           return (
@@ -668,19 +696,20 @@ export default function BrandDetailPage() {
             {/* 1. BRAND INFORMATION */}
             <Card>
               <CardHeader
-                title="Brand Information"
+                title={t("admin.brands.detail.brandInformation")}
                 icon={<Ico d={D.tag} className="h-4 w-4" />}
               />
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-                  <InfoRow label="Brand Code" value={brand.brand_code} mono />
-                  <InfoRow label="Brand Name" value={nameOf(brand)} />
-                  <InfoRow label="Country" value={brand.country || "—"} />
+                  <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono dir="ltr" />
+                  <InfoRow label={t("admin.brands.detail.brandName")} value={nameOf(brand)} dir={isRtl ? "rtl" : "ltr"} />
+                  <InfoRow label={t("admin.brands.detail.country")} value={brand.country || "—"} dir={isRtl ? "rtl" : "ltr"} />
                   <InfoRow
-                    label="Status"
-                    value={brand.is_active ? "Active" : "Inactive"}
+                    label={t("admin.brands.detail.status")}
+                    value={brand.is_active ? t("common.active") : t("common.inactive")}
                     green={brand.is_active}
                     isLast
+                    dir={isRtl ? "rtl" : "ltr"}
                   />
                 </div>
                 <div
@@ -694,7 +723,7 @@ export default function BrandDetailPage() {
                     className="mb-1 text-[10px] font-bold uppercase tracking-wide"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Description
+                    {t("admin.brands.detail.description")}
                   </p>
                   {brand.description ? (
                     <p
@@ -705,7 +734,7 @@ export default function BrandDetailPage() {
                     </p>
                   ) : (
                     <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      No description added
+                      {t("admin.brands.detail.noDescription")}
                     </p>
                   )}
                 </div>
@@ -715,20 +744,22 @@ export default function BrandDetailPage() {
             {/* 2. ADDITIONAL DETAILS */}
             <Card>
               <CardHeader
-                title="Additional Details"
+                title={t("admin.brands.detail.additionalDetails", "Additional Details")}
                 icon={<Ico d={D.clock} className="h-4 w-4" />}
               />
               <div className="grid grid-cols-1 gap-x-8 px-4 pb-2 sm:grid-cols-2">
-                <InfoRow label="Created At" value={formatDateTime(brand.created_at)} />
-                <InfoRow label="Created By" value={brand.createdby?.name} />
+                <InfoRow label={t("admin.brands.detail.createdAt")} value={formatDateTime(brand.created_at, locale)} dir="ltr" />
+                <InfoRow label={t("admin.brands.detail.createdBy")} value={brand.createdby?.name} dir={isRtl ? "rtl" : "ltr"} />
                 <InfoRow
-                  label="Updated At"
-                  value={hasUpdates ? formatDateTime(brand.updated_at) : "Never"}
+                  label={t("admin.brands.detail.updatedAt")}
+                  value={hasUpdates ? formatDateTime(brand.updated_at, locale) : t("admin.brands.detail.never", "Never")}
+                  dir="ltr"
                 />
                 <InfoRow
-                  label="Updated By"
+                  label={t("admin.brands.detail.updatedBy")}
                   value={hasUpdates ? brand.updatedby?.name : "—"}
                   isLast
+                  dir={isRtl ? "rtl" : "ltr"}
                 />
               </div>
             </Card>
@@ -745,24 +776,13 @@ export default function BrandDetailPage() {
                 <Ico d={D.eye} className="h-4 w-4" />
               </span>
               <p className="text-[11px] leading-5" style={{ color: "var(--text-secondary)" }}>
-                Brand record created by{" "}
-                <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {brand.createdby?.name || "—"}
-                </span>{" "}
-                on {formatDateTime(brand.created_at)}
+                {t("admin.brands.detail.recordCreatedBy", { name: brand.createdby?.name || "—", date: formatDateTime(brand.created_at, locale) })}
                 {hasUpdates ? (
-                  <>
-                    {" • "}Last updated by{" "}
-                    <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
-                      {brand.updatedby?.name || "—"}
-                    </span>{" "}
-                    on {formatDateTime(brand.updated_at)}
-                  </>
+                  <> {" • "}{t("admin.brands.detail.recordUpdatedBy", { name: brand.updatedby?.name || "—", date: formatDateTime(brand.updated_at, locale) })}</>
                 ) : (
-                  " • No updates recorded yet"
+                  <> {" • "}{t("admin.brands.detail.noUpdates")}</>
                 )}
-                {" • "}
-                {totalProducts} product{totalProducts === 1 ? "" : "s"} linked
+                {" • "}{t("admin.brands.detail.linkedProducts", { count: totalProducts })}
               </p>
             </div>
 
@@ -772,13 +792,13 @@ export default function BrandDetailPage() {
                 className="mb-1.5 text-[10px] font-bold uppercase tracking-widest"
                 style={{ color: "var(--text-muted)" }}
               >
-                Brand Statistics
+                {t("admin.brands.detail.brandStatistics")}
               </p>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {[
-                  { label: "Total Products", value: totalProducts, icon: D.box, color: "var(--accent)" },
-                  { label: "Active Products", value: activeProducts, icon: D.check, color: "var(--success-text)" },
-                  { label: "Inactive Products", value: inactiveProducts, icon: D.minus, color: "var(--danger-text)" },
+                  { label: t("admin.brands.detail.totalProducts"), value: totalProducts, icon: D.box, color: "var(--accent)" },
+                  { label: t("admin.brands.detail.activeProducts"), value: activeProducts, icon: D.check, color: "var(--success-text)" },
+                  { label: t("admin.brands.detail.inactiveProducts"), value: inactiveProducts, icon: D.minus, color: "var(--danger-text)" },
                 ].map((stat) => (
                   <div
                     key={stat.label}
@@ -813,7 +833,7 @@ export default function BrandDetailPage() {
             {/* 5. RELATED PRODUCTS */}
             <Card>
               <CardHeader
-                title="Related Products"
+                title={t("admin.brands.detail.relatedProducts")}
                 icon={<Ico d={D.box} className="h-4 w-4" />}
                 action={
                   productsLoading ? null : (
@@ -823,7 +843,7 @@ export default function BrandDetailPage() {
                       className="flex items-center gap-1 text-[11px] hover:underline"
                       style={{ color: "var(--accent)" }}
                     >
-                      View All <Ico d={D.chevron} className="h-3 w-3" />
+                      {t("admin.brands.detail.viewAll")} <Ico d={D.chevron} className="h-3 w-3" />
                     </button>
                   )
                 }
@@ -832,7 +852,7 @@ export default function BrandDetailPage() {
                 <div className="flex items-center justify-center gap-2 py-10">
                   <Spin />
                   <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                    Loading products...
+                    {t("admin.brands.detail.loadingProducts")}
                   </span>
                 </div>
               ) : brandProducts.length === 0 ? (
@@ -843,9 +863,9 @@ export default function BrandDetailPage() {
                   >
                     <Ico d={D.box} className="h-4 w-4 opacity-50" sw={1.5} />
                   </div>
-                  <p className="text-[12px] font-medium">No products linked yet</p>
+                  <p className="text-[12px] font-medium">{t("admin.brands.detail.noProductsLinked")}</p>
                   <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                    Link products to see them here.
+                    {t("admin.brands.detail.linkProductsHint")}
                   </p>
                 </div>
               ) : (
@@ -871,7 +891,7 @@ export default function BrandDetailPage() {
                             className="mt-0.5 truncate font-mono text-[10px]"
                             style={{ color: "var(--text-muted)" }}
                           >
-                            {product.product_code || product.sku || "No code"}
+                            {product.product_code || product.sku || t("common.none")}
                           </p>
                         </div>
                         <span
@@ -885,11 +905,11 @@ export default function BrandDetailPage() {
                               product.status === "active" ? "var(--success)" : "var(--danger)",
                           }}
                         >
-                          {product.status}
+                          {product.status === "active" ? t("common.active") : t("common.inactive")}
                         </span>
                       </div>
                       <p className="mt-2 truncate text-[11px]" style={{ color: "var(--text-secondary)" }}>
-                        {product.category_id?.name || product.description || "—"}
+                        {nameOf(product.category_id) || descriptionOf(product) || "—"}
                       </p>
                     </div>
                   ))}
@@ -900,7 +920,7 @@ export default function BrandDetailPage() {
             {/* 6. RECENT ACTIVITY */}
             <Card>
               <CardHeader
-                title="Recent Activity"
+                title={t("admin.brands.detail.recentActivity", "Recent Activity")}
                 icon={<Ico d={D.activity} className="h-4 w-4" />}
                 action={
                   <button
@@ -909,7 +929,7 @@ export default function BrandDetailPage() {
                     className="flex items-center gap-1 text-[11px] hover:underline"
                     style={{ color: "var(--accent)" }}
                   >
-                    View All <Ico d={D.chevron} className="h-3 w-3" />
+                    {t("admin.brands.detail.viewAll")} <Ico d={D.chevron} className="h-3 w-3" />
                   </button>
                 }
               />
@@ -927,15 +947,15 @@ export default function BrandDetailPage() {
                     )}
                   </div>
                   <div className="pb-1">
-                    <p className="text-[12px] font-medium">Brand Created</p>
+                    <p className="text-[12px] font-medium">{t("admin.brands.detail.brandCreated")}</p>
                     <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      by{" "}
+                      {t("admin.brands.detail.createdByLabel")}{" "}
                       <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
                         {brand.createdby?.name || "—"}
                       </span>
                     </p>
                     <p className="mt-1 font-mono text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                      {formatDateTime(brand.created_at)}
+                      {formatDateTime(brand.created_at, locale)}
                     </p>
                   </div>
                 </div>
@@ -949,15 +969,15 @@ export default function BrandDetailPage() {
                       <Ico d={D.pencil} className="h-3.5 w-3.5" />
                     </div>
                     <div>
-                      <p className="text-[12px] font-medium">Brand Updated</p>
+                      <p className="text-[12px] font-medium">{t("admin.brands.detail.brandUpdated")}</p>
                       <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        by{" "}
+                        {t("admin.brands.detail.updatedByLabel")}{" "}
                         <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
                           {brand.updatedby?.name || "—"}
                         </span>
                       </p>
                       <p className="mt-1 font-mono text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                        {formatDateTime(brand.updated_at)}
+                        {formatDateTime(brand.updated_at, locale)}
                       </p>
                     </div>
                   </div>
@@ -970,7 +990,7 @@ export default function BrandDetailPage() {
                     }}
                   >
                     <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      No updates recorded yet.
+                      {t("admin.brands.detail.noUpdates")}
                     </span>
                   </div>
                 )}
@@ -983,7 +1003,7 @@ export default function BrandDetailPage() {
             {/* 7. BRAND LOGO */}
             <Card>
               <CardHeader
-                title="Brand Logo"
+                title={t("admin.brands.detail.brandLogo")}
                 icon={<Ico d={D.image} className="h-4 w-4" />}
               />
                 <div className="p-4 flex flex-col">
@@ -1000,7 +1020,7 @@ export default function BrandDetailPage() {
                       >
                         <img
                           src={logoSrc}
-                          alt={brand.name}
+                          alt={nameOf(brand)}
                           onError={() => setLogoFailed(true)}
                           className="max-h-full max-w-full object-contain p-2"
                         />
@@ -1011,7 +1031,7 @@ export default function BrandDetailPage() {
                             {brand.logo.img_url?.split("/").pop()}
                           </p>
                           <p className="mt-0.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
-                            {fileSize(brand.logo.img_size)}
+                            {fileSize(brand.logo.img_size, locale)}
                           </p>
                         </div>
                         <a
@@ -1021,7 +1041,7 @@ export default function BrandDetailPage() {
                           className="shrink-0 text-[10px] hover:underline"
                           style={{ color: "var(--accent)" }}
                         >
-                          View <Ico d={D.link} className="inline h-3 w-3" />
+                          {t("admin.brands.detail.view")} <Ico d={D.link} className="inline h-3 w-3" />
                         </a>
                       </div>
                     </div>
@@ -1035,7 +1055,7 @@ export default function BrandDetailPage() {
                     >
                       <Ico d={D.image} className="mb-3 h-6 w-6 opacity-40" sw={1.4} />
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        No logo uploaded
+                        {t("admin.brands.detail.noLogoUploaded")}
                       </p>
                     </div>
                   )}
@@ -1045,27 +1065,30 @@ export default function BrandDetailPage() {
             {/* 8. QUICK INFO */}
             <Card>
               <CardHeader
-                title="Quick Info"
+                title={t("admin.brands.detail.quickInfo")}
                 icon={<Ico d={D.tag} className="h-4 w-4" />}
               />
               <div className="px-4 pb-4">
-                <InfoRow label="Brand Code" value={brand.brand_code} mono />
-                <InfoRow label="Country" value={brand.country || "—"} />
+                <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono dir="ltr" />
+                <InfoRow label={t("admin.brands.detail.country")} value={brand.country || "—"} dir={isRtl ? "rtl" : "ltr"} />
                 <InfoRow
-                  label="Status"
-                  value={brand.is_active ? "Active" : "Inactive"}
+                  label={t("admin.brands.detail.status")}
+                  value={brand.is_active ? t("common.active") : t("common.inactive")}
                   green={brand.is_active}
+                  dir={isRtl ? "rtl" : "ltr"}
                 />
-                <InfoRow label="Created At" value={formatDateTime(brand.created_at)} />
-                <InfoRow label="Created By" value={brand.createdby?.name} />
+                <InfoRow label={t("admin.brands.detail.createdAt")} value={formatDateTime(brand.created_at, locale)} dir="ltr" />
+                <InfoRow label={t("admin.brands.detail.createdBy")} value={brand.createdby?.name} dir={isRtl ? "rtl" : "ltr"} />
                 <InfoRow
-                  label="Updated At"
-                  value={hasUpdates ? formatDateTime(brand.updated_at) : "Never"}
+                  label={t("admin.brands.detail.updatedAt")}
+                  value={hasUpdates ? formatDateTime(brand.updated_at, locale) : t("admin.brands.detail.never", "Never")}
+                  dir="ltr"
                 />
                 <InfoRow
-                  label="Updated By"
+                  label={t("admin.brands.detail.updatedBy")}
                   value={hasUpdates ? brand.updatedby?.name : "—"}
                   isLast
+                  dir={isRtl ? "rtl" : "ltr"}
                 />
               </div>
             </Card>
@@ -1079,7 +1102,7 @@ export default function BrandDetailPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader
-              title="All Products"
+              title={t("admin.brands.detail.allProducts")}
               icon={<Ico d={D.box} className="h-4 w-4" />}
               action={
                 <div className="relative">
@@ -1090,7 +1113,7 @@ export default function BrandDetailPage() {
                   />
                   <input
                     type="text"
-                    placeholder="Search products..."
+                    placeholder={t("admin.brands.detail.searchProducts")}
                     className="h-8 w-[200px] rounded-md border pl-8 pr-3 text-[11px] outline-none"
                     style={{
                       backgroundColor: "var(--bg-tertiary)",
@@ -1105,13 +1128,13 @@ export default function BrandDetailPage() {
               <div className="flex items-center justify-center gap-2 py-14">
                 <Spin />
                 <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                  Loading products...
+                  {t("admin.brands.detail.loadingProducts")}
                 </span>
               </div>
             ) : brandProducts.length === 0 ? (
               <div className="py-16 text-center">
                 <Ico d={D.box} className="mx-auto mb-3 h-12 w-12 opacity-40" sw={1.4} />
-                <p className="text-[12px] font-medium">No products yet</p>
+                <p className="text-[12px] font-medium">{t("admin.brands.detail.noProductsYet")}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1122,25 +1145,25 @@ export default function BrandDetailPage() {
                         className="py-3 pl-4 pr-2 text-left text-[10px] font-medium"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        PRODUCT
+                        {t("admin.brands.detail.productTableProduct")}
                       </th>
                       <th
                         className="px-2 py-3 text-left text-[10px] font-medium"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        DESCRIPTION
+                        {t("admin.brands.detail.productTableDescription")}
                       </th>
                       <th
                         className="px-2 py-3 text-left text-[10px] font-medium"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        CATEGORY
+                        {t("admin.brands.detail.productTableCategory")}
                       </th>
                       <th
                         className="py-3 pr-4 text-center text-[10px] font-medium"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        STATUS
+                        {t("admin.brands.detail.productTableStatus")}
                       </th>
                     </tr>
                   </thead>
@@ -1158,7 +1181,7 @@ export default function BrandDetailPage() {
                             className="mt-1 font-mono text-[10px]"
                             style={{ color: "var(--text-muted)" }}
                           >
-                            {product.product_code || product.sku || "No code"}
+                            {product.product_code || product.sku || t("admin.brands.detail.noCode", "No code")}
                           </p>
                         </td>
                         <td className="max-w-[280px] align-top px-2 py-3">
@@ -1166,7 +1189,7 @@ export default function BrandDetailPage() {
                             className="line-clamp-2 text-[11px] leading-5"
                             style={{ color: "var(--text-secondary)" }}
                           >
-                            {descriptionOf(product) || "No description provided."}
+                            {descriptionOf(product) || t("admin.brands.detail.noDescription")}
                           </p>
                         </td>
                         <td className="px-2 py-3" style={{ color: "var(--text-secondary)" }}>
@@ -1186,7 +1209,7 @@ export default function BrandDetailPage() {
                                   : "var(--danger)",
                             }}
                           >
-                            {product.status}
+                            {product.status === "active" ? t("common.active") : t("common.inactive")}
                           </span>
                         </td>
                       </tr>
@@ -1204,7 +1227,7 @@ export default function BrandDetailPage() {
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]">
           <Card>
             <CardHeader
-              title="Full Activity Timeline"
+              title={t("admin.brands.detail.fullActivityTimeline")}
               icon={<Ico d={D.activity} className="h-4 w-4" />}
             />
             <div className="space-y-5 p-4">
@@ -1227,9 +1250,9 @@ export default function BrandDetailPage() {
                   )}
                 </div>
                 <div className="pb-1">
-                  <p className="text-[13px] font-medium">Brand Created</p>
+                  <p className="text-[13px] font-medium">{t("admin.brands.detail.brandCreated")}</p>
                   <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                    Created by{" "}
+                    {t("admin.brands.detail.createdByLabel")}{" "}
                     <span className="font-semibold text-[var(--text-primary)]">
                       {brand.createdby?.name || "—"}
                     </span>
@@ -1243,7 +1266,7 @@ export default function BrandDetailPage() {
                     className="mt-2 font-mono text-[10px]"
                     style={{ color: "var(--text-secondary)" }}
                   >
-                    {formatDateTime(brand.created_at)}
+                    {formatDateTime(brand.created_at, locale)}
                   </p>
                 </div>
               </div>
@@ -1262,9 +1285,9 @@ export default function BrandDetailPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-[13px] font-medium">Brand Updated</p>
+                    <p className="text-[13px] font-medium">{t("admin.brands.detail.brandUpdated")}</p>
                     <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      Updated by{" "}
+                      {t("admin.brands.detail.updatedByLabel")}{" "}
                       <span className="font-semibold text-[var(--text-primary)]">
                         {brand.updatedby?.name || "—"}
                       </span>
@@ -1278,7 +1301,7 @@ export default function BrandDetailPage() {
                       className="mt-2 font-mono text-[10px]"
                       style={{ color: "var(--text-secondary)" }}
                     >
-                      {formatDateTime(brand.updated_at)}
+                      {formatDateTime(brand.updated_at, locale)}
                     </p>
                   </div>
                 </div>
@@ -1291,7 +1314,7 @@ export default function BrandDetailPage() {
                   }}
                 >
                   <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                    No updates recorded yet.
+                    {t("admin.brands.detail.noUpdates")}
                   </span>
                 </div>
               )}
@@ -1300,7 +1323,7 @@ export default function BrandDetailPage() {
 
           <Card>
             <CardHeader
-              title="User Details"
+              title={t("admin.brands.detail.userDetails")}
               icon={<Ico d={D.user} className="h-4 w-4" />}
             />
             <div className="space-y-4 p-4">
@@ -1309,7 +1332,7 @@ export default function BrandDetailPage() {
                   className="mb-2 text-[10px] uppercase tracking-wide"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Creator
+                  {t("admin.brands.detail.creator")}
                 </p>
                 <div className="flex items-center gap-2">
                   <div
@@ -1339,7 +1362,7 @@ export default function BrandDetailPage() {
                     className="mb-2 text-[10px] uppercase tracking-wide"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Last Editor
+                    {t("admin.brands.detail.lastEditor")}
                   </p>
                   <div className="flex items-center gap-2">
                     <div
@@ -1373,7 +1396,7 @@ export default function BrandDetailPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="px-5 py-4 flex items-center justify-between rounded-t-xl" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-              <h3 className="text-base font-semibold">Edit Brand</h3>
+              <h3 className="text-base font-semibold">{t("admin.brands.detail.editBrand")}</h3>
               <button onClick={() => { setShowEdit(false); }} disabled={updateMutation.isPending} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}><Ico d={D.close} /></button>
             </div>
             
@@ -1382,7 +1405,7 @@ export default function BrandDetailPage() {
               {/* ROW 1: Brand Code + Brand Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Code</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.detail.brandCode")}</label>
                   <input 
                     type="text" 
                     value={form.brand_code} 
@@ -1392,7 +1415,7 @@ export default function BrandDetailPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Name *</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.detail.brandNameRequired")}</label>
                   <input 
                     type="text" 
                     value={form.name} 
@@ -1401,14 +1424,14 @@ export default function BrandDetailPage() {
                     disabled={updateMutation.isPending} 
                     className="h-9 px-3 rounded-md text-sm w-full outline-none disabled:opacity-50" 
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                    placeholder="e.g. Nike" 
+                    placeholder={t("admin.brands.ui.nameExample")}
                   />
                 </div>
               </div>
 
               {/* ROW 2: Description */}
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Description</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.detail.description")}</label>
                 <textarea 
                   value={form.description} 
                   onChange={(e) => setForm({ ...form, description: e.target.value })} 
@@ -1416,13 +1439,13 @@ export default function BrandDetailPage() {
                   disabled={updateMutation.isPending} 
                   className="px-3 py-2 rounded-md text-sm w-full outline-none disabled:opacity-50 resize-none" 
                   style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                  placeholder="Brand details..." 
+                  placeholder={t("admin.brands.ui.detailsPlaceholder")}
                 />
               </div>
 
               {/* ROW 3: DRAG AND DROP LOGO UPLOAD */}
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Brand Logo</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.detail.brandLogo")}</label>
                 
                 {/* Hidden Input */}
                 <input 
@@ -1465,9 +1488,9 @@ export default function BrandDetailPage() {
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                          {isDragging ? "Drop image here" : "Click or Drag image here"}
+                          {isDragging ? t("admin.brands.detail.dropImageHere") : t("admin.brands.detail.dragImage")}
                         </p>
-                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>PNG, JPG, WEBP up to 10MB</p>
+                        <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.imageFormats")}</p>
                       </div>
                     </>
                   )}
@@ -1477,19 +1500,19 @@ export default function BrandDetailPage() {
               {/* ROW 4: Country + Active Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Country</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.brands.detail.country")}</label>
                   <CountryDropdown value={form.country} onChange={(val) => setForm({ ...form, country: val })} disabled={updateMutation.isPending} allCountries={allCountries} />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer h-9 mb-1">
                   <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} disabled={updateMutation.isPending} className="w-4 h-4 rounded disabled:opacity-50" style={{ accentColor: "var(--accent)" }} />
-                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Active</span>
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("common.active")}</span>
                 </label>
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row gap-2 pt-4" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <button type="button" onClick={() => { setShowEdit(false); }} disabled={updateMutation.isPending} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="button" onClick={() => { setShowEdit(false); }} disabled={updateMutation.isPending} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("common.cancel")}</button>
                 <button type="submit" disabled={updateMutation.isPending} className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-1.5" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {updateMutation.isPending ? <><Spin className="w-3.5 h-3.5" /> Saving...</> : "Update Brand"}
+                  {updateMutation.isPending ? <><Spin className="w-3.5 h-3.5" /> {t("common.saving")}</> : t("admin.brands.detail.updateBrand")}
                 </button>
               </div>
             </form>
@@ -1516,17 +1539,15 @@ export default function BrandDetailPage() {
                 <Ico d={D.warn} className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold">Delete Brand?</h3>
+                <h3 className="text-[14px] font-semibold">{t("admin.brands.ui.deleteOneTitle", { name: nameOf(brand) })}</h3>
                 <p className="mt-1 text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>
-                  Are you sure you want to delete{" "}
-                  <span style={{ color: "var(--text-primary)" }}>{nameOf(brand)}</span>? This
-                  action cannot be undone.
+                  {t("admin.brands.ui.deleteWarning")}
                 </p>
               </div>
             </div>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button disabled={deleteMutation.isPending} onClick={() => setShowDelete(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 danger
@@ -1535,11 +1556,11 @@ export default function BrandDetailPage() {
               >
                 {deleteMutation.isPending ? (
                   <>
-                    <Spin className="h-3.5 w-3.5" /> Deleting...
+                    <Spin className="h-3.5 w-3.5" /> {t("admin.brands.ui.deleting")}
                   </>
                 ) : (
                   <>
-                    <Ico d={D.trash} className="h-3.5 w-3.5" /> Delete Brand
+                    <Ico d={D.trash} className="h-3.5 w-3.5" /> {t("admin.brands.ui.delete")}
                   </>
                 )}
               </Button>

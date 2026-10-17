@@ -9,8 +9,15 @@ export const DEFAULT_LOCALE = "en";
 
 export const LOCALES = [
   { code: "en", label: "English", nativeLabel: "English", dir: "ltr" },
-  { code: "ar", label: "Arabic", nativeLabel: "العربية", dir: "rtl" },
   { code: "ur", label: "Urdu", nativeLabel: "اردو", dir: "rtl" },
+  { code: "ar", label: "Arabic", nativeLabel: "العربية", dir: "rtl" },
+  { code: "es", label: "Spanish", nativeLabel: "Español", dir: "ltr" },
+  { code: "fr", label: "French", nativeLabel: "Français", dir: "ltr" },
+  { code: "de", label: "German", nativeLabel: "Deutsch", dir: "ltr" },
+  { code: "hi", label: "Hindi", nativeLabel: "हिन्दी", dir: "ltr" },
+  { code: "zh", label: "Chinese", nativeLabel: "中文", dir: "ltr" },
+  { code: "pt", label: "Portuguese", nativeLabel: "Português", dir: "ltr" },
+  { code: "tr", label: "Turkish", nativeLabel: "Türkçe", dir: "ltr" },
 ];
 
 export const LOCALE_CODES = LOCALES.map((l) => l.code);

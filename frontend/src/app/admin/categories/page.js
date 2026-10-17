@@ -905,7 +905,7 @@ const [viewMode, setViewMode] = useState(() => {
   const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const SortHeader = ({ label, sortKey }) => (
-    <th className="px-4 py-3 text-left">
+    <th className="px-4 py-3 text-start">
       <button type="button" onClick={() => handleSort(sortKey)} className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
         {label} <SortIndicator active={sortConfig.key === sortKey} direction={sortConfig.direction} />
       </button>
@@ -914,10 +914,10 @@ const [viewMode, setViewMode] = useState(() => {
 
   const SelectFilter = ({ value, onChange, children }) => (
     <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
+      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] ps-3 pe-8 rounded-lg text-[13px] md:text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-emerald-500/40" style={inputStyle}>
         {children}
       </select>
-      <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
+      <span className="absolute end-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
     </div>
   );
 
@@ -1181,7 +1181,7 @@ const [viewMode, setViewMode] = useState(() => {
                       title={parentDropdownTitle}
                       className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
                       <span className="flex items-center gap-2 min-w-0">
-                        <span className="truncate text-left">{parentLockedByName ? t("parent.none") : selectedParentName}</span>
+                        <span className="truncate text-start">{parentLockedByName ? t("parent.none") : selectedParentName}</span>
                         {parentLockedByName && (
                           <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("lock.badgeLockedToNone")}</span>
                         )}
@@ -1211,7 +1211,7 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="space-y-1.5">
                   <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.attributes")}</label>
                   <button type="button" onClick={openAttrSelectModal}
-                    className="w-full min-h-[38px] px-3 py-2 text-[12px] text-left outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-3">
+                    className="w-full min-h-[38px] px-3 py-2 text-[12px] text-start outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-3">
                     <span className="flex items-center gap-2 min-w-0">
                       <LayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
                       {formData.attributes.length === 0 ? (
@@ -1270,7 +1270,7 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="overflow-y-auto" style={{ maxHeight: "240px", flexShrink: 1 }}>
                   <button type="button"
                     onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }}
-                    className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
+                    className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
                     <span>{t("parent.none")}</span>
                     {!formData.parent_category_id && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)]" />}
                   </button>
@@ -1397,10 +1397,10 @@ const [viewMode, setViewMode] = useState(() => {
           {/* Search - Fixed */}
           <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><SearchIcon className="w-3.5 h-3.5" /></span>
+              <span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><SearchIcon className="w-3.5 h-3.5" /></span>
               <input type="text" placeholder={t("attrs.searchPlaceholder")} value={attrSearch}
                 onChange={(e) => setAttrSearch(e.target.value)}
-                className="w-full h-9 pl-8 pr-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                className="w-full h-9 ps-8 pe-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
                 autoFocus />
             </div>
           </div>
@@ -1415,7 +1415,7 @@ const [viewMode, setViewMode] = useState(() => {
                     const localizedAttr = attributeOf(attr);
                     return (
                       <button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)}
-                        className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}>
+                        className={`w-full px-5 py-2.5 flex items-center gap-3 text-start transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}>
                         {/* Checkbox */}
                         <div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>
                           {isChecked && <CheckIcon className="w-3 h-3 text-white" />}
@@ -1456,7 +1456,7 @@ const [viewMode, setViewMode] = useState(() => {
               {attrSearch.trim() && filteredAllAttributes.length === 0 ? (
                 <div className="px-5 py-2.5">
                   <button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }}
-                    className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
+                    className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span>
                   </button>
@@ -1521,13 +1521,13 @@ const [viewMode, setViewMode] = useState(() => {
           
           {/* Wider Search Bar (Left Side) */}
           <div className="relative w-full md:w-[400px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
+            <span className="absolute start-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
             <input 
               type="text" 
               placeholder={t("search.placeholder")} 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+              className="w-full h-9 ps-9 pe-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
               style={inputStyle} 
             />
           </div>
@@ -1571,10 +1571,10 @@ const [viewMode, setViewMode] = useState(() => {
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
                     <SortHeader label={t("table.code")} sortKey="code" />
                     <SortHeader label={t("table.name")} sortKey="name" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("table.description")}</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.parent")}</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.status")}</th>
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("table.description")}</th>
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.parent")}</th>
+                    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.status")}</th>
+                    <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1606,7 +1606,7 @@ const [viewMode, setViewMode] = useState(() => {
                             {isActive ? t("status.active") : t("status.inactive")}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-right"><ActionButtons category={category} /></td>
+                        <td className="px-4 py-2.5 text-end"><ActionButtons category={category} /></td>
                       </tr>
                     );
                   })}

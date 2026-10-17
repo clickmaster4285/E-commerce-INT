@@ -103,7 +103,15 @@ const TagIcon = ({ className = "w-4 h-4" }) => (
 
 // --- Helpers ---
 const getDataTypeLabel = (type) => {
-  const map = { text: "Text", number: "Number", decimal: "Decimal", multi_select: "Multi Select", select: "Select", color: "Color", boolean: "Yes / No" };
+  const map = {
+    text: "dataType.text",
+    number: "dataType.number",
+    decimal: "dataType.decimal",
+    multi_select: "dataType.multi_select",
+    select: "dataType.select",
+    color: "dataType.color",
+    boolean: "dataType.boolean",
+  };
   return map[type] || type;
 };
 
@@ -242,7 +250,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
           <div className="min-w-0">
             <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{nameOf(attr)}</h4>
             <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 mt-1">
-              {getDataTypeLabel(attr.data_type)}
+              {t(getDataTypeLabel(attr.data_type))}
             </span>
           </div>
         </div>
@@ -261,7 +269,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
                 <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.dataType")}</span>
                 <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
-                  {getDataTypeLabel(attr.data_type)}
+                  {t(getDataTypeLabel(attr.data_type))}
                 </span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
@@ -282,7 +290,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
                <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] flex justify-between items-center">
                  <span className="text-[10px] font-medium text-[var(--text-muted)]">{ t("detailPanel.variantOption") }</span>
                   <span className="text-xs font-semibold text-[var(--accent)]">{ t("common.yes") }</span>
-                 <span className="text-xs font-semibold text-[var(--accent)]"{ t("common.yes") }</span>
+                 <span className="text-xs font-semibold text-[var(--accent)]">{ t("common.yes") }</span>
                </div>
             )}
           </div>
@@ -387,6 +395,8 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
 // ==================== ATTRIBUTE FORM MODAL ====================
 function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
   const isEdit = mode === "edit";
+  const { t: __t } = useTranslation();
+  const t = (key, params) => __t(`admin.attributes.${key}`, params);
   const [form, setForm] = useState({
     name: "",
     data_type: "multi_select",
@@ -493,13 +503,15 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
     setForm({ ...form, values: (form.values || []).filter((_, i) => i !== idx) });
   };
 
-  const title = isEdit ? "Edit Attribute" : "Add New Attribute";
-  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products in this category.";
-  const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
+  const title = isEdit ? t("form.editTitle") : t("form.createTitle");
+  const subtitle = isEdit ? t("form.editSubtitle") : t("form.createSubtitle");
+  const saveText = isEdit
+    ? isSaving ? t("form.saving") : t("form.save")
+    : isSaving ? t("form.adding") : t("form.create");
 
   const dataTypeLabels = [
-    { id: "multi_select", label: "Multi Options" },
-    { id: "boolean", label: "Yes / No" },
+    { id: "multi_select", label: t("form.typeMulti") },
+    { id: "boolean", label: t("form.typeYesNo") },
   ];
 
   return (
@@ -530,7 +542,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.basicInformation")}</p>
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                Attribute Name <span className="text-red-500">*</span>
+                {t("form.name")} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -538,13 +550,13 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 autoFocus
                 className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                placeholder="e.g. Color, Size, RAM"
+                placeholder={t("form.namePlaceholder")}
               />
             </div>
           </div>
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              Attribute Type
+              {t("form.type")}
             </label>
             <div className="grid grid-cols-2 gap-4">
               {dataTypeLabels.map((type) => {
@@ -586,7 +598,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                       type="button"
                       onClick={() => removeOption(idx)}
                       className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"
-                      aria-label={t("action.remove")}
+                      aria-label={t("action.delete")}
                     >
                       <CloseIcon className="w-2.5 h-2.5" />
                     </button>
@@ -623,11 +635,11 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           )}
           {form.data_type === "boolean" && (
             <div className="space-y-2.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("form.defaultValue")}</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: true, label: "Yes" },
-                  { id: false, label: "No" },
+                  { id: true, label: t("form.yes") },
+                  { id: false, label: t("form.no") },
                 ].map((opt) => {
                   const isActive = form.value === opt.id;
                   return (
@@ -654,7 +666,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                 })}
               </div>
               <p className="text-[10px] text-[var(--text-muted)]">
-                This will be the default Yes/No state for this attribute.
+                {t("form.defaultValueHint")}
               </p>
             </div>
           )}
@@ -665,7 +677,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
             onClick={onClose}
             className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
           >
-            Cancel
+            {t("form.cancel")}
           </button>
           <button
             type="button"
@@ -1252,7 +1264,7 @@ export default function AttributesPage() {
                               : attr.data_type === 'text'
                               ? { backgroundColor: "var(--info-soft)", color: "var(--info-text)", border: "1px solid color-mix(in srgb, var(--info) 28%, transparent)" }
                               : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
-                            {getDataTypeLabel(attr.data_type)}
+                            {t(getDataTypeLabel(attr.data_type))}
                           </span>
                         </td>
                         <td className="px-4 py-2.5">

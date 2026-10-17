@@ -23,8 +23,10 @@
 //    dobara chalane par sirf wahi fields process hote hain.
 //
 // 4. KIS FIELDS TRANSLATE HOTE HAIN / NAHI
-//    Brand ka `name` trademark hai aur Product ka `name` model number — dono
-//    original (English) hi rehte hain, sirf `description` translate hota hai.
+//    Brand ka `name` user-facing official display text hai, isliye yahan
+//    translate allow hota hai; `description` bhi translate hota hai.
+//    Product ka `name` model number hota hai, isliye us par translation
+//    intentionally skip rehti hai.
 //    Category/Attribute ke descriptive `name` translate hote hain.
 //    Attribute option ka `value` machine code hai (variant matching ke liye)
 //    — sirf display wala `label` translate hota hai.
@@ -41,7 +43,7 @@ const { TARGET_LOCALES, isEnabled, translateBatch } = require("./libreTranslate"
 // WHICH FIELDS GET TRANSLATED (per model)
 // ==========================================
 const TRANSLATABLE_FIELDS = {
-  Brand: ["description"], // name = trademark → original rehne do
+  Brand: ["name", "description"],
   Category: ["name", "description"],
   Product: ["description"], // name = model number → original rehne do
   Attribute: ["name"], // + values[].label (values[].value raw rehta hai)
@@ -147,7 +149,9 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
 
     const currentHash = hashText(text);
     const storedHash = nextSource[field] || "";
-    const haveTranslation = Boolean(nextTranslations[field]?.[TARGET_LOCALES[0]]);
+    const haveTranslation = TARGET_LOCALES.every(
+      (locale) => Boolean(nextTranslations[field]?.[locale])
+    );
 
     // Hash same + translation maujood → fresh, kuch nahi karna.
     if (!force && storedHash === currentHash && haveTranslation) {

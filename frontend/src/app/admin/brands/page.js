@@ -118,7 +118,7 @@ const CountryDropdown = ({ value, onChange, disabled = false, allCountries = [] 
   const searchInputRef = useRef(null);
   const localizedCountryName = (country) => {
     try {
-      const localeTag = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en";
+      const localeTag = locale === "ur" ? "ur-PK" : locale;
       return new Intl.DisplayNames([localeTag], { type: "region" }).of(country.isoCode) || country.name;
     } catch {
       return country.name;
@@ -427,7 +427,7 @@ export default function BrandsPage() {
     const country = allCountries.find((item) => item.name === name);
     if (!country) return name;
     try {
-      return new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en"], { type: "region" }).of(country.isoCode) || name;
+      return new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale], { type: "region" }).of(country.isoCode) || name;
     } catch {
       return name;
     }
@@ -840,7 +840,7 @@ export default function BrandsPage() {
                           </div>
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(brand) || "—"}</p></td>
-                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country || "—"}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-[13px] hidden sm:table-cell" style={{ color: "var(--text-secondary)" }}>{brand.country ? countryLabel(brand.country) : "—"}</td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><StatusBadge active={brand.is_active} /></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-end"><ActionButtons brand={brand} /></td>
                       </tr>
@@ -894,7 +894,7 @@ export default function BrandsPage() {
                       className="text-[11px] truncate min-w-0"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      {brand.country || "—"}
+                      {brand.country ? countryLabel(brand.country) : "—"}
                     </span>
                     <StatusBadge active={brand.is_active} />
                   </div>
@@ -923,7 +923,7 @@ export default function BrandsPage() {
                   <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{brand.brand_code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{brand.country || "—"}</span>
+                  <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{brand.country ? countryLabel(brand.country) : "—"}</span>
                   <ActionButtons brand={brand} />
                 </div>
               </div>

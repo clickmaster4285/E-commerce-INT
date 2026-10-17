@@ -1,7 +1,7 @@
 // ==========================================
 // LIBRETRANSLATE CLIENT (self-hosted)
 // ==========================================
-// English -> Urdu translation via a self-hosted LibreTranslate instance
+// English -> supported locales via a self-hosted LibreTranslate instance
 // (Argos Translate models). Koi paid API nahi — sirf ek local/own-server
 // service jo `LIBRETRANSLATE_URL` par chal rahi hai.
 //
@@ -16,7 +16,7 @@
 //   LIBRETRANSLATE_URL=http://localhost:5000
 //   LIBRETRANSLATE_API_KEY=            (optional — sirf agar instance par
 //                                       `--api-keys` enable kiya ho)
-//   TRANSLATE_TARGET_LOCALES=ur        (comma separated)
+//   TRANSLATE_TARGET_LOCALES=ur,ar,es,fr,de,hi,zh,pt,tr (comma separated)
 //   TRANSLATE_BATCH_SIZE=10            (ek request me kitne strings)
 //   TRANSLATE_TIMEOUT_MS=30000
 //   TRANSLATE_MAX_RETRIES=3
@@ -35,7 +35,7 @@ const MAX_RETRIES = Number(process.env.TRANSLATE_MAX_RETRIES) || 3;
 const BATCH_SIZE = Number(process.env.TRANSLATE_BATCH_SIZE) || 10;
 
 const SOURCE_LANG = "en";
-const TARGET_LOCALES = String(process.env.TRANSLATE_TARGET_LOCALES || "ur")
+const TARGET_LOCALES = String(process.env.TRANSLATE_TARGET_LOCALES || "ur,ar,es,fr,de,hi,zh,pt,tr")
   .split(",")
   .map((l) => l.trim().toLowerCase())
   .filter(Boolean);

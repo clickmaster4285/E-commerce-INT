@@ -189,7 +189,8 @@ const getBrandById = async (req, res) => {
   try {
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
       .populate("createdby", "name email")
-      .populate("updatedby", "name email");
+      .populate("updatedby", "name email")
+      .lean();
 
     if (!brand) {
       return res.status(404).json({ success: false, message: "Brand not found" });
@@ -201,7 +202,7 @@ const getBrandById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { ...brand.toObject(), products },
+      data: { ...brand, products },
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

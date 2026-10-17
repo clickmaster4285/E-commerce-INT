@@ -9,6 +9,7 @@ import { attributeApi } from "@/apis/admin/attributeApi";
 import { useAttributeSocketSync } from "../../../../hooks/admin/useAttributeSocketSync";
 import { toast } from "sonner";
 import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* =========================================================
    ICONS
@@ -251,17 +252,19 @@ const getParentAssignmentError = ({ categories = [], editingCategory = null, nex
   return "";
 };
 
-function formatDateTime(date) {
+function formatDateTime(date, locale = "en") {
   if (!date) return "\u2014";
   const parsed = new Date(date);
   if (Number.isNaN(parsed.getTime())) return "\u2014";
-  return parsed.toLocaleDateString("en-US", {
+  const intlLocale = locale === "ur" ? "ur-PK" : locale;
+  return new Intl.DateTimeFormat(intlLocale, {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    numberingSystem: locale === "ur" ? "latn" : undefined,
+  }).format(parsed);
 }
 
 function getAttributeId(attribute) {
@@ -312,8 +315,16 @@ function sanitizeOptionLabels(raw) {
 }
 
 function getDataTypeLabel(type) {
-  const map = { multi_select: "Multi Select", select: "Select", color: "Color", boolean: "Yes / No" };
-  return map[type] || type || "Multi Select";
+  const map = {
+    text: "admin.attributes.dataType.text",
+    number: "admin.attributes.dataType.number",
+    decimal: "admin.attributes.dataType.decimal",
+    multi_select: "admin.attributes.dataType.multi_select",
+    select: "admin.attributes.dataType.select",
+    color: "admin.attributes.dataType.color",
+    boolean: "admin.attributes.dataType.boolean",
+  };
+  return map[type] ? map[type] : type || "Multi Select";
 }
 
 function getDataTypeBadgeStyle(type) {
@@ -336,7 +347,7 @@ function getDataTypeBadgeStyle(type) {
 
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-function StatusBadge({ active = true }) {
+function StatusBadge({ active = true, t }) {
   return (
     <span
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider"
@@ -347,7 +358,7 @@ function StatusBadge({ active = true }) {
       }}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-red-500"}`} />
-      {active ? "Active" : "Inactive"}
+      {active ? t("status.active") : t("status.inactive")}
     </span>
   );
 }
@@ -385,27 +396,32 @@ function Spin({ className = "w-4 h-4" }) {
 ========================================================= */
 
 function AttributeOptionsPanel({ attr, onClose }) {
+  const { t: __t, dir, locale } = useTranslation();
+  const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, params);
+  const { attributeOf } = useLocalized();
+  const localizedAttr = attributeOf(attr);
+  const optionLabels = sanitizeOptionLabels(localizedAttr.values);
+
   if (!attr) return null;
-  
-  const optionLabels = sanitizeOptionLabels(attr.values);
+
   const isBoolean = attr.data_type === "boolean";
   const isActive = attr.is_active !== false;
 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div dir={dir} lang={locale}
         className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-[1px] transition-opacity" 
         onClick={onClose}
       />
       
       {/* Side Panel */}
-      <div className="fixed top-0 right-0 bottom-0 z-[70] w-full max-w-[360px] bg-[var(--bg-secondary)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out">
+      <div dir={dir} lang={locale} className="fixed top-0 end-0 bottom-0 z-[70] w-full max-w-[360px] bg-[var(--bg-secondary)] border-s border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out">
         
         {/* Header */}
         <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
           <div className="min-w-0">
-            <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate pr-4">{attr.name}</h3>
+            <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate pe-4">{localizedAttr.name}</h3>
             <p className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5">{attr.code}</p>
           </div>
           <button 
@@ -421,22 +437,22 @@ function AttributeOptionsPanel({ attr, onClose }) {
           
           {/* Details */}
           <div className="space-y-3">
-            <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Details</h4>
+            <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.attributes.detailPanel.summary")}</h4>
             <div className="space-y-0 rounded-lg border border-[var(--border-color)] overflow-hidden">
               <div className="flex justify-between items-center px-3 py-2.5 bg-[var(--bg-input)]">
-                <span className="text-[12px] text-[var(--text-muted)]">Type</span>
+                <span className="text-[12px] text-[var(--text-muted)]">{t("admin.attributes.detailPanel.dataType")}</span>
                 <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
-                  {getDataTypeLabel(attr.data_type)}
+                  {t(getDataTypeLabel(attr.data_type))}
                 </span>
               </div>
               <div className="flex justify-between items-center px-3 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <span className="text-[12px] text-[var(--text-muted)]">Status</span>
-                <StatusBadge active={isActive} />
+                <span className="text-[12px] text-[var(--text-muted)]">{t("admin.attributes.detailPanel.status")}</span>
+                <StatusBadge active={isActive} t={t} />
               </div>
               {attr.category_config?.is_variant_option && (
                 <div className="flex justify-between items-center px-3 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                  <span className="text-[12px] text-[var(--text-muted)]">Variant</span>
-                  <span className="text-[11px] font-medium text-[var(--accent)]">Yes</span>
+                  <span className="text-[12px] text-[var(--text-muted)]">{t("detail.variant")}</span>
+                  <span className="text-[11px] font-medium text-[var(--accent)]">{t("common.yes")}</span>
                 </div>
               )}
             </div>
@@ -446,7 +462,7 @@ function AttributeOptionsPanel({ attr, onClose }) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                {isBoolean ? "Boolean Values" : "Available Options"}
+                {isBoolean ? t("admin.attributes.detailPanel.booleanValues") : t("admin.attributes.detailPanel.availableOptions")}
               </h4>
               <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
                 {optionLabels.length}
@@ -473,7 +489,7 @@ function AttributeOptionsPanel({ attr, onClose }) {
                 ))
               ) : (
                 <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
-                   <p className="text-[12px] text-[var(--text-muted)]">No options defined.</p>
+                   <p className="text-[12px] text-[var(--text-muted)]">{t("admin.attributes.detailPanel.noOptions")}</p>
                 </div>
               )}
             </div>
@@ -498,6 +514,8 @@ function AttributeOptionsPanel({ attr, onClose }) {
 
 function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
   const isEdit = mode === "edit";
+  const { t: __t } = useTranslation();
+  const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, params);
 
   const [form, setForm] = useState({
     name: "",
@@ -607,9 +625,11 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
     setForm({ ...form, values: (form.values || []).filter((_, i) => i !== idx) });
   };
 
-  const title = isEdit ? "Edit Attribute" : "Add New Attribute";
-  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products in this category.";
-  const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
+  const title = isEdit ? t("admin.attributes.form.editTitle") : t("admin.attributes.form.createTitle");
+  const subtitle = isEdit ? t("admin.attributes.form.editSubtitle") : t("admin.attributes.form.createSubtitle");
+  const saveText = isEdit
+    ? isSaving ? t("admin.attributes.form.saving") : t("admin.attributes.form.save")
+    : isSaving ? t("admin.attributes.form.adding") : t("admin.attributes.form.create");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -636,7 +656,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
         <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="space-y-1.5">
             <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              Attribute Name <span className="text-red-500">*</span>
+              {t("admin.attributes.form.name")} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -644,18 +664,18 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               autoFocus
               className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-              placeholder="e.g. Color, Size, RAM"
+              placeholder={t("admin.attributes.form.namePlaceholder")}
             />
           </div>
 
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              Attribute Type
+              {t("admin.attributes.form.type")}
             </label>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { id: "multi_select", label: "Multi Options" },
-                { id: "boolean", label: "Yes / No" },
+                { id: "multi_select", label: t("admin.attributes.form.typeMulti") },
+                { id: "boolean", label: t("admin.attributes.form.typeYesNo") },
               ].map((type) => {
                 const isActive = form.data_type === type.id;
                 return (
@@ -790,6 +810,8 @@ export default function CategoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
+  const { t: __t, dir, locale } = useTranslation();
+  const t = (key, values) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, values);
   // Database-sourced content (category / attribute names + descriptions) —
   // active locale me render hota hai, English fallback helper ke andar hai.
   const { nameOf, descriptionOf, attributeOf } = useLocalized();
@@ -856,10 +878,7 @@ export default function CategoryDetailPage() {
     return allCategories.find((item) => String(item._id) === String(parentId)) || null;
   }, [category, allCategories]);
 
-  const parentCategoryName = useMemo(() => {
-    if (!parentCategoryDoc) return "None";
-    return parentCategoryDoc.name || "None";
-  }, [parentCategoryDoc]);
+  const parentCategoryName = parentCategoryDoc ? nameOf(parentCategoryDoc) : t("parent.none");
 
   // Mutations
   const deleteMutation = useMutation({
@@ -867,7 +886,7 @@ export default function CategoryDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.removeQueries({ queryKey: ["category", categoryId] });
-      toast.success("Category deleted successfully");
+      toast.success(t("toast.deleted"));
       router.push(backPath);
     },
     onError: (err) => {
@@ -882,7 +901,7 @@ export default function CategoryDetailPage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
       queryClient.invalidateQueries({ queryKey: ["category", categoryId] });
-      toast.success(variables.currentActive ? "Attribute disabled" : "Attribute enabled");
+      toast.success(variables.currentActive ? t("toast.disabled") : t("toast.enabled"));
       setActiveMenuId(null);
     },
     onError: (err) => {
@@ -894,11 +913,11 @@ export default function CategoryDetailPage() {
     mutationFn: async (data) => {
       return await attributeApi.create(data);
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["category-attributes", categoryId] });
       queryClient.invalidateQueries({ queryKey: ["all-attributes"] });
       setShowCreateAttrModal(false);
-      toast.success("Attribute created successfully");
+      toast.success(t("addAttr.created", { name: created?.name || "" }));
     },
     onError: (err) => {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create attribute");
@@ -923,7 +942,7 @@ export default function CategoryDetailPage() {
         <div className="flex flex-col items-center gap-3">
           <Spin className="w-6 h-6 text-[var(--accent)]" />
           <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
-            Loading category details...
+            {t("detail.loading")}
           </span>
         </div>
       </div>
@@ -937,10 +956,10 @@ export default function CategoryDetailPage() {
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
             <Ico d={D.folder} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
           </div>
-          <h2 className="text-[16px] font-semibold mb-1.5 text-[var(--text-primary)]">Category Not Found</h2>
-          <p className="text-[12px] mb-5" style={{ color: "var(--text-muted)" }}>The category you're looking for doesn't exist or has been removed.</p>
+          <h2 className="text-[16px] font-semibold mb-1.5 text-[var(--text-primary)]">{t("detail.notFound")}</h2>
+          <p className="text-[12px] mb-5" style={{ color: "var(--text-muted)" }}>{t("detail.notFoundBody")}</p>
           <Button primary onClick={() => router.push(backPath)}>
-            Back to Categories
+            {t("detail.back")}
           </Button>
         </div>
       </div>
@@ -949,7 +968,7 @@ export default function CategoryDetailPage() {
 
   return (
     // UPDATED: Wider container (98%), less bottom padding (pb-6), small top padding (pt-2)
-    <div className="w-[98%] max-w-[1600px] mx-auto space-y-5 pb-6 pt-2 relative" style={{ color: "var(--text-primary)" }}>
+    <div dir={dir} lang={locale} className="w-[98%] max-w-[1600px] mx-auto space-y-5 pb-6 pt-2 relative" style={{ color: "var(--text-primary)" }}>
 
       {/* BREADCRUMB + HEADER + INFO CARD */}
       <div>
@@ -963,10 +982,10 @@ export default function CategoryDetailPage() {
             onClick={() => router.push(backPath)}
             className="transition-colors hover:text-[var(--text-primary)]"
           >
-            Categories
+            {t("detail.back")}
           </button>
           <Ico d={D.chevron} className="w-3 h-3" />
-          {parentCategoryName !== "None" && (
+          {parentCategoryDoc && (
             <>
               <span className="max-w-[180px] truncate">{nameOf(parentCategoryDoc)}</span>
               <Ico d={D.chevron} className="w-3 h-3" />
@@ -981,23 +1000,23 @@ export default function CategoryDetailPage() {
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <h1 className="text-[20px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">
-              Category Details
+              {t("detail.title")}
             </h1>
             <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
-              View and manage category information, attributes and settings.
+              {t("detail.subtitle")}
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <Button onClick={() => setShowEditModal(true)} icon={<Ico d={D.edit} className="w-3.5 h-3.5" />}>
-              Edit
+              {t("action.edit")}
             </Button>
             <Button
               danger
               onClick={() => setShowDelete(true)}
               icon={<Ico d={D.trash} className="w-3.5 h-3.5" />}
             >
-              Delete
+              {t("action.delete")}
             </Button>
           </div>
         </div>
@@ -1030,7 +1049,7 @@ export default function CategoryDetailPage() {
               </div>
               {category.slug && category.slug !== category.category_code && (
                 <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-                  Slug: {category.slug}
+                  {t("detail.slug")}: {category.slug}
                 </p>
               )}
               {category.description && (
@@ -1039,20 +1058,20 @@ export default function CategoryDetailPage() {
                 </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <StatusBadge active={category.is_active !== false} />
+                <StatusBadge active={category.is_active !== false} t={t} />
                 <span
                   className="inline-flex items-center gap-1.5 text-[11px] font-medium"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  <Ico d={D.user} className="w-3.5 h-3.5" /> Created by{" "}
+                  <Ico d={D.user} className="w-3.5 h-3.5" /> {t("detail.createdBy")}{" "}
                   {category.createdby?.name || "—"}
                 </span>
                 <span
                   className="inline-flex items-center gap-1.5 text-[11px] font-medium"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  <Ico d={D.clock} className="w-3.5 h-3.5" /> Created:{" "}
-                  {formatDateTime(category.created_at)}
+                  <Ico d={D.clock} className="w-3.5 h-3.5" /> {t("detail.createdAt")}: {" "}
+                  {formatDateTime(category.created_at, locale)}
                 </span>
                 {category.updatedby ? (
                   <>
@@ -1060,14 +1079,14 @@ export default function CategoryDetailPage() {
                       className="inline-flex items-center gap-1.5 text-[11px] font-medium"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      <Ico d={D.clock} className="w-3.5 h-3.5" /> Updated:{" "}
-                      {formatDateTime(category.updated_at)}
+                      <Ico d={D.clock} className="w-3.5 h-3.5" /> {t("detail.updatedAt")}: {" "}
+                      {formatDateTime(category.updated_at, locale)}
                     </span>
                     <span
                       className="inline-flex items-center gap-1.5 text-[11px] font-medium"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      <Ico d={D.user} className="w-3.5 h-3.5" /> Updated by{" "}
+                      <Ico d={D.user} className="w-3.5 h-3.5" /> {t("detail.updatedBy")}{" "}
                       {category.updatedby?.name || "—"}
                     </span>
                   </>
@@ -1076,7 +1095,7 @@ export default function CategoryDetailPage() {
                     className="inline-flex items-center gap-1.5 text-[11px] font-medium"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    <Ico d={D.clock} className="w-3.5 h-3.5" /> Updated: Never
+                    <Ico d={D.clock} className="w-3.5 h-3.5" /> {t("detail.updatedAt")}: {t("detail.never")}
                   </span>
                 )}
               </div>
@@ -1092,11 +1111,11 @@ export default function CategoryDetailPage() {
               className="text-[10px] font-bold uppercase tracking-widest"
               style={{ color: "var(--text-muted)" }}
             >
-              Basic Information
+              {t("detail.basicInformation")}
             </p>
             <div className="flex items-center justify-between gap-8">
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-                Category Name
+                {t("detail.categoryName")}
               </span>
               <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
                 {nameOf(category)}
@@ -1104,7 +1123,7 @@ export default function CategoryDetailPage() {
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-                Category Code
+                {t("detail.categoryCode")}
               </span>
               <span
                 className="rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold text-[var(--accent)]"
@@ -1115,7 +1134,7 @@ export default function CategoryDetailPage() {
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-                Parent Category
+                {t("detail.parentCategory")}
               </span>
               <span className="max-w-[140px] truncate text-[12px] font-semibold text-[var(--accent)]">
                 {parentCategoryDoc ? nameOf(parentCategoryDoc) : parentCategoryName}
@@ -1123,7 +1142,7 @@ export default function CategoryDetailPage() {
             </div>
             <div className="flex items-center justify-between gap-8">
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
-                Attributes
+                {t("form.attributes")}
               </span>
               <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">
                 {categoryAttributes.length}
@@ -1136,8 +1155,8 @@ export default function CategoryDetailPage() {
       {/* TABS */}
       <div className="flex items-center gap-1 border-b" style={{ borderColor: "var(--border-color)" }}>
         {[
-          { id: "attributes", label: "Attributes", count: categoryAttributes.length, icon: D.box },
-          { id: "history", label: "History", icon: D.clock },
+          { id: "attributes", label: t("detail.attributesTab"), count: categoryAttributes.length, icon: D.box },
+          { id: "history", label: t("detail.historyTab"), icon: D.clock },
         ].map((item) => {
           const active = tab === item.id;
           return (
@@ -1163,7 +1182,7 @@ export default function CategoryDetailPage() {
               )}
               {active && (
                 <span
-                  className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full"
+                  className="absolute bottom-0 start-2 end-2 h-[2px] rounded-full"
                   style={{ backgroundColor: "var(--accent)" }}
                 />
               )}
@@ -1178,10 +1197,10 @@ export default function CategoryDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3 className="text-[15px] font-bold text-[var(--text-primary)]">
-                {categoryAttributes.length} {categoryAttributes.length === 1 ? "Attribute" : "Attributes"}
+                {t("detail.attributeCount", { count: categoryAttributes.length })}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                Assigned to {nameOf(category)}
+                {t("detail.assignedTo", { name: nameOf(category) })}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1193,7 +1212,7 @@ export default function CategoryDetailPage() {
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
-                  {variantAttributes.length} Variant {variantAttributes.length === 1 ? "Attribute" : "Attributes"}
+                  {t("detail.variantAttributes", { count: variantAttributes.length })}
                 </span>
               )}
             </div>
@@ -1204,21 +1223,21 @@ export default function CategoryDetailPage() {
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <Ico d={D.box} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
               </div>
-              <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>No attributes assigned</p>
-              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>This category does not have any attributes assigned yet.</p>
+              <p className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("detail.noAttributes")}</p>
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("detail.noAttributesBody")}</p>
             </div>
           ) : (
             <div className="rounded-xl overflow-hidden" style={cardStyle}>
               <div className="overflow-x-auto">
-                <table className="w-full text-left">
+                <table className="w-full text-start">
                   <thead>
                     <tr style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                       <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider w-10">#</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Data Type</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Status</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-right">Actions</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.attributes.table.name")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.attributes.detailPanel.dataType")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("detail.options")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("table.status")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-end">{t("table.actions")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1269,12 +1288,12 @@ export default function CategoryDetailPage() {
                                   <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p>
                                   {isVariant && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
-                                      Variant
+                                      {t("detail.variant")}
                                     </span>
                                   )}
                                   {!isActive && (
                                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid var(--danger-soft)" }}>
-                                      Disabled
+                                      {t("detail.disabled")}
                                     </span>
                                   )}
                                 </div>
@@ -1284,7 +1303,7 @@ export default function CategoryDetailPage() {
                           </td>
                           <td className="px-5 py-3">
                             <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
-                              {getDataTypeLabel(attr.data_type)}
+                              {t(getDataTypeLabel(attr.data_type))}
                             </span>
                           </td>
                           <td className="px-5 py-3">
@@ -1296,18 +1315,18 @@ export default function CategoryDetailPage() {
                                       {label}
                                     </span>
                                   ))}
-                                  {hiddenCount > 0 && <span className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>+{hiddenCount} more</span>}
+                                  {hiddenCount > 0 && <span className="text-[9px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.attributes.detailPanel.itemsCount", { count: hiddenCount })}</span>}
                                 </div>
                               ) : (
-                                <span className="text-[11px] italic" style={{ color: "var(--text-muted)" }}>No options</span>
+                                <span className="text-[11px] italic" style={{ color: "var(--text-muted)" }}>{t("detail.noOptions")}</span>
                               )
                             ) : isBoolean ? (
                               boolValue ? (
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold" style={{ backgroundColor: boolValue === "Yes" ? "var(--success-soft)" : "rgba(107,114,128,0.08)", color: boolValue === "Yes" ? "var(--success-text)" : "var(--text-muted)", border: `1px solid ${boolValue === "Yes" ? "var(--success-soft)" : "rgba(107,114,128,0.12)"}` }}>
-                                  {boolValue}
+                                  {t(boolValue === "Yes" ? "common.yes" : "common.no")}
                                 </span>
                               ) : (
-                                <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>Not set</span>
+                                <span className="text-[10px] italic" style={{ color: "var(--text-muted)" }}>{t("detail.notSet")}</span>
                               )
                             ) : (
                               <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>\u2014</span>
@@ -1323,7 +1342,7 @@ export default function CategoryDetailPage() {
                               }}
                             >
                               <span className={`w-1 h-1 rounded-full ${isActive ? "bg-emerald-500" : "bg-red-500"}`} />
-                              {isActive ? "Active" : "Inactive"}
+                              {isActive ? t("status.active") : t("status.inactive")}
                             </span>
                           </td>
                           
@@ -1350,7 +1369,7 @@ export default function CategoryDetailPage() {
                               {isMenuOpen && (() => {
                                 const isTogglingThis = toggleStatusMutation.isPending && toggleStatusMutation.variables?.attrId === attrId;
                                 return createPortal(
-                                  <div
+                                  <div dir={dir} lang={locale}
                                   className="fixed z-[9999] w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal"
                                   style={{
                                     top: menuPos.top,
@@ -1364,10 +1383,10 @@ export default function CategoryDetailPage() {
                                           setViewPanelAttr(attr);
                                           setActiveMenuId(null);
                                         }}
-                                        className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
+                                        className="w-full px-4 py-2 text-start text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
                                       >
                                         <Ico d={D.eye} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                                        View Options
+                                        {t("detail.viewOptions")}
                                       </button>
 
                                       <button
@@ -1383,10 +1402,10 @@ export default function CategoryDetailPage() {
                                           }
                                           setActiveMenuId(null);
                                         }}
-                                        className="w-full px-4 py-2 text-left text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
+                                        className="w-full px-4 py-2 text-start text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
                                       >
                                         <Ico d={D.edit} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
-                                        Edit Attribute
+                                        {t("detail.editAttribute")}
                                       </button>
 
                                       <div className="h-px bg-[var(--border-color)] my-1" />
@@ -1400,18 +1419,18 @@ export default function CategoryDetailPage() {
                                           setActiveMenuId(null);
                                           toggleStatusMutation.mutate({ attrId, currentActive: isActive });
                                         }}
-                                        className={`w-full px-4 py-2 text-left text-[12px] font-medium flex items-center gap-2 transition-colors duration-150 ${isTogglingThis ? "opacity-80 cursor-wait" : "opacity-100 cursor-pointer hover:bg-[var(--bg-tertiary)]"}`}
+                                        className={`w-full px-4 py-2 text-start text-[12px] font-medium flex items-center gap-2 transition-colors duration-150 ${isTogglingThis ? "opacity-80 cursor-wait" : "opacity-100 cursor-pointer hover:bg-[var(--bg-tertiary)]"}`}
                                         style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)", pointerEvents: isTogglingThis ? "none" : "auto" }}
                                       >
                                         {isTogglingThis ? (
                                           <>
                                             <Spin className="w-3.5 h-3.5" />
-                                            <span className="opacity-70">{isActive ? "Disabling..." : "Enabling..."}</span>
+                                            <span className="opacity-70">{isActive ? t("detail.disabling") : t("detail.enabling")}</span>
                                           </>
                                         ) : (
                                           <>
                                             <Ico d={isActive ? "M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"} className="w-3.5 h-3.5" />
-                                            <span className="opacity-100">{isActive ? "Disable" : "Enable"}</span>
+                                            <span className="opacity-100">{isActive ? t("detail.disable") : t("detail.enable")}</span>
                                           </>
                                         )}
                                       </button>
@@ -1507,33 +1526,33 @@ export default function CategoryDetailPage() {
       {tab === "history" && (
         <div className="rounded-xl overflow-hidden" style={cardStyle}>
           <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
-            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">Activity History</h3>
+            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("detail.activityHistory")}</h3>
           </div>
           <div className="p-6">
-            <div className="space-y-5 relative before:absolute before:left-[7px] before:top-3 before:bottom-3 before:w-px before:bg-[var(--border-color)]">
-              <div className="relative pl-8">
-                <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-emerald-500 shadow-sm" />
+            <div className="space-y-5 relative before:absolute before:start-[7px] before:top-3 before:bottom-3 before:w-px before:bg-[var(--border-color)]">
+              <div className="relative ps-8">
+                <div className="absolute start-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-emerald-500 shadow-sm" />
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                   <div>
-                    <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Created</p>
+                    <p className="text-[13px] font-medium text-[var(--text-primary)]">{t("detail.categoryCreated")}</p>
                     <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      Created by <span className="font-semibold text-[var(--text-primary)]">{category.createdby?.name || "—"}</span>
+                      {t("detail.createdBy")} <span className="font-semibold text-[var(--text-primary)]">{category.createdby?.name || "—"}</span>
                     </p>
                   </div>
-                  <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.created_at)}</span>
+                  <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.created_at, locale)}</span>
                 </div>
               </div>
               {category.updatedby && (
-                <div className="relative pl-8">
-                  <div className="absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-blue-500 shadow-sm" />
+                <div className="relative ps-8">
+                  <div className="absolute start-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-blue-500 shadow-sm" />
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                     <div>
-                      <p className="text-[13px] font-medium text-[var(--text-primary)]">Category Updated</p>
+                      <p className="text-[13px] font-medium text-[var(--text-primary)]">{t("detail.categoryUpdated")}</p>
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        Updated by <span className="font-semibold text-[var(--text-primary)]">{category.updatedby?.name || "—"}</span>
+                        {t("detail.updatedBy")} <span className="font-semibold text-[var(--text-primary)]">{category.updatedby?.name || "—"}</span>
                       </p>
                     </div>
-                    <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.updated_at)}</span>
+                    <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.updated_at, locale)}</span>
                   </div>
                 </div>
               )}
@@ -1551,21 +1570,21 @@ export default function CategoryDetailPage() {
                 <Ico d={D.trash} className="w-5 h-5" style={{ color: "var(--danger)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">Delete Category?</h3>
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">{t("delete.titleOne", { name: nameOf(category) })}</h3>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                  Are you sure you want to delete <span className="font-medium text-[var(--text-primary)]">{nameOf(category)}</span>? This action cannot be undone.
+                  {t("detail.deleteBody")}
                 </p>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-6">
-              <Button onClick={() => setShowDelete(false)}>Cancel</Button>
+              <Button onClick={() => setShowDelete(false)}>{t("delete.cancel")}</Button>
               <Button
                 danger
                 onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
                 icon={deleteMutation.isPending ? <Spin className="w-3.5 h-3.5" /> : null}
               >
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                {deleteMutation.isPending ? t("delete.deleting") : t("delete.confirm")}
               </Button>
             </div>
           </div>
@@ -1581,7 +1600,7 @@ export default function CategoryDetailPage() {
             setShowEditModal(false);
             queryClient.invalidateQueries({ queryKey: ["category", categoryId] });
             queryClient.invalidateQueries({ queryKey: ["categories"] });
-            toast.success("Category updated successfully");
+            toast.success(t("toast.updated"));
           }}
         />
       )}
@@ -1613,6 +1632,9 @@ const ModalSpinner = ({ className = "w-4 h-4" }) => (<svg className={`${classNam
 
 function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   const queryClient = useQueryClient();
+  const { t: __t, dir, locale } = useTranslation();
+  const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, params);
+  const { nameOf, attributeOf } = useLocalized();
   const [formData, setFormData] = useState({ category_code: "", name: "", description: "", parent_category_id: "", status: "active", attributes: [] });
   const [showAttrSelectModal, setShowAttrSelectModal] = useState(false);
   const [attrSearch, setAttrSearch] = useState("");
@@ -1690,7 +1712,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
       nextParentId: formData.parent_category_id,
       name: formData.name,
     });
-    if (parentError) { toast.error(parentError); return; }
+    if (parentError) { toast.error(localizeParentMessage(parentError)); return; }
 
     // `status` sirf UI state hai — payload me nahi jana chahiye. `is_active`
     // sirf tab bhejo jab admin ne Status control khud chhua ho (statusTouched),
@@ -1725,7 +1747,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
 
   const handleCreateAttribute = async () => {
     if (!newAttrName.trim() || creatingAttribute) return;
-    if (newAttrType === "multi_select" && newAttrValues.length === 0) { toast.error("At least one option is required"); return; }
+    if (newAttrType === "multi_select" && newAttrValues.length === 0) { toast.error(t("attrs.multiRequired")); return; }
     setCreatingAttribute(true);
     try {
       const code = newAttrName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -1737,8 +1759,8 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
         setFormData((p) => ({ ...p, attributes: [...p.attributes, newAttrEntry] })); setTempSelectedAttrIds((prev) => [...prev, created._id]);
       }
       setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); setAttrSearch("");
-      toast.success(`Attribute "${created?.name}" created`);
-    } catch (err) { toast.error(err.response?.data?.message || "Failed to create attribute"); } finally { setCreatingAttribute(false); }
+      toast.success(t("addAttr.created", { name: created?.name || "" }));
+    } catch (err) { toast.error(err.response?.data?.message || t("addAttr.createFailed")); } finally { setCreatingAttribute(false); }
   };
 
   const filteredAllAttributes = useMemo(() => !attrSearch.trim() ? allAttributes : allAttributes.filter((a) => a.name?.toLowerCase().includes(attrSearch.toLowerCase()) || a.code?.toLowerCase().includes(attrSearch.toLowerCase())), [allAttributes, attrSearch]);
@@ -1761,7 +1783,8 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
       parentIdsWithChildren,
     }),
   }));
-  const selectedParentName = formData.parent_category_id ? allCategories.find((c) => String(c._id) === String(formData.parent_category_id))?.name || "None" : "None";
+  const selectedParent = allCategories.find((c) => String(c._id) === String(formData.parent_category_id));
+  const selectedParentName = selectedParent ? nameOf(selectedParent) : t("parent.none");
 
   // ✅ NEW: Naam kisi existing (children wali) category se match karta hai →
   // Parent Category automatically None + dropdown disabled.
@@ -1771,73 +1794,85 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
     excludeId: editingId,
   });
   const parentLockedByName = Boolean(nameMatchLockId);
-  const matchedName = parentLockedByName
-    ? allCategories.find((c) => String(c._id) === String(nameMatchLockId))?.name || formData.name
-    : "";
+  const matchedParent = parentLockedByName ? allCategories.find((c) => String(c._id) === String(nameMatchLockId)) : null;
+  const matchedName = matchedParent ? nameOf(matchedParent) : formData.name;
   const parentDropdownDisabled = editingHasChildren || parentLockedByName;
   const parentDropdownTitle = parentLockedByName
-    ? NAME_PARENT_LOCK_TEXT
+    ? t("lock.nameLockText")
     : editingHasChildren
-      ? PARENT_ALREADY_PARENT_TEXT
+      ? t("lock.alreadyParentText")
       : undefined;
+  const localizeParentMessage = (message) => {
+    const messages = {
+      [PARENT_ALREADY_PARENT_TEXT]: t("lock.alreadyParentText"),
+      [PARENT_ALREADY_PARENT_MESSAGE]: t("lock.alreadyParentMessage"),
+      [NAME_PARENT_LOCK_TEXT]: t("lock.nameLockText"),
+      [NAME_PARENT_LOCK_MESSAGE]: t("lock.nameLockMessage"),
+      "A category cannot be selected as its own parent.": t("parent.selfHint"),
+      "A category cannot be its own parent.": t("parent.selfMessage"),
+      "This is a subcategory of the category being edited, so it cannot become its parent.": t("parent.circularHint"),
+      "Cannot create a circular category hierarchy.": t("parent.circularMessage"),
+    };
+    return messages[message] || message;
+  };
 
   if (categoryLoading || !category) return null;
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div dir={dir} lang={locale} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="w-full max-w-[580px] max-h-[85vh] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden">
           <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0"><Ico d={D.folder} className="w-4 h-4" /></div>
-              <div><h2 className="text-[14px] font-bold text-[var(--text-primary)]">Edit Category</h2><p className="text-[11px] text-[var(--text-muted)] mt-0.5">Define category details, attributes, and hierarchy.</p></div>
+              <div><h2 className="text-[14px] font-bold text-[var(--text-primary)]">{t("form.editTitle")}</h2><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("form.subtitle")}</p></div>
             </div>
             <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-4 h-4" /></button>
           </div>
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0">
             <div className="p-5 space-y-4">
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.basicInfo")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Code</label><input type="text" value={formData.category_code} readOnly className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] opacity-60" /></div>
-                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Name <span className="text-red-500">*</span></label><input type="text" value={formData.name} onChange={(e) => { const name = e.target.value; const locked = getExistingParentNameMatchId({ categories: allCategories, name, excludeId: editingId }); setFormData((prev) => ({ ...prev, name, parent_category_id: locked ? "" : prev.parent_category_id })); }} required autoFocus className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
+                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.code")}</label><input type="text" value={formData.category_code} readOnly className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] opacity-60" /></div>
+                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.name")} <span className="text-red-500">*</span></label><input type="text" value={formData.name} onChange={(e) => { const name = e.target.value; const locked = getExistingParentNameMatchId({ categories: allCategories, name, excludeId: editingId }); setFormData((prev) => ({ ...prev, name, parent_category_id: locked ? "" : prev.parent_category_id })); }} required autoFocus className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
                 </div>
-                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Description</label><textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.description")}</label><textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Category Hierarchy</p>
-                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.hierarchy")}</p>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.parentCategory")}</label>
                   <div className="relative">
                     <button ref={parentDropdownRef} type="button" disabled={parentDropdownDisabled} onClick={() => { if (parentDropdownDisabled) return; if (!showParentDropdown && parentDropdownRef.current) { const rect = parentDropdownRef.current.getBoundingClientRect(); setParentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width }); } setParentRestrictionHint(""); setShowParentDropdown(!showParentDropdown); }} title={parentDropdownTitle} className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
-                      <span className="flex items-center gap-2 min-w-0"><span className="truncate text-left">{parentLockedByName ? "None" : selectedParentName}</span>{parentLockedByName && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Locked to None</span>)}{!parentLockedByName && editingHasChildren && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Already a parent</span>)}</span><ModalChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
+                      <span className="flex items-center gap-2 min-w-0"><span className="truncate text-start">{parentLockedByName ? t("parent.none") : selectedParentName}</span>{parentLockedByName && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("lock.badgeLockedToNone")}</span>)}{!parentLockedByName && editingHasChildren && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("parent.badgeAlreadyParent")}</span>)}</span><ModalChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
                     </button>
                   </div>
                   {parentLockedByName && !editingHasChildren && (
-                    <ModalParentLockNotice title="Parent Category locked to None">
-                      <span className="font-semibold text-[var(--text-primary)]">{matchedName}</span> already contains subcategories, so it can only stay a top-level category. To keep the hierarchy valid, Parent Category is locked to <span className="font-semibold text-[var(--text-primary)]">None</span>.
+                    <ModalParentLockNotice title={t("lock.lockedToNone")}>
+                      {t("lock.nameLockedBody", { name: matchedName, value: t("parent.none") })}
                     </ModalParentLockNotice>
                   )}
                   {editingHasChildren && (
-                    <ModalParentLockNotice title="Already used as a parent category">
-                      <span className="font-semibold text-[var(--text-primary)]">{category?.name}</span> already contains subcategories, so it cannot be assigned under another category.
+                    <ModalParentLockNotice title={t("lock.alreadyUsedTitle")}>
+                      {t("lock.alreadyUsedBody", { name: nameOf(category) })}
                     </ModalParentLockNotice>
                   )}
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Product Attributes</p>
-                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Attributes</label>
-                  <button type="button" onClick={openAttrSelectModal} className="w-full min-h-[38px] px-3 py-2 text-[12px] text-left outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-2 min-w-0"><ModalLayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />{formData.attributes.length === 0 ? <span className="text-[var(--text-muted)]">Select Attributes</span> : <span className="text-[var(--text-secondary)]">{formData.attributes.length} attribute{formData.attributes.length !== 1 ? "s" : ""} selected</span>}</span>
-                    <span className="text-[var(--text-muted)] text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0">Browse</span>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.productAttributes")}</p>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.attributes")}</label>
+                  <button type="button" onClick={openAttrSelectModal} className="w-full min-h-[38px] px-3 py-2 text-[12px] text-start outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 min-w-0"><ModalLayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />{formData.attributes.length === 0 ? <span className="text-[var(--text-muted)]">{t("form.selectAttributes")}</span> : <span className="text-[var(--text-secondary)]">{t("form.attributesSelected", { count: formData.attributes.length })}</span>}</span>
+                    <span className="text-[var(--text-muted)] text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0">{t("form.browse")}</span>
                   </button>
-                  {formData.attributes.length > 0 && (<div className="flex flex-wrap gap-[6px] pt-1.5">{formData.attributes.map((attr, i) => (<span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 pl-[10px] pr-[8px] py-[3px] text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-[5px] border border-[var(--border-color)] h-[28px]">{attr.seed_name || `Attribute ${i + 1}`}<button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))} className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-[var(--bg-card)] transition-colors ml-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Ico d={D.close} className="w-[10px] h-[10px]" /></button></span>))}</div>)}
+                  {formData.attributes.length > 0 && (<div className="flex flex-wrap gap-[6px] pt-1.5">{formData.attributes.map((attr, i) => { const doc = allAttributes.find((item) => String(item._id) === String(getAttributeId(attr))); return (<span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 ps-[10px] pe-[8px] py-[3px] text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-[5px] border border-[var(--border-color)] h-[28px]">{doc ? attributeOf(doc).name : attr.seed_name || t("form.attributeFallback", { n: i + 1 })}<button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))} className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-[var(--bg-card)] transition-colors ms-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Ico d={D.close} className="w-[10px] h-[10px]" /></button></span>); })}</div>)}
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Status</p>
+                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.status")}</p>
                 <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 h-[38px] max-w-xs">
-                  {[{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }].map((opt) => {
+                  {[{ id: "active", label: t("status.active") }, { id: "inactive", label: t("status.inactive") }].map((opt) => {
                     const isActive = formData.status === opt.id;
                     return (<button key={opt.id} type="button" onClick={() => { setStatusTouched(true); setFormData({ ...formData, status: opt.id }); }} className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />{opt.label}</button>);
                   })}
@@ -1846,17 +1881,17 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
             </div>
           </form>
           <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
-            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">Cancel</button>
-            <button type="submit" onClick={handleSubmit} disabled={updateMutation.isPending} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50">{updateMutation.isPending ? <ModalSpinner className="w-3.5 h-3.5" /> : <Ico d={D.check} className="w-3.5 h-3.5" />}Update Category</button>
+            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">{t("form.cancel")}</button>
+            <button type="submit" onClick={handleSubmit} disabled={updateMutation.isPending} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50">{updateMutation.isPending ? <ModalSpinner className="w-3.5 h-3.5" /> : <Ico d={D.check} className="w-3.5 h-3.5" />}{t("form.update")}</button>
           </div>
         </div>
       </div>
 
       {showParentDropdown && !parentDropdownDisabled && createPortal(<>
-        <div className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
-        <div className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "280px" }}>
+        <div dir={dir} lang={locale} className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
+        <div dir={dir} lang={locale} className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "280px" }}>
           <div className="overflow-y-auto" style={{ maxHeight: "240px", flexShrink: 1 }}>
-            <button type="button" onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }} className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}><span>None</span>{!formData.parent_category_id && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)]" />}</button>
+            <button type="button" onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }} className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}><span>{t("parent.none")}</span>{!formData.parent_category_id && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)]" />}</button>
             {rootCategories.map((cat) => {
               const state = cat.parentState || { disabled: false, badge: "", hint: "", message: "" };
               const isSelected = String(formData.parent_category_id) === String(cat._id);
@@ -1864,7 +1899,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 onClick={() => {
                   if (state.disabled) {
                     // Invalid selection — silent fail ke bajaye clear reason do
-                    toast.error(state.message || "This parent category is not available.");
+                    toast.error(localizeParentMessage(state.message) || t("form.parentUnavailable"));
                     setParentRestrictionHint(state.hint || "");
                     return;
                   }
@@ -1873,28 +1908,28 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 }}
                 onMouseEnter={() => { if (state.hint) setParentRestrictionHint(state.hint); }}
                 onFocus={() => { if (state.hint) setParentRestrictionHint(state.hint); }}
-                title={state.hint || undefined}
+                title={state.hint ? localizeParentMessage(state.hint) : undefined}
                 aria-disabled={state.disabled ? "true" : undefined}
-                className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between gap-2 transition-colors ${state.disabled ? "cursor-not-allowed text-[var(--text-muted)] opacity-60" : isSelected ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"}`}>
-                <span className="flex items-center gap-2 min-w-0"><span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{cat.name}</span>{state.badge && (<span className="text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-[var(--border-color)] shrink-0 whitespace-nowrap">{state.badge}</span>)}</span>
+                className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between gap-2 transition-colors ${state.disabled ? "cursor-not-allowed text-[var(--text-muted)] opacity-60" : isSelected ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"}`}>
+                <span className="flex items-center gap-2 min-w-0"><span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{nameOf(cat)}</span>{state.badge && (<span className="text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-[var(--border-color)] shrink-0 whitespace-nowrap">{localizeParentMessage(state.badge)}</span>)}</span>
                 {isSelected && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
               </button>);
             })}
           </div>
           {parentRestrictionHint && (
-            <div className="px-3 py-2 text-[10.5px] leading-snug text-[var(--text-muted)] bg-[var(--bg-tertiary)] border-t border-[var(--border-color)] shrink-0">{parentRestrictionHint}</div>
+            <div className="px-3 py-2 text-[10.5px] leading-snug text-[var(--text-muted)] bg-[var(--bg-tertiary)] border-t border-[var(--border-color)] shrink-0">{localizeParentMessage(parentRestrictionHint)}</div>
           )}
         </div>
       </>, document.body)}
 
       {showAttrSelectModal && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div dir={dir} lang={locale} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
-            <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0"><div><h3 className="text-[13px] font-bold text-[var(--text-primary)]">Select Attributes</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">Select attributes to use for products in this category.</p></div><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
+            <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0"><div><h3 className="text-[13px] font-bold text-[var(--text-primary)]">{t("attrs.title")}</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("attrs.subtitle")}</p></div><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
             {tempSelectedAttrIds.length > 0 && (
               <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Selected Attributes</span>
+                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">{t("attrs.selectedTitle")}</span>
                   <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-[72px] overflow-y-auto">
@@ -1902,8 +1937,8 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                     const attr = allAttributes.find((a) => String(a._id) === String(attrId));
                     if (!attr) return null;
                     return (
-                      <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
-                        {attr.name}
+                      <span key={attrId} className="inline-flex items-center gap-1 h-7 ps-2.5 pe-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
+                        {attributeOf(attr).name}
                         <button type="button" onClick={() => toggleTempAttribute(attrId)}
                           className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
                           <ModalCloseIcon className="w-2.5 h-2.5" />
@@ -1914,24 +1949,24 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 </div>
               </div>
             )}
-            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0"><div className="relative"><span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><ModalSearchIcon className="w-3.5 h-3.5" /></span><input type="text" placeholder="Search attributes..." value={attrSearch} onChange={(e) => setAttrSearch(e.target.value)} className="w-full h-9 pl-8 pr-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" autoFocus /></div></div>
+            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0"><div className="relative"><span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><ModalSearchIcon className="w-3.5 h-3.5" /></span><input type="text" placeholder={t("attrs.searchPlaceholder")} value={attrSearch} onChange={(e) => setAttrSearch(e.target.value)} className="w-full h-9 ps-8 pe-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" autoFocus /></div></div>
             <div className="flex-1 overflow-y-auto min-h-0">
-              {allAttributes.length > 0 ? (filteredAllAttributes.length > 0 ? filteredAllAttributes.map((attr) => { const isChecked = tempSelectedAttrIds.includes(attr._id); return (<button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)} className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}><div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>{isChecked && <Ico d={D.check} className="w-3 h-3 text-white" />}</div><div className="flex-1 min-w-0"><p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attr.name}</p><p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {attr.data_type || "text"}</p></div>{attr.values && attr.values.length > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{attr.values.length} values</span>}</button>); }) : <div className="px-5 py-6 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">No matching attributes found</p></div>) : <div className="px-5 py-8 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">No attributes available yet</p></div>}
+              {allAttributes.length > 0 ? (filteredAllAttributes.length > 0 ? filteredAllAttributes.map((attr) => { const isChecked = tempSelectedAttrIds.includes(attr._id); return (<button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)} className={`w-full px-5 py-2.5 flex items-center gap-3 text-start transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}><div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>{isChecked && <Ico d={D.check} className="w-3 h-3 text-white" />}</div><div className="flex-1 min-w-0"><p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attributeOf(attr).name}</p><p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {t(getDataTypeLabel(attr.data_type))}</p></div>{attr.values && attr.values.length > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{t("attrs.valuesCount", { count: attr.values.length })}</span>}</button>); }) : <div className="px-5 py-6 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noMatch")}</p></div>) : <div className="px-5 py-8 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noneYet")}</p><p className="text-[11px] text-[var(--text-muted)]">{t("attrs.noneYetBody")}</p></div>}
             </div>
-            {!showCreateAttrModal && (<div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }} className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">Create "{attrSearch.trim()}"</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(""); }} className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">Create new attribute</span></button></div>) : null}</div>)}
-            <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0"><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">Cancel</button><button type="button" onClick={applyAttributeSelection} className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">Apply{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}</button></div>
+            {!showCreateAttrModal && (<div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(""); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNewGeneric")}</span></button></div>) : null}</div>)}
+            <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0"><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">{t("attrs.cancel")}</button><button type="button" onClick={applyAttributeSelection} className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">{t("attrs.apply")}{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}</button></div>
           </div>
         </div>, document.body
       )}
 
       {showCreateAttrModal && createPortal(
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div dir={dir} lang={locale} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 85vh)" }}>
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0"><div className="flex items-start gap-3 min-w-0"><div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0"><ModalLayersIcon className="w-4 h-4" /></div><div className="min-w-0 pt-0.5"><h3 className="text-[14px] font-semibold text-[var(--text-primary)]">Add New Attribute</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">Configure properties for products in this category.</p></div></div><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
+            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0"><div className="flex items-start gap-3 min-w-0"><div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0"><ModalLayersIcon className="w-4 h-4" /></div><div className="min-w-0 pt-0.5"><h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("addAttr.title")}</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("addAttr.subtitle")}</p></div></div><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
             <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-              <div className="space-y-1.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-red-500">*</span></label><input type="text" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} autoFocus className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder="e.g. Color, Size, RAM" /></div>
+              <div className="space-y-1.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.name")} <span className="text-red-500">*</span></label><input type="text" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} autoFocus className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder={t("addAttr.namePlaceholder")} /></div>
               <div className="space-y-2"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Attribute Type</label><div className="grid grid-cols-2 gap-3">{[{ id: "multi_select", label: "Multi Options" }, { id: "boolean", label: "Yes / No" }].map((type) => { const isActive = newAttrType === type.id; return (<button key={type.id} type="button" onClick={() => { setNewAttrType(type.id); setNewAttrValues([]); setNewAttrValueInput(""); if (type.id === "boolean") setNewAttrDefaultValue("yes"); }} className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${isActive ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span>{type.label}</span></button>); })}</div></div>
-              {newAttrType === "multi_select" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Options</label>{newAttrValues.length > 0 && (<div className="flex flex-wrap gap-1.5">{newAttrValues.map((val, idx) => (<span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"><span className="w-4 h-4 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">{idx + 1}</span>{val}<button type="button" onClick={() => setNewAttrValues((p) => p.filter((_, i) => i !== idx))} className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"><Ico d={D.close} className="w-2.5 h-2.5" /></button></span>))}</div>)}<div className="flex gap-2"><input type="text" value={newAttrValueInput} onChange={(e) => setNewAttrValueInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error("Option already exists"); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); } }} className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder="Add an option" /><button type="button" onClick={() => { const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error("Option already exists"); setNewAttrValueInput(""); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); }} className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"><ModalPlusIcon className="w-3 h-3" /> Add</button></div></div>)}
+              {newAttrType === "multi_select" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.options")}</label>{newAttrValues.length > 0 && (<div className="flex flex-wrap gap-1.5">{newAttrValues.map((val, idx) => (<span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"><span className="w-4 h-4 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">{idx + 1}</span>{val}<button type="button" onClick={() => setNewAttrValues((p) => p.filter((_, i) => i !== idx))} className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ms-0.5"><Ico d={D.close} className="w-2.5 h-2.5" /></button></span>))}</div>)}<div className="flex gap-2"><input type="text" value={newAttrValueInput} onChange={(e) => setNewAttrValueInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error(t("addAttr.optionExists")); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); } }} className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder={t("addAttr.optionPlaceholder")} /><button type="button" onClick={() => { const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error(t("addAttr.optionExists")); setNewAttrValueInput(""); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); }} className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"><ModalPlusIcon className="w-3 h-3" /> {t("addAttr.addOption")}</button></div></div>)}
               {newAttrType === "boolean" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label><div className="grid grid-cols-2 gap-3">{[{ id: "yes", label: "Yes" }, { id: "no", label: "No" }].map((opt) => { const isActive = newAttrDefaultValue === opt.id; return (<button key={opt.id} type="button" onClick={() => setNewAttrDefaultValue(opt.id)} className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive ? opt.id === "yes" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10" : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]" : "border-[var(--border-color)] bg-transparent"}`} />{opt.label}</button>); })}</div></div>)}
             </div>
             <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0"><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">Cancel</button><button type="button" onClick={handleCreateAttribute} disabled={!newAttrName.trim() || creatingAttribute} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{creatingAttribute ? <span className="flex items-center gap-1.5"><ModalSpinner className="w-3.5 h-3.5" /> Adding...</span> : "Add Attribute"}</button></div>

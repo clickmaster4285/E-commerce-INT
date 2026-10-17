@@ -4,17 +4,17 @@
 // DATABASE CONTENT LOCALIZATION
 // ==========================================
 // Brand/category/product/attribute ka content database se aata hai — is liye
-// `translations.js` ke static keys usse cover nahi kar sakte. Urdu translation
-// backend par LibreTranslate se generate hoti hai aur MongoDB me persist rehti
-// hai, to frontend ko sirf sahi field choose karna hai:
+// `translations.js` ke static keys usse cover nahi kar sakte. Supported locale
+// translations backend par LibreTranslate se generate hoke MongoDB me persist
+// rehti hain, to frontend ko sirf sahi field choose karna hai:
 //
 //   locale === "en"  → original English field (HAMESHA)
-//   locale === "ur"  → translations.<field>.ur, warna English fallback
+//   locale !== "en"   → translations.<field>.<locale>, warna English fallback
 //
 // English kabhi overwrite nahi hota — wo backend me source of truth hai, aur
 // frontend bhi `en` par wahi original field padhta hai.
 //
-// Brand ka `name` (trademark) aur Product ka `name` (model number) translate
+// Product ka `name` (model number) translate
 // nahi hote — backend unhe `skipped` mark karta hai aur unka translation map
 // khali rehta hai, is liye `nameOf()` unke liye automatically English wapas
 // de deta hai. Category aur Attribute ke descriptive names translate hote hain.
