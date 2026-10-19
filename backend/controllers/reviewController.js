@@ -6,6 +6,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const { queueTranslationSync } = require("../utils/translationService");
 
 // ==========================================
 // 🔌 SOCKET HELPER (baqi controllers ki tarah)
@@ -248,6 +249,7 @@ const createReview = async (req, res) => {
       videos: media.videos || [],
       verifiedPurchase: true,
     });
+    queueTranslationSync(Review, review._id);
 
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -328,6 +330,7 @@ const updateReview = async (req, res) => {
     }
 
     await review.save();
+    queueTranslationSync(Review, review._id);
     await deleteReviewMediaFiles({ images: removedImages, videos: removedVideos });
     const populated = await Review.findById(review._id)
       .populate("user_id", "name avatar")
@@ -446,6 +449,7 @@ const setReviewResponse = async (req, res) => {
       responded_by_name: String(req.user?.name || "Store Support").trim().slice(0, 100),
     };
     await review.save();
+    queueTranslationSync(Review, review._id);
     emitSocketEvent("reviewUpdated", {
       _id: review._id,
       product_id: review.product_id,
@@ -515,7 +519,7 @@ const getAdminReviews = async (req, res) => {
     const total = await Review.countDocuments(filter);
     const reviews = await Review.find(filter)
       .select("-helpfulCount -helpfulBy")
-      .populate("product_id", "name")
+      .populate("product_id", "name translations")
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
@@ -571,7 +575,7 @@ const getAdminReviewById = async (req, res) => {
     }
     const review = await Review.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
       .select("-helpfulCount -helpfulBy")
-      .populate("product_id", "name")
+      .populate("product_id", "name translations")
       .lean();
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
     await hydrateReviewCustomers([review]);
@@ -582,8 +586,8 @@ const getAdminReviewById = async (req, res) => {
           _id: { $ne: review._id },
           is_deleted: { $ne: true },
         })
-          .select("product_id rating title comment status created_at")
-          .populate("product_id", "name")
+          .select("product_id rating title comment status created_at translations")
+          .populate("product_id", "name translations")
           .sort({ created_at: -1 })
           .limit(3)
           .lean()

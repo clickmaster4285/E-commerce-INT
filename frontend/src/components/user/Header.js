@@ -15,6 +15,8 @@ import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
 import Cookies from "js-cookie";
 import LoginModal from "./LoginModal";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 import {
   Menu,
@@ -74,6 +76,7 @@ const getIcon = (name) => {
 
 function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
   const ref = useRef(null);
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -107,7 +110,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
     <div ref={ref} className="relative flex w-full items-center">
       <input
         value={value}
-        aria-label="Search products"
+        aria-label={t("header.searchProducts")}
         onChange={(e) => {
           onChange(e);
           setOpen(true);
@@ -116,12 +119,12 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
         onKeyDown={(e) => {
           if (e.key === "Enter") submit();
         }}
-        placeholder="Search products..."
+        placeholder={t("header.searchPlaceholder")}
         className="h-10 w-full rounded-md border border-[var(--user-border)] bg-[var(--user-bg-input)] pl-4 pr-14 text-[0.8125rem] font-normal text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-accent)] focus:ring-0"
       />
       <button
         onClick={submit}
-        aria-label="Search"
+        aria-label={t("common.search")}
         className="absolute right-0 flex h-10 w-11 items-center justify-center rounded-r-md border-l border-[var(--user-border)] bg-[var(--user-accent)]/10 text-[var(--user-accent)] transition-colors hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
       >
         <Search size={14} strokeWidth={1.7} />
@@ -243,6 +246,7 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
 
 export default function Header() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -442,7 +446,7 @@ export default function Header() {
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setOpen(true)}
-                aria-label="Open menu"
+                aria-label={t("header.openMenu")}
                 className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-[0.96] lg:h-10 lg:w-10"
               >
                 <Menu size={19} strokeWidth={1.7} />
@@ -469,20 +473,18 @@ export default function Header() {
             <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1 lg:gap-1.5">
               <button
                 onClick={() => setMobileSearchOpen((v) => !v)}
-                aria-label={mobileSearchOpen ? "Close search" : "Open search"}
+                aria-label={mobileSearchOpen ? t("header.closeSearch") : t("header.openSearch")}
                 className={`${iconBtn} md:hidden`}
               >
                 {mobileSearchOpen ? <X size={18} strokeWidth={1.7} /> : <Search size={18} strokeWidth={1.7} />}
               </button>
 
+              <LanguageSwitcher />
+
               <button
                 onClick={toggleTheme}
-                title={
-                  theme === "dark"
-                    ? "Switch to light mode"
-                    : "Switch to dark mode"
-                }
-                aria-label="Toggle theme"
+                title={theme === "dark" ? t("header.lightMode") : t("header.darkMode")}
+                aria-label={t("header.toggleTheme")}
                 className={iconBtn}
               >
                 {theme === "dark" ? <Sun size={17} strokeWidth={1.7} /> : <Moon size={17} strokeWidth={1.7} />}
@@ -490,8 +492,8 @@ export default function Header() {
 
               <Link
                 href="/wishlist"
-                title="My Wishlist"
-                aria-label="My Wishlist"
+                title={t("header.myWishlist")}
+                aria-label={t("header.myWishlist")}
                 className={iconBtn}
               >
                 <Heart size={18} strokeWidth={1.7} />
@@ -510,8 +512,8 @@ export default function Header() {
                 onClick={() =>
                   isMobile ? router.push("/cart") : setIsCartOpen(true)
                 }
-                title="Cart"
-                aria-label={`Open cart, ${count} items`}
+                title={t("header.cart")}
+                aria-label={t("header.openCart", { count })}
                 className={iconBtn}
               >
                 <ShoppingCart size={18} strokeWidth={1.7} />
@@ -530,7 +532,7 @@ export default function Header() {
                 <div className="relative">
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
-                    aria-label="Account menu"
+                    aria-label={t("header.accountMenu")}
                     className="flex items-center gap-1 rounded-xl p-1 transition-colors hover:bg-[var(--user-bg-hover)] active:scale-[0.96]"
                   >
                     <Avatar
@@ -587,7 +589,7 @@ export default function Header() {
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-danger)] hover:bg-red-500/10 text-sm transition"
                         >
                           <LogOut size={16} />
-                          Logout
+                          {t("header.logout")}
                         </button>
                       </div>
                     </>
@@ -599,7 +601,7 @@ export default function Header() {
                   className="ml-1 flex h-8 items-center gap-1.5 rounded-xl border border-[var(--user-accent)]/25 bg-[var(--user-accent-soft)] px-2.5 text-xs font-medium text-[var(--user-accent)] transition-colors hover:bg-[var(--user-accent)]/15 active:scale-[0.96] lg:px-3"
                 >
                   <User size={13} />
-                  Login
+                  {t("header.login")}
                 </button>
               )}
             </div>
@@ -656,13 +658,13 @@ export default function Header() {
                   {storeName}
                 </span>
                 <span className="text-[0.5625rem] font-medium uppercase tracking-wider text-[var(--user-text-muted)]">
-                  Shop Premium
+                  {t("header.shopPremium")}
                 </span>
               </div>
             </Link>
             <button
               onClick={() => setOpen(false)}
-              aria-label="Close menu"
+              aria-label={t("header.closeMenu")}
               className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-danger)] hover:border-[var(--user-danger)] hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90 shrink-0"
             >
               <X
@@ -681,7 +683,7 @@ export default function Header() {
               className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] text-xs font-medium text-[var(--user-accent-text)] transition hover:opacity-90 active:scale-[0.98]"
             >
               <User size={14} />
-              Login / Sign Up
+              {t("header.loginSignUp")}
             </button>
           )}
         </div>
@@ -699,7 +701,7 @@ export default function Header() {
                     <User size={18} className="text-[var(--user-accent)]" />
                   </div>
                   <span className="text-xs font-medium text-[var(--user-text)]">
-                    Account
+                    {t("header.account")}
                   </span>
                 </Link>
 
@@ -712,7 +714,7 @@ export default function Header() {
                     <Package size={18} className="text-[var(--user-accent)]" />
                   </div>
                   <span className="text-xs font-medium text-[var(--user-text)]">
-                    Orders
+                    {t("header.orders")}
                   </span>
                 </Link>
 
@@ -730,7 +732,7 @@ export default function Header() {
                     )}
                   </div>
                   <span className="text-xs font-medium text-[var(--user-text)]">
-                    Wishlist
+                    {t("header.wishlist")}
                   </span>
                 </Link>
 
@@ -748,7 +750,7 @@ export default function Header() {
                     <Settings size={18} className="text-[var(--user-accent)]" />
                   </div>
                   <span className="text-xs font-medium text-[var(--user-text)]">
-                    Settings
+                    {t("header.settings")}
                   </span>
                 </Link>
               </div>
@@ -758,7 +760,7 @@ export default function Header() {
           <div className="p-5 border-b border-[var(--user-border)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-[var(--user-text)]">
-                Top Categories
+                {t("header.topCategories")}
               </h3>
             </div>
             <div className="space-y-1">
@@ -778,7 +780,7 @@ export default function Header() {
                       {category.name}
                     </span>
                     <span className="text-[0.625rem] text-[var(--user-text-muted)]">
-                      {category.count} products
+                      {t("header.productsCount", { count: category.count })}
                     </span>
                   </div>
                   <ChevronRight
@@ -793,7 +795,7 @@ export default function Header() {
           <div className="p-5 border-b border-[var(--user-border)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-[var(--user-text)]">
-                Top Brands
+                {t("header.topBrands")}
               </h3>
             </div>
             <div className="space-y-1">
@@ -830,7 +832,7 @@ export default function Header() {
                         {brand.name}
                       </span>
                       <span className="text-[0.625rem] text-[var(--user-text-muted)]">
-                        {productCount} products
+                        {t("header.productsCount", { count: productCount })}
                       </span>
                     </div>
                     <ChevronRight
@@ -846,7 +848,7 @@ export default function Header() {
 
         <div className="p-4 border-t border-[var(--user-border)] shrink-0 bg-[var(--user-bg-card)]">
           <p className="text-[0.625rem] text-[var(--user-text-subtle)] text-center">
-            © 2026 {storeName}. All rights reserved.
+            © 2026 {storeName}. {t("header.allRightsReserved")}
           </p>
         </div>
       </div>

@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useProductSocketSync, patchProductStatusInCaches } from "@/hooks/useProductSocketSync";
+import { useProductSocketSync, patchProductStatusInCaches } from "../../../hooks/admin/useProductSocketSync";
 import {
   AlertTriangle,
   ChevronDown,
@@ -27,6 +27,9 @@ import {
   Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { productApi } from "@/apis/admin/productApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
 import { brandApi } from "@/apis/admin/brandApi";
@@ -156,14 +159,22 @@ async function compressProductImage(file) {
   });
 }
 
-function handlePermissionError(error, defaultMessage, resource = "resource") {
+function localizedErrorMessage(error, fallback, locale) {
+  return locale === "en"
+    ? error?.response?.data?.message || error?.response?.data?.error || error?.message || fallback
+    : fallback;
+}
+
+function handlePermissionError(error, defaultMessage, resource = "resource", t = null, locale = "en") {
   const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || "";
   const normalized = String(message).toLowerCase();
   if (normalized.includes("permission") || normalized.includes("access denied") || normalized.includes("forbidden") || error?.response?.status === 403) {
-    toast.error(`You don't have permission to modify this ${resource}.`, { duration: 6000, description: "Contact an administrator to grant you access." });
+    const title = t ? t("errors.noPermission", { resource }) : `You don't have permission to modify this ${resource}.`;
+    const description = t ? t("errors.contactAdmin") : "Contact an administrator to grant you access.";
+    toast.error(title, { duration: 6000, description });
     return;
   }
-  toast.error(message || defaultMessage);
+  toast.error(localizedErrorMessage(error, defaultMessage, locale));
 }
 
 function normalizeId(value) {
@@ -221,6 +232,11 @@ MAIN COMPONENT
 ======================================================== */
 
 export default function ProductsPage() {
+  // Admin-panel i18n. English is the fallback for any missing key.
+  const { t: __t, locale } = useTranslation();
+  const { nameOf, productNameOf, productDescriptionOf } = useLocalized();
+  const t = (k, p) => __t("admin.products." + k, p);
+  const ts = (k, p) => __t("admin.shared." + k, p);
   const router = useRouter();
   const queryClient = useQueryClient();
   useProductSocketSync();
@@ -390,7 +406,7 @@ const [viewMode, setViewMode] = useState(() => {
     if (!trimmed || !attr) return;
     const existingLabels = getAssignedOptionList(attr);
     if (existingLabels.some((opt) => String(opt).toLowerCase() === trimmed.toLowerCase())) {
-      toast.info(`"${trimmed}" already exists in ${attr.name}`);
+      toast.info(t("toast.valueExists", { value: trimmed, attr: attr.name }));
       if (variantIndex !== undefined) {
         updateVariantOption(variantIndex, attr.code, trimmed);
       }
@@ -398,7 +414,7 @@ const [viewMode, setViewMode] = useState(() => {
     }
     const attributeId = attr?._id;
     if (!attributeId) {
-      toast.error("Cannot add value: attribute id not found");
+      toast.error(t("toast.valueAttributeIdMissing"));
       return;
     }
     const previousValues = Array.isArray(attr.values) ? attr.values : [];
@@ -456,13 +472,13 @@ const [viewMode, setViewMode] = useState(() => {
           })
         );
       }
-      toast.success(`Added "${trimmed}" to ${attr.name}`);
+      toast.success(t("toast.valueAdded", { value: trimmed, attr: attr.name }));
       if (variantIndex !== undefined) {
         updateVariantOption(variantIndex, attr.code, trimmed);
       }
     } catch (err) {
       console.error("Add value error:", err);
-      toast.error(err?.response?.data?.message || err?.message || "Failed to add value");
+      toast.error(localizedErrorMessage(err, t("toast.valueAddFailed"), locale));
       throw err;
     }
   };
@@ -487,14 +503,14 @@ const [viewMode, setViewMode] = useState(() => {
     if (!productsError || !productsErrorMsg) return;
     const msg = String(productsErrorMsg?.message || "").toLowerCase();
     if (msg.includes("permission") || msg.includes("access denied") || msg.includes("forbidden")) {
-      toast.error("You don't have permission to view products.", { duration: 6000, description: "Contact an administrator to grant you access." });
+      toast.error(t("errors.noPermissionView"), { duration: 6000, description: t("errors.contactAdmin") });
     }
   }, [productsError, productsErrorMsg]);
 
   /* Mutations */
   const [createLoading, setCreateLoading] = useState(false);
 
-  const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted successfully"); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, "Product delete failed", "product") });
+  const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success(t("toast.deleted")); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, t("toast.deleteFailed"), t("entity.product"), t, locale) });
   // ✅ Activate/deactivate OPTIMISTIC: click karte hi row + summary cards foran
   //    update ho jaate hain. Purana flow har click par PATCH + poori list/stats
   //    ka refetch (+ usi browser me socket echo ka dobara refetch) ka wait karta
@@ -527,14 +543,14 @@ const [viewMode, setViewMode] = useState(() => {
           previousStatus: ctx.previousStatus,
         });
       }
-      toast.success("Product status updated");
+      toast.success(t("toast.statusUpdated"));
     },
     onError: (e, _productId, ctx) => {
       // Ulta revert — UI wapas purani state par
       ctx?.listSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
       ctx?.statsSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
       ctx?.detailSnapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
-      handlePermissionError(e, "Status update failed", "product");
+      handlePermissionError(e, t("toast.statusFailed"), t("entity.product"), t, locale);
     },
   });
   
@@ -580,16 +596,16 @@ const [viewMode, setViewMode] = useState(() => {
           try {
             await assignAttributeToCategoryMutation.mutateAsync({ categoryId, attributes: nextAttributes });
           } catch (e) {
-            handlePermissionError(e, "Attribute created but failed to assign to category", "category");
+            handlePermissionError(e, t("toast.attributeAssignFailed"), t("entity.category"), t, locale);
           }
         }
       }
-      toast.success("Attribute created successfully!");
+      toast.success(t("toast.attributeCreated"));
       setShowNewAttributeModal(false);
       resetAttributeForm();
       if (formData.category_id) fetchCategoryAttributes(formData.category_id);
     },
-    onError: (e) => handlePermissionError(e, "Failed to create attribute", "attribute")
+    onError: (e) => handlePermissionError(e, t("toast.attributeCreateFailed"), t("entity.attribute"), t, locale)
   });
 
   /* Handlers */
@@ -618,7 +634,7 @@ const [viewMode, setViewMode] = useState(() => {
         setExpandedVariant(newIndex);
         return { ...prev, variants: [...prev.variants, createEmptyVariant(sku)] };
       });
-    } catch { toast.error("Unable to generate SKU"); }
+    } catch { toast.error(t("toast.skuGenerateFailed")); }
   };
 
   const duplicateVariant = async (index) => {
@@ -632,7 +648,7 @@ const [viewMode, setViewMode] = useState(() => {
         return { ...prev, variants: v };
       });
       setExpandedVariant(index + 1);
-    } catch { toast.error("Unable to generate SKU"); }
+    } catch { toast.error(t("toast.skuGenerateFailed")); }
   };
 
   const removeVariant = (index) => {
@@ -661,7 +677,7 @@ const [viewMode, setViewMode] = useState(() => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     const valid = files.filter((f) => ["image/jpeg", "image/png", "image/webp"].includes(f.type));
-    if (valid.length !== files.length) { toast.error("Only JPG, PNG and WebP images are allowed"); event.target.value = ""; return; }
+    if (valid.length !== files.length) { toast.error(t("toast.imageTypesOnly")); event.target.value = ""; return; }
     try {
       const compressed = await Promise.all(valid.map(compressProductImage));
       const images = compressed.map((f) => ({ file: f, existing: false, preview: URL.createObjectURL(f) }));
@@ -670,8 +686,8 @@ const [viewMode, setViewMode] = useState(() => {
         v[vi] = { ...v[vi], images: [...v[vi].images, ...images] };
         return { ...prev, variants: v };
       });
-      toast.success(`${images.length} image${images.length > 1 ? "s" : ""} uploaded`);
-    } catch (e) { toast.error(e?.message || "Image processing failed"); }
+      toast.success(t("toast.imagesUploaded", { count: images.length }));
+    } catch (e) { toast.error(localizedErrorMessage(e, t("toast.imageProcessFailed"), locale)); }
     event.target.value = "";
   };
 
@@ -702,9 +718,9 @@ const [viewMode, setViewMode] = useState(() => {
   const confirmDelete = () => { if (productToDelete?._id) deleteMutation.mutate(productToDelete._id); };
 
   const handleNextStep = () => {
-    if (!formData.category_id) { toast.error("Please select category"); return; }
-    if (!formData.brand_id) { toast.error("Please select brand"); return; }
-    if (!formData.name.trim()) { toast.error("Product name is required"); return; }
+    if (!formData.category_id) { toast.error(t("validation.selectCategory")); return; }
+    if (!formData.brand_id) { toast.error(t("validation.selectBrand")); return; }
+    if (!formData.name.trim()) { toast.error(t("validation.nameRequired")); return; }
     setCurrentStep(2);
   };
 
@@ -713,7 +729,7 @@ const [viewMode, setViewMode] = useState(() => {
     e?.preventDefault();
     const val = tagInput.trim().toLowerCase();
     if (!val) return;
-    if (formData.tag_names.includes(val)) { toast.info("Tag already added"); setTagInput(""); return; }
+    if (formData.tag_names.includes(val)) { toast.info(t("toast.tagAlreadyAdded")); setTagInput(""); return; }
     setFormData(prev => ({ ...prev, tag_names: [...prev.tag_names, val] }));
     setTagInput("");
   };
@@ -746,7 +762,7 @@ const [viewMode, setViewMode] = useState(() => {
   };
   const handleAttributeSubmit = (e) => {
     e.preventDefault();
-    if (!attributeFormData.name.trim()) { toast.error("Attribute name is required"); return; }
+    if (!attributeFormData.name.trim()) { toast.error(t("validation.attributeNameRequired")); return; }
     const finalCode = attributeFormData.code.trim() || attributeFormData.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const dt = attributeFormData.data_type;
     let normalizedValues;
@@ -774,11 +790,11 @@ const [viewMode, setViewMode] = useState(() => {
 
   const getCategoryName = (p) => {
     const cid = normalizeId(p?.category_id);
-    return p?.category_id?.name || categories.find((c) => String(c._id) === cid)?.name || "Unknown";
+    return nameOf(p?.category_id) || nameOf(categories.find((c) => String(c._id) === cid)) || t("table.unknown");
   };
   const getBrandName = (p) => {
     const bid = normalizeId(p?.brand_id);
-    return p?.brand_id?.name || brands.find((b) => String(b._id) === bid)?.name || "Unknown";
+    return nameOf(p?.brand_id) || nameOf(brands.find((b) => String(b._id) === bid)) || t("table.unknown");
   };
 
   // ✅ SERVER-SIDE PAGINATION — search/filter DB par apply ho chuke hain (backend),
@@ -837,7 +853,7 @@ const [viewMode, setViewMode] = useState(() => {
             : old
         );
       }
-      toast.error(e?.response?.data?.message || "Failed to update featured status");
+      toast.error(localizedErrorMessage(e, t("toast.featuredStatusFailed"), locale));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -853,15 +869,15 @@ const [viewMode, setViewMode] = useState(() => {
     //    API chup-chaap "removed from featured" bhej deti thi par green toast
     //    "Marked as featured" dikhta tha aur product featured list me nahi aata tha.
     if (!wasFeatured && product?.status !== "active") {
-      toast.error("This product is inactive. Please activate it before marking it as featured.", {
-        description: `${product?.name || "Product"} is currently inactive, so it can't be featured.`,
+      toast.error(t("featured.inactiveTitle"), {
+        description: t("featured.inactiveDescription", { name: product?.name || t("entity.product") }),
         duration: 5000,
       });
       return;
     }
     featuredMutation.mutate(product?._id, {
       onSuccess: (res) => {
-        toast.success(res?.message || (wasFeatured ? "Removed from featured products" : "Marked as featured"));
+        toast.success(locale === "en" ? res?.message || (wasFeatured ? t("featured.removed") : t("featured.marked")) : (wasFeatured ? t("featured.removed") : t("featured.marked")));
       },
     });
   };
@@ -878,31 +894,31 @@ const [viewMode, setViewMode] = useState(() => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}>
           <div className="rounded-xl px-8 py-6 flex flex-col items-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--text-muted)", borderTopColor: "transparent" }} />
-            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>Redirecting...</span>
+            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("state.redirecting")}</span>
           </div>
         </div>
       )}
       <div className="w-full min-h-screen space-y-5" style={{ color: "var(--text-primary)" }}>
       {/* HEADER */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-[24px] font-bold leading-7 tracking-tight">Product Management</h1>
-          <p className="mt-1 text-[13px]" style={{ color: "var(--text-muted)" }}>Manage products, variants, stock and pricing</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1">
-            <button type="button" onClick={() => setViewMode("list")} className="flex h-9 w-9 items-center justify-center rounded-lg transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><List className="h-4 w-4" /></button>
-            <button type="button" onClick={() => setViewMode("grid")} className="flex h-9 w-9 items-center justify-center rounded-lg transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><Grid3x3 className="h-4 w-4" /></button>
-          </div>
-          <button type="button" onClick={openNewProduct} className="flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-4 w-4" /> Add Product</button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title={t("page.title")}
+        subtitle={t("page.subtitle")}
+        actions={
+          <>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setViewMode("list")} aria-label={ts("action.listView")} title={ts("action.listView")} className="flex h-9 w-9 items-center justify-center rounded-lg transition" style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><List className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setViewMode("grid")} aria-label={ts("action.gridView")} title={ts("action.gridView")} className="flex h-9 w-9 items-center justify-center rounded-lg transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle}><Grid3x3 className="h-4 w-4" /></button>
+            </div>
+            <button type="button" onClick={openNewProduct} className="flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus className="h-4 w-4" /> {t("page.addProduct")}</button>
+          </>
+        }
+      />
 
       {/* STATS — ✅ Summary API load hote waqt card-level skeleton (table ko block nahi karta) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {isSummaryLoading
           ? Array.from({ length: 4 }).map((_, i) => <SummaryCardSkeleton key={`summary-skeleton-${i}`} />)
-          : [{ l: "Total Products", v: productStats ? Number(productStats.totalProducts) || 0 : pagination.total }, { l: "Active", v: activeProducts, c: "text-emerald-500" }, { l: "Inactive", v: inactiveProducts, c: "text-red-400" }, { l: "Total Variants", v: totalVariants, c: "text-blue-500" }].map((s, i) => (
+          : [{ l: t("stat.total"), v: productStats ? Number(productStats.totalProducts) || 0 : pagination.total }, { l: t("stat.active"), v: activeProducts, c: "text-emerald-500" }, { l: t("stat.inactive"), v: inactiveProducts, c: "text-red-400" }, { l: t("stat.variants"), v: totalVariants, c: "text-blue-500" }].map((s, i) => (
             <div key={i} className="rounded-lg p-4" style={cardStyle}>
               <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{s.l}</p>
               <p className={`mt-1 text-[20px] font-bold ${s.c || ""}`}>{s.v}</p>
@@ -915,13 +931,14 @@ const [viewMode, setViewMode] = useState(() => {
         
         {/* Wider Search Bar (Left Side) */}
         <div className="relative w-full md:w-[400px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+          <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
           <input 
             type="text" 
-            placeholder="Search by product name or SKU..." 
+            placeholder={t("search.placeholder")} 
+            aria-label={t("search.placeholder")}
             value={search} 
             onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }} 
-            className="h-9 w-full pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
+            className="h-9 w-full ps-9 pe-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40" 
             style={inputStyle} 
           />
         </div>
@@ -933,21 +950,21 @@ const [viewMode, setViewMode] = useState(() => {
             value={filterCategory}
             onChange={(v) => { setFilterCategory(v); setCurrentPage(1); }}
             options={categories.map((c) => ({ value: String(c._id), label: c.name }))}
-            placeholder="All Categories"
+            placeholder={t("filter.allCategories")}
             searchable
-            searchPlaceholder="Search category..."
-            clearLabel="All Categories"
+            searchPlaceholder={t("filter.searchCategory")}
+            clearLabel={t("filter.allCategories")}
           />
           <SelectFilter
             value={filterBrand}
             onChange={(v) => { setFilterBrand(v); setCurrentPage(1); }}
             options={brands.map((b) => ({ value: String(b._id), label: b.name }))}
-            placeholder="All Brands"
+            placeholder={t("filter.allBrands")}
             searchable
-            searchPlaceholder="Search brand..."
-            clearLabel="All Brands"
+            searchPlaceholder={t("filter.searchBrand")}
+            clearLabel={t("filter.allBrands")}
           />
-          <SelectFilter value={filterStatus} onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
+          <SelectFilter value={filterStatus} onChange={(v) => { setFilterStatus(v); setCurrentPage(1); }} options={[{ value: "active", label: ts("status.active") }, { value: "inactive", label: ts("status.inactive") }]} placeholder={t("filter.allStatus")} />
         </div>
       </div>
 
@@ -957,8 +974,17 @@ const [viewMode, setViewMode] = useState(() => {
           <div className="overflow-x-auto">
             <table className="w-full text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                <tr>{["Product", "Category", "Brand", "Description", "Variants", "Tax", "Status", "Actions"].map((h) => (
-                  <th key={h} className={`px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider ${h === "Actions" ? "text-right" : ""}`} style={{ color: "var(--text-muted)" }}>{h}</th>
+                <tr>{[
+                  { key: "product", label: t("table.product") },
+                  { key: "category", label: t("table.category") },
+                  { key: "brand", label: t("table.brand") },
+                  { key: "description", label: t("table.description") },
+                  { key: "variants", label: t("table.variants") },
+                  { key: "tax", label: t("table.tax") },
+                  { key: "status", label: t("table.status") },
+                  { key: "actions", label: t("table.actions") },
+                ].map((h) => (
+                  <th key={h.key} className={`px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider ${h.key === "actions" ? "text-end" : ""}`} style={{ color: "var(--text-muted)" }}>{h.label}</th>
                 ))}</tr>
               </thead>
               {/* ✅ Table loading = skeleton rows (blank table / spinner nahi).
@@ -971,12 +997,12 @@ const [viewMode, setViewMode] = useState(() => {
                   <tr>
                     <td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}>
                       <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
-                      <p className="text-[13px]">Failed to load products. Please check your connection.</p>
-                      <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+                      <p className="text-[13px]">{t("table.loadFailed")}</p>
+                      <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{ts("state.retry")}</button>
                     </td>
                   </tr>
                 ) : paginatedProducts.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> No products found</td></tr>
+                  <tr><td colSpan={8} className="px-4 py-14 text-center" style={{ color: "var(--text-muted)" }}><Package className="mx-auto mb-3 h-8 w-8 opacity-30" /> {t("table.empty")}</td></tr>
                 ) : paginatedProducts.map((p) => {
                   const img = p?.variants?.[0]?.images?.[0]?.img_url;
                   const firstVariantSku = p?.variants?.[0]?.sku || "";
@@ -985,9 +1011,9 @@ const [viewMode, setViewMode] = useState(() => {
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          {img ? <img src={getImageUrl(img)} alt={p.name} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
+                          {img ? <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{productNameOf(p)?.charAt(0).toUpperCase() || "P"}</div>}
                           <div className="min-w-0">
-                            <p className="max-w-[160px] truncate text-[13px] font-medium">{p.name}</p>
+                            <p className="max-w-[160px] truncate text-[13px] font-medium">{productNameOf(p)}</p>
                             {firstVariantSku && <p className="max-w-[160px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstVariantSku}</p>}
                           </div>
                         </div>
@@ -995,10 +1021,10 @@ const [viewMode, setViewMode] = useState(() => {
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        <span className="inline-block max-w-[220px] truncate align-middle">{p.description ? p.description : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                        <span className="inline-block max-w-[220px] truncate align-middle">{productDescriptionOf(p) ? productDescriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]">
-                        <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? "variant" : "variants"}</span>
+                        <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? t("table.variant") : t("table.variantsUnit")}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px] font-medium">{p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</td>
                       <td className="px-4 py-2.5"><StatusBadge status={p.status} /></td>
@@ -1020,8 +1046,8 @@ const [viewMode, setViewMode] = useState(() => {
         ) : productsError ? (
           <div className="rounded-lg px-4 py-14 text-center" style={cardStyle}>
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
-            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>Failed to load products. Please check your connection.</p>
-            <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+            <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>{t("table.loadFailed")}</p>
+            <button type="button" onClick={() => refetchProducts()} className="mx-auto mt-4 flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{ts("state.retry")}</button>
           </div>
         ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1033,15 +1059,15 @@ const [viewMode, setViewMode] = useState(() => {
             return (
               <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
-                  {img ? <img src={getImageUrl(img)} alt={p.name} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{p.name?.charAt(0).toUpperCase() || "P"}</div>}
+                  {img ? <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{productNameOf(p)?.charAt(0).toUpperCase() || "P"}</div>}
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold">{p.name}</p>
+                  <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p>
                   {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
-                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{p.description ? (p.description.length > 60 ? p.description.slice(0, 60) + "..." : p.description) : "—"}</p>
-                  <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>Variants: {variantCount}</p>
-                  <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>Tax: {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{productDescriptionOf(p) ? (productDescriptionOf(p).length > 60 ? productDescriptionOf(p).slice(0, 60) + "..." : productDescriptionOf(p)) : "—"}</p>
+                  <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{t("card.variantsLabel")} {variantCount}</p>
+                  <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("card.taxLabel")} {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>
                 <div className="mt-auto flex items-center justify-between border-t pt-2" style={{ borderColor: "var(--border-color)" }}>
                   <div onClick={(e) => e.stopPropagation()}><ActionButtons product={p} onView={openProductDetails} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggleStatus} onToggleFeatured={handleToggleFeatured} isDeleting={isDeleting} isToggling={isToggling} isTogglingFeatured={isTogglingFeatured} /></div>
@@ -1063,29 +1089,28 @@ const [viewMode, setViewMode] = useState(() => {
           {/* Left: record range + position */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
             <span>
-              Showing <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(firstRow)}–{fmt(lastRow)}</span> of{" "}
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalRecords)}</span> products
+              {t("pagination.showingRange", { from: fmt(firstRow), to: fmt(lastRow), total: fmt(totalRecords) })}
             </span>
             <span aria-hidden="true">·</span>
             <span>
-              Page <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{currentPage}</span> of{" "}
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{fmt(totalPages)}</span>
+              {t("pagination.pageOf", { page: currentPage, total: fmt(totalPages) })}
             </span>
           </div>
 
           {/* Right: controls */}
           <div className="flex flex-wrap items-center justify-end gap-1.5">
-            <div className="flex items-center gap-1.5" role="navigation" aria-label="Pagination">
+            <div className="flex items-center gap-1.5" role="navigation" aria-label={t("pagination.label")}>
               {/* Previous */}
               <button
                 type="button"
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1 || isFetching}
-                aria-label="Previous page"
+                aria-label={ts("pagination.prev")}
+                title={ts("pagination.prev")}
                 className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
               >
-                <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                <ChevronLeft className="h-3.5 w-3.5" /> {t("pagination.prevShort")}
               </button>
 
               {/* Page numbers */}
@@ -1099,7 +1124,7 @@ const [viewMode, setViewMode] = useState(() => {
                     onClick={() => goToPage(pg)}
                     disabled={isFetching}
                     aria-current={pg === currentPage ? "page" : undefined}
-                    aria-label={`Page ${pg}`}
+                    aria-label={t("pagination.pageLabel", { page: pg })}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums transition hover:opacity-80"
                     style={pg === currentPage
                       ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" }
@@ -1113,11 +1138,12 @@ const [viewMode, setViewMode] = useState(() => {
                 type="button"
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage >= totalPages || isFetching}
-                aria-label="Next page"
+                aria-label={ts("pagination.next")}
+                title={ts("pagination.next")}
                 className="flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium transition disabled:cursor-not-allowed disabled:opacity-35 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
               >
-                Next <ChevronRight className="h-3.5 w-3.5" />
+                {t("pagination.nextShort")} <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
@@ -1132,13 +1158,13 @@ const [viewMode, setViewMode] = useState(() => {
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "var(--danger-soft)" }}><AlertTriangle className="h-5 w-5 text-red-500" /></div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold">Delete "{productToDelete.name}"?</h3>
-                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>This action cannot be undone.</p>
+                <h3 className="text-sm font-semibold">{t("delete.titleOne", { name: nameOf(productToDelete) })}</h3>
+                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p>
               </div>
             </div>
             <div className="mt-5 flex gap-2">
-              <button type="button" onClick={() => { setShowDeleteModal(false); setProductToDelete(null); }} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
-              <button type="button" disabled={deleteMutation.isPending} onClick={confirmDelete} className="flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "var(--danger)" }}>{deleteMutation.isPending ? "Deleting..." : "Delete"}</button>
+              <button type="button" onClick={() => { setShowDeleteModal(false); setProductToDelete(null); }} className="h-9 flex-1 rounded-md text-sm font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{ts("action.cancel")}</button>
+              <button type="button" disabled={deleteMutation.isPending} onClick={confirmDelete} className="flex h-9 flex-1 items-center justify-center gap-2 rounded-md text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60" style={{ backgroundColor: "var(--danger)" }}>{deleteMutation.isPending ? ts("deleteDialog.deleting") : ts("action.delete")}</button>
             </div>
           </div>
         </ModalOverlay>
@@ -1154,11 +1180,11 @@ const [viewMode, setViewMode] = useState(() => {
           const newId = data?.product?._id || data?.data?._id || data?._id;
           setShowModal(false); setEditingProduct(null);
           if (newId) { setCreateLoading(true); setTimeout(() => { router.push(`/admin/products/${newId}/add-variant`); setCreateLoading(false); }, 800); }
-          else { toast.success("Product created successfully"); }
+          else { toast.success(t("toast.created")); }
         }}
         onUpdated={() => {
           queryClient.invalidateQueries({ queryKey: ["products"] });
-          toast.success("Product updated successfully");
+          toast.success(t("toast.updated"));
           setShowModal(false); setEditingProduct(null);
         }}
       />
@@ -1173,13 +1199,15 @@ const [viewMode, setViewMode] = useState(() => {
                   <Icons.FileText className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 pt-0.5">
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Create New Attribute</h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">Configure properties for products in this category.</p>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">{t("attr.createTitle")}</h3>
+                  <p className="text-[11px] text-[var(--text-muted)]">{t("attr.subtitle")}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }}
+                aria-label={ts("action.close")}
+                title={ts("action.close")}
                 className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -1188,23 +1216,23 @@ const [viewMode, setViewMode] = useState(() => {
 
             <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Attribute Name <span className="text-[var(--danger)]">*</span></label>
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.name")} <span className="text-[var(--danger)]">*</span></label>
                 <input
                   type="text"
                   value={attributeFormData.name}
                   onChange={(e) => setAttributeFormData({ ...attributeFormData, name: e.target.value })}
                   autoFocus
                   className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                  placeholder="e.g. Color, Size, RAM"
+                  placeholder={t("attr.namePlaceholder")}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Data Type</label>
+                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.dataType")}</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: "multi_select", label: "Multi Select", icon: <Icons.Filter className="w-4 h-4" /> },
-                    { id: "boolean", label: "Yes / No", icon: <Icons.Text className="w-4 h-4" /> },
+                    { id: "multi_select", label: t("attr.typeMulti"), icon: <Icons.Filter className="w-4 h-4" /> },
+                    { id: "boolean", label: t("attr.typeYesNo"), icon: <Icons.Text className="w-4 h-4" /> },
                   ].map((type) => {
                     const isActive = attributeFormData.data_type === type.id;
                     return (
@@ -1224,9 +1252,9 @@ const [viewMode, setViewMode] = useState(() => {
 
               {attributeFormData.data_type === "boolean" && (
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Default State</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.defaultState")}</label>
                   <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
-                    {[{ id: true, label: "True" }, { id: false, label: "False" }].map((opt) => {
+                    {[{ id: true, label: t("attr.true") }, { id: false, label: t("attr.false") }].map((opt) => {
                       const isActive = attributeFormData.value === opt.id;
                       return (
                         <button
@@ -1241,13 +1269,13 @@ const [viewMode, setViewMode] = useState(() => {
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">This will be the default True/False state for this attribute.</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">{t("attr.defaultStateHint")}</p>
                 </div>
               )}
 
               {attributeFormData.data_type === "multi_select" && (
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">Pre-defined Options</label>
+                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.predefinedOptions")}</label>
                   <div className="space-y-1.5">
                     {(attributeFormData.values || []).map((opt, idx) => (
                       <div
@@ -1265,7 +1293,7 @@ const [viewMode, setViewMode] = useState(() => {
                             newValues[idx] = { ...newValues[idx], label: e.target.value, value: e.target.value.toLowerCase() };
                             setAttributeFormData({ ...attributeFormData, values: newValues });
                           }}
-                          placeholder={`Option ${idx + 1}`}
+                          placeholder={t("attr.optionPlaceholder", { n: idx + 1 })}
                           className="flex-1 min-w-0 text-xs text-[var(--text-primary)] bg-transparent outline-none truncate"
                         />
                         <button
@@ -1275,7 +1303,7 @@ const [viewMode, setViewMode] = useState(() => {
                             setAttributeFormData({ ...attributeFormData, values: next });
                           }}
                           className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                          aria-label="Remove option"
+                          aria-label={t("attr.removeOption")}
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -1286,7 +1314,7 @@ const [viewMode, setViewMode] = useState(() => {
                     <input
                       type="text"
                       id="new-attr-option-input"
-                      placeholder="Add an option (e.g. 8 GB)"
+                      placeholder={t("attr.optionInputPlaceholder")}
                       className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -1314,10 +1342,10 @@ const [viewMode, setViewMode] = useState(() => {
                       }}
                       className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
                     >
-                      <Plus className="w-3.5 h-3.5" /> Add Option
+                      <Plus className="w-3.5 h-3.5" /> {t("attr.addOption")}
                     </button>
                   </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">Add one or more options. You can also add more after creating the attribute.</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">{t("attr.optionsHint")}</p>
                 </div>
               )}
             </div>
@@ -1328,7 +1356,7 @@ const [viewMode, setViewMode] = useState(() => {
                 onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }}
                 className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
               >
-                Cancel
+                {ts("action.cancel")}
               </button>
               <button
                 type="button"
@@ -1336,7 +1364,7 @@ const [viewMode, setViewMode] = useState(() => {
                 disabled={createAttributeMutation.isPending}
                 className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
               >
-                {createAttributeMutation.isPending ? "Creating..." : "Create Attribute"}
+                {createAttributeMutation.isPending ? t("attr.creating") : t("attr.create")}
               </button>
             </div>
           </div>
@@ -1360,13 +1388,18 @@ function SectionTitle({ children }) {
   return <p className="mb-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{children}</p>;
 }
 function StatusBadge({ status }) {
+  const { t: __t } = useTranslation();
+  const ts = (k, p) => __t("admin.shared." + k, p);
   const active = status === "active";
-  return <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={active ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{active ? "Active" : "Inactive"}</span>;
+  return <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide" style={active ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{active ? ts("status.active") : ts("status.inactive")}</span>;
 }
 function IconButton({ children, onClick, title, color = "var(--text-muted)", background = "transparent" }) {
   return <button type="button" title={title} onClick={onClick} className="flex items-center justify-center rounded p-1.5 transition hover:bg-black/5" style={{ color, backgroundColor: background }}>{children}</button>;
 }
 function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFeatured, isDeleting, isToggling, isTogglingFeatured }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
+  const ts = (k, p) => __t("admin.shared." + k, p);
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
@@ -1414,8 +1447,8 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
         onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }}
         className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-md p-2 transition hover:bg-white/5"
         style={{ color: "var(--text-secondary)" }}
-        aria-label="More actions"
-        title="More actions"
+        aria-label={ts("action.moreActions")}
+        title={ts("action.moreActions")}
       >
         <MoreVertical className="h-4 w-4" />
       </button>
@@ -1433,7 +1466,7 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            <Eye className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Details
+            <Eye className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> {ts("action.viewDetails")}
           </button>
           <button
             type="button"
@@ -1443,7 +1476,7 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            <Pencil className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+            <Pencil className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> {ts("action.edit")}
           </button>
           <button
             type="button"
@@ -1454,7 +1487,7 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            <Power className="w-4 h-4 shrink-0" /> {isActive ? "Deactivate" : "Activate"}
+            <Power className="w-4 h-4 shrink-0" /> {isActive ? ts("action.deactivate") : ts("action.activate")}
           </button>
           {/* ✅ Featured Products page — mark / unmark */}
           {onToggleFeatured && (
@@ -1463,10 +1496,10 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
               disabled={isTogglingFeatured}
               title={
                 !isFeatured && !isActive
-                  ? "This product is inactive. Please activate it before marking it as featured."
+                  ? t("featured.inactiveTitle")
                   : isFeatured
-                    ? "Remove from featured products"
-                    : "Mark as featured"
+                    ? t("featured.removeTitle")
+                    : t("featured.markTitle")
               }
               onClick={(e) => { e.stopPropagation(); setOpen(false); onToggleFeatured(product); }}
               className={menuItemClass + " disabled:opacity-50"}
@@ -1481,13 +1514,13 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
               ) : (
                 <Star className="w-4 h-4 shrink-0 fill-amber-400 text-amber-400" />
               )}
-              {isFeatured ? "Remove from Featured" : "Mark as Featured"}
+              {isFeatured ? t("featured.remove") : t("featured.mark")}
               {!isFeatured && !isActive && (
                 <span
-                  className="ml-auto rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  className="ms-auto rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                   style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}
                 >
-                  Inactive
+                  {ts("status.inactive")}
                 </span>
               )}
             </button>
@@ -1502,7 +1535,7 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
             onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
           >
-            <Trash2 className="w-4 h-4 shrink-0" /> Delete
+            <Trash2 className="w-4 h-4 shrink-0" /> {ts("action.delete")}
           </button>
         </div>,
         document.body
@@ -1510,7 +1543,9 @@ function ActionButtons({ product, onView, onEdit, onDelete, onToggle, onToggleFe
     </div>
   );
 }
-function SelectFilter({ value, onChange, options, placeholder, searchable = false, searchPlaceholder = "Search...", clearLabel = "" }) {
+function SelectFilter({ value, onChange, options, placeholder, searchable = false, searchPlaceholder = "", clearLabel = "" }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef(null);
@@ -1557,11 +1592,11 @@ function SelectFilter({ value, onChange, options, placeholder, searchable = fals
   if (!searchable) {
     return (
       <div className="relative">
-        <select value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full appearance-none rounded-lg pl-3 pr-8 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
+        <select value={value} onChange={e => onChange(e.target.value)} className="h-9 w-full appearance-none rounded-lg ps-3 pe-8 text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
           <option value="all">{placeholder}</option>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+        <ChevronDown className="pointer-events-none absolute end-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
       </div>
     );
   }
@@ -1579,37 +1614,37 @@ function SelectFilter({ value, onChange, options, placeholder, searchable = fals
         onClick={() => { setIsOpen((open) => { if (open) setSearch(""); return !open; }); }}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className="flex h-9 w-full items-center justify-between gap-2 rounded-lg pl-3 pr-8 text-left text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]"
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-lg ps-3 pe-8 text-start text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:w-[160px]"
         style={{ backgroundColor: "var(--bg-card)", border: `1px solid ${isOpen ? "var(--accent)" : "var(--border-color)"}`, color: "var(--text-primary)" }}
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
       </button>
-      <ChevronDown className={`pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 transition-transform ${isOpen ? "rotate-180" : ""}`} style={{ color: "var(--text-muted)" }} />
+      <ChevronDown className={`pointer-events-none absolute end-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 transition-transform ${isOpen ? "rotate-180" : ""}`} style={{ color: "var(--text-muted)" }} />
 
       {isOpen && (
-        <div className="absolute right-0 z-[100] mt-1 w-full min-w-[220px] overflow-hidden rounded-lg shadow-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+        <div className="absolute end-0 z-[100] mt-1 w-full min-w-[220px] overflow-hidden rounded-lg shadow-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="p-2" style={{ borderBottom: "1px solid var(--border-color)" }}>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+              <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={searchPlaceholder}
-                className="h-9 w-full rounded-md pl-8 pr-2 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:h-8 sm:text-[12px]"
+                placeholder={searchPlaceholder || t("filter.searchDefault")}
+                className="h-9 w-full rounded-md ps-8 pe-2 text-[16px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 sm:h-8 sm:text-[12px]"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
               />
             </div>
           </div>
           <div className="max-h-52 overflow-y-auto">
             {clearLabel && !search.trim() && (
-              <button type="button" onClick={() => handleSelect("all")} className="block w-full px-3 py-2 text-left text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === "all" ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === "all" ? 600 : 400 }}>{clearLabel}</button>
+              <button type="button" onClick={() => handleSelect("all")} className="block w-full px-3 py-2 text-start text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === "all" ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === "all" ? 600 : 400 }}>{clearLabel}</button>
             )}
             {filteredOptions.length === 0 ? (
-              <p className="px-3 py-3 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>No match for &quot;{search.trim()}&quot;</p>
+              <p className="px-3 py-3 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>{t("filter.noMatch", { term: search.trim() })}</p>
             ) : filteredOptions.map((o) => (
-              <button type="button" key={o.value} onClick={() => handleSelect(o.value)} className="block w-full px-3 py-2 text-left text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === String(o.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(o.value) ? 600 : 400 }}>{o.label}</button>
+              <button type="button" key={o.value} onClick={() => handleSelect(o.value)} className="block w-full px-3 py-2 text-start text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === String(o.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(o.value) ? 600 : 400 }}>{o.label}</button>
             ))}
           </div>
         </div>
@@ -1636,6 +1671,9 @@ function TagList({ names }) {
   );
 }
 function AddAttributeValueControl({ attr, onAdd }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
+  const ts = (k, p) => __t("admin.shared." + k, p);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [adding, setAdding] = useState(false);
@@ -1653,20 +1691,23 @@ function AddAttributeValueControl({ attr, onAdd }) {
   };
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold inline-flex items-center gap-1 transition hover:opacity-90" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px dashed rgba(16,185,129,0.45)", cursor: "pointer" }} title={`Add a new value to ${attr.name}`}>
-        <Plus className="h-3 w-3" /> Add Value
+      <button type="button" onClick={() => setOpen(true)} className="h-9 shrink-0 rounded-md px-2.5 text-xs font-semibold inline-flex items-center gap-1 transition hover:opacity-90" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px dashed rgba(16,185,129,0.45)", cursor: "pointer" }} title={t("attr.addValueTitle", { name: attr.name })}>
+        <Plus className="h-3 w-3" /> {t("attr.addValue")}
       </button>
     );
   }
   return (
     <div className="flex items-center gap-1.5">
-      <input type="text" autoFocus value={value} onChange={(ev) => setValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setOpen(false); setValue(""); } }} placeholder="New value..." disabled={adding} className="h-9 px-2.5 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} />
-      <button type="button" onClick={handleSave} disabled={adding || !String(value || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold inline-flex items-center gap-1 text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "var(--success)", cursor: adding || !String(value || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{adding ? "..." : "Add"}</button>
-      <button type="button" onClick={() => { setOpen(false); setValue(""); }} disabled={adding} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: adding ? "not-allowed" : "pointer" }} title="Cancel"><X className="h-4 w-4" /></button>
+      <input type="text" autoFocus value={value} onChange={(ev) => setValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setOpen(false); setValue(""); } }} placeholder={t("attr.newValuePlaceholder")} disabled={adding} className="h-9 px-2.5 rounded-md text-sm outline-none disabled:opacity-50" style={inputStyle} />
+      <button type="button" onClick={handleSave} disabled={adding || !String(value || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold inline-flex items-center gap-1 text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "var(--success)", cursor: adding || !String(value || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{adding ? "..." : ts("action.add")}</button>
+      <button type="button" onClick={() => { setOpen(false); setValue(""); }} disabled={adding} aria-label={ts("action.cancel")} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: adding ? "not-allowed" : "pointer" }} title={ts("action.cancel")}><X className="h-4 w-4" /></button>
     </div>
   );
 }
 function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, inputStyle, multiple = false }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
+  const ts = (k, p) => __t("admin.shared." + k, p);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const handleAdd = async () => {
@@ -1690,12 +1731,12 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
             if (e.key === "Enter") { e.preventDefault(); handleAdd(); }
             else if (e.key === "Escape") { e.preventDefault(); setAdding(false); setDraft(""); }
           }}
-          placeholder={`New ${attr.name} value...`}
+          placeholder={t("attr.newValueForPlaceholder", { name: attr.name })}
           className="h-9 flex-1 rounded-md px-3 text-sm outline-none"
           style={inputStyle}
         />
-        <button type="button" onClick={handleAdd} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition" style={{ backgroundColor: "var(--accent)", border: "none" }}>Add</button>
-        <button type="button" onClick={() => { setAdding(false); setDraft(""); }} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)" }} title="Cancel"><X className="h-4 w-4" /></button>
+        <button type="button" onClick={handleAdd} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition" style={{ backgroundColor: "var(--accent)", border: "none" }}>{ts("action.add")}</button>
+        <button type="button" onClick={() => { setAdding(false); setDraft(""); }} aria-label={ts("action.cancel")} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)" }} title={ts("action.cancel")}><X className="h-4 w-4" /></button>
       </div>
     );
   }
@@ -1726,23 +1767,23 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
               if (!selectedSet.has(v.toLowerCase())) toggle(v);
             }
           }}
-          className="h-9 w-full appearance-none rounded-md pl-3 pr-8 text-sm outline-none"
+          className="h-9 w-full appearance-none rounded-md ps-3 pe-8 text-sm outline-none"
           style={inputStyle}
         >
-          <option value="">{multiple ? `Select ${attr.name}...` : `Select ${attr.name}`}</option>
+          <option value="">{multiple ? t("attr.selectAttrEllipsis", { name: attr.name }) : t("attr.selectAttr", { name: attr.name })}</option>
           {options.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
-          <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>+ Add {attr.name}</option>
+          <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>{t("attr.addAttrOption", { name: attr.name })}</option>
         </select>
-        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
+        <ChevronDown className="pointer-events-none absolute end-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: "var(--text-muted)" }} />
       </div>
       {multiple && selectedArr.length > 0 && (
         <div className="flex flex-wrap gap-1 max-w-[140px]">
           {selectedArr.slice(0, 2).map((s) => (
             <span key={s} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}>
               {s}
-              <button type="button" onClick={() => toggle(s)} className="opacity-70 hover:opacity-100" aria-label={`Remove ${s}`}><X className="h-3 w-3" /></button>
+              <button type="button" onClick={() => toggle(s)} className="opacity-70 hover:opacity-100" aria-label={t("attr.removeValue", { value: s })}><X className="h-3 w-3" /></button>
             </span>
           ))}
           {selectedArr.length > 2 && (
@@ -1754,6 +1795,9 @@ function VariantAttributeSelect({ attr, options, value, onChange, onAddValue, in
   );
 }
 function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddValue, inputStyle }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
+  const ts = (k, p) => __t("admin.shared." + k, p);
   const [adding, setAdding] = useState(false);
   const [newValue, setNewValue] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1771,17 +1815,17 @@ function DropdownWithAddValue({ attr, assignedOptions, value, onChange, onAddVal
   if (adding) {
     return (
       <div className="flex items-center gap-1.5">
-        <input type="text" autoFocus value={newValue} onChange={(ev) => setNewValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setAdding(false); setNewValue(""); } }} placeholder={`New ${attr.name} value...`} disabled={saving} className="h-9 flex-1 rounded-md px-3 text-sm outline-none disabled:opacity-50" style={inputStyle} />
-        <button type="button" onClick={handleSave} disabled={saving || !String(newValue || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "var(--success)", cursor: saving || !String(newValue || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{saving ? "..." : "Add"}</button>
-        <button type="button" onClick={() => { setAdding(false); setNewValue(""); }} disabled={saving} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer" }} title="Cancel"><X className="h-4 w-4" /></button>
+        <input type="text" autoFocus value={newValue} onChange={(ev) => setNewValue(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); handleSave(); } else if (ev.key === "Escape") { ev.preventDefault(); setAdding(false); setNewValue(""); } }} placeholder={t("attr.newValueForPlaceholder", { name: attr.name })} disabled={saving} className="h-9 flex-1 rounded-md px-3 text-sm outline-none disabled:opacity-50" style={inputStyle} />
+        <button type="button" onClick={handleSave} disabled={saving || !String(newValue || "").trim()} className="h-9 px-2.5 rounded-md text-xs font-bold text-white transition disabled:opacity-50 disabled:cursor-not-allowed" style={{ backgroundColor: "var(--success)", cursor: saving || !String(newValue || "").trim() ? "not-allowed" : "pointer", border: "none" }}>{saving ? "..." : ts("action.add")}</button>
+        <button type="button" onClick={() => { setAdding(false); setNewValue(""); }} disabled={saving} aria-label={ts("action.cancel")} className="h-9 w-9 rounded-md inline-flex items-center justify-center hover:opacity-70 disabled:opacity-50" style={{ background: "none", border: "1px solid var(--border-color)", color: "var(--text-muted)", cursor: saving ? "not-allowed" : "pointer" }} title={ts("action.cancel")}><X className="h-4 w-4" /></button>
       </div>
     );
   }
   return (
     <select value={value || ""} onChange={(e) => { const v = e.target.value; if (v === "__add_new__") { setAdding(true); return; } onChange(v); }} className="h-9 w-full rounded-md px-3 text-sm outline-none" style={inputStyle}>
-      <option value="">Select {attr.name}</option>
+      <option value="">{t("attr.selectAttr", { name: attr.name })}</option>
       {assignedOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
-      <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>+ Add new value...</option>
+      <option value="__add_new__" style={{ color: "var(--success-text)", fontWeight: 600 }}>{t("attr.addNewValue")}</option>
     </select>
   );
 }
@@ -1805,8 +1849,10 @@ function SummaryCardSkeleton() {
 }
 
 function ProductTableSkeleton({ rows = PRODUCTS_PER_PAGE }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
   return (
-    <tbody aria-busy="true" aria-label="Loading products">
+    <tbody aria-busy="true" aria-label={t("table.loading")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`product-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
           {/* Product — image + name + SKU */}
@@ -1840,8 +1886,10 @@ function ProductTableSkeleton({ rows = PRODUCTS_PER_PAGE }) {
 }
 
 function ProductGridSkeleton({ cards = 8 }) {
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t("admin.products." + k, p);
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-busy="true" aria-label="Loading products">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-busy="true" aria-label={t("table.loading")}>
       {Array.from({ length: cards }).map((_, i) => (
         <div key={`product-grid-skeleton-${i}`} className="flex flex-col gap-3 rounded-lg p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="flex items-start justify-between">

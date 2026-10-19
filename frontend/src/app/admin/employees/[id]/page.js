@@ -46,7 +46,8 @@ import {
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
-import { useEmployeeSocketSync } from "@/hooks/useEmployeeSocket";
+import { useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 // ==========================================
 // ✅ ALLOWED PERMISSIONS — sab by default true
@@ -78,6 +79,7 @@ const ALLOWED_PERMISSIONS = {
 // HELPER COMPONENTS
 // ==========================================
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const active = status === "active";
 
   return (
@@ -103,7 +105,7 @@ function StatusBadge({ status }) {
         className="h-1.5 w-1.5 rounded-full"
         style={{ backgroundColor: "currentColor" }}
       />
-      {active ? "Active" : "Inactive"}
+      {active ? t("admin.employees.detail.active") : t("admin.employees.detail.inactive")}
     </span>
   );
 }
@@ -120,6 +122,7 @@ const PREDEFINED_DEPARTMENTS = [
 ];
 
 function DepartmentDropdown({ value, onChange, disabled }) {
+  const { t, locale } = useTranslation();
   const [inputValue, setInputValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
   const [filteredOptions, setFilteredOptions] = useState(
@@ -185,7 +188,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Type or select..."
+          placeholder={t("admin.employees.form.departmentPlaceholder")}
           disabled={disabled}
           className="w-full h-10 md:h-8 pl-3 pr-7 rounded-md text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
           style={inputStyle}
@@ -221,7 +224,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
               className="px-3 py-1.5 text-xs"
               style={{ color: "var(--text-muted)" }}
             >
-              No matching departments
+              {t("admin.employees.form.noDepartments")}
             </div>
           ) : (
             filteredOptions.map((dept) => (
@@ -268,7 +271,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
                   color: "var(--text-muted)",
                 }}
               >
-                Custom: &quot;{inputValue.trim()}&quot;
+                {t("admin.employees.form.creatingNew", { name: inputValue.trim() })}
               </div>
             )}
         </div>
@@ -306,6 +309,7 @@ function EmployeeOverview({
   router,
   updatedInfo,
 }) {
+  const { t, locale } = useTranslation();
   const openPermissions = () => {
     const initialData = {};
     Object.keys(ALLOWED_PERMISSIONS).forEach((key) => {
@@ -321,20 +325,20 @@ function EmployeeOverview({
   const relativeTime = (ts) => {
     if (!ts) return "";
     const minutes = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-    return `${Math.floor(minutes / 1440)}d ago`;
+    if (minutes < 1) return t("admin.employees.detail.justNow");
+    if (minutes < 60) return t("admin.employees.detail.minutesAgo", { mins: minutes });
+    if (minutes < 1440) return t("admin.employees.detail.hoursAgo", { hours: Math.floor(minutes / 60) });
+    return t("admin.employees.detail.daysAgo", { days: Math.floor(minutes / 1440) });
   };
 
   const infoItems = [
-    ["Full Name", name, User],
-    ["Username", email.split("@")[0], IdCard],
-    ["Email Address", email, Mail],
-    ["Phone Number", phone || "N/A", Phone],
-    ["Department", department, Layers],
-    ["Employee Code", empId, Tag],
-    ["Joined At", joinDate, Clock],
+    [t("admin.employees.form.fullName"), name, User],
+    [t("admin.employees.form.username"), email.split("@")[0], IdCard],
+    [t("admin.profile.email"), email, Mail],
+    [t("admin.profile.phone"), phone || "—", Phone],
+    [t("admin.employees.form.departmentPlaceholder"), department, Layers],
+    [t("admin.employees.detail.employeeCode"), empId, Tag],
+    [t("admin.employees.detail.joinedAt"), joinDate, Clock],
   ];
 
   const STAT_TONES = {
@@ -345,10 +349,10 @@ function EmployeeOverview({
   };
 
   const stats = [
-    { label: "Orders Handled", value: String(ordersHandled ?? 0), icon: ShoppingCart, tone: "success", hint: "Lifetime processed" },
-    { label: "Sales Generated", value: `$${Number(salesGenerated || 0).toLocaleString()}`, icon: DollarSign, tone: "warning", hint: "Total revenue" },
-    { label: "Products Added", value: String(productsAdded ?? 0), icon: Package, tone: "info", hint: "Catalog listings" },
-    { label: "Performance Rating", value: `${Number(performanceRating || 0).toFixed(1)}/5`, icon: Star, tone: "accent", hint: "Average score" },
+    { label: t("admin.employees.detail.ordersHandled"), value: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(ordersHandled ?? 0), icon: ShoppingCart, tone: "success", hint: t("admin.employees.detail.lifetimeProcessed") },
+    { label: t("admin.employees.detail.salesGenerated"), value: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(salesGenerated || 0)), icon: DollarSign, tone: "warning", hint: t("admin.employees.detail.totalRevenue") },
+    { label: t("admin.employees.detail.productsAdded"), value: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(productsAdded ?? 0), icon: Package, tone: "info", hint: t("admin.employees.detail.catalogListings") },
+    { label: t("admin.employees.detail.performanceRating"), value: `${new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { maximumFractionDigits: 1 }).format(Number(performanceRating || 0))}/5`, icon: Star, tone: "accent", hint: t("admin.employees.detail.averageScore") },
   ];
 
   const enabledPercent =
@@ -373,13 +377,13 @@ function EmployeeOverview({
           <nav
             className="mb-2 flex flex-wrap items-center gap-1.5 text-[11.5px]"
             style={{ color: "var(--text-muted)" }}
-            aria-label="Breadcrumb"
+            aria-label={t("admin.employees.detail.breadcrumb")}
           >
             <button
               onClick={() => router.push("/admin/employees")}
               className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
             >
-              <ArrowLeft className="h-3.5 w-3.5" /> Employees
+              <ArrowLeft className="h-3.5 w-3.5" /> {t("admin.employees.title")}
             </button>
             <span style={{ opacity: 0.5 }}>/</span>
             <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
@@ -391,11 +395,11 @@ function EmployeeOverview({
             <span className="page-title-icon">
               <User className="h-[18px] w-[18px]" />
             </span>
-            Employee Profile
+            {t("admin.employees.detail.employeeProfile")}
           </h1>
 
           <p className="page-subtitle">
-            Complete record, performance and access control for this staff member.
+            {t("admin.employees.detail.employeeProfileSubtitle")}
           </p>
         </div>
 
@@ -406,7 +410,7 @@ function EmployeeOverview({
               className="btn-secondary inline-flex items-center gap-1.5"
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              Manage Access
+              {t("admin.employees.detail.manageAccess")}
             </button>
           )}
 
@@ -414,7 +418,7 @@ function EmployeeOverview({
             onClick={() => openEditModal(employee)}
             className="btn-primary inline-flex items-center gap-1.5"
           >
-            <Pencil className="h-3.5 w-3.5" /> Edit Employee
+            <Pencil className="h-3.5 w-3.5" /> {t("admin.employees.detail.editEmployee")}
           </button>
         </div>
       </div>
@@ -450,7 +454,7 @@ function EmployeeOverview({
                 )}
 
                 <span
-                  title={status === "active" ? "Online account active" : "Account inactive"}
+                  title={status === "active" ? t("admin.employees.detail.onlineAccountActive") : t("admin.employees.detail.accountInactive")}
                   className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-[3px]"
                   style={{
                     backgroundColor:
@@ -518,7 +522,7 @@ function EmployeeOverview({
                     style={{ backgroundColor: "var(--bg-tertiary)" }}
                   >
                     <Calendar className="h-3 w-3 shrink-0" />
-                    Joined {joinDate}
+                    {t("admin.employees.detail.joined", { date: joinDate })}
                   </span>
                 </div>
 
@@ -529,10 +533,7 @@ function EmployeeOverview({
                   >
                     <Pencil className="h-3 w-3 shrink-0" style={{ color: "var(--info)" }} />
                     <span>
-                      Last updated by{" "}
-                      <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>
-                        {updatedInfo.name}
-                      </span>{" "}
+                      {t("admin.employees.detail.updatedBy", { name: updatedInfo.name, time: updatedInfo.date })}
                       · {updatedInfo.date}
                     </span>
                   </div>
@@ -639,14 +640,14 @@ function EmployeeOverview({
             <div className="mb-4 flex items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--border-color)" }}>
               <h3 className="section-header mb-0">
                 <User className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-                Personal Information
+            {t("admin.employees.detail.personalInfo")}
               </h3>
 
               <button
                 onClick={() => openEditModal(employee)}
                 className="btn-ghost inline-flex items-center gap-1 text-[11px] font-semibold"
               >
-                <Pencil className="h-3 w-3" /> Edit
+                <Pencil className="h-3 w-3" /> {t("admin.employees.detail.edit")}
               </button>
             </div>
 
@@ -688,14 +689,14 @@ function EmployeeOverview({
               className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3"
               style={{ borderColor: "var(--border-color)" }}
             >
-              <h3 className="section-header mb-0">
+            <h3 className="section-header mb-0">
                 <ShieldCheck className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-                Access Control
+                {t("admin.employees.detail.accessControl")}
               </h3>
 
               <div className="flex items-center gap-2">
                 <span className="badge badge-accent">
-                  {enabledCount} of {totalCount} enabled
+                  {t("admin.employees.detail.ofEnabled", { count: enabledCount, total: totalCount })}
                 </span>
 
                 {canEditPermissions && (
@@ -703,7 +704,7 @@ function EmployeeOverview({
                     onClick={openPermissions}
                     className="btn-ghost inline-flex items-center gap-1 text-[11px] font-semibold"
                   >
-                    <Pencil className="h-3 w-3" /> Edit
+                    <Pencil className="h-3 w-3" /> {t("admin.employees.detail.edit")}
                   </button>
                 )}
               </div>
@@ -712,7 +713,7 @@ function EmployeeOverview({
             {/* Coverage bar */}
             <div className="mb-4">
               <div className="flex items-center justify-between text-[10.5px] font-semibold" style={{ color: "var(--text-muted)" }}>
-                <span>Permission coverage</span>
+                <span>{t("admin.employees.detail.permissionCoverage")}</span>
                 <span className="tabular-nums">{enabledPercent}%</span>
               </div>
 
@@ -742,9 +743,9 @@ function EmployeeOverview({
                   <span
                     className="truncate text-[11.5px] font-semibold"
                     style={{ color: "var(--text-primary)" }}
-                    title={label}
+                    title={t(`admin.employees.permission.${key}`)}
                   >
-                    {label}
+                    {t(`admin.employees.permission.${key}`)}
                   </span>
 
                   <span
@@ -755,7 +756,7 @@ function EmployeeOverview({
                       className="h-1.5 w-1.5 rounded-full"
                       style={{ backgroundColor: "currentColor" }}
                     />
-                    {value ? "On" : "Off"}
+              {value ? t("admin.employees.detail.enabled") : t("admin.employees.detail.disabled")}
                   </span>
                 </div>
               ))}
@@ -771,7 +772,7 @@ function EmployeeOverview({
           >
             <h3 className="section-header mb-0">
               <Clock className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
-              Activity Log
+              {t("admin.employees.detail.activityLog")}
             </h3>
 
             <div className="flex items-center gap-2">
@@ -786,21 +787,21 @@ function EmployeeOverview({
                   className="h-1.5 w-1.5 animate-pulse rounded-full"
                   style={{ backgroundColor: "currentColor" }}
                 />
-                Live
+                {t("admin.employees.detail.live")}
               </span>
 
               <span
                 className="text-[11px] font-semibold"
                 style={{ color: "var(--text-muted)" }}
               >
-                {activities.length} {activities.length === 1 ? "event" : "events"}
+                {t("admin.employees.detail.events", { count: activities.length })}
               </span>
             </div>
           </div>
 
           {activityCategories.length > 1 && (
             <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto pb-0.5">
-              {[{ label: "All", value: "all" }, ...activityCategories.map((c) => ({ label: c, value: c }))].map(
+              {[{ label: t("admin.employees.detail.all"), value: "all" }, ...activityCategories.map((c) => ({ label: c, value: c }))].map(
                 (chip) => {
                   const activeChip = activityFilter === chip.value;
 
@@ -855,7 +856,7 @@ function EmployeeOverview({
                         className="text-[12px] font-semibold leading-snug"
                         style={{ color: "var(--text-primary)" }}
                       >
-                        {activity.action}
+                          {activity.action}
                       </p>
 
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -868,7 +869,7 @@ function EmployeeOverview({
 
                         {activity.performedByName && (
                           <span className="text-[9.5px]" style={{ color: "var(--text-muted)" }}>
-                            by{" "}
+                            {t("common.by")} {" "}
                             <span
                               className="font-semibold"
                               style={{ color: "var(--text-secondary)" }}
@@ -890,7 +891,7 @@ function EmployeeOverview({
                         className="mt-1 text-[9.5px]"
                         style={{ color: "var(--text-muted)", opacity: 0.85 }}
                       >
-                        {new Date(activity.timestamp).toLocaleString("en-US", {
+                        {new Date(activity.timestamp).toLocaleString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -909,8 +910,8 @@ function EmployeeOverview({
                 </span>
                 <p className="text-[12px]">
                   {activityFilter === "all"
-                    ? "No activity found for this employee yet."
-                    : `No ${activityFilter} activity recorded yet.`}
+                    ? t("admin.employees.detail.noActivity")
+                    : t("admin.employees.detail.noActivityFiltered", { type: activityFilter })}
                 </p>
               </div>
             )}
@@ -1031,6 +1032,7 @@ function getActivityColor(category) {
 // MAIN EMPLOYEE DETAIL PAGE
 // ==========================================
 export default function EmployeeDetailPage() {
+  const { t, locale } = useTranslation();
   const params = useParams();
   const router = useRouter();
 
@@ -1118,9 +1120,9 @@ export default function EmployeeDetailPage() {
   const canManageEmployees =
     isCurrentAdmin || currentUserProfile?.permissions?.employees !== false;
   const denyEmployeesAccess = () =>
-    toast.error("Access denied. You don't have 'employees' permission.", {
+    toast.error(t("admin.employees.detail.accessDenied"), {
       duration: 5000,
-      description: "Contact an administrator or another staff member to grant you access.",
+      description: t("admin.employees.detail.accessDeniedDescription"),
     });
 
   // ==========================================
@@ -1190,7 +1192,7 @@ export default function EmployeeDetailPage() {
         );
 
         toast.success(
-          "Employee updated successfully"
+          t("admin.employees.detail.updated")
         );
 
         closeEditModal();
@@ -1199,7 +1201,7 @@ export default function EmployeeDetailPage() {
       onError: (err) =>
         toast.error(
           err.message ||
-            "Update failed"
+            t("admin.employees.detail.updateFailed")
         ),
     });
 
@@ -1215,7 +1217,7 @@ export default function EmployeeDetailPage() {
         // ✅ 'employees' permission ke baghair koi permission change nahi kar sakta
         if (!canManageEmployees) {
           throw new Error(
-            "Access denied. You don't have 'employees' permission."
+            t("admin.employees.detail.accessDenied")
           );
         }
 
@@ -1233,7 +1235,7 @@ export default function EmployeeDetailPage() {
 
         if (isSelf) {
           throw new Error(
-            "Security Restriction: You cannot modify your own permissions."
+            t("admin.employees.detail.securityRestriction")
           );
         }
 
@@ -1288,7 +1290,7 @@ export default function EmployeeDetailPage() {
         );
 
         toast.success(
-          "Permissions updated successfully"
+          t("admin.employees.detail.permissionsUpdated")
         );
 
         setShowPermissionsModal(
@@ -1304,7 +1306,7 @@ export default function EmployeeDetailPage() {
 
         toast.error(
           err?.message ||
-            "Failed to update permissions"
+            t("admin.employees.detail.permissionsUpdateFailed")
         );
       },
     });
@@ -1381,19 +1383,19 @@ export default function EmployeeDetailPage() {
 
     if (!formData.name.trim()) {
       return toast.error(
-        "Name is required"
+        t("admin.employees.detail.nameRequired")
       );
     }
 
     if (!formData.email.trim()) {
       return toast.error(
-        "Email is required"
+        t("admin.employees.detail.emailRequired")
       );
     }
 
     if (!formData.department.trim()) {
       return toast.error(
-        "Department is required"
+        t("admin.employees.detail.departmentRequired")
       );
     }
 
@@ -1403,19 +1405,19 @@ export default function EmployeeDetailPage() {
     ) {
       if (!formData.password) {
         return toast.error(
-          "Password is required"
+          t("admin.employees.detail.passwordRequired")
         );
       }
       if (!formData.confirmPassword) {
         return toast.error(
-          "Confirm Password is required"
+          t("admin.employees.detail.confirmPasswordRequired")
         );
       }
       if (
         formData.password.length < 6
       ) {
         return toast.error(
-          "Password must be at least 6 characters"
+          t("admin.employees.detail.passwordMinLength")
         );
       }
       if (
@@ -1423,7 +1425,7 @@ export default function EmployeeDetailPage() {
         formData.confirmPassword
       ) {
         return toast.error(
-          "Passwords do not match"
+          t("admin.employees.detail.passwordMismatch")
         );
       }
     }
@@ -1468,7 +1470,7 @@ export default function EmployeeDetailPage() {
                 "var(--text-muted)",
             }}
           >
-            Loading employee details...
+            {t("admin.employees.detail.loading")}
           </p>
         </div>
       </div>
@@ -1490,13 +1492,11 @@ export default function EmployeeDetailPage() {
               "var(--text-muted)",
           }}
         >
-          Failed to load employee
-          details.
+          {t("admin.employees.detail.loadFailedShort")}
           <br />
 
           <span className="text-[12px] text-red-400 block mt-2 bg-red-500/10 p-2 rounded">
-            {error?.message ||
-              "Employee not found"}
+            {t("admin.employees.detail.notFound")}
           </span>
         </p>
 
@@ -1509,7 +1509,7 @@ export default function EmployeeDetailPage() {
                 "var(--text-primary)",
             }}
           >
-            Try Again
+            {t("admin.employees.detail.tryAgain")}
           </button>
 
           <button
@@ -1524,7 +1524,7 @@ export default function EmployeeDetailPage() {
                 "var(--accent-text)",
             }}
           >
-            Go Back
+            {t("admin.employees.detail.goBack")}
           </button>
         </div>
       </div>
@@ -1609,7 +1609,7 @@ export default function EmployeeDetailPage() {
     ? new Date(
         created_at
       ).toLocaleDateString(
-        "en-GB",
+        locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-GB",
         {
           day: "numeric",
           month: "short",
@@ -1634,8 +1634,8 @@ export default function EmployeeDetailPage() {
       name:
         employee.updatedby?.name ||
         employee.updatedby?.email ||
-        "Admin",
-      date: updatedDate.toLocaleString("en-US", {
+        t("admin.employees.detail.admin"),
+      date: updatedDate.toLocaleString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -1764,7 +1764,7 @@ export default function EmployeeDetailPage() {
             >
               <div>
                 <h3 className="text-base font-semibold">
-                  Edit Employee
+                  {t("admin.employees.detail.editEmployee")}
                 </h3>
 
                 <p
@@ -1774,7 +1774,7 @@ export default function EmployeeDetailPage() {
                       "var(--text-muted)",
                   }}
                 >
-                  Update employee details
+                  {t("admin.employees.form.editSubtitle")}
                 </p>
               </div>
 
@@ -1810,7 +1810,7 @@ export default function EmployeeDetailPage() {
                         "var(--text-secondary)",
                     }}
                   >
-                    Full Name *
+                    {t("admin.employees.form.fullName")}
                   </label>
 
                   <input
@@ -1833,7 +1833,7 @@ export default function EmployeeDetailPage() {
                     style={
                       inputStyle
                     }
-                    placeholder="John Doe"
+                    placeholder={t("admin.employees.form.fullNamePlaceholder")}
                   />
                 </div>
 
@@ -1845,7 +1845,7 @@ export default function EmployeeDetailPage() {
                         "var(--text-secondary)",
                     }}
                   >
-                    Email *
+                    {t("admin.employees.form.email")}
                   </label>
 
                   <input
@@ -1868,7 +1868,7 @@ export default function EmployeeDetailPage() {
                     style={
                       inputStyle
                     }
-                    placeholder="john@example.com"
+                    placeholder={t("admin.employees.form.emailPlaceholder")}
                   />
                 </div>
               </div>
@@ -1881,7 +1881,7 @@ export default function EmployeeDetailPage() {
                       "var(--text-secondary)",
                   }}
                 >
-                  Phone number
+                  {t("admin.employees.form.phone")}
                 </label>
 
                 <input
@@ -1901,7 +1901,7 @@ export default function EmployeeDetailPage() {
                   }
                   className="w-full h-10 md:h-9 px-3 rounded-md text-[16px] md:text-[13px] outline-none disabled:opacity-50"
                   style={inputStyle}
-                  placeholder="+92 300 1234567"
+                  placeholder={t("admin.employees.form.phonePlaceholder")}
                 />
               </div>
 
@@ -1914,7 +1914,7 @@ export default function EmployeeDetailPage() {
                         "var(--text-secondary)",
                     }}
                   >
-                    Password
+                    {t("admin.employees.form.password")}
                   </label>
 
                   <div className="relative">
@@ -1942,7 +1942,7 @@ export default function EmployeeDetailPage() {
                       style={
                         inputStyle
                       }
-                      placeholder="Min 6 chars"
+                      placeholder={t("admin.employees.form.confirmPasswordPlaceholder")}
                       minLength={6}
                     />
 
@@ -1976,7 +1976,7 @@ export default function EmployeeDetailPage() {
                         "var(--text-secondary)",
                     }}
                   >
-                    Confirm Password
+                    {t("admin.employees.form.confirmPassword")}
                   </label>
 
                   <div className="relative">
@@ -2004,7 +2004,7 @@ export default function EmployeeDetailPage() {
                       style={
                         inputStyle
                       }
-                      placeholder="Confirm"
+                      placeholder={t("admin.employees.form.confirmPlaceholder")}
                       minLength={6}
                     />
 
@@ -2040,7 +2040,7 @@ export default function EmployeeDetailPage() {
                         "var(--text-secondary)",
                     }}
                   >
-                    Status
+                    {t("common.status")}
                   </label>
 
                   <select
@@ -2064,11 +2064,11 @@ export default function EmployeeDetailPage() {
                     }
                   >
                     <option value="active">
-                      Active
+                      {t("admin.employees.detail.active")}
                     </option>
 
                     <option value="inactive">
-                      Inactive
+                      {t("admin.employees.detail.inactive")}
                     </option>
                   </select>
                 </div>
@@ -2081,7 +2081,7 @@ export default function EmployeeDetailPage() {
                         "var(--text-secondary)",
                     }}
                   >
-                    Department *
+                    {t("admin.employees.form.department")}
                   </label>
 
                   <DepartmentDropdown
@@ -2127,7 +2127,7 @@ export default function EmployeeDetailPage() {
                       "var(--text-primary)",
                   }}
                 >
-                  Cancel
+                    {t("admin.employees.page.cancel")}
                 </button>
 
                 <button
@@ -2146,7 +2146,7 @@ export default function EmployeeDetailPage() {
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                   ) : (
-                    "Update Employee"
+                      t("admin.employees.detail.updateEmployee")
                   )}
                 </button>
               </div>
@@ -2173,7 +2173,7 @@ export default function EmployeeDetailPage() {
             >
               <div>
                 <h3 className="text-base font-bold">
-                  Configure Access
+                  {t("admin.employees.detail.configureAccess")}
                 </h3>
 
                 <p
@@ -2183,7 +2183,7 @@ export default function EmployeeDetailPage() {
                       "var(--text-muted)",
                   }}
                 >
-                  Editing permissions
+                  {t("admin.employees.detail.editingPermissionsFor")} {" "}
                   for{" "}
                   <span className="font-semibold text-[var(--text-primary)]">
                     {name}
@@ -2260,7 +2260,7 @@ export default function EmployeeDetailPage() {
                             "var(--text-primary)",
                         }}
                       >
-                        {config.label}
+                      {t(`admin.employees.permission.${key}`)}
                       </span>
                     </div>
 
@@ -2315,7 +2315,7 @@ export default function EmployeeDetailPage() {
                     "var(--text-primary)",
                 }}
               >
-                Cancel
+                {t("admin.employees.page.cancel")}
               </button>
 
               <button
@@ -2354,7 +2354,7 @@ export default function EmployeeDetailPage() {
                 {updatePermissionsMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  "Save Permissions"
+                  t("admin.employees.detail.savePermissions")
                 )}
               </button>
             </div>

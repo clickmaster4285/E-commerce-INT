@@ -9,7 +9,10 @@ import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
+import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
+import { translate } from "@/i18n/translations";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
 
@@ -112,9 +115,10 @@ const dateToISO = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
+  const { t } = useTranslation();
   const config = {
-    active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    active: { text: t("admin.banners.page.active"), bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    inactive: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
   const item = config[status] || config.inactive;
   return (
@@ -127,6 +131,7 @@ const StatusBadge = ({ status }) => {
 
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
@@ -175,7 +180,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.noOptionsAvailable")}</div>
           ) : (
             options.map((opt) => {
               const active = value === opt.value;
@@ -307,8 +312,9 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function DiscountRowsSkeleton({ rows = 10 }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading discounts">
+    <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1174c380be73")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`discount-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
           {/* checkbox */}
@@ -337,8 +343,9 @@ function DiscountRowsSkeleton({ rows = 10 }) {
 }
 
 function DiscountCardsSkeleton({ cards = 8, cardStyle }) {
+  const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading discounts">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.1174c380be73")}>
       {Array.from({ length: cards }).map((_, i) => (
         <div key={`discount-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
           <div className="flex items-start justify-between">
@@ -476,6 +483,8 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
+  const { t, locale } = useTranslation();
+  const { nameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -575,7 +584,7 @@ export default function DiscountsPage() {
     onMutate: (_, variables) => markSelfAction(variables.id ? "update" : "create"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success(variables.id ? "Discount updated successfully" : "Discount created successfully");
+      toast.success(variables.id ? t("admin.discounts.toast.updated") : t("admin.discounts.toast.created"));
       setShowModal(false);
       resetForm();
     },
@@ -596,9 +605,9 @@ export default function DiscountsPage() {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
       setDeleteTarget(null);
       setSelectedIds([]);
-      toast.success("Discount deleted successfully");
+      toast.success(t("admin.discounts.toast.deleted"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.deleteFailed")),
   });
 
   const toggleStatusMutation = useMutation({
@@ -610,9 +619,9 @@ export default function DiscountsPage() {
     onMutate: () => markSelfAction("update"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success(variables.newStatus === "active" ? "Discount activated" : "Discount deactivated");
+      toast.success(variables.newStatus === "active" ? t("admin.discounts.toast.activated") : t("admin.discounts.toast.deactivated"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.statusFailed")),
   });
 
   const filteredDiscounts = useMemo(() => {
@@ -702,24 +711,24 @@ export default function DiscountsPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormErrors({});
-    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.discounts.validation.nameRequired"));
     const manualCode = String(formData.code || "").trim();
     if (!manualCode) {
       setFormErrors({ code: "Discount code is required." });
       return;
     }
-    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
-    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
-    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error(t("admin.discounts.validation.valueRequired"));
+    if (Number(formData.value) < 0) return toast.error(t("admin.discounts.validation.valueNegative"));
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error(t("admin.discounts.validation.percentageMax"));
 
     // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
     const nonNegativeError = validateNonNegative([
-      ["Discount value", formData.value],
-      ["Minimum order amount", formData.min_order_amount],
-      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
-      ["Total usage limit", formData.usage_limit],
-      ["Per customer limit", formData.usage_per_customer],
-    ]);
+      [t("admin.discounts.form.discountValue"), formData.value],
+      [t("admin.discounts.form.minOrderAmount"), formData.min_order_amount],
+      [t("admin.discounts.form.minQuantity"), formData.has_min_quantity ? formData.min_quantity : ""],
+      [t("admin.discounts.form.totalUsageLimit"), formData.usage_limit],
+      [t("admin.discounts.form.perCustomerLimit"), formData.usage_per_customer],
+    ], t);
     if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
@@ -728,21 +737,21 @@ export default function DiscountsPage() {
 
     if (activeFormType === "product") {
       target_type = "specific_products"; applyTo = "specific_products";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectProduct"));
       payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "category") {
       target_type = "specific_categories"; applyTo = "specific_categories";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectCategory"));
       payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "brand") {
       target_type = "brand"; applyTo = "brand";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectBrand"));
       payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
     }
 
     const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.discounts.validation.dateOrder"));
 
     const finalMinQuantity = formData.has_min_quantity && formData.min_quantity 
       ? Number(formData.min_quantity) 
@@ -785,10 +794,10 @@ export default function DiscountsPage() {
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const discountTypes = [
-    { key: "all", title: "All Products Discount", desc: "Apply discount on all products", icon: GlobeIcon },
-    { key: "product", title: "Product Discount", desc: "Apply discount on specific products", icon: BoxIcon },
-    { key: "category", title: "Category Discount", desc: "Apply discount on entire categories", icon: FolderIcon },
-    { key: "brand", title: "Brand Discount", desc: "Apply discount on specific brands", icon: AwardIcon },
+    { key: "all", title: t("admin.discounts.page.allProductsDiscount"), desc: "Apply discount on all products", icon: GlobeIcon },
+    { key: "product", title: t("admin.discounts.page.productDiscount"), desc: "Apply discount on specific products", icon: BoxIcon },
+    { key: "category", title: t("admin.discounts.page.categoryDiscount"), desc: "Apply discount on entire categories", icon: FolderIcon },
+    { key: "brand", title: t("admin.discounts.page.brandDiscount"), desc: "Apply discount on specific brands", icon: AwardIcon },
   ];
 
   const openDiscountForm = (type) => {
@@ -835,7 +844,7 @@ export default function DiscountsPage() {
           aria-expanded={open}
           className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
-          title="Actions"
+          title={t("admin.featuredProducts.ui.actions")}
         >
           <DotsIcon className="w-4 h-4" />
         </button>
@@ -856,17 +865,17 @@ export default function DiscountsPage() {
             >
               <MenuItem
                 icon={<EyeIcon className="w-4 h-4" />}
-                label="View Details"
+                label={t("admin.promotions.ui.generated.e45a7490664f")}
                 onClick={() => { setActionMenu(null); handleView(id); }}
               />
               <MenuItem
                 icon={<EditIcon className="w-4 h-4" />}
-                label="Edit Discount"
+                label={t("admin.promotions.ui.generated.5beba536c8fd")}
                 onClick={() => { setActionMenu(null); openEdit(discount); }}
               />
               <MenuItem
                 icon={<PowerIcon className="w-4 h-4" />}
-                label={getDiscountStatus(discount) === "active" ? "Deactivate" : "Activate"}
+                label={getDiscountStatus(discount) === "active" ? t("admin.brands.ui.deactivate") : t("admin.brands.ui.activate")}
                 danger={getDiscountStatus(discount) === "active"}
                 success={getDiscountStatus(discount) !== "active"}
                 onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
@@ -874,7 +883,7 @@ export default function DiscountsPage() {
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<TrashIcon className="w-4 h-4" />}
-                label="Delete"
+                label={t("admin.promotions.ui.generated.9485989ff514")}
                 danger
                 onClick={() => { setActionMenu(null); setDeleteTarget([discount]); }}
               />
@@ -895,8 +904,8 @@ export default function DiscountsPage() {
           {/* Title & Actions Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-[24px] leading-7 font-bold tracking-tight">Discount Management</h1>
-              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
+              <h1 className="text-[24px] leading-7 font-bold tracking-tight">{t("admin.discounts.page.title")}</h1>
+              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.subtitle")}</p>
             </div>
             
             <div className="flex items-center gap-2">
@@ -907,7 +916,7 @@ export default function DiscountsPage() {
                   onClick={() => setViewMode("list")} 
                   className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
                   style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
-                  title="List view"
+                  title={t("admin.discounts.page.listView")}
                 >
                   <ListIcon />
                 </button>
@@ -916,7 +925,7 @@ export default function DiscountsPage() {
                   onClick={() => setViewMode("grid")} 
                   className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
                   style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
-                  title="Grid view"
+                  title={t("admin.discounts.page.gridView")}
                 >
                   <GridIcon />
                 </button>
@@ -931,7 +940,7 @@ export default function DiscountsPage() {
                   className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition" 
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                 >
-                  <PlusIcon /> New Discount <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+                  <PlusIcon /> {t("admin.discounts.page.new")} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isTypeMenuOpen && (
                   <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
@@ -952,9 +961,9 @@ export default function DiscountsPage() {
 
           {/* Stats Cards Row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
-            <StatCard title="Active" value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
-            <StatCard title="Inactive" value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.total")} value={stats.total} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.active")} value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.inactive")} value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
           </div>
 
           {/* Search Bar & Filters Row */}
@@ -963,7 +972,7 @@ export default function DiscountsPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
               <input 
                 type="text" 
-                placeholder="Search by discount name or code..." 
+                placeholder={t("admin.discounts.page.search")} 
                 value={search} 
                 onChange={(e) => setSearch(e.target.value)} 
                 className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]" 
@@ -982,10 +991,10 @@ export default function DiscountsPage() {
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
           <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length}{" "}{t("admin.promotions.ui.generated.835f3b50e337")}</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
+              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.discounts.page.clear")}</button>
+              <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> {t("admin.discounts.page.deleteSelected")}</button>
             </div>
           </div>
         )}
@@ -1001,11 +1010,11 @@ export default function DiscountsPage() {
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
                       <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.discount")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.value")}</th>
+                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.actions")}</th>
                     </tr>
                   </thead>
                   <DiscountRowsSkeleton rows={itemsPerPage} />
@@ -1018,7 +1027,7 @@ export default function DiscountsPage() {
         ) : paginatedDiscounts.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <TagIcon className="w-8 h-8 mb-3 opacity-50" />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No discounts found" : "No discounts created yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? t("admin.discounts.page.noMatch") : t("admin.discounts.page.noneYet")}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -1027,11 +1036,11 @@ export default function DiscountsPage() {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={paginatedDiscounts.length > 0 && paginatedDiscounts.every((d) => selectedIds.includes(d._id || d.id))} onChange={(e) => setSelectedIds(e.target.checked ? paginatedDiscounts.map((d) => d._id || d.id) : [])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.discount")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.value")}</th>
+                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1046,12 +1055,12 @@ export default function DiscountsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{discount?.name || "Untitled Discount"}</p>
+                              <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount)}</span></td>
+                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, locale)}</td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, locale)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons discount={discount} /></td>
                       </tr>
@@ -1070,10 +1079,10 @@ export default function DiscountsPage() {
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{discount?.name || "Untitled Discount"}</p>
+                  <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, locale)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>
@@ -1084,7 +1093,7 @@ export default function DiscountsPage() {
         {/* PAGINATION */}
         {totalDiscounts > itemsPerPage && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)} of {totalDiscounts} discounts</p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{totalDiscounts}{" "}{t("admin.nav.item.discounts")}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
@@ -1139,14 +1148,13 @@ export default function DiscountsPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={cardStyle}>
-            <h3 className="text-base font-semibold">Delete Discount?</h3>
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-              Are you sure you want to delete {deleteTarget.length === 1 ? <span className="font-semibold">{deleteTarget[0]?.name}</span> : `${deleteTarget.length} discounts`}?
+            <h3 className="text-base font-semibold">{t("admin.discounts.page.deleteQuestion")}</h3>
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.b3ea6f7db57f")}{" "}{deleteTarget.length === 1 ? <span className="font-semibold">{deleteTarget[0]?.name}</span> : `${deleteTarget.length} discounts`}?
             </p>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>Cancel</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.30f6237868a6")}</> : "Delete"}
               </button>
             </div>
           </div>
@@ -1155,4 +1163,3 @@ export default function DiscountsPage() {
     </div>
   );
 }
-

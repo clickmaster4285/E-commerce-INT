@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ==================== ICONS ==================== */
 const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
@@ -29,12 +30,14 @@ const XCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} f
 const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
 
 /* ==================== HELPERS ==================== */
-const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const intlLocale = (locale) => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US";
+const formatDate = (d, locale = "en") => d ? new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" }).format(new Date(d)) : "—";
 
 // ✅ Product history me "KAB order hua" exact dekhna ho to time bhi chahiye
-const formatDateTime = (d) => d
-  ? new Date(d).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
+const formatDateTime = (d, locale = "en") => d
+  ? new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(d))
   : "—";
+const formatCurrency = (value, locale = "en") => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK", { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(Number(value) || 0);
 
 // ✅ Line item product se match karta hai? (String compare — ObjectId vs string safe)
 const isProductMatch = (item, productId) =>
@@ -164,33 +167,37 @@ function SkeletonRows({ rows = 6 }) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const item = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
   return (
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {status}
+      {t(`admin.orders.status.${status}`)}
     </span>
   );
 }
 
 function PaymentBadge({ status }) {
+  const { t } = useTranslation();
   const item = PAYMENT_STATUS_CONFIG[status] || PAYMENT_STATUS_CONFIG.pending;
   return (
     <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {item.label}
+      {t(`admin.orders.status.${status === "paid" ? "paid" : status === "refunded" ? "refunded" : status === "failed" ? "failed" : "unpaid"}`)}
     </span>
   );
 }
 
 function FilterSelect({ value, onChange, options, width = 160 }) {
+  const { t } = useTranslation();
+  const filterKeys = { "All Status": "allStatuses", "All Payments": "allPayments", "All Shipping": "allShipping", "All Time": "allTime", Today: "today", Yesterday: "yesterday", "Last 7 days": "last7Days", "Last 30 days": "last30Days", Pending: "status.pending", Confirmed: "status.confirmed", Processing: "status.processing", Shipped: "status.shipped", Delivered: "status.delivered", Cancelled: "status.cancelled", Paid: "status.paid", Unpaid: "status.unpaid", Failed: "status.failed", Standard: "standardShipping", Express: "expressShipping" };
   return (
     <div className="relative">
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter orders"
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={t("admin.orders.page.filterOrders")}
         className="appearance-none h-9 pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
         style={{ width: `${width}px`, backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         {options.map(([val, label]) => (
-          <option key={`${val}-${label}`} value={val}>{label}</option>
+          <option key={`${val}-${label}`} value={val}>{filterKeys[label]?.startsWith("status.") ? t(`admin.orders.${filterKeys[label]}`) : t(`admin.orders.page.${filterKeys[label] || label}`)}</option>
         ))}
       </select>
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
@@ -211,16 +218,18 @@ export default function OrdersPage() {
 }
 
 function OrdersFallback() {
+  const { t } = useTranslation();
   return (
     <div className="w-full min-h-screen flex items-center justify-center p-10">
       <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-muted)" }}>
-        <Spinner className="w-4 h-4" /> Loading orders...
+        <Spinner className="w-4 h-4" /> {t("admin.orders.page.loading")}
       </div>
     </div>
   );
 }
 
 function OrdersView() {
+  const { t, locale } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -314,7 +323,7 @@ if (lastProductId !== productId) {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
+    onError: () => toast.error(t("admin.orders.toast.updateOrderFailed")),
   });
 
   const updatePaymentMutation = useMutation({
@@ -322,9 +331,9 @@ if (lastProductId !== productId) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success("Payment marked as received");
+      toast.success(t("admin.orders.toast.paymentReceived"));
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update payment"),
+    onError: () => toast.error(t("admin.orders.toast.paymentFailed")),
   });
 
   const orders = useMemo(() => data?.data || [], [data]);
@@ -370,11 +379,11 @@ if (lastProductId !== productId) {
       await Promise.all(targets.map((id) => orderApi.updateStatus(id, { status })));
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success(`${targets.length} order${targets.length > 1 ? "s" : ""} marked as ${status}`);
+      toast.success(t("admin.orders.toast.bulkStatus", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(targets.length), status: t(`admin.orders.status.${status}`) }));
       setSelectedIds([]);
       setBulkCancelConfirm(false);
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || "Bulk update failed");
+      toast.error(t("admin.orders.toast.bulkUpdateFailed"));
     } finally {
       setBulkBusy(false);
     }
@@ -382,17 +391,17 @@ if (lastProductId !== productId) {
   const openCancelModal = (ids) => { setCancelIds(ids); setCancelReason(""); setBulkCancelConfirm(true); };
 
   const runCancelWithReason = async () => {
-    if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
+    if (!cancelReason.trim()) return toast.error(t("admin.orders.toast.cancelRequired"));
     if (!cancelIds.length) return;
     setCancelBusy(true);
     try {
       await Promise.all(cancelIds.map((id) => orderApi.updateStatus(id, { status: "cancelled", cancel_reason: cancelReason.trim() })));
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success(`${cancelIds.length} order${cancelIds.length > 1 ? "s" : ""} cancelled`);
+      toast.success(t("admin.orders.toast.bulkCancelled", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(cancelIds.length) }));
       setSelectedIds([]); setBulkCancelConfirm(false); setCancelIds([]);
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || "Bulk cancel failed");
+      toast.error(t("admin.orders.toast.bulkCancelFailed"));
     } finally { setCancelBusy(false); }
   };
   const handleSort = (key) => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
@@ -444,11 +453,11 @@ if (lastProductId !== productId) {
   };
 
   const statCards = [
-    { title: "Total Orders", value: allCount?.pagination?.total ?? "—", valueClass: "" },
-    { title: "Pending", value: pendingCount?.pagination?.total ?? "—", valueClass: "text-amber-400" },
-    { title: "Shipped", value: shippedCount?.pagination?.total ?? "—", valueClass: "text-indigo-400" },
-    { title: "Delivered", value: deliveredCount?.pagination?.total ?? "—", valueClass: "text-emerald-400" },
-    { title: "Cancelled", value: cancelledCount?.pagination?.total ?? "—", valueClass: "text-red-400" },
+    { title: t("admin.orders.page.totalOrders"), value: allCount?.pagination?.total ?? "—", valueClass: "" },
+    { title: t("admin.orders.status.pending"), value: pendingCount?.pagination?.total ?? "—", valueClass: "text-amber-400" },
+    { title: t("admin.orders.status.shipped"), value: shippedCount?.pagination?.total ?? "—", valueClass: "text-indigo-400" },
+    { title: t("admin.orders.status.delivered"), value: deliveredCount?.pagination?.total ?? "—", valueClass: "text-emerald-400" },
+    { title: t("admin.orders.status.cancelled"), value: cancelledCount?.pagination?.total ?? "—", valueClass: "text-red-400" },
   ];
 
   const openDetailPage = (order) => router.push(`/admin/orders/${order._id}`);
@@ -456,21 +465,21 @@ if (lastProductId !== productId) {
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div aria-live="polite" className="sr-only">
-        {selectedIds.length > 0 ? `${selectedIds.length} orders selected` : ""}
-        {updateStatusMutation.isSuccess ? "Order status updated" : ""}
+        {selectedIds.length > 0 ? t("admin.orders.page.selectedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(selectedIds.length) }) : ""}
+        {updateStatusMutation.isSuccess ? t("admin.orders.page.retryStatus") : ""}
       </div>
 
       <div className="w-full space-y-4 sm:space-y-5 p-3 sm:p-4 md:p-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-[22px] sm:text-[24px] leading-7 font-bold tracking-tight">Order Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Track, verify, and fulfil customer orders</p>
+            <h1 className="text-[22px] sm:text-[24px] leading-7 font-bold tracking-tight">{t("admin.orders.page.title")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {isError && (
               <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
                 style={{ backgroundColor: "var(--danger, var(--danger))", color: "#fff" }}>
-                Retry Loading
+                {t("admin.orders.page.retryLoading")}
               </button>
             )}
           </div>
@@ -506,15 +515,15 @@ if (lastProductId !== productId) {
             </span>
             <input 
               type="text" 
-              placeholder="Search order #, customer name or phone..." 
+              placeholder={t("admin.orders.page.searchPlaceholder")}
               value={searchInput} 
               onChange={(e) => handleSearchInput(e.target.value)} 
-              aria-label="Search orders"
+              aria-label={t("admin.orders.page.search")}
               className="w-full h-9 pl-9 pr-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 motion-reduce:transition-none"
               style={inputStyle} 
             />
             {searchInput && (
-              <button onClick={() => handleSearchInput("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
+              <button onClick={() => handleSearchInput("")} aria-label={t("admin.orders.page.clearSearch")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
                 style={{ color: "var(--text-muted)" }}>
                 <CloseIcon className="w-4 h-4" />
               </button>
@@ -541,11 +550,11 @@ if (lastProductId !== productId) {
               <span key={f.key || f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-[11px] font-medium"
                 style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)", color: "var(--success-text)" }}>
                 {f.label}
-                <button onClick={f.clear} aria-label={`Remove filter ${f.label}`} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
+                <button onClick={f.clear} aria-label={t("admin.orders.page.removeFilter", { label: f.label })} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
               </span>
             ))}
             <button onClick={clearAllFilters} className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80 px-2 py-1"
-              style={{ color: "var(--text-muted)" }}>Clear all</button>
+              style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.clearAll")}</button>
           </div>
         )}
 
@@ -553,27 +562,27 @@ if (lastProductId !== productId) {
         {selectedIds.length > 0 && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-lg px-3 sm:px-4 py-3 sm:py-2.5"
             style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} order{selectedIds.length > 1 ? "s" : ""} selected</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{t("admin.orders.page.selectedCount", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(selectedIds.length) })}</p>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => runBulkStatus("confirmed")} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                {bulkBusy ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />} Confirm
+                {bulkBusy ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />} {t("admin.orders.page.confirm")}
               </button>
               <button onClick={() => runBulkStatus("shipped")} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                <TruckIcon className="w-3.5 h-3.5" /> Shipped
+                <TruckIcon className="w-3.5 h-3.5" /> {t("admin.orders.status.shipped")}
               </button>
               <button onClick={() => openCancelModal(selectedIds)} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                <BanIcon className="w-3.5 h-3.5" /> Cancel
+                <BanIcon className="w-3.5 h-3.5" /> {t("common.cancel")}
               </button>
               <button onClick={() => setSelectedIds([])}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Clear
+                {t("admin.orders.page.clearAll")}
               </button>
             </div>
           </div>
@@ -583,16 +592,16 @@ if (lastProductId !== productId) {
         {isLoading ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-6 py-4 flex items-center gap-2" style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-              <Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading orders...</span>
+              <Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.loading")}</span>
             </div>
             <table className="w-full text-[13px]"><SkeletonRows rows={6} /></table>
           </div>
         ) : isError ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
             <AlertIcon className="w-8 h-8 opacity-60" />
-            <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>Failed to load orders. Please check your connection.</p>
+            <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.loadFailed")}</p>
             <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
-              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{t("admin.orders.page.retry")}</button>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-2" style={cardStyle}>
@@ -600,16 +609,16 @@ if (lastProductId !== productId) {
             {/* ✅ Product filter active hai + koi order nahi -> specific message */}
             <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>
               {productFilterActive
-                ? "No orders found for this product."
+                ? t("admin.orders.page.noProductOrders")
                 : activeFilters.length > 0
-                  ? "No orders match your filters"
-                  : "No orders yet"}
+                  ? t("admin.orders.page.noMatchingOrders")
+                  : t("admin.orders.page.noOrders")}
             </p>
             {productFilterActive && (
               <button onClick={clearProductFilter}
                 className="mt-2 px-4 h-9 rounded-lg text-[13px] font-semibold transition hover:opacity-90"
                 style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                Show all orders
+                {t("admin.orders.page.showAllOrders")}
               </button>
             )}
           </div>
@@ -630,10 +639,10 @@ if (lastProductId !== productId) {
                     <SortHeader label="Order #" sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="12%" />
                     <SortHeader label="Customer" sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="16%" />
                     <th className="px-3 py-4 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell"
-                      style={{ color: "var(--text-muted)", width: "28%" }}>Products</th>
+                      style={{ color: "var(--text-muted)", width: "28%" }}>{t("admin.orders.page.products")}</th>
                     <SortHeader label="Total" sortKey="total" sortConfig={sortConfig} onSort={handleSort} align="right" width="12%" />
                     <th className="px-3 py-4 text-center text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell"
-                      style={{ color: "var(--text-muted)", width: "9%" }}>Payment</th>
+                      style={{ color: "var(--text-muted)", width: "9%" }}>{t("admin.orders.page.payment")}</th>
                     <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} align="center" width="11%" />
                     <SortHeader label="Date" sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} hidden width="9%" />
                     <th className="w-[80px] px-3 py-4 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap rounded-tr-lg"
@@ -661,7 +670,7 @@ if (lastProductId !== productId) {
                           <td className="px-1 py-2.5 align-middle text-center" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => setExpandedRows((prev) => isExpanded ? prev.filter((x) => x !== order._id) : [...prev, order._id])}
-                              aria-label={isExpanded ? "Collapse items preview" : "Expand items preview"}
+                              aria-label={t(isExpanded ? "admin.orders.page.collapsePreview" : "admin.orders.page.expandPreview")}
                               aria-expanded={isExpanded}
                               className="p-1 rounded-md hover:bg-white/5 transition motion-reduce:transition-none"
                               style={{ color: "var(--text-muted)" }}>
@@ -713,7 +722,7 @@ if (lastProductId !== productId) {
                                     <span className="shrink-0 hidden xl:inline-block"><PromoTag tone="success">+{item.free_items} free</PromoTag></span>
                                   )}
                                   {item.bundle_name && (
-                                    <span className="shrink-0"><PromoTag tone="info">Combo</PromoTag></span>
+                                <span className="shrink-0"><PromoTag tone="info">{t("admin.orders.page.combo")}</PromoTag></span>
                                   )}
                                 </div>
                                 );
@@ -730,7 +739,7 @@ if (lastProductId !== productId) {
                             </div>
                           </td>
                           <td className="px-4 py-2.5 align-middle text-right box-border">
-                            <p className="font-bold whitespace-nowrap">Rs. {order.total?.toLocaleString()}</p>
+                            <p className="font-bold whitespace-nowrap">{formatCurrency(order.total, locale)}</p>
                             {orderFreeUnits(order) > 0 && (
                               <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--success-text)" }}>
                                 +{orderFreeUnits(order)} free
@@ -753,15 +762,15 @@ if (lastProductId !== productId) {
                           <td className="px-3 py-2.5 align-middle text-center box-border"><StatusBadge status={order.status} /></td>
                           <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap hidden lg:table-cell box-border"
                             style={{ color: "var(--text-muted)" }}
-                            title={formatDateTime(order.created_at)}>
+                            title={formatDateTime(order.created_at, locale)}>
                             {/* ✅ Product history me exact time chahiye — date + time dikhao */}
-                            {productFilterActive ? formatDateTime(order.created_at) : formatDate(order.created_at)}
+                            {productFilterActive ? formatDateTime(order.created_at, locale) : formatDate(order.created_at, locale)}
                           </td>
                           <td className="px-3 py-2.5 align-middle whitespace-nowrap text-right relative box-border" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end items-center">
                               <button
                                 onClick={() => setActionMenuFor(actionMenuFor === order._id ? null : order._id)}
-                                aria-label={`Actions for order ${order.order_number}`}
+                                aria-label={t("admin.orders.page.actionsFor", { number: order.order_number })}
                                 aria-haspopup="menu"
                                 aria-expanded={actionMenuFor === order._id}
                                 className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
@@ -813,8 +822,8 @@ if (lastProductId !== productId) {
                                 {orderFreeUnits(order) > 0 && (
                                   <PromoTag tone="success">{orderFreeUnits(order)} free</PromoTag>
                                 )}
-                                {orderDealCount(order) > 0 && <PromoTag tone="warning">Deal applied</PromoTag>}
-                                {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
+                                {orderDealCount(order) > 0 && <PromoTag tone="warning">{t("admin.orders.page.dealApplied")}</PromoTag>}
+                                {orderBundleCount(order) > 0 && <PromoTag tone="info">{t("admin.orders.page.comboApplied")}</PromoTag>}
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
                                 {/* ✅ Matched product pehle + highlight */}
@@ -838,7 +847,7 @@ if (lastProductId !== productId) {
                                           {Number(item.free_items) > 0 && (
                                             <PromoTag tone="success">+{item.free_items} free</PromoTag>
                                           )}
-                                          {item.bundle_name && <PromoTag tone="info">Combo</PromoTag>}
+                                          {item.bundle_name && <PromoTag tone="info">{t("admin.orders.page.combo")}</PromoTag>}
                                         </p>
                                       )}
                                     </div>
@@ -889,12 +898,12 @@ if (lastProductId !== productId) {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-3 sm:p-4" style={cardStyle}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
               <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>
-                Showing {filteredOrders.length > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + pageSize, total)} of {total}
+                {t("admin.orders.page.showingRange", { from: new Intl.NumberFormat(intlLocale(locale)).format(filteredOrders.length > 0 ? startIndex + 1 : 0), to: new Intl.NumberFormat(intlLocale(locale)).format(Math.min(startIndex + pageSize, total)), total: new Intl.NumberFormat(intlLocale(locale)).format(total) })}
               </p>
               <div className="flex items-center gap-2">
-                <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>Rows:</label>
+                <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.rows")}</label>
                 <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  aria-label="Rows per page"
+                  aria-label={t("admin.orders.page.rowsPerPage")}
                   className="appearance-none h-9 sm:h-8 pl-2 pr-7 rounded-md text-[12px] outline-none cursor-pointer"
                   style={{ ...inputStyle, backgroundColor: "var(--bg-tertiary)" }}>
                   {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -902,7 +911,7 @@ if (lastProductId !== productId) {
               </div>
               {totalPages > 1 && (
                 <div className="flex items-center gap-1.5">
-                  <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>Go to:</label>
+                  <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.goTo")}</label>
                   <input type="number" min="1" max={totalPages} value={jumpTo}
                     onChange={(e) => setJumpTo(e.target.value)}
                     onKeyDown={(e) => {
@@ -911,7 +920,7 @@ if (lastProductId !== productId) {
                         if (n >= 1 && n <= totalPages) { setPage(n); setJumpTo(""); }
                       }
                     }}
-                    aria-label="Jump to page"
+                    aria-label={t("admin.orders.page.jumpToPage")}
                     className="w-16 sm:w-14 h-9 sm:h-8 rounded-md text-[12px] text-center outline-none"
                     style={inputStyle} />
                 </div>
@@ -963,21 +972,21 @@ if (lastProductId !== productId) {
                 <AlertIcon className="w-5 h-5" style={{ color: "var(--danger, var(--danger))" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">Cancel {selectedIds.length} order{selectedIds.length > 1 ? "s" : ""}?</h3>
+                <h3 className="text-sm font-semibold">{t("admin.orders.page.cancelCount", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(selectedIds.length) })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  Orders will be marked as cancelled:{" "}
+                  {t("admin.orders.page.ordersCancelledList")}{" "}
                   <span className="font-mono">{orders.filter((o) => selectedIds.includes(o._id)).map((o) => o.order_number).slice(0, 4).join(", ")}</span>
-                  {selectedIds.length > 4 && ` +${selectedIds.length - 4} more`}.
+                  {selectedIds.length > 4 && ` ${t("admin.orders.page.moreCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(selectedIds.length - 4) })}`}.
                 </p>
                 <div className="mt-3">
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                    Cancellation Reason <span style={{ color: "var(--danger-text)" }}>*</span>
+                    {t("admin.orders.page.cancellationReason")} <span style={{ color: "var(--danger-text)" }}>*</span>
                   </label>
                   <textarea
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={3}
-                    placeholder="e.g. Stock unavailable, customer request..."
+                  placeholder={t("admin.orders.page.cancelReasonPlaceholder")}
                     className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                   />
@@ -987,11 +996,11 @@ if (lastProductId !== productId) {
             <div className="flex flex-col sm:flex-row gap-2 mt-5">
               <button onClick={() => setBulkCancelConfirm(false)} disabled={bulkBusy}
                 className="h-11 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border order-2 sm:order-1"
-                style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
+                style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>{t("common.cancel")}</button>
               <button onClick={runCancelWithReason} disabled={bulkBusy || cancelBusy || !cancelReason.trim()}
                 className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                {bulkBusy ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel Orders"}
+                {bulkBusy ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> {t("admin.orders.page.cancelling")}</> : t("admin.orders.page.confirmCancel")}
               </button>
             </div>
           </div>
@@ -1119,6 +1128,7 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
 
 // Mobile Order Card - Optimized for touch
 function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
+  const { t, locale } = useTranslation();
   return (
     <div className="rounded-xl p-4 space-y-3 cursor-pointer transition box-border max-w-full"
       style={cardStyle} onClick={onOpen}>
@@ -1128,7 +1138,7 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
                
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-[15px] break-words">{order.order_number}</p>
-            <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDate(order.created_at)}</p>
+            <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDate(order.created_at, locale)}</p>
           </div>
         </div>
         <div className="shrink-0 pt-0.5"><StatusBadge status={order.status} /></div>
@@ -1176,8 +1186,8 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
       {/* ✅ Promo tags — deal / combo / free units (mobile card) */}
       {(orderDealCount(order) > 0 || orderBundleCount(order) > 0 || orderFreeUnits(order) > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {orderDealCount(order) > 0 && <PromoTag tone="warning">Deal applied</PromoTag>}
-          {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
+          {orderDealCount(order) > 0 && <PromoTag tone="warning">{t("admin.orders.page.dealApplied")}</PromoTag>}
+          {orderBundleCount(order) > 0 && <PromoTag tone="info">{t("admin.orders.page.comboApplied")}</PromoTag>}
           {orderFreeUnits(order) > 0 && <PromoTag tone="success">+{orderFreeUnits(order)} free</PromoTag>}
         </div>
       )}
@@ -1193,11 +1203,11 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
       {/* Footer - Total & Actions */}
       <div className="flex items-center justify-between pt-3 relative" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex-1 min-w-0 pr-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Total</p>
-          <p className="font-bold text-[18px] text-emerald-500">Rs. {order.total?.toLocaleString()}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.totalAmount")}</p>
+          <p className="font-bold text-[18px] text-emerald-500">{formatCurrency(order.total, locale)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onToggleMenu} aria-label="Actions" aria-haspopup="menu" aria-expanded={menuOpen}
+          <button onClick={onToggleMenu} aria-label={t("admin.orders.page.actions")} aria-haspopup="menu" aria-expanded={menuOpen}
             className="min-w-[48px] min-h-[48px] p-3 rounded-xl transition hover:bg-white/5 flex items-center justify-center"
             style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
             <DotsIcon className="w-5 h-5" />

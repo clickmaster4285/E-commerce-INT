@@ -43,6 +43,39 @@ const reviewSchema = new mongoose.Schema(
     rating: { type: Number, required: true, min: 1, max: 5 },
     title: { type: String, trim: true, default: "" },
     comment: { type: String, trim: true, default: "" },
+    translations: {
+      title: { type: Map, of: String, default: () => ({}) },
+      comment: { type: Map, of: String, default: () => ({}) },
+      storeResponse: {
+        message: { type: Map, of: String, default: () => ({}) },
+      },
+    },
+    translation_source: {
+      title: { type: String, default: "" },
+      comment: { type: String, default: "" },
+      storeResponse: {
+        message: { type: String, default: "" },
+      },
+    },
+    translation_status: {
+      title: {
+        type: String,
+        enum: ["pending", "done", "failed", "skipped"],
+        default: "pending",
+      },
+      comment: {
+        type: String,
+        enum: ["pending", "done", "failed", "skipped"],
+        default: "pending",
+      },
+      storeResponse: {
+        message: {
+          type: String,
+          enum: ["pending", "done", "failed", "skipped"],
+          default: "pending",
+        },
+      },
+    },
     storeResponse: {
       message: { type: String, trim: true, default: "" },
       responded_at: { type: Date, default: null },

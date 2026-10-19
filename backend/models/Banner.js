@@ -24,6 +24,45 @@ const displayRulesSchema = new mongoose.Schema({
 const bannerSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
+    translations: {
+      title: { type: Map, of: String, default: () => ({}) },
+      eyebrow: { type: Map, of: String, default: () => ({}) },
+      heading: { type: Map, of: String, default: () => ({}) },
+      description: { type: Map, of: String, default: () => ({}) },
+      altText: { type: Map, of: String, default: () => ({}) },
+      primaryButton: {
+        text: { type: Map, of: String, default: () => ({}) },
+      },
+      secondaryButton: {
+        text: { type: Map, of: String, default: () => ({}) },
+      },
+    },
+    translation_source: {
+      title: { type: String, default: "" },
+      eyebrow: { type: String, default: "" },
+      heading: { type: String, default: "" },
+      description: { type: String, default: "" },
+      altText: { type: String, default: "" },
+      primaryButton: {
+        text: { type: String, default: "" },
+      },
+      secondaryButton: {
+        text: { type: String, default: "" },
+      },
+    },
+    translation_status: {
+      title: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      eyebrow: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      heading: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      description: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      altText: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      primaryButton: {
+        text: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      },
+      secondaryButton: {
+        text: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      },
+    },
     bannerType: { type: String, enum: ["homepage_hero", "promotional", "product", "collection", "popup"], required: true },
     status: { type: String, enum: ["active", "inactive", "scheduled", "expired", "draft"], default: "draft" },
     position: { type: Number, default: 0 },

@@ -5,7 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import { useAttributeSocketSync } from "@/hooks/useAttributeSocketSync";
+import { useAttributeSocketSync } from "../../../hooks/admin/useAttributeSocketSync";
+import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 // --- Icons ---
 const SearchIcon = ({ className = "w-4 h-4" }) => (
@@ -31,8 +33,9 @@ const SlidersIcon = ({ className = "w-4 h-4" }) => (
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function AttributeRowsSkeleton({ rows = ATTRS_PER_PAGE }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading attributes">
+    <tbody aria-busy="true" aria-label={t("common.loading")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`attr-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
           {/* attribute name — icon + name + code */}
@@ -101,7 +104,15 @@ const TagIcon = ({ className = "w-4 h-4" }) => (
 
 // --- Helpers ---
 const getDataTypeLabel = (type) => {
-  const map = { text: "Text", number: "Number", decimal: "Decimal", multi_select: "Multi Select", select: "Select", color: "Color", boolean: "Yes / No" };
+  const map = {
+    text: "dataType.text",
+    number: "dataType.number",
+    decimal: "dataType.decimal",
+    multi_select: "dataType.multi_select",
+    select: "dataType.select",
+    color: "dataType.color",
+    boolean: "dataType.boolean",
+  };
   return map[type] || type;
 };
 
@@ -109,6 +120,11 @@ const ATTRS_PER_PAGE = 15;
 
 // ==================== RIGHT SIDE DETAIL PANEL ====================
 function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isAddingOption = false }) {
+  // DB-sourced values (attribute name + option labels) — locale ke hisaab se.
+  const { nameOf, descriptionOf, optionLabelOf } = useLocalized();
+  // Static UI labels — `t()` se.
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
   // ✅ Slide-in/out animation — mount par drawer right se smoothly slide hota hai,
   //    close par pehle slide-out animation, phir parent se unmount hota hai.
   const [visible, setVisible] = useState(false);
@@ -170,11 +186,13 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
   if (!attr) return null;
 
   // ✅ Robust option label extraction — values objects ({label, value}) ya strings
-  //    dono handle, "[object Object]" kabhi show nahi hota
+  //    dono handle, "[object Object]" kabhi show nahi hota.
+  //    Localize yahi kiya jata hai (values[].label_translations) — option ka raw
+  //    `value` kabhi nahi badalta, wahi DB me rehta hai.
   const getOptionLabel = (v) => {
     if (v === null || v === undefined) return "";
     if (typeof v === "string") return v;
-    return String(v.label || v.value || v.name || "").trim();
+    return String(optionLabelOf(v) || v.value || v.name || "").trim();
   };
 
   const options = (attr.values || []).map(getOptionLabel).filter(Boolean);
@@ -188,7 +206,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
     if (!val || isAddingOption) return;
     const exists = options.some((o) => o.toLowerCase() === val.toLowerCase());
     if (exists) {
-      toast.error(`Option "${val}" already exists`);
+      toast.error(t("toast.optionExists", { value: val }));
       return;
     }
     onAddOption && onAddOption(val);
@@ -212,13 +230,13 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
         <div className="px-5 sm:px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-3 bg-[var(--bg-card)]">
           <div className="flex items-center gap-2 min-w-0">
             <SlidersIcon className="w-4 h-4 text-[var(--accent)] shrink-0" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] truncate">Attribute Options</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] truncate">{t("detailPanel.title")}</h3>
           </div>
           <button
             type="button"
             onClick={requestClose}
-            aria-label="Close panel"
-            title="Close panel"
+            aria-label={t("detailPanel.close")}
+            title={t("detailPanel.close")}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
           >
             <CloseIcon className="w-5 h-5" />
@@ -231,39 +249,49 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
             <SlidersIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{attr.name}</h4>
+            <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{nameOf(attr)}</h4>
             <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 mt-1">
-              {getDataTypeLabel(attr.data_type)}
+              {t(getDataTypeLabel(attr.data_type))}
             </span>
           </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          
+          {descriptionOf(attr) && (
+            <section className="space-y-2">
+              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {t("admin.categories.form.description")}
+              </h4>
+              <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                {descriptionOf(attr)}
+              </p>
+            </section>
+          )}
+
           {/* Summary Section — Code / Data Type / Status / Options Count */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">Summary</h4>
+            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("detailPanel.summary")}</h4>
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Attribute Code</span>
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.code")}</span>
                 <span className="block text-xs font-mono font-semibold text-[var(--text-primary)] truncate">{attr.code || "—"}</span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Data Type</span>
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.dataType")}</span>
                 <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
-                  {getDataTypeLabel(attr.data_type)}
+                  {t(getDataTypeLabel(attr.data_type))}
                 </span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Status</span>
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.status")}</span>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isActive ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
-                  {isActive ? 'Active' : 'Inactive'}
+                  {isActive ? t("filter.active") : t("filter.inactive")}
                 </span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">Options Count</span>
+                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.optionsCount")}</span>
                 <span className="block text-xs font-bold text-[var(--text-primary)]">{options.length}</span>
               </div>
             </div>
@@ -271,8 +299,9 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
             {/* Variant Option Row */}
             {attr.category_config?.is_variant_option && (
                <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] flex justify-between items-center">
-                 <span className="text-[10px] font-medium text-[var(--text-muted)]">Variant Option</span>
-                 <span className="text-xs font-semibold text-[var(--accent)]">Yes</span>
+                 <span className="text-[10px] font-medium text-[var(--text-muted)]">{ t("detailPanel.variantOption") }</span>
+                  <span className="text-xs font-semibold text-[var(--accent)]">{ t("common.yes") }</span>
+                 <span className="text-xs font-semibold text-[var(--accent)]">{ t("common.yes") }</span>
                </div>
             )}
           </div>
@@ -281,10 +310,10 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                {isBoolean ? 'Boolean Values' : 'Available Options'}
+                { isBoolean ? t("detailPanel.booleanValues") : t("detailPanel.availableOptions") }
               </h4>
               <span className="text-[10px] font-medium bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)]">
-                {options.length} items
+                { t("detailPanel.itemsCount", { count: options.length }) }
               </span>
             </div>
 
@@ -309,7 +338,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
               ) : (
                 <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
                   <TagIcon className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)] opacity-50" />
-                  <p className="text-sm text-[var(--text-muted)]">No options defined yet.</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t("detailPanel.noOptions")}</p>
                 </div>
               )}
             </div>
@@ -324,7 +353,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
                     value={newOption}
                     onChange={(e) => setNewOption(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitNewOption(); } }}
-                    placeholder="Add an option (e.g. 8 GB)"
+                    placeholder={t("form.optionPlaceholder")}
                     disabled={isAddingOption}
                     className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors disabled:opacity-60"
                   />
@@ -351,21 +380,21 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
             <button
               type="button"
               onClick={handleAddAttribute}
-              title="Add a new attribute"
-              aria-label="Add new attribute"
+              title={t("form.createTitle")}
+              aria-label={t("form.createTitle")}
               className="flex-1 h-10 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
             >
               <PlusIcon className="w-4 h-4" />
-              <span>Add Attribute</span>
+              <span>{t("form.create")}</span>
             </button>
             <button
               type="button"
               onClick={requestClose}
-              title="Close panel"
-              aria-label="Close panel"
+              title={t("detailPanel.close")}
+              aria-label={t("detailPanel.close")}
               className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
             >
-              <span>Close Panel</span>
+              <span>{t("detailPanel.closePanel")}</span>
             </button>
           </div>
         </div>
@@ -377,8 +406,11 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
 // ==================== ATTRIBUTE FORM MODAL ====================
 function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
   const isEdit = mode === "edit";
+  const { t: __t } = useTranslation();
+  const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.attributes.${key}`, params);
   const [form, setForm] = useState({
     name: "",
+    description: "",
     data_type: "multi_select",
     values: [],
     value: isEdit ? false : "",
@@ -410,6 +442,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           .filter(Boolean);
         setForm({
           name: initialData.name || "",
+          description: initialData.description || "",
           data_type: dataType,
           values,
           value: booleanValue,
@@ -420,6 +453,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
       } else {
         setForm({
           name: "",
+          description: "",
           data_type: "multi_select",
           values: [],
           value: "",
@@ -452,6 +486,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
       : [];
     const payload = {
       name: form.name.trim(),
+      description: form.description.trim(),
       data_type: form.data_type,
       values: valuesPayload,
       is_active: form.is_active !== false,
@@ -483,13 +518,15 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
     setForm({ ...form, values: (form.values || []).filter((_, i) => i !== idx) });
   };
 
-  const title = isEdit ? "Edit Attribute" : "Add New Attribute";
-  const subtitle = isEdit ? "Update attribute details and values." : "Configure properties for products in this category.";
-  const saveText = isEdit ? (isSaving ? "Saving..." : "Save Changes") : (isSaving ? "Adding..." : "Add Attribute");
+  const title = isEdit ? t("form.editTitle") : t("form.createTitle");
+  const subtitle = isEdit ? t("form.editSubtitle") : t("form.createSubtitle");
+  const saveText = isEdit
+    ? isSaving ? t("form.saving") : t("form.save")
+    : isSaving ? t("form.adding") : t("form.create");
 
   const dataTypeLabels = [
-    { id: "multi_select", label: "Multi Options" },
-    { id: "boolean", label: "Yes / No" },
+    { id: "multi_select", label: t("form.typeMulti") },
+    { id: "boolean", label: t("form.typeYesNo") },
   ];
 
   return (
@@ -517,10 +554,10 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
         </div>
         <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: "min(640px, 85vh)" }}>
           <div className="space-y-3">
-            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
+            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("admin.categories.detail.basicInformation")}</p>
             <div className="space-y-1.5">
               <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                Attribute Name <span className="text-red-500">*</span>
+                {t("form.name")} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -528,13 +565,24 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 autoFocus
                 className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                placeholder="e.g. Color, Size, RAM"
+                placeholder={t("form.namePlaceholder")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                {t("admin.categories.form.description")}
+              </label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 text-sm outline-none resize-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
               />
             </div>
           </div>
           <div className="space-y-2">
             <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              Attribute Type
+              {t("form.type")}
             </label>
             <div className="grid grid-cols-2 gap-4">
               {dataTypeLabels.map((type) => {
@@ -564,7 +612,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
           </div>
           {form.data_type === "multi_select" && (
             <div className="space-y-2">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Options</p>
+              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.options")}</p>
               <div className="flex flex-wrap gap-1.5">
                 {(form.values || []).map((opt, idx) => (
                   <span
@@ -576,7 +624,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                       type="button"
                       onClick={() => removeOption(idx)}
                       className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"
-                      aria-label="Remove option"
+                      aria-label={t("action.delete")}
                     >
                       <CloseIcon className="w-2.5 h-2.5" />
                     </button>
@@ -587,7 +635,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                 <input
                   ref={optionInputRef}
                   type="text"
-                  placeholder="Add an option (e.g. 8 GB)"
+                  placeholder={t("form.optionPlaceholder")}
                   value={isEdit ? editOptionInput : newOptionInput}
                   onChange={(e) => (isEdit ? setEditOptionInput(e.target.value) : setNewOptionInput(e.target.value))}
                   onKeyDown={(e) => {
@@ -603,21 +651,21 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                   onClick={addOption}
                   className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
                 >
-                  <PlusIcon className="w-3 h-3" /> <span>Add</span>
+                  <PlusIcon className="w-3 h-3" /> <span>{t("form.addOption")}</span>
                 </button>
               </div>
               <p className="text-[10px] text-[var(--text-muted)]">
-                Add one or more options. You can also add more after creating the attribute.
+                {t("form.optionsHint")}
               </p>
             </div>
           )}
           {form.data_type === "boolean" && (
             <div className="space-y-2.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Default Value</label>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("form.defaultValue")}</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { id: true, label: "Yes" },
-                  { id: false, label: "No" },
+                  { id: true, label: t("form.yes") },
+                  { id: false, label: t("form.no") },
                 ].map((opt) => {
                   const isActive = form.value === opt.id;
                   return (
@@ -644,7 +692,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
                 })}
               </div>
               <p className="text-[10px] text-[var(--text-muted)]">
-                This will be the default Yes/No state for this attribute.
+                {t("form.defaultValueHint")}
               </p>
             </div>
           )}
@@ -655,7 +703,7 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
             onClick={onClose}
             className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
           >
-            Cancel
+            {t("form.cancel")}
           </button>
           <button
             type="button"
@@ -674,6 +722,13 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
 export default function AttributesPage() {
   useAttributeSocketSync();
   const queryClient = useQueryClient();
+  // Static UI labels (headers, stats, buttons, toasts) — database ke nahi,
+  // is liye `t()` se aati hain. Nahi milne par English fallback rehta hai.
+  const { t: __t } = useTranslation();
+  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
+  // `code` aur har option ka raw `value` kabhi translate nahi hote (variant
+  // matching unhi par chalti hai) — sirf `name` + option `label` localized.
+  const { nameOf, attributeOf, optionLabelOf, text } = useLocalized();
 
   // State
   const [attributeSearch, setAttributeSearch] = useState("");
@@ -719,7 +774,7 @@ export default function AttributesPage() {
         openEditModal(attr);
       } catch (err) {
         console.error("Failed to load attribute for edit:", err);
-        toast.error("Failed to load attribute for edit");
+        toast.error(t("toast.loadFailed"));
       }
       setEditParamHandled(true);
     };
@@ -815,9 +870,9 @@ export default function AttributesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setShowAttributeModal(false);
-      toast.success("Attribute added successfully");
+      toast.success(t("toast.created"));
     },
-    onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to add attribute"),
+    onError: (err) => toast.error(err?.response?.data?.message || err?.message || t("toast.createFailed")),
   });
 
   // ===== EDIT ATTRIBUTE =====
@@ -834,9 +889,9 @@ export default function AttributesPage() {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setShowEditModal(false);
       setEditingAttribute(null);
-      toast.success("Attribute updated successfully");
+      toast.success(t("toast.updated"));
     },
-    onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute"),
+    onError: (err) => toast.error(err?.response?.data?.message || err?.message || t("toast.updateFailed")),
   });
 
   // ===== TOGGLE ATTRIBUTE STATUS =====
@@ -847,9 +902,9 @@ export default function AttributesPage() {
     try {
       await attributeApi.update(attrId, { is_active: !currentActive });
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
-      toast.success(currentActive ? "Attribute disabled" : "Attribute enabled");
+      toast.success(currentActive ? t("toast.disabled") : t("toast.enabled"));
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to update attribute status");
+      toast.error(err?.response?.data?.message || err?.message || t("toast.statusFailed"));
     }
   };
 
@@ -861,9 +916,9 @@ export default function AttributesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       setDeleteTarget(null);
-      toast.success("Attribute deleted successfully");
+      toast.success(t("toast.deleted"));
     },
-    onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to delete attribute"),
+    onError: (err) => toast.error(err?.response?.data?.message || err?.message || t("toast.deleteFailed")),
   });
 
   const handleDeleteAttribute = () => {
@@ -880,9 +935,9 @@ export default function AttributesPage() {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
       // Drawer turant fresh data dikhaye — API updated attribute return karta hai
       setDetailAttr((prev) => (prev ? { ...prev, ...(updated || {}) } : prev));
-      toast.success("Option added successfully");
+      toast.success(t("toast.optionAdded"));
     },
-    onError: (err) => toast.error(err?.response?.data?.message || err?.message || "Failed to add option"),
+    onError: (err) => toast.error(err?.response?.data?.message || err?.message || t("toast.optionAddFailed")),
   });
 
   const handleAddOption = (label) => {
@@ -936,7 +991,7 @@ export default function AttributesPage() {
         <div className="flex items-center gap-2">
           <button onClick={() => go(current - 1)} disabled={current === 1}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Previous page">
+            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.prev")}>
             <ChevronLeftIcon className="w-4 h-4" />
           </button>
           <span className="hidden sm:inline-flex items-center gap-1">
@@ -953,7 +1008,7 @@ export default function AttributesPage() {
           </span>
           <button onClick={() => go(current + 1)} disabled={current === total}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
-            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title="Next page">
+            style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.next")}>
             <ChevronRightIcon className="w-4 h-4" />
           </button>
         </div>
@@ -1005,10 +1060,10 @@ export default function AttributesPage() {
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); open ? setOpen(false) : openMenu(); } }}
           className="w-8 h-8 inline-flex items-center justify-center rounded-md transition-all duration-150 cursor-pointer hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
           style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
-          aria-label="More actions"
+          aria-label={t("action.more")}
           aria-haspopup="true"
           aria-expanded={open}
-          title="More actions"
+          title={t("action.more")}
         >
           <DotsVerticalIcon className="w-[18px] h-[18px]" />
         </button>
@@ -1036,7 +1091,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> View Options
+              <EyeIcon className="w-4 h-4 shrink-0" style={{ color: "var(--success-text)" }} /> {t("action.viewOptions")}
             </button>
             <button
               type="button"
@@ -1046,7 +1101,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> Edit
+              <EditIcon className="w-4 h-4 shrink-0" style={{ color: "var(--text-secondary)" }} /> {t("action.edit")}
             </button>
             <button
               type="button"
@@ -1060,7 +1115,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? "Disable" : "Enable"}
+              <ShieldCheckIcon className="w-4 h-4 shrink-0" /> {isActive ? t("action.disable") : t("action.enable")}
             </button>
             <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
             <button
@@ -1071,7 +1126,7 @@ export default function AttributesPage() {
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--danger-soft)")}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <TrashIcon className="w-4 h-4 shrink-0" /> Delete
+              <TrashIcon className="w-4 h-4 shrink-0" /> {t("action.delete")}
             </button>
           </div>,
           document.body
@@ -1098,20 +1153,20 @@ export default function AttributesPage() {
         {/* ===== Header ===== */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Attribute Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>All attributes</p>
+            <h1 className="text-[24px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("page.title")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("page.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setShowAttributeModal(true)}
-              title="Add a new attribute"
-              aria-label="Add attribute"
+              title={t("form.createTitle")}
+              aria-label={t("form.createTitle")}
               className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 shadow-sm transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
             >
               <PlusIcon className="w-4 h-4" />
-              <span>Add Attribute</span>
+              <span>{t("page.addButton")}</span>
             </button>
           </div>
         </div>
@@ -1122,10 +1177,10 @@ export default function AttributesPage() {
         <div className={`space-y-5 origin-top-left transition-all duration-300 ease-out ${detailAttr ? "scale-[0.98] opacity-60 pointer-events-none select-none" : "scale-100 opacity-100"}`}>
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Total Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{stats.total}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Active Attributes</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{stats.active}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>With Options</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{stats.withOptions}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>Data Types</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{stats.dataTypes}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.total")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{stats.total}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.active")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{stats.active}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.withOptions")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{stats.withOptions}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.dataTypes")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{stats.dataTypes}</p></div>
         </div>
 
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
@@ -1135,7 +1190,7 @@ export default function AttributesPage() {
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
             <input
               type="text"
-              placeholder="Search attributes by name or code..."
+              placeholder={t("search.placeholder")}
               value={attributeSearch}
               onChange={e => setAttributeSearch(e.target.value)}
               className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40"
@@ -1151,9 +1206,9 @@ export default function AttributesPage() {
                 className="h-9 pl-3 pr-8 rounded-lg text-[13px] font-medium appearance-none cursor-pointer outline-none transition focus:ring-1 focus:ring-emerald-500/40"
                 style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
               >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="all">{t("filter.allStatus")}</option>
+                <option value="active">{t("filter.active")}</option>
+                <option value="inactive">{t("filter.inactive")}</option>
               </select>
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}><ChevronDownIcon className="w-3.5 h-3.5" /></span>
             </div>
@@ -1168,12 +1223,12 @@ export default function AttributesPage() {
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Attribute Name</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Data Type</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Category</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Options Count</th>
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.name")}</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.type")}</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.category")}</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.optionsCount")}</th>
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.status")}</th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
                   </tr>
                 </thead>
                 <AttributeRowsSkeleton rows={ATTRS_PER_PAGE} />
@@ -1182,19 +1237,19 @@ export default function AttributesPage() {
           ) : filteredAttributes.length === 0 ? (
             <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3">
               <SlidersIcon className="w-10 h-10" style={{ color: "var(--text-muted)" }} />
-              <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No attributes found" : "No attributes available"}</p>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? t("table.emptyFiltered") : t("table.empty")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <SortHeader label="Attribute Name" sortKey="name" />
-                    <SortHeader label="Data Type" sortKey="type" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Category</th>
-                    <SortHeader label="Options Count" sortKey="options" />
-                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>Actions</th>
+                    <SortHeader label={t("table.name")} sortKey="name" />
+                    <SortHeader label={t("table.type")} sortKey="type" />
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.category")}</th>
+                    <SortHeader label={t("table.optionsCount")} sortKey="options" />
+                    <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("table.status")}</th>
+                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1205,8 +1260,8 @@ export default function AttributesPage() {
                       <tr
                         key={attr._id}
                         tabIndex={0}
-                        aria-label={`View options for ${attr.name}`}
-                        title="Click to view options"
+                        aria-label={`View options for ${nameOf(attr)}`}
+                        title={t("action.viewOptions")}
                         onClick={() => setDetailAttr(attr)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailAttr(attr); }
@@ -1223,7 +1278,7 @@ export default function AttributesPage() {
                               <SlidersIcon className="w-4 h-4" />
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-medium text-[13px] truncate block" style={{ color: "var(--text-primary)" }}>{attr.name}</span>
+                              <span className="font-medium text-[13px] truncate block" style={{ color: "var(--text-primary)" }}>{nameOf(attr)}</span>
                               {attr.code && <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.code}</span>}
                             </div>
                           </div>
@@ -1235,21 +1290,21 @@ export default function AttributesPage() {
                               : attr.data_type === 'text'
                               ? { backgroundColor: "var(--info-soft)", color: "var(--info-text)", border: "1px solid color-mix(in srgb, var(--info) 28%, transparent)" }
                               : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>
-                            {getDataTypeLabel(attr.data_type)}
+                            {t(getDataTypeLabel(attr.data_type))}
                           </span>
                         </td>
                         <td className="px-4 py-2.5">
                           <span className="text-[12px] font-medium capitalize" style={{ color: "var(--text-secondary)" }}>
-                            {attr.category ? attr.category : "—"}
+                            {text(attr.category, attr.category_translations) || "—"}
                           </span>
                         </td>
                         <td className="px-4 py-2.5">
-                          <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{opts} Options</span>
+                          <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("detailPanel.itemsCount", { count: opts })}</span>
                         </td>
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={isActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-                            {isActive ? "Active" : "Inactive"}
+                            {isActive ? t("filter.active") : t("filter.inactive")}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right"><ActionButtons attr={attr} /></td>
@@ -1263,7 +1318,7 @@ export default function AttributesPage() {
         </div>
 
         <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
-          label={totalAttributes > 0 ? `Showing ${attrStartIndex}–${attrEndIndex} of ${totalAttributes} attributes` : "No attributes"} />
+          label={totalAttributes > 0 ? `${t("table.showingRange", { start: attrStartIndex, end: attrEndIndex, total: totalAttributes })}` : t("table.empty")} />
         </div>
 
       </div>
@@ -1294,6 +1349,7 @@ export default function AttributesPage() {
         mode="edit"
         initialData={editingAttribute ? {
           name: editingAttribute.name || "",
+          description: editingAttribute.description || "",
           data_type: editingAttribute.data_type || "multi_select",
           values: (editingAttribute.values || []).map((v) => {
             const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
@@ -1332,6 +1388,7 @@ export default function AttributesPage() {
             : [];
           editAttributeMutation.mutate({
             name: payload.name.trim(),
+            description: payload.description,
             data_type: payload.data_type,
             values: valuesPayload,
             is_active: payload.is_active !== false,
@@ -1348,20 +1405,20 @@ export default function AttributesPage() {
                 <TrashIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Delete &quot;{deleteTarget.name}&quot;?</h3>
-                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>This action cannot be undone. The attribute will be permanently removed.</p>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("delete.titleOne", { name: deleteTarget.name })}</h3>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p>
               </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 mt-6">
               <button onClick={() => setDeleteTarget(null)} disabled={deleteAttributeMutation.isPending}
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Cancel
+                {t("delete.cancel")}
               </button>
               <button onClick={handleDeleteAttribute} disabled={deleteAttributeMutation.isPending}
                 className="flex-1 h-10 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                {deleteAttributeMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                {deleteAttributeMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> {t("delete.deleting")}</> : t("delete.confirm")}
               </button>
             </div>
           </div>

@@ -35,29 +35,33 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminReviewApi } from "@/apis/admin/reviewApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const mediaUrl = (value) =>
   !value ? "" : value.startsWith("http") ? value : `${API_ORIGIN}${value.startsWith("/") ? "" : "/"}${value}`;
 
-function formatDate(value, options = { day: "numeric", month: "short", year: "numeric" }) {
+function formatDate(value, locale = "en", options = { day: "numeric", month: "short", year: "numeric" }) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-PK", options);
+  const localeTag = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat(localeTag, { ...options, numberingSystem: locale === "ur" ? "latn" : undefined }).format(date);
 }
 
-function formatDateTime(value) {
+function formatDateTime(value, locale = "en") {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? "—"
-    : date.toLocaleString("en-PK", {
+    : new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK", {
         day: "numeric",
         month: "short",
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
-      });
+        numberingSystem: locale === "ur" ? "latn" : undefined,
+      }).format(date);
 }
 
 function StarRating({ rating, size = 14, showValue = true }) {
@@ -80,7 +84,7 @@ function StarRating({ rating, size = 14, showValue = true }) {
   );
 }
 
-function StatusPill({ hidden, size = "sm" }) {
+function StatusPill({ hidden, size = "sm", t }) {
   const isSm = size === "sm";
   return (
     <span
@@ -88,18 +92,18 @@ function StatusPill({ hidden, size = "sm" }) {
       style={hidden ? { backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" } : { backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
     >
       <span className={`rounded-full bg-current ${isSm ? "h-1 w-1" : "h-1.5 w-1.5"}`} />
-      {hidden ? "Hidden" : "Visible"}
+      {hidden ? t("admin.reviews.ui.hidden") : t("admin.reviews.ui.visible")}
     </span>
   );
 }
 
-function VerifiedBadge({ verified }) {
+function VerifiedBadge({ verified, t }) {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
       style={verified ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)" } : { backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}
     >
-      {verified ? <><BadgeCheck size={10} /> Verified</> : "Unverified"}
+      {verified ? <><BadgeCheck size={10} /> {t("admin.reviews.detail.verified")}</> : t("admin.reviews.detail.unverified")}
     </span>
   );
 }
@@ -125,6 +129,8 @@ function buildSuggestedReply(review, customerName) {
 
 export default function AdminReviewDetailPage() {
   const { id } = useParams();
+  const { t, dir, locale } = useTranslation();
+  const { productNameOf, reviewTextOf } = useLocalized();
   const queryClient = useQueryClient();
   const [responseDraft, setResponseDraft] = useState("");
   const [isEditingResponse, setIsEditingResponse] = useState(false);
@@ -146,11 +152,11 @@ export default function AdminReviewDetailPage() {
   const statusMutation = useMutation({
     mutationFn: (status) => adminReviewApi.setStatus(id, status),
     onSuccess: (_data, status) => {
-      toast.success(status === "hidden" ? "Review hidden" : "Review visible");
+      toast.success(status === "hidden" ? t("admin.reviews.detail.hiddenToast") : t("admin.reviews.detail.visibleToast"));
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || "Could not update review"),
+    onError: (error) => toast.error(locale === "en" ? error?.response?.data?.message || t("admin.reviews.detail.statusFailed") : t("admin.reviews.detail.statusFailed")),
   });
 
   const responseMutation = useMutation({
@@ -166,11 +172,11 @@ export default function AdminReviewDetailPage() {
       );
       initResponseDraft(storeResponse.message);
       setIsEditingResponse(false);
-      toast.success("Store response saved");
+      toast.success(t("admin.reviews.detail.responseSaved"));
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Could not publish response"),
+    onError: (error) => toast.error(locale === "en" ? error?.response?.data?.message || error?.message || t("admin.reviews.detail.publishFailed") : t("admin.reviews.detail.publishFailed")),
   });
 
   const deleteResponseMutation = useMutation({
@@ -180,16 +186,16 @@ export default function AdminReviewDetailPage() {
       initResponseDraft("");
       setIsEditingResponse(false);
       setIsDeleteResponseConfirmOpen(false);
-      toast.success("Store response deleted");
+      toast.success(t("admin.reviews.detail.responseDeleted"));
       queryClient.invalidateQueries({ queryKey: ["adminReview", id] });
       queryClient.invalidateQueries({ queryKey: ["adminReviews"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || "Could not delete response"),
+    onError: (error) => toast.error(locale === "en" ? error?.response?.data?.message || t("admin.reviews.detail.deleteFailed") : t("admin.reviews.detail.deleteFailed")),
   });
 
   if (isLoading || !id) {
     return (
-      <div className="w-full space-y-4">
+      <div dir={dir} lang={locale} className="w-full space-y-4">
         <div className="flex items-center gap-3">
           <span className="skeleton h-9 w-9 rounded-lg" />
           <div className="space-y-1.5">
@@ -207,20 +213,20 @@ export default function AdminReviewDetailPage() {
 
   if (isError || !review) {
     return (
-      <div className="w-full space-y-4">
+      <div dir={dir} lang={locale} className="w-full space-y-4">
         <Link href="/admin/reviews" className="inline-flex items-center gap-2 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
-          <ArrowLeft size={14} /> Back to reviews
+          <ArrowLeft size={14} /> {t("admin.reviews.detail.back")}
         </Link>
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
             <MessageSquareText size={22} className="text-[var(--text-muted)]" />
           </div>
-          <h1 className="mt-3 text-base font-bold text-[var(--text-primary)]">Review not found</h1>
+          <h1 className="mt-3 text-base font-bold text-[var(--text-primary)]">{t("admin.reviews.detail.notFound")}</h1>
           <p className="mt-1.5 max-w-xs text-xs text-[var(--text-muted)]">
-            This review may have been removed or is no longer available.
+            {t("admin.reviews.detail.notFoundBody")}
           </p>
           <Link href="/admin/reviews" className="mt-4 inline-flex h-9 items-center rounded-lg px-4 text-xs font-bold text-white" style={{ backgroundColor: "var(--accent)" }}>
-            View all reviews
+            {t("admin.reviews.detail.viewAll")}
           </Link>
         </div>
       </div>
@@ -229,11 +235,14 @@ export default function AdminReviewDetailPage() {
 
   const user = review.user_id && typeof review.user_id === "object" ? review.user_id : {};
   const product = review.product_id && typeof review.product_id === "object" ? review.product_id : {};
+  const reviewTitle = reviewTextOf(review, "title");
+  const reviewComment = reviewTextOf(review, "comment");
+  const localizedStoreResponse = reviewTextOf(review, "storeResponse.message");
   const hidden = review.status === "hidden";
   const rating = Math.max(0, Math.min(5, Number(review.rating) || 0));
   const productId = product._id || (typeof review.product_id === "string" ? review.product_id : null);
   const orderId = review.relatedOrder?._id || null;
-  const reviewerName = user.name || "Customer name unavailable";
+  const reviewerName = user.name || t("admin.reviews.ui.customer");
   const attachments = [
     ...(review.images || []).map((image, index) => ({ key: `image-${index}`, type: "image", url: mediaUrl(image.img_url), index })),
     ...(review.videos || []).map((video, index) => ({ key: `video-${index}`, type: "video", url: mediaUrl(video.video_url), index })),
@@ -243,25 +252,25 @@ export default function AdminReviewDetailPage() {
   const handlePublishResponse = () => {
     const message = responseDraft.trim();
     if (!message) {
-      toast.error("Write a response before publishing.");
+      toast.error(t("admin.reviews.detail.writeResponse"));
       return;
     }
     if (message.length > 1000) {
-      toast.error("Response must be 1,000 characters or fewer.");
+      toast.error(t("admin.reviews.detail.responseLimit"));
       return;
     }
     responseMutation.mutate(message);
   };
 
   return (
-    <div className="w-full space-y-4 pb-6">
+    <div dir={dir} lang={locale} className="w-full space-y-4 pb-6">
       {/* Header */}
       <header className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3.5 sm:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              href="/admin/reviews"
-              aria-label="Back to reviews"
+              <Link
+                href="/admin/reviews"
+                aria-label={t("admin.reviews.detail.back")}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] transition hover:opacity-70"
               style={{ color: "var(--text-secondary)" }}
             >
@@ -269,18 +278,18 @@ export default function AdminReviewDetailPage() {
             </Link>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[18px] font-bold tracking-tight text-[var(--text-primary)]">Review Details</h1>
-                <StatusPill hidden={hidden} size="md" />
+                <h1 className="text-[18px] font-bold tracking-tight text-[var(--text-primary)]">{t("admin.reviews.detail.reviewDetails")}</h1>
+                <StatusPill hidden={hidden} size="md" t={t} />
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 pl-11 md:pl-0">
+          <div className="flex flex-wrap items-center gap-2 ps-11 md:ps-0">
             {productId ? (
               <Link
                 href={`/admin/products/${productId}`}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3.5 text-xs font-semibold text-[var(--text-secondary)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
               >
-                <Package size={14} /> View Product
+                <Package size={14} /> {t("admin.reviews.detail.viewProduct")}
               </Link>
             ) : null}
             {orderId ? (
@@ -288,16 +297,16 @@ export default function AdminReviewDetailPage() {
                 href={`/admin/orders/${orderId}`}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3.5 text-xs font-semibold text-[var(--text-secondary)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
               >
-                <ShoppingCart size={14} /> View Order
+                <ShoppingCart size={14} /> {t("admin.reviews.detail.viewOrder")}
               </Link>
             ) : (
               <button
                 type="button"
                 disabled
-                title="No matching order is linked to this review"
+                title={t("admin.reviews.detail.noOrder")}
                 className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3.5 text-xs font-semibold text-[var(--text-muted)] opacity-70"
               >
-                <ShoppingCart size={14} /> View Order
+                <ShoppingCart size={14} /> {t("admin.reviews.detail.viewOrder")}
               </button>
             )}
             <button
@@ -308,7 +317,7 @@ export default function AdminReviewDetailPage() {
               style={{ backgroundColor: "var(--accent)" }}
             >
               {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-              {statusMutation.isPending ? "Updating…" : hidden ? "Make Visible" : "Hide Review"}
+              {statusMutation.isPending ? t("admin.reviews.detail.updating") : hidden ? t("admin.reviews.detail.makeVisible") : t("admin.reviews.detail.hide")}
             </button>
           </div>
         </div>
@@ -339,16 +348,16 @@ export default function AdminReviewDetailPage() {
               </div>
             </div>
 
-            {review.title && (
+            {reviewTitle && (
               <div className="mt-3.5 rounded-md border-l-2 border-[var(--accent)] bg-[var(--bg-tertiary)]/60 px-3 py-2">
-                <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{review.title}</h3>
+                <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{reviewTitle}</h3>
               </div>
             )}
 
-            {review.comment && (
+            {reviewComment && (
               <div className="mt-3">
                 <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--text-secondary)]">
-                  {review.comment}
+                  {reviewComment}
                 </p>
               </div>
             )}
@@ -408,10 +417,10 @@ export default function AdminReviewDetailPage() {
                 </span>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[12px] font-bold text-[var(--text-primary)]">Store Response</h2>
+                    <h2 className="text-[12px] font-bold text-[var(--text-primary)]">{t("admin.reviews.detail.storeResponse")}</h2>
                     {review.storeResponse?.message && (
                       <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
-                        Published
+                        {t("admin.reviews.detail.published")}
                       </span>
                     )}
                   </div>
@@ -431,7 +440,7 @@ export default function AdminReviewDetailPage() {
                       className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border-color)] px-2 text-[10px] font-semibold transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}
                     >
-                      <Pencil size={11} /> Edit
+                      <Pencil size={11} /> {t("admin.reviews.detail.edit")}
                     </button>
                     <button
                       type="button"
@@ -452,7 +461,7 @@ export default function AdminReviewDetailPage() {
                     className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-[var(--accent-soft)] bg-[var(--accent-soft)] px-2 text-[10px] font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                     style={{ color: "var(--accent)" }}
                   >
-                    <Sparkles size={11} /> Suggested Reply
+                    <Sparkles size={11} /> {t("admin.reviews.detail.suggestedReply")}
                   </button>
                 )}
               </div>
@@ -462,17 +471,17 @@ export default function AdminReviewDetailPage() {
               {review.storeResponse?.message && !isEditingResponse ? (
                 <div className="rounded-md border-l-2 border-[var(--accent)] bg-[var(--bg-tertiary)] p-3">
                   <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--text-primary)]">
-                    {review.storeResponse.message}
+                    {localizedStoreResponse}
                   </p>
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
                     <span className="inline-flex items-center gap-1">
                       <User size={9} />
-                      Published by {review.storeResponse.responded_by_name || "Store Support"}
+                      {t("admin.reviews.detail.publishedBy", { name: review.storeResponse.responded_by_name || "Store Support" })}
                     </span>
                     {review.storeResponse.responded_at && (
                       <span className="inline-flex items-center gap-1">
                         <Calendar size={9} />
-                        {formatDateTime(review.storeResponse.responded_at)}
+                        {formatDateTime(review.storeResponse.responded_at, locale)}
                       </span>
                     )}
                   </div>
@@ -482,7 +491,7 @@ export default function AdminReviewDetailPage() {
               {(!review.storeResponse?.message || isEditingResponse) && (
                 <div className="space-y-2.5">
                   <label htmlFor="review-store-response" className="sr-only">
-                    Store response message
+                    {t("admin.reviews.detail.responseMessage")}
                   </label>
                   <textarea
                     id="review-store-response"
@@ -491,12 +500,12 @@ export default function AdminReviewDetailPage() {
                     disabled={responseMutation.isPending}
                     maxLength={1000}
                     rows={4}
-                    placeholder="Write a thoughtful response to this customer…"
+                    placeholder={t("admin.reviews.detail.responsePlaceholder")}
                     className="min-h-28 w-full resize-y rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 text-[12px] leading-5 text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1.5 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-[10px] text-[var(--text-muted)]">
-                      <span className="font-semibold text-[var(--text-secondary)]">{responseDraft.length}/1,000</span> chars
+                      <span className="font-semibold text-[var(--text-secondary)]">{responseDraft.length}/1,000</span> {t("admin.reviews.detail.chars")}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {review.storeResponse?.message && isEditingResponse && (
@@ -510,7 +519,7 @@ export default function AdminReviewDetailPage() {
                           className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-color)] px-2.5 text-[10px] font-semibold transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
                           style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}
                         >
-                          <X size={11} /> Cancel
+                          <X size={11} /> {t("admin.reviews.detail.cancel")}
                         </button>
                       )}
                       <button
@@ -523,12 +532,12 @@ export default function AdminReviewDetailPage() {
                         {responseMutation.isPending ? (
                           <>
                             <Loader2 size={13} className="animate-spin" />
-                            {review.storeResponse?.message ? "Updating…" : "Publishing…"}
+                            {review.storeResponse?.message ? t("admin.reviews.detail.updatingResponse") : t("admin.reviews.detail.publishing")}
                           </>
                         ) : (
                           <>
                             <Send size={12} />
-                            {review.storeResponse?.message ? "Update" : "Publish"}
+                            {review.storeResponse?.message ? t("admin.reviews.detail.update") : t("admin.reviews.detail.publish")}
                           </>
                         )}
                       </button>
@@ -543,8 +552,8 @@ export default function AdminReviewDetailPage() {
           {customerReviews.length > 0 && (
             <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3.5">
               <div className="mb-2.5 flex items-center justify-between">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">All Reviews by This Customer</h3>
-                <span className="text-[10px] text-[var(--text-muted)]">{customerReviews.length} more</span>
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.allByCustomer")}</h3>
+                <span className="text-[10px] text-[var(--text-muted)]">{t("admin.reviews.detail.more", { count: customerReviews.length })}</span>
               </div>
               <div className="space-y-2">
                 {customerReviews.map((customerReview) => {
@@ -559,9 +568,9 @@ export default function AdminReviewDetailPage() {
                       className="flex flex-wrap items-center justify-between gap-2.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 transition hover:border-[var(--accent)]/30"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{relatedProduct.name || "Product unavailable"}</p>
+                        <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(relatedProduct) || t("admin.reviews.detail.productUnavailable")}</p>
                         <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">
-                          {customerReview.title || customerReview.comment || "No written comment"}
+                          {reviewTextOf(customerReview, "title") || reviewTextOf(customerReview, "comment") || t("admin.reviews.ui.ratingOnly")}
                         </p>
                         <div className="mt-1 flex items-center gap-1">
                           <StarRating rating={relatedRating} size={10} showValue={false} />
@@ -569,8 +578,8 @@ export default function AdminReviewDetailPage() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        <StatusPill hidden={customerReview.status === "hidden"} />
-                        <span className="text-[10px] text-[var(--text-muted)]">{formatDate(customerReview.created_at)}</span>
+                        <StatusPill hidden={customerReview.status === "hidden"} t={t} />
+                        <span className="text-[10px] text-[var(--text-muted)]">{formatDate(customerReview.created_at, locale)}</span>
                       </div>
                     </Link>
                   );
@@ -585,7 +594,7 @@ export default function AdminReviewDetailPage() {
           {/* Customer Information */}
           <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
             <div className="border-b border-[var(--border-color)] px-3.5 py-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Customer Information</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.customerInformation")}</h3>
             </div>
             <div className="p-3.5">
               <div className="flex flex-col items-center gap-2.5 border-b border-[var(--border-color)] pb-3">
@@ -602,7 +611,7 @@ export default function AdminReviewDetailPage() {
               <div className="mt-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
-                    <Mail size={10} /> Email
+                    <Mail size={10} /> {t("admin.reviews.detail.email")}
                   </span>
                   {user.email ? (
                     <a href={`mailto:${user.email}`} className="text-[11px] font-bold hover:underline" style={{ color: "var(--accent)" }}>{user.email}</a>
@@ -612,15 +621,15 @@ export default function AdminReviewDetailPage() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
-                    <Phone size={10} /> Phone
+                    <Phone size={10} /> {t("admin.reviews.detail.phone")}
                   </span>
                   <span className="text-[11px] font-bold text-[var(--text-primary)]">{user.phone || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
-                    <Calendar size={10} /> Joined
+                    <Calendar size={10} /> {t("admin.reviews.detail.joined")}
                   </span>
-                  <span className="text-[11px] font-bold text-[var(--text-primary)]">{user.created_at ? formatDate(user.created_at) : "—"}</span>
+                  <span className="text-[11px] font-bold text-[var(--text-primary)]">{user.created_at ? formatDate(user.created_at, locale) : "—"}</span>
                 </div>
               </div>
             </div>
@@ -629,7 +638,7 @@ export default function AdminReviewDetailPage() {
           {/* Product Information */}
           <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
             <div className="border-b border-[var(--border-color)] px-3.5 py-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Product Information</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.productInformation")}</h3>
             </div>
             <div className="p-3.5">
               <div className="flex items-center gap-2.5">
@@ -641,7 +650,7 @@ export default function AdminReviewDetailPage() {
                   )}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{product.name || "Product unavailable"}</p>
+                  <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(product) || t("admin.reviews.detail.productUnavailable")}</p>
                   <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">ID: {productId || "—"}</p>
                 </div>
               </div>
@@ -650,7 +659,7 @@ export default function AdminReviewDetailPage() {
                   href={`/admin/products/${productId}`}
                   className="mt-3 inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
                 >
-                  <Package size={13} /> View Product
+                  <Package size={13} /> {t("admin.reviews.detail.viewProduct")}
                 </Link>
               )}
             </div>
@@ -659,20 +668,20 @@ export default function AdminReviewDetailPage() {
           {/* Review Information */}
           <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
             <div className="border-b border-[var(--border-color)] px-3.5 py-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Review Information</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.reviewInformation")}</h3>
             </div>
             <div className="p-3.5 space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-[var(--text-muted)]">Posted On</span>
-                <span className="text-[11px] font-bold text-[var(--text-primary)]">{formatDateTime(review.created_at)}</span>
+                <span className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.reviews.detail.postedOn")}</span>
+                <span className="text-[11px] font-bold text-[var(--text-primary)]">{formatDateTime(review.created_at, locale)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-[var(--text-muted)]">Review ID</span>
+                <span className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.reviews.detail.reviewId")}</span>
                 <span className="text-[11px] font-bold text-[var(--text-primary)]">{review._id}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-[var(--text-muted)]">Purchase</span>
-                <VerifiedBadge verified={review.verifiedPurchase} />
+                <span className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.reviews.detail.purchase")}</span>
+                <VerifiedBadge verified={review.verifiedPurchase} t={t} />
               </div>
             </div>
           </div>
@@ -687,14 +696,14 @@ export default function AdminReviewDetailPage() {
               style={{ backgroundColor: "var(--bg-card)", color: hidden ? "var(--success-text)" : "var(--warning-text)" }}
             >
               {hidden ? <Eye size={11} /> : <EyeOff size={11} />}
-              {hidden ? "Show" : "Hide"}
+              {hidden ? t("admin.reviews.detail.show") : t("admin.reviews.detail.hideShort")}
             </button>
             <Link
               href="/admin/reviews"
               className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-[var(--border-color)] px-2 text-[10px] font-bold transition hover:bg-[var(--bg-tertiary)]"
               style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}
             >
-              <MessageSquareText size={11} /> All Reviews
+              <MessageSquareText size={11} /> {t("admin.reviews.detail.allReviews")}
             </Link>
           </div>
         </aside>
@@ -723,10 +732,10 @@ export default function AdminReviewDetailPage() {
               </span>
               <div className="min-w-0">
                 <h2 id="delete-response-title" className="text-[12px] font-bold text-[var(--text-primary)]">
-                  Delete this store response?
+                  {t("admin.reviews.detail.deleteResponseTitle")}
                 </h2>
                 <p id="delete-response-description" className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-                  Customers will no longer see it.
+                  {t("admin.reviews.detail.deleteResponseBody")}
                 </p>
               </div>
             </div>
@@ -739,7 +748,7 @@ export default function AdminReviewDetailPage() {
                 className="inline-flex h-9 items-center justify-center rounded-md text-[11px] font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
               >
-                Cancel
+                {t("admin.reviews.detail.cancel")}
               </button>
               <button
                 type="button"
@@ -750,10 +759,10 @@ export default function AdminReviewDetailPage() {
               >
                 {deleteResponseMutation.isPending ? (
                   <>
-                    <Loader2 size={13} className="animate-spin" /> Deleting…
+                    <Loader2 size={13} className="animate-spin" /> {t("admin.reviews.detail.deleting")}
                   </>
                 ) : (
-                  "Delete"
+                  t("admin.reviews.detail.delete")
                 )}
               </button>
             </div>
@@ -771,7 +780,7 @@ export default function AdminReviewDetailPage() {
             type="button"
             onClick={() => setLightboxMedia(null)}
             className="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-            aria-label="Close lightbox"
+            aria-label={t("common.close")}
           >
             <X size={18} />
           </button>

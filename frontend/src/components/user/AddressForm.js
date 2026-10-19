@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Country, State, City } from "country-state-city";
 import { addressApi } from "@/apis/user/addressApi";
-import { useCurrentLocation } from "@/hooks/useCurrentLocation";
+import { useCurrentLocation } from "../../hooks/user/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";
 import { userHttp } from "@/apis/axiosInstance"
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";

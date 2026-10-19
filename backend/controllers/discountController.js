@@ -4,6 +4,7 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
 const log = require("../utils/logger");
+const { queueTranslationSync } = require("../utils/translationService");
 
 const emitSocketEvent = (event, data) => {
   try {
@@ -295,6 +296,7 @@ exports.createDiscount = async (req, res) => {
     // SAVE
     // ===================================================
     const newDiscount = await Discount.create(discountData);
+    queueTranslationSync(Discount, newDiscount._id);
 
     // ===================================================
     // SOCKET
@@ -394,9 +396,9 @@ exports.getDiscounts = async (req, res) => {
     // ---- LEGACY MODE (no limit) -> exact old behavior ----
     if (!limit) {
       const discounts = await Discount.find(filter)
-        .populate("selectedProducts", "name sku selling_price")
-        .populate("selectedCategories", "name")
-        .populate("selectedBrands", "name")
+        .populate("selectedProducts", "name translations sku selling_price")
+        .populate("selectedCategories", "name translations")
+        .populate("selectedBrands", "name translations")
         .populate("createdBy", "name email")
         .populate("updatedBy", "name email")
         .sort({ createdAt: -1 });
@@ -414,9 +416,9 @@ exports.getDiscounts = async (req, res) => {
       Discount.countDocuments(withStatus("active")),
       Discount.countDocuments(withStatus("inactive")),
       Discount.find(filter)
-        .populate("selectedProducts", "name sku selling_price")
-        .populate("selectedCategories", "name")
-        .populate("selectedBrands", "name")
+        .populate("selectedProducts", "name translations sku selling_price")
+        .populate("selectedCategories", "name translations")
+        .populate("selectedBrands", "name translations")
         .populate("createdBy", "name email")
         .populate("updatedBy", "name email")
         .sort({ createdAt: -1 })
@@ -462,9 +464,9 @@ const buildDiscountResponse = async (id) => {
     .lean();
 
   const discount = await Discount.findOne({ _id: id, is_deleted: false })
-    .populate("selectedProducts", "name sku selling_price")
-    .populate("selectedCategories", "name")
-    .populate("selectedBrands", "name")
+    .populate("selectedProducts", "name translations sku selling_price")
+    .populate("selectedCategories", "name translations")
+    .populate("selectedBrands", "name translations")
     .populate("createdBy", "name email")
     .populate("updatedBy", "name email");
 
@@ -689,6 +691,7 @@ exports.updateDiscount = async (req, res) => {
     // SAVE
     // ===================================================
     const updatedDiscount = await discount.save();
+    queueTranslationSync(Discount, updatedDiscount._id);
 
     // ===================================================
     // SOCKET

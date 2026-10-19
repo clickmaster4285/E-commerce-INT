@@ -2,6 +2,7 @@ const Attribute = require("../models/Attribute");
 const Category = require("../models/Category");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const { queueTranslationSync, hashText } = require("../utils/translationService");
 const log = require("../utils/logger");
 
 const emitSocket = (event, data) => {
@@ -11,8 +12,24 @@ const emitSocket = (event, data) => {
   } catch (e) {}
 };
 
-const normalizeValues = (rawValues) => {
+// `values` har save par SCRATCH se rebuild hote hain — matlab purane
+// `label_translations` / `label_source` default (`{}` / `""`) par reset ho
+// jaate aur saari option translations mit jaati. Is liye existing options ki
+// translations yahan carry over karni padti hain.
+//
+// Matching `value` (machine code, stable) par hoti hai — `value` hi variant
+// matching/filtering ka key hai. Agar `label` badli hai to translation jaan
+// boojh kar drop kar dete hain, taake `queueTranslationSync` use dobara
+// generate kar de (stale hash ke through).
+const normalizeValues = (rawValues, existingValues = []) => {
   if (!Array.isArray(rawValues)) return [];
+
+  const existingByValue = new Map();
+  for (const prev of Array.isArray(existingValues) ? existingValues : []) {
+    const key = String(prev?.value || "").trim().toLowerCase();
+    if (key) existingByValue.set(key, prev);
+  }
+
   const seen = new Set();
   const out = [];
   for (const v of rawValues) {
@@ -20,14 +37,32 @@ const normalizeValues = (rawValues) => {
     const label = String(v.label || v.value || "").trim();
     const value = String(v.value || v.label || "").trim();
     if (!value) continue;
-    if (seen.has(value.toLowerCase())) continue;
-    seen.add(value.toLowerCase());
-    out.push({
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const option = {
       label: label || value,
       value,
       sort_order: Number.isFinite(Number(v.sort_order)) ? Number(v.sort_order) : out.length,
       is_active: v.is_active === false ? false : true,
-    });
+    };
+
+    const prev = existingByValue.get(key);
+    if (prev) {
+      const prevHash = prev.label_source || hashText(prev.label);
+      const labelUnchanged = prevHash === hashText(option.label);
+      if (labelUnchanged && prev.label_translations) {
+        const carried = typeof prev.label_translations.toObject === "function"
+          ? prev.label_translations.toObject()
+          : { ...prev.label_translations };
+        if (Object.keys(carried).length) option.label_translations = carried;
+        option.label_source = prevHash;
+      }
+      // `label` change hua → translation nahi carry karni, dogenerate hogi.
+    }
+
+    out.push(option);
   }
   return out;
 };
@@ -43,7 +78,7 @@ const LEGACY_DATA_TYPE_MAP = {
   measurement: "decimal",
 };
 
-const sanitizePayload = (body) => {
+const sanitizePayload = (body, existingValues = []) => {
   const allowed = [
     "name", "code", "data_type", "unit", "description", "values", "category",
     "variant_allowed", "filterable", "searchable", "visible", "is_active",
@@ -66,7 +101,7 @@ const sanitizePayload = (body) => {
   }
   if (out.unit !== undefined) out.unit = String(out.unit || "").trim();
   if (out.description !== undefined) out.description = String(out.description || "").trim();
-  if (out.values !== undefined) out.values = normalizeValues(out.values);
+  if (out.values !== undefined) out.values = normalizeValues(out.values, existingValues);
   if (out.variant_allowed !== undefined) out.variant_allowed = Boolean(out.variant_allowed);
   if (out.filterable !== undefined) out.filterable = Boolean(out.filterable);
   if (out.searchable !== undefined) out.searchable = Boolean(out.searchable);
@@ -154,11 +189,16 @@ const enrichAttributesWithCategories = async (attributes) => {
     is_deleted: false,
     "attributes.attribute_id": { $in: attrIds },
   })
-    .select("name attributes.attribute_id")
+    .select("name attributes.attribute_id translations")
     .lean();
 
   // Build a map: attributeId → category name
+  // 🌍 `translations` bhi side-car me rakhna zaroori hai — pehle yahan sirf
+  // plain `cat.name` attach hota tha, jiski wajah se attributes page ka
+  // "Category" column hamesha English dikhata tha. Purana `category` string
+  // field backward-compatibility ke liye waise hi rehta hai.
   const attrCategoryMap = {};
+  const attrCategoryTranslations = {};
   for (const cat of categories) {
     for (const ca of cat.attributes || []) {
       const aid = String(ca.attribute_id);
@@ -166,6 +206,7 @@ const enrichAttributesWithCategories = async (attributes) => {
         // Use the first category found for each attribute
         if (!attrCategoryMap[aid]) {
           attrCategoryMap[aid] = cat.name;
+          attrCategoryTranslations[aid] = cat.translations?.name || null;
         }
       }
     }
@@ -175,6 +216,7 @@ const enrichAttributesWithCategories = async (attributes) => {
   return attributes.map((attr) => ({
     ...attr,
     category: attrCategoryMap[String(attr._id)] || attr.category || null,
+    category_translations: attrCategoryTranslations[String(attr._id)] || null,
   }));
 };
 
@@ -185,6 +227,11 @@ const createAttribute = async (req, res) => {
       return res.status(400).json({ success: false, message: "Name and Code are required" });
     }
     const attribute = await Attribute.create({ ...data, createdby: req.user?._id || null });
+
+    // 🌍 Attribute `name` + har option ka `label` background me translate hota
+    // hai (`value` raw rehta hai — variant matching usi par chalti hai)
+    queueTranslationSync(Attribute, attribute._id);
+
     emitSocket("attributeCreated", attribute.toObject());
 
     const io = req.io || getIO();
@@ -210,7 +257,16 @@ const createAttribute = async (req, res) => {
 
 const updateAttribute = async (req, res) => {
   try {
-    const data = sanitizePayload(req.body || {});
+    // Existing options ki translations bacha ke rakhne ke liye pehle purane
+    // values chahiye — `normalizeValues` inke basis par carry-over karta hai.
+    const existing = await Attribute.findOne({
+      _id: req.params.id,
+      is_deleted: { $ne: true },
+    })
+      .select("values")
+      .lean();
+
+    const data = sanitizePayload(req.body || {}, existing?.values);
     const attribute = await Attribute.findOneAndUpdate(
       { _id: req.params.id, is_deleted: { $ne: true } },
       { ...data, updatedby: req.user?._id || null },
@@ -219,6 +275,10 @@ const updateAttribute = async (req, res) => {
     if (!attribute) {
       return res.status(404).json({ success: false, message: "Attribute not found" });
     }
+
+    // 🌍 Name/option labels change hue → stale translations dobara generate
+    queueTranslationSync(Attribute, attribute._id);
+
     emitSocket("attributeUpdated", attribute.toObject());
     res.status(200).json({ success: true, data: attribute });
   } catch (error) {
@@ -241,7 +301,7 @@ const getAttributeCategories = async (req, res) => {
       is_deleted: false,
       "attributes.attribute_id": attribute._id,
     })
-      .select("name category_code category_type attributes")
+      .select("name category_code category_type attributes translations")
       .lean();
 
     const result = categories.map((cat) => {
@@ -251,6 +311,7 @@ const getAttributeCategories = async (req, res) => {
       return {
         _id: cat._id,
         name: cat.name,
+        translations: cat.translations,
         category_code: cat.category_code,
         category_type: cat.category_type,
         config: attrConfig

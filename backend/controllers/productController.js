@@ -35,6 +35,7 @@ const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
 
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, isSameValue, isSameList } = require("../utils/activityHelper");
+const { queueTranslationSync } = require("../utils/translationService");
 
 // ======================================================
 // SOCKET HELPER
@@ -225,9 +226,12 @@ const collectIds = (value) => {
 
 // ✅ Category subtree expand (homeCatalog.categorySubtreeIds parity) —
 // parent select ho to uske saare children bhi match hote hain
+// ⚠️ Sirf ACTIVE categories ka tree expand karo — disabled category ke
+// products storefront me nahi dikhne chahiye (category public endpoint
+// aur category-tiles bhi is_active: true filter karte hain).
 const expandCategorySubtrees = async (rootIds) => {
   if (!rootIds.length) return [];
-  const cats = await Category.find({ is_deleted: false }).select("parent_category_id").lean();
+  const cats = await Category.find({ is_deleted: false, is_active: true }).select("parent_category_id").lean();
   const childrenOf = new Map();
   cats.forEach((c) => {
     const pid = String(c.parent_category_id?._id || c.parent_category_id || "");
@@ -266,10 +270,12 @@ const buildProductFilter = async (query = {}) => {
   const filter = { is_deleted: { $ne: true } };
   if (brandIds.length === 1) filter.brand_id = brandIds[0];
   else if (brandIds.length > 1) filter.brand_id = { $in: brandIds };
-  if (categoryIds.length) {
-    const expanded = await expandCategorySubtrees(categoryIds);
-    filter.category_id = { $in: expanded.length ? expanded : categoryIds };
-  }
+  // ⚠️ Filter by category + ensure category is active (is_active: true)
+    // This prevents products in disabled categories from appearing in storefront
+    if (categoryIds.length) {
+      const expanded = await expandCategorySubtrees(categoryIds);
+      filter.category_id = { $in: expanded.length ? expanded : categoryIds };
+    }
   if (statusFilter && statusFilter !== "all") filter.status = statusFilter;
   if (featuredFilter === "true" || featuredFilter === "1") filter.is_featured = true;
   else if (featuredFilter === "false" || featuredFilter === "0") filter.is_featured = false;
@@ -277,10 +283,14 @@ const buildProductFilter = async (query = {}) => {
   if (search) {
     const rx = { $regex: escapeRegex(search), $options: "i" };
     const [brandDocs, catDocs, variantDocs] = await Promise.all([
+      // ⚠️ Sirf ACTIVE brands ko search me include karo — disabled brand
+      // ke products storefront search me nahi aane chahiye
       Brand
-        ? Brand.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => [])
+        ? Brand.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => [])
         : Promise.resolve([]),
-      Category.find({ name: rx, is_deleted: { $ne: true } }).select("_id").lean().catch(() => []),
+      // ⚠️ Sirf ACTIVE categories ko search me include karo — disabled category
+      // ke products storefront search me nahi aane chahiye
+      Category.find({ name: rx, is_deleted: { $ne: true }, is_active: true }).select("_id").lean().catch(() => []),
       Variant.find({ sku: rx, is_deleted: { $ne: true } }).select("product_id").lean().catch(() => []),
     ]);
     filter.$or = [
@@ -720,11 +730,17 @@ const computeProductStats = async (filter, totalOverride = null) => {
 // ke products dobara aa jate the aur kuch products kabhi dikhte hi nahi the).
 // `_id` tie-breaker ek TOTAL order banata hai, is liye har page exactly ek baar.
 const PRODUCT_LIST_SORT = { created_at: -1, _id: -1 };
+
+// Populated category/brand ke saath translations bhi chahiye, warna frontend
+// `nameOf()` / `descriptionOf()` English par hi fallback karega (category ka
+// name aur brand ki description dono translate hoti hain).
+const CATEGORY_BRAND_POPULATE = "name translations";
+
 // ✅ slim=1 (opt-in, storefront lists): sirf category/brand names populate.
 // tag_ids/createdby/updatedby storefront cards me kahin display nahi hote
 // (admin/detail callers slim nahi bhejte → unka response bilkul same).
 const applyListPopulates = (query, slim) => {
-  query.populate("category_id", "name").populate("brand_id", "name");
+  query.populate("category_id", CATEGORY_BRAND_POPULATE).populate("brand_id", CATEGORY_BRAND_POPULATE);
   if (!slim) {
     query
       .populate("tag_ids", "name")
@@ -779,8 +795,8 @@ const getProducts = async (req, res) => {
     // ---- LEGACY MODE (no limit) → exact old behavior ----
     if (!limit) {
       const products = await Product.find(filter)
-        .populate("category_id", "name")
-        .populate("brand_id", "name")
+        .populate("category_id", CATEGORY_BRAND_POPULATE)
+        .populate("brand_id", CATEGORY_BRAND_POPULATE)
         .populate("tag_ids", "name")
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
@@ -1014,7 +1030,10 @@ const getProductFacets = async (req, res) => {
         { $group: { _id: "$brand_id", count: { $sum: 1 } } },
       ]),
       Product.find(globalBase).select("_id").lean(),
-      Category.find({ is_deleted: false }).select("_id parent_category_id").lean(),
+      // ⚠️ `is_active` bhi select karo (niche emit filter ke liye). Tree
+      // structure ke liye INACTIVE children bhi chahiye — warna active parent ka
+      // subtree count galat aa jayega. Filtering sirf emit karte waqt hoti hai.
+      Category.find({ is_deleted: false }).select("_id parent_category_id is_active").lean(),
     ]);
     const allIds = allIdsDocs.map((d) => d._id);
     const globalStats = await variantStatsMap(allIds);
@@ -1038,10 +1057,16 @@ const getProductFacets = async (req, res) => {
       });
       return sum;
     };
-    const categoryCounts = categories.map((c) => ({
-      _id: c._id,
-      count: subtreeCount(String(c._id)),
-    }));
+    // ⚠️ Sirf ACTIVE categories ka facet emit karo — admin ne category
+    // disable ki to wo shop filter sidebar me bhi nahi dikhni chahiye
+    // (`/categories/public` + `category-tiles` ke same rule). Products khud
+    // chhapte nahi — wo grid me normal rehte hain, sirf category option hat jaata hai.
+    const categoryCounts = categories
+      .filter((c) => c.is_active !== false)
+      .map((c) => ({
+        _id: c._id,
+        count: subtreeCount(String(c._id)),
+      }));
     const brandCounts = brandGroups.map((g) => ({ _id: g._id, count: g.count }));
 
     // ✅ Shared pieces (ek baar fetch) + indexed counting (single pass)
@@ -1155,8 +1180,10 @@ const getCategoryTiles = async (req, res) => {
   try {
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 12;
-    const categories = await Category.find({ is_deleted: false })
-      .select("name description parent_category_id sort_order")
+    // ⚠️ `is_active` filter — deactivate ki gayi category tiles me nahi dikhni
+    // chahiye (wahi bug jo `/categories/public` me tha).
+    const categories = await Category.find({ is_deleted: false, is_active: true })
+      .select("name description parent_category_id sort_order translations")
       .sort({ sort_order: 1, name: 1 })
       .lean();
     const isTop = (c) => !c.parent_category_id;
@@ -1280,8 +1307,8 @@ const getProductById = async (req, res) => {
       _id: req.params.id,
       is_deleted: { $ne: true },
     })
-      .populate("category_id", "name category_code description is_active")
-      .populate("brand_id", "name brand_code description country is_active logo")
+      .populate("category_id", "name category_code description is_active translations")
+      .populate("brand_id", "name brand_code description country is_active logo translations")
       .populate("tag_ids", "name")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
@@ -1525,6 +1552,10 @@ const createProduct = async (req, res) => {
     }
 
     createdProduct = await Product.create(productData);
+
+    // 🌍 Urdu translation background me generate (response block nahi hota).
+    // Sirf `description` translate hoti hai — product ka naam model number hai.
+    queueTranslationSync(Product, createdProduct._id);
 
     const imageVariantIndexes = parseJSON(req.body.image_variant_indexes, []);
     const imagesByVariant = {};
@@ -1771,6 +1802,9 @@ const updateProduct = async (req, res) => {
     if (productActuallyChanged) {
       product.updatedby = req.user?._id || null;
       await product.save();
+
+      // 🌍 English change → hash badla → Urdu description dobara generate hogi
+      queueTranslationSync(Product, product._id);
     }
 
     const variants = parseJSON(req.body.variants, null);

@@ -15,6 +15,7 @@ import {
   FaLinkedinIn,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -59,6 +60,7 @@ const badgeCls =
   "inline-flex h-7 items-center rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 text-[9px] font-medium text-[var(--user-text-muted)]";
 
 export default function Footer() {
+  const { t } = useTranslation();
   const { data: store = null } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
@@ -100,7 +102,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-[1.3fr_1fr_1fr_1.35fr]">
           {/* COMPANY INFO — apna store data */}
           <div className="col-span-2 sm:col-span-1 lg:col-span-1">
-            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">Company info</h3>
+            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">{t("footer.companyInfo")}</h3>
             <Link href="/" className="inline-flex items-center gap-2.5 mb-2.5">
               <StoreLogo store={store} />
               <span className="font-semibold text-base tracking-tight text-[var(--user-text)]">{storeName}</span>
@@ -136,7 +138,7 @@ export default function Footer() {
 
           {/* CATEGORIES — apni categories */}
           <div>
-            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">Customer service</h3>
+            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">{t("footer.customerService")}</h3>
             <ul className="space-y-2">
               {footerCategories.length > 0 ? (
                 footerCategories.map((cat) => (
@@ -147,14 +149,14 @@ export default function Footer() {
                   </li>
                 ))
               ) : (
-                <li className="text-[13px] text-[var(--user-text-subtle)]">No categories</li>
+                <li className="text-[13px] text-[var(--user-text-subtle)]">{t("footer.noCategories")}</li>
               )}
             </ul>
           </div>
 
           {/* SUPPORT — apne support links */}
           <div>
-            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">Help</h3>
+            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">{t("footer.help")}</h3>
             <ul className="space-y-2">
               {supportEmail && (
                 <li>
@@ -163,17 +165,17 @@ export default function Footer() {
                   </Link>
                 </li>
               )}
-              <li><Link href="#" className={linkCls}>Privacy Policy</Link></li>
-              <li><Link href="#" className={linkCls}>Terms &amp; Conditions</Link></li>
-              <li><Link href="#" className={linkCls}>Returns</Link></li>
-              <li><Link href="/account" className={linkCls}>My Account</Link></li>
+              <li><Link href="#" className={linkCls}>{t("footer.privacyPolicy")}</Link></li>
+              <li><Link href="#" className={linkCls}>{t("footer.termsConditions")}</Link></li>
+              <li><Link href="#" className={linkCls}>{t("footer.returns")}</Link></li>
+              <li><Link href="/account" className={linkCls}>{t("footer.myAccount")}</Link></li>
             </ul>
           </div>
 
           {/* SOCIALS — sirf apne socials, app buttons nahi (app hamare paas nahi hai) */}
           <div className="col-span-2 lg:col-span-1">
             <h4 className="text-[var(--user-text)] font-medium text-sm mb-3">
-              Connect with {storeName || "us"}
+              {t("footer.connectWith", { name: storeName || "us" })}
             </h4>
             <div className="flex items-center gap-3">
               {socialsToRender.map(({ key, Icon, url, label }) => (
@@ -195,7 +197,7 @@ export default function Footer() {
         {/* MIDDLE — image wali strip, sirf layout (koi store data nahi hota isme) */}
         <div className="grid gap-6 border-t border-[var(--user-border-soft)] pt-5 mt-6 lg:grid-cols-2">
           <div>
-            <h4 className="text-[var(--user-text)] font-medium text-sm mb-2.5">Security certification</h4>
+            <h4 className="text-[var(--user-text)] font-medium text-sm mb-2.5">{t("footer.securityCertification")}</h4>
             <div className="flex flex-wrap gap-2">
               <span className={badgeCls}>PCI DSS</span>
               <span className={`${badgeCls} italic`}>VISA</span>
@@ -208,7 +210,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="text-[var(--user-text)] font-medium text-sm mb-2.5">We accept</h4>
+            <h4 className="text-[var(--user-text)] font-medium text-sm mb-2.5">{t("footer.weAccept")}</h4>
             <div className="flex flex-wrap gap-2">
               <span className={badgeCls}>JazzCash</span>
               <span className={badgeCls}>easypaisa</span>
@@ -235,11 +237,11 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-[var(--user-text-muted)] text-center sm:text-left">
               Â© {new Date().getFullYear()}{" "}
-              <span className="text-[var(--user-text-secondary)] font-medium">{storeName}</span>. All rights reserved.
+              <span className="text-[var(--user-text-secondary)] font-medium">{storeName}</span>. {t("header.allRightsReserved")}
             </p>
             <div className="flex items-center gap-4 text-xs text-[var(--user-text-muted)]">
-              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">Privacy</Link>
-              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">Terms</Link>
+              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.privacyPolicy")}</Link>
+              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.termsConditions")}</Link>
               <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">Cookies</Link>
             </div>
           </div>
