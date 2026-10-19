@@ -563,26 +563,26 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label={t("admin.discounts.form.discountPercentage")} hint="Value must be between 0 and 100" fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" max={100} style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.discountPercentage")} hint={t("admin.discounts.form.valueRangeHint")} fullWidth>
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.percentagePlaceholder")} max={100} style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
                     <FormField label={t("admin.discounts.form.discountAmount")} fullWidth>
-                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
+                      <TextInput type="number" value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.amountPlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "buy_x_get_y" && (
                     <>
                       <FormField label={t("admin.promotions.ui.generated.f8d9708de5a9")}>
-                        <TextInput type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder="e.g., 2" style={inputStyle} />
+                        <TextInput type="number" value={formData.buy_quantity} onChange={(v) => setFormData({ ...formData, buy_quantity: v })} placeholder={t("admin.discounts.form.minQuantityPlaceholder")} style={inputStyle} />
                       </FormField>
                       <FormField label={t("admin.promotions.ui.generated.8996337e7996")}>
-                        <TextInput type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder="e.g., 1" style={inputStyle} />
+                        <TextInput type="number" value={formData.get_quantity} onChange={(v) => setFormData({ ...formData, get_quantity: v })} placeholder={t("admin.discounts.form.percentagePlaceholder")} style={inputStyle} />
                       </FormField>
-                      <FormField label={t("admin.promotions.ui.generated.8e06991c147a")} hint="100 means free" fullWidth>
+                      <FormField label={t("admin.promotions.ui.generated.8e06991c147a")} hint={t("admin.discounts.form.valueRangeHint")} fullWidth>
                         <TextInput type="number" value={formData.get_discount_value} onChange={(v) => setFormData({ ...formData, get_discount_value: v })} placeholder="100" max={100} style={inputStyle} />
                       </FormField>
                     </>
@@ -672,7 +672,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                   )}
 
                   {formData.value_type === "free_shipping" && (
-                    <FormField label={t("admin.promotions.ui.generated.36abd54d7de4")} hint="Applies to all orders" fullWidth>
+                    <FormField label={t("admin.promotions.ui.generated.36abd54d7de4")} hint={t("admin.discounts.form.quantityHint")} fullWidth>
                       <div className="h-[38px] rounded-md flex items-center px-3 text-[13px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--success)" }}>{t("admin.promotions.ui.generated.a07c9da72a52")}</div>
                     </FormField>
                   )}
@@ -712,7 +712,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         step="1"
                         value={formData.min_quantity}
                         onChange={(v) => setFormData({ ...formData, min_quantity: v })}
-                        placeholder={formData.has_min_quantity ? "e.g., 3" : "Disabled"}
+                        placeholder={formData.has_min_quantity ? t("admin.discounts.form.minQuantityPlaceholder") : t("admin.discounts.form.disabledPlaceholder")}
                         disabled={!formData.has_min_quantity}
                         style={{
                           ...inputStyle,
@@ -742,10 +742,10 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                   <FormField label={t("admin.promotions.ui.generated.269c8b374312")}>
                     <TextInput type="datetime-local" value={formData.end_at} onChange={(v) => setFormData({ ...formData, end_at: v })} style={inputStyle} />
                   </FormField>
-                  <FormField label={t("admin.discounts.form.totalUsageLimit")} hint="Leave empty for unlimited">
+                  <FormField label={t("admin.discounts.form.totalUsageLimit")} hint={t("admin.discounts.form.unlimitedHint")}>
                     <TextInput type="number" value={formData.usage_limit} onChange={(v) => setFormData({ ...formData, usage_limit: v })} placeholder={t("admin.discounts.detail.unlimited")} style={inputStyle} />
                   </FormField>
-                  <FormField label={t("admin.promotions.ui.generated.79a6ed65cb12")} hint="Leave empty for unlimited">
+                  <FormField label={t("admin.promotions.ui.generated.79a6ed65cb12")} hint={t("admin.discounts.form.unlimitedHint")}>
                     <TextInput type="number" value={formData.per_user_limit} onChange={(v) => setFormData({ ...formData, per_user_limit: v })} placeholder={t("admin.discounts.detail.unlimited")} style={inputStyle} />
                   </FormField>
                 </div>
@@ -1116,7 +1116,7 @@ function BundleRulesEditor({ rules = [], onChange, products = [], inputStyle, ca
           {(singleRule.reward_type !== "free_product") ? (
             <div className="w-[132px]">
               <label className="block text-[10px] font-semibold mb-1" style={labelStyle}>
-                {singleRule.reward_type === "percentage" ? "Discount (%)" : "Discount (Rs.)"}
+                {singleRule.reward_type === "percentage" ? t("admin.discounts.form.discountPercentage") : t("admin.discounts.form.discountAmount")}
               </label>
               <input
                 type="number"
@@ -1128,7 +1128,7 @@ function BundleRulesEditor({ rules = [], onChange, products = [], inputStyle, ca
                   // ✅ Percentage discount 100% se zyada nahi ho sakta — typing/paste par clamp
                   update({ value: singleRule.reward_type === "percentage" && raw !== "" && Number(raw) > 100 ? "100" : raw });
                 }}
-                placeholder={singleRule.reward_type === "percentage" ? "e.g., 10" : "e.g., 200"}
+                placeholder={singleRule.reward_type === "percentage" ? t("admin.discounts.form.percentagePlaceholder") : t("admin.discounts.form.amountPlaceholder")}
                 className="h-9 w-full px-2.5 rounded-md text-[13px] outline-none"
                 style={inputStyle}
               />

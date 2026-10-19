@@ -66,13 +66,6 @@ const getId = (item) => {
   return String(item);
 };
 
-const getName = (item, type) => {
-  if (type === "product") return item?.name || item?.title || "Unnamed Product";
-  if (type === "category") return item?.name || item?.categoryName || "Unnamed Category";
-  if (type === "brand") return item?.name || item?.brandName || "Unnamed Brand";
-  return item?.name || "Unnamed";
-};
-
 const getDealStatus = (deal) => {
   // ✅ Sirf Active/Inactive model — off (isActive false) ya expired sab "inactive"
   if (!deal?.isActive) return "inactive";
@@ -81,38 +74,48 @@ const getDealStatus = (deal) => {
   return "active";
 };
 
-const formatTarget = (target) => {
-  if (!target) return "All Products";
-  const map = { all: "All Products", product: "Specific Products", category: "Categories", brand: "Brands", collection: "Collections" };
-  return map[target] || target;
+// Target / value summaries parte hain → inhe `t` chahiye, isliye caller pass karta hai.
+const formatTarget = (target, t) => {
+  if (!target) return t("admin.discounts.page.allProducts");
+  const map = {
+    all: "admin.discounts.page.allProducts",
+    product: "admin.discounts.page.specificProducts",
+    category: "admin.discounts.page.categories",
+    brand: "admin.discounts.page.brands",
+  };
+  return map[target] ? t(map[target]) : target;
 };
 
-const formatDealValue = (deal) => {
+const formatDealValue = (deal, t, productNameOf = null) => {
   const type = deal?.type || "";
-  const value = Number(deal?.discountValue ?? 0); 
+  const value = Number(deal?.discountValue ?? 0);
+  const off = t("admin.shipping.page.off");
   switch (type) {
-    case "percentage": return `${value}% OFF`;
-    case "fixed_amount": case "fixed": return `Rs. ${value} OFF`;
+    case "percentage": return `${value}% ${off}`;
+    case "fixed_amount": case "fixed": return `Rs. ${value} ${off}`;
     case "buy_x_get_y": {
       const buy = deal?.buyQuantity ?? 1;
       const get = deal?.getQuantity ?? 1;
       const disc = deal?.getDiscountValue ?? 100;
-      return `Buy ${buy} Get ${get} (${disc === 100 ? "Free" : `${disc}% Off`})`;
+      return `Buy ${buy} Get ${get} (${disc === 100 ? t("admin.deals.detail.freeGift") : `${disc}% ${off}`})`;
     }
-    case "free_shipping": return "Free Shipping";
+    case "free_shipping": return t("admin.promotions.ui.generated.36abd54d7de4");
     case "bundle": {
       const rule = deal?.bundleRule || deal?.bundle_rule || null;
-      if (!rule) return "Bundle Deal";
+      if (!rule) return t("admin.promotions.ui.generated.1c0af76c9361");
       const buy = rule.buyQuantity || rule.buy_quantity || 1;
       if (rule.rewardType === "free_product" || rule.reward_type === "free_product") {
-        const gift = rule.freeProductName || rule.freeProduct?.name || "Gift";
+        // Gift product ka naam DB se aata hai → `productNameOf` translations map padhta hai.
+        const gift = rule.freeProduct
+          ? productNameOf(rule.freeProduct)
+          : rule.freeProductName || t("admin.deals.detail.freeGift");
         const qty = rule.freeQuantity || rule.free_quantity || 1;
-        return `Buy ${buy} → ${qty > 1 ? qty + "× " : ""}${gift} FREE`;
+        return `Buy ${buy} → ${qty > 1 ? qty + "× " : ""}${gift} ${off}`;
       }
       if (rule.rewardType === "percentage" || rule.reward_type === "percentage") {
-        return `Buy ${buy} → ${rule.value || 0}% OFF`;
+        return `Buy ${buy} → ${rule.value || 0}% ${off}`;
       }
-      return `Buy ${buy} → Rs. ${rule.value || 0} OFF`;
+      return `Buy ${buy} → Rs. ${rule.value || 0} ${off}`;
     }
     default: return value > 0 ? `${value}` : "-";
   }
@@ -236,7 +239,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 /* ==================== MAIN COMPONENT ==================== */
 export default function DealsPage() {
   const { t, locale, dir } = useTranslation();
-  const { nameOf } = useLocalized();
+  const { nameOf, productNameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -509,14 +512,14 @@ export default function DealsPage() {
 
     // ✅ Negative values block — Deal Offer, quantities, limits (input level pe bhi blocked)
     const nonNegativeError = validateNonNegative([
-      ["Deal value", formData.value],
-      ["Buy quantity", formData.buy_quantity],
-      ["Get quantity", formData.get_quantity],
-      ["Get discount value", formData.get_discount_value],
-      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
-      ["Usage limit", formData.usage_limit],
-      ["Per customer limit", formData.per_user_limit],
-    ]);
+      [t("admin.deals.form.dealValue"), formData.value],
+      [t("admin.promotions.ui.generated.4ee9bbdde227"), formData.buy_quantity],
+      [t("admin.promotions.ui.generated.42218e32a31f"), formData.get_quantity],
+      [t("admin.promotions.ui.generated.1c1b9e4d6f8f"), formData.get_discount_value],
+      [t("admin.promotions.ui.generated.e3f2be9ede5c"), formData.has_min_quantity ? formData.min_quantity : ""],
+      [t("admin.discounts.form.totalUsageLimit"), formData.usage_limit],
+      [t("admin.discounts.form.perCustomerLimit"), formData.per_user_limit],
+    ], t);
     if (nonNegativeError) return toast.error(nonNegativeError);
     if (formData.has_min_quantity) {
       const minQuantity = Number(formData.min_quantity);
@@ -720,7 +723,7 @@ export default function DealsPage() {
               />
               <MenuItem
                 icon={<PowerIcon className="w-4 h-4" />}
-                label={getDealStatus(deal) === "active" ? "Deactivate" : "Activate"}
+                label={getDealStatus(deal) === "active" ? t("admin.shared.action.deactivate") : t("admin.shared.action.activate")}
                 danger={getDealStatus(deal) === "active"}
                 success={getDealStatus(deal) !== "active"}
                 onClick={() => { setActionMenu(null); handleToggleStatus(deal); }}
@@ -799,8 +802,8 @@ export default function DealsPage() {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <Select value={statusFilter} onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["inactive", "Inactive"]]} />
-            <Select value={targetFilter} onChange={(v) => { setTargetFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all_targets", "All Targets"], ["all", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+            <Select value={statusFilter} onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all", t("admin.brands.ui.allStatus")], ["active", t("admin.discounts.page.active")], ["inactive", t("admin.discounts.page.inactive")]]} />
+            <Select value={targetFilter} onChange={(v) => { setTargetFilter(v); setCurrentPage(1); }} inputStyle={inputStyle} options={[["all_targets", t("common.all")], ["all", t("admin.discounts.page.allProducts")], ["product", t("admin.discounts.page.specificProducts")], ["category", t("admin.discounts.page.categories")], ["brand", t("admin.discounts.page.brands")]]} />
           </div>
         </div>
 
@@ -858,13 +861,13 @@ export default function DealsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || "Untitled Deal"}</p>
+                              <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
                               <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(deal?.applyTo)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatDealValue(deal)}</span></td>
+                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(deal?.applyTo, t)}</td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatDealValue(deal, t, productNameOf)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons deal={deal} /></td>
                       </tr>
@@ -883,11 +886,11 @@ export default function DealsPage() {
                   <StatusBadge status={getDealStatus(deal)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{nameOf(deal) || "Untitled Deal"}</p>
+                  <p className="font-semibold text-[13px] truncate">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
                   <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatDealValue(deal)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatDealValue(deal, t, productNameOf)}</span>
                   <ActionButtons deal={deal} />
                 </div>
               </div>
@@ -935,7 +938,7 @@ export default function DealsPage() {
             <div className="flex gap-2 mt-5">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.30f6237868a6")}</> : "Delete"}
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.brands.ui.deleting")}</> : t("common.delete")}
               </button>
             </div>
           </div>
@@ -1127,7 +1130,7 @@ function BundleImageUploader({ value, onChange }) {
     setUploading(true);
     try {
       const url = await dealApi.uploadImage(file);
-      if (!url) throw new Error("Image upload failed");
+      if (!url) throw new Error(t("admin.deals.toast.imageUploadFailed"));
       onChange(url);
       toast.success(t("admin.deals.toast.imageUploaded"));
     } catch (err) {
@@ -1199,7 +1202,7 @@ function BundleImageUploader({ value, onChange }) {
               {uploading ? <Spinner className="h-5 w-5" /> : <UploadIcon className="h-5 w-5" />}
             </span>
             <p className="text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>
-              {uploading ? "Uploading image..." : isDragging ? "Drop image here" : "Click to upload or drag & drop"}
+              {uploading ? t("admin.deals.toast.imageUploaded") : isDragging ? t("admin.brands.detail.dropImageHere") : t("admin.shared.media.dragDrop")}
             </p>
             <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.df9ec0d4a893")}</p>
           </div>

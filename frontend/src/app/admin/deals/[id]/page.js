@@ -48,28 +48,34 @@ function getDealStatus(deal) {
   return "active";
 }
 
-function formatDealValue(deal) {
+function formatDealValue(deal, t) {
   const type = deal?.type || "";
   const value = Number(deal?.discountValue ?? 0);
+  const off = t("admin.shipping.page.off");
   switch (type) {
-    case "percentage": return `${value}% OFF`;
-    case "fixed_amount": case "fixed": return `Rs. ${value} OFF`;
+    case "percentage": return `${value}% ${off}`;
+    case "fixed_amount": case "fixed": return `Rs. ${value} ${off}`;
     case "buy_x_get_y": {
       const buy = deal?.buyQuantity ?? 1;
       const get = deal?.getQuantity ?? 1;
       const disc = deal?.getDiscountValue ?? 100;
-      return `Buy ${buy} Get ${get} (${disc === 100 ? "Free" : `${disc}% Off`})`;
+      return `Buy ${buy} Get ${get} (${disc === 100 ? t("admin.deals.detail.freeGift") : `${disc}% ${off}`})`;
     }
-    case "free_shipping": return "Free Shipping";
+    case "free_shipping": return t("admin.promotions.ui.generated.36abd54d7de4");
     case "bundle": return `Bundle @ Rs. ${deal?.bundlePrice ?? 0}`;
     default: return value > 0 ? `${value}` : "-";
   }
 }
 
-function formatTarget(target) {
-  if (!target) return "All Products";
-  const map = { all: "All Products", product: "Specific Products", category: "Categories", brand: "Brands", collection: "Collections" };
-  return map[target] || target;
+function formatTarget(target, t) {
+  if (!target) return t("admin.discounts.page.allProducts");
+  const map = {
+    all: "admin.discounts.page.allProducts",
+    product: "admin.discounts.page.specificProducts",
+    category: "admin.discounts.page.categories",
+    brand: "admin.discounts.page.brands",
+  };
+  return map[target] ? t(map[target]) : target;
 }
 
 const getId = (item) => {
@@ -95,12 +101,12 @@ const getBrandLogo = (brand) => {
   return brand.logo?.img_url || null;
 };
 
-// Display label for a user — real name first, fallback email, then role, then "Admin"
-function getUserLabel(user) {
-  if (!user) return "Admin";
+// Display label for a user — real name first, fallback email, then role.
+function getUserLabel(user, t) {
+  if (!user) return t("admin.shared.label.notAvailable");
   if (user.name || user.email) return user.name || user.email;
   if (user.role) return user.role.charAt(0).toUpperCase() + user.role.slice(1);
-  return "Admin";
+  return t("admin.shared.label.notAvailable");
 }
 
 const toDateInput = (value) => {
@@ -540,7 +546,7 @@ export default function DealDetailPage() {
             ) : null}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
               <span className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.createdBy")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{creator ? getUserLabel(creator) : "Admin"}</b>
+                <User className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.createdBy")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{creator ? getUserLabel(creator, t) : t("admin.shared.label.notAvailable")}</b>
               </span>
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />{" "}{t("admin.brands.detail.createdAt")}<b className="font-semibold" style={{ color: "var(--text-primary)" }}>{fdt(deal.created_at || deal.createdAt, locale)}</b>
@@ -566,7 +572,7 @@ export default function DealDetailPage() {
             <button type="button" disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate()}
               className="h-9 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
               style={{ backgroundColor: isActive ? "var(--bg-card)" : "var(--success-soft)", border: `1px solid ${isActive ? "var(--border-color)" : "color-mix(in srgb, var(--success) 28%, transparent)"}`, color: isActive ? "var(--text-primary)" : "var(--success)" }}>
-              <Ban className="w-3.5 h-3.5" /> {isActive ? "Deactivate" : "Activate"}
+              <Ban className="w-3.5 h-3.5" /> {isActive ? t("admin.shared.action.deactivate") : t("admin.shared.action.activate")}
             </button>
             <button type="button" disabled={deleteMutation.isPending} onClick={() => setShowDelete(true)}
               className="h-9 px-3.5 rounded-lg text-[12px] font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50"
@@ -600,7 +606,7 @@ export default function DealDetailPage() {
                   </span>
                 </Field>
                 <Field label={t("admin.discounts.form.discountValue")}>
-                  <span style={{ color: "var(--success)" }}>{formatDealValue(deal)}</span>
+                  <span style={{ color: "var(--success)" }}>{formatDealValue(deal, t)}</span>
                 </Field>
               </div>
 
@@ -608,7 +614,7 @@ export default function DealDetailPage() {
               <div className="space-y-4">
                 <Field label={t("admin.discounts.detail.applyTo")}>
                   <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
-                    {formatTarget(deal.applyTo)}
+                    {formatTarget(deal.applyTo, t)}
                   </span>
                 </Field>
                 <Field label={deal.applyTo === "product" ? "Target Products" : deal.applyTo === "category" ? "Target Categories" : deal.applyTo === "brand" ? "Target Brands" : "Target"}>
@@ -641,13 +647,13 @@ export default function DealDetailPage() {
 
               {/* COLUMN 3 — usage & flags (form fields only) */}
               <div className="space-y-4">
-                <Field label={t("admin.discounts.detail.usageLimit")}>{deal.usageLimit ? String(deal.usageLimit) : "No limit"}</Field>
-                <Field label={t("admin.promotions.ui.generated.fdbbcd998612")}>{deal.perUserLimit ? String(deal.perUserLimit) : "No limit"}</Field>
+                <Field label={t("admin.discounts.detail.usageLimit")}>{deal.usageLimit ? String(deal.usageLimit) : t("admin.shared.label.unlimited")}</Field>
+                <Field label={t("admin.promotions.ui.generated.fdbbcd998612")}>{deal.perUserLimit ? String(deal.perUserLimit) : t("admin.shared.label.unlimited")}</Field>
                 <Field label={t("admin.promotions.ui.generated.19a010ebee80")}>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold"
                     style={{ backgroundColor: isActive ? "var(--success-soft)" : "var(--danger-soft)", color: isActive ? "var(--success)" : "var(--danger)" }}>
                     <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? "var(--success)" : "var(--danger)" }} />
-                    {isActive ? "Active" : "Inactive"}
+                    {isActive ? t("admin.discounts.page.active") : t("admin.discounts.page.inactive")}
                   </span>
                 </Field>
                 <Field label={t("admin.discounts.form.minQuantity")}>{deal.minQuantity ? String(deal.minQuantity) : "—"}</Field>
@@ -849,8 +855,8 @@ export default function DealDetailPage() {
           <InfoCard icon={Activity} title={t("admin.promotions.ui.generated.220a5be56a5d")}>
             <div className="space-y-0.5">
               <DataRow icon={Percent} label={t("admin.promotions.ui.generated.687fe75d1223")} value={deal.type?.replace(/_/g, " ") || "—"} />
-              <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDealValue(deal)} highlight />
-              <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(deal.applyTo)} />
+              <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDealValue(deal, t)} highlight />
+              <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(deal.applyTo, t)} />
               <DataRow icon={Calendar} label={t("admin.discounts.form.startDate")} value={fdt(deal.startDate, locale)} />
               <DataRow icon={Calendar} label={t("admin.promotions.ui.generated.269c8b374312")} value={fdt(deal.endDate, locale)} />
               <div className="flex items-center justify-between gap-3 py-1.5">
@@ -867,14 +873,14 @@ export default function DealDetailPage() {
                 <TrendingUp className="w-4 h-4" style={{ color: "var(--accent)" }} />
                 <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.usageLimit")}</p>
               </div>
-              <p className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.usageLimit ? String(deal.usageLimit) : "Unlimited"}</p>
+              <p className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.usageLimit ? String(deal.usageLimit) : t("admin.shared.label.unlimited")}</p>
             </div>
             <div className="rounded-2xl p-4" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
               <div className="flex items-center gap-2 mb-1.5">
                 <User className="w-4 h-4" style={{ color: "var(--accent)" }} />
                 <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.fdbbcd998612")}</p>
               </div>
-              <p className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.perUserLimit ? String(deal.perUserLimit) : "No limit"}</p>
+              <p className="text-[18px] font-bold" style={{ color: "var(--text-primary)" }}>{deal.perUserLimit ? String(deal.perUserLimit) : t("admin.shared.label.unlimited")}</p>
             </div>
           </div>
         </div>
@@ -886,8 +892,13 @@ export default function DealDetailPage() {
           <table className="w-full text-left">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                {["Date & Time", "Action", "By", "Details"].map((h) => (
-                  <th key={h} className="py-2 pr-4 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
+                {[
+                  { id: "when", label: t("common.date") },
+                  { id: "action", label: t("admin.deals.detail.dealDetails") },
+                  { id: "by", label: t("admin.discounts.detail.createdBy") },
+                  { id: "details", label: t("admin.discounts.detail.detailsModified") },
+                ].map((h) => (
+                  <th key={h.id} className="py-2 pr-4 text-[9px] font-bold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h.label}</th>
                 ))}
               </tr>
             </thead>
@@ -900,7 +911,7 @@ export default function DealDetailPage() {
                 <td className="py-2.5 pr-4">
                   <div className="flex items-center gap-2">
                     {creator ? <Avatar user={creator} size="sm" color="emerald" /> : null}
-                    <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{getUserLabel(creator)}</span>
+                    <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{getUserLabel(creator, t)}</span>
                   </div>
                 </td>
                 <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.0a9dcb3cf2ea")}</td>
@@ -914,7 +925,7 @@ export default function DealDetailPage() {
                   <td className="py-2.5 pr-4">
                     <div className="flex items-center gap-2">
                       {editor ? <Avatar user={editor} size="sm" color="blue" /> : null}
-                      <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{editor ? getUserLabel(editor) : "—"}</span>
+                      <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{editor ? getUserLabel(editor, t) : t("admin.shared.label.notAvailable")}</span>
                     </div>
                   </td>
                   <td className="py-2.5 pr-4 text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.44238ab8b809")}</td>

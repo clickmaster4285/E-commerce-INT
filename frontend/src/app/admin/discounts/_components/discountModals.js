@@ -1,6 +1,6 @@
 "use client";
 
-/* Shared discount modals — moved out of page.js (App Router pages cannot have named exports). */
+/* Shared discount modals â€” moved out of page.js (App Router pages cannot have named exports). */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { attributeApi } from "../../../../apis/admin/attributeApi";
@@ -35,7 +35,7 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
-// ✅ Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
+// âœ… Rupee icon â€” "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
 const RupeeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12M6 8h12M6 13h3m-3 0 8.5 8M9 13c6.667 0 6.667-10 0-10" /></svg>);
 
 const getId = (item) => {
@@ -44,10 +44,13 @@ const getId = (item) => {
   return String(item);
 };
 
-const getName = (item, type, locale = "en") => {
-  if (type === "product") return localizedProductNameOf(item, locale) || item?.title || "Unnamed Product";
-  if (type === "category" || type === "brand") return localizedNameOf(item, locale) || item?.categoryName || item?.brandName || "Unnamed";
-  return item?.name || "Unnamed";
+// Naam DB se aata hai â†’ `localized*Of` already translations map padhta hai.
+// Sirf missing-name fallback k liye `t` chahiye, isliye caller pass karta hai.
+const getName = (item, type, locale = "en", t = null) => {
+  const unnamed = (key) => (t ? t(key) : "");
+  if (type === "product") return localizedProductNameOf(item, locale) || item?.title || unnamed("admin.shared.label.product");
+  if (type === "category" || type === "brand") return localizedNameOf(item, locale) || item?.categoryName || item?.brandName || unnamed("admin.shared.label.name");
+  return localizedNameOf(item, locale) || unnamed("admin.shared.label.name");
 };
 
 const formatCurrency = (amount) => {
@@ -111,7 +114,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               const active = value === opt.value;
               const OptionIcon = opt.icon;
 
-              // ✅ Plain option (icon/description na ho) — purana simple row
+              // âœ… Plain option (icon/description na ho) â€” purana simple row
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
@@ -122,7 +125,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
                 );
               }
 
-              // ✅ Rich row — icon badge + title + example description + selected tick
+              // âœ… Rich row â€” icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
                   className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -198,12 +201,12 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // ✅ Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. percentage max 100) â€” typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}
     onKeyDown={nonNegative ? (e) => {
-      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      // âœ… "-", "+", "e", "E" type karne hi nahi dena (negative value block)
       if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
     } : undefined}
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
@@ -279,7 +282,7 @@ const attrValueText = (value) => {
     if ("value" in value) return attrValueText(value.value);
     if ("label" in value) return attrValueText(value.label);
     if ("name" in value) return attrValueText(value.name);
-    // Nested objects like { "Exterior Color": "BLACK" } — join their values
+    // Nested objects like { "Exterior Color": "BLACK" } â€” join their values
     return Object.values(value).map(attrValueText).filter(Boolean).join(", ");
   }
   return "";
@@ -300,7 +303,7 @@ const getProductAttributes = (product) => {
     });
   }
 
-  // Variant attributes — supports object form { Color: "Red" } and array form [{ name, value }]
+  // Variant attributes â€” supports object form { Color: "Red" } and array form [{ name, value }]
   (product.variants || []).forEach((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return;
@@ -322,7 +325,12 @@ const getProductAttributes = (product) => {
 };
 
 /* ==================== FORM MODAL ==================== */
-const DISCOUNT_TYPE_LABELS = { all: "All Products Discount", product: "Product Discount", category: "Category Discount", brand: "Brand Discount" };
+const DISCOUNT_TYPE_LABELS = {
+  all: "admin.discounts.page.allProductsDiscount",
+  product: "admin.discounts.page.productDiscount",
+  category: "admin.discounts.page.categoryDiscount",
+  brand: "admin.discounts.page.brandDiscount",
+};
 const DISCOUNT_TYPE_SUBTITLES = {
   all: "admin.discounts.detail.appliesToAll",
   product: "admin.discounts.page.applySpecificProducts",
@@ -342,13 +350,13 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
   const { t, locale, dir } = useTranslation();
   const [viewingProduct, setViewingProduct] = useState(null);
 
-  const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
+  const typeLabel = t(DISCOUNT_TYPE_LABELS[formType] || "admin.discounts.page.discount");
   const TypeIcon = DISCOUNT_TYPE_ICONS[formType] || TagIcon;
 
   const selConfig = {
-    product: { key: "selected_ids", items: products, label: t("admin.brands.detail.products"), sub: "Select specific products to include in this discount" },
-    category: { key: "selected_ids", items: categories, label: t("admin.discounts.page.categories"), sub: "Apply this discount to entire categories" },
-    brand: { key: "selected_ids", items: brands, label: t("admin.brands.page.title"), sub: "Apply this discount to specific brands" },
+    product: { key: "selected_ids", items: products, label: t("admin.brands.detail.products"), sub: t("admin.discounts.page.applySpecificProducts") },
+    category: { key: "selected_ids", items: categories, label: t("admin.discounts.page.categories"), sub: t("admin.discounts.page.applyCategories") },
+    brand: { key: "selected_ids", items: brands, label: t("admin.brands.page.title"), sub: t("admin.discounts.page.applyBrands") },
   };
 
   const sel = formType !== "all" ? selConfig[formType] : null;
@@ -421,7 +429,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
               <SectionHeader icon={InfoIcon} title={t("admin.discounts.form.basicInfo")} subtitle={t("admin.discounts.form.basicInfoSubtitle")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="space-y-4">
-                  <FormField label={t("admin.promotions.ui.generated.da79cfc9f31f")} required fullWidth>
+                  <FormField label={t("admin.discounts.form.discountName")} required fullWidth>
                     <TextInput
                       value={formData.name}
                       onChange={(v) => setFormData({ ...formData, name: v })}
@@ -429,7 +437,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                       style={inputStyle}
                     />
                   </FormField>
-                  <FormField label={t("admin.discounts.form.discountCode")} required hint="Enter a unique code, e.g., SUMMER20">
+                  <FormField label={t("admin.discounts.form.discountCode")} required hint={t("admin.discounts.form.codePlaceholder")}>
                     <TextInput
                       value={formData.code}
                       onChange={(v) => { setFormData({ ...formData, code: v }); setFormErrors(prev => ({ ...prev, code: undefined })); }}
@@ -457,7 +465,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
               <section>
                 <SectionHeader
                   icon={TargetIconFor(formType)}
-                  title={`Target Selection — ${sel.label}`}
+                  title={`Target Selection â€” ${sel.label}`}
                   subtitle={sel.sub}
                   right={
                     formType === 'product' && ids.length > 0 ? (
@@ -487,11 +495,11 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                       <div className="min-w-0">
                         <p className="text-[13px] font-semibold truncate">
                           {ids.length > 0
-                            ? `${ids.length} ${sel.label.toLowerCase()} selected`
-                            : `No ${sel.label.toLowerCase()} selected yet`}
+                            ? t("admin.discounts.form.selectedCount", { count: ids.length })
+                            : t("admin.discounts.form.noneSelected", { type: sel.label })}
                         </p>
                         <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
-                          {ids.length > 0 ? "Click below to manage the selection" : `Choose which ${sel.label.toLowerCase()} this discount applies to`}
+                          {ids.length > 0 ? t("admin.discounts.form.clickToManage") : t("admin.discounts.form.targetSelectionFor")}
                         </p>
                       </div>
                     </div>
@@ -538,9 +546,9 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
                                   style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                                 >
-                                  {getInitials(getName(item, formType, locale))}
+                                  {getInitials(getName(item, formType, locale, t))}
                                 </span>
-                                <p className="text-[13px] font-medium truncate">{getName(item, formType, locale)}</p>
+                                <p className="text-[13px] font-medium truncate">{getName(item, formType, locale, t)}</p>
                               </div>
                               <button
                                 type="button"
@@ -606,20 +614,20 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label={t("admin.discounts.form.discountPercentage")} fullWidth hint="Value must be between 0 and 100 (max 100)">
-                      <TextInput type="number" nonNegative max={100} value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.discountPercentage")} fullWidth hint={t("admin.discounts.form.valueRangeHint")}>
+                      <TextInput type="number" nonNegative max={100} value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.percentagePlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
-                    <FormField label={t("admin.discounts.form.discountAmount")} fullWidth hint="Negative values are not allowed (minimum 0)">
-                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.discountAmount")} fullWidth hint={t("admin.discounts.form.negativeHint")}>
+                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.amountPlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_price" && (
-                    <FormField label={t("admin.discounts.form.fixedPrice")} fullWidth hint="Negative values are not allowed (minimum 0)">
-                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 999" style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.fixedPrice")} fullWidth hint={t("admin.discounts.form.negativeHint")}>
+                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.pricePlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
                 </div>
@@ -637,13 +645,13 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                 
                 {/* Row 1: Min Order Amount & Min Quantity */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField label={t("admin.promotions.ui.generated.69c2c12f288e")} hint="Leave empty for no minimum">
+                  <FormField label={t("admin.discounts.form.minOrderAmount")} hint={t("admin.discounts.form.minOrderHint")}>
                     <TextInput 
                       type="number" 
                       nonNegative
                       value={formData.min_order_amount} 
                       onChange={(v) => setFormData({ ...formData, min_order_amount: v })} 
-                      placeholder="e.g., 1000" 
+                      placeholder={t("admin.discounts.form.minOrderPlaceholder")} 
                       style={inputStyle} 
                     />
                   </FormField>
@@ -681,7 +689,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                         integer
                         value={formData.min_quantity} 
                         onChange={(v) => setFormData({ ...formData, min_quantity: v })} 
-                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"} 
+                        placeholder={formData.has_min_quantity ? t("admin.discounts.form.minQuantityPlaceholder") : t("admin.discounts.form.disabledPlaceholder")} 
                         disabled={!formData.has_min_quantity}
                         style={{
                           ...inputStyle,
@@ -701,7 +709,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
                 {/* Row 2: Usage Limits */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField label={t("admin.discounts.form.totalUsageLimit")} hint="Leave empty for unlimited uses">
+                  <FormField label={t("admin.discounts.form.totalUsageLimit")} hint={t("admin.discounts.form.unlimitedHint")}>
                     <TextInput 
                       type="number" 
                       nonNegative
@@ -712,7 +720,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                       style={inputStyle} 
                     />
                   </FormField>
-                  <FormField label={t("admin.promotions.ui.generated.79a6ed65cb12")} hint="Leave empty for unlimited per user">
+                  <FormField label={t("admin.discounts.form.perCustomerLimit")} hint={t("admin.discounts.form.unlimitedHint")}>
                     <TextInput 
                       type="number" 
                       nonNegative
@@ -804,7 +812,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
     if (!term) return items;
-    return items.filter((item) => getName(item, type, locale).toLowerCase().includes(term));
+    return items.filter((item) => getName(item, type, locale, t).toLowerCase().includes(term));
   }, [items, search, type, locale]);
 
   const title = type === "product" ? t("common.product") + "s" : type === "category" ? t("common.category") + "s" : t("common.brand") + "s";
@@ -843,7 +851,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               <TypeIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <h3 className="text-[15px] font-bold truncate">{t(editingDiscount ? "admin.discounts.form.update" : "admin.discounts.form.create")}{sel ? " — " + sel.label : ""}</h3>
+              <h3 className="text-[15px] font-bold truncate">{t(editingDiscount ? "admin.discounts.form.update" : "admin.discounts.form.create")}{sel ? " â€” " + sel.label : ""}</h3>
               <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.563bf1031bfb")}{" "}{title.toLowerCase()}{" "}{t("admin.promotions.ui.generated.f936d324fc3a")}</p>
             </div>
           </div>
@@ -921,7 +929,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                         {image ? (
                           <img
                             src={image}
-                            alt={getName(item, type, locale)}
+                            alt={getName(item, type, locale, t)}
                             className="w-9 h-9 rounded-md object-cover shrink-0"
                             style={{ border: "1px solid var(--border-color)" }}
                             onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
@@ -936,14 +944,14 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                             border: "1px solid var(--border-color)",
                           }}
                         >
-                          {getInitials(getName(item, type, locale))}
+                          {getInitials(getName(item, type, locale, t))}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p
                             className={`text-[13px] truncate ${selected ? "font-semibold" : "font-medium"}`}
                             style={{ color: selected ? "var(--accent)" : "var(--text-primary)" }}
                           >
-                            {getName(item, type, locale)}
+                            {getName(item, type, locale, t)}
                           </p>
                           <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>
                             {formatCurrency(price)}
@@ -956,14 +964,14 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
                           style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
                         >
-                          {getInitials(getName(item, type, locale))}
+                          {getInitials(getName(item, type, locale, t))}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p
                             className={`text-[13px] truncate ${selected ? "font-semibold" : "font-medium"}`}
                             style={{ color: selected ? "var(--accent)" : "var(--text-primary)" }}
                           >
-                            {getName(item, type, locale)}
+                            {getName(item, type, locale, t)}
                           </p>
                         </div>
                       </>
@@ -983,7 +991,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
           <div className="flex items-center gap-2">
             <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
               <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{draftIds.length}</span>{" "}{t("admin.promotions.ui.generated.835f3b50e337")}{type === "product" && draftIds.length > 0 && (
-                <> · <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalDraftValue)}</span></>
+                <> Â· <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalDraftValue)}</span></>
               )}
             </span>
             {draftIds.length > 0 && (
@@ -1019,7 +1027,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
 function SelectedProductRow({ product, price, image, onView, onRemove }) {
   const { t } = useTranslation();
   const { locale } = useTranslation();
-  const name = getName(product, "product", locale);
+  const name = getName(product, "product", locale, t);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
 
   return (
@@ -1058,7 +1066,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
           </span>
           {variantCount > 1 && (
             <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              · {variantCount}{" "}{t("admin.products.table.variantsUnit")}</span>
+              Â· {variantCount}{" "}{t("admin.products.table.variantsUnit")}</span>
           )}
         </div>
       </div>
@@ -1097,13 +1105,13 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
 function ProductDetailsModal({ product, onClose }) {
   const { t } = useTranslation();
   const { locale } = useTranslation();
-  const name = getName(product, "product", locale);
+  const name = getName(product, "product", locale, t);
   const price = getProductPrice(product);
   const image = getProductImage(product);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-  // Category-assigned attributes (Attribute manager) — shown even when no variant value exists
+  // Category-assigned attributes (Attribute manager) â€” shown even when no variant value exists
   const categoryId = product?.category_id?._id || product?.category_id;
   const { data: categoryAttributes = [] } = useQuery({
     queryKey: ["category-attributes", categoryId],
@@ -1117,7 +1125,7 @@ function ProductDetailsModal({ product, onClose }) {
     const have = new Set(base.map((a) => String(a.name).toLowerCase()));
     const assigned = (categoryAttributes || [])
       .filter((a) => a && a.name && a.is_active !== false && !have.has(String(a.name).toLowerCase()))
-      .map((a) => ({ name: a.name, value: "Not set" }));
+      .map((a) => ({ name: a.name, value: t("admin.discounts.detail.notSet") }));
     return [...base, ...assigned];
   }, [product, categoryAttributes]);
 

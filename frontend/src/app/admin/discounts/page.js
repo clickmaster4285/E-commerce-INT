@@ -72,19 +72,28 @@ const getName = (item, type) => {
 
 const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
 
-const formatTarget = (target) => {
-  if (!target) return "All Products";
-  const map = { all: "All Products", all_products: "All Products", product: "Specific Products", specific_products: "Specific Products", category: "Categories", specific_categories: "Categories", brand: "Brands" };
-  return map[target] || String(target).replaceAll("_", " ");
+// Target/value summaries parte hain → inhe `t` chahiye, isliye caller pass karta hai.
+const formatTarget = (target, t) => {
+  if (!target) return t("admin.discounts.page.allProducts");
+  const map = {
+    all: "admin.discounts.page.allProducts",
+    all_products: "admin.discounts.page.allProducts",
+    product: "admin.discounts.page.specificProducts",
+    specific_products: "admin.discounts.page.specificProducts",
+    category: "admin.discounts.page.categories",
+    specific_categories: "admin.discounts.page.categories",
+    brand: "admin.discounts.page.brands",
+  };
+  return map[target] ? t(map[target]) : String(target).replaceAll("_", " ");
 };
 
-const formatValue = (discount) => {
+const formatValue = (discount, t) => {
   const type = discount?.value_type || discount?.valueType || discount?.type || "percentage";
   const value = Number(discount?.value ?? 0);
-  if (type === "percentage") return `${value}% OFF`;
-  if (type === "fixed_amount" || type === "fixed") return `Rs. ${value} OFF`;
-  if (type === "fixed_price") return `Fixed Rs. ${value}`;
-  return `Rs. ${value} OFF`;
+  if (type === "percentage") return `${value}% ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_amount" || type === "fixed") return `${formatCurrency(value)} ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${formatCurrency(value)}`;
+  return `${formatCurrency(value)} ${t("admin.shipping.page.off")}`;
 };
 
 
@@ -589,9 +598,9 @@ export default function DiscountsPage() {
       resetForm();
     },
     onError: (error) => {
-      const msg = error?.response?.data?.message || error?.message || "Failed to save discount";
+      const msg = error?.response?.data?.message || error?.message || t("admin.discounts.toast.saveFailed");
       if (msg && msg.toLowerCase().includes("already exists")) {
-        setFormErrors({ code: "This discount code already exists. Please use a different code." });
+        setFormErrors({ code: t("admin.discounts.validation.codeExists") });
         return;
       }
       toast.error(msg);
@@ -714,7 +723,7 @@ export default function DiscountsPage() {
     if (!String(formData.name || "").trim()) return toast.error(t("admin.discounts.validation.nameRequired"));
     const manualCode = String(formData.code || "").trim();
     if (!manualCode) {
-      setFormErrors({ code: "Discount code is required." });
+      setFormErrors({ code: t("admin.discounts.validation.codeRequired") });
       return;
     }
     if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error(t("admin.discounts.validation.valueRequired"));
@@ -794,10 +803,10 @@ export default function DiscountsPage() {
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const discountTypes = [
-    { key: "all", title: t("admin.discounts.page.allProductsDiscount"), desc: "Apply discount on all products", icon: GlobeIcon },
-    { key: "product", title: t("admin.discounts.page.productDiscount"), desc: "Apply discount on specific products", icon: BoxIcon },
-    { key: "category", title: t("admin.discounts.page.categoryDiscount"), desc: "Apply discount on entire categories", icon: FolderIcon },
-    { key: "brand", title: t("admin.discounts.page.brandDiscount"), desc: "Apply discount on specific brands", icon: AwardIcon },
+    { key: "all", title: t("admin.discounts.page.allProductsDiscount"), desc: t("admin.discounts.page.applyAllProducts"), icon: GlobeIcon },
+    { key: "product", title: t("admin.discounts.page.productDiscount"), desc: t("admin.discounts.page.applySpecificProducts"), icon: BoxIcon },
+    { key: "category", title: t("admin.discounts.page.categoryDiscount"), desc: t("admin.discounts.page.applyCategories"), icon: FolderIcon },
+    { key: "brand", title: t("admin.discounts.page.brandDiscount"), desc: t("admin.discounts.page.applyBrands"), icon: AwardIcon },
   ];
 
   const openDiscountForm = (type) => {
@@ -981,8 +990,8 @@ export default function DiscountsPage() {
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["inactive", "Inactive"]]} />
-              <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", "All Targets"], ["all_products", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", t("admin.brands.ui.allStatus")], ["active", t("admin.discounts.page.active")], ["inactive", t("admin.discounts.page.inactive")]]} />
+              <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", t("common.all")], ["all_products", t("admin.discounts.page.allProducts")], ["product", t("admin.discounts.page.specificProducts")], ["category", t("admin.discounts.page.categories")], ["brand", t("admin.discounts.page.brands")]]} />
             </div>
           </div>
 
@@ -1059,8 +1068,8 @@ export default function DiscountsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, locale)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, locale)}</span></td>
+                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, t)}</td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, t)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons discount={discount} /></td>
                       </tr>
@@ -1082,7 +1091,7 @@ export default function DiscountsPage() {
                   <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, locale)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>
@@ -1149,12 +1158,12 @@ export default function DiscountsPage() {
         <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={cardStyle}>
             <h3 className="text-base font-semibold">{t("admin.discounts.page.deleteQuestion")}</h3>
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.b3ea6f7db57f")}{" "}{deleteTarget.length === 1 ? <span className="font-semibold">{deleteTarget[0]?.name}</span> : `${deleteTarget.length} discounts`}?
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{deleteTarget.length === 1 ? <span className="font-semibold">{nameOf(deleteTarget[0])}</span> : `${deleteTarget.length} discounts`}?
             </p>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.promotions.ui.generated.30f6237868a6")}</> : "Delete"}
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.brands.ui.deleting")}</> : t("admin.discounts.delete.confirm")}
               </button>
             </div>
           </div>
