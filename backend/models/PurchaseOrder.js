@@ -57,6 +57,7 @@ const purchaseOrderSchema = new mongoose.Schema(
     items: { type: [poItemSchema], required: true, validate: (v) => Array.isArray(v) && v.length > 0 },
     subtotal: { type: Number, required: true, min: 0 },
     tax: { type: Number, default: 0, min: 0 },
+    overall_tax: { type: Number, default: 0, min: 0 },
     shipping: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },

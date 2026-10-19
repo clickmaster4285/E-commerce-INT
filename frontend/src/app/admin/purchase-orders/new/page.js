@@ -74,6 +74,7 @@ function NewPOPage() {
   const [lines, setLines] = useState([]); // each line: { ..., included: true }
   const [shipping, setShipping] = useState(0);
   const [discount, setDiscount] = useState(0);
+  const [overallTax, setOverallTax] = useState(0);
   const [notes, setNotes] = useState("");
   const [sideTab, setSideTab] = useState("items");
   const [events, setEvents] = useState([{ t: nowStamp(locale), label: t("admin.purchaseOrders.create.event.started") }]);
@@ -306,6 +307,9 @@ function NewPOPage() {
   };
 
   const includedLines = useMemo(() => lines.filter((l) => l.included !== false), [lines]);
+  const invalidPriceLines = useMemo(() => includedLines.filter((line) => (
+    Number(line.cost_price || 0) > Number(line.sell_price || 0)
+  )), [includedLines]);
 
   // Frontend estimate only — mirrors the backend formula (ticked lines only).
   // The backend re-calculates everything on save and remains the source of truth.
@@ -318,8 +322,9 @@ function NewPOPage() {
     }
     const ship = Math.max(0, Number(shipping) || 0);
     const disc = Math.max(0, Number(discount) || 0);
-    return { subtotal, tax, shipping: ship, discount: disc, total: Math.max(0, Math.round(subtotal + tax + ship - disc)) };
-  }, [includedLines, shipping, discount]);
+    const extraTax = Math.max(0, Number(overallTax) || 0);
+    return { subtotal, tax, overallTax: extraTax, shipping: ship, discount: disc, total: Math.max(0, Math.round(subtotal + tax + extraTax + ship - disc)) };
+  }, [includedLines, shipping, discount, overallTax]);
 
   const buildPayload = () => ({
     vendor_id: vendorId,
@@ -331,11 +336,10 @@ function NewPOPage() {
       tax_rate: Math.min(100, Math.max(0, Number(l.tax_rate) || 0)),
       topup: Number(l.topup) || 0,
       mfg_date: l.mfg_date || undefined,
-      expiry_after_delivery: Math.max(0, Math.floor(Number(l.expiry_after_delivery) || 0)),
-      expiry_after_delivery_unit: l.expiry_after_delivery_unit || "days",
     })),
     shipping: Math.max(0, Number(shipping) || 0),
     discount: Math.max(0, Number(discount) || 0),
+    overall_tax: Math.max(0, Number(overallTax) || 0),
     expected_date: expectedDate || undefined,
     notes: notes.trim() || undefined,
   });
@@ -354,7 +358,7 @@ function NewPOPage() {
     onError: () => { toast.error(t("admin.purchaseOrders.create.toast.saveFailed")); },
   });
 
-  const saveDisabled = createMutation.isPending || !vendorId || !includedLines.length;
+  const saveDisabled = createMutation.isPending || !vendorId || !includedLines.length || invalidPriceLines.length > 0;
   const tickedProducts = pickerFiltered.filter((g) => checkedProducts[String(g.product_id)] === true).length;
 
   // Group order lines by product for display.
@@ -554,33 +558,22 @@ function NewPOPage() {
                       </div>
                       {expanded[group.id] !== false && (
                         <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
-                          <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.35fr)] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
-                            <span>✓</span><span>{t("admin.purchaseOrders.create.productVariant")}</span><span className="text-center">{t("admin.purchaseOrders.create.inStock")}</span><span className="text-right">{t("admin.purchaseOrders.create.costPrice")}</span><span className="text-right">{t("admin.purchaseOrders.create.sellPrice")}</span><span className="text-right">{t("admin.purchaseOrders.create.qty")}</span><span className="text-right">{t("admin.purchaseOrders.create.taxPercent")}</span><span className="text-right">{t("admin.purchaseOrders.create.lineTotal")}</span><span>{t("admin.purchaseOrders.create.mfgDate")}</span><span>{t("admin.purchaseOrders.create.expiryAfterDelivery")}</span>
+                          <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
+                            <span>✓</span><span>Product / Variant</span><span className="text-center">In Stock</span><span className="text-right">Cost Price</span><span className="text-right">Sell Price</span><span className="text-right">Qty</span><span className="text-right">Tax %</span><span className="text-right">Line Total</span><span>Mfg Date</span>
                           </div>
                             {group.lines.map((line) => {
                               const lineTotal = Math.round(Math.max(0, Number(line.cost_price) || 0) * Math.max(1, Math.floor(Number(line.qty_ordered) || 1)));
                               return <div key={String(line.variant_id)} className="min-w-0 px-3 sm:px-4 py-3.5 transition-all duration-200 rounded-xl mx-1 my-0.5" style={{ backgroundColor: line.included === false ? "#f8fafc" : "#fff", opacity: line.included === false ? 0.7 : 1, border: line.included === false ? "1px solid #e2e8f0" : "1px solid transparent" }}>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.35fr)] gap-2 xl:items-center">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)] gap-2 xl:items-start">
                                   <div className="flex items-center"><input type="checkbox" checked={line.included !== false} onChange={(event) => updateLine(line.variant_id, { included: event.target.checked })} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} aria-label={`Include ${line.title || line.sku}`} /></div>
-                                  <div className="min-w-0 flex items-center gap-2"><Thumb src={line.image} alt={line.title || line.product_name} size="w-10 h-10" /><div className="min-w-0"><div className="font-semibold text-xs truncate" title={line.title || t("admin.purchaseOrders.create.defaultVariant")}>{line.title || t("admin.purchaseOrders.create.defaultVariant")}</div><div className="font-mono text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{line.sku || "—"}</div></div></div>
-                                  <div className="min-w-0 xl:flex xl:justify-center"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.inStock")}</div>{stockPill(line)}</div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.costPrice")}</div><input type="number" min={0} step="0.01" value={line.cost_price} onChange={(event) => updateLine(line.variant_id, { cost_price: Math.max(0, Number(event.target.value) || 0) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.sellPrice")}</div><input type="number" min={0} step="0.01" value={line.sell_price ?? ""} onChange={(event) => updateLine(line.variant_id, { sell_price: Math.max(0, Number(event.target.value) || 0) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0 flex items-center gap-2"><Thumb src={line.image} alt={line.title || line.product_name} size="w-10 h-10" /><div className="min-w-0"><div className="font-semibold text-xs truncate" title={line.title || "Default variant"}>{line.title || "Default variant"}</div><div className="font-mono text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{line.sku || "—"}</div></div></div>
+                                  <div className="min-w-0 xl:flex xl:justify-center"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>In Stock</div>{stockPill(line)}</div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Cost Price</div><input type="number" min={0} step="0.01" value={line.cost_price} onChange={(event) => updateLine(line.variant_id, { cost_price: Math.max(0, Number(event.target.value) || 0) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Sell Price</div><input type="number" min={0} step="0.01" value={line.sell_price ?? ""} onChange={(event) => updateLine(line.variant_id, { sell_price: Math.max(0, Number(event.target.value) || 0) })} className={`w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 ${Number(line.cost_price || 0) > Number(line.sell_price || 0) ? "border-red-400 focus:ring-red-100" : "focus:ring-blue-200"}`} style={{ backgroundColor: "#fff", border: Number(line.cost_price || 0) > Number(line.sell_price || 0) ? "1.5px solid #ef4444" : "1.5px solid #e2e8f0", color: "#0f172a" }} />{Number(line.cost_price || 0) > Number(line.sell_price || 0) && <p className="mt-1 max-w-full break-words text-[9px] font-semibold leading-3 text-red-600">Cost exceeds sell price. Please correct it.</p>}</div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Qty</div><input type="number" min={1} step={1} value={line.qty_ordered} onChange={(event) => updateLine(line.variant_id, { qty_ordered: Math.max(1, Math.floor(Number(event.target.value) || 1)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.taxPercent")}</div><input type="number" min={0} max={100} value={line.tax_rate} onChange={(event) => updateLine(line.variant_id, { tax_rate: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.lineTotal")}</div><div className="h-9 px-2 rounded-lg flex items-center justify-end font-extrabold text-[11px] tabular-nums whitespace-nowrap overflow-hidden shadow-inner" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>{money(lineTotal, locale, 0)}</div></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.mfgDate")}</div><input type="date" value={line.mfg_date || ""} onChange={(event) => updateLine(line.variant_id, { mfg_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0">
-                                    <div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.expiryAfterDelivery")}</div>
-                                    <div className="grid grid-cols-[minmax(0,1fr)_75px] gap-1.5">
-                                      <input type="number" min={0} step={1} inputMode="numeric" aria-label={`Expiry duration after delivery for ${line.title || line.sku}`} value={line.expiry_after_delivery ?? ""} onChange={(event) => updateLine(line.variant_id, { expiry_after_delivery: event.target.value === "" ? "" : Math.max(0, Math.floor(Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
-                                      <select aria-label={`Expiry duration unit for ${line.title || line.sku}`} value={line.expiry_after_delivery_unit || "days"} onChange={(event) => updateLine(line.variant_id, { expiry_after_delivery_unit: event.target.value })} className="w-full min-w-0 h-9 px-1 rounded-lg text-[10px] outline-none font-medium shadow-sm focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
-                                        <option value="days">{t("admin.purchaseOrders.create.days")}</option>
-                                        <option value="months">{t("admin.purchaseOrders.create.months")}</option>
-                                        <option value="years">{t("admin.purchaseOrders.create.years")}</option>
-                                      </select>
-                                    </div>
-                                  </div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Tax %</div><input type="number" min={0} max={100} value={line.tax_rate} onChange={(event) => updateLine(line.variant_id, { tax_rate: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Line Total</div><div className="h-9 px-2 rounded-lg flex items-center justify-end font-extrabold text-[11px] tabular-nums whitespace-nowrap overflow-hidden shadow-inner" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>{money(lineTotal, 0)}</div></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>Mfg Date</div><input type="date" value={line.mfg_date || ""} onChange={(event) => updateLine(line.variant_id, { mfg_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                 </div>
                               </div>;
                             })}
@@ -610,6 +603,10 @@ function NewPOPage() {
                   <FieldLabel>{t("admin.purchaseOrders.create.discount")}</FieldLabel>
                   <input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
                 </div>
+                <div>
+                  <FieldLabel>Overall Tax (Rs.)</FieldLabel>
+                  <input type="number" min={0} value={overallTax} onChange={(e) => setOverallTax(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                </div>
               </div>
               <div className="mt-4">
                 <FieldLabel>{t("admin.purchaseOrders.create.notes")}</FieldLabel>
@@ -625,11 +622,12 @@ function NewPOPage() {
                 <h2 className="text-base font-extrabold tracking-tight" style={{ color: "#0f172a" }}>{t("admin.purchaseOrders.create.summary")}</h2>
               </div>
               <div className="text-sm space-y-2.5">
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.subtotal")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal, locale)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.tax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax, locale)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.shippingLabel")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping, locale)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.discountLabel")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount, locale)}</b></div>
-                <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>{t("admin.purchaseOrders.create.total")}</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total, locale)}</span></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Subtotal</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Overall Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
+                <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>Total</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
               </div>
             </section>
           </div>
@@ -656,7 +654,7 @@ function NewPOPage() {
             </div>
             {(lines.length > 0 || vendorId) && (
               <button
-                onClick={() => { if (confirm(t("admin.purchaseOrders.create.clearConfirm"))) { setLines([]); setVendorId(""); setExpectedDate(""); setShipping(0); setDiscount(0); setNotes(""); } }}
+                onClick={() => { if (confirm("Clear this order?")) { setLines([]); setVendorId(""); setExpectedDate(""); setShipping(0); setDiscount(0); setOverallTax(0); setNotes(""); } }}
                 className="mt-3 w-full text-[12px] font-bold transition-all duration-200 hover:scale-[1.02] py-2 rounded-xl" style={{ color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0" }}
               >
                 {t("admin.purchaseOrders.create.clearOrder")}
@@ -686,11 +684,12 @@ function NewPOPage() {
               )}
               {sideTab === "summary" && (
                 <div className="text-sm space-y-1.5">
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.subtotal")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal, locale)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.tax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax, locale)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.shippingLabel")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping, locale)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.discountLabel")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount, locale)}</b></div>
-                  <div className="flex justify-between items-center pt-2 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span style={{ color: "#059669" }}>{t("admin.purchaseOrders.create.total")}</span><span style={{ color: "#059669" }}>{money(totals.total, locale)}</span></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Subtotal</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Overall Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
+                  <div className="flex justify-between items-center pt-2 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span style={{ color: "#059669" }}>Total</span><span style={{ color: "#059669" }}>{money(totals.total)}</span></div>
                 </div>
               )}
               {sideTab === "history" && (

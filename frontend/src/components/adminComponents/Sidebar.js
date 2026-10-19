@@ -38,6 +38,7 @@ import {
   Star, // Added for Featured Products
   SlidersHorizontal, // Added for Attributes
   MessageSquareText, // Reviews
+  ContactRound,
 } from "lucide-react";
 
 // ============================================================
@@ -119,6 +120,10 @@ const sidebarSections = [
     items: ["Vendors", "Purchase Orders"],
   },
   {
+    title: "POS & CUSTOMER MANAGEMENT",
+    items: ["POS", "Customers", "Leads"],
+  },
+  {
     title: "STORE",
     items: ["Store Info"],
   },
@@ -156,6 +161,9 @@ const allMenuItems = [
   { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
   { name: "Vendors", icon: Users, path: "/admin/vendors", permissionKey: "vendors" },
   { name: "Purchase Orders", icon: Package, path: "/admin/purchase-orders", permissionKey: "purchaseOrders" },
+  { name: "Customers", icon: Users, path: "/admin/customers", permissionKey: "customers" },
+  { name: "Leads", icon: ContactRound, path: "/admin/leads", permissionKey: "leads" },
+  { name: "POS", icon: ShoppingCart, path: "/admin/pos", permissionKey: "pos" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
   { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },
 ];
@@ -752,13 +760,13 @@ export default function Sidebar({ onNavigate, userData }) {
                     className="mx-auto my-2 h-px w-6 rounded-full"
                     style={{ backgroundColor: "var(--sidebar-divider)" }}
                   />
-                ) : (
+                ) : section.title !== "POS & CUSTOMER MANAGEMENT" ? (
                   <div className="px-2.5 pt-1.5 pb-1">
                     <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
                       {navLabel("section", section.title)}
                     </span>
                   </div>
-                )}
+                ) : null}
                 <div className="space-y-0.5">
                   {sectionItems.map((item) => {
                     const Icon = item.icon;

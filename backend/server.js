@@ -47,6 +47,9 @@ const attributeRoutes = require("./routes/attributeRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
 const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+const customerRoutes = require("./routes/customerRoutes");
+const leadRoutes = require("./routes/leadRoutes");
+const posRoutes = require("./routes/posRoutes");
 
 // ==========================================
 // APP & SERVER SETUP
@@ -202,6 +205,9 @@ app.use(`${API_PREFIX}/shipping`, shippingRoutes);
 app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
 app.use(`${API_PREFIX}/vendors`, vendorRoutes);
 app.use(`${API_PREFIX}/purchase-orders`, purchaseOrderRoutes);
+app.use(`${API_PREFIX}/customers`, customerRoutes);
+app.use(`${API_PREFIX}/leads`, leadRoutes);
+app.use(`${API_PREFIX}/pos`, posRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
@@ -273,7 +279,7 @@ const seedDefaultData = async () => {
               profile: true, employees: true, discounts: true,
               deals: true, bundles: true, store: true, banners: true,
               manageStock: true, shipping: true, order: true, attribute: true,
-              vendors: true, purchaseOrders: true,
+              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true,
             },
           });
           log.info("✅ Default Admin Employee Created (employees collection)");

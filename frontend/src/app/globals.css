@@ -1276,3 +1276,36 @@ html.dark input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 60px #1e2233 inset;
   -webkit-text-fill-color: #e6e8f0;
 }
+
+/* Keep POS surfaces and controls aligned with the active admin theme. */
+html.dark .admin-pos-workspace [class~="bg-white"] {
+  background-color: var(--bg-card) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="bg-slate-50"], [class~="bg-slate-50/60"], [class~="bg-slate-50/70"], [class~="bg-slate-50/90"],
+  [class~="bg-slate-100"], [class~="bg-slate-100/50"], [class~="bg-blue-50"],
+  [class~="bg-slate-100/60"], [class~="bg-blue-50/40"], [class~="bg-blue-50/50"], [class~="bg-blue-50/60"], [class~="bg-blue-100"]
+) {
+  background-color: var(--bg-card-alt) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="text-slate-900"], [class~="text-slate-800"], [class~="text-slate-700"]
+) {
+  color: var(--text-primary) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="text-slate-600"], [class~="text-slate-500"], [class~="text-slate-400"]
+) {
+  color: var(--text-muted) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="text-blue-700"], [class~="text-blue-600"]
+) {
+  color: var(--accent) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-200/80"],
+  [class~="border-slate-200/90"], [class~="border-blue-100"], [class~="border-blue-200"]
+) {
+  border-color: var(--border-color) !important;
+}
