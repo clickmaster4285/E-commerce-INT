@@ -1044,8 +1044,12 @@ export default function BannersPage() {
   if (!file) return null;
   if (file instanceof File) return getFilePreviewUrl(file);
 
-  const cleanPath = file.startsWith('/') ? file : `/${file}`;
   const baseUrl = API_BASE_URL.replace(/\/api\/?$/, '');
+
+  let cleanPath = file.startsWith('/') ? file : `/${file}`;
+
+  // Remove /api/ from the beginning of the file path
+  cleanPath = cleanPath.replace(/^\/api\//, '/');
 
   return `${baseUrl}${cleanPath}`;
 };
