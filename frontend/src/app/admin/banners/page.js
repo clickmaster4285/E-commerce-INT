@@ -1041,11 +1041,14 @@ export default function BannersPage() {
   const updateNested = (parent, field, value) => setForm((prev) => ({ ...prev, [parent]: { ...prev[parent], [field]: value } }));
 
   const getImagePreview = (file) => {
-    if (!file) return null;
-    if (file instanceof File) return getFilePreviewUrl(file);
-    const cleanPath = file.startsWith('/') ? file : `/${file}`;
-    return `${API_BASE_URL}${cleanPath}`;
-  };
+  if (!file) return null;
+  if (file instanceof File) return getFilePreviewUrl(file);
+
+  const cleanPath = file.startsWith('/') ? file : `/${file}`;
+  const baseUrl = API_BASE_URL.replace(/\/api\/?$/, '');
+
+  return `${baseUrl}${cleanPath}`;
+};
 
   // --- Reusable Styles ---
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
