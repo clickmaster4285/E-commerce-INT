@@ -22,31 +22,11 @@ export async function addLeadAsCustomer(lead) {
     notes,
   };
 
-  const matches = await customerApi.search(lead.email || lead.phone);
-  const existing = matches.find((customer) =>
-    (lead.email && customer.email?.trim().toLowerCase() === lead.email.trim().toLowerCase()) ||
-    (lead.phone && customer.phone?.trim() === lead.phone.trim() && customer.name?.trim().toLowerCase() === customerName.trim().toLowerCase())
-  );
+  // A lead represents its own customer record. Email and phone are contact
+  // details and may be shared, so they must not be used to merge customers.
+  const response = await customerApi.create(customerPayload);
+  const customer = response?.data || response;
 
-  let customer;
-  let alreadyExists = false;
-  if (existing) {
-    const marker = `Converted from lead ${lead.lead_number}`;
-    const response = await customerApi.update(existing._id, {
-      ...customerPayload,
-      name: existing.name || customerName,
-      phone: lead.phone || existing.phone || "",
-      email: lead.email || existing.email || "",
-      address: customerPayload.address || existing.address || "",
-      notes: existing.notes?.includes(marker) ? existing.notes : [existing.notes, notes].filter(Boolean).join("\n\n"),
-    });
-    customer = response?.data || response;
-    alreadyExists = true;
-  } else {
-    const response = await customerApi.create(customerPayload);
-    customer = response?.data || response;
-  }
-
-  await leadApi.updateStatus(lead._id, { status: "Converted", customer_added: true });
-  return { customer, alreadyExists };
+  await leadApi.updateStatus(lead._id, { status: "Customer", customer_added: true, customer_id: customer._id });
+  return { customer, alreadyExists: false };
 }

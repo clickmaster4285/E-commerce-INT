@@ -24,7 +24,7 @@ const STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"];
 const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", delivered: "Received", closed: "Closed", cancelled: "Cancelled" };
 const PAY_STATUSES = ["unpaid", "partial", "paid"];
 const RANGES = [["all", "All time"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]];
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
 function StatCard({ icon: Icon, tint, label, value, delta, down }) {
   return (
@@ -343,7 +343,7 @@ export default function PurchaseOrdersPage() {
             </div>
           )}
 
-          <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-[13px]" style={{ color: "var(--text-muted)" }}>
+          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
             <span>{t("admin.purchaseOrders.list.showing", { from: new Intl.NumberFormat(intlLocale(locale)).format(filtered.length ? (safePage - 1) * PAGE_SIZE + 1 : 0), to: new Intl.NumberFormat(intlLocale(locale)).format((safePage - 1) * PAGE_SIZE + rows.length), total: new Intl.NumberFormat(intlLocale(locale)).format(filtered.length) })}</span>
             <div className="flex items-center gap-1">
               <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronLeft size={14} /></button>
@@ -352,7 +352,7 @@ export default function PurchaseOrdersPage() {
               ))}
               <button disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronRight size={14} /></button>
             </div>
-          </div>
+          </footer>}
         </div>
 
       </div>

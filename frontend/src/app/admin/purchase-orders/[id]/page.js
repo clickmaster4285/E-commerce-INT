@@ -80,8 +80,13 @@ export default function PODetailPage({ params }) {
   const [invoiceNo, setInvoiceNo] = useState("");
   const [payAmount, setPayAmount] = useState("");
   const [cancelReason, setCancelReason] = useState("");
+  const [showAllItems, setShowAllItems] = useState(false);
   const { data: res, isLoading, isError, refetch } = useQuery({ queryKey: ["po", id], queryFn: () => purchaseOrderApi.getById(id) });
   const po = res?.data || null;
+  const taxBase = po ? Math.max(0, Number(po.subtotal || 0) - Number(po.discount || 0)) : 0;
+  const overallTaxPercent = po?.overall_tax_rate != null
+    ? Number(po.overall_tax_rate)
+    : taxBase > 0 ? Number(po?.overall_tax || 0) / taxBase * 100 : 0;
   const refresh = () => qc.invalidateQueries({ queryKey: ["po", id] });
   const act = (fn, ok) => useMutation({ mutationFn: fn, onSuccess: () => { toast.success(ok); refresh(); }, onError: () => toast.error(t("admin.purchaseOrders.toast.updateFailed")) });
   const confirmM = act(() => purchaseOrderApi.confirm(id), t("admin.purchaseOrders.toast.confirmed"));
@@ -126,7 +131,6 @@ export default function PODetailPage({ params }) {
   const canPay = ["delivered", "closed"].includes(status) && dueAmount > 0;
   const vendorId = po.vendor_id?._id || po.vendor_id;
   const vendorActive = po.vendor_id?.is_active;
-  const taxPercent = items.length ? items.reduce((sum, item) => sum + Number(item.tax_rate || 0), 0) / items.length : 0;
   const steps = ["pending", "confirmed", "delivered", "closed", "cancelled"];
   const currentStep = steps.indexOf(status);
   const openDeliver = () => { setInvoiceNo(""); setDeliverOpen(true); };
@@ -180,8 +184,7 @@ export default function PODetailPage({ params }) {
             <Panel title={t("admin.purchaseOrders.view.summary")} icon={FileText}>
               <div className="space-y-2 p-4 text-[13px]">
                 <div className="flex justify-between"><span style={muted}>Subtotal</span><span style={primary}>{money(po.subtotal)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Tax ({taxPercent.toLocaleString()}%)</span><span style={primary}>{money(po.tax)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Overall Tax</span><span style={primary}>{money(po.overall_tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>Tax (overall {new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 2 }).format(overallTaxPercent)}%)</span><span style={primary}>{money(Number(po.tax || 0) + Number(po.overall_tax || 0))}</span></div>
                 <div className="flex justify-between"><span style={muted}>Shipping</span><span style={primary}>{money(po.shipping)}</span></div>
                 <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>{money(po.discount)}</span></div>
                 <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Total</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
@@ -193,7 +196,7 @@ export default function PODetailPage({ params }) {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-xs">
                 <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "admin.purchaseOrders.view.image", "admin.purchaseOrders.view.productVariant", "SKU", "admin.purchaseOrders.view.qtyOrdered", "admin.purchaseOrders.view.costPrice", "admin.purchaseOrders.view.sellPrice", "admin.purchaseOrders.view.lineTotal", "admin.purchaseOrders.view.taxRate", "admin.purchaseOrders.view.expiryAfterDelivery"].map((key) => <th key={key} className="whitespace-nowrap px-2.5 py-2 font-semibold">{key === "#" || key === "SKU" ? key : t(key)}</th>)}</tr></thead>
-                <tbody>{items.map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
+                <tbody>{items.slice(0, showAllItems ? items.length : 10).map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
                   <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || "Product"} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
                   <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{item.name || "—"}</div><div className="truncate" style={muted}>{item.variantTitle || "—"}</div></td>
@@ -208,6 +211,13 @@ export default function PODetailPage({ params }) {
                   {!items.length && <tr><td colSpan={10} className="p-8 text-center text-xs" style={muted}>{t("admin.purchaseOrders.view.noItems")}</td></tr>}</tbody>
               </table>
             </div>
+            {items.length > 10 && (
+              <div className="border-t p-3 text-center" style={{ borderColor: "#eaf0f8" }}>
+                <button type="button" onClick={() => setShowAllItems((current) => !current)} className="rounded-lg px-4 py-2 text-xs font-semibold transition hover:bg-blue-50" style={{ color: "#2878f0" }}>
+                  {showAllItems ? "Show less" : `Show more (${items.length - 10} remaining)`}
+                </button>
+              </div>
+            )}
           </Panel>
 
         </main>

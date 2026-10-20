@@ -72,7 +72,7 @@ const buildItems = async (rawItems) => {
 
 const createPO = async (req, res) => {
   try {
-    const { vendor_id, items: rawItems, shipping = 0, discount = 0, overall_tax = 0, expected_date, due_date, notes } = req.body;
+    const { vendor_id, items: rawItems, shipping = 0, discount = 0, overall_tax = 0, overall_tax_rate = 0, expected_date, due_date, notes } = req.body;
     const vendor = await Vendor.findOne({ _id: vendor_id, is_deleted: false });
     if (!vendor) return res.status(400).json({ success: false, message: "Vendor not found" });
     if (!vendor.is_active) return res.status(400).json({ success: false, message: "Vendor is inactive" });
@@ -85,7 +85,7 @@ const createPO = async (req, res) => {
         po = await PurchaseOrder.create({
           po_number: await generateNextPONumber(), vendor_id: vendor._id,
           vendor_snapshot: { name: vendor.name, company_name: vendor.company_name, phone: vendor.phone, email: vendor.email, address: vendor.address, city: vendor.city },
-          items, subtotal, tax, overall_tax: extraTax, shipping: ship, discount: disc, total,
+          items, subtotal, tax, overall_tax: extraTax, overall_tax_rate: Math.min(100, Math.max(0, Number(overall_tax_rate) || 0)), shipping: ship, discount: disc, total,
           status: "pending", payment_status: "unpaid", paid_amount: 0, due_amount: total,
           expected_date: expected_date || null, due_date: due_date || null, notes: notes || "",
           createdby: req.user?._id || null,
@@ -143,7 +143,7 @@ const updatePO = async (req, res) => {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     if (po.status !== "pending") return res.status(400).json({ success: false, message: "Only pending POs can be edited" });
-    const { items: rawItems, shipping, discount, overall_tax, expected_date, due_date, notes } = req.body;
+    const { items: rawItems, shipping, discount, overall_tax, overall_tax_rate, expected_date, due_date, notes } = req.body;
     if (rawItems) {
       const { items, subtotal, tax } = await buildItems(rawItems);
       po.items = items; po.subtotal = subtotal; po.tax = tax;
@@ -151,6 +151,7 @@ const updatePO = async (req, res) => {
     if (shipping !== undefined) po.shipping = Math.max(0, Number(shipping) || 0);
     if (discount !== undefined) po.discount = Math.max(0, Number(discount) || 0);
     if (overall_tax !== undefined) po.overall_tax = Math.max(0, Number(overall_tax) || 0);
+    if (overall_tax_rate !== undefined) po.overall_tax_rate = Math.min(100, Math.max(0, Number(overall_tax_rate) || 0));
     po.total = Math.max(0, Math.round(po.subtotal + po.tax + po.overall_tax + po.shipping - po.discount));
     po.due_amount = Math.max(0, po.total - po.paid_amount);
     if (expected_date !== undefined) po.expected_date = expected_date || null;

@@ -74,11 +74,25 @@ function NewPOPage() {
   const [lines, setLines] = useState([]); // each line: { ..., included: true }
   const [shipping, setShipping] = useState(0);
   const [discount, setDiscount] = useState(0);
-  const [overallTax, setOverallTax] = useState(0);
+  const [overallTaxRate, setOverallTaxRate] = useState(0);
   const [notes, setNotes] = useState("");
   const [sideTab, setSideTab] = useState("items");
   const [events, setEvents] = useState([{ t: nowStamp(locale), label: t("admin.purchaseOrders.create.event.started") }]);
   const vendorBoxRef = useRef(null);
+  const expectedDateRef = useRef(null);
+
+  const openExpectedDatePicker = () => {
+    const input = expectedDateRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch {}
+    input.focus();
+    input.click();
+  };
 
   const pushEvent = (label) => setEvents((e) => [...e, { t: nowStamp(locale), label }]);
 
@@ -322,9 +336,12 @@ function NewPOPage() {
     }
     const ship = Math.max(0, Number(shipping) || 0);
     const disc = Math.max(0, Number(discount) || 0);
-    const extraTax = Math.max(0, Number(overallTax) || 0);
-    return { subtotal, tax, overallTax: extraTax, shipping: ship, discount: disc, total: Math.max(0, Math.round(subtotal + tax + extraTax + ship - disc)) };
-  }, [includedLines, shipping, discount, overallTax]);
+    const taxBase = Math.max(0, subtotal - disc);
+    const extraTaxRate = Math.min(100, Math.max(0, Number(overallTaxRate) || 0));
+    const extraTax = Math.round(taxBase * extraTaxRate / 100);
+    const totalTax = tax + extraTax;
+    return { subtotal, tax: totalTax, overallTaxAmount: extraTax, shipping: ship, discount: disc, total: Math.max(0, Math.round(subtotal + totalTax + ship - disc)) };
+  }, [includedLines, shipping, discount, overallTaxRate]);
 
   const buildPayload = () => ({
     vendor_id: vendorId,
@@ -339,7 +356,8 @@ function NewPOPage() {
     })),
     shipping: Math.max(0, Number(shipping) || 0),
     discount: Math.max(0, Number(discount) || 0),
-    overall_tax: Math.max(0, Number(overallTax) || 0),
+    overall_tax: totals.overallTaxAmount,
+    overall_tax_rate: Math.min(100, Math.max(0, Number(overallTaxRate) || 0)),
     expected_date: expectedDate || undefined,
     notes: notes.trim() || undefined,
   });
@@ -476,8 +494,10 @@ function NewPOPage() {
               <div>
                 <FieldLabel>{t("admin.purchaseOrders.create.expectedDelivery")}</FieldLabel>
                 <div className="relative">
-                  <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
-                  <CalendarDays size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94a3b8" }} />
+                  <input ref={expectedDateRef} type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="po-expected-date w-full h-10 px-4 pr-10 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                  <button type="button" onClick={openExpectedDatePicker} aria-label="Open expected delivery date calendar" className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-600 transition hover:bg-blue-50 hover:text-blue-700">
+                    <CalendarDays size={16} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -521,10 +541,6 @@ function NewPOPage() {
               <>
                 <div className="flex items-center justify-between gap-2 px-1 py-2 text-[12px] rounded-lg" style={{ backgroundColor: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.1)" }}>
                   <span className="font-semibold px-2" style={{ color: "#2563eb" }}>{t("admin.purchaseOrders.create.variantsIncluded", { included: includedLines.length, total: lines.length })}</span>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setLines((prev) => prev.map((line) => ({ ...line, included: true })))} className="underline font-bold text-[11px] transition hover:text-blue-700" style={{ color: "#2563eb" }}>{t("admin.purchaseOrders.create.selectAll")}</button>
-                    <button onClick={() => setLines((prev) => prev.map((line) => ({ ...line, included: false })))} className="underline font-medium text-[11px] transition hover:text-slate-500" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.deselectAll")}</button>
-                  </div>
                 </div>
                 <div className="mt-2 space-y-3">
                   {groupedLines.map((group) => (
@@ -585,9 +601,9 @@ function NewPOPage() {
               </>
             )}
           </section>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid items-stretch md:grid-cols-2 gap-4">
             {/* 3. Additional Details */}
-            <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
+            <section className="flex h-full flex-col rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}>
                   <Plus size={16} color="#fff" />
@@ -604,8 +620,11 @@ function NewPOPage() {
                   <input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
                 </div>
                 <div>
-                  <FieldLabel>Overall Tax (Rs.)</FieldLabel>
-                  <input type="number" min={0} value={overallTax} onChange={(e) => setOverallTax(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                  <FieldLabel>Overall Tax (%)</FieldLabel>
+                  <div className="relative">
+                    <input type="number" min={0} max={100} step="0.01" value={overallTaxRate} onChange={(e) => setOverallTaxRate(e.target.value)} className="w-full h-10 pl-4 pr-10 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                    <span className="absolute inset-y-0 right-4 flex items-center text-sm font-medium" style={{ color: "#64748b" }}>%</span>
+                  </div>
                 </div>
               </div>
               <div className="mt-4">
@@ -614,17 +633,16 @@ function NewPOPage() {
               </div>
             </section>
             {/* 4. Summary */}
-            <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
+            <section className="flex h-full flex-col rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}>
                   <span className="text-[10px] font-extrabold text-white">Rs</span>
                 </div>
                 <h2 className="text-base font-extrabold tracking-tight" style={{ color: "#0f172a" }}>{t("admin.purchaseOrders.create.summary")}</h2>
               </div>
-              <div className="text-sm space-y-2.5">
+              <div className="flex flex-1 flex-col justify-between gap-2 text-sm">
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Subtotal</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Overall Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
                 <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>Total</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
@@ -686,7 +704,6 @@ function NewPOPage() {
                 <div className="text-sm space-y-1.5">
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Subtotal</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Overall Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
                   <div className="flex justify-between items-center pt-2 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span style={{ color: "#059669" }}>Total</span><span style={{ color: "#059669" }}>{money(totals.total)}</span></div>

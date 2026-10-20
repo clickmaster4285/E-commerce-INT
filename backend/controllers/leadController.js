@@ -4,17 +4,54 @@ const Employee = require("../models/Employee");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
+const Customer = require("../models/Customer");
+const PosSale = require("../models/PosSale");
+const Quote = require("../models/Quote");
+const Invoice = require("../models/Invoice");
+const syncLeadCustomer = require("../utils/syncLeadCustomer");
 
 const enumValues = {
   lead_type: ["Individual", "Business"],
   source: ["Walk-in", "Phone Call", "WhatsApp", "Referral", "Email", "Social Media", "Other"],
-  status: ["New", "Contacted", "Qualified", "Converted", "Lost"],
+  status: ["New", "Contacted", "Qualified", "Customer", "Converted", "Lost"],
 };
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const nextLeadNumber = async () => {
+  const existing = await Lead.find({ lead_number: /^LD-\d+$/ }).select("lead_number").lean();
+  const max = existing.reduce((highest, lead) => Math.max(highest, Number(String(lead.lead_number).slice(3)) || 0), 0);
+  return `LD-${String(max + 1).padStart(4, "0")}`;
+};
 const validId = (id) => mongoose.isValidObjectId(id);
 const actorId = (req) => req.user?._id || req.user?.id || null;
+const actorName = async (req) => req.user?.name || (actorId(req) ? (await Employee.findById(actorId(req)).select("name").lean())?.name : null) || "Staff";
 const idError = (res, entity) => res.status(400).json({ success: false, message: `Invalid ${entity} ID` });
 const validationError = (res, message) => res.status(400).json({ success: false, message });
+const historyLabels = { lead_type: "Lead type", name: "Contact person", phone: "Phone", email: "Email", company_name: "Company", business_type: "Business type", business_address: "Business address", city: "City", source: "Source", status: "Status", assigned_employee_id: "Assigned employee", next_follow_up_date: "Next follow-up", notes: "Notes", estimated_deal_value: "Estimated value", expected_purchase_date: "Expected purchase", product_interest: "Product interest", products: "Products", custom_requirements: "Custom requirements" };
+const historyValue = (value) => {
+  if (value == null || value === "") return "—";
+  if (value instanceof Date) return value.toLocaleString();
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  if (typeof value === "object") return value.name || value._id?.toString() || JSON.stringify(value);
+  return String(value);
+};
+const buildHistoryChanges = async (before, after) => {
+  const employeeIds = [before?.assigned_employee_id, after?.assigned_employee_id].filter(Boolean).map((value) => value?._id || value);
+  const employees = employeeIds.length ? await Employee.find({ _id: { $in: employeeIds } }).select("name").lean() : [];
+  const employeeNames = new Map(employees.map((employee) => [String(employee._id), employee.name]));
+  return Object.keys(historyLabels).flatMap((key) => {
+    const from = before?.[key];
+    const to = after?.[key];
+    const normalize = (value) => ["next_follow_up_date", "expected_purchase_date"].includes(key) && value
+      ? new Date(value).toISOString().slice(0, 10)
+      : value?._id?.toString?.() || value?.toString?.() || JSON.stringify(value ?? "");
+    if (normalize(from) === normalize(to)) return [];
+    const displayValue = (value) => key === "assigned_employee_id"
+      ? employeeNames.get(String(value?._id || value)) || "Unassigned"
+      : historyValue(value);
+    return [{ field: historyLabels[key], from: displayValue(from), to: displayValue(to) }];
+  });
+};
+const historyEntry = async (req, action, summary, changes = []) => ({ action, summary, changes, employee_id: actorId(req), employee_name: await actorName(req), created_at: new Date() });
 const leadFields = ["lead_type", "name", "phone", "email", "company_name", "business_type", "business_address", "city", "source", "status", "product_interest", "category_id", "assigned_employee_id", "estimated_deal_value", "expected_purchase_date", "next_follow_up_date", "products", "custom_requirements", "notes"];
 const pickLeadFields = (body = {}) => Object.fromEntries(leadFields.filter((key) => body[key] !== undefined).map((key) => [key, body[key]]));
 
@@ -72,7 +109,7 @@ function validatePayload(body, partial = false) {
   if (payload.estimated_deal_value !== undefined && payload.estimated_deal_value !== "" && (!Number.isFinite(Number(payload.estimated_deal_value)) || Number(payload.estimated_deal_value) < 0)) return "Deal value must be zero or greater";
   if (payload.estimated_deal_value === "") payload.estimated_deal_value = null;
   for (const key of ["expected_purchase_date", "next_follow_up_date"]) {
-    if (payload[key] === "") payload[key] = null;
+    if (payload[key] === "" || payload[key] === null) payload[key] = null;
     else if (payload[key] !== undefined && Number.isNaN(Date.parse(payload[key]))) return `${key.replaceAll("_", " ")} is invalid`;
   }
   return payload;
@@ -88,7 +125,9 @@ exports.listLeads = async (req, res) => {
       const regex = new RegExp(escapeRegex(search), "i");
       filter.$or = [{ name: regex }, { phone: regex }, { email: regex }, { company_name: regex }, { product_interest: regex }, { lead_number: regex }];
     }
-    for (const key of ["lead_type", "status", "source"]) if (req.query[key] && enumValues[key].includes(req.query[key])) filter[key] = req.query[key];
+    for (const key of ["lead_type", "status", "source"]) if (req.query[key] && enumValues[key].includes(req.query[key])) {
+      filter[key] = key === "status" && req.query[key] === "Customer" ? { $in: ["Customer", "Converted"] } : req.query[key];
+    }
     if (req.query.assigned_employee_id) {
       if (!validId(req.query.assigned_employee_id)) return idError(res, "employee");
       filter.assigned_employee_id = req.query.assigned_employee_id;
@@ -109,18 +148,38 @@ exports.listLeads = async (req, res) => {
       Lead.countDocuments({ ...activeLeads, status: "Qualified" }),
       Lead.countDocuments({ ...activeLeads, next_follow_up_date: { $ne: null, $lte: now } }),
     ]);
-    res.json({ success: true, data: items, stats: { total: allLeads, newThisMonth, qualified, followUpsDue }, pagination: { total, page, limit, pages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrev: page > 1 } });
+    res.json({ success: true, data: items.map((item) => item.status === "Converted" ? { ...item, status: "Customer" } : item), stats: { total: allLeads, newThisMonth, qualified, followUpsDue }, pagination: { total, page, limit, pages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrev: page > 1 } });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to load leads" }); }
 };
 
 exports.getLead = async (req, res) => {
   try {
     if (!validId(req.params.id)) return idError(res, "lead");
-    const lead = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+    let lead = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
       .populate("assigned_employee_id", "name email phone").populate("category_id", "name").populate("activities.employee_id", "name email")
+      .populate("history.employee_id", "name email")
       .populate("products.product_id", "name has_variants").populate("products.variant_id", "title sku selling_price").lean();
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
-    res.json({ success: true, data: lead });
+    if (lead.status === "Customer" || lead.status === "Converted") {
+      const leadDocument = await Lead.findById(lead._id);
+      if (leadDocument) {
+        await syncLeadCustomer(leadDocument, actorId(req));
+        lead = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+          .populate("assigned_employee_id", "name email phone").populate("category_id", "name").populate("activities.employee_id", "name email")
+          .populate("history.employee_id", "name email")
+          .populate("products.product_id", "name has_variants").populate("products.variant_id", "title sku selling_price").lean();
+      }
+    }
+    let customerHistory = { pos: [], quotes: [], invoices: [] };
+    if ((lead.status === "Customer" || lead.status === "Converted") && lead.customer_id) {
+      const [pos, quotes, invoices] = await Promise.all([
+        PosSale.find({ customer_id: lead.customer_id }).sort({ created_at: -1 }).lean(),
+        Quote.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
+        Invoice.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
+      ]);
+      customerHistory = { pos, quotes, invoices };
+    }
+    res.json({ success: true, data: { ...lead, customer_history: customerHistory } });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to load lead" }); }
 };
 
@@ -129,7 +188,15 @@ exports.createLead = async (req, res) => {
     const payload = validatePayload(pickLeadFields(req.body));
     if (typeof payload === "string") return validationError(res, payload);
     if (!(await validateReferences(payload, res))) return;
-    const lead = await Lead.create({ ...payload, lead_number: `LD-${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-${new mongoose.Types.ObjectId().toString().slice(-6).toUpperCase()}`, createdby: actorId(req), updatedby: actorId(req) });
+    const initialStatus = payload.status || "New";
+    const createdEvent = await historyEntry(req, "created", `Lead created with status ${initialStatus}`, [{ field: "Status", from: "—", to: initialStatus }]);
+    let lead;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        lead = await Lead.create({ ...payload, lead_number: await nextLeadNumber(), createdby: actorId(req), updatedby: actorId(req), history: [createdEvent] });
+        break;
+      } catch (error) { if (error.code !== 11000 || attempt === 4) throw error; }
+    }
     res.status(201).json({ success: true, data: lead });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ success: false, message: "Unable to generate a unique lead number. Please try again." });
@@ -146,11 +213,25 @@ exports.updateLead = async (req, res) => {
     if (!(await validateReferences(payload, res))) return;
     const current = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
     if (!current) return res.status(404).json({ success: false, message: "Lead not found" });
+    if (current.status === "Customer" || current.status === "Converted") await syncLeadCustomer(current, actorId(req));
+    if (payload.status === "Lost" && current.status !== "Contacted" && current.status !== "Lost") return validationError(res, "Only contacted leads can be marked as lost");
+    if (payload.status === "Customer" && !current.customer_added) return validationError(res, "Add the lead to Customers before setting this status");
     const mergedValidation = validatePayload({ ...current.toObject(), ...payload });
     if (typeof mergedValidation === "string") return validationError(res, mergedValidation);
     if (payload.lead_type === "Individual") { payload.company_name = ""; payload.business_type = ""; payload.business_address = ""; payload.city = ""; }
+    const before = current.toObject();
     const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, { $set: { ...payload, updatedby: actorId(req) } }, { new: true, runValidators: true });
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
+    const changes = await buildHistoryChanges(before, lead.toObject());
+    if (changes.length) {
+      const statusChanged = changes.some((change) => change.field === "Status");
+      const summary = statusChanged
+        ? `Status changed from ${changes.find((change) => change.field === "Status").from} to ${changes.find((change) => change.field === "Status").to}`
+        : "Lead details updated";
+      lead.history.push(await historyEntry(req, statusChanged ? "status" : "updated", summary, changes));
+      await lead.save();
+    }
+    if (lead.status === "Customer" || lead.status === "Converted") await syncLeadCustomer(lead, actorId(req));
     res.json({ success: true, data: lead });
   } catch (error) { if (error.name === "ValidationError") return validationError(res, error.message); res.status(500).json({ success: false, message: "Unable to update lead" }); }
 };
@@ -159,14 +240,34 @@ exports.updateStatus = async (req, res) => {
   try {
     if (!validId(req.params.id)) return idError(res, "lead");
     if (!enumValues.status.includes(req.body?.status)) return validationError(res, "Choose a valid lead status");
+    if (req.body.status === "Customer" && req.body.customer_added !== true) return validationError(res, "Convert the lead to a customer before setting this status");
+    const current = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } }).select("status lost_reason").lean();
+    if (!current) return res.status(404).json({ success: false, message: "Lead not found" });
+    if (req.body.status === "Lost" && current.status !== "Contacted") return validationError(res, "Only contacted leads can be marked as lost");
     const updates = { status: req.body.status, updatedby: actorId(req) };
     if (req.body.status === "Lost") updates.lost_reason = String(req.body.lost_reason || "").trim().slice(0, 1000);
     if (req.body.customer_added !== undefined) {
-      if (req.body.status !== "Converted" || req.body.customer_added !== true) return validationError(res, "Customer can only be marked added for a converted lead");
+      if (req.body.status !== "Customer" || req.body.customer_added !== true) return validationError(res, "Customer can only be marked added when the lead is converted to a customer");
       updates.customer_added = true;
     }
-    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, { $set: updates }, { new: true, runValidators: true });
+    if (req.body.customer_id !== undefined) {
+      if (req.body.status !== "Customer" || !validId(req.body.customer_id)) return validationError(res, "A valid customer record is required");
+      const customer = await Customer.findOne({ _id: req.body.customer_id, is_deleted: { $ne: true } }).select("_id").lean();
+      if (!customer) return validationError(res, "Customer record not found");
+      updates.customer_id = customer._id;
+    }
+    const changes = [];
+    if (current.status !== req.body.status) changes.push({ field: "Status", from: current.status, to: req.body.status });
+    if (req.body.status === "Lost" && String(current.lost_reason || "") !== String(updates.lost_reason || "")) changes.push({ field: "Lost reason", from: current.lost_reason || "—", to: updates.lost_reason || "—" });
+    const nextStatus = req.body.status === "Customer" ? "Customer" : req.body.status;
+    const summary = current.status !== nextStatus
+      ? `Status changed from ${current.status} to ${nextStatus}`
+      : req.body.status === "Lost" ? "Lost reason updated" : "Lead status confirmed";
+    const update = { $set: updates };
+    if (changes.length) update.$push = { history: await historyEntry(req, "status", summary, changes) };
+    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, update, { new: true, runValidators: true });
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
+    if (lead.status === "Customer") await syncLeadCustomer(lead, actorId(req));
     res.json({ success: true, data: lead });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to update status" }); }
 };
@@ -191,7 +292,10 @@ exports.addActivity = async (req, res) => {
 exports.deleteLead = async (req, res) => {
   try {
     if (!validId(req.params.id)) return idError(res, "lead");
-    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, { $set: { is_deleted: true, deleted_at: new Date(), updatedby: actorId(req) } });
+    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, {
+      $set: { is_deleted: true, deleted_at: new Date(), updatedby: actorId(req) },
+      $push: { history: await historyEntry(req, "deleted", "Lead deleted") },
+    });
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
     res.json({ success: true, message: "Lead deleted" });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to delete lead" }); }
