@@ -17,7 +17,7 @@ import { brandApi } from "../../../apis/admin/brandApi";
 // ==========================================
 // Base URL env se (frontend/.env → NEXT_PUBLIC_SERVERURL).
 // Pehle yahan env se `/api` hatakar wapas `/api` lagaya jata tha
-// (`replace(/\/api$/)` → `${API_BASE}/api`) — pure redundant round-trip jo
+// (`replace(/\/api$/)` → `${API_BASE_URL}/api`) — pure redundant round-trip jo
 // `/api/api` jaisi galti ka bhi risk rakhta tha.
 const API_BASE_URL =
   (process.env.NEXT_PUBLIC_SERVERURL || "").trim().replace(/\/+$/, "") || null;
@@ -332,7 +332,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
     if (file instanceof File) return getFilePreviewUrl(file);
     if (typeof file === 'string') {
       // If it's already a URL string (from DB), use it directly or prepend base
-      return file.startsWith('http') ? file : `${API_BASE}${file.startsWith('/') ? '' : '/'}${file}`;
+      return file.startsWith('http') ? file : `${API_BASE_URL}${file.startsWith('/') ? '' : '/'}${file}`;
     }
     return null;
   };
@@ -1044,7 +1044,7 @@ export default function BannersPage() {
     if (!file) return null;
     if (file instanceof File) return getFilePreviewUrl(file);
     const cleanPath = file.startsWith('/') ? file : `/${file}`;
-    return `${API_BASE}${cleanPath}`;
+    return `${API_BASE_URL}${cleanPath}`;
   };
 
   // --- Reusable Styles ---
