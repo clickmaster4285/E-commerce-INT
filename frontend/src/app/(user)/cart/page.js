@@ -13,6 +13,7 @@ import {
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import DealInfoDropdown from "@/components/user/DealInfoDropdown";
+import { useLocalized } from "@/i18n/localize";
 import { shippingApi } from "@/apis/user/shippingApi";
 import {
   calculateFreeItems,
@@ -75,6 +76,7 @@ function getDealBadgeConfig(deal) {
 
 export default function CartPage() {
   const router = useRouter();
+  const { text } = useLocalized();
   const { cart, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems, clearSelection, applyDealToItem } = useCart();
   const { calculateProductDiscount, deals: dealsList = [], getActiveDealsForProduct } = useDiscounts();
   const [collapsedDeals, setCollapsedDeals] = useState(() => new Set());
@@ -315,6 +317,8 @@ export default function CartPage() {
   };
 
   const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => {
+    const displayName = text(row.name, row.raw?.translations?.name);
+    const displayBrand = text(row.brand, row.raw?.brandTranslations?.name);
     const dealOpen = openDealCardKey === row.key;
     // ✅ Deal button/picker sirf tab jab is product ke liye koi active deal ho
     const hasAvailableDeals = (getActiveDealsForProduct?.({
@@ -337,7 +341,7 @@ export default function CartPage() {
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
-        aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
+        aria-label={isSelected ? `Unselect ${displayName}` : `Select ${displayName}`}
         aria-pressed={isSelected}
         className="shrink-0 p-1 mt-0.5 sm:mt-1 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
       >
@@ -354,7 +358,7 @@ export default function CartPage() {
             {getImgUrl(row.image) ? (
               <img
                 src={getImgUrl(row.image)}
-                alt={row.name}
+                alt={displayName}
                 className="w-24 h-24 rounded-xl object-cover border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] group-hover/img:scale-105 transition-transform duration-300"
               />
             ) : (
@@ -370,9 +374,9 @@ export default function CartPage() {
 
         <div className="flex-1 min-w-0 flex flex-col">
           <Link href={`/product/${row.raw.productId || row.raw.id}`} className="text-sm sm:text-base font-bold text-[var(--user-text)] hover:text-[var(--user-accent)] transition-colors line-clamp-2 leading-snug">
-            {row.name}
+            {displayName}
           </Link>
-          {row.brand && <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-subtle)] mt-1">{row.brand}</p>}
+          {displayBrand && <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-subtle)] mt-1">{displayBrand}</p>}
           {row.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{row.variantTitle}</p>}
           
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -482,7 +486,7 @@ export default function CartPage() {
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); handleRemove(row); }}
-          aria-label={`Remove ${row.name}`}
+          aria-label={`Remove ${displayName}`}
           className="p-2 rounded-lg text-[var(--user-text-subtle)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] transition"
         >
           <Trash2 size={16} />
@@ -924,7 +928,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
-        aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
+        aria-label={isSelected ? `Unselect ${text(row.name, row.raw?.translations?.name)}` : `Select ${text(row.name, row.raw?.translations?.name)}`}
         aria-pressed={isSelected}
         className="shrink-0 p-1 mt-0.5 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
       >
@@ -938,7 +942,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
       {/* Image (unchanged) */}
       <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0">
         {img ? (
-          <img src={img} alt={row.name} className="w-20 h-20 rounded-lg object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
+          <img src={img} alt={text(row.name, row.raw?.translations?.name)} className="w-20 h-20 rounded-lg object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
         ) : (
           <div className="w-20 h-20 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
             <Package size={26} className="text-[var(--user-text-muted)]" />
@@ -950,12 +954,12 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
         {/* ✅ Row 1 — Name (left) + DELETE icon (top-right) */}
         <div className="flex items-start gap-2">
           <Link href={`/product/${row.raw.productId || row.raw.id}`} className="flex-1 min-w-0 text-[0.8125rem] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">
-            {row.name}
+            {text(row.name, row.raw?.translations?.name)}
           </Link>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemove(row); }}
-            aria-label={`Remove ${row.name}`}
+            aria-label={`Remove ${text(row.name, row.raw?.translations?.name)}`}
             className="shrink-0 -mt-0.5 -mr-0.5 h-7 w-7 flex items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)] active:scale-90 transition"
           >
             <Trash2 size={14} />

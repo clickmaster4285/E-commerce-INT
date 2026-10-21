@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customerApi } from "@/apis/admin/customerApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreHorizontal, Pencil, Plus, Search,
@@ -13,12 +14,11 @@ import {
 } from "lucide-react";
 
 const emptyForm = { name: "", phone: "", email: "", address: "", notes: "" };
-const dateTime = (value) => value ? new Date(value).toLocaleString([], {
-  year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-}) : "—";
+const dateTime = (value, locale, t) => value ? new Date(value).toLocaleString(locale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : t("common.notProvided");
 const initials = (name = "") => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "C";
 
 export default function CustomersPage() {
+  const { t, locale, dir } = useTranslation();
   const router = useRouter();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -29,7 +29,7 @@ export default function CustomersPage() {
   const [editingId, setEditingId] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
 
-  const { data: customers = [], isLoading } = useQuery({
+  const { data: customers = [], isLoading, isError, error } = useQuery({
     queryKey: ["customers-admin", search],
     queryFn: () => customerApi.getAll({ search }),
   });
@@ -52,7 +52,7 @@ export default function CustomersPage() {
     mutationFn: (payload) => editingId ? customerApi.update(editingId, payload) : customerApi.create(payload),
     onSuccess: (response) => {
       const saved = response?.data || response;
-      toast.success(editingId ? "Customer updated" : "Customer created");
+      toast.success(t(editingId ? "admin.customers.toast.updated" : "admin.customers.toast.created"));
       setForm(emptyForm);
       setEditingId(null);
       setFormOpen(false);
@@ -60,16 +60,16 @@ export default function CustomersPage() {
       qc.invalidateQueries({ queryKey: ["customers-admin"] });
       qc.invalidateQueries({ queryKey: ["customer-detail"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || "Customer save failed"),
+    onError: (error) => toast.error(error?.response?.data?.message || t("admin.customers.toast.saveFailed")),
   });
   const deleteMutation = useMutation({
     mutationFn: (id) => customerApi.delete(id),
     onSuccess: () => {
-      toast.success("Customer deleted");
+      toast.success(t("admin.customers.toast.deleted"));
       qc.invalidateQueries({ queryKey: ["customers-admin"] });
       qc.invalidateQueries({ queryKey: ["customer-detail"] });
     },
-    onError: (error) => toast.error(error?.response?.data?.message || "Delete failed"),
+    onError: (error) => toast.error(error?.response?.data?.message || t("admin.customers.toast.deleteFailed")),
   });
 
   const thisMonthCount = customers.filter((customer) => {
@@ -92,15 +92,15 @@ export default function CustomersPage() {
     setFormOpen(true);
   };
   const submitForm = () => {
-    if (!form.name.trim()) return toast.error("Customer name is required");
+    if (!form.name.trim()) return toast.error(t("admin.customers.validation.nameRequired"));
     saveMutation.mutate(form);
   };
 
   const statCards = [
-    { title: "Total Customers", value: customers.length.toLocaleString(), meta: "All registered", Icon: Users, tone: "accent" },
-    { title: "New This Month", value: thisMonthCount.toLocaleString(), meta: "Added this month", Icon: Plus, tone: "blue" },
-    { title: "With Phone", value: phoneCount.toLocaleString(), meta: `${percent(phoneCount)}% of customers`, Icon: Smartphone, tone: "green" },
-    { title: "With Email", value: emailCount.toLocaleString(), meta: `${percent(emailCount)}% of customers`, Icon: Mail, tone: "blue" },
+    { title: t("admin.customers.stats.total"), value: customers.length.toLocaleString(locale), meta: t("admin.customers.stats.allRegistered"), Icon: Users, tone: "accent" },
+    { title: t("admin.customers.stats.newThisMonth"), value: thisMonthCount.toLocaleString(locale), meta: t("admin.customers.stats.addedThisMonth"), Icon: Plus, tone: "blue" },
+    { title: t("admin.customers.stats.withPhone"), value: phoneCount.toLocaleString(locale), meta: t("admin.customers.stats.percentOfCustomers", { percent: percent(phoneCount) }), Icon: Smartphone, tone: "green" },
+    { title: t("admin.customers.stats.withEmail"), value: emailCount.toLocaleString(locale), meta: t("admin.customers.stats.percentOfCustomers", { percent: percent(emailCount) }), Icon: Mail, tone: "blue" },
   ];
 
   return (
@@ -109,16 +109,16 @@ export default function CustomersPage() {
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={23} /></span>
           <div>
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Customers</h1>
-            <p className="mt-0.5 text-xs text-[var(--text-muted)] sm:text-sm">Manage your customers and their information</p>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t("admin.customers.title")}</h1>
+            <p className="mt-0.5 text-xs text-[var(--text-muted)] sm:text-sm">{t("admin.customers.subtitle")}</p>
           </div>
         </div>
         <button type="button" onClick={openCreate} className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(37,99,235,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
-          <Plus size={16} /> Add Customer
+          <Plus size={16} /> {t("admin.customers.add")}
         </button>
       </header>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Customer statistics">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("admin.customers.statistics")}>
         {statCards.map(({ title, value, meta, Icon, tone }) => (
           <div key={title} className="group flex min-w-0 items-center gap-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/30 hover:shadow-lg sm:p-5">
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm transition-transform duration-200 group-hover:scale-105 ${tone === "green" ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}><Icon size={19} /></span>
@@ -149,8 +149,9 @@ export default function CustomersPage() {
                 <tr><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Address</th><th className="px-4 py-3">Added On</th><th className="px-4 py-3 text-right">Actions</th></tr>
               </thead>
               <tbody>
-                {isLoading ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--text-muted)]">Loading customers…</td></tr>
-                  : customerList.length === 0 ? <tr><td colSpan={6} className="px-3 py-7"><div className="flex flex-col items-center justify-center text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={18} /></span><p className="text-xs font-semibold text-[var(--text-primary)]">{search ? "No matching customers" : "No customers yet"}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search ? "Try another search or clear your search to see all customers." : "Add your first customer to start building your customer list."}</p><button type="button" onClick={() => search ? (setPage(1), setSearch("")) : openCreate()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[10px] font-semibold text-[var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">{search ? <><X size={12} /> Clear Search</> : <><Plus size={12} /> Add Customer</>}</button></div></td></tr>
+                {isLoading ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--text-muted)]">{t("admin.customers.loading")}</td></tr>
+                  : isError ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--danger-text)]">{error?.response?.data?.message || t("admin.customers.loadFailed")} <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ["customers-admin"] })} className="ms-2 underline">{t("common.retry")}</button></td></tr>
+                  : customerList.length === 0 ? <tr><td colSpan={6} className="px-3 py-7"><div className="flex flex-col items-center justify-center text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={18} /></span><p className="text-xs font-semibold text-[var(--text-primary)]">{search ? t("admin.customers.empty.searchTitle") : t("admin.customers.empty.title")}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search ? t("admin.customers.empty.searchDescription") : t("admin.customers.empty.description")}</p><button type="button" onClick={() => search ? (setPage(1), setSearch("")) : openCreate()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[10px] font-semibold text-[var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">{search ? <><X size={12} /> {t("admin.customers.search.clear")}</> : <><Plus size={12} /> {t("admin.customers.add")}</>}</button></div></td></tr>
                     : pageCustomers.map((customer) => (
                       <tr key={customer._id} onClick={() => router.push(`/admin/customers/${customer._id}`)} className="cursor-pointer border-b border-slate-200 transition-colors duration-150 hover:bg-blue-50/60">
                         <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{initials(customer.name)}</span><div className="min-w-0"><p className="max-w-40 truncate text-[13px] font-semibold text-slate-900">{customer.name}</p><span className="mt-0.5 inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">Customer</span></div></div></td>
@@ -211,7 +212,7 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, on
     const top = flipUp
       ? Math.max(8, rect.top - menuHeight - 4)
       : Math.min(rect.bottom + 4, window.innerHeight - menuHeight - 8);
-    const left = Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    const left = dir === "rtl" ? Math.min(Math.max(8, rect.left), window.innerWidth - menuWidth - 8) : Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
     setPosition({ top, left });
     setOpen(true);
   };
@@ -220,7 +221,7 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, on
     close();
     callback(customer);
   };
-  const menuItem = "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors duration-150";
+  const menuItem = "flex w-full items-center gap-2.5 px-3 py-2 text-start text-[13px] transition-colors duration-150";
   const hover = {
     onMouseEnter: (event) => { event.currentTarget.style.backgroundColor = "var(--bg-row-hover)"; },
     onMouseLeave: (event) => { event.currentTarget.style.backgroundColor = "transparent"; },
@@ -237,4 +238,3 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, on
     </div>, document.body)}
   </>;
 }
-

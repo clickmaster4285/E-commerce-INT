@@ -315,6 +315,8 @@ html:has([lang="ur"]) {
   /* `!important` on an inherited property outranks the descendant
      `tracking-*` / `uppercase` utilities — tracking joins harf in Nastaliq. */
   letter-spacing: 0 !important;
+  /* Add a little room between Urdu words while keeping joined letters intact. */
+  word-spacing: 0.06em;
   text-transform: none !important;
   /* Nastaliq words run long — break instead of overflowing their box. */
   word-break: normal;

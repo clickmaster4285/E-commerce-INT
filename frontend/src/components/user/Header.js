@@ -17,6 +17,7 @@ import Cookies from "js-cookie";
 import LoginModal from "./LoginModal";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 import {
   Menu,
@@ -77,6 +78,7 @@ const getIcon = (name) => {
 function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
   const ref = useRef(null);
   const { t } = useTranslation();
+  const { productNameOf, fieldOf } = useLocalized();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -154,7 +156,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                   {img ? (
                     <Image
                       src={getImageUrl(img)}
-                      alt={p.name}
+                      alt={productNameOf(p)}
                       width={40}
                       height={40}
                       loader={smartImageLoader}
@@ -170,10 +172,10 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--user-text)]">
-                      {p.name}
+                      {productNameOf(p)}
                     </p>
                     <p className="text-[0.6875rem] text-[var(--user-text-muted)] capitalize truncate">
-                      {p.brand_id?.name || p.brand || ""}
+                      {fieldOf(p.brand_id, "name") || p.brand || ""}
                     </p>
                   </div>
                   <span className="whitespace-nowrap text-sm font-medium text-[var(--user-accent)]">
@@ -247,6 +249,7 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
 export default function Header() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -773,11 +776,11 @@ export default function Header() {
                   style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
                 >
                   <span className="w-10 h-10 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] group-hover:bg-[var(--user-accent)] group-hover:text-[var(--user-accent-text)] group-hover:shadow-md transition-all duration-300 shrink-0">
-                    {getIcon(category.name)}
+                    {getIcon(fieldOf(category, "name"))}
                   </span>
                   <div className="flex-1 min-w-0">
                     <span className="block truncate text-sm font-medium capitalize text-[var(--user-text)] transition-colors group-hover:text-[var(--user-accent)]">
-                      {category.name}
+                      {fieldOf(category, "name")}
                     </span>
                     <span className="text-[0.625rem] text-[var(--user-text-muted)]">
                       {t("header.productsCount", { count: category.count })}
@@ -815,7 +818,7 @@ export default function Header() {
                       <span className="relative w-10 h-10 rounded-full bg-white p-2 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
                         <Image
                           src={logoUrl}
-                          alt={brand.name}
+                          alt={fieldOf(brand, "name")}
                           fill
                           loader={smartImageLoader}
                           sizes="40px"
@@ -824,12 +827,12 @@ export default function Header() {
                       </span>
                     ) : (
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-shadow group-hover:shadow-md">
-                        {brand.name?.charAt(0).toUpperCase()}
+                        {fieldOf(brand, "name")?.charAt(0).toUpperCase()}
                       </span>
                     )}
                     <div className="flex-1 min-w-0">
                       <span className="block truncate text-sm font-medium capitalize text-[var(--user-text)] transition-colors group-hover:text-[var(--user-accent)]">
-                        {brand.name}
+                        {fieldOf(brand, "name")}
                       </span>
                       <span className="text-[0.625rem] text-[var(--user-text-muted)]">
                         {t("header.productsCount", { count: productCount })}

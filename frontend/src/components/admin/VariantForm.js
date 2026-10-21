@@ -18,6 +18,7 @@ import {
   Layers,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { productApi } from "@/apis/admin/productApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
@@ -47,6 +48,7 @@ const createEmptyVariant = (sku = "") => ({
 // Compact Sub-Attribute Select
 // ===========================================================
 function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -92,7 +94,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
   const handleAddNew = async () => {
     const trimmed = addText.trim();
     if (!trimmed) {
-      setAddError("Enter a value.");
+      setAddError(t("admin.productForm.enterValue"));
       return;
     }
 
@@ -100,7 +102,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
       (v) => String(v?.value || v?.label || v).trim().toLowerCase() === trimmed.toLowerCase()
     );
     if (exists) {
-      setAddError("Value already exists.");
+      setAddError(t("admin.productForm.valueExists"));
       return;
     }
 
@@ -120,7 +122,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
       toast.success(`Added "${trimmed}"`);
     } catch (err) {
       console.error("Add value error:", err);
-      setAddError("Failed to save value.");
+      setAddError(t("admin.productForm.saveValueFailed"));
     } finally {
       setSaving(false);
     }
@@ -283,7 +285,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
         <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Enter new value..."
+            placeholder={t("admin.productForm.enterNewValue")}
             value={addText}
             onChange={(e) => {
               setAddText(e.target.value);
@@ -349,6 +351,7 @@ const inputStyle = {
 };
 
 export default function VariantForm({ productId: id, onSuccess, onCancel, editVariantId = null, returnTab = null }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -418,7 +421,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
       toast.error(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
-          "Failed to save variant."
+          t("admin.productForm.saveFailed")
       );
     },
   });
@@ -484,7 +487,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
         })
         .catch((error) => {
           console.error("SKU Error:", error);
-          toast.error("SKU auto-generate failed");
+          toast.error(t("admin.productForm.skuFailed"));
         });
     }
   }, [product, initialized, isEditMode, editVariantId]);
@@ -636,7 +639,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
       ["image/jpeg", "image/png", "image/webp"].includes(file.type)
     );
     if (valid.length !== fileArray.length) {
-      toast.error("Only JPG, PNG and WebP allowed");
+      toast.error(t("admin.shared.media.invalidType"));
     }
     try {
       const compressed = await Promise.all(valid.map((file) => compressProductImage(file)));
@@ -650,10 +653,10 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
         variants[0] = { ...variants[0], images: [...variants[0].images, ...imgs] };
         return { ...prev, variants };
       });
-      toast.success("Image optimized");
+      toast.success(t("admin.shared.media.preview"));
     } catch (error) {
       console.error("Image Error:", error);
-      toast.error("Image processing failed");
+      toast.error(t("admin.shared.media.tooLarge"));
     }
   };
 
@@ -710,11 +713,11 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!id) {
-      toast.error("Product ID missing");
+      toast.error(t("admin.productForm.productIdMissing"));
       return;
     }
     if (!formData || !formData.variants?.length) {
-      toast.error("At least one variant is required");
+      toast.error(t("admin.productForm.atLeastOne"));
       return;
     }
 
@@ -748,7 +751,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
               className="mt-4 px-4 py-2 rounded-lg text-sm font-medium"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
             >
-              Go Back
+              {t("admin.shared.action.back")}
             </button>
           </div>
         </div>
@@ -757,21 +760,21 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
   }
       const sku = (variant.sku || "").trim();
       if (!sku) {
-        toast.error("SKU is required");
+        toast.error(t("admin.productForm.skuRequired"));
         return;
       }
 
       const title = (variant.title || "").trim();
       if (!title) {
-        toast.error("Variant title is required");
+        toast.error(t("admin.productForm.titleRequired"));
         return;
       }
       if (variant.selling_price === "") {
-        toast.error("Selling price required");
+        toast.error(t("admin.productForm.priceRequired"));
         return;
       }
       if (Number(variant.selling_price) <= (Number(variant.cost_price) || 0)) {
-        toast.error(`Selling Price must be greater than the saved cost price for "${title}"`);
+        toast.error(t("admin.productForm.priceGreaterThanCost") + " for \"" + title + "\"");
         return;
       }
 
@@ -824,7 +827,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
       updateMutation.mutate({ id, data });
     } catch (error) {
       console.error("Submission error:", error);
-      toast.error("An unexpected error occurred");
+      toast.error(t("admin.shared.state.errorBody"));
     }
   };
 
@@ -870,7 +873,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
             className="mt-4 px-4 py-2 rounded-lg text-sm"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
-            Go Back
+            {t("admin.shared.action.back")}
           </button>
         </div>
       </div>
@@ -911,10 +914,10 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                 </div>
                 <div>
                   <h2 className="text-base font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
-                    {isEditMode ? "Edit Variant" : "Add New Variant"}
+                    {isEditMode ? t("admin.productForm.editVariant") : t("admin.productForm.addVariant")}
                   </h2>
                   <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {isEditMode ? "Update variant details for this product." : "Configure variant details for this product."}
+                    {isEditMode ? t("admin.productForm.updateVariant") : t("admin.productForm.configureVariant")}
                   </p>
                 </div>
               </div>
@@ -929,7 +932,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                   className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Identification
+                  {t("admin.productForm.identification")}
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -940,7 +943,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                     <input
                       required
                       type="text"
-                      placeholder="e.g. SKU-001"
+                      placeholder={t("admin.productForm.skuPlaceholder")}
                       value={variant.sku}
                       readOnly={!!variant._id}
                       onChange={(ev) => updateVariant("sku", ev.target.value)}
@@ -955,7 +958,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                     <input
                       required
                       type="text"
-                      placeholder="e.g. Black / Large"
+                      placeholder={t("admin.productForm.titlePlaceholder")}
                       value={variant.title}
                       onChange={(ev) => updateVariant("title", ev.target.value)}
                       className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -970,7 +973,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                   </label>
                   <textarea
                     rows={2}
-                    placeholder="Optional description..."
+                    placeholder={t("admin.productForm.descPlaceholder")}
                     value={variant.description}
                     onChange={(ev) => updateVariant("description", ev.target.value)}
                     className="px-3 py-2.5 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-[var(--accent)]"
@@ -987,7 +990,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                       className="text-[10px] font-bold uppercase tracking-wider"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Category Attributes
+                      {t("admin.productForm.categoryAttributes")}
                     </h3>
                   </div>
 
@@ -1063,13 +1066,13 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                   className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Pricing & Stock
+                  {t("admin.productForm.pricingStock")}
                 </h3>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { l: "Selling Price", f: "selling_price", p: "0.00", req: true },
-                    { l: "Quantity", f: "quantity", p: "0", req: false },
+                    { l: t("admin.productForm.sellingPrice"), f: "selling_price", p: "0.00", req: true },
+                    { l: t("admin.productForm.quantity"), f: "quantity", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
                     <div key={f}>
                       <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
@@ -1099,7 +1102,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                     <div className="flex items-center gap-2 rounded-lg px-3 py-2 bg-red-500/10 border border-red-500/20 mt-2">
                       <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
                       <p className="text-xs font-medium text-red-500">
-                        Selling Price must be greater than the saved cost price
+                        t("admin.productForm.priceGreaterThanCost")
                       </p>
                     </div>
                   )}
@@ -1111,7 +1114,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                   className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Product Images
+                  {t("admin.productForm.productImages")}
                 </h3>
 
                 {/* Professional Drag & Drop Image Uploader */}
@@ -1138,7 +1141,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-sm font-semibold" style={{ color: isDragOver ? "var(--accent)" : "var(--text-secondary)" }}>
-                          {isDragOver ? "Drop images here" : "Drag & drop images here"}
+                          {isDragOver ? t("admin.shared.media.dragDrop") : t("admin.shared.media.dragDrop")}
                         </p>
                         <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                           or click to browse
@@ -1157,7 +1160,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                       <div key={imageIndex} className="relative group rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: "var(--border-color)" }}>
                         <img
                           src={image.preview}
-                          alt={image.file?.name || "Variant image"}
+                          alt={image.file?.name || t("admin.shared.label.image")}
                           className="h-20 w-20 object-cover"
                         />
                         <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/70 to-transparent">
@@ -1171,7 +1174,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                           type="button"
                           onClick={() => removeImage(imageIndex)}
                           className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white opacity-0 group-hover:opacity-100 transition shadow-md hover:bg-red-700"
-                          aria-label="Remove image"
+                          aria-label={t("admin.shared.media.remove")}
                         >
                           <X className="w-3 h-3" />
                         </button>

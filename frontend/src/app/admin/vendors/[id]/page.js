@@ -19,8 +19,9 @@ const muted = { color: "#64748b" };
 const primary = { color: "#0f172a" };
 const accent = { color: "#2563eb" };
 const accentBtn = { background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff" };
-const money = (n) => `Rs. ${(Math.max(0, Number(n) || 0)).toLocaleString()}`;
-const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : "—");
+const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
+const money = (n, locale = "en") => `Rs. ${new Intl.NumberFormat(intlLocale(locale)).format(Math.max(0, Number(n) || 0))}`;
+const fmtDate = (d, locale = "en") => (d ? new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "medium" }).format(new Date(d)) : "—");
 
 function getStatusLabels(tDetail) {
   return {
@@ -73,7 +74,7 @@ export default function VendorDetailPage({ params }) {
   const { id } = use(params);
   const router = useRouter();
   const qc = useQueryClient();
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.vendors." + k, p);
   const tDetail = (k, p) => __t("admin.vendors.detail." + k, p);
   const tToast = (k, p) => __t("admin.vendors.toast." + k, p);
@@ -111,16 +112,16 @@ export default function VendorDetailPage({ params }) {
     if (!detail) return [];
     const ev = [];
     for (const p of detail.purchaseOrders || []) {
-      ev.push({ t: p.created_at, label: `${p.po_number} created`, sub: `${(p.items || []).length} lines · ${money(p.total)}` });
+      ev.push({ t: p.created_at, label: tDetail("events.poCreated", { number: p.po_number }), sub: tDetail("events.poSummary", { count: new Intl.NumberFormat(intlLocale(locale)).format((p.items || []).length), amount: money(p.total, locale) }) });
       for (const r of p.receivings || []) {
-        const invoice = r.invoice_no ? ` · Invoice ${r.invoice_no}` : "";
-        const receiver = r.received_by_name ? ` · ${r.received_by_name}` : "";
-        ev.push({ t: r.received_at, label: `${p.po_number} received`, sub: `${(r.items || []).reduce((s, x) => s + (x.qty || 0), 0)} units${invoice}${receiver}` });
+        const invoice = r.invoice_no ? tDetail("events.invoice", { invoice: r.invoice_no }) : "";
+        const receiver = r.received_by_name ? tDetail("events.receivedBy", { name: r.received_by_name }) : "";
+        ev.push({ t: r.received_at, label: tDetail("events.poReceived", { number: p.po_number }), sub: tDetail("events.receivingSummary", { count: new Intl.NumberFormat(intlLocale(locale)).format((r.items || []).reduce((s, x) => s + (x.qty || 0), 0)), units: tShared("label.units"), invoice: invoice ? ` · ${invoice}` : "", receiver: receiver ? ` · ${receiver}` : "" }) });
       }
     }
-    for (const pay of paymentsByPo || []) ev.push({ t: pay.paid_at || pay.created_at, label: `Payment of ${money(pay.amount)} received`, sub: pay.po_number || "" });
+    for (const pay of paymentsByPo || []) ev.push({ t: pay.paid_at || pay.created_at, label: tDetail("events.paymentReceived", { amount: money(pay.amount, locale) }), sub: pay.po_number || "" });
     return ev.sort((a, b) => new Date(b.t) - new Date(a.t));
-  }, [detail, paymentsByPo]);
+  }, [detail, paymentsByPo, locale, tDetail, tShared]);
 
   if (isLoading) return <p className="text-sm p-6 text-center" style={{ color: "var(--text-muted)" }}>{tDetail("states.loading")}</p>;
   if (!detail) return <p className="text-sm p-6">{tDetail("states.notFound")} <Link className="underline" href="/admin/vendors">{tDetail("backTo")}</Link></p>;
@@ -203,10 +204,10 @@ export default function VendorDetailPage({ params }) {
                       {(detail.purchaseOrders || []).map((p) => (
                         <tr key={p._id} style={{ borderBottom: "1px solid var(--border-color)" }}>
                           <td className="px-3 py-2"><Link href={`/admin/purchase-orders/${p._id}`} className="font-mono underline" style={{ color: "var(--accent)" }}>{p.po_number}</Link></td>
-                          <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.created_at)}</td>
+                          <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.created_at, locale)}</td>
                           <td className="px-3 py-2">{p.items?.length || 0}</td>
-                          <td className="px-3 py-2 font-semibold">{money(p.total)}</td>
-                          <td className="px-3 py-2">{money(p.paid_amount)}</td>
+                          <td className="px-3 py-2 font-semibold">{money(p.total, locale)}</td>
+                          <td className="px-3 py-2">{money(p.paid_amount, locale)}</td>
                           <td className="px-3 py-2"><Pill tone={statusTone(p.status)}>{STATUS_LABEL[p.status] || p.status}</Pill></td>
                         </tr>
                       ))}
@@ -225,8 +226,8 @@ export default function VendorDetailPage({ params }) {
                         {(paymentsByPo || []).map((payment, index) => (
                           <tr key={payment._id || `${payment.po_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                             <td className="px-3 py-2.5"><Link href={`/admin/purchase-orders/${payment.po_id}`} className="font-mono font-semibold hover:underline" style={accent}>{payment.po_number || tDetail("viewPO")}</Link></td>
-                            <td className="px-3 py-2.5" style={muted}>{fmtDate(payment.paid_at || payment.created_at)}</td>
-                            <td className="px-3 py-2.5 font-bold" style={primary}>{money(payment.amount)}</td>
+                            <td className="px-3 py-2.5" style={muted}>{fmtDate(payment.paid_at || payment.created_at, locale)}</td>
+                            <td className="px-3 py-2.5 font-bold" style={primary}>{money(payment.amount, locale)}</td>
                           </tr>
                         ))}
                         {!(paymentsByPo || []).length && <tr><td colSpan={3} className="p-8 text-center text-sm" style={muted}>{tDetail("states.noPayments")}</td></tr>}
@@ -258,7 +259,7 @@ export default function VendorDetailPage({ params }) {
               {[[tDetail("summary.purchased"), detail.total_purchased, "#2563eb"], [tDetail("summary.paid"), detail.total_paid, "#079878"], [tDetail("summary.balance"), detail.balance_payable, "#cf3348"]].map(([label, amount, color]) => (
                 <div key={label} className="min-w-0 px-1">
                   <div className="text-[11px]" style={muted}>{label}</div>
-                  <div className="mt-1 break-words text-[13px] font-extrabold" style={{ color }}>{money(amount)}</div>
+                  <div className="mt-1 break-words text-[13px] font-extrabold" style={{ color }}>{money(amount, locale)}</div>
                 </div>
               ))}
             </div>
@@ -267,9 +268,9 @@ export default function VendorDetailPage({ params }) {
             <div className="space-y-2 p-3">
               {recentPOs.map((p) => (
                 <Link key={p._id} href={`/admin/purchase-orders/${p._id}`} className="flex items-center justify-between gap-2 rounded-xl border p-3 transition hover:border-blue-200 hover:bg-blue-50/40" style={{ borderColor: "#eaf0f8" }}>
-                  <div className="min-w-0 text-[12px]"><div className="truncate font-mono font-bold" style={primary}>{p.po_number}</div><div className="mt-0.5" style={muted}>{fmtDate(p.created_at)}</div></div>
+                  <div className="min-w-0 text-[12px]"><div className="truncate font-mono font-bold" style={primary}>{p.po_number}</div><div className="mt-0.5" style={muted}>{fmtDate(p.created_at, locale)}</div></div>
                   <Pill tone={statusTone(p.status)}>{STATUS_LABEL[p.status] || p.status}</Pill>
-                  <b className="whitespace-nowrap text-[12px]" style={primary}>{money(p.total)}</b>
+                  <b className="whitespace-nowrap text-[12px]" style={primary}>{money(p.total, locale)}</b>
                 </Link>
               ))}
               {!recentPOs.length && <p className="text-xs text-center py-4" style={{ color: "var(--text-muted)" }}>{tDetail("states.noOrders")}</p>}

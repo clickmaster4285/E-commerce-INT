@@ -6,6 +6,7 @@ import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
 import { useStockSocketSync } from "../../../hooks/admin/useStockSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedField } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (url) => {
@@ -134,21 +135,21 @@ const explanationOf = (h) => {
 
 const formatDateTime = (date, locale = "en") => {
   if (!date) return "—";
-  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale, {
     day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
   }).format(new Date(date));
 };
 
-const formatNumber = (value, locale) => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(Number(value) || 0);
+const formatNumber = (value, locale) => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale).format(Number(value) || 0);
 
 /* ================= Small Components ================= */
 const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const image = getImageUrl(item?.image);
   return image ? (
     <img
       src={image}
-      alt={item?.product_name || t("admin.manageStock.page.product")}
+      alt={localizedField(item.product_name, item.product_translations, locale) || t("admin.manageStock.page.product")}
       className={`${size} shrink-0 rounded-lg object-cover`}
       style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
     />
@@ -531,14 +532,14 @@ export default function ManageStockPage() {
                           const status = getStockStatus(item);
                           // ✅ Category/brand assign nahi hai to ye line bilkul render nahi hoti
                           //    (backend ab "Uncategorized"/"No brand" jaisa fake text nahi bhejta).
-                          const metaLine = [item.category_name, item.brand_name].filter(Boolean).join(" · ");
+                          const metaLine = [localizedField(item.category_name, item.category_translations, locale), localizedField(item.brand_name, item.brand_translations, locale)].filter(Boolean).join(" · ");
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
 <td className="px-4 py-2.5">
   <div className="flex items-center gap-2.5">
     <ProductThumbnail item={item} />
     <div className="flex items-center gap-1.5 min-w-0">
-      <span className="font-medium text-[13px] truncate max-w-[160px] block">{item.product_name}</span>
+      <span className="font-medium text-[13px] truncate max-w-[160px] block">{localizedField(item.product_name, item.product_translations, locale)}</span>
         {metaLine && (
           <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{metaLine}</span>
         )}
@@ -588,10 +589,10 @@ export default function ManageStockPage() {
                           </div>
                                                <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-[13px] font-medium truncate leading-tight">{item.product_name}</p>
+                              <p className="text-[13px] font-medium truncate leading-tight">{localizedField(item.product_name, item.product_translations, locale)}</p>
                               {item.product_is_deleted && (
                                 <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-                                  Deleted
+                                  {t("admin.manageStock.page.deleted")}
                                 </span>
                               )}
                             </div>
@@ -600,7 +601,7 @@ export default function ManageStockPage() {
                         </div>
                         <div className="flex items-center justify-between gap-2 min-w-0">
                           <span className="text-[12px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>
-                            {item.quantity} units
+                            {formatNumber(item.quantity, locale)} {t("admin.manageStock.page.units")}
                           </span>
                           <StatusPill status={status} />
                         </div>
@@ -610,7 +611,7 @@ export default function ManageStockPage() {
                             className="flex-shrink-0 min-h-[44px] px-3 rounded-md transition hover:opacity-80 flex items-center justify-center text-[12px] font-semibold gap-1.5"
                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
                           >
-                            <EyeIcon className="w-4 h-4" /> Details
+                            <EyeIcon className="w-4 h-4" /> {t("admin.manageStock.page.details")}
                           </button>
                           <button
                             onClick={() => openAdjustModal(item)}
@@ -618,7 +619,7 @@ export default function ManageStockPage() {
                             className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center text-[12px] font-semibold gap-1.5"
                             style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                           >
-                            <EditIcon className="w-4 h-4" /> Adjust
+                            <EditIcon className="w-4 h-4" /> {t("admin.manageStock.page.adjust")}
                           </button>
                         </div>
                       </div>
@@ -630,9 +631,9 @@ export default function ManageStockPage() {
 
             {!loading && !isError && (stockPagination?.total || 0) > itemsPerPage && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>Showing {paginationStart}-{paginationEnd} of {stockPagination?.total || stockItems.length} stock items</p>
+                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingItemsRange", { from: formatNumber(paginationStart, locale), to: formatNumber(paginationEnd, locale), total: formatNumber(stockPagination?.total || stockItems.length, locale) })}</p>
                 <div className="flex items-center gap-2">
-                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {currentPage} of {stockTotalPages}</span>
+                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(currentPage, locale), pages: formatNumber(stockTotalPages, locale) })}</span>
                   <button onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                   <span className="hidden sm:inline-flex items-center gap-1">
                     {renderPageNumbers(currentPage, stockTotalPages, setCurrentPage)}
@@ -674,12 +675,12 @@ export default function ManageStockPage() {
                         const isSet = h.adjustment_type === "set";
                         return (
                           <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistoryItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
-                            <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={h.product_name} /><span className="font-medium text-[13px] truncate max-w-[150px]">{h.product_name}</span></div></td>
+                            <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={localizedField(h.product_name, h.product_translations, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{localizedField(h.product_name, h.product_translations, locale)}</span></div></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.variant_title}</span></td>
-                            <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{h.previous_quantity} units</span></td>
+                            <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{formatNumber(h.previous_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "var(--warning)" : change > 0 ? "var(--success-text)" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
-                            <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{h.new_quantity} units</span></td>
+                            <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{formatNumber(h.new_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{h.reason || "—"}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[12px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDateTime(h.created_at, locale)}</span></td>
@@ -694,9 +695,9 @@ export default function ManageStockPage() {
 
             {!historyLoading && (historyPagination?.total || 0) > itemsPerPage && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>Showing {(historyPage - 1) * itemsPerPage + 1}-{Math.min(historyPage * itemsPerPage, historyPagination?.total || historyItems.length)} of {historyPagination?.total || historyItems.length} records</p>
+                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingRecordsRange", { from: formatNumber((historyPage - 1) * itemsPerPage + 1, locale), to: formatNumber(Math.min(historyPage * itemsPerPage, historyPagination?.total || historyItems.length), locale), total: formatNumber(historyPagination?.total || historyItems.length, locale) })}</p>
                 <div className="flex items-center gap-2">
-                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {historyPage} of {historyPagination?.pages || 1}</span>
+                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(historyPage, locale), pages: formatNumber(historyPagination?.pages || 1, locale) })}</span>
                   <button onClick={() => historyPage > 1 && setHistoryPage(historyPage - 1)} disabled={historyPage === 1} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                   <span className="hidden sm:inline-flex items-center gap-1">
                     {renderPageNumbers(historyPage, historyPagination?.pages || 1, setHistoryPage)}
@@ -729,7 +730,7 @@ export default function ManageStockPage() {
                   <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                   <div className="min-w-0">
                     <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.stockDetails")}</h3>
-                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
+                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{localizedField(detailsTarget.product_name, detailsTarget.product_translations, locale)}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-[11px] truncate max-w-[180px]" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</span>
                       <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsTarget.sku}</span>
@@ -753,7 +754,7 @@ export default function ManageStockPage() {
                     <div className="flex items-center gap-3">
                       <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                       <div className="min-w-0">
-                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
+                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{localizedField(detailsTarget.product_name, detailsTarget.product_translations, locale)}</p>
                         <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</p>
                       </div>
                     </div>
@@ -792,7 +793,7 @@ export default function ManageStockPage() {
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                   <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                     <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.stockHistory")}</h4>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsHistory.length} records</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{t("admin.manageStock.page.recordsCount", { count: formatNumber(detailsHistory.length, locale) })}</span>
                   </div>
                   <div className="p-4">
                     {detailsHistoryLoading ? (
@@ -816,7 +817,7 @@ export default function ManageStockPage() {
                             <div key={h._id} className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[13px] font-bold" style={{ color: changeColor(change) }}>
-                                  {change > 0 ? `+${change}` : change} units
+                                  {change > 0 ? `+${formatNumber(change, locale)}` : formatNumber(change, locale)} {t("admin.manageStock.page.units")}
                                 </span>
                                 <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{h.reason || h.adjustment_type || "—"}</span>
                               </div>
@@ -849,7 +850,7 @@ export default function ManageStockPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.action")}</span>
                           <span className="text-[12px] font-semibold" style={{ color: changeColor(latest.change_quantity ?? 0) }}>
-                            {(latest.change_quantity ?? 0) > 0 ? "Added" : "Removed"} {Math.abs(latest.change_quantity ?? 0)} units
+                            {t((latest.change_quantity ?? 0) > 0 ? "admin.manageStock.page.added" : "admin.manageStock.page.removed")} {formatNumber(Math.abs(latest.change_quantity ?? 0), locale)} {t("admin.manageStock.page.units")}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
@@ -881,7 +882,7 @@ export default function ManageStockPage() {
                   className="flex-1 h-10 rounded-lg text-[13px] font-semibold transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}
                 >
-                  Adjust Stock
+                  {t("admin.manageStock.page.adjustStock")}
                 </button>
               </div>
             </div>
@@ -913,7 +914,7 @@ export default function ManageStockPage() {
                   <div className="flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <ProductThumbnail item={adjustTarget} size="h-12 w-12" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{adjustTarget.product_name}</p>
+                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{localizedField(adjustTarget.product_name, adjustTarget.product_translations, locale)}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{adjustTarget.sku}</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{adjustTarget.title}</span>
@@ -935,8 +936,8 @@ export default function ManageStockPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.adjustment")}</p>
                   <div className="grid grid-cols-2 gap-3 mb-3.5">
                     {[
-                      { value: "add", label: "Add Stock", icon: "+", color: "var(--success-text)" },
-                      { value: "remove", label: "Remove Stock", icon: "−", color: "var(--danger)" },
+                      { value: "add", labelKey: "admin.manageStock.page.addStock", icon: "+", color: "var(--success-text)" },
+                      { value: "remove", labelKey: "admin.manageStock.page.removeStock", icon: "−", color: "var(--danger)" },
                     ].map((opt) => {
                       const isActive = adjustForm.type === opt.value;
                       const currentStock = Number(adjustTarget.quantity ?? 0);
@@ -960,12 +961,12 @@ export default function ManageStockPage() {
                             }}
                           >
                             <span className="text-[16px] font-bold leading-none">{opt.icon}</span>
-                            <span className="text-[11px] font-medium leading-tight mt-0.5">{opt.label}</span>
+                            <span className="text-[11px] font-medium leading-tight mt-0.5">{t(opt.labelKey)}</span>
                           </button>
                           
                           {opt.value === "remove" && isRemoveDisabled && (
                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10" style={{ backgroundColor: "var(--danger)", color: "#fff", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
-                              No stock available to remove
+                              {t("admin.manageStock.page.noStockToRemove")}
                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent" style={{ borderTopColor: "var(--danger)" }} />
                             </div>
                           )}
@@ -1008,7 +1009,7 @@ export default function ManageStockPage() {
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <InfoIcon className="w-3.5 h-3.5" style={{ color: "var(--warning)" }} />
                         <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                          Maximum removable: <span className="font-semibold" style={{ color: "var(--warning)" }}>{adjustTarget.quantity} units</span>
+                          {t("admin.manageStock.page.maximumRemovable", { quantity: formatNumber(adjustTarget.quantity, locale) })} <span className="font-semibold" style={{ color: "var(--warning)" }}>{t("admin.manageStock.page.units")}</span>
                         </p>
                       </div>
                     )}

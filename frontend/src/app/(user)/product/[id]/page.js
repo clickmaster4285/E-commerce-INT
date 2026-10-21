@@ -20,6 +20,8 @@ import ProductRating, { ReviewMediaGallery, StoreResponse } from "@/components/u
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useWishlist } from "@/components/user/WishlistContext";
+import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const DEFAULT_QTY = 1;
@@ -60,17 +62,14 @@ const attrEntries = (attributes, limit) => {
   return typeof limit === "number" ? list.slice(0, limit) : list;
 };
 
-const getDealBadgeText = (deal) => {
-  if (!deal?.type) return deal?.name || "Deal";
-  if (deal.type === "percentage") return Number(deal.discountValue) > 0 ? `${deal.discountValue}% OFF` : null;
-  if (deal.type === "fixed_amount") return Number(deal.discountValue) > 0 ? `Rs. ${deal.discountValue} OFF` : null;
-  if (deal.type === "buy_x_get_y") {
-    const b = deal.buyQuantity || 0, g = deal.getQuantity || 0;
-    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+const getDealBadgeText = (deal, t) => {
+  if (!deal?.type) return t("admin.deals.page.deal");
+  if (deal.type === "percentage" || deal.type === "fixed_amount") {
+    return Number(deal.discountValue) > 0
+      ? `${deal.type === "percentage" ? `${deal.discountValue}%` : `Rs. ${deal.discountValue}`} ${t("admin.discounts.page.discount")}`
+      : null;
   }
-  if (deal.type === "bundle") return "Bundle Deal";
-  if (deal.type === "free_shipping") return "Free Shipping";
-  return deal.name || "Deal";
+  return t("admin.deals.page.offer");
 };
 
 // ✅ Flash-sale countdown — sirf real deal.endDate se
@@ -183,19 +182,22 @@ function useStickyBar() {
 
 /* ================= Daraz-style pieces (sirf real data) ================= */
 
-const Breadcrumb = memo(({ categoryId, categoryName, productName }) => (
-  <nav className="flex items-center gap-1 text-xs text-[var(--user-text-muted)] flex-wrap py-3">
-    <Link href="/" className="text-[var(--user-accent)] hover:underline">Home</Link>
-    {categoryName && (
-      <>
-        <ChevronRight size={12} className="opacity-50" />
-        <Link href={`/?category=${categoryId}`} className="text-[var(--user-accent)] hover:underline">{categoryName}</Link>
-      </>
-    )}
-    <ChevronRight size={12} className="opacity-50" />
-    <span className="text-[var(--user-text-secondary)] truncate max-w-[12rem] sm:max-w-[24rem] lg:max-w-[32rem]">{productName}</span>
-  </nav>
-));
+const Breadcrumb = memo(({ categoryId, categoryName, productName }) => {
+  const { t } = useTranslation();
+  return (
+    <nav className="flex items-center gap-1 text-xs text-[var(--user-text-muted)] flex-wrap py-3">
+      <Link href="/" className="text-[var(--user-accent)] hover:underline">{t("mobileNav.home")}</Link>
+      {categoryName && (
+        <>
+          <ChevronRight size={12} className="opacity-50" />
+          <Link href={`/?category=${categoryId}`} className="text-[var(--user-accent)] hover:underline">{categoryName}</Link>
+        </>
+      )}
+      <ChevronRight size={12} className="opacity-50" />
+      <span className="text-[var(--user-text-secondary)] truncate max-w-[12rem] sm:max-w-[24rem] lg:max-w-[32rem]">{productName}</span>
+    </nav>
+  );
+});
 Breadcrumb.displayName = "Breadcrumb";
 
 const Stars = memo(({ value = 0, size = 13 }) => (
@@ -212,17 +214,19 @@ const Stars = memo(({ value = 0, size = 13 }) => (
 Stars.displayName = "Stars";
 
 function ReviewComment({ comment }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   if (!comment) return null;
   return (
     <div>
       <p className={`whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-4"}`}>{comment}</p>
-      {comment.length > 220 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? "Read less" : "Read more"}</button>}
+      {comment.length > 220 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? t("admin.reviews.ui.readLess") : t("admin.reviews.ui.readMore")}</button>}
     </div>
   );
 }
 
 const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
+  const { t } = useTranslation();
   const stripRef = useRef(null);
   const imageFrameRef = useRef(null);
   const lensRef = useRef(null);
@@ -395,7 +399,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
           <div className="w-full h-full flex items-center justify-center bg-white"><Package size={64} strokeWidth={1.25} className="text-gray-300" /></div>
         )}
         {stock === 0 && (
-          <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Out of Stock</span>
+          <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">{t("admin.productDetail.page.outOfStock")}</span>
         )}
         {stock > 0 && stock < 5 && (
           <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Only {stock} left</span>
@@ -431,7 +435,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
           <button
             type="button"
             onClick={() => stepImage(-1)}
-            aria-label="Previous image"
+            aria-label={t("admin.productDetail.page.previousImage")}
             className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
           >
             <ChevronLeft size={18} />
@@ -443,7 +447,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
                 type="button"
                 data-img-url={url}
                 onClick={() => onImageSelect(url)}
-                aria-label={`View image ${i + 1}`}
+                aria-label={t("admin.productDetail.page.productImageNumber", { number: i + 1 })}
                 aria-current={url === mainImage}
                 className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-80 hover:opacity-100"}`}
               >
@@ -454,7 +458,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
           <button
             type="button"
             onClick={() => stepImage(1)}
-            aria-label="Next image"
+            aria-label={t("admin.productDetail.page.nextImage")}
             className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
           >
             <ChevronRight size={18} />
@@ -469,6 +473,7 @@ Gallery.displayName = "Gallery";
 // ✅ Product details images — pehle sirf pehli image (neeche se fade), "View More" par saari images
 const COLLAPSED_IMAGE_HEIGHT = 620;
 const DetailImages = memo(({ productName, images, onZoom }) => {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   if (!images?.length) return null;
   const hasMore = images.length > 1;
@@ -504,7 +509,7 @@ const DetailImages = memo(({ productName, images, onZoom }) => {
             aria-expanded={expanded}
             className="border border-[var(--user-accent)] px-8 py-2 text-sm font-medium uppercase text-[var(--user-accent)] transition hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
           >
-            {expanded ? "View Less" : `View More (${images.length - 1})`}
+            {expanded ? t("admin.productDetail.page.showLess") : `${t("admin.productDetail.page.showMore")} (${images.length - 1})`}
           </button>
         </div>
       )}
@@ -514,6 +519,7 @@ const DetailImages = memo(({ productName, images, onZoom }) => {
 DetailImages.displayName = "DetailImages";
 
 const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
+  const { t } = useTranslation();
   if (!show) return null;
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl md:hidden" style={{ animation: "slideUp .25s ease" }}>
@@ -529,7 +535,7 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
           className={`flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"}`}
         >
           {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
-          {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : "Add to Cart"}
+          {stock < 1 ? t("admin.productDetail.page.outOfStock") : t("product.addToCart")}
         </button>
       </div>
     </div>
@@ -538,6 +544,7 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
 StickyBar.displayName = "StickyBar";
 
 const Lightbox = memo(({ images, index, onClose, onStep }) => {
+  const { t } = useTranslation();
   const [zoom, setZoom] = useState({ index, scale: 1 });
   const zoomScale = zoom.index === index ? zoom.scale : 1;
   const touchGestureRef = useRef(null);
@@ -587,9 +594,9 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Product image viewer" className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
-      <button type="button" onClick={(event) => { event.stopPropagation(); onClose(); }} className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Close"><X size={20} /></button>
-      <button type="button" onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Previous"><ChevronLeft size={20} /></button>
+    <div role="dialog" aria-modal="true" aria-label={t("admin.productDetail.page.openImagePreview")} className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <button type="button" onClick={(event) => { event.stopPropagation(); onClose(); }} className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label={t("common.close")}><X size={20} /></button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label={t("admin.productDetail.page.previousImage")}><ChevronLeft size={20} /></button>
       <img
         src={images[index]}
         alt=""
@@ -600,7 +607,7 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       />
-      <button type="button" onClick={(e) => { e.stopPropagation(); onStep(1); }} className="absolute right-3 lg:right-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label="Next"><ChevronRight size={20} /></button>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onStep(1); }} className="absolute right-3 lg:right-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label={t("admin.productDetail.page.nextImage")}><ChevronRight size={20} /></button>
       <span className="absolute bottom-4 text-white/60 text-xs font-medium">{index + 1} / {images.length}</span>
     </div>
   );
@@ -624,16 +631,19 @@ const LoadingState = () => (
   </div>
 );
 
-const ErrorState = ({ isError }) => (
+const ErrorState = ({ isError }) => {
+  const { t } = useTranslation();
+  return (
   <div className="user-shell px-4 py-16 text-center">
     <div className="w-14 h-14 mx-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-4">
       <Package size={24} className="text-[var(--user-accent)]" />
     </div>
-    <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">{isError ? "Something Went Wrong" : "Product Not Found"}</h1>
-    <p className="text-[var(--user-text-muted)] text-sm mb-6 max-w-sm mx-auto">{isError ? "We could not load this product. Please try again later." : "This product may have been removed."}</p>
-    <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 text-sm font-bold hover:opacity-90 transition">Back to Home</Link>
+    <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">{isError ? t("admin.shared.toast.loadFailed") : t("admin.productDetail.page.notFound")}</h1>
+    <p className="text-[var(--user-text-muted)] text-sm mb-6 max-w-sm mx-auto">{isError ? t("admin.dashboard.state.loadFailedBody") : t("admin.productDetail.page.notFoundBody")}</p>
+    <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 text-sm font-bold hover:opacity-90 transition">{t("mobileNav.home")}</Link>
   </div>
-);
+  );
+};
 
 export default function ProductDetailPage(props) {
   return (
@@ -645,8 +655,19 @@ export default function ProductDetailPage(props) {
 
 function ProductDetailContent({ params }) {
   const { id } = use(params);
+  const { locale, t } = useTranslation();
+  const { productNameOf, fieldOf, reviewTextOf } = useLocalized();
   const searchParams = useSearchParams();
   const { product, isLoading, isError } = useProductDetail(id);
+  const productName = productNameOf(product) || product?.name || "";
+  const categoryName = product?.category_id && typeof product.category_id === "object"
+    ? fieldOf(product.category_id, "name")
+    : extractName(product?.category_id);
+  const brandName = product?.brand_id && typeof product.brand_id === "object"
+    ? fieldOf(product.brand_id, "name")
+    : extractName(product?.brand_id);
+  const fullDescription = fieldOf(product, "description") || "";
+  const shortDescription = fieldOf(product, "short_description") || "";
 
   // ✅ User ki apni ratings — product page par sirf apni di hui rating dikhani hai.
   const { data: user = null } = useQuery({
@@ -745,8 +766,9 @@ function ProductDetailContent({ params }) {
     return {
       dealId: matchedDeal._id,
       dealType: matchedDeal.type,
-      dealName: matchedDeal.name,
-      dealBadge: getDealBadgeText(matchedDeal) || null,
+      dealName: fieldOf(matchedDeal, "name"),
+      dealTranslations: matchedDeal.translations,
+      dealBadge: getDealBadgeText(matchedDeal, t) || null,
       savings: dealDisc?.hasDiscount ? dealDisc.originalPrice - dealDisc.discountedPrice : 0,
       originalPrice: Number(dealDisc?.originalPrice) || variantPrice,
       dealDiscountValue: Number(matchedDeal.discountValue) || 0,
@@ -758,7 +780,7 @@ function ProductDetailContent({ params }) {
           }
         : {}),
     };
-  }, [isDealMode, matchedDeal, dealDisc, variantPrice]);
+  }, [isDealMode, matchedDeal, dealDisc, variantPrice, fieldOf, t]);
 
   const countdown = useCountdown(isDealMode ? matchedDeal?.endDate : null);
 
@@ -775,18 +797,17 @@ function ProductDetailContent({ params }) {
   }, [stock, product, currentVariant, quantity, addToCart, setIsCartOpen, selectedDealInfo]);
 
   const categoryId = extractId(product?.category_id);
-  const categoryName = extractName(product?.category_id);
-  const brandName = extractName(product?.brand_id);
   const brandId = extractId(product?.brand_id);
 
-  const fullDescription = product?.description || "";
-  const shortDescription = product?.short_description || "";
   const specEntries = attrEntries(currentVariant?.attributes);
-  const variantAttrName = specEntries.length > 0 ? specEntries[0][0] : (variants.length > 1 ? "Option" : "");
+  const variantAttrName = specEntries.length > 0 ? specEntries[0][0] : (variants.length > 1 ? t("admin.productDetail.page.attributes") : "");
   const expiryDuration = Number(product?.expiryDuration);
   const expiryUnit = String(product?.expiryUnit || "").toLowerCase();
-  const expiryUnitName = { days: "Day", months: "Month", years: "Year" }[expiryUnit] || "";
-  const expiryUnitLabel = expiryUnitName ? `${expiryUnitName}${expiryDuration === 1 ? "" : "s"}` : "";
+  const expiryUnitLabel = {
+    days: t("admin.productDetail.page.unitDays"),
+    months: t("admin.productDetail.page.unitMonths"),
+    years: t("admin.productDetail.page.unitYears"),
+  }[expiryUnit] || "";
   const showExpiryInfo = product?.isPerishable === true
     && Number.isFinite(expiryDuration)
     && expiryDuration > 0
@@ -827,14 +848,14 @@ function ProductDetailContent({ params }) {
       `}</style>
 
       <div className="user-shell px-3 lg:px-8">
-        <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={product.name} />
+        <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={productName} />
 
         {/* ===== Top card: gallery + info + sold-by (Daraz 3-col) ===== */}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <section className="bg-[var(--user-bg-card)] p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
               <Gallery
-                productName={product.name}
+                productName={productName}
                 mainImage={mainImage}
                 images={images}
                 onImageSelect={selectImageByUrl}
@@ -848,36 +869,36 @@ function ProductDetailContent({ params }) {
                   <div className="mb-2 flex items-stretch justify-between border border-[var(--user-accent)]/30">
                     <div className="flex items-center gap-2 bg-[var(--user-accent)] px-3 py-1.5">
                       <Zap size={14} className="fill-[var(--user-accent-text)] text-[var(--user-accent-text)]" />
-                      <span className="text-xs font-black italic tracking-wide text-[var(--user-accent-text)]">FLASH SALE</span>
+                      <span className="text-xs font-black italic tracking-wide text-[var(--user-accent-text)]">{t("admin.deals.page.offer")}</span>
                     </div>
                     <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--user-text-secondary)]">
                       {countdown ? (
-                        <span>Ends in <span className="font-bold text-[var(--user-accent)] tabular-nums">{countdown}</span></span>
+                        <span className="font-bold text-[var(--user-accent)] tabular-nums">{countdown}</span>
                       ) : (
-                        <span className="font-semibold">{matchedDeal.name || "Limited time deal"}</span>
+                        <span className="font-semibold">{fieldOf(matchedDeal, "name") || t("admin.deals.page.offer")}</span>
                       )}
                     </div>
                   </div>
                 )}
 
-                <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{product.name}</h1>
+                <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{productName}</h1>
 
                 {/* Rating + wishlist */}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Stars value={ratingAvg} />
                     <span className="text-xs text-[var(--user-accent)]">
-                      {ratingCount > 0 ? `${ratingAvg}/5 (${ratingCount} Rating${ratingCount > 1 ? "s" : ""})` : "No Ratings"}
+                      {ratingCount > 0 ? `${ratingAvg}/5 (${ratingCount} ${t("admin.reviews.page.rating")})` : t("admin.reviews.ui.noReviews")}
                     </span>
                     {myReview && (
-                      <span className="text-xs font-bold text-amber-500">· Your rating: {myReview.rating}/5</span>
+                      <span className="text-xs font-bold text-amber-500">· {t("admin.reviews.page.rating")}: {myReview.rating}/5</span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-[var(--user-text-muted)]">
                     <button
                       type="button"
                       onClick={() => productId && toggleWishlist(productId)}
-                      aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
+                      aria-label={liked ? t("header.wishlist") : t("header.wishlist")}
                       className={`${liked ? "text-[var(--user-accent)]" : ""} hover:text-[var(--user-accent)] transition-colors`}
                     >
                       <Heart size={17} fill={liked ? "currentColor" : "none"} />
@@ -889,11 +910,11 @@ function ProductDetailContent({ params }) {
                 {(brandName || categoryName) && (
                   <p className="mt-2 text-xs text-[var(--user-text-muted)]">
                     {brandName && (
-                      <>Brand: <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName}</Link></>
+                      <>{t("admin.productDetail.page.brand")}: <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName}</Link></>
                     )}
                     {brandName && categoryName && <span className="mx-1.5 text-[var(--user-text-subtle)]">|</span>}
                     {categoryName && (
-                      <>More {categoryName} from <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName || storeName || "this store"}</Link></>
+                      <>{t("admin.productDetail.page.category")}: {categoryName} · <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName || storeName}</Link></>
                     )}
                   </p>
                 )}
@@ -924,12 +945,12 @@ function ProductDetailContent({ params }) {
                         {!isDealMode && <span className="h-2 w-2 rounded-full bg-[var(--user-accent)]" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-bold text-[var(--user-text)]">Regular Price</span>
+                        <span className="block text-xs font-bold text-[var(--user-text)]">{t("admin.productDetail.page.sellingPrice")}</span>
                         <span className="flex items-center gap-1 text-[11px] text-[var(--user-text-muted)]">
                           <Tag size={11} />
                           {regularHasDiscount && regularDisc.discountName
-                            ? `${regularDisc.discountName} applied`
-                            : "Original price"}
+                            ? fieldOf(regularDisc.matchedDeal, "name") || regularDisc.discountName
+                            : t("common.price")}
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
@@ -959,11 +980,11 @@ function ProductDetailContent({ params }) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--user-text)]">
-                          <Sparkles size={12} className="text-[var(--user-accent)]" /> Deal Offers
+                          <Sparkles size={12} className="text-[var(--user-accent)]" /> {t("admin.deals.page.offer")}
                           <span className="bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[10px] font-bold text-[var(--user-accent)] tabular-nums">{allDeals.length}</span>
                         </span>
                         <span className="block text-[11px] text-[var(--user-text-muted)]">
-                          {isDealMode && matchedDeal ? (matchedDeal.name || getDealBadgeText(matchedDeal) || "Deal selected") : "Tap to view all deals on this product"}
+                          {isDealMode && matchedDeal ? (fieldOf(matchedDeal, "name") || getDealBadgeText(matchedDeal, t) || t("admin.deals.page.deal")) : t("admin.deals.page.deal")}
                         </span>
                       </span>
                       <ChevronDown size={15} className={`shrink-0 text-[var(--user-text-muted)] transition-transform ${dealsOpen ? "rotate-180" : ""}`} />
@@ -990,10 +1011,10 @@ function ProductDetailContent({ params }) {
                               >
                                 <Sparkles size={13} className="shrink-0 text-[var(--user-accent)]" />
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate font-semibold text-[var(--user-text)]">{d.name || getDealBadgeText(d) || "Deal"}</span>
+                                  <span className="block truncate font-semibold text-[var(--user-text)]">{fieldOf(d, "name") || getDealBadgeText(d, t) || t("admin.deals.page.deal")}</span>
                                   <span className="block text-[11px] text-[var(--user-text-muted)]">
                                     Rs. {dd.discountedPrice.toLocaleString()}
-                                    {saveAmt > 0 && <span className="ml-1.5 font-semibold text-[var(--user-success)]">Save Rs. {saveAmt.toLocaleString()}</span>}
+                                    {saveAmt > 0 && <span className="ml-1.5 font-semibold text-[var(--user-success)]">{t("common.save")} Rs. {saveAmt.toLocaleString()}</span>}
                                   </span>
                                 </span>
                                 {sel && <Check size={14} className="shrink-0 text-[var(--user-accent)]" />}
@@ -1010,7 +1031,7 @@ function ProductDetailContent({ params }) {
                 {variants.length > 1 && (
                   <div className="mt-4">
                     <p className="text-xs text-[var(--user-text-muted)]">
-                      {variantAttrName || "Option"}: <span className="text-[var(--user-text)]">{currentVariant?.title || currentVariant?.sku || `Option ${variantIndex + 1}`}</span>
+                      {variantAttrName || t("admin.productDetail.page.selectOption")}: <span className="text-[var(--user-text)]">{fieldOf(currentVariant, "title") || currentVariant?.sku || `${t("admin.productDetail.page.selectOption")} ${variantIndex + 1}`}</span>
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {variants.map((variant, index) => {
@@ -1023,13 +1044,13 @@ function ProductDetailContent({ params }) {
                             type="button"
                             onClick={() => selectVariant(index)}
                             disabled={unavailable}
-                            title={variant.title || variant.sku || `Option ${index + 1}`}
+                            title={fieldOf(variant, "title") || variant.sku || `${t("admin.productDetail.page.selectOption")} ${index + 1}`}
                             className={`flex h-11 min-w-11 items-center justify-center gap-2 border px-1.5 text-xs ${selected ? "border-[var(--user-accent)] ring-1 ring-[var(--user-accent)]" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/60"} ${unavailable ? "cursor-not-allowed opacity-40" : ""}`}
                           >
                             {image ? (
                               <img src={image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
                             ) : (
-                              <span className="px-2 font-medium text-[var(--user-text)]">{variant.title || variant.sku || index + 1}</span>
+                              <span className="px-2 font-medium text-[var(--user-text)]">{fieldOf(variant, "title") || variant.sku || index + 1}</span>
                             )}
                           </button>
                         );
@@ -1057,12 +1078,9 @@ function ProductDetailContent({ params }) {
                         <Clock3 size={17} aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-[var(--user-text)]">Perishable Product</p>
+                        <p className="text-xs font-semibold text-[var(--user-text)]">{t("admin.productDetail.page.expiryAfterDelivery")}</p>
                         <p className="mt-1 text-sm font-medium text-[var(--user-text)]">
-                          Valid for {expiryDuration} {expiryUnitLabel} after delivery
-                        </p>
-                        <p className="mt-1 text-[11px] leading-4 text-[var(--user-text-muted)]">
-                          Please consume or use before the validity period ends.
+                          {t("admin.productDetail.page.expiryAfterDeliveryNotice", { duration: expiryDuration, unit: expiryUnitLabel })}
                         </p>
                       </div>
                     </div>
@@ -1071,13 +1089,13 @@ function ProductDetailContent({ params }) {
 
                 {/* Quantity — real stock */}
                 <div className="mt-4 flex items-center gap-4">
-                  <span className="text-xs text-[var(--user-text-muted)]">Quantity</span>
+                  <span className="text-xs text-[var(--user-text-muted)]">{t("admin.productDetail.page.quantity")}</span>
                   <div className="flex items-center">
                     <button
                       onClick={decrement}
                       disabled={quantity <= 1}
                       className="flex h-7 w-7 items-center justify-center bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] hover:text-[var(--user-accent)] disabled:opacity-40"
-                      aria-label="Decrease quantity"
+                      aria-label={t("admin.productDetail.page.quantity")}
                     >
                       <Minus size={13} />
                     </button>
@@ -1086,13 +1104,13 @@ function ProductDetailContent({ params }) {
                       onClick={increment}
                       disabled={quantity >= Math.max(stock, 1)}
                       className="flex h-7 w-7 items-center justify-center bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] hover:text-[var(--user-accent)] disabled:opacity-40"
-                      aria-label="Increase quantity"
+                      aria-label={t("admin.productDetail.page.quantity")}
                     >
                       <Plus size={13} />
                     </button>
                   </div>
                   {stock < 1 ? (
-                    <span className="text-xs font-semibold text-[var(--user-accent)]">Out of stock</span>
+                    <span className="text-xs font-semibold text-[var(--user-accent)]">{t("admin.productDetail.page.outOfStock")}</span>
                   ) : null}
                 </div>
 
@@ -1103,7 +1121,7 @@ function ProductDetailContent({ params }) {
                     disabled={stock < 1}
                     className="flex h-11 items-center justify-center gap-1.5 border-2 border-[var(--user-accent)] text-sm font-medium text-[var(--user-accent)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.99] transition disabled:opacity-40"
                   >
-                    Buy Now
+                    {t("product.buyNow")}
                   </button>
                   <button
                     onClick={handleAdd}
@@ -1111,7 +1129,7 @@ function ProductDetailContent({ params }) {
                     className={`flex h-11 items-center justify-center gap-1.5 text-sm font-medium active:scale-[0.99] transition disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}
                   >
                     {isAdded ? <Check size={15} /> : null}
-                    {stock < 1 ? "Out of Stock" : isAdded ? "Added!" : "Add to Cart"}
+                    {stock < 1 ? t("admin.productDetail.page.outOfStock") : t("product.addToCart")}
                   </button>
                 </div>
 
@@ -1122,20 +1140,20 @@ function ProductDetailContent({ params }) {
           {/* ===== Right sidebar — sirf real data (no fake fees/location) ===== */}
           <aside className="space-y-3 lg:col-span-3 xl:col-span-2">
             <div className="bg-[var(--user-bg-card)]">
-              <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">Sold by</p>
+              <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">{t("common.brand")}</p>
               <div className="px-3 py-3">
                 <div className="flex items-center gap-2">
                   <span className="flex h-9 w-9 items-center justify-center bg-[var(--user-accent)]/10">
                     <Store size={17} className="text-[var(--user-accent)]" />
                   </span>
-                  <p className="text-sm font-semibold text-[var(--user-text)]">{storeName || "Official Store"}</p>
+                  {storeName && <p className="text-sm font-semibold text-[var(--user-text)]">{storeName}</p>}
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs">
                   <ShieldCheck size={14} className={stock > 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"} />
                   {stock > 0 ? (
-                    <span className="text-[var(--user-text-secondary)]">In stock, ready to ship</span>
+                    <span className="text-[var(--user-text-secondary)]">{t("admin.productDetail.page.inStock")}</span>
                   ) : (
-                    <span className="text-[var(--user-accent)] font-semibold">Currently unavailable</span>
+                    <span className="text-[var(--user-accent)] font-semibold">{t("admin.productDetail.page.outOfStock")}</span>
                   )}
                 </div>
               </div>
@@ -1143,7 +1161,7 @@ function ProductDetailContent({ params }) {
 
             {specEntries.length > 0 && (
               <div className="hidden bg-[var(--user-bg-card)] lg:block">
-                <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">Highlights</p>
+                <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">{t("admin.productDetail.page.quickInfo")}</p>
                 <ul className="space-y-1.5 px-3 py-3">
                   {specEntries.slice(0, 4).map(([k, v]) => (
                     <li key={k} className="text-xs text-[var(--user-text-secondary)]">
@@ -1157,18 +1175,18 @@ function ProductDetailContent({ params }) {
         </div>
 
         {/* ===== Product details — real description ===== */}
-        {(shortDescription || fullDescription || currentVariant?.description) && (
+        {(shortDescription || fullDescription || fieldOf(currentVariant, "description")) && (
           <section className="mt-3 bg-[var(--user-bg-card)]">
             <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
-              Product details of {shortDescription || product.name}
+              {t("admin.productDetail.page.productDetails")}: {shortDescription || productName}
             </h2>
             <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-[var(--user-text)]">
               {shortDescription && <p className="font-medium">{shortDescription}</p>}
               {fullDescription && <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">{fullDescription}</p>}
-              {currentVariant?.description && (
+              {fieldOf(currentVariant, "description") && (
                 <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">
-                  <span className="font-semibold text-[var(--user-text)]">{currentVariant?.title || "Selected option"}: </span>
-                  {currentVariant.description}
+                  <span className="font-semibold text-[var(--user-text)]">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
+                  {fieldOf(currentVariant, "description")}
                 </p>
               )}
             </div>
@@ -1178,12 +1196,12 @@ function ProductDetailContent({ params }) {
         {/* ===== Specifications — sirf real fields ===== */}
         <section className="mt-3 bg-[var(--user-bg-card)]">
           <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
-            Specifications of {product.name}
+            {t("admin.productDetail.page.attributes")}: {productName}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 px-3 sm:px-4 py-2">
             {brandName && (
               <div className="border-b border-[var(--user-border)] py-3">
-                <p className="text-xs text-[var(--user-text-muted)]">Brand</p>
+                <p className="text-xs text-[var(--user-text-muted)]">{t("admin.productDetail.page.brand")}</p>
                 <p className="mt-0.5 text-sm text-[var(--user-text)]">{brandName}</p>
               </div>
             )}
@@ -1205,7 +1223,7 @@ function ProductDetailContent({ params }) {
         {/* ===== Ratings & Reviews — real summary + real reviews ===== */}
         <section className="mt-3 bg-[var(--user-bg-card)]">
           <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
-            Ratings &amp; Reviews of {product.name}
+            {t("admin.reviews.page.rating")} &amp; {t("admin.nav.item.reviews")}: {productName}
           </h2>
           <div className="grid grid-cols-1 gap-6 px-3 sm:px-4 py-5 md:grid-cols-[12rem_1fr]">
             <div>
@@ -1213,7 +1231,7 @@ function ProductDetailContent({ params }) {
                 {ratingAvg}<span className="text-lg text-[var(--user-text-muted)]">/5</span>
               </p>
               <div className="mt-2"><Stars value={ratingAvg} size={16} /></div>
-              <p className="mt-2 text-xs text-[var(--user-text-muted)]">{ratingCount} Rating{ratingCount === 1 ? "" : "s"}</p>
+              <p className="mt-2 text-xs text-[var(--user-text-muted)]">{ratingCount} {t("admin.reviews.page.rating")}</p>
             </div>
             <div className="max-w-md space-y-1.5">
               {[5, 4, 3, 2, 1].map((star) => {
@@ -1235,15 +1253,18 @@ function ProductDetailContent({ params }) {
           <div className="border-t border-[var(--user-border)] px-3 sm:px-4 py-5">
             {myReview && (
               <div className="mb-4">
-                <ProductRating productId={productId} productName={product?.name} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
+                <ProductRating productId={productId} productName={productName} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
               </div>
             )}
             {reviewsToDisplay.length > 0 ? (
               <ul className="divide-y divide-[var(--user-border)]">
                 {reviewsToDisplay.map((r) => {
-                  const reviewerName = r.user_id?.name || "Customer";
+                  const reviewerName = r.user_id?.name || t("common.customer");
+                  const localizedResponse = r.storeResponse?.message
+                    ? { ...r.storeResponse, message: reviewTextOf(r, "storeResponse.message") }
+                    : r.storeResponse;
                   const reviewDate = r.created_at
-                    ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                    ? new Date(r.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale, { month: "short", day: "numeric", year: "numeric" })
                     : "";
                   return (
                     <li key={r._id} className="py-3 first:pt-0 last:pb-0">
@@ -1255,15 +1276,15 @@ function ProductDetailContent({ params }) {
                           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                               <p className="text-sm font-semibold text-[var(--user-text)]">{reviewerName}</p>
-                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Check size={12} strokeWidth={2.5} /> Verified buyer</span>}
+                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Check size={12} strokeWidth={2.5} /> {t("admin.reviews.ui.customer")}</span>}
                             </div>
                             {reviewDate && <time className="text-xs text-[var(--user-text-muted)]">{reviewDate}</time>}
                           </div>
                           <div className="mt-2"><Stars value={r.rating} size={15} /></div>
-                          <p className="mt-1.5 text-base font-semibold text-[var(--user-text)]">{r.title || `${r.rating}/5`}</p>
-                          {r.comment && <div className="mt-1"><ReviewComment comment={r.comment} /></div>}
+                          <p className="mt-1.5 text-base font-semibold text-[var(--user-text)]">{reviewTextOf(r, "title") || `${r.rating}/5`}</p>
+                          {r.comment && <div className="mt-1"><ReviewComment comment={reviewTextOf(r, "comment")} /></div>}
                           {(r.images?.length > 0 || r.videos?.length > 0) && <div className="mt-3"><ReviewMediaGallery images={r.images} videos={r.videos} /></div>}
-                          {r.storeResponse?.message && <div className="mt-3"><StoreResponse response={r.storeResponse} /></div>}
+                          {localizedResponse?.message && <div className="mt-3"><StoreResponse response={localizedResponse} /></div>}
                         </div>
                       </div>
                     </li>
@@ -1272,8 +1293,7 @@ function ProductDetailContent({ params }) {
               </ul>
             ) : !myReview ? (
               <div className="py-6 text-center">
-                <p className="text-sm text-[var(--user-text-muted)]">This product has no reviews.</p>
-                <p className="mt-1 text-xs text-[var(--user-text-muted)]">Let others know what you think — be the first to write a review after delivery.</p>
+                <p className="text-sm text-[var(--user-text-muted)]">{t("admin.reviews.ui.noReviews")}</p>
               </div>
             ) : null}
           </div>
@@ -1283,10 +1303,10 @@ function ProductDetailContent({ params }) {
         {allImages.length > 0 && (
           <section className="mt-3 bg-[var(--user-bg-card)]">
             <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
-              Product images of {product.name}
+              {t("admin.productDetail.page.productImages")}: {productName}
             </h2>
             <div className="px-3 sm:px-4 py-4">
-              <DetailImages productName={product.name} images={allImages} onZoom={openLightbox} />
+              <DetailImages productName={productName} images={allImages} onZoom={openLightbox} />
             </div>
           </section>
         )}
@@ -1294,7 +1314,7 @@ function ProductDetailContent({ params }) {
         {/* ===== You may also like — real related ===== */}
         {related.length > 0 && (
           <section className="mt-6">
-            <h2 className="mb-3 text-base font-bold text-[var(--user-text)]">You may also like</h2>
+            <h2 className="mb-3 text-base font-bold text-[var(--user-text)]">{t("admin.brands.detail.relatedProducts")}</h2>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {related.slice(0, 10).map((p) => {
                 const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
@@ -1309,7 +1329,7 @@ function ProductDetailContent({ params }) {
                       )}
                     </div>
                     <div className="p-2.5">
-                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{p.name}</p>
+                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{productNameOf(p)}</p>
                       {price != null && <p className="mt-1.5 text-sm font-medium text-[var(--user-accent)]">Rs. {toNum(price).toLocaleString()}</p>}
                       <div className="mt-1"><Stars value={0} size={10} /></div>
                     </div>
@@ -1321,7 +1341,7 @@ function ProductDetailContent({ params }) {
         )}
       </div>
 
-      <StickyBar show={showStickyBar} name={product.name} price={activePrice} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} />
+      <StickyBar show={showStickyBar} name={productName} price={activePrice} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} />
       <Lightbox images={allImages} index={lightbox} onClose={() => setLightbox(null)} onStep={stepLightbox} />
     </main>
   );

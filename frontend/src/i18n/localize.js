@@ -59,6 +59,10 @@ function localizedContentField(source, translations, locale, { preserveFirstWord
   return translated;
 }
 
+function valueAtPath(value, path) {
+  return path.split(".").reduce((current, part) => current?.[part], value);
+}
+
 /** Product names may retain the first brand token and technical identifiers. */
 export function localizedProductNameOf(product, locale) {
   return localizedContentField(
@@ -84,7 +88,7 @@ export function useLocalized() {
   return useMemo(() => {
     /** Brand / Category / Product doc se localized name. */
     const nameOf = (doc) =>
-      localizedContentField(doc?.name, doc?.translations?.name, locale);
+      localizedContentField(doc?.name, doc?.translations?.name, locale, { preserveFirstWord: true });
 
     /** Product name with stale mixed-language translations rejected. */
     const productNameOf = (product) => localizedProductNameOf(product, locale);
@@ -141,9 +145,18 @@ export function useLocalized() {
     const text = (source, translations) =>
       localizedContentField(source, translations, locale);
 
+    /** Localize any supported database field, including nested banner buttons. */
+    const fieldOf = (doc, field) =>
+      localizedContentField(
+        valueAtPath(doc, field),
+        valueAtPath(doc?.translations, field),
+        locale
+      );
+
     return {
       locale,
       text,
+      fieldOf,
       nameOf,
       productNameOf,
       productDescriptionOf,

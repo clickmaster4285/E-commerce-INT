@@ -7,12 +7,17 @@ import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
 import useScrollFade from "../../hooks/user/useScrollFade";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 function getCategoryImage(category) {
   return category?.image || null;
 }
 
 function CategoryCard({ category, tabIndex }) {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
+  const categoryName = fieldOf(category, "name");
   const image = getCategoryImage(category);
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -28,7 +33,7 @@ function CategoryCard({ category, tabIndex }) {
         {image && !imageFailed ? (
           <Image
             src={image}
-            alt={category.name}
+            alt={categoryName}
             fill
             loader={smartImageLoader}
             sizes="(max-width: 639px) 140px, 168px"
@@ -45,11 +50,11 @@ function CategoryCard({ category, tabIndex }) {
 
       <span className="flex min-h-0 flex-col gap-1 px-3.5 py-3">
         <span className="line-clamp-2 min-h-0 break-words text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--user-text)]">
-          {category.name}
+          {categoryName}
         </span>
         {category.count != null && category.count !== "" ? (
           <span className="text-[11px] font-normal leading-4 text-[var(--user-text-muted)]">
-            {category.count} {Number(category.count) === 1 ? "product" : "products"}
+            {t("cart.itemsCount", { count: category.count })}
           </span>
         ) : null}
       </span>

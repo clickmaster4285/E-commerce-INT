@@ -4,6 +4,7 @@ import { useMemo, useEffect, useRef, useState } from "react";
 import { Sparkles, Tag, PackageOpen, Package, Truck, Zap, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDiscounts } from "./DiscountContext";
 import { getEffectiveMinQuantity } from "@/utils/dealCalculator";
+import { useLocalized } from "@/i18n/localize";
 
 function getDealIcon(type) {
   if (type === "percentage") return Tag;
@@ -15,7 +16,7 @@ function getDealIcon(type) {
   return Tag;
 }
 
-function getDealBadgeText(deal) {
+function getDealBadgeText(deal, displayName = deal?.name) {
   if (!deal) return "";
   const val = deal.discountValue || 0;
   const buyQty = deal.buyQuantity || 0;
@@ -26,7 +27,7 @@ function getDealBadgeText(deal) {
   if (deal.type === "bundle") return "Bundle Deal";
   if (deal.type === "free_shipping") return "Free Shipping";
   if (deal.type === "flash_sale") return "Flash Sale";
-  return deal.name || "Deal";
+  return displayName || "Deal";
 }
 
 function getDealSavingsPreview(deal, regularPrice) {
@@ -52,6 +53,7 @@ function getDealSavingsPreview(deal, regularPrice) {
 }
 
 export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose }) {
+  const { fieldOf } = useLocalized();
   const rootRef = useRef(null);
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -200,7 +202,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
           const gap = Math.max(0, minQty - currentQty);
           const isSelected = activeDealId === deal._id;
           const savingsText = getDealSavingsPreview(deal, regularPrice);
-          const badgeText = getDealBadgeText(deal);
+          const badgeText = getDealBadgeText(deal, fieldOf(deal, "name"));
 
           return (
             <button
@@ -223,7 +225,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
                 {isSelected ? <Check size={14} strokeWidth={2} /> : <Icon size={14} />}
               </span>
               <span className="line-clamp-2 text-sm font-medium leading-5 text-[var(--user-text)]">
-                {deal.name}
+                {fieldOf(deal, "name")}
               </span>
               {badgeText ? (
                 <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs font-normal text-[var(--user-text-muted)]">

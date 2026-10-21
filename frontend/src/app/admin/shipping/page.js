@@ -587,7 +587,7 @@ export default function ShippingManagementPage() {
               <div className="flex justify-between items-center">
                 <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryTime")}</span>
                 <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} days
+                  {config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} {t("admin.shipping.page.days")}
                 </span>
               </div>
             </div>
@@ -621,7 +621,7 @@ export default function ShippingManagementPage() {
               <div className="flex justify-between items-center">
                 <span className="text-[11px] sm:text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryTime")}</span>
                 <span className="text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} days
+                  {config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} {t("admin.shipping.page.days")}
                 </span>
               </div>
             </div>
@@ -639,7 +639,7 @@ export default function ShippingManagementPage() {
                   <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.minDays")}</th>
                   <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.maxDays")}</th>
                   <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryWindow")}</th>
-                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.common.actions")}</th>
+                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.shared.label.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -658,7 +658,7 @@ export default function ShippingManagementPage() {
                   <td className="px-4 py-2.5 text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {config?.standard?.fee ?? 200}</td>
                   <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{config?.standard?.min_days ?? 2}</td>
                   <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{config?.standard?.max_days ?? 4}</td>
-                  <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} days</td>
+                  <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} {t("admin.shipping.page.days")}</td>
                   <td className="px-4 py-2.5 whitespace-nowrap w-1">
                     <div className="flex items-center justify-end">
                       <button
@@ -687,7 +687,7 @@ export default function ShippingManagementPage() {
                   <td className="px-4 py-2.5 text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {config?.express?.fee ?? 500}</td>
                   <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{config?.express?.min_days ?? 1}</td>
                   <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{config?.express?.max_days ?? 2}</td>
-                  <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} days</td>
+                  <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} {t("admin.shipping.page.days")}</td>
                   <td className="px-4 py-2.5 whitespace-nowrap w-1">
                     <div className="flex items-center justify-end">
                       <button
@@ -720,7 +720,7 @@ export default function ShippingManagementPage() {
                     <td className="px-4 py-2.5 text-[13px] font-semibold" style={{ color: "var(--text-primary)" }}>Rs. {Number(m.fee ?? 0)}</td>
                     <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{m.min_days}</td>
                     <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-secondary)" }}>{m.max_days}</td>
-                    <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{m.min_days}-{m.max_days} days</td>
+                    <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{m.min_days}-{m.max_days} {t("admin.shipping.page.days")}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap w-1">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
@@ -766,7 +766,7 @@ export default function ShippingManagementPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium truncate leading-tight">{t("admin.shipping.page.standardDelivery")}</p>
-                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} days</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{config?.standard?.min_days ?? 2}-{config?.standard?.max_days ?? 4} {t("admin.shipping.page.days")}</p>
               </div>
             </div>
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -791,7 +791,7 @@ export default function ShippingManagementPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-medium truncate leading-tight">{t("admin.shipping.page.expressDelivery")}</p>
-                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} days</p>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{config?.express?.min_days ?? 1}-{config?.express?.max_days ?? 2} {t("admin.shipping.page.days")}</p>
               </div>
             </div>
             <div className="flex items-center justify-between gap-2 min-w-0">
@@ -820,7 +820,7 @@ export default function ShippingManagementPage() {
                     {m.name}
                     {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                   </p>
-                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{m.min_days}-{m.max_days} days</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{m.min_days}-{m.max_days} {t("admin.shipping.page.days")}</p>
                 </div>
               </div>
               <div className="flex items-center justify-between gap-2 min-w-0">

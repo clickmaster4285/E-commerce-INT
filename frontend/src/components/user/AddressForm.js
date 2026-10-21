@@ -9,6 +9,7 @@ import { useCurrentLocation } from "../../hooks/user/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";
 import { userHttp } from "@/apis/axiosInstance"
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
+import { useTranslation } from "@/i18n/LanguageProvider";
 const normalizeStateName = (s) => {
   if (!s) return "";
   return s
@@ -31,6 +32,7 @@ const normalizeCityName = (c) => {
 };
 
 export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { loading: locLoading, fetchLocation } = useCurrentLocation();
   const locationFillingRef = useRef(false);
@@ -144,13 +146,13 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
       if (found) {
         setForm((f) => ({ ...f, city: found.name }));
         setPendingCityCandidates(null);
-        toast("\ud83d\udccd Location filled");
+        toast(`📍 ${t("checkout.address.locationFilled")}`);
         return;
       }
     }
     setPendingCityCandidates(null);
-    toast("\u26a0\ufe0f Partially filled \u2014 complete manually");
-  }, [allCities, pendingCityCandidates]);
+    toast(`⚠️ ${t("checkout.address.locationPartial")}`);
+  }, [allCities, pendingCityCandidates, t]);
 
   const fillLocationFromCurrent = async () => {
     const res = await fetchLocation();
@@ -158,10 +160,10 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
       const r = res?.reason;
       const msg =
         r === "insecure"
-          ? "\u26a0\ufe0f Location not found  \u2014 enter manually"
+          ? `⚠️ ${t("checkout.address.locationNotFound")}`
           : r === "denied"
-            ? "\u26a0\ufe0f Location denied \u2014 enter manually"
-            : "\u26a0\ufe0f Location unavailable \u2014 enter manually";
+            ? `⚠️ ${t("checkout.address.locationDenied")}`
+            : `⚠️ ${t("checkout.address.locationUnavailable")}`;
       toast(msg);
       return;
     }
@@ -222,8 +224,8 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
       const filled = matchedState || postal || street;
       toast(
         filled
-          ? "\u26a0\ufe0f Partially filled \u2014 complete manually"
-          : "\u26a0\ufe0f Location unavailable \u2014 enter manually",
+          ? `⚠️ ${t("checkout.address.locationPartial")}`
+          : `⚠️ ${t("checkout.address.locationUnavailable")}`,
       );
     }
 
@@ -234,12 +236,12 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
 
   const handleSave = async () => {
     const f = form;
-    if (!f.phone) return toast.error("Phone number is required");
+    if (!f.phone) return toast.error(t("checkout.phone.required"));
     if (!isValidPhone(f.phone)) {
       return toast.error(
         f.phone.length < PHONE_MIN
-          ? `Phone number must be at least ${PHONE_MIN} digits`
-          : `Phone number must be at most ${PHONE_MAX} digits`,
+          ? t("checkout.phone.minDigits", { min: PHONE_MIN })
+          : t("checkout.phone.maxDigits", { max: PHONE_MAX }),
       );
     }
     if (
@@ -249,22 +251,22 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
       !f.state.trim() ||
       !f.city.trim()
     ) {
-      return toast.error("Please fill in all required fields");
+      return toast.error(t("checkout.address.requiredFields"));
     }
     setSaving(true);
     try {
       let result;
       if (initialAddress) {
         result = await addressApi.update(initialAddress._id, f);
-        toast.success("Address updated!");
+        toast.success(t("checkout.address.updated"));
       } else {
         result = await addressApi.create(f);
-        toast.success("Address saved!");
+        toast.success(t("checkout.address.saved"));
       }
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       onSuccess(result);
     } catch (e) {
-      toast.error(e.response?.data?.message || "Address save failed");
+      toast.error(e.response?.data?.message || t("checkout.address.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -299,7 +301,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
         >
           <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-elevated)]/95 backdrop-blur-sm">
             <h3 className="text-sm font-black text-[var(--user-text)]">
-              {initialAddress ? "Edit Address" : "Add New Address"}
+              {initialAddress ? t("checkout.address.editTitle") : t("checkout.address.addTitle")}
             </h3>
             <button
               onClick={onCancel}
@@ -317,28 +319,28 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
             >
               {locLoading ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" /> Locating…
+                  <Loader2 size={14} className="animate-spin" /> {t("checkout.address.locating")}
                 </>
               ) : (
                 <>
-                  <MapPin size={14} /> Use my current location
+                  <MapPin size={14} /> {t("checkout.address.useCurrentLocation")}
                 </>
               )}
             </button>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Full Name</label>
+                <label className={labelCls}>{t("checkout.address.fullName")}</label>
                 <input
                   value={form.full_name}
                   onChange={(e) =>
                     setForm({ ...form, full_name: e.target.value })
                   }
-                  placeholder="Ahsan Khan"
+                  placeholder={t("checkout.address.fullNamePlaceholder")}
                   className={inputCls}
                 />
               </div>
               <div>
-                <label className={labelCls}>Phone Number</label>
+                <label className={labelCls}>{t("checkout.phone.label")}</label>
                 <input
                   type="tel"
                   inputMode="numeric"
@@ -348,14 +350,14 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                     const val = e.target.value.replace(/\D/g, "").slice(0, PHONE_MAX);
                     setForm({ ...form, phone: val });
                   }}
-                  placeholder="Phone number"
+                  placeholder={t("checkout.phone.placeholder")}
                   className={inputCls}
                 />
-                <p className="mt-1 text-xs text-[var(--user-text-muted)]">{form.phone.length}/{PHONE_MAX} digits</p>
+                <p className="mt-1 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: form.phone.length, max: PHONE_MAX })}</p>
               </div>
             </div>
             <div>
-              <label className={labelCls}>Country / Region</label>
+              <label className={labelCls}>{t("checkout.address.countryRegion")}</label>
               <div className="relative">
                 <select
                   value={form.country}
@@ -366,7 +368,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                     inputCls + " appearance-none pr-10 cursor-pointer"
                   }
                 >
-                  <option value="">Select country</option>
+                  <option value="">{t("checkout.address.selectCountry")}</option>
                   {allCountries.map((c) => (
                     <option key={c.isoCode} value={c.name}>
                       {c.name}
@@ -381,7 +383,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className={labelCls}>State</label>
+                <label className={labelCls}>{t("checkout.address.state")}</label>
                 <div className="relative">
                   <select
                     value={form.state}
@@ -394,7 +396,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                       " appearance-none pr-10 cursor-pointer disabled:opacity-50"
                     }
                   >
-                    <option value="">Select</option>
+                    <option value="">{t("checkout.address.select")}</option>
                     {allStates.map((s) => (
                       <option key={s.name} value={s.name}>
                         {s.name}
@@ -408,7 +410,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 </div>
               </div>
               <div>
-                <label className={labelCls}>City</label>
+                <label className={labelCls}>{t("checkout.address.city")}</label>
                 <div className="relative">
                   <select
                     value={form.city}
@@ -421,7 +423,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                       " appearance-none pr-10 cursor-pointer disabled:opacity-50"
                     }
                   >
-                    <option value="">Select</option>
+                    <option value="">{t("checkout.address.select")}</option>
                     {allCities.map((c) => (
                       <option key={c.name} value={c.name}>
                         {c.name}
@@ -435,32 +437,32 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 </div>
               </div>
               <div>
-                <label className={labelCls}>ZIP Code</label>
+                <label className={labelCls}>{t("checkout.address.zipCode")}</label>
                 <input
                   value={form.zip_code}
                   onChange={(e) =>
                     setForm({ ...form, zip_code: e.target.value })
                   }
-                  placeholder="54000"
+                  placeholder={t("checkout.address.zipPlaceholder")}
                   className={inputCls}
                 />
               </div>
             </div>
             <div>
-              <label className={labelCls}>Street Address</label>
+              <label className={labelCls}>{t("checkout.address.streetAddress")}</label>
               <textarea
                 value={form.street_address1}
                 onChange={(e) =>
                   setForm({ ...form, street_address1: e.target.value })
                 }
                 rows="2"
-                placeholder="Street address or P.O. Box"
+                placeholder={t("checkout.address.streetPlaceholder")}
                 className={textareaCls}
               />
             </div>
             <div>
               <label className={labelCls}>
-                Delivery Instructions (Optional)
+                {t("checkout.address.deliveryInstructions")}
               </label>
               <textarea
                 value={form.delivery_instructions}
@@ -471,7 +473,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                   })
                 }
                 rows="2"
-                placeholder="Add preferences, notes, access codes"
+                placeholder={t("checkout.address.instructionsPlaceholder")}
                 className={textareaCls}
               />
             </div>
@@ -486,7 +488,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 style={{ accentColor: "var(--user-accent)" }}
               />
               <span className="text-sm font-semibold text-[var(--user-text)]">
-                Make this my default address
+                {t("checkout.address.makeDefault")}
               </span>
             </label>
             <div className="pt-4 flex items-center justify-between gap-3 border-t-2 border-[var(--user-border)]">
@@ -494,7 +496,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 onClick={onCancel}
                 className={`h-12 px-6 rounded-xl text-sm font-bold ${ghostBtn}`}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handleSave}
@@ -506,7 +508,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 ) : (
                   <Check size={16} />
                 )}
-                {initialAddress ? "Update Address" : "Save Address"}
+                {initialAddress ? t("checkout.address.update") : t("checkout.address.save")}
               </button>
             </div>
           </div>

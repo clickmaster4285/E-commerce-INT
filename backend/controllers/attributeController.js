@@ -67,7 +67,7 @@ const normalizeValues = (rawValues, existingValues = []) => {
   return out;
 };
 
-const VALID_DATA_TYPES = ["text", "number", "decimal", "multi_select", "boolean"];
+const VALID_DATA_TYPES = ["multi_select", "boolean"];
 
 const LEGACY_DATA_TYPE_MAP = {
   select: "multi_select",
@@ -96,7 +96,7 @@ const sanitizePayload = (body, existingValues = []) => {
     } else if (LEGACY_DATA_TYPE_MAP[normalized]) {
       out.data_type = LEGACY_DATA_TYPE_MAP[normalized];
     } else {
-      out.data_type = "text";
+      out.data_type = "multi_select";
     }
   }
   if (out.unit !== undefined) out.unit = String(out.unit || "").trim();

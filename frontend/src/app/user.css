@@ -1025,3 +1025,24 @@ html:has(.user-theme) {
 .checkout-premium label:has(input[type="radio"]:focus-visible) .checkout-option-indicator {
   outline-color: var(--checkout-selection-mark);
 }
+
+html:has([lang="ur"])
+  :is(.user-home-sidebar, .user-home-nav, .user-featured-products)
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, dd, dt, strong, em) {
+  letter-spacing: 0 !important;
+  line-height: 2 !important;
+  text-transform: none !important;
+}
+
+html:has([lang="ur"])
+  :is(.user-home-sidebar, .user-home-nav, .user-featured-products)
+  :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 2.2 !important;
+}
+
+html:has([lang="ar"])
+  :is(.user-home-sidebar, .user-home-nav, .user-featured-products)
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, dd, dt, strong, em) {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}

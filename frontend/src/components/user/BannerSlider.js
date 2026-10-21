@@ -6,7 +6,9 @@ import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { bannerApi } from "@/apis/user/bannerApi";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const getImageUrl = (img) => {
@@ -46,19 +48,45 @@ const PALETTES = [
 const anim = (on, name, delay = 0, duration = 0.7) =>
   on ? { animation: `${name} ${duration}s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s both` } : undefined;
 
-const fmtDay = (d) => d.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-
 /* Real start/end dates se pill text — dates na hon to pill hi nahi dikhti */
-function getDateLabel(banner, now) {
+function getDateLabel(banner, now, locale) {
   const s = banner.startDate ? new Date(banner.startDate) : null;
   const e = banner.endDate ? new Date(banner.endDate) : null;
   const ok = (d) => d && !Number.isNaN(d.getTime());
   if (!ok(e)) return null;
-  if (ok(s) && s.getTime() > now) return `Starting ${fmtDay(s)} – ${fmtDay(e)}`;
-  return `Ends ${fmtDay(e)}`;
+  const dateLocale = locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale;
+  const start = (d) => d.toLocaleDateString(dateLocale, { day: "numeric", month: "short" });
+  if (ok(s) && s.getTime() > now) return `${start(s)} – ${start(e)}`;
+  return start(e);
+}
+
+function valueAtPath(value, path) {
+  return path.split(".").reduce((current, part) => current?.[part], value);
+}
+
+function getText(field, locale) {
+  const localized = field?.[locale];
+  const english = field?.en;
+  return (
+    (typeof localized === "string" && localized.trim()) ||
+    (typeof english === "string" && english.trim()) ||
+    ""
+  );
+}
+
+function localizedBannerField(banner, field, locale, fieldOf) {
+  const source = valueAtPath(banner, field);
+  const translationMap = valueAtPath(banner?.translations, field);
+  const resolved = fieldOf(banner, field);
+  return (
+    (typeof resolved === "string" && resolved.trim()) ||
+    getText({ ...(translationMap || {}), en: source }, locale)
+  );
 }
 
 export default function BannerSlider({ initialBanners = null }) {
+  const { locale, dir, t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const { data: banners = [], isLoading } = useQuery({
     queryKey: ["activeBanners"],
     queryFn: bannerApi.getActive,
@@ -146,10 +174,24 @@ export default function BannerSlider({ initialBanners = null }) {
       >
         {/* SLIDES */}
         {slides.map((banner, i) => {
+          const localizedBanner = {
+            ...banner,
+            title: localizedBannerField(banner, "title", locale, fieldOf),
+            eyebrow: localizedBannerField(banner, "eyebrow", locale, fieldOf),
+            heading: localizedBannerField(banner, "heading", locale, fieldOf),
+            description: localizedBannerField(banner, "description", locale, fieldOf),
+            altText: localizedBannerField(banner, "altText", locale, fieldOf),
+            primaryButton: banner.primaryButton
+              ? { ...banner.primaryButton, text: localizedBannerField(banner, "primaryButton.text", locale, fieldOf) }
+              : banner.primaryButton,
+            secondaryButton: banner.secondaryButton
+              ? { ...banner.secondaryButton, text: localizedBannerField(banner, "secondaryButton.text", locale, fieldOf) }
+              : banner.secondaryButton,
+          };
           const imgUrl = getImageUrl(banner.desktopImage || banner.tabletImage || banner.mobileImage);
           const isActive = i === active;
           const hasCopy = Boolean(
-            banner.eyebrow || banner.heading || banner.description || banner.primaryButton?.text,
+            localizedBanner.eyebrow || localizedBanner.heading || localizedBanner.description || localizedBanner.primaryButton?.text,
           );
 
           return (
@@ -161,16 +203,17 @@ export default function BannerSlider({ initialBanners = null }) {
             >
               {hasCopy ? (
                 <PromoSlide
-                  banner={banner}
+                  banner={localizedBanner}
                   imgUrl={imgUrl}
                   mountImage={isMounted(i)}
                   isActive={isActive}
                   palette={PALETTES[i % PALETTES.length]}
                   priority={i === 0}
-                  dateLabel={getDateLabel(banner, now)}
+                  dateLabel={getDateLabel(banner, now, locale)}
+                  dir={dir}
                 />
               ) : (
-                <ImageSlide banner={banner} imgUrl={imgUrl} mountImage={isMounted(i)} isActive={isActive} priority={i === 0} />
+                <ImageSlide banner={localizedBanner} imgUrl={imgUrl} mountImage={isMounted(i)} isActive={isActive} priority={i === 0} fallbackAlt={t("banner.imageAlt")} />
               )}
             </div>
           );
@@ -181,14 +224,14 @@ export default function BannerSlider({ initialBanners = null }) {
           <>
             <button
               onClick={goPrev}
-              aria-label="Previous banner"
+              aria-label={t("banner.previous")}
               className="absolute left-0 top-1/2 z-20 flex h-10 w-9 -translate-y-1/2 items-center justify-center rounded-r-md bg-black/30 text-white opacity-0 transition-colors duration-200 hover:bg-black/50 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <ChevronLeft size={13} />
             </button>
             <button
               onClick={goNext}
-              aria-label="Next banner"
+              aria-label={t("banner.next")}
               className="absolute right-0 top-1/2 z-20 flex h-10 w-9 -translate-y-1/2 items-center justify-center rounded-l-md bg-black/30 text-white opacity-0 transition-colors duration-200 hover:bg-black/50 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <ChevronRight size={13} />
@@ -204,7 +247,7 @@ export default function BannerSlider({ initialBanners = null }) {
                 <button
                   key={i}
                   onClick={() => goTo(i)}
-                  aria-label={`Banner ${i + 1} (current)`}
+                  aria-label={t("banner.current", { index: i + 1 })}
                   className="relative h-1.5 w-10 overflow-hidden rounded-full bg-white/35"
                 >
                   <span
@@ -221,7 +264,7 @@ export default function BannerSlider({ initialBanners = null }) {
                 <button
                   key={i}
                   onClick={() => goTo(i)}
-                  aria-label={`Go to banner ${i + 1}`}
+                  aria-label={t("banner.goTo", { index: i + 1 })}
                   className="h-1.5 w-1.5 rounded-full bg-white/50 hover:bg-white/80 transition-colors duration-300"
                 />
               ),
@@ -238,9 +281,10 @@ export default function BannerSlider({ initialBanners = null }) {
    Banner image poori slide ka background hai, text iske upar overlay jaisa —
    word-by-word heading, date pill, CTA. Koi alag card/fan nahi.
 ===================================================== */
-function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, dateLabel }) {
-  const words = (banner.heading || "").split(/\s+/).filter(Boolean).slice(0, 8);
-  const alt = banner.altText || banner.title || banner.heading || "Banner";
+function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, dateLabel, dir }) {
+  const words = (banner.heading || "").split(/\s+/).filter(Boolean);
+  const { t } = useTranslation();
+  const alt = banner.altText || banner.title || banner.heading || t("banner.imageAlt");
   const extrude = `1px 1px 0 ${palette.extrude}, 2px 2px 0 ${palette.extrude}, 3px 3px 0 ${palette.extrude}, 4px 4px 0 ${palette.extrude}, 5px 5px 0 rgba(0,0,0,0.3)`;
 
   return (
@@ -268,9 +312,9 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
       <div className="absolute inset-0 bg-black/35" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
 
-      <div className="relative z-10 flex h-full items-center px-4 sm:px-6 lg:px-8 xl:px-10">
+      <div dir="ltr" className="relative z-10 flex h-full items-center px-4 sm:px-6 lg:px-8 xl:px-10">
         {/* COPY — ab image ke upar hi text aa raha hai */}
-        <div className="w-full max-w-xl sm:w-[58%]">
+        <div dir={dir} className="w-full max-w-xl sm:w-[58%]">
           {banner.eyebrow && (
             <span
               className="bn-anim mb-2 inline-block rounded-md border border-white/40 bg-white/15 px-2.5 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-white sm:mb-2.5 sm:text-xs"
@@ -282,23 +326,27 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
 
           {words.length > 0 && (
             <h2
+              dir={dir}
               className="mb-2 text-2xl font-black uppercase italic leading-[0.95] tracking-tight text-white sm:mb-2.5 sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"
-              style={{ textShadow: extrude }}
+              style={{ overflowWrap: "anywhere", textShadow: extrude }}
             >
-              {words.map((w, wi) => (
-                <span
-                  key={`${w}-${wi}`}
-                  className="bn-anim mr-[0.25em] inline-block"
-                  style={anim(isActive, "bnWord", 0.15 + wi * 0.09, 0.6)}
-                >
-                  {w}
-                </span>
-              ))}
+              {dir === "rtl"
+                ? <span className="bn-anim inline-block" style={anim(isActive, "bnSlideLeft", 0.15, 0.6)}>{banner.heading}</span>
+                : words.map((w, wi) => (
+                    <span
+                      key={`${w}-${wi}`}
+                      className="bn-anim me-[0.25em] inline-block"
+                      style={anim(isActive, "bnWord", 0.15 + wi * 0.09, 0.6)}
+                    >
+                      {w}
+                    </span>
+                  ))}
             </h2>
           )}
 
           {banner.description && (
             <p
+              dir={dir}
               className="bn-anim mb-2 hidden max-w-lg text-sm leading-relaxed text-white/85 sm:block sm:text-base lg:mb-3 lg:text-lg line-clamp-2"
               style={anim(isActive, "bnSlideLeft", 0.35)}
             >
@@ -331,13 +379,13 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
 }
 
 /* Sirf image wale banners (koi text/button nahi) — full-bleed + Ken Burns */
-function ImageSlide({ banner, imgUrl, mountImage, isActive, priority }) {
+function ImageSlide({ banner, imgUrl, mountImage, isActive, priority, fallbackAlt }) {
   return (
     <>
       {imgUrl && mountImage ? (
         <Image
           src={imgUrl}
-          alt={banner.altText || banner.title || banner.heading || "Banner"}
+          alt={banner.altText || banner.title || banner.heading || fallbackAlt}
           fill
           loader={smartImageLoader}
           sizes="100vw"
@@ -356,6 +404,7 @@ function ImageSlide({ banner, imgUrl, mountImage, isActive, priority }) {
 }
 
 function ButtonLink({ button, palette, primary = false, isActive, delay = 0 }) {
+  const { dir, t } = useTranslation();
   const href = button.link || "#";
 
   // Inline color: `.user-theme a { color: inherit }` Tailwind text-* ko override kar deta hai
@@ -367,14 +416,16 @@ function ButtonLink({ button, palette, primary = false, isActive, delay = 0 }) {
       }`}
       style={{ color: primary ? palette.from : "#ffffff", ...anim(isActive, "bnSlideLeft", delay, 0.6) }}
     >
-      {primary ? "Shop Now" : button.text}
-      {primary && (
-        <ArrowRight
+      {primary ? t("banner.shopNow") : button.text}
+      {primary && (dir === "rtl" ? <ArrowLeft
           size={15}
           className="bn-anim"
           style={{ animation: isActive ? "bnNudge 1.6s ease-in-out 1.2s infinite" : undefined }}
-        />
-      )}
+        /> : <ArrowRight
+          size={15}
+          className="bn-anim"
+          style={{ animation: isActive ? "bnNudge 1.6s ease-in-out 1.2s infinite" : undefined }}
+        />)}
     </Link>
   );
 }

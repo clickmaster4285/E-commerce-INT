@@ -15,6 +15,8 @@ import {
 } from "@/utils/bundleCalculator";
 import ProductCard from "./ProductCard";
 import SectionHeading from "./SectionHeading";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -168,6 +170,8 @@ export default function DealsSection({ embedded = false }) {
    DEAL ENGINE
 ===================================================== */
 function DealEngine({ deals }) {
+  const { locale } = useTranslation();
+  const { fieldOf } = useLocalized();
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef(null);
@@ -212,6 +216,8 @@ function DealEngine({ deals }) {
         })();
 
   const activeDeal = deals[current];
+  const activeDealName = fieldOf(activeDeal, "name");
+  const activeDealDescription = fieldOf(activeDeal, "description");
   const activeDealId = activeDeal?._id || activeDeal?.id || null;
 
   // ✅ Carousel deal ke products — server (12 tak, variants ke saath).
@@ -233,7 +239,8 @@ function DealEngine({ deals }) {
     [activeDealDetail],
   );
 
-  const endsLabel = new Date(activeDeal.endDate).toLocaleDateString("en-US", {
+  const dateLocale = locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale;
+  const endsLabel = new Date(activeDeal.endDate).toLocaleDateString(dateLocale, {
     day: "numeric",
     month: "short",
   });
@@ -338,7 +345,7 @@ function DealEngine({ deals }) {
                 <PodiumStage
                   key={`stage-${activeDeal._id}`}
                   images={slides}
-                  name={activeDeal.name}
+                  name={activeDealName}
                   hex={cfg.hex}
                 />
               </div>
@@ -359,7 +366,7 @@ function DealEngine({ deals }) {
                     ...dealAnim("dealSlideLeft", 0.12, 0.7),
                   }}
                 >
-                  {activeDeal.name}
+                  {activeDealName}
                 </h3>
 
                 <span
@@ -373,8 +380,8 @@ function DealEngine({ deals }) {
                   className="deal-anim mt-2.5 text-xs text-white/65 line-clamp-1"
                   style={dealAnim("dealSlideLeft", 0.3)}
                 >
-                  {products.length > 0 ? `${products.length} products · ` : ""}Ends {endsLabel}
-                  {activeDeal.description ? ` · ${activeDeal.description}` : ""}
+                  {products.length > 0 ? `${products.length} · ` : ""}{endsLabel}
+                  {activeDealDescription ? ` · ${activeDealDescription}` : ""}
                 </p>
 
                 {/* Shop Now — inline color: `.user-theme a { color: inherit }` outranks Tailwind text-* on links */}

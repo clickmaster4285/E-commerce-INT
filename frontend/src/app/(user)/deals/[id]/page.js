@@ -9,6 +9,7 @@ import { dealApi } from "@/apis/user/dealApi";
 import ProductCard from "@/components/user/ProductCard";
 import PaginationBar from "@/components/user/PaginationBar";
 import { BundleDealPanel } from "@/components/user/DealsSection";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -77,6 +78,7 @@ export default function DealDetailPage({ params }) {
 
 function DealDetailContent({ params }) {
   const { id } = use(params);
+  const { fieldOf } = useLocalized();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -153,6 +155,9 @@ function DealDetailContent({ params }) {
     );
   }
 
+  const dealName = fieldOf(deal, "name");
+  const dealDescription = fieldOf(deal, "description");
+
   // ✅ Server page (backend se variants+price ke saath — full catalog nahi)
   const products = deal.resolvedProducts || [];
   const totalProducts = deal.totalProducts ?? products.length;
@@ -189,7 +194,7 @@ function DealDetailContent({ params }) {
         <div className="grid md:grid-cols-2 gap-0">
           <div className="relative aspect-[4/3] md:aspect-auto block overflow-hidden">
             {imgUrl ? (
-              <img src={imgUrl} alt={deal.name} className="w-full h-full object-cover" />
+              <img src={imgUrl} alt={dealName} className="w-full h-full object-cover" />
             ) : (
               <div className={`w-full h-full bg-gradient-to-br ${visual.color} flex flex-col items-center justify-center p-6`}>
                 <div className="relative z-10 w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 border-2 border-white/30">
@@ -214,8 +219,8 @@ function DealDetailContent({ params }) {
                 </span>
               )}
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-[var(--user-text)] mb-4 leading-tight">{deal.name}</h1>
-            {deal.description && <p className="text-base text-[var(--user-text-muted)] mb-6">{deal.description}</p>}
+            <h1 className="text-3xl sm:text-4xl font-black text-[var(--user-text)] mb-4 leading-tight">{dealName}</h1>
+            {dealDescription && <p className="text-base text-[var(--user-text-muted)] mb-6">{dealDescription}</p>}
 
             {!time.expired ? (
               <div className="mb-6">

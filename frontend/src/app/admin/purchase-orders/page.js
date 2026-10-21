@@ -16,12 +16,11 @@ import {
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 const accentBtn = { backgroundColor: "var(--accent)", color: "var(--accent-text)" };
-const intlLocale = (locale) => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
 const money = (n, locale = "en") => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(Math.max(0, Number(n) || 0));
 const fmtDate = (d, locale = "en") => (d ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "short", day: "numeric" }).format(new Date(d)) : "—");
 
 const STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"];
-const STATUS_LABEL = { pending: "Pending", confirmed: "Confirmed", delivered: "Received", closed: "Closed", cancelled: "Cancelled" };
 const PAY_STATUSES = ["unpaid", "partial", "paid"];
 const RANGES = [["all", "All time"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]];
 const PAGE_SIZE = 20;
@@ -280,7 +279,7 @@ export default function PurchaseOrdersPage() {
               <option value="all">{t("admin.purchaseOrders.list.vendorAll")}</option>{vendorList.map((v) => <option key={v._id} value={v._id}>{v.name}</option>)}
             </select>
             <select value={draft.range} onChange={(e) => setDraft({ ...draft, range: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
-              {RANGES.map(([v]) => <option key={v} value={v}>{t(`admin.purchaseOrders.list.range.${v}`)}</option>)}
+              {RANGES.map((v) => <option key={v} value={v}>{t(`admin.purchaseOrders.list.range.${v}`)}</option>)}
             </select>
             <select value={draft.payment} onChange={(e) => setDraft({ ...draft, payment: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
               <option value="all">{t("admin.purchaseOrders.list.paymentAll")}</option>{PAY_STATUSES.map((s) => <option key={s} value={s}>{t(`admin.purchaseOrders.status.${s}`)}</option>)}

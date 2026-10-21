@@ -19,11 +19,12 @@ import SectionHeading from "./SectionHeading";
 import { idOf } from "@/utils/homeCatalog";
 import { useShopProducts, scrollToListTop } from "../../hooks/user/useShopProducts";
 import { FEATURED_TAB_EVENT } from "./HomeNav";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const TABS = [
-  { id: "featured", label: "Featured", icon: Sparkles },
-  { id: "new", label: "New Arrivals", icon: TrendingUp },
-  { id: "offers", label: "Best Offers", icon: Flame },
+  { id: "featured", labelKey: "admin.featuredProducts.ui.featuredAria", icon: Sparkles },
+  { id: "new", labelKey: "storefront.navigation.newProducts", icon: TrendingUp },
+  { id: "offers", labelKey: "storefront.navigation.bestOffers", icon: Flame },
 ];
 
 const PER_PAGE = 20;
@@ -39,6 +40,7 @@ const GRID =
   "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9";
 
 function TabGrid({ tab }) {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const gridRef = useRef(null);
   const params = TAB_PARAMS[tab] || TAB_PARAMS.featured;
@@ -77,13 +79,13 @@ function TabGrid({ tab }) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
         <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-        <p className="text-sm font-bold text-[var(--user-text)]">Could not load products</p>
+        <p className="text-sm font-bold text-[var(--user-text)]">{t("admin.shared.state.error")}</p>
         <button
           type="button"
           onClick={() => refetch()}
           className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
         >
-          Retry
+          {t("admin.shared.state.errorBody")}
         </button>
       </div>
     );
@@ -93,8 +95,8 @@ function TabGrid({ tab }) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
         <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-        <p className="text-sm font-bold text-[var(--user-text)]">No products found</p>
-        <p className="text-[0.6875rem] text-[var(--user-text-muted)]">New products are on the way.</p>
+        <p className="text-sm font-bold text-[var(--user-text)]">{t("admin.products.table.empty")}</p>
+        <p className="text-[0.6875rem] text-[var(--user-text-muted)]">{t("storefront.featured.comingSoon")}</p>
       </div>
     );
   }
@@ -115,13 +117,14 @@ function TabGrid({ tab }) {
         onPageChange={goToPage}
       />
       {isFetching && products.length > 0 ? (
-        <p className="mt-2 text-center text-[0.6875rem] text-[var(--user-text-subtle)]">Updating…</p>
+        <p className="mt-2 text-center text-[0.6875rem] text-[var(--user-text-subtle)]">{t("common.loading")}</p>
       ) : null}
     </div>
   );
 }
 
 export default function FeaturedProducts({ titleOverride = null }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -197,22 +200,22 @@ export default function FeaturedProducts({ titleOverride = null }) {
   const title =
     titleOverride ||
     (safeTab === "new"
-      ? "New Arrivals"
+      ? t("storefront.navigation.newProducts")
       : safeTab === "offers"
-        ? "Best Offers"
-        : "Featured Products");
+        ? t("storefront.navigation.bestOffers")
+        : t("admin.nav.item.featuredProducts"));
   const subtitle =
     safeTab === "new"
-      ? "Fresh arrivals — latest first"
+      ? t("storefront.featured.newSubtitle")
       : safeTab === "offers"
-        ? "Biggest discounts first"
-        : "Handpicked across every category and brand";
+        ? t("storefront.featured.offersSubtitle")
+        : t("storefront.featured.defaultSubtitle");
 
   return (
-    <section id="featured-products" ref={sectionRef} className="scroll-mt-[7.5rem] lg:scroll-mt-[8.5rem]">
+    <section id="featured-products" ref={sectionRef} className="user-featured-products scroll-mt-[7.5rem] lg:scroll-mt-[8.5rem]">
       <SectionHeading title={title} subtitle={subtitle}>
         <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
-          {tabs.map(({ id, label, icon: Icon }) => (
+          {tabs.map(({ id, labelKey, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -220,7 +223,7 @@ export default function FeaturedProducts({ titleOverride = null }) {
               className={`${tabClass(safeTab === id)} flex items-center gap-1.5`}
             >
               <Icon size={12} />
-              {label}
+              {t(labelKey)}
               <span
                 className={`absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--user-accent)] transition-opacity ${
                   safeTab === id ? "opacity-100" : "opacity-0"

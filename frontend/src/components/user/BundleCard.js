@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCart } from "./CartContext";
 import { productApi } from "@/apis/user/productApi";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -58,6 +59,7 @@ export function resolveBundleItems(bundle, products = []) {
 }
 
 export default function BundleCard({ bundle, className = "" }) {
+  const { fieldOf, productNameOf } = useLocalized();
   const [added, setAdded] = useState(false);
   const [showItems, setShowItems] = useState(false);
   const { addBundleToCart } = useCart();
@@ -89,7 +91,8 @@ export default function BundleCard({ bundle, className = "" }) {
     [bundle, products]
   );
 
-  const name = bundle?.name || "Bundle Deal";
+  const name = fieldOf(bundle, "name") || bundle?.name || "Bundle Deal";
+  const description = fieldOf(bundle, "description");
   const bundlePrice = Number(bundle?.bundlePrice) || 0;
 
   const originalPrice =
@@ -164,9 +167,9 @@ export default function BundleCard({ bundle, className = "" }) {
           {name}
         </h3>
 
-        {bundle?.description ? (
+        {description ? (
           <p className="mt-1 text-[0.6875rem] line-clamp-1 text-[var(--user-text-subtle)]">
-            {bundle.description}
+            {description}
           </p>
         ) : null}
 
@@ -198,7 +201,7 @@ export default function BundleCard({ bundle, className = "" }) {
                   <span className="text-[var(--user-accent)] font-bold">
                     {quantity}×
                   </span>
-                  <span className="truncate">{product.name}</span>
+                  <span className="truncate">{productNameOf(product)}</span>
                 </li>
               ))
             )}
