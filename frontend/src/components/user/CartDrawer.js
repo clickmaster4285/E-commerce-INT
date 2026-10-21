@@ -13,6 +13,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
   import { useCart } from "./CartContext";
   import { useDiscounts } from "./DiscountContext";
   import DealInfoDropdown from "./DealInfoDropdown";
+  import { useLocalized } from "@/i18n/localize";
+  import { useTranslation } from "@/i18n/LanguageProvider";
   import {
     calculateFreeItems,
     calculatePayableItems,
@@ -42,6 +44,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
   };
 
   export default function CartDrawer() {
+    const { t } = useTranslation();
+    const { text } = useLocalized();
     const router = useRouter();
     const { cart, isCartOpen, setIsCartOpen, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems } = useCart();
     const { calculateProductDiscount, deals: dealsList = [] } = useDiscounts();
@@ -105,7 +109,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
     }, []);
 
     // ✅ Deal badge config (type-based color/text + raw badge text merge)
-    function getDealBadgeConfig(deal) {
+    const getDealBadgeConfig = useCallback((deal) => {
       if (!deal) return null;
       const type = deal.type;
       const discountValue = deal.discountValue ?? deal.discount_value ?? deal.savings ?? 0;
@@ -114,7 +118,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
       if (type === "buy_x_get_y") {
         return {
-          text: `Buy ${buyQuantity} Get ${getQuantity}`,
+          text: `${buyQuantity} + ${getQuantity} · ${t("admin.deals.page.offer")}`,
           color: "from-purple-500 to-pink-600",
           icon: Tag,
         };
@@ -122,7 +126,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
       if (type === "percentage") {
         return {
-          text: `${discountValue}% OFF`,
+          text: `${discountValue}% · ${t("admin.discounts.page.discount")}`,
           color: "from-green-500 to-emerald-600",
           icon: Tag,
         };
@@ -130,7 +134,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
       if (type === "fixed_amount") {
         return {
-          text: `Rs. ${discountValue} OFF`,
+          text: `Rs. ${discountValue} · ${t("admin.discounts.page.discount")}`,
           color: "from-blue-500 to-cyan-600",
           icon: Tag,
         };
@@ -138,18 +142,18 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
       if (type === "free_shipping") {
         return {
-          text: "Free Shipping",
+          text: t("admin.promotions.ui.generated.36abd54d7de4"),
           color: "from-orange-500 to-red-600",
           icon: Tag,
         };
       }
 
       return {
-        text: deal.name || "Deal",
+        text: deal.name || t("admin.deals.page.offer"),
         color: "from-orange-500 to-red-600",
         icon: Tag,
       };
-    }
+    }, [t]);
 
     const groupedItems = useMemo(() => {
       const dealGroups = new Map();
@@ -223,6 +227,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
           isGift: Boolean(raw.isBundleGift),
           bundleId: raw.bundleId || null,
           bundleName: raw.bundleName || "",
+          dealTranslations: raw.dealTranslations || {},
           bundleAppliedRule: raw.bundleAppliedRule || "",
           bundleProgress: raw.bundleProgress || "",
         };
@@ -232,7 +237,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
             dealGroups.set(raw.dealId, {
               dealId: raw.dealId,
               dealType: raw.dealType,
-              dealName: raw.dealName || "Deal",
+              dealName: raw.dealName || t("admin.deals.page.offer"),
+              dealTranslations: raw.dealTranslations || {},
               // ✅ discountValue = actual deal value (percent/fixed) — dealSavings rupees hai jo "0% OFF" banata tha
               dealBadge: sanitizeDealBadge(raw.dealBadge) || getDealBadgeConfig({ type: raw.dealType, discountValue: raw.dealDiscountValue ?? raw.dealSavings, buyQuantity: raw.dealBuyQuantity, getQuantity: raw.dealGetQuantity })?.text,
               items: [],
@@ -251,7 +257,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
         deals: Array.from(dealGroups.values()),
         regular: regularItems,
       };
-    }, [cart, pendingQty, calculateProductDiscount]);
+    }, [cart, pendingQty, calculateProductDiscount, getDealBadgeConfig, t]);
 
     const totals = useMemo(() => {
       // ✅ Use SELECTED items for totals (selection-aware)
@@ -369,7 +375,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
           next_.delete(key);
           return next_;
         });
-        toast.success("Item removed", { duration: 5000, action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
+        toast.success(t("admin.shared.toast.deleted"), { duration: 5000, action: { label: t("admin.shared.action.undo"), onClick: () => restoreItems([row.raw]) } });
       }, REMOVE_ANIM_MS);
       timersRef.current.push(t);
     };
@@ -401,8 +407,8 @@ import { shippingApi } from "@/apis/user/shippingApi";
       setConfirmClear(false);
       const snapshot = cart.map((i) => i.raw ?? i);
       cart.forEach((i) => removeFromCart(i.key));
-      toast.success("Cart cleared", {
-        action: { label: "Undo", onClick: () => restoreItems(snapshot) },
+      toast.success(t("admin.shared.toast.deleted"), {
+        action: { label: t("admin.shared.action.undo"), onClick: () => restoreItems(snapshot) },
       });
     };
 
@@ -410,15 +416,15 @@ import { shippingApi } from "@/apis/user/shippingApi";
       <>
         <div aria-hidden="true" onClick={closeCart} className={`fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] transition-opacity duration-200 ease-out ${isCartOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-        <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Shopping cart" className={`fixed top-0 right-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[var(--user-bg-elevated)] font-normal text-[var(--user-text)] shadow-[var(--user-shadow-md)] outline-none transition-transform duration-200 ease-out sm:w-[420px] ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}>
-          <span className="sr-only" aria-live="polite">{count} {count === 1 ? "item" : "items"} in cart</span>
+        <div ref={drawerRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t("cart.title")} className={`fixed top-0 right-0 z-50 flex h-full w-full flex-col overflow-hidden bg-[var(--user-bg-elevated)] font-normal text-[var(--user-text)] shadow-[var(--user-shadow-md)] outline-none transition-transform duration-200 ease-out sm:w-[420px] ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}>
+          <span className="sr-only" aria-live="polite">{t("cart.itemsCount", { count })}</span>
 
           <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] px-5 py-3">
             <div className="flex min-w-0 items-center gap-2.5">
-              <h2 className="text-base font-semibold leading-6 text-[var(--user-text)]">Shopping Cart</h2>
-              <span aria-label={`${count} ${count === 1 ? "item" : "items"}`} className="inline-flex min-w-6 items-center justify-center rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs font-normal tabular-nums text-[var(--user-text-muted)]">{count}</span>
+              <h2 className="break-words text-base font-semibold leading-6 text-[var(--user-text)]">{t("cart.title")}</h2>
+              <span aria-label={t("cart.itemsCount", { count })} className="inline-flex min-w-6 items-center justify-center rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs font-normal tabular-nums text-[var(--user-text-muted)]">{count}</span>
             </div>
-            <button type="button" onClick={closeCart} aria-label="Close cart" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]">
+            <button type="button" onClick={closeCart} aria-label={t("common.close")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]">
               <X size={18} aria-hidden="true" />
             </button>
           </header>
@@ -428,12 +434,12 @@ import { shippingApi } from "@/apis/user/shippingApi";
               {totals.shipping === 0 ? (
                 <p className="flex items-center gap-2 text-sm font-normal text-[var(--user-text-muted)]">
                   <Check size={14} aria-hidden="true" />
-                  You&apos;ve unlocked free shipping
+                  {t("admin.promotions.ui.generated.36abd54d7de4")}
                 </p>
               ) : (
                 <>
-                  <p className="text-sm font-normal text-[var(--user-text-muted)]">Add {fmt(freeShippingRemaining)} more for free shipping</p>
-                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--user-bg-hover)]" role="progressbar" aria-label="Free shipping progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(freeShippingProgress)}>
+                  <p className="text-sm font-normal text-[var(--user-text-muted)]">{fmt(freeShippingRemaining)} · {t("admin.promotions.ui.generated.36abd54d7de4")}</p>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--user-bg-hover)]" role="progressbar" aria-label={t("admin.promotions.ui.generated.36abd54d7de4")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(freeShippingProgress)}>
                     <div className="h-full rounded-full bg-[var(--user-text-muted)] transition-[width] duration-300 ease-out" style={{ width: `${freeShippingProgress}%` }} />
                   </div>
                 </>
@@ -460,23 +466,23 @@ import { shippingApi } from "@/apis/user/shippingApi";
                           <Icon size={16} aria-hidden="true" />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <h3 className="truncate text-sm font-semibold text-[var(--user-text)]">{dealGroup.dealName}</h3>
+                          <h3 className="truncate text-sm font-semibold text-[var(--user-text)]">{text(dealGroup.dealName, dealGroup.dealTranslations?.name)}</h3>
                           <p className="mt-0.5 text-xs font-normal text-[var(--user-text-muted)]">
-                            {dealGroup.dealType === "free_shipping" ? "Free Shipping" : "Deal applied"}
+                            {dealGroup.dealType === "free_shipping" ? t("admin.promotions.ui.generated.36abd54d7de4") : t("admin.deals.page.offer")}
                           </p>
                         </div>
                         {isCollapsed && (
                           <span className="shrink-0 text-xs font-normal text-[var(--user-text-muted)]">
-                            {dealGroup.items.length} {dealGroup.items.length === 1 ? "item" : "items"}
+                            {t("cart.itemsCount", { count: dealGroup.items.length })}
                           </span>
                         )}
                         {dealGroup.totalSavings > 0 && (
-                          <span className="shrink-0 text-xs font-normal text-[var(--user-text-muted)]">Save {fmt(dealGroup.totalSavings)}</span>
+                          <span className="shrink-0 text-xs font-normal text-[var(--user-text-muted)]">{t("common.save")} {fmt(dealGroup.totalSavings)}</span>
                         )}
                         <button
                           type="button"
                           onClick={() => toggleDealCollapse(dealGroup.dealId)}
-                          aria-label={isCollapsed ? "Expand deal section" : "Collapse deal section"}
+                          aria-label={t("admin.deals.page.offer")}
                           aria-expanded={!isCollapsed}
                           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]"
                         >
@@ -523,7 +529,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
 
                 {groupedItems.regular.length > 0 && (
                   <div>
-                    {groupedItems.deals.length > 0 && <h3 className="mb-1 text-xs font-medium text-[var(--user-text-muted)]">Regular items</h3>}
+                    {groupedItems.deals.length > 0 && <h3 className="mb-1 text-xs font-medium text-[var(--user-text-muted)]">{t("admin.shared.label.product")}</h3>}
                     <ul className="m-0 list-none p-0">
                       {groupedItems.regular.map((row, index) => (
                         <CartItemRow
@@ -551,10 +557,10 @@ import { shippingApi } from "@/apis/user/shippingApi";
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--user-bg-hover)]">
                   <ShoppingBag size={28} aria-hidden="true" className="text-[var(--user-text-muted)]" />
                 </div>
-                <h3 className="text-base font-semibold text-[var(--user-text)]">Your cart is empty</h3>
-                <p className="mt-2 max-w-[16.25rem] text-sm leading-relaxed text-[var(--user-text-muted)]">Add some products to get started.</p>
+                <h3 className="break-words text-base font-semibold text-[var(--user-text)]">{t("cart.empty")}</h3>
+                <p className="mt-2 max-w-[16.25rem] text-sm leading-relaxed text-[var(--user-text-muted)]">{t("cart.emptyBody")}</p>
                 <button type="button" onClick={startShopping} className="mt-5 inline-flex h-10 items-center justify-center rounded-lg border border-[var(--user-border)] px-5 text-sm font-medium text-[var(--user-text)] transition-colors duration-150 hover:bg-[var(--user-bg-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]">
-                  Continue shopping
+                  {t("cart.continueShopping")}
                 </button>
               </div>
             )}
@@ -573,36 +579,36 @@ import { shippingApi } from "@/apis/user/shippingApi";
                     <span className={`flex h-5 w-5 items-center justify-center rounded border transition-[background,border-color] duration-150 ${allSelected ? "border-[var(--user-accent)] bg-[var(--user-accent)]" : "border-[var(--user-border)] bg-transparent hover:border-[var(--user-border-hover)]"}`}>
                       {allSelected && <Check size={12} className="text-[var(--user-accent-text)]" strokeWidth={2} />}
                     </span>
-                    <span>Select all</span>
+                    <span>{t("cart.selectAll")}</span>
                   </button>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-normal tabular-nums text-[var(--user-text-muted)]">{selectedLineCount} of {cart.length} selected</span>
+                    <span className="text-xs font-normal tabular-nums text-[var(--user-text-muted)]">{selectedLineCount} / {cart.length}</span>
                     <button
                       type="button"
                       onClick={handleClearCart}
-                      aria-label={confirmClear ? "Confirm clear cart" : "Clear cart"}
+                      aria-label={confirmClear ? t("admin.shared.action.confirm") : t("admin.shared.action.clear")}
                       className={`text-xs font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-danger)] ${confirmClear ? "text-[var(--user-danger)]" : "text-[var(--user-text-muted)] hover:text-[var(--user-danger)]"}`}
                     >
-                      {confirmClear ? "Confirm clear?" : "Clear cart"}
+                      {confirmClear ? t("admin.shared.action.confirm") : t("admin.shared.action.clear")}
                     </button>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--user-text-muted)]">Subtotal</span>
+                    <span className="text-sm text-[var(--user-text-muted)]">{t("cart.subtotal")}</span>
                     <span key={totals.subtotal} className="cart-qty-pop text-sm tabular-nums text-[var(--user-text-muted)]">{fmt(totals.subtotal)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--user-text-muted)]">Shipping</span>
-                    <span className="text-sm tabular-nums text-[var(--user-text-muted)]">{totals.shipping === 0 ? "FREE" : fmt(totals.shipping)}</span>
+                    <span className="text-sm text-[var(--user-text-muted)]">{t("cart.shipping")}</span>
+                    <span className="text-sm tabular-nums text-[var(--user-text-muted)]">{totals.shipping === 0 ? t("admin.promotions.ui.generated.36abd54d7de4") : fmt(totals.shipping)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--user-text-muted)]">Tax</span>
+                    <span className="text-sm text-[var(--user-text-muted)]">{t("cart.tax")}</span>
                     <span className="text-sm tabular-nums text-[var(--user-text-muted)]">{fmt(totals.tax)}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between border-t border-[var(--user-border)] pt-3">
-                  <span className="text-sm font-medium text-[var(--user-text)]">Total</span>
+                  <span className="text-sm font-medium text-[var(--user-text)]">{t("admin.shared.label.total")}</span>
                   <span key={totals.grandTotal} className="cart-qty-pop text-lg font-semibold tabular-nums text-[var(--user-text)]">{fmt(totals.grandTotal)}</span>
                 </div>
                 <button
@@ -612,14 +618,13 @@ import { shippingApi } from "@/apis/user/shippingApi";
                   className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition-colors duration-150 hover:bg-[var(--user-accent-hover)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
                 >
                   <LockKeyhole size={15} aria-hidden="true" />
-                  {selectedLineCount === 0 ? "Select items" : dealRequirementIssues.length ? "Complete deal requirements" : "Proceed to Checkout"}
+                  {selectedLineCount === 0 ? t("admin.shared.action.select") : dealRequirementIssues.length ? t("admin.deals.page.offer") : t("cart.checkout")}
                 </button>
                 {dealRequirementIssues.length > 0 && (
                   <p role="alert" className="text-center text-xs text-amber-700 dark:text-amber-300">
                     {formatDealRequirementIssue(dealRequirementIssues[0])}
                   </p>
                 )}
-                <p className="-mt-2 text-center text-xs text-[var(--user-text-muted)]">Secure checkout · Easy returns</p>
               </div>
             </footer>
           )}
@@ -629,6 +634,9 @@ import { shippingApi } from "@/apis/user/shippingApi";
   }
 
   function CartItemRow({ row, index, imgUrl, isRemoving, isCommitting, onQtyChange, onRemove, isSelected = true, onToggleSelect, openDealPicker = false, onToggleDealPicker, onCloseDealPicker }) {
+    const { text } = useLocalized();
+    const rowName = text(row.name, row.raw?.translations?.name);
+    const brandName = text(row.brand, row.raw?.brandTranslations?.name);
     const { applyDealToItem } = useCart();
     const { getActiveDealsForProduct } = useDiscounts();
     // ✅ Deal button sirf tab dikhao jab is product ke liye koi active deal ho —
@@ -647,7 +655,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
-          aria-label={isSelected ? `Unselect ${row.name}` : `Select ${row.name}`}
+          aria-label={isSelected ? `Unselect ${rowName}` : `Select ${rowName}`}
           aria-pressed={isSelected}
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors duration-150 hover:bg-[var(--user-bg-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]"
         >
@@ -657,12 +665,12 @@ import { shippingApi } from "@/apis/user/shippingApi";
         </button>
 
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--user-bg-hover)]">
-          {imgUrl ? (<img src={imgUrl} alt={row.name} loading="lazy" decoding="async" className="h-full w-full object-cover" />) : (<Package size={24} aria-hidden="true" className="text-[var(--user-text-subtle)]" />)}
+          {imgUrl ? (<img src={imgUrl} alt={rowName} loading="lazy" decoding="async" className="h-full w-full object-cover" />) : (<Package size={24} aria-hidden="true" className="text-[var(--user-text-subtle)]" />)}
         </div>
 
         <div className="flex min-w-0 flex-col">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[var(--user-text)]">{row.name}</h3>
-          <p className="mt-1 truncate text-xs text-[var(--user-text-muted)]">{row.variantTitle || "Default"}{row.brand ? ` · ${row.brand}` : ""}</p>
+          <h3 className="line-clamp-2 text-sm font-medium leading-snug text-[var(--user-text)]">{rowName}</h3>
+          <p className="mt-1 truncate text-xs text-[var(--user-text-muted)]">{row.variantTitle || "Default"}{brandName ? ` · ${brandName}` : ""}</p>
 
           {(row.isGift || row.bundleAppliedRule || (!row.isGift && row.bundleProgress)) && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--user-text-muted)]">

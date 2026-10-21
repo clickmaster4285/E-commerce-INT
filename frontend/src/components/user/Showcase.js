@@ -8,6 +8,8 @@ import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
 import ProductCard from "./ProductCard";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 // ✅ Helper: Extract a clean string ID from any value (string, ObjectId, or { _id: ... } object)
 const getStrId = (x) => String(typeof x === "object" ? (x?._id || "") : (x || ""));
@@ -21,13 +23,14 @@ const safeIdCompare = (a, b) => {
 
 // ✅ ARROW — dark semi-transparent circular button on the outer carousel edge
 function ArrowBtn({ dir, onClick, disabled, onHover }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       onMouseEnter={() => onHover?.(dir)}
       onMouseLeave={() => onHover?.(null)}
-      aria-label={dir === "left" ? "Previous products" : "Next products"}
+      aria-label={dir === "left" ? t("admin.shared.action.previous") : t("admin.shared.action.next")}
       className={`absolute top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-md text-white border border-white/25 shadow-lg w-10 h-10 sm:w-11 sm:h-11 transition-all duration-500 ease-out ${
         dir === "left"
           ? "-left-2 sm:-left-3 lg:-left-4 hover:-translate-x-0.5"
@@ -62,6 +65,7 @@ function RowSkeleton() {
 
 // ✅ Generic product row — title + arrows + horizontal slide
 function ProductRow({ title, subtitle, href, products }) {
+  const { t } = useTranslation();
   const scrollRef = useRef(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
@@ -187,7 +191,7 @@ function ProductRow({ title, subtitle, href, products }) {
           )}
         </div>
         <Link href={href} className="shrink-0 inline-flex items-center gap-1 text-[0.6875rem] lg:text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">
-          See all <ChevronRight size={12} />
+          {t("admin.dashboard.topProducts.viewAll")} <ChevronRight size={12} />
         </Link>
       </div>
 
@@ -226,6 +230,8 @@ function ProductRow({ title, subtitle, href, products }) {
 // Row 3 = teesre number wali
 // ==========================================
 export function CategoryShowcase() {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     queryFn: categoryApi.getAll,
@@ -275,8 +281,8 @@ export function CategoryShowcase() {
       {top.map((cat) => (
         <ProductRow
           key={cat._id}
-          title={cat.name}
-          subtitle={`${cat.count} products`}
+          title={fieldOf(cat, "name")}
+          subtitle={t("cart.itemsCount", { count: cat.count })}
           href={`/?category=${cat._id}`}
           products={products.filter((p) => safeIdCompare(p.category_id, cat._id))}
         />
@@ -292,6 +298,8 @@ export function CategoryShowcase() {
 // Row 3 = teesre number wala
 // ==========================================
 export function BrandShowcase() {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const { data: brands = [] } = useQuery({
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
@@ -341,8 +349,8 @@ export function BrandShowcase() {
       {top.map((brand) => (
         <ProductRow
           key={brand._id}
-          title={brand.name}
-          subtitle={`${brand.count} products`}
+          title={fieldOf(brand, "name")}
+          subtitle={t("cart.itemsCount", { count: brand.count })}
           href={`/?brand=${brand._id}`}
           products={products.filter((p) => safeIdCompare(p.brand_id, brand._id))}
         />

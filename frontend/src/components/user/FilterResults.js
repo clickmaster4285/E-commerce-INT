@@ -22,6 +22,8 @@ import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
 import { STOCK_STATES, formatPrice, idOf } from "@/utils/homeCatalog";
 import { useShopProducts, scrollToListTop } from "../../hooks/user/useShopProducts";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 // ✅ 24 per page — xl par grid 6 columns hai, 24 = 4 poore rows (20 par
 // teesra row adhoora rehta tha).
@@ -38,8 +40,8 @@ const GRID =
 
 function Chip({ label, onRemove }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--user-accent)]/40 bg-[var(--user-accent-soft)] py-1 pl-3 pr-1.5 text-[0.6875rem] font-bold text-[var(--user-text)]">
-      <span className="min-w-0 truncate capitalize">{label}</span>
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--user-accent)]/40 bg-[var(--user-accent-soft)] py-1 ps-3 pe-1.5 text-[0.6875rem] font-bold text-[var(--user-text)]">
+      <span className="min-w-0 break-words capitalize">{label}</span>
       <button
         type="button"
         onClick={onRemove}
@@ -69,6 +71,8 @@ export default function FilterResults({
      "remove a filter" wali line ka matlab nahi banta. Home false bhejta hai. */
   cleanMode = false,
 }) {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -139,7 +143,7 @@ export default function FilterResults({
       const category = (categories || []).find((item) => idOf(item?._id) === value);
       list.push({
         key: `cat-${value}`,
-        label: category?.name || "Category",
+        label: category ? fieldOf(category, "name") : t("admin.shared.label.category"),
         onRemove: () => onChange?.({ categoryIds: without(categoryIds, value) }),
       });
     });
@@ -150,7 +154,7 @@ export default function FilterResults({
       const brand = (brands || []).find((item) => idOf(item?._id) === value);
       list.push({
         key: `brand-${value}`,
-        label: brand?.name || "Brand",
+        label: brand ? fieldOf(brand, "name") : t("admin.shared.label.brand"),
         onRemove: () => onChange?.({ brandIds: without(brandIds, value) }),
       });
     });
@@ -162,8 +166,8 @@ export default function FilterResults({
         minPrice !== null && maxPrice !== null
           ? `${formatPrice(minPrice)} – ${formatPrice(maxPrice)}`
           : minPrice !== null
-            ? `Above ${formatPrice(minPrice)}`
-            : `Under ${formatPrice(maxPrice)}`;
+            ? `${t("common.price")}: ≥ ${formatPrice(minPrice)}`
+            : `${t("common.price")}: ≤ ${formatPrice(maxPrice)}`;
       list.push({
         key: "price",
         label: range,
@@ -175,7 +179,11 @@ export default function FilterResults({
       const state = STOCK_STATES.find((item) => item.id === id);
       list.push({
         key: `stock-${id}`,
-        label: state?.label || id,
+        label: id === "in"
+          ? t("admin.productDetail.page.inStock")
+          : id === "low"
+            ? t("admin.shared.status.lowStock")
+            : t("admin.shared.status.outOfStock"),
         onRemove: () => onChange?.({ stockStates: without(filters.stockStates, id) }),
       });
     });
@@ -187,7 +195,7 @@ export default function FilterResults({
     [...new Set(bands)].forEach((band) => {
       list.push({
         key: `disc-${band}`,
-        label: `${band}% or more off`,
+        label: `${band}% · ${t("admin.discounts.page.discount")}`,
         onRemove: () =>
           onChange?.({
             discountBand: null,
@@ -202,20 +210,20 @@ export default function FilterResults({
       const deal = (deals || []).find((item) => idOf(item?._id) === value);
       list.push({
         key: `deal-${value}`,
-        label: deal?.name || "Deal",
+        label: deal ? fieldOf(deal, "name") : t("admin.deals.page.offer"),
         onRemove: () => onChange?.({ dealIds: without(dealIds, value) }),
       });
     });
 
     return list;
-  }, [filters, categories, brands, deals, onChange]);
+  }, [filters, categories, brands, deals, onChange, fieldOf, t]);
 
   if (isLoading && !products.length) {
     return (
-      <section aria-label="Filter results">
+      <section aria-label={t("admin.nav.item.products")}>
         <SectionHeading
-          title={titleOverride || "Filter Results"}
-          subtitle="Loading products…"
+          title={titleOverride || t("admin.nav.item.products")}
+          subtitle={t("admin.products.table.loading")}
           icon={ListFilter}
         />
         <div className={GRID}>
@@ -233,20 +241,19 @@ export default function FilterResults({
   if (isError) {
     return (
       <section
-        aria-label="Filter results"
+        aria-label={t("admin.nav.item.products")}
         className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]/60 p-3 sm:p-4"
       >
-        <SectionHeading title={titleOverride || "Filter Results"} subtitle="Something went wrong" icon={ListFilter} />
+        <SectionHeading title={titleOverride || t("admin.nav.item.products")} subtitle={t("admin.shared.state.error")} icon={ListFilter} />
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
           <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-          <p className="text-sm font-bold text-[var(--user-text)]">Could not load products</p>
-          <p className="text-[0.6875rem] text-[var(--user-text-muted)]">Please check your connection and try again.</p>
+          <p className="text-sm font-bold text-[var(--user-text)]">{t("admin.shared.toast.loadFailed")}</p>
           <button
             type="button"
             onClick={() => refetch()}
             className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
           >
-            Retry
+            {t("admin.shared.action.retry")}
           </button>
         </div>
       </section>
@@ -256,12 +263,12 @@ export default function FilterResults({
   return (
     <section
       ref={sectionRef}
-      aria-label="Filter results"
+      aria-label={t("admin.nav.item.products")}
       className="rounded-2xl border border-[var(--user-accent)]/30 bg-[var(--user-bg-card)]/60 p-3 sm:p-4 scroll-mt-24"
     >
       <SectionHeading
-        title={titleOverride || "Filter Results"}
-        subtitle={`${total} ${total === 1 ? "product" : "products"} match your filters${isFetching ? "…" : ""}`}
+        title={titleOverride || t("admin.nav.item.products")}
+        subtitle={`${t("admin.dashboard.salesDistribution.productsCount", { count: total })}${isFetching ? "…" : ""}`}
         icon={ListFilter}
       >
         <button
@@ -270,7 +277,7 @@ export default function FilterResults({
           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
         >
           <RotateCcw size={12} />
-          Clear all
+          {t("admin.shared.action.clearFilters")}
         </button>
       </SectionHeading>
 
@@ -287,19 +294,17 @@ export default function FilterResults({
         <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
           <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
           <p className="text-sm font-bold text-[var(--user-text)]">
-            {cleanMode ? "No products found" : "No products match these filters"}
+            {t("admin.featuredProducts.modal.noProducts")}
           </p>
           <p className="text-[0.6875rem] text-[var(--user-text-muted)]">
-            {cleanMode
-              ? "Try a different search or filter."
-              : "Try removing a filter or clear them all."}
+            {t("admin.shared.state.noResults")}
           </p>
           <button
             type="button"
             onClick={onClear}
             className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
           >
-            Clear filters
+            {t("admin.shared.action.clearFilters")}
           </button>
         </div>
       ) : (

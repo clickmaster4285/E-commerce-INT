@@ -27,6 +27,8 @@ import {
 import { shippingApi } from "@/apis/user/shippingApi";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
+import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import {
   ArrowLeft, ArrowRight, Check, Lock, MapPin, Phone, CreditCard,
@@ -71,10 +73,10 @@ function PrimaryButton({
 }
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
-const getPhoneValidationError = (value) => {
-  if (!value) return "Phone number is required";
-  if (value.length < PHONE_MIN) return `Phone number must be at least ${PHONE_MIN} digits`;
-  if (!isValidPhone(value)) return `Phone number must be at most ${PHONE_MAX} digits`;
+const getPhoneValidationError = (value, t) => {
+  if (!value) return t("checkout.phone.required");
+  if (value.length < PHONE_MIN) return t("checkout.phone.minDigits", { min: PHONE_MIN });
+  if (!isValidPhone(value)) return t("checkout.phone.maxDigits", { max: PHONE_MAX });
   return "";
 };
 const getImgUrl = (img) => {
@@ -110,16 +112,16 @@ const BANK_DETAILS = {
 };
 
 // 🏦 Bank Transfer Panel — mobile + desktop dono ke liye (compact = mobile)
-const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormErrors, compact = false }) => {
+const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormErrors, t, compact = false }) => {
   const [copied, setCopied] = useState("");
   const copy = async (text, key) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(key);
-      toast.success("Copied to clipboard!");
+      toast.success(t("checkout.bank.copied"));
       setTimeout(() => setCopied(""), 1500);
     } catch {
-      toast.error("Could not copy");
+      toast.error(t("checkout.bank.copyFailed"));
     }
   };
   const inp = compact
@@ -151,7 +153,7 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[0.625rem] uppercase tracking-widest font-black text-emerald-200/80">Pay To</p>
+            <p className="text-[0.625rem] uppercase tracking-widest font-black text-emerald-200/80">{t("checkout.bank.payTo")}</p>
             <p className="text-sm sm:text-base font-black text-white truncate">{BANK_DETAILS.title}</p>
             <p className="text-[0.6875rem] sm:text-xs text-emerald-100/80 font-semibold mt-0.5">{BANK_DETAILS.bank}</p>
           </div>
@@ -162,17 +164,17 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
         <div className="relative mt-4 space-y-2">
           <button type="button" onClick={() => copy(BANK_DETAILS.accountNumber.replace(/\s/g, ""), "acc")} className="w-full flex items-center justify-between gap-2 rounded-lg bg-black/25 border border-white/10 px-3 py-2 text-left hover:bg-black/40 transition active:scale-[0.99]">
             <span className="min-w-0">
-              <span className="block text-[0.5625rem] uppercase tracking-widest font-bold text-emerald-200/70">Account Number</span>
+              <span className="block text-[0.5625rem] uppercase tracking-widest font-bold text-emerald-200/70">{t("checkout.bank.accountNumber")}</span>
               <span className="block font-mono text-[0.75rem] sm:text-[0.8125rem] font-bold text-white truncate">{BANK_DETAILS.accountNumber}</span>
             </span>
-            <span className="text-[0.5625rem] font-black uppercase text-emerald-200 shrink-0">{copied === "acc" ? "Copied!" : "Copy"}</span>
+            <span className="text-[0.5625rem] font-black uppercase text-emerald-200 shrink-0">{copied === "acc" ? t("checkout.bank.copied") : t("checkout.bank.copy")}</span>
           </button>
           <button type="button" onClick={() => copy(BANK_DETAILS.iban.replace(/\s/g, ""), "iban")} className="w-full flex items-center justify-between gap-2 rounded-lg bg-black/25 border border-white/10 px-3 py-2 text-left hover:bg-black/40 transition active:scale-[0.99]">
             <span className="min-w-0">
-              <span className="block text-[0.5625rem] uppercase tracking-widest font-bold text-emerald-200/70">IBAN</span>
+              <span className="block text-[0.5625rem] uppercase tracking-widest font-bold text-emerald-200/70">{t("checkout.bank.iban")}</span>
               <span className="block font-mono text-[0.6875rem] sm:text-[0.75rem] font-bold text-white truncate">{BANK_DETAILS.iban}</span>
             </span>
-            <span className="text-[0.5625rem] font-black uppercase text-emerald-200 shrink-0">{copied === "iban" ? "Copied!" : "Copy"}</span>
+            <span className="text-[0.5625rem] font-black uppercase text-emerald-200 shrink-0">{copied === "iban" ? t("checkout.bank.copied") : t("checkout.bank.copy")}</span>
           </button>
         </div>
       </div>
@@ -180,27 +182,27 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
       {/* ✅ Steps + fillable fields */}
       <div className={`${compact ? "p-3" : "p-4 sm:p-5"} space-y-3`}>
         <ol className={`space-y-1.5 text-[var(--user-text-muted)] ${compact ? "text-[0.6875rem]" : "text-xs"}`}>
-          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">1.</span> Transfer the total amount to the account shown above.</li>
-          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">2.</span> After the transfer, add your sender name and transaction ID below.</li>
-          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">3.</span> Your order is confirmed once the payment is verified.</li>
+          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">1.</span> {t("checkout.bank.instruction.transfer")}</li>
+          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">2.</span> {t("checkout.bank.instruction.reference")}</li>
+          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">3.</span> {t("checkout.bank.instruction.confirm")}</li>
         </ol>
         <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
           <div>
-            <label className={lbl}>Sender Name (as per bank)</label>
+            <label className={lbl}>{t("checkout.bank.senderName")}</label>
             <input 
               value={bankForm.senderName} 
               onChange={handleSenderNameChange}
-              placeholder="e.g. Ahsan Younas" 
+              placeholder={t("checkout.bank.senderPlaceholder")}
               className={`${inp} ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
             />
             {bankFormErrors.senderName && <p className={errCls}>{bankFormErrors.senderName}</p>}
           </div>
           <div>
-            <label className={lbl}>Transaction ID / Reference</label>
+            <label className={lbl}>{t("checkout.bank.transactionReference")}</label>
             <input 
               value={bankForm.transactionRef} 
               onChange={handleTransactionRefChange}
-              placeholder="Add after transferring" 
+              placeholder={t("checkout.bank.referencePlaceholder")}
               className={`${inp} ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
             />
             {bankFormErrors.transactionRef && <p className={errCls}>{bankFormErrors.transactionRef}</p>}
@@ -212,17 +214,17 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
 };
 
 // ✅ Card validation helper function
-const validateCardDetails = (cardData) => {
+const validateCardDetails = (cardData, t) => {
   const trimmedName = String(cardData.name || "").trim();
   const cleanNumber = String(cardData.number || "").replace(/\s/g, "");
   const cleanExpiry = String(cardData.expiry || "").trim();
 
   // 1. Card Number validation
   if (!cleanNumber) {
-    return { valid: false, field: "number", message: "Please enter your card number." };
+    return { valid: false, field: "number", message: t("checkout.card.numberRequired") };
   }
   if (!/^\d+$/.test(cleanNumber)) {
-    return { valid: false, field: "number", message: "Card number can contain digits only." };
+    return { valid: false, field: "number", message: t("checkout.card.numberDigitsOnly") };
   }
 
   const brand = getCardBrand(cleanNumber);
@@ -241,7 +243,7 @@ const validateCardDetails = (cardData) => {
     return {
       valid: false,
       field: "number",
-      message: "Please enter a Visa, Mastercard, or American Express card number.",
+      message: t("checkout.card.unsupportedBrand"),
     };
   }
   if (!supportedLengths[brand].includes(cleanNumber.length)) {
@@ -249,7 +251,7 @@ const validateCardDetails = (cardData) => {
     return {
       valid: false,
       field: "number",
-      message: `Please enter a valid ${brandName} card number (${lengths} digits).`,
+      message: t("checkout.card.numberLength", { brand: brandName, lengths }),
     };
   }
 
@@ -266,26 +268,26 @@ const validateCardDetails = (cardData) => {
     isEven = !isEven;
   }
   if (sum % 10 !== 0) {
-    return { valid: false, field: "number", message: `Please enter a valid ${brandName} card number.` };
+    return { valid: false, field: "number", message: t("checkout.card.numberInvalid", { brand: brandName }) };
   }
 
   // 2. Card Holder Name validation
   if (!trimmedName) {
-    return { valid: false, field: "name", message: "Please enter the card holder name." };
+    return { valid: false, field: "name", message: t("checkout.card.holderRequired") };
   }
   if (trimmedName.length < 3) {
-    return { valid: false, field: "name", message: "Please enter a valid card holder name." };
+    return { valid: false, field: "name", message: t("checkout.card.holderInvalid") };
   }
   if (!/^[a-zA-Z\s.\-']+$/.test(trimmedName)) {
-    return { valid: false, field: "name", message: "Please enter a valid card holder name." };
+    return { valid: false, field: "name", message: t("checkout.card.holderInvalid") };
   }
 
   // 3. Expiry validation
   if (!cleanExpiry) {
-    return { valid: false, field: "expiry", message: "Please enter the card expiry date." };
+    return { valid: false, field: "expiry", message: t("checkout.card.expiryRequired") };
   }
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(cleanExpiry)) {
-    return { valid: false, field: "expiry", message: "Please enter a valid expiry date." };
+    return { valid: false, field: "expiry", message: t("checkout.card.expiryInvalid") };
   }
   const [datePart, timePart] = cleanExpiry.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
@@ -298,12 +300,12 @@ const validateCardDetails = (cardData) => {
     expiryDate.getHours() !== hour ||
     expiryDate.getMinutes() !== minute
   ) {
-    return { valid: false, field: "expiry", message: "Please enter a valid expiry date." };
+    return { valid: false, field: "expiry", message: t("checkout.card.expiryInvalid") };
   }
   const now = new Date();
   now.setSeconds(0, 0);
   if (expiryDate < now) {
-    return { valid: false, field: "expiry", message: "Your card has expired. Please use a valid card." };
+    return { valid: false, field: "expiry", message: t("checkout.card.expired") };
   }
 
   return { valid: true };
@@ -326,7 +328,7 @@ const getCardBrand = (number) => {
 };
 
 // 💳 Card Preview — intentionally dark (credit-card look), white text OK
-const CardPreview = ({ number, name, expiry }) => (
+const CardPreview = ({ number, name, expiry, t }) => (
   <div className="relative w-full max-w-[22.5rem] h-[12.5rem] rounded-3xl mx-auto mb-6 overflow-hidden shadow-2xl"
     style={{ background: "linear-gradient(135deg, #0b1220 0%, #16213e 55%, #065f46 130%)" }}>
     <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
@@ -340,16 +342,16 @@ const CardPreview = ({ number, name, expiry }) => (
         </span>
       </div>
       <div className="space-y-1">
-        <p className="text-white/60 text-[0.625rem] uppercase tracking-widest font-semibold">Card Number</p>
+        <p className="text-white/60 text-[0.625rem] uppercase tracking-widest font-semibold">{t("checkout.card.number")}</p>
         <p className="text-white font-mono text-lg tracking-[0.18em] font-bold">{number || "•••• •••• •••• ••••"}</p>
       </div>
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">Card Holder</p>
-          <p className="text-white text-sm font-bold uppercase tracking-wider">{name.trim() || "YOUR NAME"}</p>
+          <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">{t("checkout.card.holder")}</p>
+          <p className="text-white text-sm font-bold uppercase tracking-wider">{name.trim() || t("checkout.card.yourName")}</p>
         </div>
         <div>
-          <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">Expires</p>
+          <p className="text-[0.5625rem] uppercase tracking-widest text-white/60 font-semibold">{t("checkout.card.expires")}</p>
           <p className="text-white text-sm font-bold">{formatPreviewExpiry(expiry)}</p>
         </div>
       </div>
@@ -359,6 +361,8 @@ const CardPreview = ({ number, name, expiry }) => (
 
 function CheckoutContent() {
   const router = useRouter();
+  const { text } = useLocalized();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const urlDraftId = searchParams.get("draftId");
@@ -393,7 +397,7 @@ function CheckoutContent() {
   const savingPhoneRef = useRef(false);
   const draftCreateInFlight = useRef(false);
   const placingRef = useRef(false);
-  const phoneValidationError = getPhoneValidationError(phone);
+  const phoneValidationError = getPhoneValidationError(phone, t);
   const phoneError = phoneTouched || phoneSubmitted ? phoneValidationError : "";
   const phoneIsValid = !phoneValidationError;
 
@@ -479,7 +483,7 @@ function CheckoutContent() {
   const goToStep = async (n) => {
     // ✅ Validate card fields when moving from step 2 to step 3
     if (n === 3 && paymentMethod === "card") {
-      const validation = validateCardDetails(cardForm);
+      const validation = validateCardDetails(cardForm, t);
       if (!validation.valid) {
         showCardValidationError(validation);
         return;
@@ -496,17 +500,17 @@ function CheckoutContent() {
       let hasError = false;
 
       if (!trimmedSenderName) {
-        errors.senderName = "Please enter the sender name as shown on your bank account.";
+        errors.senderName = t("checkout.bank.senderNameRequired");
         hasError = true;
       }
       if (!trimmedTransactionRef) {
-        errors.transactionRef = "Please enter your bank transaction ID or reference.";
+        errors.transactionRef = t("checkout.bank.referenceRequired");
         hasError = true;
       }
 
       if (hasError) {
         setBankFormErrors(errors);
-        toast.error("Please fill in all required bank transfer fields.");
+        toast.error(t("checkout.bank.fieldsRequired"));
         return;
       }
 
@@ -529,7 +533,7 @@ function CheckoutContent() {
 
   const proceedToStep2 = async () => {
     if (draftCreateInFlight.current) return;
-    if (!selectedCartItems.length) return toast.error("Please select at least one item");
+    if (!selectedCartItems.length) return toast.error(t("checkout.items.selectAtLeastOne"));
     const dealIssue = getDealRequirementIssues(selectedCartItems)[0];
     if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
 
@@ -563,7 +567,7 @@ function CheckoutContent() {
       restoreItems(snap);
       setDraftItems([]);
       setSelectedKeys(snap.map((item) => item.key));
-      toast.error(e.response?.data?.message || "Could not save checkout draft");
+      toast.error(e.response?.data?.message || t("checkout.draft.saveFailed"));
       return;
     } finally {
       draftCreateInFlight.current = false;
@@ -751,9 +755,9 @@ function CheckoutContent() {
     shipping = shipQuote?.fee ?? (customSelected ? Number(customSelected.fee ?? 0) : shippingMethod === "express" ? cfg.express.fee : cfg.standard.fee);
   }
   const shippingReason = isFreeForCurrentMethod
-    ? "Free shipping via active deal"
+    ? t("checkout.shipping.freeViaDeal")
     : ruleFree
-    ? `Free shipping (${matchedRule.rule_type} rule)`
+    ? t("checkout.shipping.freeRule", { rule: matchedRule.rule_type })
     : (shipQuote?.reason || "");
 
   const tax = Math.round(itemsWithDiscounts.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.tax || 0) / 100), 0));
@@ -787,7 +791,7 @@ function CheckoutContent() {
   const savePhone = async () => {
     setPhoneSubmitted(true);
     const normalizedPhone = normalizePhone(phone);
-    const validationError = getPhoneValidationError(normalizedPhone);
+    const validationError = getPhoneValidationError(normalizedPhone, t);
     if (validationError) {
       setPhone(normalizedPhone);
       return;
@@ -798,8 +802,8 @@ function CheckoutContent() {
     try {
       await userHttp.put("/users/phone", { phone: normalizedPhone });
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
-      toast.success("Phone number saved!");
-    } catch (e) { toast.error(e.response?.data?.message || "Phone save failed"); }
+      toast.success(t("checkout.phone.saved"));
+    } catch (e) { toast.error(e.response?.data?.message || t("checkout.phone.saveFailed")); }
     finally { savingPhoneRef.current = false; setSavingPhone(false); }
   };
 
@@ -818,18 +822,18 @@ function CheckoutContent() {
       await addressApi.remove(id);
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       if (selectedAddressId === id) setSelectedAddressId(null);
-      toast.success("Address deleted!");
-    } catch (e) { toast.error(e.response?.data?.message || "Address delete failed"); }
+      toast.success(t("checkout.address.deleted"));
+    } catch (e) { toast.error(e.response?.data?.message || t("checkout.address.deleteFailed")); }
   };
 
   const placeOrder = async () => {
     if (placingRef.current) return;
-    if (!activeItems.length) return toast.error("No items selected");
-    if (!selectedAddressId) return toast.error("Please select a delivery address");
+    if (!activeItems.length) return toast.error(t("checkout.items.noneSelected"));
+    if (!selectedAddressId) return toast.error(t("checkout.address.selectRequired"));
     
     // ✅ Validate card fields for card payment
     if (paymentMethod === "card") {
-      const validation = validateCardDetails(cardForm);
+      const validation = validateCardDetails(cardForm, t);
       if (!validation.valid) {
         showCardValidationError(validation);
         return;
@@ -842,10 +846,10 @@ function CheckoutContent() {
       const trimmedSenderName = bankForm.senderName.trim();
       const trimmedTransactionRef = bankForm.transactionRef.trim();
       if (!trimmedSenderName) {
-        return toast.error("Sender name is required for bank transfer");
+        return toast.error(t("checkout.bank.senderNameRequired"));
       }
       if (!trimmedTransactionRef) {
-        return toast.error("Transaction ID / Reference is required for bank transfer");
+        return toast.error(t("checkout.bank.referenceRequired"));
       }
       // ✅ Update bankForm with trimmed values for order submission
       setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
@@ -882,7 +886,7 @@ function CheckoutContent() {
       setCurrentDraftId(null);
       router.push("/orders");
     } catch (e) {
-      toast.error(e.response?.data?.message || "Order place failed");
+      toast.error(e.response?.data?.message || t("checkout.order.placeFailed"));
       placingRef.current = false;
       setPlacing(false);
     }
@@ -890,8 +894,9 @@ function CheckoutContent() {
 
   if (userLoading || !draftReady || (!user && !needsPhone)) {
     return (
-      <div className="flex h-[60vh] items-center justify-center">
+      <div className="flex h-[60vh] items-center justify-center" aria-label={t("checkout.loading")}>
         <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+        <span className="sr-only">{t("checkout.loading")}</span>
       </div>
     );
   }
@@ -903,10 +908,10 @@ function CheckoutContent() {
         <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
           <Package size={34} className="text-[var(--user-accent)]" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-2">Your cart is empty</h1>
-        <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mb-7 max-w-md mx-auto">Looks like you haven't added anything yet. Start shopping to fill it up!</p>
+        <h1 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-2">{t("cart.empty")}</h1>
+        <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mb-7 max-w-md mx-auto">{t("checkout.empty.message")}</p>
         <button onClick={() => router.push("/")} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-7 py-3 rounded-xl text-sm font-black hover:opacity-90 active:scale-[0.98] transition">
-          <ShoppingBag size={17} /> Start Shopping
+          <ShoppingBag size={17} /> {t("checkout.startShopping")}
         </button>
       </div>
     );
@@ -927,7 +932,7 @@ function CheckoutContent() {
 
   const StepIndicator = () => (
     <div className="flex items-start justify-center mb-8 sm:mb-10">
-      {["Items", "Delivery", "Payment"].map((label, i) => {
+      {["items", "delivery", "payment"].map((label, i) => {
         const n = i + 1;
         const active = step === n;
         const done = step > n;
@@ -943,7 +948,7 @@ function CheckoutContent() {
               <span className={`checkout-step-marker ${done ? "is-complete" : active ? "is-active" : "is-upcoming"}`}>
                 {done ? <Check size={15} /> : n}
               </span>
-              <span className={`checkout-step-label ${active ? "is-active" : done ? "is-complete" : "is-upcoming"}`}>{label}</span>
+              <span className={`checkout-step-label ${active ? "is-active" : done ? "is-complete" : "is-upcoming"}`}>{t(`checkout.step.${label}`)}</span>
             </button>
             {n < 3 && (
               <div className={`checkout-step-connector h-0.5 w-16 sm:w-28 lg:w-36 mt-4 rounded-full ${done ? "is-complete" : ""}`} />
@@ -956,21 +961,21 @@ function CheckoutContent() {
 
   const SummaryPanel = ({ footer }) => (
     <div className={`${cardCls} p-5 sm:p-6 lg:sticky lg:top-24`}>
-      <h2 className="text-lg font-black text-[var(--user-text)] mb-4">Order Summary</h2>
+      <h2 className="text-lg font-black text-[var(--user-text)] mb-4">{t("checkout.summary.title")}</h2>
 
       <div className="space-y-3 mt-4 mb-0 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 custom-scrollbar">
         {itemsWithDiscounts.map((i) => (
           <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
             <div className="flex-1 min-w-0">
-              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] leading-snug line-clamp-2">{i.name}</p>
-              {i.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
+              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] leading-snug line-clamp-2">{text(i.name, i.translations?.name)}</p>
+              {i.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{text(i.variantTitle, i.variantTranslations?.title)}</p>}
               {i.dealActive && i.dealId && (
                 <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1">
-                  <Tag size={10} /> Deal
+                  <Tag size={10} /> {t("checkout.item.deal")}
                 </span>
               )}
-              <p className="text-xs text-[var(--user-text-muted)] mt-0.5">Qty: {i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
+              <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{t("checkout.item.quantity", { count: i.qty })}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
             </div>
             <div className="text-right shrink-0">
               {i.hasDiscount && i.originalPrice * i.qty > i.lineTotal && (
@@ -984,27 +989,27 @@ function CheckoutContent() {
 
       <div className="space-y-2.5 pt-3 border-t border-[var(--user-border)] text-[0.8125rem]">
         <div className="flex justify-between">
-          <span className="text-[var(--user-text)] font-medium">Subtotal</span>
+          <span className="text-[var(--user-text)] font-medium">{t("cart.subtotal")}</span>
           <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
         </div>
         {totalSavings > 0 && (
           <div className="flex justify-between">
-            <span className="text-[var(--user-text)] font-medium">You Save</span>
+            <span className="text-[var(--user-text)] font-medium">{t("checkout.summary.youSave")}</span>
             <span className="text-[var(--user-success)] font-bold">– Rs. {totalSavings.toLocaleString()}</span>
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-[var(--user-text)] font-medium">Shipping</span>
-          <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{shipping === 0 ? "FREE" : `Rs. ${shipping}`}</span>
+          <span className="text-[var(--user-text)] font-medium">{t("cart.shipping")}</span>
+          <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping}`}</span>
         </div>
         {tax > 0 && (
           <div className="flex justify-between">
-            <span className="text-[var(--user-text)] font-medium">Tax</span>
+            <span className="text-[var(--user-text)] font-medium">{t("cart.tax")}</span>
             <span className="text-[var(--user-text)] font-bold">Rs. {tax.toLocaleString()}</span>
           </div>
         )}
         <div className="flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
-          <span className="text-base font-black text-[var(--user-text)]">Total</span>
+          <span className="text-base font-black text-[var(--user-text)]">{t("cart.total")}</span>
           <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</p>
         </div>
       </div>
@@ -1013,18 +1018,22 @@ function CheckoutContent() {
   );
 
   const shippingMethods = [
-    { id: "standard", title: "Standard Delivery", time: `${cfg.standard.min_days}–${cfg.standard.max_days} days`, icon: Truck, badge: "Popular" },
-    { id: "express", title: "Express Delivery", time: `${cfg.express.min_days}–${cfg.express.max_days} days`, icon: Zap, badge: "Fast" },
+    { id: "standard", titleKey: "checkout.shipping.standard", time: t("checkout.shipping.days", { min: cfg.standard.min_days, max: cfg.standard.max_days }), icon: Truck, badge: t("checkout.shipping.popular") },
+    { id: "express", titleKey: "checkout.shipping.express", time: t("checkout.shipping.days", { min: cfg.express.min_days, max: cfg.express.max_days }), icon: Zap, badge: t("checkout.shipping.fast") },
     // ✅ Admin ke custom shipping methods (Add New se bane hue)
     ...(customShippingMethods || []).map((m) => ({
       id: m.code,
-      title: m.name,
-      time: `${m.min_days}–${m.max_days} days`,
+      title: text(m.name, m.translations?.name),
+      time: t("checkout.shipping.days", { min: m.min_days, max: m.max_days }),
       icon: Package,
       custom: true,
       fee: Number(m.fee ?? 0),
     })),
   ];
+  const shippingMethodName = (id) => {
+    const method = shippingMethods.find((item) => item.id === id);
+    return method?.titleKey ? t(method.titleKey) : method?.title;
+  };
 
   return (
     <>
@@ -1042,11 +1051,11 @@ function CheckoutContent() {
       <div className="flex items-center justify-between mb-6 sm:mb-8">
         <button onClick={() => router.push("/")} className="flex items-center gap-2 text-xs sm:text-sm text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition group">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="font-semibold">Continue Shopping</span>
+          <span className="font-semibold">{t("cart.continueShopping")}</span>
         </button>
         <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20">
           <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-          <span className="text-xs font-black text-[var(--user-accent)]">Secure Checkout</span>
+          <span className="text-xs font-black text-[var(--user-accent)]">{t("checkout.secureCheckout")}</span>
         </div>
       </div>
 
@@ -1057,10 +1066,10 @@ function CheckoutContent() {
               <Phone size={24} className="text-[var(--user-accent-text)]" />
             </div>
             <div className="space-y-1.5">
-              <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">Phone Number Required</h2>
-              <p className="text-sm text-[var(--user-text-muted)]">We need your phone number for delivery updates and order confirmation.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">{t("checkout.phone.requiredTitle")}</h2>
+              <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.phone.requiredMessage")}</p>
             </div>
-            <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">Phone number</label>
+            <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.phone.label")}</label>
             <input
               id="checkout-phone-desktop"
               type="tel"
@@ -1076,22 +1085,22 @@ function CheckoutContent() {
               onPaste={handlePhonePaste}
               onKeyDown={handlePhoneKeyDown}
               onBlur={() => setPhoneTouched(true)}
-              placeholder="Enter phone number"
+              placeholder={t("checkout.phone.placeholder")}
               className={phoneInputCls}
             />
             <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
               {phoneError ? <p id="checkout-phone-error-desktop" className="text-xs text-red-600">{phoneError}</p> : <span />}
-              <p id="checkout-phone-helper-desktop" className="shrink-0 text-xs text-[var(--user-text-muted)]">{phone.length}/{PHONE_MAX} digits</p>
+              <p id="checkout-phone-helper-desktop" className="shrink-0 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: phone.length, max: PHONE_MAX })}</p>
             </div>
             <PrimaryButton
               onClick={savePhone}
               disabled={!phoneIsValid}
               loading={savingPhone}
-              loadingText="Saving..."
+              loadingText={t("checkout.phone.saving")}
               iconEnd={ArrowRight}
               className="mt-6 h-12"
             >
-              Save &amp; Continue
+              {t("checkout.phone.saveContinue")}
             </PrimaryButton>
           </div>
         </div>
@@ -1111,11 +1120,11 @@ function CheckoutContent() {
                         <ShoppingBag size={18} className="text-[var(--user-accent-text)]" />
                       </div>
                       <div>
-                        <h2 className="text-sm font-black text-[var(--user-text)] uppercase tracking-wider">Your Cart</h2>
-                        <p className="text-xs text-[var(--user-text-muted)]">{selectedCartItems.length} of {cart.length} items selected</p>
+                        <h2 className="text-sm font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.cart.title")}</h2>
+                        <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.cart.selectedSummary", { selected: selectedCartItems.length, total: cart.length })}</p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">Edit Cart</button>
+                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">{t("checkout.cart.edit")}</button>
                   </div>
 
                   {/* ✅ LIST — shows ONLY selected items (selection managed on /cart page) */}
@@ -1130,22 +1139,22 @@ function CheckoutContent() {
                             {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{item.name}</p>
-                            {item.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{item.variantTitle}</p>}
+                            <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{text(item.name, item.translations?.name)}</p>
+                            {item.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{text(item.variantTitle, item.variantTranslations?.title)}</p>}
                             {item.dealId && (
                               <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1.5">
-                                <Tag size={10} /> Deal
+                                <Tag size={10} /> {t("checkout.item.deal")}
                               </span>
                             )}
                           </div>
                           <div className="shrink-0 flex flex-col items-end gap-2.5">
                             <p className="text-sm font-black text-[var(--user-text)]">Rs. {item.lineTotal.toLocaleString()}</p>
                             <div className="flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]">
-                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
+                              <button type="button" aria-label={t("checkout.item.decreaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
                                 <Minus size={12} />
                               </button>
                               <span className="text-xs font-black text-[var(--user-text)] w-8 text-center">{item.qty}</span>
-                              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
+                              <button type="button" aria-label={t("checkout.item.increaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
                                 <Plus size={12} />
                               </button>
                             </div>
@@ -1158,7 +1167,7 @@ function CheckoutContent() {
                   {/* Slim footer */}
                   <div className="px-5 py-3.5 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 flex items-center justify-between">
                     <p className="text-xs text-[var(--user-text-muted)] font-semibold">
-                      Selected: <span className="font-black text-[var(--user-text)]">{selectedCartItems.length}</span> / {cart.length}
+                      {t("checkout.cart.selected")}: <span className="font-black text-[var(--user-text)]">{selectedCartItems.length}</span> / {cart.length}
                     </p>
                     <p className="text-lg font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                   </div>
@@ -1174,11 +1183,11 @@ function CheckoutContent() {
                     iconEnd={ArrowRight}
                     className="h-12"
                   >
-                    Proceed to Delivery
+                    {t("checkout.proceedDelivery")}
                   </PrimaryButton>
                   <div className="flex items-center justify-center gap-2 text-xs text-[var(--user-text-muted)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
-                    <span className="font-semibold">Secure checkout · SSL encrypted</span>
+                    <span className="font-semibold">{t("checkout.secureSsl")}</span>
                   </div>
                 </div>
               } />
@@ -1189,7 +1198,7 @@ function CheckoutContent() {
             <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t-2 border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{selectedCartItems.length} selected</p>
+                  <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{t("checkout.cart.selectedCount", { count: selectedCartItems.length })}</p>
                   <p className="text-base font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
                 </div>
                 <PrimaryButton
@@ -1198,7 +1207,7 @@ function CheckoutContent() {
                   iconEnd={ArrowRight}
                     className="h-11 w-auto shrink-0 px-5"
                 >
-                  Proceed
+                  {t("checkout.proceed")}
                 </PrimaryButton>
               </div>
             </div>
@@ -1214,8 +1223,8 @@ function CheckoutContent() {
                       <MapPin size={18} className="text-[var(--user-accent-text)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">Delivery Address</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">Where should we deliver your order?</p>
+                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.address.title")}</h2>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.address.subtitle")}</p>
                     </div>
                   </div>
                   {addresses.length > 0 ? (
@@ -1231,23 +1240,23 @@ function CheckoutContent() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="text-sm font-bold text-[var(--user-text)] truncate">{a.full_name}</p>
-                                {a.is_default && <span className="text-[0.625rem] font-bold text-[var(--user-accent)] border border-[var(--user-accent)]/40 px-1.5 py-0.5 rounded">Default</span>}
+                                {a.is_default && <span className="text-[0.625rem] font-bold text-[var(--user-accent)] border border-[var(--user-accent)]/40 px-1.5 py-0.5 rounded">{t("checkout.address.default")}</span>}
                               </div>
                               <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
                                 {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
                               </p>
                               <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-1">{a.phone}</p>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} aria-label="Edit address" className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} aria-label={t("checkout.address.edit")} className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
                               <Pencil size={15} />
                             </button>
                           </div>
                           <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
                             <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-xs font-semibold">
-                              <Pencil size={11} /> Edit
+                              <Pencil size={11} /> {t("checkout.address.edit")}
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); deleteAddress(a._id); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition text-xs font-semibold">
-                              <Trash2 size={11} /> Delete
+                              <Trash2 size={11} /> {t("common.delete")}
                             </button>
                           </div>
                         </div>
@@ -1259,11 +1268,11 @@ function CheckoutContent() {
                       <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
                         <MapPin size={28} className="text-[var(--user-text-subtle)]" />
                       </div>
-                      <p className="text-sm text-[var(--user-text-muted)]">No saved addresses yet</p>
+                      <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.address.noneSaved")}</p>
                     </div>
                   )}
                   <button onClick={openAddressModal} className="w-full h-12 rounded-xl border-2 border-dashed border-[var(--user-border)] text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-accent)]/5 transition flex items-center justify-center gap-2">
-                    <Plus size={16} /> Add New Address
+                    <Plus size={16} /> {t("checkout.address.add")}
                   </button>
                 </div>
 
@@ -1273,13 +1282,13 @@ function CheckoutContent() {
                       <Truck size={18} className="text-[var(--user-accent-text)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">Shipping Method</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">Choose your preferred delivery option</p>
+                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.shipping.title")}</h2>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.shipping.subtitle")}</p>
                     </div>
                   </div>
                   {cfg.free_shipping_over > 0 && (
                     <div className="mb-4 p-3 rounded-xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20">
-                      <p className="text-xs text-[var(--user-success)] font-bold flex items-center gap-2"><Gift size={14} /> Free shipping on orders over Rs. {cfg.free_shipping_over.toLocaleString()}</p>
+                      <p className="text-xs text-[var(--user-success)] font-bold flex items-center gap-2"><Gift size={14} /> {t("checkout.shipping.freeOver", { amount: `Rs. ${cfg.free_shipping_over.toLocaleString()}` })}</p>
                     </div>
                   )}
                   <div className="space-y-3">
@@ -1304,17 +1313,17 @@ function CheckoutContent() {
                           </span>
                           <IconComp size={20} className={active ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
+                            <p className="text-sm font-bold text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
                             <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.time}</p>
                             {active && shippingReason && <p className="text-[0.625rem] text-[var(--user-success)] mt-1 font-semibold">{shippingReason}</p>}
                             {/* ✅ Non-covered method hint (only when a deal exists AND it's not covering this method) */}
                             {showNotApplicableHint && (
                               <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-1 font-semibold italic">
-                                Free shipping not applicable
+                                {t("checkout.shipping.freeNotApplicable")}
                               </p>
                             )}
                           </div>
-                          <span className={`text-sm font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? "FREE" : `Rs. ${displayFee.toLocaleString()}`}</span>
+                          <span className={`text-sm font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}</span>
                         </button>
                       );
                     })}
@@ -1327,23 +1336,23 @@ function CheckoutContent() {
                       <CreditCard size={18} className="text-[var(--user-accent-text)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">Payment Method</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">Select how you'd like to pay</p>
+                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.payment.title")}</h2>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.payment.subtitle")}</p>
                     </div>
                   </div>
                   <div className="space-y-3">
                     {[
-                      { id: "cod", icon: Banknote, title: "Cash on Delivery", sub: "Pay in cash when your order arrives" },
-                      { id: "bank", icon: Landmark, title: "Bank Transfer", sub: "Transfer to our bank account" },
-                      { id: "card", icon: CreditCard, title: "Card", sub: "Visa, Mastercard, American Express" },
+                      { id: "cod", icon: Banknote, titleKey: "checkout.payment.cod", subKey: "checkout.payment.codDescription" },
+                      { id: "bank", icon: Landmark, titleKey: "checkout.payment.bank", subKey: "checkout.payment.bankDescription" },
+                      { id: "card", icon: CreditCard, titleKey: "checkout.payment.card", subKey: "checkout.payment.cardDescription" },
                     ].map((m) => (
                       <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${paymentMethod === m.id ? "is-selected" : ""}`}>
                         <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
                           {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-[var(--user-text)]">{m.title}</p>
-                          <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.sub}</p>
+                          <p className="text-sm font-bold text-[var(--user-text)]">{t(m.titleKey)}</p>
+                          <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{t(m.subKey)}</p>
                         </div>
                         <m.icon size={20} className={paymentMethod === m.id ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
                       </button>
@@ -1351,57 +1360,57 @@ function CheckoutContent() {
                   </div>
                                    {paymentMethod === "bank" && (
                     <div className="mt-4 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4 space-y-3">
-                      <p className="text-xs font-bold text-[var(--user-text)]">Bank Transfer Details</p>
+                      <p className="text-xs font-bold text-[var(--user-text)]">{t("checkout.bank.details")}</p>
                       <div className="space-y-1 text-xs text-[var(--user-text-muted)]">
-                        <p>Account: <span className="font-bold text-[var(--user-text)]">ClickMasters Store</span></p>
-                        <p>Bank: <span className="font-bold text-[var(--user-text)]">Meezan Bank</span></p>
-                        <p>IBAN: <span className="font-mono font-bold text-[var(--user-text)]">PK00 MEZN 0000 1234 5678 9012</span></p>
+                        <p>{t("checkout.bank.account")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.title}</span></p>
+                        <p>{t("checkout.bank.bank")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.bank}</span></p>
+                        <p>{t("checkout.bank.iban")}: <span className="font-mono font-bold text-[var(--user-text)]">{BANK_DETAILS.iban}</span></p>
                       </div>
                       <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
                         <div>
-                          <label className={labelCls}>Sender Name (as per bank)</label>
+                          <label className={labelCls}>{t("checkout.bank.senderName")}</label>
                           <input 
                             value={bankForm.senderName} 
                             onChange={(e) => {
                               setBankForm({ ...bankForm, senderName: e.target.value });
                               if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
                             }}
-                            placeholder="e.g. Ahsan Younas" 
+                            placeholder={t("checkout.bank.senderPlaceholder")}
                             className={`${inputCls} ${bankFormErrors.senderName ? "!border-red-500 focus:!border-red-500" : ""}`}
                           />
                           {bankFormErrors.senderName && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.senderName}</p>}
                         </div>
                         <div>
-                          <label className={labelCls}>Transaction ID / Reference</label>
+                          <label className={labelCls}>{t("checkout.bank.transactionReference")}</label>
                           <input 
                             value={bankForm.transactionRef} 
                             onChange={(e) => {
                               setBankForm({ ...bankForm, transactionRef: e.target.value });
                               if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
                             }}
-                            placeholder="Add after transferring" 
+                            placeholder={t("checkout.bank.referencePlaceholder")}
                             className={`${inputCls} ${bankFormErrors.transactionRef ? "!border-red-500 focus:!border-red-500" : ""}`}
                           />
                           {bankFormErrors.transactionRef && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.transactionRef}</p>}
                         </div>
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">Add your transaction ID after transferring the total amount for faster verification.</p>
+                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">{t("checkout.bank.verificationHint")}</p>
                       </div>
                     </div>
                   )}
                   {paymentMethod === "card" && (
                     <div className="mt-5">
-                      <CardPreview number={cardForm.number} name={cardForm.name} expiry={cardForm.expiry} />
+                      <CardPreview number={cardForm.number} name={cardForm.name} expiry={cardForm.expiry} t={t} />
                       <div className="space-y-3 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4">
-                        <div><label className={labelCls}>Card Number</label>
+                        <div><label className={labelCls}>{t("checkout.card.number")}</label>
                           <input name="card-number" value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 19); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" }); }} placeholder="1234 5678 9012 3456" className={`${inputCls} ${cardFormErrors.number ? "!border-red-500 focus:!border-red-500" : ""}`} />
                           {cardFormErrors.number && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.number}</p>}
                         </div>
-                        <div><label className={labelCls}>Card Holder Name</label>
-                          <input name="card-name" value={cardForm.name} onChange={(e) => { setCardForm({ ...cardForm, name: e.target.value }); if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" }); }} placeholder="John Doe" className={`${inputCls} ${cardFormErrors.name ? "!border-red-500 focus:!border-red-500" : ""}`} />
+                        <div><label className={labelCls}>{t("checkout.card.holder")}</label>
+                          <input name="card-name" value={cardForm.name} onChange={(e) => { setCardForm({ ...cardForm, name: e.target.value }); if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" }); }} placeholder={t("checkout.card.holderPlaceholder")} className={`${inputCls} ${cardFormErrors.name ? "!border-red-500 focus:!border-red-500" : ""}`} />
                           {cardFormErrors.name && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.name}</p>}
                         </div>
                         <div>
-                          <label className={labelCls}>Expiry Date</label>
+                          <label className={labelCls}>{t("checkout.card.expiryDate")}</label>
                           <input name="card-expiry" type="datetime-local" value={cardForm.expiry} onChange={(e) => { setCardForm({ ...cardForm, expiry: e.target.value }); if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" }); }} className={`${inputCls} ${cardFormErrors.expiry ? "!border-red-500 focus:!border-red-500" : ""}`} />
                           {cardFormErrors.expiry && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.expiry}</p>}
                         </div>
@@ -1414,14 +1423,14 @@ function CheckoutContent() {
               <SummaryPanel footer={
                 <div className="space-y-3">
                   <PrimaryButton
-                    onClick={() => selectedAddressId ? goToStep(3) : toast.error("Please select or add a delivery address first")}
+                    onClick={() => selectedAddressId ? goToStep(3) : toast.error(t("checkout.address.selectOrAdd"))}
                     iconEnd={ArrowRight}
                     className="h-12"
                   >
-                    Review Order
+                    {t("checkout.reviewOrder")}
                   </PrimaryButton>
                   <button onClick={backToStep1} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
-                    <ArrowLeft size={14} /> Back to Cart
+                    <ArrowLeft size={14} /> {t("checkout.backToCart")}
                   </button>
                 </div>
               } />
@@ -1438,15 +1447,15 @@ function CheckoutContent() {
                       <ShieldCheck size={18} className="text-[var(--user-accent-text)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">Review Your Order</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">Please verify all details before placing your order</p>
+                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.review.title")}</h2>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.review.subtitle")}</p>
                     </div>
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4 mb-5">
                     <div className="rounded-xl border-2 border-[var(--user-border)] p-4 bg-[var(--user-bg-hover)]/50">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">Delivery Address</p>
-                        <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">Change</button>
+                        <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.address.title")}</p>
+                        <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
                       </div>
                       {selectedAddress && (
                         <div className="space-y-1.5">
@@ -1461,42 +1470,42 @@ function CheckoutContent() {
                     </div>
                     <div className="rounded-xl border-2 border-[var(--user-border)] p-4 bg-[var(--user-bg-hover)]/50">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">Shipping & Payment</p>
-                        <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">Change</button>
+                        <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.shippingPayment")}</p>
+                        <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
                       </div>
                       <div className="space-y-2 text-xs text-[var(--user-text-muted)]">
                         <div className="flex items-center gap-2">
                           <Truck size={12} className="text-[var(--user-accent)]" />
-                          <span className="font-semibold text-[var(--user-text)]">{shippingMethods.find((m) => m.id === shippingMethod)?.title}</span>
+                          <span className="font-semibold text-[var(--user-text)]">{shippingMethodName(shippingMethod)}</span>
                         </div>
                         <p className="text-[0.625rem]">{shippingMethods.find((m) => m.id === shippingMethod)?.time}</p>
                         {shippingReason && <p className="text-[var(--user-success)] font-semibold">{shippingReason}</p>}
                         <div className="flex items-center gap-2 pt-2 border-t border-[var(--user-border)]">
                           {paymentMethod === "cod" ? <Banknote size={12} className="text-[var(--user-accent)]" /> : paymentMethod === "bank" ? <Landmark size={12} className="text-[var(--user-accent)]" /> : <CreditCard size={12} className="text-[var(--user-accent)]" />}
                           <span className="font-semibold text-[var(--user-text)]">
-                            {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}
+                            {paymentMethod === "cod" ? t("checkout.payment.cod") : paymentMethod === "bank" ? t("checkout.payment.bank") : t("checkout.payment.debitCreditCard")}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="rounded-xl border-2 border-[var(--user-border)] p-4 space-y-5">
-                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">Order Items ({itemsWithDiscounts.length})</p>
+                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.review.items", { count: itemsWithDiscounts.length })}</p>
                     <div className="divide-y divide-[var(--user-border)]">
                       {itemsWithDiscounts.map((i) => (
                         <div key={i.key} className="flex items-start gap-4 py-1.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-14 h-14" />
                           <div className="flex-1 min-w-0 space-y-1.5">
-                            <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{i.name}</p>
+                            <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{text(i.name, i.translations?.name)}</p>
 {i.dealActive && i.dealId && (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
                                 <span className="inline-flex items-center gap-1 text-[0.5625rem] sm:text-[0.625rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-1 rounded-full">
                                   <Gift size={9} />
-                                  {i.dealType === 'buy_x_get_y' ? `Buy ${i.dealBuyQuantity} Get ${i.dealGetQuantity} Free` : (i.dealName || 'Active Deal')}
+                                  {i.dealType === 'buy_x_get_y' ? t("checkout.item.buyGetFree", { buy: i.dealBuyQuantity, get: i.dealGetQuantity }) : text(i.dealName, i.dealTranslations?.name) || t("checkout.item.activeDeal")}
                                 </span>
                               </div>
                             )}
-                            <p className="text-[0.625rem] sm:text-xs text-[var(--user-text-muted)]">Qty: {i.qty} {i.freeItems > 0 && `(${i.payableItems} paid + ${i.freeItems} FREE)`}</p>
+                            <p className="text-[0.625rem] sm:text-xs text-[var(--user-text-muted)]">{t("checkout.item.quantity", { count: i.qty })} {i.freeItems > 0 && `(${t("checkout.item.freeQuantitySummary", { paid: i.payableItems, free: i.freeItems })})`}</p>
                           </div>
                           <p className="text-xs sm:text-sm font-black text-[var(--user-text)]">Rs. {Number(i.lineTotal || 0).toLocaleString()}</p>
                         </div>
@@ -1511,18 +1520,18 @@ function CheckoutContent() {
                   <PrimaryButton
                     onClick={placeOrder}
                     loading={placing}
-                    loadingText="Placing Order..."
+                    loadingText={t("checkout.order.placing")}
                     icon={Lock}
                     className="h-12"
                   >
-                    Place Order
+                    {t("checkout.order.place")}
                   </PrimaryButton>
                   <button onClick={() => goToStep(2)} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
-                    <ArrowLeft size={14} /> Back
+                    <ArrowLeft size={14} /> {t("checkout.back")}
                   </button>
                   <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--user-border)]">
                     <ShieldCheck size={14} className="text-[var(--user-success)]" />
-                    <span className="text-xs text-[var(--user-text-muted)] font-semibold">Your payment is secure and encrypted</span>
+                    <span className="text-xs text-[var(--user-text-muted)] font-semibold">{t("checkout.payment.secureMessage")}</span>
                   </div>
                 </div>
               } />
@@ -1555,8 +1564,9 @@ function CheckoutContent() {
       // Early-out: loading / empty / needs-phone states render their compact mobile equivalents.
       if (userLoading || !draftReady || (!user && !needsPhone)) {
         return (
-          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
+          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]" aria-label={t("checkout.loading")}>
             <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+            <span className="sr-only">{t("checkout.loading")}</span>
           </div>
         );
       }
@@ -1571,20 +1581,20 @@ function CheckoutContent() {
               style={{ paddingTop: "env(safe-area-inset-top)" }}
             >
               <div className="flex items-center gap-2 px-3 h-12">
-                <button type="button" onClick={() => router.push("/")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+                <button type="button" onClick={() => router.push("/")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
                   <ArrowLeft size={20} />
                 </button>
-                <p className="text-[0.9375rem] font-black text-[var(--user-text)]">Checkout</p>
+                <p className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("cart.checkout")}</p>
               </div>
             </div>
             <div className="flex flex-col items-center justify-center pt-16 pb-8 px-4 text-center">
               <div className="w-20 h-20 rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
                 <Package size={36} className="text-[var(--user-accent)]" />
               </div>
-              <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Your cart is empty</h2>
-              <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[17.5rem]">Looks like you haven&apos;t added anything yet.</p>
+              <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">{t("cart.empty")}</h2>
+              <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[17.5rem]">{t("checkout.empty.mobileMessage")}</p>
               <button onClick={() => router.push("/")} className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
-                <ShoppingBag size={16} /> Start Shopping
+                <ShoppingBag size={16} /> {t("checkout.startShopping")}
               </button>
             </div>
           </div>
@@ -1600,10 +1610,10 @@ function CheckoutContent() {
               style={{ paddingTop: "env(safe-area-inset-top)" }}
             >
               <div className="flex items-center gap-2 px-3 h-12">
-                <button type="button" onClick={() => router.push("/")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+                <button type="button" onClick={() => router.push("/")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
                   <ArrowLeft size={20} />
                 </button>
-                <p className="text-[0.9375rem] font-black text-[var(--user-text)]">Checkout</p>
+                <p className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("cart.checkout")}</p>
               </div>
             </div>
             <div className="px-4 pt-6 pb-8 max-w-[30rem] mx-auto">
@@ -1612,10 +1622,10 @@ function CheckoutContent() {
                   <Phone size={22} className="text-[var(--user-accent-text)]" />
                 </div>
                 <div className="space-y-1.5">
-                  <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">Phone Number Required</h2>
-                  <p className="text-sm text-[var(--user-text-muted)]">We need your phone number for delivery updates and order confirmation.</p>
+                  <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">{t("checkout.phone.requiredTitle")}</h2>
+                  <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.phone.requiredMessage")}</p>
                 </div>
-                <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">Phone number</label>
+                <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.phone.label")}</label>
                 <input
                   id="checkout-phone-mobile"
                   type="tel"
@@ -1631,22 +1641,22 @@ function CheckoutContent() {
                   onPaste={handlePhonePaste}
                   onKeyDown={handlePhoneKeyDown}
                   onBlur={() => setPhoneTouched(true)}
-                  placeholder="Enter phone number"
+                  placeholder={t("checkout.phone.placeholder")}
                   className={phoneInputCls}
                 />
                 <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
                   {phoneError ? <p id="checkout-phone-error-mobile" className="text-xs text-red-600">{phoneError}</p> : <span />}
-                  <p id="checkout-phone-helper-mobile" className="shrink-0 text-xs text-[var(--user-text-muted)]">{phone.length}/{PHONE_MAX} digits</p>
+                  <p id="checkout-phone-helper-mobile" className="shrink-0 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: phone.length, max: PHONE_MAX })}</p>
                 </div>
                 <PrimaryButton
                   onClick={savePhone}
                   disabled={!phoneIsValid}
                   loading={savingPhone}
-                  loadingText="Saving..."
+                  loadingText={t("checkout.phone.saving")}
                   iconEnd={ArrowRight}
                   className="mt-5 h-12"
                 >
-                  Save &amp; Continue
+                  {t("checkout.phone.saveContinue")}
                 </PrimaryButton>
               </div>
             </div>
@@ -1656,13 +1666,13 @@ function CheckoutContent() {
 
       // ✅ Main mobile checkout: single-scroll, all cards visible at once.
       const shippingMethodsMob = [
-        { id: "standard", title: "Standard Delivery", time: `${cfg.standard.min_days}–${cfg.standard.max_days} days`, icon: Truck },
-        { id: "express", title: "Express Delivery", time: `${cfg.express.min_days}–${cfg.express.max_days} days`, icon: Zap },
+        { id: "standard", titleKey: "checkout.shipping.standard", time: t("checkout.shipping.days", { min: cfg.standard.min_days, max: cfg.standard.max_days }), icon: Truck },
+        { id: "express", titleKey: "checkout.shipping.express", time: t("checkout.shipping.days", { min: cfg.express.min_days, max: cfg.express.max_days }), icon: Zap },
         // ✅ Admin ke custom shipping methods (Add New se bane hue)
         ...(customShippingMethods || []).map((m) => ({
           id: m.code,
-          title: m.name,
-          time: `${m.min_days}–${m.max_days} days`,
+          title: text(m.name, m.translations?.name),
+          time: t("checkout.shipping.days", { min: m.min_days, max: m.max_days }),
           icon: Package,
           custom: true,
           fee: Number(m.fee ?? 0),
@@ -1677,10 +1687,10 @@ function CheckoutContent() {
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
             <div className="flex items-center gap-2 px-3 h-12">
-              <button type="button" onClick={() => router.push("/cart")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+              <button type="button" onClick={() => router.push("/cart")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
                 <ArrowLeft size={20} />
               </button>
-              <p className="text-[0.9375rem] font-black text-[var(--user-text)]">Checkout</p>
+              <p className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("cart.checkout")}</p>
             </div>
           </div>
 
@@ -1688,12 +1698,12 @@ function CheckoutContent() {
             {/* Card 1: Shipping Address — standalone card with header (tappable) */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] overflow-hidden">
               <p className="px-3 pt-2.5 pb-1.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <MapPin size={13} /> Shipping Address
+                <MapPin size={13} /> {t("checkout.address.shippingAddress")}
               </p>
               <button
                 type="button"
                 onClick={() => { setEditingAddressId(null); setMobileAddressSheet(true); }}
-                aria-label="Change delivery address"
+                aria-label={t("checkout.address.changeDelivery")}
                 className="w-full text-left px-3 pb-3 pt-1 flex items-center gap-3 active:scale-[0.99] transition"
               >
                 <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
@@ -1710,7 +1720,7 @@ function CheckoutContent() {
                       </p>
                     </>
                   ) : (
-                    <p className="text-[0.75rem] text-[var(--user-text-muted)]">Tap to select a delivery address</p>
+                    <p className="text-[0.75rem] text-[var(--user-text-muted)]">{t("checkout.address.tapToSelect")}</p>
                   )}
                 </div>
                 <span className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] shrink-0">
@@ -1722,7 +1732,7 @@ function CheckoutContent() {
             {/* Card 2: Items (only) */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-3">
               <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <Package size={13} /> Items
+                <Package size={13} /> {t("checkout.step.items")}
               </p>
 
               {/* Compact item rows */}
@@ -1737,10 +1747,10 @@ function CheckoutContent() {
                       {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
+                      <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{text(i.name, i.translations?.name)}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{i.variantTitle}</p>}
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
+                        {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{text(i.variantTitle, i.variantTranslations?.title)}</p>}
+                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
                       </div>
                     </div>
                     <p className="text-[0.75rem] font-black text-[var(--user-text)] shrink-0">Rs. {i.lineTotal.toLocaleString()}</p>
@@ -1752,7 +1762,7 @@ function CheckoutContent() {
               {/* Free shipping threshold banner (matches desktop) */}
               {cfg.free_shipping_over > 0 && (
                 <p className="text-[0.625rem] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
-                  <Gift size={11} /> Free shipping on orders over Rs. {cfg.free_shipping_over.toLocaleString()}
+                  <Gift size={11} /> {t("checkout.shipping.freeOver", { amount: `Rs. ${cfg.free_shipping_over.toLocaleString()}` })}
                 </p>
               )}
             </div>
@@ -1760,7 +1770,7 @@ function CheckoutContent() {
             {/* Card 3: Delivery Method (standalone) */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-2">
               <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <Truck size={13} /> Delivery Method
+                <Truck size={13} /> {t("checkout.shipping.title")}
               </p>
               <div className="space-y-1.5">
                   {shippingMethodsMob.map((m) => {
@@ -1787,11 +1797,11 @@ function CheckoutContent() {
                       </span>
                       <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.75rem] font-bold text-[var(--user-text)]">{m.title}</p>
+                        <p className="text-[0.75rem] font-bold text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
                         <p className="text-[0.625rem] text-[var(--user-text-muted)]">{m.time}</p>
                       </div>
                       <span className={`text-[0.75rem] font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
-                        {isFree ? "FREE" : `Rs. ${baseFee.toLocaleString()}`}
+                        {isFree ? t("checkout.summary.free") : `Rs. ${baseFee.toLocaleString()}`}
                       </span>
                     </label>
                   );
@@ -1806,9 +1816,9 @@ function CheckoutContent() {
               </p>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "cod", icon: Truck, label: "COD" },
-                  { id: "bank", icon: Landmark, label: "Bank" },
-                  { id: "card", icon: CreditCard, label: "Card" },
+                  { id: "cod", icon: Truck, labelKey: "checkout.payment.codShort" },
+                  { id: "bank", icon: Landmark, labelKey: "checkout.payment.bankShort" },
+                  { id: "card", icon: CreditCard, labelKey: "checkout.payment.card" },
                 ].map((m) => {
                   const active = paymentMethod === m.id;
                   return (
@@ -1825,7 +1835,7 @@ function CheckoutContent() {
                         {active && <Check size={10} strokeWidth={2.5} aria-hidden="true" />}
                       </span>
                       <m.icon size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
-                      <span className="text-[0.625rem] font-black uppercase tracking-wider mt-1">{m.label}</span>
+                      <span className="text-[0.625rem] font-black uppercase tracking-wider mt-1">{t(m.labelKey)}</span>
                     </button>
                   );
                              })}
@@ -1834,35 +1844,35 @@ function CheckoutContent() {
               {/* ✅ Mobile: Bank transfer info + fillable fields */}
               {paymentMethod === "bank" && (
                 <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
-                  <p className="text-[0.6875rem] font-bold text-[var(--user-text)]">Bank Transfer Details</p>
+                  <p className="text-[0.6875rem] font-bold text-[var(--user-text)]">{t("checkout.bank.details")}</p>
                   <div className="space-y-1 text-[0.6875rem] text-[var(--user-text-muted)]">
-                    <p>Account: <span className="font-bold text-[var(--user-text)]">ClickMasters Store</span></p>
-                    <p>Bank: <span className="font-bold text-[var(--user-text)]">Meezan Bank</span></p>
-                    <p>IBAN: <span className="font-mono font-bold text-[var(--user-text)]">PK00 MEZN 0000 1234 5678 9012</span></p>
+                    <p>{t("checkout.bank.account")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.title}</span></p>
+                    <p>{t("checkout.bank.bank")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.bank}</span></p>
+                    <p>{t("checkout.bank.iban")}: <span className="font-mono font-bold text-[var(--user-text)]">{BANK_DETAILS.iban}</span></p>
                   </div>
                   <div className="pt-2 border-t border-[var(--user-border)] space-y-2.5">
                     <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Sender Name</label>
+                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.bank.senderName")}</label>
                       <input 
                         value={bankForm.senderName} 
                         onChange={(e) => {
                           setBankForm({ ...bankForm, senderName: e.target.value });
                           if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
                         }}
-                        placeholder="e.g. Ahsan Younas" 
+                        placeholder={t("checkout.bank.senderPlaceholder")}
                         className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
                       />
                       {bankFormErrors.senderName && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.senderName}</p>}
                     </div>
                     <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Transaction ID</label>
+                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.bank.transactionId")}</label>
                       <input 
                         value={bankForm.transactionRef} 
                         onChange={(e) => {
                           setBankForm({ ...bankForm, transactionRef: e.target.value });
                           if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
                         }}
-                        placeholder="Add after transferring" 
+                        placeholder={t("checkout.bank.referencePlaceholder")}
                         className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
                       />
                       {bankFormErrors.transactionRef && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.transactionRef}</p>}
@@ -1875,7 +1885,7 @@ function CheckoutContent() {
               {paymentMethod === "card" && (
                 <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
                   <div>
-                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Number</label>
+                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.card.number")}</label>
                     <input 
                       name="card-number"
                       value={cardForm.number} 
@@ -1890,7 +1900,7 @@ function CheckoutContent() {
                     {cardFormErrors.number && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.number}</p>}
                   </div>
                   <div>
-                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Card Holder Name</label>
+                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.card.holder")}</label>
                     <input 
                       name="card-name"
                       value={cardForm.name} 
@@ -1898,13 +1908,13 @@ function CheckoutContent() {
                         setCardForm({ ...cardForm, name: e.target.value });
                         if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" });
                       }} 
-                      placeholder="John Doe" 
+                      placeholder={t("checkout.card.holderPlaceholder")}
                       className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.name ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
                     />
                     {cardFormErrors.name && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.name}</p>}
                   </div>
                   <div>
-                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">Expiry Date</label>
+                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.card.expiryDate")}</label>
                     <input
                       name="card-expiry"
                       type="datetime-local"
@@ -1924,33 +1934,33 @@ function CheckoutContent() {
             {/* Card 4: Order summary */}
             <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-2">
               <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <PackageCheck size={13} /> Order Summary
+                <PackageCheck size={13} /> {t("checkout.summary.title")}
               </p>
               <div className="space-y-1.5 text-[0.75rem]">
                 <div className="flex justify-between text-[var(--user-text-muted)]">
-                  <span>Items Total ({itemsWithDiscounts.length})</span>
+                  <span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>
                   <span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span>
                 </div>
                 {totalSavings > 0 && (
                   <div className="flex justify-between text-[var(--user-success)]">
-                    <span className="font-bold">You Save</span>
+                    <span className="font-bold">{t("checkout.summary.youSave")}</span>
                     <span className="font-black">-Rs. {totalSavings.toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-[var(--user-text-muted)]">
-                  <span>Shipping Fee</span>
+                  <span>{t("checkout.summary.shippingFee")}</span>
                   <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
-                    {shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}
+                    {shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}
                   </span>
                 </div>
                 {tax > 0 && (
                   <div className="flex justify-between text-[var(--user-text-muted)]">
-                    <span>Tax</span>
+                    <span>{t("cart.tax")}</span>
                     <span className="font-bold text-[var(--user-text)]">Rs. {tax.toLocaleString()}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-[var(--user-border)]">
-                  <span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span>
+                  <span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span>
                   <span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span>
                 </div>
               </div>
@@ -1965,9 +1975,9 @@ function CheckoutContent() {
             <div className="flex items-center gap-3 px-3 py-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[0.625rem] text-[var(--user-text-muted)] font-bold uppercase tracking-wider">
-                  Total
+                  {t("cart.total")}
                   <span className={`ml-1 ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"}`}>
-                    {shipping === 0 ? "FREE shipping" : "incl. shipping"}
+                    {shipping === 0 ? t("checkout.summary.freeShipping") : t("checkout.summary.includingShipping")}
                   </span>
                 </p>
                 <p className="text-base font-black text-[var(--user-accent)] leading-none mt-0.5">Rs. {grandTotal.toLocaleString()}</p>
@@ -1975,11 +1985,11 @@ function CheckoutContent() {
               <PrimaryButton
                 onClick={() => setOrderReviewOpen(true)}
                 loading={placing}
-                loadingText="Placing..."
+                loadingText={t("checkout.order.placing")}
                 icon={Lock}
                 className="h-11 w-auto shrink-0 px-6"
               >
-                Place Order
+                {t("checkout.order.place")}
               </PrimaryButton>
             </div>
           </div>
@@ -1999,12 +2009,12 @@ function CheckoutContent() {
                 {/* Sheet header */}
                 <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
                   <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">
-                    Delivery Address
+                    {t("checkout.address.title")}
                   </h3>
                   <button
                     type="button"
                     onClick={() => { setMobileAddressSheet(false); setEditingAddressId(null); }}
-                    aria-label="Close"
+                    aria-label={t("common.close")}
                     className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
                   >
                     <X size={18} />
@@ -2019,7 +2029,7 @@ function CheckoutContent() {
                         <div className="w-14 h-14 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
                           <MapPin size={24} className="text-[var(--user-text-muted)]" />
                         </div>
-                        <p className="text-sm text-[var(--user-text-muted)]">No saved addresses yet</p>
+                        <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.address.noneSaved")}</p>
                       </div>
                     )}
                     {addresses.map((a) => {
@@ -2037,7 +2047,7 @@ function CheckoutContent() {
                             <div className="flex items-center gap-2 mb-1">
                               <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate">{a.full_name}</p>
                               <span className="text-[0.6875rem] text-[var(--user-text-muted)] font-semibold">· {a.phone}</span>
-                              {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">DEFAULT</span>}
+                              {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">{t("checkout.address.default")}</span>}
                               {isSel && <Check size={14} className="checkout-selection-check ml-auto shrink-0" />}
                             </div>
                             <p className="text-[0.6875rem] text-[var(--user-text-muted)] line-clamp-2 leading-snug">
@@ -2050,14 +2060,14 @@ function CheckoutContent() {
                               onClick={() => { setEditingAddressId(a._id); setMobileAddressSheet(false); setShowAddressModal(true); }}
                               className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-[0.6875rem] font-semibold"
                             >
-                              <Pencil size={11} /> Edit
+                              <Pencil size={11} /> {t("checkout.address.edit")}
                             </button>
                             <button
                               type="button"
-                              onClick={() => { if (window.confirm("Delete this address?")) deleteAddress(a._id); }}
+                              onClick={() => { if (window.confirm(t("checkout.address.deleteConfirmation"))) deleteAddress(a._id); }}
                               className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition text-[0.6875rem] font-semibold"
                             >
-                              <Trash2 size={11} /> Delete
+                              <Trash2 size={11} /> {t("common.delete")}
                             </button>
                           </div>
                         </div>
@@ -2068,7 +2078,7 @@ function CheckoutContent() {
                       onClick={() => { setEditingAddressId(null); setMobileAddressSheet(false); setShowAddressModal(true); }}
                       className="w-full h-11 rounded-xl border-2 border-dashed border-[var(--user-border)] text-[0.75rem] font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-accent)]/5 transition flex items-center justify-center gap-2 mt-2"
                     >
-                      <Plus size={14} /> Add New Address
+                      <Plus size={14} /> {t("checkout.address.add")}
                     </button>
                   </div>
                 )}
@@ -2076,29 +2086,29 @@ function CheckoutContent() {
                 {/* Summary */}
                 <div className="px-4 py-3 border-t border-[var(--user-border)] space-y-2 text-[0.75rem]">
                   <div className="flex justify-between">
-                    <span className="text-[var(--user-text-muted)]">Items Total ({itemsWithDiscounts.length})</span>
+                    <span className="text-[var(--user-text-muted)]">{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>
                     <span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span>
                   </div>
                   {totalSavings > 0 && (
                     <div className="flex justify-between">
-                      <span className="font-bold text-[var(--user-success)]">You Save</span>
+                      <span className="font-bold text-[var(--user-success)]">{t("checkout.summary.youSave")}</span>
                       <span className="font-black text-[var(--user-success)]">-Rs. {totalSavings.toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-[var(--user-text-muted)]">Shipping Fee</span>
+                    <span className="text-[var(--user-text-muted)]">{t("checkout.summary.shippingFee")}</span>
                     <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
-                      {shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}
+                      {shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}
                     </span>
                   </div>
                   {tax > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-[var(--user-text-muted)]">Tax</span>
+                      <span className="text-[var(--user-text-muted)]">{t("cart.tax")}</span>
                       <span className="font-bold text-[var(--user-text)]">Rs. {tax.toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-[var(--user-border)]">
-                    <span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span>
+                    <span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span>
                     <span className="text-lg font-black text-[var(--user-text)]">Rs. {grandTotal.toLocaleString()}</span>
                   </div>
                 </div>
@@ -2108,11 +2118,11 @@ function CheckoutContent() {
                   <PrimaryButton
                     onClick={placeOrder}
                     loading={placing}
-                    loadingText="Placing..."
+                    loadingText={t("checkout.order.placing")}
                     icon={Lock}
                     className="h-12"
                   >
-                    Confirm &amp; Place Order
+                    {t("checkout.order.confirmPlace")}
                   </PrimaryButton>
                 </div>
               </div>
@@ -2124,8 +2134,8 @@ function CheckoutContent() {
             <div className="fixed inset-0 z-[70] flex items-end bg-black/70 backdrop-blur-sm" onClick={() => setOrderReviewOpen(false)} style={{ animation: "fadeIn 0.2s ease-out" }}>
               <div className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[var(--user-bg-card)] border-t-2 border-[var(--user-border)] shadow-2xl" style={{ animation: "modalUp .3s ease-out", paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
-                  <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">Order Review</h3>
-                  <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label="Close" className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
+                  <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("checkout.review.orderReview")}</h3>
+                  <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label={t("common.close")} className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="divide-y divide-[var(--user-border)]">
@@ -2133,34 +2143,34 @@ function CheckoutContent() {
                     <div key={i.key} className="flex items-center gap-4 py-1.5 first:pt-0 last:pb-0">
                       <ItemThumb item={i} size="w-12 h-12" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{i.name}</p>
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${i.payableItems} paid)` : ""}</p>
+                        <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{text(i.name, i.translations?.name)}</p>
+                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
                       </div>
                       <p className="text-[0.75rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
                     </div>
                   ))}
                   </div>
                   <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-3 text-[0.6875rem] space-y-1.5">
-                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : "No address selected"}</p>
+                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : t("checkout.address.noneSelected")}</p>
                     {selectedAddress && <p className="text-[var(--user-text-muted)] line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
-                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? "Cash on Delivery" : paymentMethod === "bank" ? "Bank Transfer" : "Debit / Credit Card"}</p>
+                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? t("checkout.payment.cod") : paymentMethod === "bank" ? t("checkout.payment.bank") : t("checkout.payment.debitCreditCard")}</p>
                   </div>
                   <div className="space-y-2.5 text-[0.75rem] pt-3">
-                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>Items Total</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
-                    {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">You Save</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
-                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-bold">{shipping === 0 ? "FREE" : `Rs. ${shipping.toLocaleString()}`}</span></div>
-                    <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">Total</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
+                    {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">{t("checkout.summary.youSave")}</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
+                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>{t("cart.shipping")}</span><span className="font-bold">{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}</span></div>
+                    <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
                   </div>
                 </div>
                 <div className="px-4 pt-3 pb-1">
                   <PrimaryButton
                     onClick={placeOrder}
                     loading={placing}
-                    loadingText="Placing..."
+                    loadingText={t("checkout.order.placing")}
                     icon={Lock}
                     className="h-12"
                   >
-                    Confirm &amp; Place Order
+                    {t("checkout.order.confirmPlace")}
                   </PrimaryButton>
                 </div>
               </div>

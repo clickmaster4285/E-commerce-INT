@@ -121,7 +121,8 @@ const getId = (item) => {
    UI COMPONENTS
 ========================================================= */
 function StatusBadge({ active, label }) {
-  const displayLabel = label || (active ? "Active" : "Inactive");
+  const { t } = useTranslation();
+  const displayLabel = label || (active ? t("admin.discounts.page.active") : t("admin.discounts.page.inactive"));
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide"
       style={{
@@ -546,7 +547,7 @@ export default function DiscountDetailPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 rounded-md overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        {[{ icon: Percent, label: t("admin.discounts.detail.discountType"), value: discount.type === "percentage" ? "Percentage" : discount.type === "fixed" ? "Fixed" : "Fixed Price" }, { icon: Calendar, label: t("admin.discounts.detail.validPeriod"), value: `${fd(discount.startDate, locale)} - ${fd(discount.endDate, locale)}` }, { icon: TrendingUp, label: t("admin.discounts.detail.usageLimit"), value: discount.usageLimit ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(discount.usageLimit) : "Unlimited" }, { icon: ShoppingCart, label: t("admin.discounts.detail.minimumOrderValue"), value: discount.minOrderValue ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : "No minimum" }].map(({ icon: Icon, label, value }) => (
+        {[{ icon: Percent, label: t("admin.discounts.detail.discountType"), value: discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.form.fixedPriceType") }, { icon: Calendar, label: t("admin.discounts.detail.validPeriod"), value: `${fd(discount.startDate, locale)} - ${fd(discount.endDate, locale)}` }, { icon: TrendingUp, label: t("admin.discounts.detail.usageLimit"), value: discount.usageLimit ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(discount.usageLimit) : t("admin.discounts.detail.unlimited") }, { icon: ShoppingCart, label: t("admin.discounts.detail.minimumOrderValue"), value: discount.minOrderValue ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : t("admin.discounts.detail.noMinimum") }].map(({ icon: Icon, label, value }) => (
           <div key={label} className="flex items-center gap-2.5 px-3 py-3 border-b md:border-b-0 md:border-r last:border-0" style={{ borderColor: "var(--border-color)" }}><Icon className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} /><div className="min-w-0"><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{value}</p></div></div>
         ))}
       </div>
@@ -560,10 +561,10 @@ export default function DiscountDetailPage() {
             <DataRow icon={Hash} label={t("admin.promotions.ui.generated.e6fb06210faf")} value={discount.code} mono />
             <DataRow icon={Tag} label={t("admin.discounts.detail.name")} value={nameOf(discount)} />
             <DataRow icon={Activity} label={t("admin.discounts.detail.description")} value={descriptionOf(discount) || "—"} />
-            <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.detail.fixedPrice")} />
+            <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.form.fixedPriceType")} />
             <DataRow icon={DollarSign} label={t("admin.discounts.detail.value")} value={formatDiscountValue(discount)} highlight />
             <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />
-            <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? "Active" : "Inactive"} highlight={isActive} />
+            <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? t("admin.discounts.page.active") : t("admin.discounts.page.inactive")} highlight={isActive} />
           </InfoCard>
           <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")} action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
             {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{product.name}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
@@ -575,7 +576,7 @@ export default function DiscountDetailPage() {
 
         <div className="space-y-3">
           <InfoCard icon={Calendar} title={t("admin.discounts.detail.validityPeriod")}><DataRow label={t("admin.discounts.form.startDate")} value={formatDateTime(discount.startDate)} /><DataRow label={t("admin.promotions.ui.generated.269c8b374312")} value={formatDateTime(discount.endDate)} /><p className="text-[8px] text-right mt-2" style={{ color: "var(--text-muted)" }}>{Math.max(0, Math.ceil((new Date(discount.endDate) - new Date(discount.startDate)) / 86400000))}{" "}{t("admin.promotions.ui.generated.5548ae4f34cb")}</p></InfoCard>
-          <InfoCard icon={TrendingUp} title={t("admin.discounts.detail.usageLimits")}><DataRow label={t("admin.discounts.form.totalUsageLimit")} value={discount.usageLimit || "Unlimited"} /><DataRow label={t("admin.promotions.ui.generated.fdbbcd998612")} value={discount.perUserLimit || 1} /><DataRow label={t("admin.discounts.detail.minimumOrderValue")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} /><DataRow label={t("admin.promotions.ui.generated.e3f2be9ede5c")} value={discount.minQuantity || "Not set"} /></InfoCard>
+          <InfoCard icon={TrendingUp} title={t("admin.discounts.detail.usageLimits")}><DataRow label={t("admin.discounts.form.totalUsageLimit")} value={discount.usageLimit || "Unlimited"} /><DataRow label={t("admin.promotions.ui.generated.fdbbcd998612")} value={discount.perUserLimit || 1} /><DataRow label={t("admin.discounts.detail.minimumOrderValue")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : t("admin.discounts.detail.noMinimum")} /><DataRow label={t("admin.promotions.ui.generated.e3f2be9ede5c")} value={discount.minQuantity || "Not set"} /></InfoCard>
         </div>
 
         <div className="space-y-3">
@@ -591,16 +592,16 @@ export default function DiscountDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div id="d-rules" className="scroll-mt-4 h-full"><InfoCard icon={Percent} title={t("admin.discounts.detail.discountRules")}>
               <div className="space-y-1">
-                <DataRow icon={Percent} label={t("admin.discounts.detail.discountType")} value={discount.type === "percentage" ? "Percentage (%)" : discount.type === "fixed" ? "Fixed Amount" : "Fixed Price"} />
+                <DataRow icon={Percent} label={t("admin.discounts.detail.discountType")} value={discount.type === "percentage" ? t("admin.discounts.form.percentageType") : discount.type === "fixed" ? t("admin.discounts.form.fixedAmountType") : t("admin.discounts.form.fixedPriceType")} />
                 <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDiscountValue(discount)} highlight />
-                <DataRow icon={DollarSign} label={t("admin.promotions.ui.generated.7e9c655b729a")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : "No minimum"} />
-                <DataRow icon={Box} label={t("admin.discounts.form.minQuantity")} value={discount.minQuantity ? String(discount.minQuantity) : "No minimum"} />
+                <DataRow icon={DollarSign} label={t("admin.promotions.ui.generated.7e9c655b729a")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : t("admin.discounts.detail.noMinimum")} />
+                <DataRow icon={Box} label={t("admin.discounts.form.minQuantity")} value={discount.minQuantity ? String(discount.minQuantity) : t("admin.discounts.detail.noMinimum")} />
               </div>
             </InfoCard></div>
 
             <div id="d-usage" className="scroll-mt-4 h-full"><InfoCard icon={Clock} title={t("admin.discounts.detail.usageLimits")}>
               <div className="space-y-1">
-                <DataRow icon={TrendingUp} label={t("admin.discounts.form.totalUsageLimit")} value={discount.usageLimit ? String(discount.usageLimit) : "Unlimited"} />
+                <DataRow icon={TrendingUp} label={t("admin.discounts.form.totalUsageLimit")} value={discount.usageLimit ? String(discount.usageLimit) : t("admin.discounts.detail.unlimited")} />
                 <DataRow icon={User} label={t("admin.promotions.ui.generated.fdbbcd998612")} value={discount.perUserLimit ? String(discount.perUserLimit) : "1"} />
               </div>
             </InfoCard></div>

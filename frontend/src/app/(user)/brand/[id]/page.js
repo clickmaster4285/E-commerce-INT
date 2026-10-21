@@ -9,6 +9,8 @@ import { brandApi } from "@/apis/user/brandApi";
 import ProductCard from "@/components/user/ProductCard";
 import PaginationBar from "@/components/user/PaginationBar";
 import { Package, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const PAGE_SIZE = 20;
 const VALID_SORTS = ["featured", "newest", "price-asc", "price-desc"];
@@ -47,6 +49,8 @@ export default function BrandPage() {
 }
 
 function BrandContent({ brandId }) {
+  const { t, locale, dir } = useTranslation();
+  const { fieldOf, descriptionOf } = useLocalized();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -112,17 +116,19 @@ function BrandContent({ brandId }) {
   };
 
   const logoUrl = getLogoUrl(brand?.logo);
+  const brandDisplayName = fieldOf(brand, "name") || brand?.name || t("common.brand");
+  const brandDisplayDesc = descriptionOf(brand) || brand?.description || "";
 
   return (
-    <>
+    <div dir={dir}>
       {/* BREADCRUMB */}
       <nav className="flex items-center gap-1.5 text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)] mb-6 lg:mb-10 flex-wrap">
         <Link href="/" className="hover:text-[var(--user-accent)] transition">
-          Home
+          {t("mobileNav.home")}
         </Link>
-        <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
+        <ChevronRight size={12} className={`text-[var(--user-text-subtle)] ${dir === "rtl" ? "rotate-180" : ""}`} />
         <span className="text-[var(--user-text-secondary)] line-clamp-1 max-w-[11.25rem] sm:max-w-[13.75rem]">
-          {brand?.name || "Brand"}
+          {brandDisplayName}
         </span>
       </nav>
 
@@ -133,21 +139,26 @@ function BrandContent({ brandId }) {
             <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-xl bg-[var(--user-text)] border border-[var(--user-border)] flex items-center justify-center p-2 lg:p-2.5 shrink-0">
               <img
                 src={logoUrl}
-                alt={brand?.name}
+                alt={brandDisplayName}
                 className="max-h-full max-w-full object-contain"
               />
             </div>
           ) : (
             <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
               <span className="text-xl lg:text-2xl font-black text-[var(--user-accent)]">
-                {brand?.name?.charAt(0) || "B"}
+                {brandDisplayName?.charAt(0) || "B"}
               </span>
             </div>
           )}
           <div className="min-w-0">
             <h1 className="text-2xl lg:text-3xl xl:text-4xl font-extrabold text-[var(--user-text)] tracking-tight uppercase">
-              {brand?.name || "Brand"}
+              {brandDisplayName}
             </h1>
+            {brandDisplayDesc && (
+              <p className="mt-1 text-sm text-[var(--user-text-muted)] line-clamp-2">
+                {brandDisplayDesc}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -162,10 +173,10 @@ function BrandContent({ brandId }) {
               onChange={(e) => changeSort(e.target.value)}
               className="h-10 lg:h-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-full lg:rounded-lg px-3 lg:px-3 py-1.5 lg:py-2 text-[0.6875rem] lg:text-xs font-bold text-[var(--user-text-secondary)] outline-none cursor-pointer hover:border-[var(--user-accent)]/50 transition focus:border-[var(--user-accent)]"
             >
-              <option value="featured">Featured</option>
-              <option value="newest">Newest Arrivals</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
+              <option value="featured">{t("admin.featuredProducts.page.featured")}</option>
+              <option value="newest">{t("admin.reviews.ui.newest")}</option>
+              <option value="price-asc">{t("common.price")}: {t("admin.reviews.ui.lowest")}</option>
+              <option value="price-desc">{t("common.price")}: {t("admin.reviews.ui.highest")}</option>
             </select>
           </div>
         </div>
@@ -192,23 +203,20 @@ function BrandContent({ brandId }) {
             <Package size={28} className="text-[var(--user-danger)] lg:w-8 lg:h-8" />
           </div>
           <p className="text-[var(--user-text)] font-semibold mb-2 text-lg">
-            We couldn't load these products.
-          </p>
-          <p className="text-[var(--user-text-muted)] text-sm mb-6 max-w-sm mx-auto">
-            Please try again later.
+            {t("admin.brands.ui.loadFailed")}
           </p>
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => refetch()}
               className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-5 lg:px-6 py-2.5 lg:py-3 rounded-xl text-sm font-bold hover:opacity-90 active:scale-95 transition"
             >
-              Retry
+              {t("common.retry")}
             </button>
             <Link
               href="/"
               className="inline-flex items-center gap-2 border border-[var(--user-border)] text-[var(--user-text-muted)] px-5 lg:px-6 py-2.5 lg:py-3 rounded-xl text-sm font-bold hover:border-[var(--user-accent)]/50 transition"
             >
-              Back to Home
+              {t("mobileNav.home")}
             </Link>
           </div>
         </div>
@@ -230,7 +238,7 @@ function BrandContent({ brandId }) {
             onPageChange={goToPage}
           />
           {isFetching ? (
-            <p className="mt-2 text-center text-[0.6875rem] text-[var(--user-text-subtle)]">Updating…</p>
+            <p className="mt-2 text-center text-[0.6875rem] text-[var(--user-text-subtle)]">{t("common.loading")}</p>
           ) : null}
         </div>
       )}
@@ -242,19 +250,19 @@ function BrandContent({ brandId }) {
             <Package size={28} className="text-[var(--user-accent)] lg:w-8 lg:h-8 opacity-60" />
           </div>
           <p className="text-[var(--user-text)] font-semibold mb-2 text-lg">
-            No products available
+            {t("product.noProducts")}
           </p>
           <p className="text-[var(--user-text-muted)] text-sm mb-6 max-w-sm mx-auto">
-            We don't have any products for this brand yet. Check back soon for new arrivals.
+            {t("admin.brands.page.noBrands")}
           </p>
           <Link
             href="/"
             className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-5 lg:px-6 py-2.5 lg:py-3 rounded-xl text-sm font-bold hover:bg-[var(--user-accent-hover)] active:scale-95 transition"
           >
-            Explore All Products
+            {t("cart.continueShopping")}
           </Link>
         </div>
       )}
-    </>
+    </div>
   );
 }

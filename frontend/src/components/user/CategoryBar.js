@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { Package } from "lucide-react";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 export default function CategoryBar() {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   // ✅ Real categories database se
   // ✅ Client-side slice for display only; endpoint has no server pagination yet
   const { data: categoriesRaw = [], isLoading, isError } = useQuery({
@@ -21,7 +25,7 @@ export default function CategoryBar() {
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">
           <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
-            Shop By Category
+            {t("admin.nav.item.categories")}
           </h2>
         </div>
 
@@ -40,7 +44,7 @@ export default function CategoryBar() {
         {/* ERROR */}
         {isError && (
           <div className="text-center py-8 text-[var(--user-text-muted)] text-sm">
-            Categories are unavailable right now.
+            {t("admin.shared.toast.loadFailed")}
           </div>
         )}
 
@@ -62,7 +66,7 @@ export default function CategoryBar() {
                     className="mr-3 w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-3 py-6 flex items-center justify-center min-h-[5.625rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
                   >
                     <p className="text-[var(--user-accent)] font-extrabold text-xs sm:text-sm uppercase tracking-wider text-center leading-relaxed">
-                      {category.name}
+                      {fieldOf(category, "name")}
                     </p>
                   </Link>
                 ))}
@@ -75,7 +79,7 @@ export default function CategoryBar() {
         {!isLoading && !isError && categories.length === 0 && (
           <div className="text-center py-8 text-[var(--user-text-subtle)] text-sm">
             <Package size={32} className="mx-auto mb-2 opacity-50" />
-            No categories available yet.
+            {t("admin.categories.table.empty")}
           </div>
         )}
       </div>

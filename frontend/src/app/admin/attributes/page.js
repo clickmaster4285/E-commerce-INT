@@ -436,13 +436,13 @@ function AttributeFormModal({ open, onClose, mode = "create", initialData, onSav
         }
         const values = (initialData.values || [])
           .map((v) => {
-            const label = typeof v === "string" ? v : v?.label || v?.value || String(v);
+            const label = typeof v === "string" ? v : (v?.label || v?.value || v);
             return String(label);
           })
           .filter(Boolean);
         setForm({
-          name: initialData.name || "",
-          description: initialData.description || "",
+          name: (typeof initialData.name === "object" && initialData.name) ? String(initialData.name.en || initialData.name.name || initialData.name.label || Object.values(initialData.name)[0] || "") : (initialData.name || ""),
+          description: (typeof initialData.description === "object" && initialData.description) ? String(initialData.description.en || initialData.description.description || Object.values(initialData.description)[0] || "") : (initialData.description || ""),
           data_type: dataType,
           values,
           value: booleanValue,

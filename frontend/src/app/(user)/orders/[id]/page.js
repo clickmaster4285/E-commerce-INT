@@ -10,6 +10,7 @@ import { orderApi } from "@/apis/user/orderApi";
 import { addressApi } from "@/apis/user/addressApi";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating from "@/components/user/ProductReviews";
+import { useLocalized } from "@/i18n/localize";
 import { Country, State, City } from "country-state-city";
 import {
   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
@@ -287,6 +288,7 @@ const CancelConfirmModal = ({ orderNumber, canceling, onClose, onConfirm }) => (
 
 /* ============ MAIN ============ */
 export default function OrderDetailPage({ params }) {
+  const { text } = useLocalized();
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -523,14 +525,14 @@ export default function OrderDetailPage({ params }) {
                   <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors group">
                     <div className="shrink-0 relative">
                       {getImgUrl(i.image) ? (
-                        <img src={getImgUrl(i.image)} alt={i.name} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
+                        <img src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
                       ) : (
                         <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></div>
                       )}
                       <div className="absolute -top-2 -right-2 min-w-[1.375rem] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{i.name}</h3>
+                      <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{text(i.name, i.translations?.name)}</h3>
                       {i.variantTitle && <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
                         {i.deal_id && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
@@ -538,7 +540,7 @@ export default function OrderDetailPage({ params }) {
                       </div>
                       {canRate && (
                         <div className="mt-3 max-w-xs">
-                          <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={i.name} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
+                          <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={text(i.name, i.translations?.name)} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
                         </div>
                       )}
                     </div>
@@ -778,7 +780,7 @@ export default function OrderDetailPage({ params }) {
                 <div key={idx} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                   <div className="shrink-0 relative">
                     {getImgUrl(i.image) ? (
-                      <img src={getImgUrl(i.image)} alt={i.name} className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
+                      <img src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
                     ) : (
                       <div className="w-14 h-14 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
                         <Package size={20} className="text-[var(--user-text-muted)]" />
@@ -787,13 +789,13 @@ export default function OrderDetailPage({ params }) {
                     <div className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-black flex items-center justify-center border border-[var(--user-bg-card)]">×{qty}</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[0.8125rem] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{i.name}</p>
+                    <p className="text-[0.8125rem] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{text(i.name, i.translations?.name)}</p>
                     {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
                     <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5">x{qty}</p>
                     {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
                     {canRate && (
                       <div className="mt-2">
-                        <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={i.name} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
+                        <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={text(i.name, i.translations?.name)} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
                       </div>
                     )}
                   </div>

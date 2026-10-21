@@ -11,10 +11,14 @@ import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { ArrowRight, ImageOff } from "lucide-react";
 import SectionHeading from "./SectionHeading";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const LIMIT = 12;
 
 export default function PopularCategories({ tiles = [], isLoading = false }) {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   // ✅ Tiles server se (image) — full catalog nahi
   const list = (tiles || []).slice(0, LIMIT);
 
@@ -39,10 +43,9 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
   return (
     <section>
       <SectionHeading
-        title="Popular Categories"
-        subtitle="Categories with the most products"
+        title={t("admin.categories.page.title")}
         href="/filtering-product"
-        linkLabel="View All"
+        linkLabel={t("admin.dashboard.topProducts.viewAll")}
       />
 
       <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9">
@@ -56,7 +59,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
               {category.image ? (
                 <Image
                   src={category.image}
-                  alt={category.name}
+                  alt={fieldOf(category, "name")}
                   fill
                   loader={smartImageLoader}
                   sizes="(max-width: 640px) 50vw, 33vw"
@@ -69,7 +72,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
 
             <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
               <span className="w-full line-clamp-2 break-words text-xs font-medium capitalize text-[var(--user-text)] sm:text-[0.8125rem]">
-                {category.name}
+                {fieldOf(category, "name")}
               </span>
             </span>
           </Link>
@@ -81,7 +84,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
           href="/filtering-product"
           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-medium text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
         >
-          Browse all products
+          {t("admin.dashboard.topProducts.viewAll")}
           <ArrowRight size={13} />
         </Link>
       </div>
