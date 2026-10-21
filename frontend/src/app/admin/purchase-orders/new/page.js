@@ -678,7 +678,7 @@ function NewPOPage() {
                         <div className="font-extrabold text-sm truncate" style={{ color: "#0f172a" }}>{l.product_name}</div>
                       <div className="text-[11px] font-medium" style={{ color: "#64748b" }}>{l.sku} × {new Intl.NumberFormat(intlLocale(locale)).format(l.qty_ordered)}</div>
                       </div>
-                      <b className="font-extrabold text-sm whitespace-nowrap" style={{ color: "#0f172a" }}>{(Math.round(Math.max(0, Number(l.cost_price) || 0) * Math.max(1, Math.floor(Number(l.qty_ordered) || 1)))).toLocaleString()}</b>
+                      <b className="font-extrabold text-sm whitespace-nowrap" style={{ color: "#0f172a" }}>{new Intl.NumberFormat(intlLocale(locale)).format(Math.round(Math.max(0, Number(l.cost_price) || 0) * Math.max(1, Math.floor(Number(l.qty_ordered) || 1))))}</b>
                     </div>
                   ))}</div>
               )}
@@ -777,7 +777,7 @@ function NewPOPage() {
                       <Thumb src={g.image} alt={g.product_name} size="w-12 h-12" />
                       <div className="min-w-0 flex-1">
                         <div className="font-extrabold text-[14px] truncate" style={{ color: ticked ? "#2563eb" : "#0f172a" }}>{g.product_name}</div>
-                        <div className="text-[11px] font-medium truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.variantsCount", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(g.variants.length) })} · {t("admin.purchaseOrders.create.stockCount", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(stock) })}{g.category_name ? ` · ${g.category_name}` : ""}</div>
+                        <div className="text-[11px] font-medium truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.variantsCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(g.variants.length) })} · {t("admin.purchaseOrders.create.stockCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(stock) })}{g.category_name ? ` · ${g.category_name}` : ""}</div>
                       </div>
                     </div>
                   );

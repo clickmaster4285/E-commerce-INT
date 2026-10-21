@@ -25,16 +25,20 @@ function ini(name) {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
+function intlLocale(locale) {
+  return locale === "ur" ? "ur-PK" : locale === "en" ? "en-US" : locale;
+}
+
 function fd(date, locale = "en") {
   if (!date) return "—";
-  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     day: "numeric", month: "short", year: "numeric",
   }).format(new Date(date));
 }
 
 function fdt(date, locale = "en") {
   if (!date) return "—";
-  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   }).format(new Date(date));

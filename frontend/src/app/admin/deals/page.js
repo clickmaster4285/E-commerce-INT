@@ -124,7 +124,7 @@ const formatDealValue = (deal, t, productNameOf = null) => {
 // âœ… CURRENCY FORMATTER
 const formatCurrency = (amount) => {
   const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
-  const intlLocale = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+  const intlLocale = locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale;
   return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'PKR' }).format(amount || 0);
 };
 

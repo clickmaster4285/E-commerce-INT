@@ -70,7 +70,10 @@ const getName = (item, type) => {
   return item?.name || "Unnamed";
 };
 
-const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+const formatCurrency = (amount, locale = "en") => new Intl.NumberFormat(
+  locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale,
+  { style: "currency", currency: "PKR" },
+).format(amount || 0);
 
 // Target/value summaries parte hain â†’ inhe `t` chahiye, isliye caller pass karta hai.
 const formatTarget = (target, t) => {
@@ -87,13 +90,13 @@ const formatTarget = (target, t) => {
   return map[target] ? t(map[target]) : String(target).replaceAll("_", " ");
 };
 
-const formatValue = (discount, t) => {
+const formatValue = (discount, t, locale) => {
   const type = discount?.value_type || discount?.valueType || discount?.type || "percentage";
   const value = Number(discount?.value ?? 0);
   if (type === "percentage") return `${value}% ${t("admin.shipping.page.off")}`;
-  if (type === "fixed_amount" || type === "fixed") return `${formatCurrency(value)} ${t("admin.shipping.page.off")}`;
-  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${formatCurrency(value)}`;
-  return `${formatCurrency(value)} ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_amount" || type === "fixed") return `${formatCurrency(value, locale)} ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${formatCurrency(value, locale)}`;
+  return `${formatCurrency(value, locale)} ${t("admin.shipping.page.off")}`;
 };
 
 
@@ -1069,7 +1072,7 @@ export default function DiscountsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, t)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, t)}</span></td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, t, locale)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons discount={discount} /></td>
                       </tr>
@@ -1091,7 +1094,7 @@ export default function DiscountsPage() {
                   <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t, locale)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>

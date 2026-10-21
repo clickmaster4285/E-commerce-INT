@@ -41,7 +41,7 @@ export default function LeadsPage() {
   const changeSearch = (value) => { setPage(1); setSearch(value); };
   const submitLostReason = (event) => { event.preventDefault(); const reason = lostReason.trim(); if (!lostReasonLead || !reason) return; statusMutation.mutate({ id: lostReasonLead._id, payload: { status: "Lost", lost_reason: reason } }); };
 
-  return <div dir={dir} className="min-h-full space-y-4 p-1 text-[var(--text-primary)] sm:space-y-5 sm:p-2 lg:p-3">
+  return <div dir={dir} className="admin-leads-page min-h-full space-y-4 p-1 text-[var(--text-primary)] sm:space-y-5 sm:p-2 lg:p-3">
     <header className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]"><ContactRound size={23} /></span><div><h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t("admin.leads.title")}</h1><p className="mt-0.5 text-xs text-[var(--text-muted)] sm:text-sm">{t("admin.leads.subtitle")}</p></div></div><button type="button" onClick={openCreate} className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-4 text-sm font-semibold text-white shadow transition-all hover:-translate-y-0.5"><Plus size={16} /> {t("admin.leads.add")}</button></header>
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("admin.leads.statistics")}>
       <Stat label={t("admin.leads.stats.total")} value={stats.total || 0} meta={t("admin.leads.stats.allActive")} Icon={Users} />

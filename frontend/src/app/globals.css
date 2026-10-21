@@ -323,6 +323,22 @@ html:has([lang="ur"]) {
   overflow-wrap: break-word;
 }
 
+/* Tailwind tracking utilities set letter-spacing directly on headings, labels,
+   and table cells, so the root-level reset above cannot override them. Reset
+   each text element on the customer and lead screens where Urdu Nastaliq was
+   appearing crowded, and give adjacent words a readable gap. */
+html:has([lang="ur"]) :is(.admin-customers-page, .admin-leads-page) * {
+  letter-spacing: 0 !important;
+  word-spacing: 0.14em;
+  text-transform: none;
+}
+
+html:has([lang="ur"]) :is(.admin-customers-page, .admin-leads-page) :is(
+  h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, strong, em
+) {
+  line-height: 2;
+}
+
 html:has([lang="ur"]) body,
 [lang="ur"] {
   line-height: 2;

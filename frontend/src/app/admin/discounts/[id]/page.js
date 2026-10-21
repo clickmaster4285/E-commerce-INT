@@ -28,22 +28,26 @@ function ini(name) {
   return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
 }
 
+function intlLocale(locale) {
+  return locale === "ur" ? "ur-PK" : locale === "en" ? "en-US" : locale;
+}
+
 function fd(date, locale = "en") {
   if (!date) return "—";
-  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     day: "numeric", month: "short", year: "numeric",
   }).format(new Date(date));
 }
 
-function tago(date) {
+function tago(date, locale, t) {
   if (!date) return "";
   const m = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t("admin.dashboard.recentActivity.justNow");
+  if (m < 60) return t("admin.dashboard.recentActivity.minutesAgo", { mins: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t("admin.dashboard.recentActivity.hoursAgo", { hours: h });
   const d = Math.floor(h / 24);
-  return d < 30 ? `${d}d ago` : fd(date);
+  return d < 30 ? t("admin.dashboard.recentActivity.daysAgo", { days: d }) : fd(date, locale);
 }
 
 function formatTarget(value, locale = "en") {
@@ -58,13 +62,13 @@ function formatTarget(value, locale = "en") {
   return map[value] || String(value).replaceAll("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-function formatDiscountValue(discount) {
+function formatDiscountValue(discount, locale, t) {
   const type = discount?.type || "percentage";
   const value = discount?.value ?? 0;
-  if (type === "percentage") return `${value}%`;
-  if (type === "fixed") return `Rs. ${value}`;
-  if (type === "fixed_price") return `Fixed Rs. ${value}`;
-  return `Rs. ${value}`;
+  if (type === "percentage") return `${new Intl.NumberFormat(intlLocale(locale)).format(value)}%`;
+  const amount = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR" }).format(value);
+  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${amount}`;
+  return amount;
 }
 
 function getDiscountStatus(discount) {
@@ -79,7 +83,7 @@ function getDiscountStatus(discount) {
 
 function formatDateTime(date, locale = "en") {
   if (!date) return "—";
-  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     month: "short", day: "numeric", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   }).format(new Date(date));
@@ -547,7 +551,12 @@ export default function DiscountDetailPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 rounded-md overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-        {[{ icon: Percent, label: t("admin.discounts.detail.discountType"), value: discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.form.fixedPriceType") }, { icon: Calendar, label: t("admin.discounts.detail.validPeriod"), value: `${fd(discount.startDate, locale)} - ${fd(discount.endDate, locale)}` }, { icon: TrendingUp, label: t("admin.discounts.detail.usageLimit"), value: discount.usageLimit ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(discount.usageLimit) : t("admin.discounts.detail.unlimited") }, { icon: ShoppingCart, label: t("admin.discounts.detail.minimumOrderValue"), value: discount.minOrderValue ? new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : t("admin.discounts.detail.noMinimum") }].map(({ icon: Icon, label, value }) => (
+        {[
+          { icon: Percent, label: t("admin.discounts.detail.discountType"), value: discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.form.fixedPriceType") },
+          { icon: Calendar, label: t("admin.discounts.detail.validPeriod"), value: `${fd(discount.startDate, locale)} - ${fd(discount.endDate, locale)}` },
+          { icon: TrendingUp, label: t("admin.discounts.detail.usageLimit"), value: discount.usageLimit ? new Intl.NumberFormat(intlLocale(locale)).format(discount.usageLimit) : t("admin.discounts.detail.unlimited") },
+          { icon: ShoppingCart, label: t("admin.discounts.detail.minimumOrderValue"), value: discount.minOrderValue ? new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : t("admin.discounts.detail.noMinimum") },
+        ].map(({ icon: Icon, label, value }) => (
           <div key={label} className="flex items-center gap-2.5 px-3 py-3 border-b md:border-b-0 md:border-r last:border-0" style={{ borderColor: "var(--border-color)" }}><Icon className="w-4 h-4 shrink-0" style={{ color: "var(--accent)" }} /><div className="min-w-0"><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{label}</p><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{value}</p></div></div>
         ))}
       </div>
@@ -562,7 +571,7 @@ export default function DiscountDetailPage() {
             <DataRow icon={Tag} label={t("admin.discounts.detail.name")} value={nameOf(discount)} />
             <DataRow icon={Activity} label={t("admin.discounts.detail.description")} value={descriptionOf(discount) || "—"} />
             <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.form.fixedPriceType")} />
-            <DataRow icon={DollarSign} label={t("admin.discounts.detail.value")} value={formatDiscountValue(discount)} highlight />
+            <DataRow icon={DollarSign} label={t("admin.discounts.detail.value")} value={formatDiscountValue(discount, locale, t)} highlight />
             <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />
             <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? t("admin.discounts.page.active") : t("admin.discounts.page.inactive")} highlight={isActive} />
           </InfoCard>
@@ -593,8 +602,8 @@ export default function DiscountDetailPage() {
             <div id="d-rules" className="scroll-mt-4 h-full"><InfoCard icon={Percent} title={t("admin.discounts.detail.discountRules")}>
               <div className="space-y-1">
                 <DataRow icon={Percent} label={t("admin.discounts.detail.discountType")} value={discount.type === "percentage" ? t("admin.discounts.form.percentageType") : discount.type === "fixed" ? t("admin.discounts.form.fixedAmountType") : t("admin.discounts.form.fixedPriceType")} />
-                <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDiscountValue(discount)} highlight />
-                <DataRow icon={DollarSign} label={t("admin.promotions.ui.generated.7e9c655b729a")} value={discount.minOrderValue ? `Rs. ${discount.minOrderValue}` : t("admin.discounts.detail.noMinimum")} />
+                <DataRow icon={DollarSign} label={t("admin.discounts.form.discountValue")} value={formatDiscountValue(discount, locale, t)} highlight />
+                <DataRow icon={DollarSign} label={t("admin.promotions.ui.generated.7e9c655b729a")} value={discount.minOrderValue ? new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR" }).format(discount.minOrderValue) : t("admin.discounts.detail.noMinimum")} />
                 <DataRow icon={Box} label={t("admin.discounts.form.minQuantity")} value={discount.minQuantity ? String(discount.minQuantity) : t("admin.discounts.detail.noMinimum")} />
               </div>
             </InfoCard></div>
@@ -703,7 +712,7 @@ export default function DiscountDetailPage() {
                         {fd(discount.created_at || discount.createdAt, locale)}
                       </p>
                       <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                        {tago(discount.created_at || discount.createdAt)}
+                        {tago(discount.created_at || discount.createdAt, locale, t)}
                       </p>
                     </div>
                   </div>
@@ -740,7 +749,7 @@ export default function DiscountDetailPage() {
                           {fd(discount.updated_at || discount.updatedAt, locale)}
                         </p>
                         <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-                          {tago(discount.updated_at || discount.updatedAt)}
+                          {tago(discount.updated_at || discount.updatedAt, locale, t)}
                         </p>
                       </div>
                     </div>
