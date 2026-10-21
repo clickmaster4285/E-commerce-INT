@@ -9,7 +9,7 @@ import CustomerFormModal from "@/components/admin/CustomerFormModal";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, Eye, Mail, MoreHorizontal, Pencil, Plus, Search,
+  ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreHorizontal, Pencil, Plus, Search,
   SlidersHorizontal, Smartphone, Trash2, Users, X,
 } from "lucide-react";
 
@@ -44,7 +44,7 @@ export default function CustomersPage() {
       return direction * (new Date(a.created_at || 0) - new Date(b.created_at || 0));
     });
   }, [customers, filter, sort]);
-  const pageSize = 8;
+  const pageSize = 20;
   const pageCount = Math.max(1, Math.ceil(customerList.length / pageSize));
   const pageCustomers = customerList.slice((page - 1) * pageSize, page * pageSize);
 
@@ -128,49 +128,49 @@ export default function CustomersPage() {
       </section>
 
       <div className="grid grid-cols-1 items-start gap-4">
-        <section className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-4">
-          <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(180px,1fr)_150px_150px_40px]">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-lg shadow-slate-900/5">
+          <div className="grid gap-2 border-b border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(220px,1fr)_150px_170px_40px]">
             <label className="relative block">
-              <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder={t("admin.customers.search.placeholder")} aria-label={t("admin.customers.search.aria")} className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-xs text-[var(--text-primary)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] hover:border-[var(--accent)]/50 hover:shadow-sm focus:border-[var(--accent)] focus:shadow-md focus:ring-4 focus:ring-[var(--accent-soft)]" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search by name, phone, or email..." aria-label="Search customers" className="h-10 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-900 outline-none shadow-sm transition-all placeholder:text-slate-400 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" />
             </label>
-            <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value); }} aria-label={t("admin.customers.filters.aria")} className="h-10 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] outline-none transition-all duration-200 hover:border-[var(--accent)]/50 hover:shadow-sm focus:border-[var(--accent)] focus:shadow-md focus:ring-4 focus:ring-[var(--accent-soft)]">
-              <option value="all">{t("admin.customers.filters.all")}</option><option value="phone">{t("admin.customers.filters.withPhone")}</option><option value="email">{t("admin.customers.filters.withEmail")}</option>
+            <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value); }} aria-label="Filter customers" className="h-10 rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
+              <option value="all">All Customers</option><option value="phone">With Phone</option><option value="email">With Email</option>
             </select>
-            <select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value); }} aria-label={t("admin.customers.sort.aria")} className="h-10 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] outline-none transition-all duration-200 hover:border-[var(--accent)]/50 hover:shadow-sm focus:border-[var(--accent)] focus:shadow-md focus:ring-4 focus:ring-[var(--accent-soft)]">
-              <option value="newest">{t("admin.customers.sort.newest")}</option><option value="oldest">{t("admin.customers.sort.oldest")}</option>
+            <select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value); }} aria-label="Sort customers" className="h-10 rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
+              <option value="newest">Newest First</option><option value="oldest">Oldest First</option>
             </select>
-            <span className="hidden h-10 items-center justify-center rounded-xl border border-[var(--border-color)] text-[var(--text-muted)] sm:flex" title={t("admin.customers.filters.title")}><SlidersHorizontal size={15} /></span>
+            <span className="hidden h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 sm:flex" title="Customer filters"><SlidersHorizontal size={15} /></span>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] shadow-sm transition-shadow duration-200 hover:shadow-md">
-            <table className="w-full min-w-[730px] text-start">
-              <thead className="bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                <tr><th className="px-3 py-2.5">{t("admin.customers.table.customer")}</th><th className="px-3 py-2.5">{t("common.phone")}</th><th className="px-3 py-2.5">{t("common.email")}</th><th className="px-3 py-2.5">{t("admin.customers.table.address")}</th><th className="px-3 py-2.5">{t("admin.customers.table.addedOn")}</th><th className="px-3 py-2.5 text-end">{t("common.actions")}</th></tr>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-[13px]">
+              <thead className="border-b border-slate-200 bg-slate-100 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Address</th><th className="px-4 py-3">Added On</th><th className="px-4 py-3 text-right">Actions</th></tr>
               </thead>
               <tbody>
                 {isLoading ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--text-muted)]">{t("admin.customers.loading")}</td></tr>
                   : isError ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--danger-text)]">{error?.response?.data?.message || t("admin.customers.loadFailed")} <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ["customers-admin"] })} className="ms-2 underline">{t("common.retry")}</button></td></tr>
                   : customerList.length === 0 ? <tr><td colSpan={6} className="px-3 py-7"><div className="flex flex-col items-center justify-center text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={18} /></span><p className="text-xs font-semibold text-[var(--text-primary)]">{search ? t("admin.customers.empty.searchTitle") : t("admin.customers.empty.title")}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search ? t("admin.customers.empty.searchDescription") : t("admin.customers.empty.description")}</p><button type="button" onClick={() => search ? (setPage(1), setSearch("")) : openCreate()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[10px] font-semibold text-[var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">{search ? <><X size={12} /> {t("admin.customers.search.clear")}</> : <><Plus size={12} /> {t("admin.customers.add")}</>}</button></div></td></tr>
                     : pageCustomers.map((customer) => (
-                      <tr key={customer._id} onClick={() => router.push(`/admin/customers/${customer._id}`)} className="cursor-pointer border-t border-[var(--border-color)] transition-all duration-150 hover:bg-[var(--bg-row-hover)]">
-                        <td className="px-3 py-2.5"><div className="flex items-center gap-2.5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]">{initials(customer.name)}</span><div className="min-w-0"><p className="max-w-40 truncate text-[11px] font-semibold text-[var(--text-primary)]">{customer.name}</p><span className="mt-0.5 inline-flex rounded-full bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--success-text)]">{t("admin.customers.table.customer")}</span></div></div></td>
-                        <td className="px-3 py-2.5 text-[10px] text-[var(--text-secondary)]">{customer.phone || t("common.notProvided")}</td>
-                        <td className="px-3 py-2.5 text-[10px] text-[var(--text-secondary)]"><span className="block max-w-36 truncate">{customer.email || t("common.notProvided")}</span></td>
-                        <td className="px-3 py-2.5 text-[10px] text-[var(--text-secondary)]"><span className="block max-w-32 truncate">{customer.address || t("common.notProvided")}</span></td>
-                        <td className="px-3 py-2.5 text-[10px] text-[var(--text-secondary)]">{dateTime(customer.created_at, locale, t)}</td>
-                        <td className="px-3 py-2.5"><div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
-                          <CustomerRowMenu customer={customer} onView={(record) => router.push(`/admin/customers/${record._id}`)} onEdit={openEdit} onDelete={(record) => { if (window.confirm(t("admin.customers.confirm.delete", { name: record.name }))) deleteMutation.mutate(record._id); }} />
+                      <tr key={customer._id} onClick={() => router.push(`/admin/customers/${customer._id}`)} className="cursor-pointer border-b border-slate-200 transition-colors duration-150 hover:bg-blue-50/60">
+                        <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{initials(customer.name)}</span><div className="min-w-0"><p className="max-w-40 truncate text-[13px] font-semibold text-slate-900">{customer.name}</p><span className="mt-0.5 inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">Customer</span></div></div></td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">{customer.phone || "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600"><span className="block max-w-48 truncate">{customer.email || "—"}</span></td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600"><span className="block max-w-40 truncate">{customer.address || "—"}</span></td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">{dateTime(customer.created_at)}</td>
+                        <td className="px-4 py-2.5"><div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+                          <CustomerRowMenu customer={customer} onView={(record) => router.push(`/admin/customers/${record._id}`)} onEdit={openEdit} onDelete={(record) => { if (window.confirm(`Delete ${record.name}?`)) deleteMutation.mutate(record._id); }} onCreateQuote={(record) => router.push(`/admin/quotes/new?customer=${record._id}`)} onCreateInvoice={(record) => router.push(`/admin/invoices/new?customer=${record._id}`)} />
                         </div></td>
                       </tr>
                     ))}
               </tbody>
             </table>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-3 text-[10px] text-[var(--text-muted)]">
-            <span>{t("admin.customers.pagination.showing", { from: customerList.length ? (page - 1) * pageSize + 1 : 0, to: Math.min(page * pageSize, customerList.length), total: customerList.length })}</span>
-            <div className="flex items-center gap-1"><button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label={t("admin.customers.pagination.previous")}><ChevronLeft size={13} /></button>{Array.from({ length: pageCount }, (_, index) => index + 1).slice(Math.max(0, page - 3), page + 2).map((pageNumber) => <button key={pageNumber} type="button" onClick={() => setPage(pageNumber)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${pageNumber === page ? "bg-[var(--accent)] text-[var(--accent-text)]" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{pageNumber}</button>)}<button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label={t("admin.customers.pagination.next")}><ChevronRight size={13} /></button></div>
-          </div>
+          {customerList.length > pageSize && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
+            <span>Showing {customerList.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, customerList.length)} of {customerList.length} customers</span>
+            <div className="flex items-center gap-1"><button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label="Previous page"><ChevronLeft size={13} /></button>{Array.from({ length: pageCount }, (_, index) => index + 1).slice(Math.max(0, page - 3), page + 2).map((pageNumber) => <button key={pageNumber} type="button" onClick={() => setPage(pageNumber)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${pageNumber === page ? "bg-[var(--accent)] text-[var(--accent-text)]" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{pageNumber}</button>)}<button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label="Next page"><ChevronRight size={13} /></button></div>
+          </footer>}
         </section>
 
       </div>
@@ -180,8 +180,7 @@ export default function CustomersPage() {
   );
 }
 
-function CustomerRowMenu({ customer, onView, onEdit, onDelete }) {
-  const { t } = useTranslation();
+function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, onCreateInvoice }) {
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -207,8 +206,8 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete }) {
     if (open) return close();
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const menuWidth = 160;
-    const menuHeight = 132;
+    const menuWidth = 180;
+    const menuHeight = 220;
     const flipUp = window.innerHeight - rect.bottom < menuHeight;
     const top = flipUp
       ? Math.max(8, rect.top - menuHeight - 4)
@@ -229,11 +228,13 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete }) {
   };
 
   return <>
-    <button ref={buttonRef} type="button" onClick={toggleMenu} className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--bg-row-hover)] hover:text-[var(--text-primary)]" aria-label={t("admin.customers.actions.for", { name: customer.name })} aria-haspopup="true" aria-expanded={open}><MoreHorizontal size={16} /></button>
-    {open && createPortal(<div ref={menuRef} className="fixed z-[9999] w-40 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[0_8px_28px_rgba(15,23,42,0.2)]" style={{ top: position.top, left: position.left }}>
-      <button type="button" onClick={run(onView)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><Eye size={14} />{t("admin.customers.actions.view")}</button>
-      <button type="button" onClick={run(onEdit)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><Pencil size={14} />{t("common.edit")}</button>
-      <button type="button" onClick={run(onDelete)} className={`${menuItem} text-[var(--danger-text)]`} {...hover}><Trash2 size={14} />{t("common.delete")}</button>
+    <button ref={buttonRef} type="button" onClick={toggleMenu} className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--bg-row-hover)] hover:text-[var(--text-primary)]" aria-label={`Actions for ${customer.name}`} aria-haspopup="true" aria-expanded={open}><MoreHorizontal size={16} /></button>
+    {open && createPortal(<div ref={menuRef} className="fixed z-[9999] w-44 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[0_8px_28px_rgba(15,23,42,0.2)]" style={{ top: position.top, left: position.left }}>
+      <button type="button" onClick={run(onView)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><Eye size={14} />View details</button>
+      <button type="button" onClick={run(onCreateQuote)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><ContactRound size={14} />Create quote</button>
+      <button type="button" onClick={run(onCreateInvoice)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><FilePlus2 size={14} />Create invoice</button>
+      <button type="button" onClick={run(onEdit)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><Pencil size={14} />Edit</button>
+      <button type="button" onClick={run(onDelete)} className={`${menuItem} text-[var(--danger-text)]`} {...hover}><Trash2 size={14} />Delete</button>
     </div>, document.body)}
   </>;
 }

@@ -52,6 +52,8 @@ const employeeSchema = new mongoose.Schema(
       purchaseOrders: { type: Boolean, default: true },
       customers: { type: Boolean, default: true },
       leads: { type: Boolean, default: false },
+      quotes: { type: Boolean, default: true },
+      invoices: { type: Boolean, default: true },
       pos: { type: Boolean, default: true },
       featuredProducts: { type: Boolean, default: true },
       reviews: { type: Boolean, default: true },

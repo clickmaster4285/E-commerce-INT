@@ -39,6 +39,8 @@ import {
   SlidersHorizontal, // Added for Attributes
   MessageSquareText, // Reviews
   ContactRound,
+  FileText,
+  Receipt,
 } from "lucide-react";
 
 // ============================================================
@@ -121,7 +123,7 @@ const sidebarSections = [
   },
   {
     title: "POS & CUSTOMER MANAGEMENT",
-    items: ["POS", "Customers", "Leads"],
+    items: ["POS", "Customers", "Leads", "Quotes", "Invoices"],
   },
   {
     title: "STORE",
@@ -163,6 +165,8 @@ const allMenuItems = [
   { name: "Purchase Orders", icon: Package, path: "/admin/purchase-orders", permissionKey: "purchaseOrders" },
   { name: "Customers", icon: Users, path: "/admin/customers", permissionKey: "customers" },
   { name: "Leads", icon: ContactRound, path: "/admin/leads", permissionKey: "leads" },
+  { name: "Quotes", icon: FileText, path: "/admin/quotes", permissionKey: "quotes" },
+  { name: "Invoices", icon: Receipt, path: "/admin/invoices", permissionKey: "invoices", fallbackKey: "quotes" },
   { name: "POS", icon: ShoppingCart, path: "/admin/pos", permissionKey: "pos" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
   { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },

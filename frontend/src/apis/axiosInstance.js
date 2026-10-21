@@ -21,14 +21,35 @@ const API_BASE_URL =
   (process.env.NEXT_PUBLIC_SERVERURL || "").trim().replace(/\/+$/, "") || null;
 
 if (!API_BASE_URL && typeof window !== "undefined") {
-  // eslint-disable-next-line no-console
   console.error(
     "[api] NEXT_PUBLIC_SERVERURL missing hai — API requests fail hongi. " +
       "frontend/.env me set karo, e.g. NEXT_PUBLIC_SERVERURL=http://<host>:5000/api",
   );
 }
 
-const getBaseURL = () => API_BASE_URL;
+const isLocalNetworkHost = (hostname) =>
+  hostname === "localhost" ||
+  hostname === "127.0.0.1" ||
+  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+  /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+  /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
+const getBaseURL = () => {
+  if (!API_BASE_URL || typeof window === "undefined") return API_BASE_URL;
+  try {
+    const apiUrl = new URL(API_BASE_URL);
+    const pageHost = window.location.hostname;
+    // Keep local development frontend and API on the same hostname. This makes
+    // localhost:3000 use localhost:5000 and LAN access use the same LAN IP,
+    // so the browser can send the HttpOnly auth cookies to both apps.
+    if (isLocalNetworkHost(apiUrl.hostname) && isLocalNetworkHost(pageHost)) {
+      apiUrl.hostname = pageHost;
+    }
+    return apiUrl.toString().replace(/\/+$/, "");
+  } catch {
+    return API_BASE_URL;
+  }
+};
 
 const PUBLIC_AUTH_PATHS = [
   "/users/login",
@@ -71,7 +92,6 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
     const path = window.location.pathname;
     if (["/login", "/register", "/admin/login"].includes(path)) return;
     if (path.startsWith("/admin")) {
-      localStorage.clear();
       window.location.href = "/admin/login";
     }
   };
@@ -128,7 +148,10 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
           return http(originalRequest);
         } catch (refreshError) {
           if (mode === "admin") {
-            redirectToAdminLogin();
+            const status = refreshError.response?.status;
+            // A temporary network/API failure is not proof that the session
+            // expired. Keep the admin page and allow the request to be retried.
+            if (status === 401 || status === 403) redirectToAdminLogin();
             return Promise.reject(refreshError);
           }
           notifyUserSessionExpired();

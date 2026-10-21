@@ -73,12 +73,24 @@ const generateTokens = (userId, role, type = 'user') => {
   return { accessToken, refreshToken };
 };
 
-const getCookieOptions = (maxAge) => ({
-  httpOnly: true,
-  secure: false, 
-  sameSite: "lax",
-  maxAge,
-});
+const getCookieOptions = (maxAge) => {
+  const requestedSameSite = String(process.env.AUTH_COOKIE_SAME_SITE || "lax").toLowerCase();
+  const sameSite = ["strict", "lax", "none"].includes(requestedSameSite) ? requestedSameSite : "lax";
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production" || sameSite === "none",
+    sameSite,
+    maxAge,
+    path: "/",
+  };
+};
+
+const clearAuthCookies = (res) => {
+  const { httpOnly, secure, sameSite, path } = getCookieOptions(0);
+  const options = { httpOnly, secure, sameSite, path };
+  res.clearCookie("accessToken", options);
+  res.clearCookie("refreshToken", options);
+};
 
 // ==========================================
 // REGISTER (Customer only)
@@ -436,34 +448,57 @@ const refreshAccessToken = async (req, res) => {
     res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge(userType, user.role)));
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    res.status(401).json({ success: false, message: "Invalid refresh token" });
+    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+      return res.status(401).json({ success: false, message: "Invalid refresh token" });
+    }
+    log.error("refreshAccessToken error:", error);
+    return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
-// ✅ ADMIN refresh alias — refreshAccessToken jaisi (purani untouched),
-// sirf employee-type token accept (user token yahan reject).
+// Admin refresh alias. Explicit employee tokens and signed legacy admin tokens
+// are accepted; customer tokens are rejected.
 const refreshAdminAccessToken = async (req, res) => {
+  let decoded;
   try {
     const token = req.cookies.refreshToken;
     if (!token)
       return res
         .status(401)
         .json({ success: false, message: "Refresh token required" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.type !== "employee")
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const adminRoles = ["admin", "staff", "manager"];
+    // Older admin sessions did not always include the `type` claim. Their
+    // signed role and matching Employee record let us safely migrate them.
+    if (decoded.type && decoded.type !== "employee") {
+      clearAuthCookies(res);
       return res
         .status(401)
         .json({ success: false, message: "Invalid refresh token" });
+    }
+    if (!decoded.type && !adminRoles.includes(String(decoded.role || "").toLowerCase())) {
+      clearAuthCookies(res);
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid refresh token" });
+    }
     const user = await Employee.findById(decoded.userId);
-    if (!user)
+    if (!user || user.is_deleted || user.status === "inactive" || !["admin", "staff", "manager"].includes(user.role)) {
+      clearAuthCookies(res);
       return res
         .status(401)
         .json({ success: false, message: "User not found" });
+    }
     const { accessToken } = generateTokens(decoded.userId, user.role, "employee");
     res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    res.status(401).json({ success: false, message: "Invalid refresh token" });
+    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
+      clearAuthCookies(res);
+      return res.status(401).json({ success: false, message: "Invalid refresh token" });
+    }
+    log.error("refreshAdminAccessToken error:", error);
+    return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
@@ -482,12 +517,10 @@ const logoutUser = async (req, res) => {
         req.user._id,
       );
     }
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    clearAuthCookies(res);
     res.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    clearAuthCookies(res);
     res.json({ success: true, message: "Logged out successfully" });
   }
 };

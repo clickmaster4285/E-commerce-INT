@@ -120,7 +120,7 @@ export default function VendorsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyVendorForm);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 20;
 
   const { data: vendorsRaw, isLoading } = useQuery({ queryKey: ["vendors"], queryFn: () => vendorApi.getAll() });
   const vendors = useMemo(() => {
@@ -261,7 +261,7 @@ export default function VendorsPage() {
             </div>
           )}
 
-          <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-[13px]" style={{ color: "var(--text-muted)" }}>
+          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
             <span>{t("showingRange", { from: (safePage - 1) * PAGE_SIZE + (rows.length ? 1 : 0), to: (safePage - 1) * PAGE_SIZE + rows.length, total: filtered.length })}</span>
             <div className="flex items-center gap-1">
               <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronLeft size={14} /></button>
@@ -270,7 +270,7 @@ export default function VendorsPage() {
               ))}
               <button disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronRight size={14} /></button>
             </div>
-          </div>
+          </footer>}
         </div>
 
 

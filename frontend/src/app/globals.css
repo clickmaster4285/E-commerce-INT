@@ -504,6 +504,13 @@ input[type="radio"] {
   accent-color: var(--accent);
 }
 
+/* Keep the PO date picker clickable while showing the app's calendar icon. */
+.po-expected-date::-webkit-calendar-picker-indicator {
+  width: 2rem;
+  cursor: pointer;
+  opacity: 0;
+}
+
 /* BASE_APPEND_MARKER */
 /* NOTE: Base styles (html/body/a/button/headings) sirf upar ek hi baar define hain —
    yahan pehle ek duplicate block tha jo CSS bloat kar raha tha, usay hata diya gaya hai. */

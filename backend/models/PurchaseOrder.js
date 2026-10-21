@@ -58,6 +58,7 @@ const purchaseOrderSchema = new mongoose.Schema(
     subtotal: { type: Number, required: true, min: 0 },
     tax: { type: Number, default: 0, min: 0 },
     overall_tax: { type: Number, default: 0, min: 0 },
+    overall_tax_rate: { type: Number, default: 0, min: 0, max: 100 },
     shipping: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },

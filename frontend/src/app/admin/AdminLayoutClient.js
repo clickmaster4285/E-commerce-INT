@@ -38,6 +38,8 @@ const ROUTE_PERMISSIONS = {
   '/admin/manage-stock': 'manageStock',
   '/admin/vendors': 'vendors',
   '/admin/purchase-orders': 'purchaseOrders',
+  '/admin/quotes': 'quotes',
+  '/admin/invoices': 'invoices',
 };
 
 // ==========================================
@@ -157,28 +159,6 @@ export default function AdminLayout({ children }) {
     refetchOnWindowFocus: false,
   });
 
-  const [authTimeoutError, setAuthTimeoutError] = useState(null);
-
-  // ==========================================
-  // AUTH TIMEOUT GUARD — spinner hang hone se roke
-  // ==========================================
-  useEffect(() => {
-    if (!userLoading) {
-      setAuthTimeoutError(null);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      const msg = __t('admin.layout.authTimeout');
-      console.error('❌ ' + msg);
-      setAuthTimeoutError(new Error(msg));
-      // Force query to fail so authResult resolves
-      queryClient.invalidateQueries({ queryKey: ['admin-user-profile'] });
-    }, 10000);
-
-    return () => clearTimeout(timer);
-  }, [userLoading, queryClient, __t]);
-
   // ==========================================
   // DERIVED AUTH + PERMISSION RESULT
   // (setState ki jagah render ke waqt derive)
@@ -188,7 +168,7 @@ export default function AdminLayout({ children }) {
       return { isAuthenticated: true, checkComplete: true, redirectTo: null };
     }
 
-    if (userLoading && !authTimeoutError) {
+    if (userLoading) {
       return {
         isAuthenticated: null,
         checkComplete: false,
@@ -196,24 +176,20 @@ export default function AdminLayout({ children }) {
       };
     }
 
-    // Timeout guard triggered
-    if (authTimeoutError) {
+    if (userError) {
+      const status = userQueryError?.response?.status;
+      const authenticationRejected = status === 401 || status === 403;
       return {
         isAuthenticated: false,
         checkComplete: true,
-        redirectTo: '/admin/login',
-        redirectMode: 'push',
-        timeoutError: true,
+        redirectTo: authenticationRejected ? '/admin/login' : null,
+        redirectMode: authenticationRejected ? 'push' : undefined,
+        transientError: !authenticationRejected,
       };
     }
 
-    if (userError || !userData) {
-      return {
-        isAuthenticated: false,
-        checkComplete: true,
-        redirectTo: '/admin/login',
-        redirectMode: 'push',
-      };
+    if (!userData) {
+      return { isAuthenticated: false, checkComplete: true, redirectTo: '/admin/login', redirectMode: 'push' };
     }
 
     // ==========================================
@@ -284,7 +260,7 @@ export default function AdminLayout({ children }) {
       checkComplete: true,
       redirectTo: null,
     };
-  }, [isLoginPage, userLoading, userError, userData, pathname, authTimeoutError]);
+  }, [isLoginPage, userLoading, userError, userQueryError, userData, pathname]);
 
   // ==========================================
   // STORE QUERY
@@ -325,10 +301,7 @@ export default function AdminLayout({ children }) {
     if (!authResult.redirectTo) return;
 
     if (authResult.redirectMode === 'push') {
-      console.error(
-        '❌ Auth failed:',
-        authResult.timeoutError ? 'Verification timeout (>10s)' : (userQueryError?.message || 'Authentication failed')
-      );
+      console.error('❌ Auth failed:', userQueryError?.message || 'Authentication failed');
 
       router.push(authResult.redirectTo);
 
@@ -562,12 +535,10 @@ export default function AdminLayout({ children }) {
         <div className="text-center">
           <h2 className="text-white text-lg font-bold">{t('accessVerificationFailed')}</h2>
           <p className="text-sm text-white/50 mt-2 max-w-md">
-            {authResult.timeoutError
-              ? t('authTimeout')
-              : t('notAuthorized')}
+            {authResult.transientError ? t('verificationUnavailable') : t('notAuthorized')}
           </p>
         </div>
-        <button
+        {!authResult.transientError && <button
           onClick={() => {
             window.location.href = '/admin/login';
           }}
@@ -575,10 +546,9 @@ export default function AdminLayout({ children }) {
           style={{ backgroundColor: '#10b981' }}
         >
           {t('goToLogin')}
-        </button>
+        </button>}
         <button
           onClick={() => {
-            setAuthTimeoutError(null);
             queryClient.invalidateQueries({ queryKey: ['admin-user-profile'] });
           }}
           className="text-xs text-white/40 hover:text-white/70 underline mt-2"

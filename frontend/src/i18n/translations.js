@@ -1166,6 +1166,7 @@ const translations = {
   "admin.layout.accessVerificationFailed": { en: "Access Verification Failed", ar: "فشل التحقق من الوصول", ur: "رسائی کی تصدیق ناکام" },
   "admin.layout.adminPanel": { en: "Admin Panel", ar: "لوحة تحكم المدير", ur: "ایڈمن پینل" },
   "admin.layout.authTimeout": { en: "Auth verification timed out (>10s). Server may be unreachable or cookie/token missing.", ar: "انتهت مهلة التحقق. قد يكون الخادم غير متاح، أو قد تكون ملفات تعريف الارتباط محظورة، أو قد تكون خدمة المصادقة متوقفة.", ur: "تصدیق کا وقت ختم ہو گیا۔ سرور تک رسائی نہ ہو، کوکیز بلاک ہوں، یا تصدیقی خدمت بند ہو سکتی ہے۔" },
+  "admin.layout.verificationUnavailable": { en: "We couldn't reach the server to verify your session. Please try again.", ar: "تعذر الاتصال بالخادم للتحقق من جلستك. يرجى المحاولة مرة أخرى.", ur: "آپ کے سیشن کی تصدیق کے لیے سرور سے رابطہ نہیں ہو سکا۔ دوبارہ کوشش کریں۔" },
   "admin.layout.goToLogin": { en: "Go to Login", ar: "الذهاب إلى تسجيل الدخول", ur: "لاگ ان پر جائیں" },
   "admin.layout.notAuthorized": { en: "You are not authorized to view this page. Please log in again.", ar: "لا تملك صلاحية عرض هذه الصفحة. يرجى تسجيل الدخول مرة أخرى.", ur: "آپ کو یہ صفحہ دیکھنے کی اجازت نہیں۔ دوبارہ لاگ ان کریں۔" },
   "admin.layout.retryVerification": { en: "Retry verification", ar: "إعادة التحقق", ur: "تصدیق دوبارہ کریں" },

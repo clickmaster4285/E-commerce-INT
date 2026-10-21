@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
-  const hasToken = !!request.cookies.get('accessToken');
+  const hasAccessToken = !!request.cookies.get('accessToken');
+  const hasRefreshToken = !!request.cookies.get('refreshToken');
+  const hasSessionCookie = hasAccessToken || hasRefreshToken;
 
   // Static files ignore karein
   if (pathname.startsWith('/_next') || pathname.startsWith('/api')) {
@@ -19,7 +21,7 @@ export function middleware(request) {
 
   // ✅ User Login — public page
   if (pathname === '/login') {
-    if (hasToken) {
+    if (hasAccessToken) {
       return NextResponse.redirect(new URL('/', request.url));
     }
     return NextResponse.next();
@@ -27,9 +29,10 @@ export function middleware(request) {
 
   // ✅ Baqi sab ADMIN pages — protected
   if (pathname.startsWith('/admin')) {
-    if (!hasToken) {
-      // ❌ Failure case: token missing — redirect to login
-      console.warn('🔒 Middleware blocked:', pathname, '| accessToken cookie missing');
+    // Let the admin layout's API auth interceptor refresh an expired/missing
+    // access token when the long-lived refresh cookie is still present.
+    if (!hasSessionCookie) {
+      console.warn('🔒 Middleware blocked:', pathname, '| auth cookies missing');
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
     // ✅ Success case: token present — allow through
