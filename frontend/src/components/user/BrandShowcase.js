@@ -23,6 +23,8 @@ import ProductCard from "./ProductCard";
 import SectionHeading from "./SectionHeading";
 import SlideArrow from "./SlideArrow";
 import { productApi } from "@/apis/user/productApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 import {
   idOf,
   imageUrl,
@@ -52,10 +54,13 @@ function useVisibleCount() {
 }
 
 function BrandRow({ brand, items }) {
+  const { t, dir } = useTranslation();
+  const { fieldOf } = useLocalized();
   const [start, setStart] = useState(0);
   const visibleCount = useVisibleCount();
   const brandId = idOf(brand._id);
   const logo = imageUrl(brand.logo);
+  const brandDisplayName = fieldOf(brand, "name") || brand.name;
 
   const maxStart = Math.max(0, items.length - visibleCount);
   const safeStart = Math.min(start, maxStart);
@@ -67,27 +72,27 @@ function BrandRow({ brand, items }) {
       <div className="mb-3 flex items-center gap-3">
         <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
           {logo ? (
-            <Image src={logo} alt={brand.name} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
+            <Image src={logo} alt={brandDisplayName} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
           ) : (
             <span className="text-base font-black text-[var(--user-accent)]">
-              {String(brand.name || "?").charAt(0).toUpperCase()}
+              {String(brandDisplayName || "?").charAt(0).toUpperCase()}
             </span>
           )}
         </span>
         <div className="min-w-0 flex-1">
-          <p title={brand.name} className="truncate text-sm font-medium capitalize text-[var(--user-text)]">
-            {brand.name}
+          <p title={brandDisplayName} className="truncate text-sm font-medium capitalize text-[var(--user-text)]">
+            {brandDisplayName}
           </p>
           <p className="text-xs font-normal text-[var(--user-text-muted)]">
-            {brand.count} {brand.count === 1 ? "item" : "items"}
+            {t("cart.itemsCount", { count: brand.count })}
           </p>
         </div>
         <Link
           href={`/filtering-product?brand=${brandId}`}
           className="group inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-[var(--user-text-secondary)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
         >
-          View all
-          <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+          {t("admin.brands.detail.viewAll")}
+          <ArrowRight size={13} className={`transition-transform ${dir === "rtl" ? "rotate-180 group-hover:-translate-x-0.5" : "group-hover:translate-x-0.5"}`} />
         </Link>
       </div>
 
@@ -105,10 +110,10 @@ function BrandRow({ brand, items }) {
 
         {/* Floating arrows (Deals style) — jis taraf kuch na ho hide */}
         {safeStart > 0 ? (
-          <SlideArrow dir="left" onClick={() => setStart(safeStart - 1)} label={`Previous ${brand.name} products`} />
+          <SlideArrow dir="left" onClick={() => setStart(safeStart - 1)} label={`${t("admin.shared.action.previous")} ${brandDisplayName}`} />
         ) : null}
         {safeStart < maxStart ? (
-          <SlideArrow dir="right" onClick={() => setStart(safeStart + 1)} label={`Next ${brand.name} products`} />
+          <SlideArrow dir="right" onClick={() => setStart(safeStart + 1)} label={`${t("admin.shared.action.next")} ${brandDisplayName}`} />
         ) : null}
       </div>
     </div>
@@ -135,6 +140,7 @@ function BrandRowData({ brand }) {
 }
 
 export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading = false }) {
+  const { t, dir } = useTranslation();
   // ✅ Top brands server counts se (>=6 wali), items per-brand query se
   const rows = useMemo(() => {
     const counts = brandCounts || {};
@@ -146,7 +152,7 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
 
   if (isLoading && !rows.length) {
     return (
-      <section>
+      <section dir={dir}>
         <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
         <div className="space-y-3">
           {[...Array(2).keys()].map((index) => (
@@ -163,7 +169,7 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
   if (!rows.length) return null;
 
   return (
-    <section>
+    <section dir={dir}>
       <style>{`
         @keyframes catSlideIn {
           from { opacity: 0; transform: translateX(10px); }
@@ -172,10 +178,10 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
       `}</style>
 
       <SectionHeading
-        title="Brand Spotlight"
-        subtitle="Top products from leading brands"
+        title={t("header.topBrands")}
+        subtitle={t("admin.brands.page.title")}
         href="/filtering-product"
-        linkLabel="All products"
+        linkLabel={t("common.all")}
       />
 
       <div className="space-y-3 lg:space-y-4">

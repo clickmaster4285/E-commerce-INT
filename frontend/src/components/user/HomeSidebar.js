@@ -27,9 +27,9 @@ import {
 } from "lucide-react";
 import CategoryIcon from "./CategoryIcon";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 import {
   formatPrice,
-  getDealBadgeText,
   idOf,
   isTopLevelCategory,
   sortByPopularity,
@@ -38,6 +38,23 @@ import {
 const CATEGORY_PREVIEW = 7;
 const BRAND_PREVIEW = 6;
 const DEAL_PREVIEW = 6;
+
+const dealBadgeTextOf = (deal, t) => {
+  if (deal?.type === "percentage") {
+    return `${Number(deal.discountValue) || 0}% ${t("admin.discounts.page.discount")}`;
+  }
+  if (deal?.type === "fixed_amount") {
+    return `Rs. ${Number(deal.discountValue) || 0} ${t("admin.discounts.page.discount")}`;
+  }
+  if (deal?.type === "buy_x_get_y") {
+    return `${Number(deal.buyQuantity) || 0} + ${Number(deal.getQuantity) || 0}`;
+  }
+  if (deal?.type === "bundle") return t("admin.deals.page.offer");
+  if (deal?.type === "free_shipping") {
+    return t("admin.promotions.ui.generated.36abd54d7de4");
+  }
+  return null;
+};
 
 /* ---------- Collapsible filter section ---------- */
 function Section({ title, icon: Icon, hint, children }) {
@@ -49,7 +66,7 @@ function Section({ title, icon: Icon, hint, children }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-start transition-colors hover:bg-[var(--user-bg-hover)]"
       >
         {Icon ? <Icon size={13} className="shrink-0 text-[var(--user-accent)]" /> : null}
         <span className="flex-1 text-xs font-normal text-[var(--user-text)]">
@@ -90,7 +107,7 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       onClick={onClick}
       disabled={disabled}
       title={typeof title === "string" ? title : typeof label === "string" ? label : undefined}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
+      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start transition-colors ${
         disabled
           ? "cursor-not-allowed opacity-45"
           : checked
@@ -109,7 +126,7 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       </span>
       {icon}
       <span
-        className={`min-w-0 flex-1 line-clamp-2 break-words text-[0.78125rem] font-normal capitalize ${
+        className={`min-w-0 flex-1 break-words text-[0.78125rem] font-normal capitalize ${
           checked ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"
         }`}
       >
@@ -124,14 +141,16 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
   );
 }
 
-function ShowMore({ open, total, onClick }) {
+function ShowMore({ open, total, onClick, t }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="mt-1 w-full rounded-md py-1.5 text-[0.6875rem] font-normal text-[var(--user-accent)] transition-colors hover:bg-[var(--user-bg-hover)]"
     >
-      {open ? "Show less" : `Show all (${total})`}
+      {open
+        ? t("admin.productDetail.page.showLess")
+        : `${t("admin.promotions.ui.generated.e7c95b4c2824")} (${total})`}
     </button>
   );
 }
@@ -146,7 +165,7 @@ const THUMB_CLASS =
   "[&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full " +
   "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--user-accent)]";
 
-function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
+function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease, t }) {
   const span = max - min;
   if (span <= 0) return null;
 
@@ -174,7 +193,7 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
         onChange={(event) => onChange([Math.min(Number(event.target.value), value[1]), value[1]])}
         onKeyUp={onRelease}
         onBlur={onRelease}
-        aria-label="Minimum price"
+        aria-label={`${t("admin.discounts.page.priceRange")} −`}
         className={THUMB_CLASS}
         style={{ zIndex: lowPercent > 70 ? 2 : 1 }}
       />
@@ -187,7 +206,7 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
         onChange={(event) => onChange([value[0], Math.max(Number(event.target.value), value[0])])}
         onKeyUp={onRelease}
         onBlur={onRelease}
-        aria-label="Maximum price"
+        aria-label={`${t("admin.discounts.page.priceRange")} +`}
         className={THUMB_CLASS}
         style={{ zIndex: 1 }}
       />
@@ -201,7 +220,7 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease }) {
      chhodne (release) par ek baar apply.
    - Inputs kabhi remount nahi hote (stable keys + focused-hote-hue external
      sync nahi) → click/type par focus nahi toot-ta. */
-function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
+function PriceFilter({ bounds, filterMin, filterMax, onApply, t }) {
   const externalMin = filterMin ?? bounds.min;
   const externalMax = filterMax ?? bounds.max;
 
@@ -261,7 +280,7 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
   if (span <= 0) {
     return (
       <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">
-        No price data yet.
+        {t("admin.shared.state.noResults")}
       </p>
     );
   }
@@ -284,11 +303,12 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
         value={[shownLow, shownHigh]}
         onChange={setDraft}
         onRelease={commitSlider}
+        t={t}
       />
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="flex min-w-0 flex-col gap-1">
-          <span className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">Min</span>
+          <span aria-hidden="true" className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">−</span>
           <input
             type="number"
             inputMode="numeric"
@@ -306,12 +326,12 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
             onKeyDown={(event) => {
               if (event.key === "Enter") event.currentTarget.blur();
             }}
-            aria-label="Minimum price"
+            aria-label={`${t("admin.discounts.page.priceRange")} −`}
             className={inputClass}
           />
         </label>
         <label className="flex min-w-0 flex-col gap-1">
-          <span className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">Max</span>
+          <span aria-hidden="true" className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">+</span>
           <input
             type="number"
             inputMode="numeric"
@@ -329,7 +349,7 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply }) {
             onKeyDown={(event) => {
               if (event.key === "Enter") event.currentTarget.blur();
             }}
-            aria-label="Maximum price"
+            aria-label={`${t("admin.discounts.page.priceRange")} +`}
             className={inputClass}
           />
         </label>
@@ -366,7 +386,8 @@ export default function HomeSidebar({
   showAllDealsView = false,
   onToggleAllDealsView,
 }) {
-  const { dir } = useTranslation();
+  const { dir, t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showAllDeals, setShowAllDeals] = useState(false);
   const [brandQuery, setBrandQuery] = useState("");
@@ -467,8 +488,8 @@ export default function HomeSidebar({
   const searchedBrands = useMemo(() => {
     const query = brandQuery.trim().toLowerCase();
     if (!query) return brandList;
-    return brandList.filter((brand) => String(brand.name || "").toLowerCase().includes(query));
-  }, [brandList, brandQuery]);
+    return brandList.filter((brand) => String(fieldOf(brand, "name") || "").toLowerCase().includes(query));
+  }, [brandList, brandQuery, fieldOf]);
 
   const visibleBrands = showAllBrands ? searchedBrands : searchedBrands.slice(0, BRAND_PREVIEW);
 
@@ -513,9 +534,9 @@ export default function HomeSidebar({
   if (collapsed) {
     return (
       <aside
-        aria-label="Filters"
-        title="Filters"
-        className={`isolate flex min-h-12 justify-center overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 text-[var(--user-text-muted)] ${className}`}
+        aria-label={t("admin.shared.action.filter")}
+        title={t("admin.shared.action.filter")}
+        className={`user-home-sidebar isolate flex min-h-12 justify-center overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 text-[var(--user-text-muted)] ${className}`}
       >
         <div className="flex h-6 w-6 items-center justify-center">
           <SlidersHorizontal size={16} />
@@ -526,13 +547,13 @@ export default function HomeSidebar({
 
   if (isLoading) {
     return (
-      <aside className={`isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
+      <aside className={`user-home-sidebar isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
         <div className="flex items-center gap-2 border-b border-[var(--user-border)] px-4 py-3.5 pb-3">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
             <SlidersHorizontal size={15} className="text-orange-500" />
           </span>
           <h2 className="flex-1 text-base font-semibold tracking-tight text-[var(--user-text)]">
-            Filters
+            {t("admin.shared.action.filter")}
           </h2>
         </div>
         <div className="space-y-5 p-4">
@@ -547,7 +568,7 @@ export default function HomeSidebar({
 
   return (
     <aside dir={dir}
-      className={`isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
+      className={`user-home-sidebar isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
     >
       <div
         className={
@@ -562,7 +583,7 @@ export default function HomeSidebar({
           <SlidersHorizontal size={14} className="text-orange-500" />
         </span>
         <h2 className="flex-1 text-base font-semibold tracking-tight text-[var(--user-text)]">
-          Filters
+          {t("admin.shared.action.filter")}
         </h2>
         <button
           type="button"
@@ -574,32 +595,31 @@ export default function HomeSidebar({
               : "cursor-not-allowed text-[var(--user-text-disabled)]"
           }`}
         >
-          <RotateCcw size={11} /> Clear All
+          <RotateCcw size={11} /> {t("admin.shared.action.clearFilters")}
         </button>
       </div>
 
         <p className="border-b border-[var(--user-border)] px-4 py-2 text-xs text-[var(--user-text-muted)]">
-          <span className="font-normal text-[var(--user-text)]">{matchCount}</span>{" "}
-          {matchCount === 1 ? "product" : "products"} {filtersActive ? "match your filters" : "available"}
+          {t("admin.dashboard.salesDistribution.productsCount", { count: matchCount })}
         </p>
 
         {/* CATEGORY — nothing is pre-selected: the list starts clean and any
             click adds a filter (clicking the same category again removes it).
             "Clear All" in the header resets everything. */}
-        <Section title="Category" icon={Tags} hint={categoryList.length ? `${categoryList.length}` : null}>
-          <div className={showAllCategories ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pr-0.5" : "space-y-0.5"}>
+        <Section title={t("common.category")} icon={Tags} hint={categoryList.length ? `${categoryList.length}` : null}>
+          <div className={showAllCategories ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pe-0.5" : "space-y-0.5"}>
             {visibleCategories.map((category) => (
               <CheckRow
                 key={category._id}
                 checked={activeCategoryIds.includes(idOf(category._id))}
-                label={category.name}
+                label={fieldOf(category, "name")}
                 count={category.count}
-                icon={<CategoryIcon name={category.name} size={13} className="shrink-0 text-[var(--user-accent)]" />}
+                icon={<CategoryIcon name={fieldOf(category, "name")} size={13} className="shrink-0 text-[var(--user-accent)]" />}
                 onClick={() => toggleCategory(category._id)}
               />
             ))}
             {!categoryList.length ? (
-              <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">No categories yet.</p>
+              <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">{t("admin.shared.state.noResults")}</p>
             ) : null}
           </div>
 
@@ -608,46 +628,48 @@ export default function HomeSidebar({
               open={showAllCategories}
               total={categoryList.length}
               onClick={() => setShowAllCategories((value) => !value)}
+              t={t}
             />
           ) : null}
         </Section>
 
         {/* PRICE RANGE — Amazon style: Min/Max + Go, slider release par apply.
             Discount ke baad wali final qeemat par filter hota hai (backend). */}
-        <Section title="Price Range" icon={Wallet}>
+        <Section title={t("admin.discounts.page.priceRange")} icon={Wallet}>
           <PriceFilter
             bounds={bounds}
             filterMin={filterMin}
             filterMax={filterMax}
             onApply={(patch) => onChange(patch)}
+            t={t}
           />
         </Section>
 
         {/* TOP BRANDS */}
-        <Section title="Brand" icon={Store} hint={brandList.length ? `${brandList.length}` : null}>
+        <Section title={t("common.brand")} icon={Store} hint={brandList.length ? `${brandList.length}` : null}>
           <div className="relative mb-2">
             <Search
               size={13}
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)]"
+              className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)]"
             />
             <input
               value={brandQuery}
               onChange={(event) => setBrandQuery(event.target.value)}
-              placeholder="Search brand..."
-              aria-label="Search brands"
-              className="w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] py-1.5 pl-7 pr-2.5 text-sm text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-disabled)] focus:border-[var(--user-accent)]"
+              placeholder={t("admin.products.filter.searchBrand")}
+              aria-label={t("admin.products.filter.searchBrand")}
+              className="w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] py-1.5 ps-7 pe-2.5 text-start text-sm text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-disabled)] focus:border-[var(--user-accent)]"
             />
           </div>
 
           {searchedBrands.length === 0 ? (
-            <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">No brands found.</p>
+            <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">{t("admin.shared.state.noResults")}</p>
           ) : (
-            <div className={showAllBrands ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pr-0.5" : "space-y-0.5"}>
+            <div className={showAllBrands ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pe-0.5" : "space-y-0.5"}>
               {visibleBrands.map((brand) => (
                 <CheckRow
                   key={brand._id}
                   checked={selectedBrandIds.includes(idOf(brand._id))}
-                  label={brand.name}
+                  label={fieldOf(brand, "name")}
                   count={brand.count}
                   onClick={() => toggleBrand(brand._id)}
                 />
@@ -660,6 +682,7 @@ export default function HomeSidebar({
               open={showAllBrands}
               total={searchedBrands.length}
               onClick={() => setShowAllBrands((value) => !value)}
+              t={t}
             />
           ) : null}
         </Section>
@@ -667,12 +690,12 @@ export default function HomeSidebar({
         {/* DEALS — active deals (Brand ke neeche): click karne par right side
             me us deal ke products filter ho kar show hote hain
             (dobara click = remove). "Clear All" se reset. */}
-        <Section title="Deals" icon={Flame} hint={dealList.length ? `${dealList.length}` : null}>
+        <Section title={t("admin.nav.item.deals")} icon={Flame} hint={dealList.length ? `${dealList.length}` : null}>
           {dealsLoading && !dealList.length ? (
             <LoadingRows count={4} />
           ) : !dealList.length ? (
             <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">
-              No active deals right now.
+              {t("admin.shared.state.noResults")}
             </p>
           ) : (
             <>
@@ -681,12 +704,12 @@ export default function HomeSidebar({
               <div className="space-y-0.5">
                 <CheckRow
                   checked={!!showAllDealsView}
-                  title="All Deals"
+                  title={`${t("common.all")} ${t("admin.nav.item.deals")}`}
                   label={
                     <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate font-normal">All Deals</span>
+                      <span className="break-words font-normal">{t("common.all")} {t("admin.nav.item.deals")}</span>
                       <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-[var(--user-accent)]">
-                        All offers
+                        {t("common.all")} {t("admin.deals.page.offer")}
                       </span>
                     </span>
                   }
@@ -698,19 +721,19 @@ export default function HomeSidebar({
               <div className="mx-2 my-1 border-t border-dashed border-[var(--user-border)]" />
               {/* INDIVIDUAL DEALS — Brand ki tarah: expand par poora lamba
                   nahi hota, usi block me scrollbar ban jata hai. */}
-              <div className={showAllDeals ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pr-0.5" : "space-y-0.5"}>
+              <div className={showAllDeals ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pe-0.5" : "space-y-0.5"}>
                 {visibleDeals.map((deal) => {
                   const dealId = idOf(deal._id);
                   const checked = selectedDealIds.includes(dealId);
-                  const badge = getDealBadgeText(deal);
+                  const badge = dealBadgeTextOf(deal, t);
                   return (
                     <CheckRow
                       key={dealId}
                       checked={checked}
-                      title={deal.name || "Deal"}
+                      title={fieldOf(deal, "name") || t("admin.nav.item.deals")}
                       label={
                         <span className="flex min-w-0 flex-col gap-0.5">
-                          <span className="truncate">{deal.name || "Deal"}</span>
+                          <span className="break-words">{fieldOf(deal, "name") || t("admin.nav.item.deals")}</span>
                           {badge ? (
                             <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-[var(--user-accent)]">
                               {badge}
@@ -726,21 +749,12 @@ export default function HomeSidebar({
                   );
                 })}
               </div>
-              {showAllDealsView ? (
-                <p className="mt-2 rounded-lg bg-[var(--user-accent-soft)] px-2.5 py-1.5 text-[0.625rem] font-normal leading-relaxed text-[var(--user-text-muted)]">
-                  Showing all deal cards on the right (10 per page) →
-                </p>
-              ) : selectedDealIds.length > 0 ? (
-                <p className="mt-2 rounded-lg bg-[var(--user-accent-soft)] px-2.5 py-1.5 text-[0.625rem] font-normal leading-relaxed text-[var(--user-text-muted)]">
-                  Showing products from {selectedDealIds.length}{" "}
-                  {selectedDealIds.length === 1 ? "deal" : "deals"} on the right →
-                </p>
-              ) : null}
               {dealList.length > DEAL_PREVIEW ? (
                 <ShowMore
                   open={showAllDeals}
                   total={dealList.length}
                   onClick={() => setShowAllDeals((value) => !value)}
+                  t={t}
                 />
               ) : null}
             </>
@@ -748,7 +762,7 @@ export default function HomeSidebar({
         </Section>
 
         {/* DISCOUNT — selected band sab se upar */}
-        <Section title="Discount" icon={BadgePercent}>
+        <Section title={t("admin.discounts.page.discount")} icon={BadgePercent}>
           <div className="space-y-0.5">
             {discountFacet.length === 0 ? (
               <LoadingRows count={4} />
@@ -759,7 +773,7 @@ export default function HomeSidebar({
                   <CheckRow
                     key={band.band}
                     checked={selectedBand === band.band}
-                    label={`${band.band}% or more`}
+                    label={`${band.band}%+`}
                     count={band.count}
                     disabled={band.count === 0 && selectedBand !== band.band}
                     onClick={() => toggleBand(band.band)}

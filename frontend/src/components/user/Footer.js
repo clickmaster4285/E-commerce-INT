@@ -16,6 +16,7 @@ import {
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -61,6 +62,7 @@ const badgeCls =
 
 export default function Footer() {
   const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const { data: store = null } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
@@ -144,7 +146,7 @@ export default function Footer() {
                 footerCategories.map((cat) => (
                   <li key={cat._id}>
                     <Link href={`/?category=${cat._id}`} className={linkCls}>
-                      {cat.name}
+                      {fieldOf(cat, "name")}
                     </Link>
                   </li>
                 ))

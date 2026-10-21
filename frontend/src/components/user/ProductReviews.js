@@ -19,6 +19,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Star, Loader2, X, Check, ImagePlus, Video, AlertCircle, Play, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
 import { reviewApi, getReviewErrorMessage } from "@/apis/user/reviewApi";
+import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -30,7 +32,6 @@ const mediaUrl = (raw) => {
 };
 const reviewImageUrl = (image) => typeof image === "string" ? image : image?.img_url || image?.url || "";
 
-const RATING_LABELS = ["", "Poor", "Fair", "Good", "Very good", "Excellent"];
 const MAX_IMAGES = 5;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;   // 10MB
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;   // 50MB
@@ -71,6 +72,7 @@ function StarRow({ value = 0, hover = 0, size = 16, interactive = false, onPick,
 
 /* ---------- Saved media thumbnails (already uploaded) ---------- */
 function SavedMedia({ images = [], videos = [], onPreview }) {
+  const { t } = useTranslation();
   const entries = [
     ...images.map((item) => ({ type: "image", url: mediaUrl(reviewImageUrl(item)) })).filter((item) => item.url),
     ...videos.map((item) => ({ type: "video", url: mediaUrl(item?.video_url), duration: item?.duration })).filter((item) => item.url),
@@ -80,9 +82,9 @@ function SavedMedia({ images = [], videos = [], onPreview }) {
   const hiddenCount = Math.max(0, entries.length - visible.length);
   const thumb = "relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]";
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Review photos and videos">
+    <div className="flex gap-2 overflow-x-auto pb-1" aria-label={t("admin.reviews.ui.media")}>
       {visible.map((item, i) => (
-        <button key={`${item.type}-${i}`} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview && onPreview(item); }} className={`${thumb} group`} aria-label={item.type === "video" ? "Play video" : "View photo"}>
+        <button key={`${item.type}-${i}`} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview && onPreview(item); }} className={`${thumb} group`} aria-label={t("admin.reviews.ui.media")}>
           {item.type === "video" ? (
             <>
               <video src={item.url} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover opacity-70 transition-transform duration-200 group-hover:scale-105" />
@@ -108,23 +110,24 @@ export function ReviewMediaGallery({ images = [], videos = [] }) {
 }
 
 export function StoreResponse({ response }) {
+  const { locale, t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const message = response?.message?.trim();
   if (!message) return null;
   const paragraphs = message.split(/\n+/).filter(Boolean);
   const date = response?.responded_at
-    ? new Date(response.responded_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    ? new Date(response.responded_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale, { month: "short", day: "numeric", year: "numeric" })
     : "";
   return (
     <div className="rounded-xl border-l-[3px] border-[var(--user-accent)] bg-[var(--user-accent)]/10 px-3.5 py-3.5 sm:px-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-accent)]"><MessageSquareText size={15} aria-hidden="true" /> Store response</p>
-        <p className="text-xs text-[var(--user-text-muted)]">Store team{date ? ` · ${date}` : ""}</p>
+        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-accent)]"><MessageSquareText size={15} aria-hidden="true" /> {t("admin.reviews.detail.storeResponse")}</p>
+        {date && <p className="text-xs text-[var(--user-text-muted)]">{date}</p>}
       </div>
       <div className={`mt-2 max-w-2xl overflow-hidden text-sm leading-relaxed text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-3"}`}>
         {paragraphs.map((paragraph, index) => <p key={index} className={index ? "mt-2" : ""}>{paragraph}</p>)}
       </div>
-      {message.length > 180 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1.5 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? "Show less" : "Show more"}</button>}
+      {message.length > 180 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1.5 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? t("admin.productDetail.page.showLess") : t("admin.productDetail.page.showMore")}</button>}
     </div>
   );
 }
@@ -133,7 +136,7 @@ export function StoreResponse({ response }) {
 function RatingModal({
   productName, rated, saving, rating, hover, title, comment, images, video, error, existingImages = [], existingVideo = null,
   onPick, onHover, onTitle, onComment, onPickImages, onRemoveImage, onRemoveExistingImage, onRemoveExistingVideo, onPickVideo, onRemoveVideo,
-  onSubmit, onClose,
+  onSubmit, onClose, t,
 }) {
   const imgId = useId();
   const vidId = useId();
@@ -181,13 +184,13 @@ function RatingModal({
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur">
           <div className="min-w-0">
             <p className="text-[0.6875rem] font-bold tracking-wide text-[var(--user-text-muted)]">
-              {rated ? "Update your rating" : "Rate this product"}
+              {rated ? `${t("common.edit")} ${t("admin.reviews.ui.review")}` : t("admin.reviews.ui.review")}
             </p>
             {productName ? (
               <h3 className="mt-1 text-sm font-black text-[var(--user-text)] leading-snug line-clamp-2">{productName}</h3>
             ) : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close"
+          <button type="button" onClick={onClose} aria-label={t("common.close")}
             className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] transition">
             <X size={16} />
           </button>
@@ -200,20 +203,20 @@ function RatingModal({
               <StarRow value={rating} hover={hover} size={32} interactive onPick={onPick} onHover={onHover} />
             </div>
             <p className={`mt-2 text-sm font-semibold ${(hover || rating) ? "text-amber-500" : "text-[var(--user-text-subtle)]"}`}>
-              {RATING_LABELS[hover || rating] || "Tap a star to rate"}
+              {hover || rating ? t("admin.reviews.ui.starsCount", { value: hover || rating }) : t("admin.reviews.page.rating")}
             </p>
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Review title <span className="text-[var(--user-accent)]">*</span></span>
+            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">{t("admin.reviews.ui.review")} <span className="text-[var(--user-accent)]">*</span></span>
             <input type="text" required aria-required="true" value={title} onChange={(e) => onTitle(e.target.value)} maxLength={120}
-              placeholder="Summarize your experience" className={inputCls} />
+              className={inputCls} />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">Your review</span>
+            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">{t("admin.reviews.page.comment")}</span>
             <textarea value={comment} onChange={(e) => onComment(e.target.value)} rows={4} maxLength={800}
-              placeholder="What should other shoppers know?" className={inputCls} />
+              className={inputCls} />
           </label>
 
 
@@ -221,9 +224,9 @@ function RatingModal({
           <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3.5 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-secondary)] flex items-center gap-1.5">
-                <ImagePlus size={13} /> Add photos &amp; video
+                <ImagePlus size={13} /> {t("common.add")} {t("admin.reviews.ui.media")}
               </p>
-              <span className="text-[0.5625rem] font-semibold text-[var(--user-text-subtle)]">Optional</span>
+              <span className="text-[0.5625rem] font-semibold text-[var(--user-text-subtle)]">{t("common.optional")}</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -231,11 +234,11 @@ function RatingModal({
                   tab se "silently kuch nahi hota" ka issue avoid karta hai) */}
               <label htmlFor={imgId}
                 className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${images.length + savedImages.length >= MAX_IMAGES ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
-                <ImagePlus size={15} /> Add photos ({images.length + savedImages.length}/{MAX_IMAGES})
+                <ImagePlus size={15} /> {t("common.add")} {t("admin.reviews.ui.media")} ({images.length + savedImages.length}/{MAX_IMAGES})
               </label>
               <label htmlFor={vidId}
                 className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${video || existingVideo ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
-                <Video size={15} /> {video || existingVideo ? "Video added" : "Add video (max 1)"}
+                <Video size={15} /> {video || existingVideo ? t("admin.reviews.ui.media") : t("common.add")}
               </label>
             </div>
 
@@ -246,14 +249,14 @@ function RatingModal({
 
             {(savedImages.length > 0 || existingVideo || previews.length > 0 || videoPreview) && (
               <div className="space-y-2">
-                {savedImages.length || existingVideo ? <p className="text-[0.625rem] font-semibold text-[var(--user-text-muted)]">Uploaded media · select × to remove</p> : null}
+                {savedImages.length || existingVideo ? <p className="text-[0.625rem] font-semibold text-[var(--user-text-muted)]">{t("admin.reviews.ui.media")} · {t("admin.productDetail.page.remove")}</p> : null}
                 <div className="flex gap-2 overflow-x-auto pb-1">
                 {savedImages.map((item, i) => {
                   const url = mediaUrl(item.img_url);
                   return url ? (
                     <span key={`saved-i-${item.img_url}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]">
-                      <img src={url} alt={`Uploaded review photo ${i + 1}`} className="h-full w-full object-cover" />
-                      <button type="button" onClick={() => onRemoveExistingImage(item.img_url)} aria-label={`Remove uploaded photo ${i + 1}`} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => onRemoveExistingImage(item.img_url)} aria-label={t("admin.productDetail.page.remove")} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
                     </span>
                   ) : null;
                 })}
@@ -261,13 +264,13 @@ function RatingModal({
                   <span className="relative flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--user-border)] bg-black">
                     <video src={mediaUrl(existingVideo.video_url)} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover opacity-70" />
                     <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black/60"><Play size={13} className="fill-white text-white" /></span>
-                    <button type="button" onClick={onRemoveExistingVideo} aria-label="Remove uploaded video" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
+                    <button type="button" onClick={onRemoveExistingVideo} aria-label={t("admin.productDetail.page.remove")} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
                   </span>
                 ) : null}
                 {previews.map((src, i) => (
                   <span key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-[var(--user-border)] shrink-0 bg-[var(--user-bg-hover)]">
                     <img src={src} alt="" className="w-full h-full object-cover" />
-                    <button type="button" onClick={() => onRemoveImage(i)} aria-label="Remove photo"
+                    <button type="button" onClick={() => onRemoveImage(i)} aria-label={t("admin.productDetail.page.remove")}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition"><X size={12} /></button>
                   </span>
                 ))}
@@ -275,7 +278,7 @@ function RatingModal({
                   <span className="relative w-28 h-16 rounded-xl overflow-hidden border border-[var(--user-border)] shrink-0 bg-black flex items-center justify-center">
                     <video src={videoPreview} preload="metadata" muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-70" />
                     <span className="relative w-7 h-7 rounded-full bg-black/60 flex items-center justify-center"><Play size={13} className="text-white fill-white" /></span>
-                    <button type="button" onClick={onRemoveVideo} aria-label="Remove video"
+                    <button type="button" onClick={onRemoveVideo} aria-label={t("admin.productDetail.page.remove")}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition"><X size={12} /></button>
                   </span>
                 )}
@@ -286,6 +289,7 @@ function RatingModal({
             <p className="text-[0.625rem] text-[var(--user-text-subtle)] leading-relaxed">
               Photos: JPG / PNG / WEBP, up to 10MB each &middot; Video: MP4 / WEBM / MOV, up to 50MB.
             </p>
+
           </div>
 
 
@@ -301,12 +305,12 @@ function RatingModal({
         <div className="sticky bottom-0 flex gap-3 px-5 py-4 border-t border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur">
           <button type="button" onClick={onClose} disabled={saving}
             className="flex-1 h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-bold text-[var(--user-text)] hover:opacity-80 transition disabled:opacity-50">
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" onClick={onSubmit} disabled={saving || !rating}
             className="flex-[1.4] h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-            {saving ? "Saving..." : rated ? "Update rating" : "Submit rating"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
         </div>
       </div>
@@ -317,6 +321,7 @@ function RatingModal({
 
 /* ---------- Lightbox (saved media full view) ---------- */
 function MediaLightbox({ preview, onClose }) {
+  const { t } = useTranslation();
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -325,7 +330,7 @@ function MediaLightbox({ preview, onClose }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[210] bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
-      <button className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition" aria-label="Close">
+      <button className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition" aria-label={t("common.close")}>
         <X size={20} />
       </button>
       {preview.type === "video" ? (
@@ -350,6 +355,8 @@ function MediaLightbox({ preview, onClose }) {
 // ========================================== */
 export default function ProductRating({ productId, productName = "", review = null, variant = "compact", showMedia = false, onSaved, autoOpen = false }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { reviewTextOf } = useLocalized();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hover, setHover] = useState(0);
@@ -426,8 +433,8 @@ export default function ProductRating({ productId, productName = "", review = nu
 
   const submit = async (e) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (!title.trim()) { setError("Please enter a review title."); return; }
-    if (!rating) { setError("Please select a star rating."); return; }
+    if (!title.trim()) { setError(t("admin.shared.validation.required", { field: t("admin.reviews.ui.review") })); return; }
+    if (!rating) { setError(t("admin.shared.validation.selectAtLeastOne")); return; }
     setSaving(true);
     setError("");
     try {
@@ -443,10 +450,10 @@ export default function ProductRating({ productId, productName = "", review = nu
 
       if (rated) {
         await reviewApi.update(review._id, fd);
-        toast.success("Your rating was updated");
+        toast.success(t("admin.shared.toast.saved"));
       } else {
         await reviewApi.create(fd);
-        toast.success("Thanks for rating this product!");
+        toast.success(t("admin.shared.toast.created"));
       }
       await queryClient.invalidateQueries({ queryKey: ["myReviews"] });
       if (onSaved) onSaved();
@@ -488,6 +495,7 @@ export default function ProductRating({ productId, productName = "", review = nu
       onRemoveVideo={removeVideo}
       onSubmit={submit}
       onClose={closeModal}
+      t={t}
     />
   ) : null;
 
@@ -497,6 +505,11 @@ export default function ProductRating({ productId, productName = "", review = nu
   /* ---------- DETAIL variant — product page "Your rating" card ---------- */
   if (variant === "detail") {
     const hasReviewBody = !!(review.title || review.comment || savedCount || review.storeResponse?.message);
+    const displayTitle = reviewTextOf(review, "title");
+    const displayComment = reviewTextOf(review, "comment");
+    const displayResponse = review.storeResponse?.message
+      ? { ...review.storeResponse, message: reviewTextOf(review, "storeResponse.message") }
+      : review.storeResponse;
     return (
       <>
         <section className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 sm:p-6 shadow-sm">
@@ -506,29 +519,29 @@ export default function ProductRating({ productId, productName = "", review = nu
                 <Star size={17} className="fill-amber-500 text-amber-500" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--user-text-muted)]">Your rating</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--user-text-muted)]">{t("admin.reviews.page.rating")}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <StarRow value={review.rating} size={15} />
-                  <span className="text-sm font-semibold text-[var(--user-text)]">{RATING_LABELS[review.rating]}</span>
+                  <span className="text-sm font-semibold text-[var(--user-text)]">{t("admin.reviews.ui.starsCount", { value: review.rating })}</span>
                 </div>
               </div>
             </div>
             <button type="button" onClick={openModal}
               className="h-9 rounded-lg border border-[var(--user-border)] px-3.5 text-xs font-semibold text-[var(--user-text-secondary)] transition hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]">
-              Edit rating
+              {t("common.edit")}
             </button>
           </div>
           {hasReviewBody ? (
             <div className="mt-4 space-y-4 border-t border-[var(--user-border)] pt-4">
               {(review.title || review.comment) && <div>
-                {review.title ? <p className="text-base font-semibold text-[var(--user-text)]">{review.title}</p> : null}
+                {displayTitle ? <p className="text-base font-semibold text-[var(--user-text)]">{displayTitle}</p> : null}
                 {review.comment ? <div>
-                  <p className={`mt-1.5 whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${commentExpanded ? "" : "line-clamp-4"}`}>{review.comment}</p>
-                  {review.comment.length > 220 && <button type="button" onClick={() => setCommentExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{commentExpanded ? "Read less" : "Read more"}</button>}
+                  <p className={`mt-1.5 whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${commentExpanded ? "" : "line-clamp-4"}`}>{displayComment}</p>
+                  {displayComment.length > 220 && <button type="button" onClick={() => setCommentExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{commentExpanded ? t("admin.productDetail.page.showLess") : t("admin.productDetail.page.showMore")}</button>}
                 </div> : null}
               </div>}
               {savedCount > 0 && <SavedMedia images={review.images} videos={review.videos} onPreview={setPreview} />}
-              {review.storeResponse?.message && <StoreResponse response={review.storeResponse} />}
+              {displayResponse?.message && <StoreResponse response={displayResponse} />}
             </div>
           ) : null}
         </section>
@@ -547,12 +560,12 @@ export default function ProductRating({ productId, productName = "", review = nu
             <div className="min-w-0">
               <StarRow value={review.rating} size={11} />
               <p className="text-[0.5rem] sm:text-[0.5625rem] font-black text-amber-500 mt-0.5 truncate">
-                You rated {review.rating}/5{savedCount > 0 ? ` \u00b7 ${savedCount} media` : ""}
+                {t("admin.reviews.ui.starsCount", { value: review.rating })}{savedCount > 0 ? ` · ${savedCount} ${t("admin.reviews.ui.media")}` : ""}
               </p>
             </div>
             <button type="button" onClick={openModal}
               className="shrink-0 text-[0.5625rem] font-bold text-[var(--user-accent)] hover:underline">
-              Edit
+              {t("common.edit")}
             </button>
           </div>
           {showMedia && savedCount > 0 ? (
@@ -562,7 +575,7 @@ export default function ProductRating({ productId, productName = "", review = nu
       ) : (
         <button type="button" onClick={openModal}
           className="mt-2 w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] sm:text-[0.625rem] font-black hover:opacity-90 active:scale-[0.98] transition">
-          <Star size={11} className="fill-current" /> Rate this product
+          <Star size={11} className="fill-current" /> {t("admin.reviews.ui.review")}
         </button>
       )}
       {modal}

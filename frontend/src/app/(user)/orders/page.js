@@ -10,6 +10,8 @@ import { userHttp } from "@/apis/axiosInstance";
 import { orderApi } from "@/apis/user/orderApi";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating from "@/components/user/ProductReviews";
+import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
@@ -34,15 +36,15 @@ const getImgUrl = (img) => {
    Backend stores item.qty as the PAID quantity (orderController.js:188 `qty: payableItems`)
    and item.free_items as units given ON TOP of it (stock moves by qty + free_items).
    So: paid = payable_items || qty, free = free_items, received = paid + free.        */
-const DEAL_TYPE_LABEL = {
-  buy_x_get_y: "Buy X Get Y",
-  percentage: "Percentage Discount",
-  fixed_amount: "Flat Price Discount",
-  fixed: "Flat Price Discount",
-  bundle: "Bundle Deal",
+const DEAL_TYPE_KEY = {
+  buy_x_get_y: "buyXGetY",
+  percentage: "percentageDiscount",
+  fixed_amount: "flatPriceDiscount",
+  fixed: "flatPriceDiscount",
+  bundle: "bundleDeal",
 };
 
-const buildQtyBreakdown = (item) => {
+const buildQtyBreakdown = (item, t) => {
   const paidQty = Number(item.payable_items) > 0 ? Number(item.payable_items) : Number(item.qty) || 1;
   const freeQty = Number(item.free_items) || 0;
   const totalQty = paidQty + freeQty;
@@ -53,7 +55,9 @@ const buildQtyBreakdown = (item) => {
 
   const dealTitle =
     item.bundle_name ||
-    (isBXG && buy > 0 && get > 0 ? `Buy ${buy} Get ${get} Free` : item.deal_name || DEAL_TYPE_LABEL[item.deal_type] || "");
+    (isBXG && buy > 0 && get > 0
+      ? t("user.orders.qty.buyGetFree", { buy, get })
+      : item.deal_name || (DEAL_TYPE_KEY[item.deal_type] ? t(`user.orders.deal.${DEAL_TYPE_KEY[item.deal_type]}`) : ""));
 
   const unitPrice = Number(item.price || 0);
   const originalPrice = Number(item.original_price || 0);
@@ -64,12 +68,12 @@ const buildQtyBreakdown = (item) => {
   if (item.discount_name) reasons.push(item.discount_name);
   if (freeQty > 0) {
     reasons.push(isBXG && buy > 0 && get > 0
-      ? `Buy ${buy} Get ${get} — you receive ${totalQty} units for the price of ${paidQty}`
-      : `You receive ${totalQty} units (${paidQty} paid + ${freeQty} free)`);
+      ? t("user.orders.qty.buyGetReceive", { buy, get, total: totalQty, paid: paidQty })
+      : t("user.orders.qty.receive", { total: totalQty, paid: paidQty, free: freeQty }));
   } else if (item.deal_name && !isBXG) {
     reasons.push(item.deal_name);
   }
-  if (savings > 0) reasons.push(`You saved Rs. ${savings.toLocaleString()} on this item`);
+  if (savings > 0) reasons.push(t("user.orders.qty.savedOnItem", { amount: savings.toLocaleString() }));
 
   return {
     paidQty, freeQty, totalQty, dealTitle, isBXG, reasons, savings,
@@ -80,18 +84,18 @@ const buildQtyBreakdown = (item) => {
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
 
 const STATUS_CONFIG = {
-  pending:    { label: "Pending",    icon: Clock,        color: "text-[var(--user-warning)]", bg: "bg-[var(--user-warning)]/10", border: "border-transparent", textColor: "text-[var(--user-warning)]", dotColor: "bg-[var(--user-warning)]" },
-  confirmed:  { label: "Confirmed",  icon: CheckCircle2, color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
-  processing: { label: "Processing", icon: Package,      color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
-  shipped:    { label: "Shipped",    icon: Truck,        color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
-  delivered:  { label: "Delivered",  icon: CheckCircle2, color: "text-[var(--user-success)]", bg: "bg-[var(--user-success)]/10", border: "border-transparent", textColor: "text-[var(--user-success)]", dotColor: "bg-[var(--user-success)]" },
-  cancelled:  { label: "Cancelled",  icon: XCircle,      color: "text-[var(--user-danger)]", bg: "bg-[var(--user-danger)]/10", border: "border-transparent", textColor: "text-[var(--user-danger)]", dotColor: "bg-[var(--user-danger)]" },
+  pending:    { icon: Clock,        color: "text-[var(--user-warning)]", bg: "bg-[var(--user-warning)]/10", border: "border-transparent", textColor: "text-[var(--user-warning)]", dotColor: "bg-[var(--user-warning)]" },
+  confirmed:  { icon: CheckCircle2, color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
+  processing: { icon: Package,      color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
+  shipped:    { icon: Truck,        color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
+  delivered:  { icon: CheckCircle2, color: "text-[var(--user-success)]", bg: "bg-[var(--user-success)]/10", border: "border-transparent", textColor: "text-[var(--user-success)]", dotColor: "bg-[var(--user-success)]" },
+  cancelled:  { icon: XCircle,      color: "text-[var(--user-danger)]", bg: "bg-[var(--user-danger)]/10", border: "border-transparent", textColor: "text-[var(--user-danger)]", dotColor: "bg-[var(--user-danger)]" },
 };
 
 const PAYMENT_LABEL = {
-  cod: { label: "Cash on Delivery", icon: Banknote },
-  bank: { label: "Bank Transfer", icon: Landmark },
-  card: { label: "Card", icon: CreditCard },
+  cod: { key: "cashOnDelivery", icon: Banknote },
+  bank: { key: "bankTransfer", icon: Landmark },
+  card: { key: "card", icon: CreditCard },
 };
 
 /* ============ PROFESSIONAL FILTER DROPDOWN ============ */
@@ -143,13 +147,14 @@ const FilterDropdown = ({ icon: Icon, options, value, onChange, buttonClass, wid
 
 /* ============ PROGRESS STEPPER ============ */
 const OrderProgress = ({ status }) => {
+  const { t } = useTranslation();
   const currentIndex = STATUS_FLOW.indexOf(status);
   if (status === "cancelled") {
     return (
       <div className="flex items-center gap-3 py-3">
         <div className="flex-1 h-px bg-[var(--user-danger)]/30" />
         <XCircle size={14} className="text-[var(--user-danger)]" />
-        <span className="text-xs font-semibold text-[var(--user-danger)]">Cancelled</span>
+        <span className="text-xs font-semibold text-[var(--user-danger)]">{t("user.orders.status.cancelled")}</span>
       </div>
     );
   }
@@ -173,7 +178,7 @@ const OrderProgress = ({ status }) => {
                 <div className={`absolute top-[0.4375rem] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-[var(--user-text-secondary)]" : "bg-[var(--user-border)]"}`} />
               )}
               <span className={`mt-2 text-[0.5625rem] font-medium whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>
-                {cfg.label}
+                {t(`user.orders.status.${step}`)}
               </span>
             </div>
           );
@@ -185,6 +190,8 @@ const OrderProgress = ({ status }) => {
 
 /* ============ PRODUCT SCROLL LIST ============ */
 const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) => {
+  const { text } = useLocalized();
+  const { t } = useTranslation();
   const scrollRef = useRef(null);
   const [showLeftArrow, setShowLeftArrow] = useState(false);
   const [showRightArrow, setShowRightArrow] = useState(false);
@@ -222,13 +229,15 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
         {items.map((item, index) => {
           const unitPrice = Number(item.price || item.displayPrice || 0);
           const originalPrice = Number(item.original_price || item.originalPrice || 0);
-          const q = buildQtyBreakdown(item);
+          const q = buildQtyBreakdown(item, t);
           // qty is ALREADY the paid qty (free units sit on top) — never subtract free_items here.
           const totalPrice = unitPrice * q.paidQty;
           const hasDiscount = originalPrice > unitPrice;
           const isOpen = openIndex === index;
           const panelId = `qty-breakdown-${idPrefix || "ord"}-${index}`;
-          const qtyLabel = `Qty ${q.paidQty}${q.freeQty > 0 ? ` +${q.freeQty} free` : ""} — ${q.totalQty} unit${q.totalQty > 1 ? "s" : ""} in total. Tap for deal details`;
+          const qtyLabel = q.freeQty > 0
+            ? t("user.orders.qty.accessibleWithFree", { paid: q.paidQty, free: q.freeQty, total: q.totalQty })
+            : t("user.orders.qty.accessible", { paid: q.paidQty, total: q.totalQty });
           const pid = String(item.product_id?._id || item.product_id || "");
           const itemReview = rateable && pid ? (reviewsMap && reviewsMap.get(pid)) || null : null;
           return (
@@ -237,7 +246,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                 <div className="flex gap-2 sm:gap-3 mb-1.5 sm:mb-2">
                   <div className="shrink-0">
                     {getImgUrl(item.image) ? (
-                      <img src={getImgUrl(item.image)} alt={item.name} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
+                      <img src={getImgUrl(item.image)} alt={text(item.name, item.translations?.name)} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
                     ) : (
                       <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center"><Package size={18} className="text-[var(--user-text-subtle)]" /></div>
                     )}
@@ -248,7 +257,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 mb-1.5 sm:mb-2">
-                  <p className="text-sm font-medium text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{item.name}</p>
+                  <p className="text-sm font-medium text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{text(item.name, item.translations?.name)}</p>
                   {item.variantTitle && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
                 </div>
                 {/* QTY + free/deal bonus — attached together, inside the card */}
@@ -264,36 +273,36 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                         title={qtyLabel}
                         className="inline-flex items-center gap-1 shrink-0 rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-1.5 py-0.5 hover:border-[var(--user-border-hover)] active:scale-95 transition"
                       >
-                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text)]">Qty: {q.paidQty}</span>
+                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text)]">{t("user.orders.qty.label")}: {q.paidQty}</span>
                         {q.freeQty > 0 && (
                           <span className="inline-flex items-center gap-0.5 rounded-[0.1875rem] border border-[var(--user-success)]/30 bg-[var(--user-success)]/15 px-1 py-px text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-success)]">
-                            +{q.freeQty} FREE
+                            +{q.freeQty} {t("user.orders.qty.free").toUpperCase()}
                           </span>
                         )}
                         <ChevronDown size={10} className={`text-[var(--user-text-subtle)] transition-transform ${isOpen ? "rotate-180" : ""}`} />
                       </button>
                     ) : (
-                      <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">Qty: {q.paidQty}</span>
+                      <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">{t("user.orders.qty.label")}: {q.paidQty}</span>
                     )}
-                    <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} each</p>
+                    <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} {t("user.orders.qty.each")}</p>
                   </div>
 
                   {/* Inline breakdown — paid / free / total / deal reason / savings */}
                   {q.hasDetail && isOpen && (
                     <div id={panelId} className="mt-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-1.5 space-y-1">
                       <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
-                        <span className="font-semibold text-[var(--user-text-muted)]">Paid units</span>
+                        <span className="font-semibold text-[var(--user-text-muted)]">{t("user.orders.qty.paidUnits")}</span>
                         <span className="font-medium text-[var(--user-text)]">{q.paidQty} × Rs. {unitPrice.toLocaleString()}</span>
                       </div>
                       {q.freeQty > 0 && (
                         <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
-                          <span className="font-semibold text-[var(--user-success)]">Free units</span>
+                          <span className="font-semibold text-[var(--user-success)]">{t("user.orders.qty.freeUnits")}</span>
                           <span className="font-medium text-[var(--user-success)]">+{q.freeQty}</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem] pt-1 border-t border-dashed border-[var(--user-border)]">
-                        <span className="font-medium text-[var(--user-text)]">Total you receive</span>
-                        <span className="font-semibold text-[var(--user-text)]">{q.totalQty} unit{q.totalQty > 1 ? "s" : ""}</span>
+                        <span className="font-medium text-[var(--user-text)]">{t("user.orders.qty.totalReceived")}</span>
+                        <span className="font-semibold text-[var(--user-text)]">{q.totalQty} {t(q.totalQty > 1 ? "user.orders.qty.units" : "user.orders.qty.unit")}</span>
                       </div>
                       {q.dealTitle && (
                         <p className="flex items-start gap-1 pt-1 border-t border-dashed border-[var(--user-border)] text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text-secondary)]">
@@ -309,7 +318,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
 
                 {rateable && (
                   <div className="pt-1.5 mt-1.5 border-t border-dashed border-[var(--user-border)]">
-                    <ProductRating productId={pid} productName={item.name} review={itemReview} variant="compact" />
+                    <ProductRating productId={pid} productName={text(item.name, item.translations?.name)} review={itemReview} variant="compact" />
                   </div>
                 )}
               </div>
@@ -327,49 +336,54 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
 };
 
 /* ============ DELETE MODAL ============ */
-const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => (
+const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => {
+  const { t } = useTranslation();
+  return (
   <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
     <div className="w-full max-w-sm bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl p-5" onClick={e => e.stopPropagation()}>
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-full bg-[var(--user-danger)]/10 flex items-center justify-center shrink-0"><AlertTriangle size={18} className="text-[var(--user-danger)]" /></div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-[var(--user-text)] leading-snug">Delete &quot;{orderNumber}&quot;?</h3>
-          <p className="text-xs text-[var(--user-text-muted)] mt-1">This action cannot be undone.</p>
+          <h3 className="text-sm font-semibold text-[var(--user-text)] leading-snug">{t("user.orders.delete.question", { number: orderNumber })}</h3>
+          <p className="text-xs text-[var(--user-text-muted)] mt-1">{t("user.orders.delete.irreversible")}</p>
         </div>
       </div>
       <div className="flex gap-3 mt-5">
-        <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] hover:opacity-80 transition">Cancel</button>
+        <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] hover:opacity-80 transition">{t("user.orders.cancel")}</button>
         <button onClick={onConfirm} disabled={deleting} className="flex-1 h-10 rounded-xl bg-[var(--user-danger)] text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
-          {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} Delete
+          {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} {t("common.delete")}
         </button>
       </div>
     </div>
   </div>
-);
+  );
+};
 
-const DraftProgress = ({ step }) => (
-  <p className="text-xs text-[var(--user-text-muted)]">
-    Step {step} of 3 · {step >= 3 ? "Payment" : step === 2 ? "Delivery" : "Cart"}
-  </p>
-);
+const DraftProgress = ({ step }) => {
+  const { t } = useTranslation();
+  return <p className="text-xs text-[var(--user-text-muted)]">
+    {t("user.orders.draft.step", { step, current: t(step >= 3 ? "user.orders.draft.payment" : step === 2 ? "user.orders.draft.delivery" : "user.orders.draft.cart") })}
+  </p>;
+};
 
 /* ============ PAGINATION CONTROLS COMPONENT ============ */
 const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd, goToPage, getPageItems }) => {
+  const { t } = useTranslation();
   if (totalPages <= 1) return null;
   return (
     <div className="mt-8 lg:mt-10 flex flex-col items-center gap-3">
       <p className="text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)]">
-        Showing{" "}
+        {t("user.orders.pagination.showing")}{" "}
         <span className="font-semibold text-[var(--user-text)]">
           {rangeStart}–{rangeEnd}
         </span>{" "}
-        of <span className="font-semibold text-[var(--user-text)]">{pagination.total}</span> orders
+        {t("user.orders.pagination.of")} <span className="font-semibold text-[var(--user-text)]">{pagination.total}</span> {t("user.orders.pagination.orders")}
       </p>
       <div className="flex items-center gap-1.5 flex-wrap justify-center">
         <button
           onClick={() => goToPage(page - 1)}
           disabled={page === 1}
-          aria-label="Previous page"
+          aria-label={t("user.orders.pagination.previous")}
           className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-border-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={15} />
@@ -399,7 +413,7 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
         <button
           onClick={() => goToPage(page + 1)}
           disabled={page === totalPages}
-          aria-label="Next page"
+          aria-label={t("user.orders.pagination.next")}
           className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-border-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight size={15} />
@@ -438,6 +452,8 @@ export default function OrdersPage({ compact = false }) {
 }
 
 function OrdersContent({ compact = false }) {
+  const { t, locale } = useTranslation();
+  const { text } = useLocalized();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -599,8 +615,8 @@ function OrdersContent({ compact = false }) {
       if (items?.length) restoreItems(items);
       await userHttp.delete(`/users/checkout-drafts/${draftId}`);
       queryClient.invalidateQueries({ queryKey: ["checkoutDrafts"] });
-      toast.success("Draft deleted — items returned to cart!");
-    } catch (e) { toast.error("Failed to delete draft"); }
+      toast.success(t("user.orders.toast.draftDeleted"));
+    } catch (e) { toast.error(t("user.orders.toast.draftDeleteFailed")); }
   };
 
   const handleDeleteOrder = async () => {
@@ -609,9 +625,9 @@ function OrdersContent({ compact = false }) {
     try {
       await userHttp.delete(`/orders/${deleteTarget._id}`);
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
-      toast.success("Order deleted successfully!");
+      toast.success(t("user.orders.toast.orderDeleted"));
       setDeleteTarget(null);
-    } catch (error) { toast.error(error.response?.data?.message || "Failed to delete order"); }
+    } catch (error) { toast.error(error.response?.data?.message || t("user.orders.toast.orderDeleteFailed")); }
     finally { setDeleting(false); }
   };
 
@@ -622,8 +638,8 @@ function OrdersContent({ compact = false }) {
   if (isLoading) {
     return (
     <>
-      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
-      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]"><Loader2 className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
+      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 aria-label={t("user.orders.loading")} className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
+      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]"><Loader2 aria-label={t("user.orders.loading")} className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
     </>
     );
   }
@@ -646,22 +662,22 @@ function OrdersContent({ compact = false }) {
   const clearFilters = () => { setSearch(""); setFilter("all"); setTimeRange("all"); setSortBy("newest"); };
 
   const statusOptions = [
-    { value: "all", label: "All Orders", icon: Package, count: isDraftFilter ? allOrders.length : (totalOrders || 0) },
-    { value: "draft", label: "Drafts", icon: ShoppingBag, count: drafts.length },
-    ...Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label, icon: cfg.icon, color: cfg.color, count: counts[key] || 0 })),
+    { value: "all", label: t("user.orders.filters.allOrders"), icon: Package, count: isDraftFilter ? allOrders.length : (totalOrders || 0) },
+    { value: "draft", label: t("user.orders.filters.drafts"), icon: ShoppingBag, count: drafts.length },
+    ...Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: t(`user.orders.status.${key}`), icon: cfg.icon, color: cfg.color, count: counts[key] || 0 })),
   ];
   const sortOptions = [
-    { value: "newest", label: "Newest First" },
-    { value: "oldest", label: "Oldest First" },
-    { value: "total_high", label: "Total: High to Low" },
-    { value: "total_low", label: "Total: Low to High" },
+    { value: "newest", label: t("user.orders.sort.newest") },
+    { value: "oldest", label: t("user.orders.sort.oldest") },
+    { value: "total_high", label: t("user.orders.sort.totalHighToLow") },
+    { value: "total_low", label: t("user.orders.sort.totalLowToHigh") },
   ];
   const timeOptions = [
-    { value: "all", label: "All Time" },
-    { value: "30", label: "Last 30 Days" },
-    { value: "90", label: "Last 3 Months" },
-    { value: "180", label: "Last 6 Months" },
-    { value: "365", label: "This Year" },
+    { value: "all", label: t("user.orders.range.allTime") },
+    { value: "30", label: t("user.orders.range.last30Days") },
+    { value: "90", label: t("user.orders.range.last3Months") },
+    { value: "180", label: t("user.orders.range.last6Months") },
+    { value: "365", label: t("user.orders.range.thisYear") },
   ];
 
   const dropdownBtn = "w-full flex items-center gap-2 px-3 h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] transition";
@@ -712,43 +728,43 @@ function OrdersContent({ compact = false }) {
         !(item.productId || item.product_id || item.id || item._id)
       );
     const draftDate = draft.updatedAt
-      ? new Date(draft.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      ? new Date(draft.updatedAt).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })
       : "—";
 
     return (
       <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:p-5 transition-colors hover:border-[var(--user-border-hover)]">
         <div className="mb-3 flex justify-end gap-2">
-          {unavailable && <span className="rounded-full bg-[var(--user-bg-hover)] px-2.5 py-1 text-xs text-[var(--user-text-muted)]">Item unavailable</span>}
+          {unavailable && <span className="rounded-full bg-[var(--user-bg-hover)] px-2.5 py-1 text-xs text-[var(--user-text-muted)]">{t("user.orders.draft.itemUnavailable")}</span>}
           <span className="text-xs text-[var(--user-text-muted)]">{draftDate}</span>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {getImgUrl(firstItem?.image) ? (
-              <Image src={getImgUrl(firstItem.image)} alt={firstItem.name || "Draft product"} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-[var(--user-border)] object-cover" />
+              <Image src={getImgUrl(firstItem.image)} alt={text(firstItem.name, firstItem.translations?.name) || t("user.orders.draft.product")} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-[var(--user-border)] object-cover" />
             ) : (
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
             )}
             <div className="min-w-0">
-              <p className="line-clamp-2 text-sm font-medium text-[var(--user-text)]">{firstItem?.name || "Saved checkout"}</p>
+              <p className="line-clamp-2 text-sm font-medium text-[var(--user-text)]">{text(firstItem?.name, firstItem?.translations?.name) || t("user.orders.draft.savedCheckout")}</p>
               <p className="mt-0.5 text-xs text-[var(--user-text-muted)]">
-                Qty {Number(firstItem?.qty) || 1}{count > 1 ? ` · +${count - 1} more ${count - 1 === 1 ? "item" : "items"}` : ""}
+                {t("user.orders.qty.label")} {Number(firstItem?.qty) || 1}{count > 1 ? ` · +${count - 1} ${t(count - 1 === 1 ? "user.orders.draft.moreItem" : "user.orders.draft.moreItems")}` : ""}
               </p>
               <DraftProgress step={draft.step || 1} />
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] pt-3 sm:border-0 sm:pt-0">
             <div className="min-w-0">
-              <p className="text-[0.6875rem] text-[var(--user-text-muted)]">Total</p>
+              <p className="text-[0.6875rem] text-[var(--user-text-muted)]">{t("user.orders.total")}</p>
               {total > 0 ? (
                 <p className="text-base font-semibold text-[var(--user-text)]">Rs. {total.toLocaleString()}</p>
               ) : (
-                <p className="text-sm text-[var(--user-text-muted)]">Calculated at checkout</p>
+                <p className="text-sm text-[var(--user-text-muted)]">{t("user.orders.draft.calculatedAtCheckout")}</p>
               )}
-              {displayedSavings > 0 && <p className="mt-0.5 text-xs text-[var(--user-success)]">You save Rs. {displayedSavings.toLocaleString()}</p>}
+              {displayedSavings > 0 && <p className="mt-0.5 text-xs text-[var(--user-success)]">{t("user.orders.youSave")} Rs. {displayedSavings.toLocaleString()}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => resumeDraft(draft._id)} disabled={unavailable} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><Play size={13} /> Resume</button>
-              <button type="button" onClick={() => deleteDraft(draft._id, items)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[var(--user-text-muted)] transition hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)]"><Trash2 size={14} /> Delete</button>
+              <button type="button" onClick={() => resumeDraft(draft._id)} disabled={unavailable} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><Play size={13} /> {t("user.orders.draft.resume")}</button>
+              <button type="button" onClick={() => deleteDraft(draft._id, items)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[var(--user-text-muted)] transition hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)]"><Trash2 size={14} /> {t("user.orders.delete.action")}</button>
             </div>
           </div>
         </div>
@@ -765,11 +781,11 @@ function OrdersContent({ compact = false }) {
       {!compact && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--user-text)]">My Orders</h1>
-          <p className="mt-1 text-sm text-[var(--user-text-muted)]">{isDraftFilter ? allOrders.length : (totalOrders || 0)} orders</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--user-text)]">{t("user.orders.title")}</h1>
+          <p className="mt-1 text-sm text-[var(--user-text-muted)]">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {t((isDraftFilter ? allOrders.length : totalOrders) === 1 ? "user.orders.pagination.order" : "user.orders.pagination.orders")}</p>
         </div>
         <Link href="/" className="inline-flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-3 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
-          <ShoppingBag size={16} /> Continue Shopping
+          <ShoppingBag size={16} /> {t("user.orders.continueShopping")}
         </Link>
       </div>
       )}
@@ -785,7 +801,7 @@ function OrdersContent({ compact = false }) {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by order # or product..."
+                placeholder={t("user.orders.searchByOrderOrProduct")}
                 className="w-full h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] pl-10 pr-9 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-border-hover)] transition"
               />
               {search && (
@@ -805,8 +821,8 @@ function OrdersContent({ compact = false }) {
 
         </div>
         <div className="mb-6 flex items-center justify-between gap-3 px-1 text-xs text-[var(--user-text-muted)]">
-          <p>Showing {isDraftFilter ? drafts.length : (pagination.total || orders.length)} of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders</p>
-          {hasActiveFilters && <button onClick={clearFilters} className="inline-flex items-center gap-1 font-medium hover:text-[var(--user-text)]"><X size={12} /> Clear filters</button>}
+          <p>{t("user.orders.results", { shown: isDraftFilter ? drafts.length : (pagination.total || orders.length), total: isDraftFilter ? drafts.length : (totalOrders || 0) })}</p>
+          {hasActiveFilters && <button onClick={clearFilters} className="inline-flex items-center gap-1 font-medium hover:text-[var(--user-text)]"><X size={12} /> {t("user.orders.clearFilters")}</button>}
         </div>
         </>
       )}
@@ -815,13 +831,13 @@ function OrdersContent({ compact = false }) {
       {hasDrafts && (filter === "all" || filter === "draft") && (
         <div className="mb-6 space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-[var(--user-text)]">Saved drafts</h2>
+            <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.savedDrafts")}</h2>
             <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs text-[var(--user-text-muted)]">{drafts.length}</span>
           </div>
           {(showAllDrafts ? drafts : drafts.slice(0, 2)).map((draft) => <DraftCard key={draft._id} draft={draft} />)}
           {drafts.length > 2 && (
             <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-[var(--user-text-muted)] hover:text-[var(--user-text)]">
-              {showAllDrafts ? "Show fewer drafts" : `Show all drafts (${drafts.length})`}
+              {showAllDrafts ? t("user.orders.showFewerDrafts") : t("user.orders.showAllDrafts", { count: drafts.length })}
             </button>
           )}
         </div>
@@ -831,12 +847,12 @@ function OrdersContent({ compact = false }) {
       {(filter !== "draft" || !hasDrafts) && orders.length === 0 && !(filter === "all" && hasDrafts) && (
         <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 text-center">
           <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4"><ShoppingBag size={28} className="text-[var(--user-text-subtle)]" /></div>
-          <h2 className="text-base font-semibold text-[var(--user-text)] mb-2">{filter === "draft" ? "No saved drafts" : (totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}</h2>
-          <p className="text-sm text-[var(--user-text-muted)] mb-5">{filter === "draft" ? "Saved checkout drafts will appear here." : (totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your search or filters."}</p>
+          <h2 className="text-base font-semibold text-[var(--user-text)] mb-2">{filter === "draft" ? t("user.orders.empty.noDrafts") : (totalOrders || 0) === 0 ? t("user.orders.empty.noOrders") : t("user.orders.empty.noFilterMatches")}</h2>
+          <p className="text-sm text-[var(--user-text-muted)] mb-5">{filter === "draft" ? t("user.orders.empty.draftsHint") : (totalOrders || 0) === 0 ? t("user.orders.empty.shoppingHint") : t("user.orders.empty.filtersHint")}</p>
           {hasActiveFilters ? (
-            <button onClick={clearFilters} className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">Clear Filters</button>
+            <button onClick={clearFilters} className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">{t("user.orders.clearFilters")}</button>
           ) : (
-            <Link href="/" className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">Start shopping</Link>
+            <Link href="/" className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">{t("user.orders.startShopping")}</Link>
           )}
         </div>
       )}
@@ -844,12 +860,13 @@ function OrdersContent({ compact = false }) {
       {/* ORDERS LIST */}
       {filter !== "draft" && orders.length > 0 && (
         <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-          <h2 className="text-sm font-semibold text-[var(--user-text)]">Orders</h2>
+          <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.title")}</h2>
           {orders.map((order) => {
-            const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+            const status = STATUS_CONFIG[order.status] ? order.status : "pending";
+            const cfg = STATUS_CONFIG[status];
             const StatusIcon = cfg.icon;
             const pay = PAYMENT_LABEL[order.payment?.method] || PAYMENT_LABEL.cod;
-            const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+            const date = new Date(order.created_at).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
             const orderTotalSavings = order.items.reduce((sum, i) => {
               const original = Number(i.original_price || 0);
               const paid = Number(i.price || 0);
@@ -863,21 +880,21 @@ function OrdersContent({ compact = false }) {
               <div key={order._id} className="group rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 transition-colors hover:border-[var(--user-border-hover)] sm:p-5">
                 <div className="grid grid-cols-2 gap-3 border-b border-[var(--user-border)] pb-3 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Order number</p>
+                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">{t("user.orders.orderNumber")}</p>
                     <p className="text-sm font-medium text-[var(--user-text)] font-mono">{order.order_number}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Placed on</p>
+                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">{t("user.orders.placedOn")}</p>
                     <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><Calendar size={12} className="text-[var(--user-text-subtle)]" /> {date}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">Payment</p>
-                    <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><pay.icon size={12} className="text-[var(--user-text-subtle)]" /> {pay.label}</p>
+                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">{t("user.orders.payment")}</p>
+                    <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><pay.icon size={12} className="text-[var(--user-text-subtle)]" /> {t(`user.orders.paymentMethod.${pay.key}`)}</p>
                   </div>
                   <div className="flex sm:justify-end">
                     <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 ${cfg.bg}`}>
                       <StatusIcon size={12} className={cfg.color} />
-                      <span className={`text-xs font-medium ${cfg.textColor}`}>{cfg.label}</span>
+                      <span className={`text-xs font-medium ${cfg.textColor}`}>{t(`user.orders.status.${status}`)}</span>
                     </div>
                   </div>
                 </div>
@@ -887,9 +904,9 @@ function OrdersContent({ compact = false }) {
                     <div className="mb-3 flex items-start gap-2.5 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-3">
                       <XCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-[var(--user-danger)]">Order Cancelled</p>
+                        <p className="text-xs font-semibold text-[var(--user-danger)]">{t("user.orders.status.cancelled")}</p>
                         <p className="text-xs text-[var(--user-text)] mt-1 leading-relaxed">
-                          <span className="font-medium text-[var(--user-danger)]">Reason:</span> {order.cancel_reason || "No reason provided."}
+                          <span className="font-medium text-[var(--user-danger)]">{t("user.orders.reason")}:</span> {order.cancel_reason || t("user.orders.noReasonProvided")}
                         </p>
                       </div>
                     </div>
@@ -904,23 +921,23 @@ function OrdersContent({ compact = false }) {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] pt-3">
                   <div>
-                    <p className="text-[0.625rem] text-[var(--user-text-muted)] font-medium mb-0.5">Order Total</p>
+                    <p className="text-[0.625rem] text-[var(--user-text-muted)] font-medium mb-0.5">{t("user.orders.orderTotal")}</p>
                     <div className="flex items-baseline gap-2">
                       <p className="text-base font-semibold text-[var(--user-text)]">Rs. {order.total.toLocaleString()}</p>
                       {orderTotalSavings > 0 && (
-                        <span className="text-[0.625rem] font-medium text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> Saved Rs. {orderTotalSavings.toLocaleString()}</span>
+                        <span className="text-[0.625rem] font-medium text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> {t("user.orders.saved")} Rs. {orderTotalSavings.toLocaleString()}</span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {order.status === "shipped" && (
-                      <button className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] hover:border-[var(--user-border-hover)] transition"><Navigation size={13} /> Track</button>
+                      <button className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] hover:border-[var(--user-border-hover)] transition"><Navigation size={13} /> {t("user.orders.track")}</button>
                     )}
                     {order.status === "pending" && (
-                      <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-medium hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={13} /> Cancel Order</button>
+                      <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-medium hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={13} /> {t("user.orders.cancelOrder")}</button>
                     )}
                     <Link href={`/orders/${order._id}`} className="flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
-                      View details <ArrowRight size={15} />
+                      {t("user.orders.viewDetails")} <ArrowRight size={15} />
                     </Link>
                   </div>
                 </div>
@@ -958,17 +975,17 @@ function OrdersContent({ compact = false }) {
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="flex items-center gap-2 px-3 h-12">
-          <button type="button" onClick={() => router.push("/")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+          <button type="button" onClick={() => router.push("/")} aria-label={t("user.orders.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-2xl font-semibold tracking-tight text-[var(--user-text)] leading-none truncate">My Orders</p>
-            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {totalOrders === 1 ? "order" : "orders"}</p>
+            <p className="text-2xl font-semibold tracking-tight text-[var(--user-text)] leading-none truncate">{t("user.orders.title")}</p>
+            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {t(totalOrders === 1 ? "user.orders.pagination.order" : "user.orders.pagination.orders")}</p>
           </div>
           <Link href="/" className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 text-xs font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
             <ShoppingBag size={14} />
-            <span className="hidden sm:inline">Continue Shopping</span>
-            <span className="sm:hidden">Shop</span>
+            <span className="hidden sm:inline">{t("user.orders.continueShopping")}</span>
+            <span className="sm:hidden">{t("user.orders.shop")}</span>
           </Link>
         </div>
       </div>
@@ -984,7 +1001,7 @@ function OrdersContent({ compact = false }) {
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search orders"
+                    placeholder={t("user.orders.searchOrders")}
                     className="h-10 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] pl-9 pr-3 text-sm text-[var(--user-text)] outline-none placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-border-hover)]"
                   />
                 </div>
@@ -1000,8 +1017,8 @@ function OrdersContent({ compact = false }) {
               </div>
             </div>
             <div className="-mt-5 flex items-center justify-between px-1 text-xs text-[var(--user-text-muted)]">
-              <p>Showing {isDraftFilter ? drafts.length : (pagination.total || orders.length)} of {isDraftFilter ? drafts.length : (totalOrders || 0)} orders</p>
-              {hasActiveFilters && <button onClick={clearFilters} className="font-medium hover:text-[var(--user-text)]">Clear filters</button>}
+              <p>{t("user.orders.results", { shown: isDraftFilter ? drafts.length : (pagination.total || orders.length), total: isDraftFilter ? drafts.length : (totalOrders || 0) })}</p>
+              {hasActiveFilters && <button onClick={clearFilters} className="font-medium hover:text-[var(--user-text)]">{t("user.orders.clearFilters")}</button>}
             </div>
           </>
         )}
@@ -1010,13 +1027,13 @@ function OrdersContent({ compact = false }) {
         {hasDrafts && (filter === "all" || filter === "draft") && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-[var(--user-text)]">Saved drafts</h2>
+              <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.savedDrafts")}</h2>
               <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs text-[var(--user-text-muted)]">{drafts.length}</span>
             </div>
             {(showAllDrafts ? drafts : drafts.slice(0, 2)).map((draft) => <DraftCard key={draft._id} draft={draft} />)}
             {drafts.length > 2 && (
               <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-[var(--user-text-muted)] hover:text-[var(--user-text)]">
-                {showAllDrafts ? "Show fewer drafts" : `Show all drafts (${drafts.length})`}
+                {showAllDrafts ? t("user.orders.showFewerDrafts") : t("user.orders.showAllDrafts", { count: drafts.length })}
               </button>
             )}
           </div>
@@ -1029,18 +1046,18 @@ function OrdersContent({ compact = false }) {
                 <Package size={36} className="text-[var(--user-text-muted)]" />
             </div>
             <h2 className="text-base font-semibold text-[var(--user-text)] mb-1.5">
-              {filter === "draft" ? "No saved drafts" : (totalOrders || 0) === 0 ? "No orders yet" : "No orders match your filters"}
+              {filter === "draft" ? t("user.orders.empty.noDrafts") : (totalOrders || 0) === 0 ? t("user.orders.empty.noOrders") : t("user.orders.empty.noFilterMatches")}
             </h2>
             <p className="text-xs text-[var(--user-text-muted)] mb-5">
-              {filter === "draft" ? "Saved checkout drafts will appear here." : (totalOrders || 0) === 0 ? "Start shopping to see your orders here." : "Try adjusting your filters."}
+              {filter === "draft" ? t("user.orders.empty.draftsHint") : (totalOrders || 0) === 0 ? t("user.orders.empty.shoppingHint") : t("user.orders.empty.filtersHint")}
             </p>
             {hasActiveFilters ? (
               <button onClick={clearFilters} className="w-full h-10 rounded-lg border border-[var(--user-border)] text-sm font-medium text-[var(--user-text)] flex items-center justify-center gap-2 hover:bg-[var(--user-bg-hover)] transition">
-                Clear Filters
+                {t("user.orders.clearFilters")}
               </button>
             ) : (
               <Link href="/" className="w-full h-10 rounded-lg border border-[var(--user-border)] text-sm font-medium text-[var(--user-text)] flex items-center justify-center gap-2 hover:bg-[var(--user-bg-hover)] transition">
-                <ShoppingBag size={16} /> Start Shopping
+                <ShoppingBag size={16} /> {t("user.orders.startShopping")}
               </Link>
             )}
           </div>
@@ -1049,9 +1066,10 @@ function OrdersContent({ compact = false }) {
         {/* Orders list */}
         {filter !== "draft" && orders.length > 0 && (
           <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-            <h2 className="text-sm font-semibold text-[var(--user-text)]">Orders</h2>
+            <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.title")}</h2>
             {orders.map((order) => {
-              const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+              const status = STATUS_CONFIG[order.status] ? order.status : "pending";
+              const cfg = STATUS_CONFIG[status];
               const StatusIcon = cfg.icon;
               const pay = PAYMENT_LABEL[order.payment?.method] || PAYMENT_LABEL.cod;
               const date = new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
@@ -1063,20 +1081,20 @@ function OrdersContent({ compact = false }) {
                 >
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     <div>
-                      <p className="text-xs text-[var(--user-text-muted)]">Order number</p>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("user.orders.orderNumber")}</p>
                       <p className="text-sm font-medium text-[var(--user-text)]">{order.order_number}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-[var(--user-text-muted)]">Placed on</p>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("user.orders.placedOn")}</p>
                       <p className="text-sm font-medium text-[var(--user-text)]">{date}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[var(--user-text-muted)]">Payment</p>
-                      <p className="text-sm font-medium text-[var(--user-text)]">{pay.label}</p>
+                      <p className="text-xs text-[var(--user-text-muted)]">{t("user.orders.payment")}</p>
+                      <p className="text-sm font-medium text-[var(--user-text)]">{t(`user.orders.paymentMethod.${pay.key}`)}</p>
                     </div>
                     <div className="flex justify-end">
                       <span className={`inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.bg} ${cfg.textColor}`}>
-                        <StatusIcon size={12} /> {cfg.label}
+                        <StatusIcon size={12} /> {t(`user.orders.status.${status}`)}
                       </span>
                     </div>
                   </div>
@@ -1084,7 +1102,7 @@ function OrdersContent({ compact = false }) {
                   {order.status === "cancelled" && order.cancel_reason && (
                     <div className="mt-3 rounded-lg bg-[var(--user-danger)]/10 p-2">
                       <p className="text-xs text-[var(--user-danger)] line-clamp-2">
-                        Reason: {order.cancel_reason}
+                        {t("user.orders.reason")}: {order.cancel_reason}
                       </p>
                     </div>
                   )}
@@ -1100,7 +1118,7 @@ function OrdersContent({ compact = false }) {
                       Rs. {order.total.toLocaleString()}
                     </p>
                     <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--user-border)] px-3 text-sm font-medium text-[var(--user-text)]">
-                      View details <ChevronRight size={14} />
+                      {t("user.orders.viewDetails")} <ChevronRight size={14} />
                     </div>
                   </div>
                 </Link>

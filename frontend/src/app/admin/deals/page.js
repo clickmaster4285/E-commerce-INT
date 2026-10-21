@@ -16,7 +16,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 
 /* ==================== CONSTANTS ==================== */
-// ✅ Server-side pagination — ek request par yehi deals aati hain
+// âœ… Server-side pagination â€” ek request par yehi deals aati hain
 const DEALS_PER_PAGE = 20;
 
 /* ==================== ICONS ==================== */
@@ -67,14 +67,14 @@ const getId = (item) => {
 };
 
 const getDealStatus = (deal) => {
-  // ✅ Sirf Active/Inactive model — off (isActive false) ya expired sab "inactive"
+  // âœ… Sirf Active/Inactive model â€” off (isActive false) ya expired sab "inactive"
   if (!deal?.isActive) return "inactive";
   const end = deal?.endDate ? new Date(deal.endDate) : null;
   if (end && end < new Date()) return "inactive";
   return "active";
 };
 
-// Target / value summaries parte hain → inhe `t` chahiye, isliye caller pass karta hai.
+// Target / value summaries parte hain â†’ inhe `t` chahiye, isliye caller pass karta hai.
 const formatTarget = (target, t) => {
   if (!target) return t("admin.discounts.page.allProducts");
   const map = {
@@ -105,23 +105,23 @@ const formatDealValue = (deal, t, productNameOf = null) => {
       if (!rule) return t("admin.promotions.ui.generated.1c0af76c9361");
       const buy = rule.buyQuantity || rule.buy_quantity || 1;
       if (rule.rewardType === "free_product" || rule.reward_type === "free_product") {
-        // Gift product ka naam DB se aata hai → `productNameOf` translations map padhta hai.
+        // Gift product ka naam DB se aata hai â†’ `productNameOf` translations map padhta hai.
         const gift = rule.freeProduct
           ? productNameOf(rule.freeProduct)
           : rule.freeProductName || t("admin.deals.detail.freeGift");
         const qty = rule.freeQuantity || rule.free_quantity || 1;
-        return `Buy ${buy} → ${qty > 1 ? qty + "× " : ""}${gift} ${off}`;
+        return `Buy ${buy} â†’ ${qty > 1 ? qty + "Ã— " : ""}${gift} ${off}`;
       }
       if (rule.rewardType === "percentage" || rule.reward_type === "percentage") {
-        return `Buy ${buy} → ${rule.value || 0}% ${off}`;
+        return `Buy ${buy} â†’ ${rule.value || 0}% ${off}`;
       }
-      return `Buy ${buy} → Rs. ${rule.value || 0} ${off}`;
+      return `Buy ${buy} â†’ Rs. ${rule.value || 0} ${off}`;
     }
     default: return value > 0 ? `${value}` : "-";
   }
 };
 
-// ✅ CURRENCY FORMATTER
+// âœ… CURRENCY FORMATTER
 const formatCurrency = (amount) => {
   const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
   const intlLocale = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
@@ -146,7 +146,7 @@ const dateToISO = (value) => {
 
 const StatusBadge = ({ status }) => {
   const { t } = useTranslation();
-  // ✅ Sirf Active/Inactive — purani values (scheduled/expired/disabled) bhi inactive
+  // âœ… Sirf Active/Inactive â€” purani values (scheduled/expired/disabled) bhi inactive
   const config = {
     active: { text: t("admin.banners.page.active"), bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
     inactive: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
@@ -198,7 +198,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
   return (
     <div className="relative w-full" ref={containerRef}>
       <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
-        className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 md:h-9 w-full items-center justify-between rounded-md px-3 text-start text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
         <span className="truncate">{displayValue}</span>
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -211,7 +211,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
           ) : (
             options.map((opt) => (
               <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-black/5 transition-colors"
+                className="block w-full px-3 py-2 text-start text-sm hover:bg-black/5 transition-colors"
                 style={{ color: value === opt.value ? "var(--accent)" : "var(--text-primary)", backgroundColor: value === opt.value ? "rgba(16,185,129,0.05)" : "transparent" }}>
                 {opt.label}
               </button>
@@ -229,7 +229,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className={`w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
+    className={`w-full px-3 py-2.5 text-start text-[13px] flex items-center gap-2.5 transition hover:bg-white/5 ${danger ? "text-red-400 hover:bg-red-500/10" : success ? "text-emerald-400 hover:bg-emerald-500/10" : ""}`}
     style={{ color: danger || success ? undefined : "var(--text-primary)" }}
   >
     {icon} {label}
@@ -244,14 +244,14 @@ export default function DealsPage() {
   const router = useRouter();
   const pathname = usePathname();
   
-  // ✅ SERVER-SIDE PAGINATION — search / status / target / page sab backend par (DB-level).
+  // âœ… SERVER-SIDE PAGINATION â€” search / status / target / page sab backend par (DB-level).
   const [searchInput, setSearchInput] = useState(""); // input box (turant update)
-  const [search, setSearch] = useState("");          // debounced value → API query
+  const [search, setSearch] = useState("");          // debounced value â†’ API query
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Typing ke dauran har keystroke par API hit na ho — 400ms debounce
+  // Typing ke dauran har keystroke par API hit na ho â€” 400ms debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
@@ -309,11 +309,11 @@ export default function DealsPage() {
         status: statusFilter,
         applyTo: targetFilter === "all_targets" ? "all" : targetFilter,
       }),
-    // Page/filter change par purani list retain hoti hai → table blink nahi karta
+    // Page/filter change par purani list retain hoti hai â†’ table blink nahi karta
     placeholderData: (previousData) => previousData,
     retry: false,
   });
-  // Backend sirf CURRENT PAGE ki deals bhejta hai → { deals, stats, pagination }
+  // Backend sirf CURRENT PAGE ki deals bhejta hai â†’ { deals, stats, pagination }
   const deals = useMemo(() => normalizeArrayResponse(dealsResponse?.deals ?? dealsResponse), [dealsResponse]);
   const pagination = dealsResponse?.pagination || {
     total: 0,
@@ -409,13 +409,13 @@ export default function DealsPage() {
     onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.statusFailed")),
   });
 
-  // ✅ Search / status / target filtering ab backend par ho chuki hai — is liye yahan
+  // âœ… Search / status / target filtering ab backend par ho chuki hai â€” is liye yahan
   //    koi client-side filter/slice nahi. Jo data aaya wohi current page hai.
   const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (currentPage > totalPages) setCurrentPage(totalPages); }, [currentPage, totalPages]);
 
-  // ✅ Stats ab server se aate hain (poori filtered dataset par, current page par nahi).
+  // âœ… Stats ab server se aate hain (poori filtered dataset par, current page par nahi).
   //    Legacy response (stats missing) ho to current page data se fallback.
   const serverStats = dealsResponse?.stats || null;
   const stats = useMemo(() => {
@@ -423,7 +423,7 @@ export default function DealsPage() {
       return {
         total: Number(serverStats.total) || 0,
         active: Number(serverStats.active) || 0,
-        // ✅ Backend ab 'inactive' bhejta hai; purana response ho to baaqi se derive karo
+        // âœ… Backend ab 'inactive' bhejta hai; purana response ho to baaqi se derive karo
         inactive: serverStats.inactive !== undefined && serverStats.inactive !== null
           ? Number(serverStats.inactive) || 0
           : Math.max(0, (Number(serverStats.total) || 0) - (Number(serverStats.active) || 0)),
@@ -436,7 +436,7 @@ export default function DealsPage() {
     };
   }, [serverStats, deals]);
 
-  // ✅ Numbered pagination (Products page ke pattern ke mutabiq)
+  // âœ… Numbered pagination (Products page ke pattern ke mutabiq)
   const renderPageNumbers = () => {
     const pages = [];
     const maxVisible = 5;
@@ -448,7 +448,7 @@ export default function DealsPage() {
   };
 
   const openEdit = (deal) => {
-    // ✅ Backward compatible: missing/empty freeShippingMethods → BOTH methods
+    // âœ… Backward compatible: missing/empty freeShippingMethods â†’ BOTH methods
     const fsm = Array.isArray(deal?.freeShippingMethods) && deal.freeShippingMethods.length > 0
       ? deal.freeShippingMethods
       : ["standard", "express"];
@@ -470,7 +470,7 @@ export default function DealsPage() {
       buy_quantity: deal?.buyQuantity ?? "",
       get_quantity: deal?.getQuantity ?? "",
       get_discount_value: deal?.getDiscountValue ?? "",
-      // ✅ Single offer condition (bundle deal)
+      // âœ… Single offer condition (bundle deal)
       bundle_rule: {
         mode: deal?.bundleRule?.mode === "limit" ? "limit" : "all",
         buy_quantity: deal?.bundleRule?.buyQuantity ?? "",
@@ -510,7 +510,7 @@ export default function DealsPage() {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error(t("admin.deals.validation.nameRequired"));
 
-    // ✅ Negative values block — Deal Offer, quantities, limits (input level pe bhi blocked)
+    // âœ… Negative values block â€” Deal Offer, quantities, limits (input level pe bhi blocked)
     const nonNegativeError = validateNonNegative([
       [t("admin.deals.form.dealValue"), formData.value],
       [t("admin.promotions.ui.generated.4ee9bbdde227"), formData.buy_quantity],
@@ -540,7 +540,7 @@ export default function DealsPage() {
       if (formData.get_discount_value !== "" && Number(formData.get_discount_value) > 100) return toast.error(t("admin.deals.validation.getDiscountPercent"));
     }
 
-    // ✅ Bundle deal — single offer condition validation
+    // âœ… Bundle deal â€” single offer condition validation
     if (formData.value_type === "bundle") {
       const rule = formData.bundle_rule || {};
 
@@ -595,8 +595,8 @@ export default function DealsPage() {
       buyQuantity: formData.buy_quantity ? Number(formData.buy_quantity) : 1,
       getQuantity: formData.get_quantity ? Number(formData.get_quantity) : 1,
       getDiscountValue: formData.get_discount_value ? Number(formData.get_discount_value) : 100,
-      // ✅ Single bundle offer condition (bundle deal only)
-      // ✅ Single bundle offer condition (bundle deal only)
+      // âœ… Single bundle offer condition (bundle deal only)
+      // âœ… Single bundle offer condition (bundle deal only)
       bundleRule:
         formData.value_type === "bundle" && formData.bundle_rule
           ? {
@@ -765,7 +765,7 @@ export default function DealsPage() {
                   {dealTypes.map((dt) => {
                     const Icon = dt.icon;
                     return (
-                      <button key={dt.key} type="button" onClick={() => openDealForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
+                      <button key={dt.key} type="button" onClick={() => openDealForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-[var(--bg-tertiary)]">
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
                         <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
                       </button>
@@ -809,7 +809,7 @@ export default function DealsPage() {
 
         {/* TABLE / GRID DISPLAY */}
         {isLoading ? (
-          /* ✅ SKELETON — spinner ki jagah real layout ka skeleton:
+          /* âœ… SKELETON â€” spinner ki jagah real layout ka skeleton:
              list view me wahi table shell + shimmer rows, grid view me shimmer cards */
           viewMode === "list" ? (
             <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -817,11 +817,11 @@ export default function DealsPage() {
                 <table className="w-full text-[13px]">
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deal")}</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.appliesToHeading")}</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.offer")}</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
-                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deal")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.appliesToHeading")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.offer")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                      <th className="px-4 py-3 text-end" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
                     </tr>
                   </thead>
                   <DealRowsSkeleton rows={DEALS_PER_PAGE} />
@@ -844,11 +844,11 @@ export default function DealsPage() {
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deal")}</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.appliesToHeading")}</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.offer")}</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
-                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.deal")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.appliesToHeading")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.offer")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                    <th className="px-4 py-3 text-end" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -862,7 +862,7 @@ export default function DealsPage() {
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
                               <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
-                              <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
+                              <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "â€”"}</p>
                             </div>
                           </div>
                         </td>
@@ -887,7 +887,7 @@ export default function DealsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[13px] truncate">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
-                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
+                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "â€”"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                   <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatDealValue(deal, t, productNameOf)}</span>
@@ -898,7 +898,7 @@ export default function DealsPage() {
           </div>
         )}
 
-        {/* ✅ PAGINATION (server-side) */}
+        {/* âœ… PAGINATION (server-side) */}
         {totalPages > 1 && (
           <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
             <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{pagination.total === 0 ? 0 : (currentPage - 1) * DEALS_PER_PAGE + 1}-{Math.min(currentPage * DEALS_PER_PAGE, pagination.total)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{pagination.total}{" "}{t("admin.nav.item.deals")}{isFetching && !isLoading && <span className="ml-2 opacity-70">{t("admin.promotions.ui.generated.6542a6f2bacd")}</span>}
@@ -907,7 +907,7 @@ export default function DealsPage() {
               <button type="button" disabled={currentPage === 1 || isFetching} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label={t("admin.reviews.ui.previousPage")}><ChevronLeftIcon className="h-4 w-4" /></button>
               {renderPageNumbers().map((pg, i) =>
                 pg === "..." ? (
-                  <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
+                  <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>â€¦</span>
                 ) : (
                   <button key={pg} type="button" disabled={isFetching} onClick={() => setCurrentPage(pg)} className="flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-[13px] font-medium transition" style={pg === currentPage ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>{pg}</button>
                 )
@@ -950,11 +950,11 @@ export default function DealsPage() {
 
 /* ==================== SUB-COMPONENTS ==================== */
 /* =========================================================
-   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
-   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+   SKELETON LOADING UI â€” existing `.skeleton` shimmer utility (globals.css) reuse
+   âœ… Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
       widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
       par layout shift nahi hota (pehle yahan sirf spinner tha).
-   ✅ Sirf loading state ke liye — real table/grid design me koi change nahi.
+   âœ… Sirf loading state ke liye â€” real table/grid design me koi change nahi.
 ========================================================= */
 // `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
 const SKELETON_ROUND = { borderRadius: "9999px" };
@@ -965,7 +965,7 @@ function DealRowsSkeleton({ rows = DEALS_PER_PAGE }) {
     <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1b44fba50568")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`deal-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
-          {/* deal — icon + name + code */}
+          {/* deal â€” icon + name + code */}
           <td className="px-4 py-3">
             <div className="flex items-center gap-3">
               <span className="skeleton h-9 w-9 shrink-0 rounded-lg" />
@@ -1070,7 +1070,7 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-// ✅ Deal form ke number inputs kabhi negative nahi ho sakte (nonNegative default) —
+// âœ… Deal form ke number inputs kabhi negative nahi ho sakte (nonNegative default) â€”
 // "-"/"+"/"e"/"E" type nahi hota, paste par sign hat jata hai, min=0 aur spinner bhi 0 se neeche nahi jata.
 const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, min, max, nonNegative = type === "number", integer = false }) => (
   <input
@@ -1082,12 +1082,12 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // ✅ Upper bound (e.g. discount percentage max 100) — typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. discount percentage max 100) â€” typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}
     onKeyDown={nonNegative ? (e) => {
-      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      // âœ… "-", "+", "e", "E" type karne hi nahi dena (negative value block)
       if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
     } : undefined}
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}

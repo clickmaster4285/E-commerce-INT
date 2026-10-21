@@ -12,6 +12,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown } from "lucide-react";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { productApi } from "@/apis/user/productApi";
+import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import CategoryIcon from "./CategoryIcon";
 import {
   idOf,
@@ -33,9 +35,9 @@ export function scrollToFeatured() {
 }
 
 const NAV_LINKS = [
-  { label: "Home", href: "/", tab: null, isActive: (path, activeTab) => path === "/" && !activeTab },
-  { label: "Best Offers", href: "/?tab=offers", tab: "offers", isActive: (_path, activeTab) => activeTab === "offers" },
-  { label: "New Arrivals", href: "/?tab=new", tab: "new", isActive: (_path, activeTab) => activeTab === "new" },
+  { labelKey: "mobileNav.home", href: "/", tab: null, isActive: (path, activeTab) => path === "/" && !activeTab },
+  { labelKey: "storefront.navigation.bestOffers", href: "/?tab=offers", tab: "offers", isActive: (_path, activeTab) => activeTab === "offers" },
+  { labelKey: "storefront.navigation.newProducts", href: "/?tab=new", tab: "new", isActive: (_path, activeTab) => activeTab === "new" },
 ];
 
 const PARENT_LIMIT = 3;
@@ -91,7 +93,8 @@ function DropdownPanel({ style, panelRef, title, meta, footer, children, onMouse
   );
 }
 
-function CategoryRow({ category, count = 0, onPick }) {
+function CategoryRow({ category, count = 0, onPick, fieldOf }) {
+  const categoryName = fieldOf(category, "name");
   return (
     <Link
       href={`/filtering-product?category=${category._id}`}
@@ -99,10 +102,10 @@ function CategoryRow({ category, count = 0, onPick }) {
       className="flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-[var(--user-bg-hover)]"
     >
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-[var(--user-accent)]">
-        <CategoryIcon name={category.name} size={15} />
+        <CategoryIcon name={categoryName} size={15} />
       </span>
       <span className="min-w-0 flex-1 truncate text-[0.78125rem] font-medium capitalize text-[var(--user-text-secondary)]">
-        {category.name}
+        {categoryName}
       </span>
       {count > 0 ? (
         <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-text-subtle)]">
@@ -114,6 +117,8 @@ function CategoryRow({ category, count = 0, onPick }) {
 }
 
 export default function HomeNav() {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -277,7 +282,10 @@ export default function HomeNav() {
   }, [panel, positionPanel, closePanel]);
 
   return (
-    <nav aria-label="Primary" className="sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16">
+    <nav
+      aria-label={t("admin.sidebar.navigation")}
+      className="user-home-nav sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16"
+    >
       <div className="w-full min-w-0 max-w-full px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
         <div
           ref={navScrollRef}
@@ -286,12 +294,12 @@ export default function HomeNav() {
           {/* PLAIN LINKS — Home | Best Offers | New Arrivals */}
           {NAV_LINKS.map((link) => (
             <Link
-              key={link.label}
+              key={link.labelKey}
               href={link.href}
               onClick={(event) => handleNavClick(event, link)}
               className={itemClass(link.isActive(pathname, activeTab))}
             >
-              {link.label}
+              {t(link.labelKey)}
             </Link>
           ))}
 
@@ -302,7 +310,7 @@ export default function HomeNav() {
               href={`/filtering-product?category=${category._id}`}
               className={`${itemClass(pathname.startsWith(`/?category=${category._id}`))} max-w-[200px}`}
             >
-              <span className="truncate capitalize">{category.name}</span>
+              <span className="truncate capitalize">{fieldOf(category, "name")}</span>
             </Link>
           ))}
 
@@ -319,7 +327,7 @@ export default function HomeNav() {
               onMouseLeave={scheduleMoreClose}
               className={`${itemClass(panel === "more")} gap-1.5`}
             >
-              More
+              {t("storefront.navigation.moreCategories")}
               <ChevronDown
                 size={14}
                 className={`transition-transform duration-200 ${panel === "more" ? "rotate-180" : ""}`}
@@ -342,7 +350,7 @@ export default function HomeNav() {
           {hiddenParents.length > 0 ? (
             <>
               <p className="px-2.5 pb-1.5 pt-1 text-[0.625rem] font-black uppercase tracking-[0.16em] text-[var(--user-text-subtle)]">
-                More Categories
+                {t("storefront.navigation.moreCategories")}
               </p>
               {hiddenParents.slice(0, MORE_DROPDOWN_LIMIT).map((category) => (
                 <CategoryRow
@@ -350,6 +358,7 @@ export default function HomeNav() {
                   category={category}
                   count={counts[idOf(category._id)] || 0}
                   onPick={closePanel}
+                  fieldOf={fieldOf}
                 />
               ))}
               {hiddenParents.length > MORE_DROPDOWN_LIMIT && (
@@ -358,7 +367,7 @@ export default function HomeNav() {
                   onClick={closePanel}
                   className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-[var(--user-bg-hover)] text-[var(--user-accent)] font-medium"
                 >
-                  <span className="text-[0.78125rem]">All Categories</span>
+                  <span className="text-[0.78125rem]">{t("admin.products.filter.allCategories")}</span>
                   <ChevronDown size={14} />
                 </Link>
               )}

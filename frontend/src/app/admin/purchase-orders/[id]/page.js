@@ -18,7 +18,7 @@ const card = { ...edge, background: "linear-gradient(135deg, #ffffff 0%, #f8fafc
 const muted = { color: "#64748b" };
 const primary = { color: "#0f172a" };
 const accent = { color: "#2563eb" };
-const intlLocale = (locale) => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
 const money = (n, locale = "en") => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
 const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
 const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "—";
@@ -179,12 +179,12 @@ export default function PODetailPage({ params }) {
 
             <Panel title={t("admin.purchaseOrders.view.summary")} icon={FileText}>
               <div className="space-y-2 p-4 text-[13px]">
-                <div className="flex justify-between"><span style={muted}>Subtotal</span><span style={primary}>{money(po.subtotal)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Tax ({taxPercent.toLocaleString()}%)</span><span style={primary}>{money(po.tax)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Overall Tax</span><span style={primary}>{money(po.overall_tax)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Shipping</span><span style={primary}>{money(po.shipping)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>{money(po.discount)}</span></div>
-                <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Total</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.subtotal")}</span><span style={primary}>{money(po.subtotal)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.tax")} ({new Intl.NumberFormat(intlLocale(locale)).format(taxPercent)}%)</span><span style={primary}>{money(po.tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.overallTax")}</span><span style={primary}>{money(po.overall_tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.shipping")}</span><span style={primary}>{money(po.shipping)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.discount")}</span><span style={primary}>{money(po.discount)}</span></div>
+                <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>{t("admin.purchaseOrders.detail.total")}</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
               </div>
             </Panel>
           </div>
@@ -195,7 +195,7 @@ export default function PODetailPage({ params }) {
                 <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "admin.purchaseOrders.view.image", "admin.purchaseOrders.view.productVariant", "SKU", "admin.purchaseOrders.view.qtyOrdered", "admin.purchaseOrders.view.costPrice", "admin.purchaseOrders.view.sellPrice", "admin.purchaseOrders.view.lineTotal", "admin.purchaseOrders.view.taxRate", "admin.purchaseOrders.view.expiryAfterDelivery"].map((key) => <th key={key} className="whitespace-nowrap px-2.5 py-2 font-semibold">{key === "#" || key === "SKU" ? key : t(key)}</th>)}</tr></thead>
                 <tbody>{items.map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
-                  <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || "Product"} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
+                  <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || ""} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
                   <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{item.name || "—"}</div><div className="truncate" style={muted}>{item.variantTitle || "—"}</div></td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "—"}</td>
                   <td className="px-2.5 py-2.5 text-center" style={primary}>{item.qty_ordered}</td>

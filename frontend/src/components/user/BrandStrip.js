@@ -11,6 +11,8 @@ import Image from "next/image";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
 import useScrollFade from "../../hooks/user/useScrollFade";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 import {
   idOf,
   imageUrl,
@@ -20,6 +22,8 @@ import {
 const LIMIT = 14;
 
 export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = false }) {
+  const { t, dir } = useTranslation();
+  const { fieldOf } = useLocalized();
   const stripRef = useRef(null);
   // ✅ Counts server facets se — full catalog nahi
   const list = useMemo(() => {
@@ -36,12 +40,12 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
   if (!list.length) return null;
 
   return (
-    <section>
+    <section dir={dir}>
       <SectionHeading
-        title="Shop by Brand"
-        subtitle={`${list.length} featured brands`}
+        title={t("header.topBrands")}
+        subtitle={t("admin.brands.page.title")}
         href="/filtering-product"
-        linkLabel="All brands"
+        linkLabel={t("common.all")}
       />
 
       <div
@@ -50,26 +54,27 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
       >
         {list.map((brand) => {
           const logo = imageUrl(brand.logo);
+          const brandName = fieldOf(brand, "name") || brand.name;
           return (
             <Link
               key={brand._id}
               href={`/filtering-product?brand=${brand._id}`}
-              title={brand.name}
+              title={brandName}
               className="group flex w-[8.75rem] shrink-0 flex-col items-center gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
             >
               <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
                 {logo ? (
-                  <Image src={logo} alt={brand.name} fill loader={smartImageLoader} sizes="48px" className="object-contain" />
+                  <Image src={logo} alt={brandName} fill loader={smartImageLoader} sizes="48px" className="object-contain" />
                 ) : (
                   <span className="text-lg font-black text-[var(--user-accent)]">
-                    {String(brand.name || "?").charAt(0).toUpperCase()}
+                    {String(brandName || "?").charAt(0).toUpperCase()}
                   </span>
                 )}
               </span>
               <span className="w-full truncate text-center text-sm font-medium capitalize text-[var(--user-text)]">
-                {brand.name}
+                {brandName}
               </span>
-              <span className="text-xs font-normal text-[var(--user-text-muted)]">{brand.count} items</span>
+              <span className="text-xs font-normal text-[var(--user-text-muted)]">{t("cart.itemsCount", { count: brand.count })}</span>
             </Link>
           );
         })}

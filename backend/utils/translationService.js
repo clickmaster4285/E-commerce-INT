@@ -131,7 +131,7 @@ function isUsableTranslation(source, translation, locale, options = {}) {
     targetScript &&
     (options.rejectSourceWords || options.productName) &&
     containsUntranslatedLatinWords(original, translated, {
-      preserveFirstWord: options.productName,
+      preserveFirstWord: options.preserveFirstWord === true,
     })
   ) {
     return false;
@@ -254,6 +254,12 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
     const storedHash = getPathValue(nextSource, field) || "";
     const validationOptions = {
       productName: modelName === "Product" && field === "name",
+      // Brand/product tokens (LuxeCarry, FitPro, ...) must survive translation,
+      // same as Product names do via preserveFirstWord. Applies to names of
+      // Discount/Deal/Banner too, which frequently embed brand names.
+      preserveFirstWord:
+        (modelName === "Product" && field === "name") ||
+        (["Discount", "Deal", "Banner"].includes(modelName) && field === "name"),
       rejectSourceWords:
         (modelName === "Product" && field === "description") ||
         ["Review", "Discount", "Deal", "Banner"].includes(modelName),
@@ -472,7 +478,7 @@ async function backfillTranslations(models, opts = {}) {
     // Cursor → poori dataset ek saath memory me nahi aati.
     const cursor = Model.find({ is_deleted: { $ne: true } })
       .select(
-        "_id name description title comment storeResponse.message values translations translation_source translation_status is_deleted"
+        "_id name description title comment storeResponse.message values translations translation_source translation_status is_deleted eyebrow heading altText primaryButton.text secondaryButton.text"
       )
       .lean()
       .cursor();

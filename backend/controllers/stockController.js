@@ -56,13 +56,16 @@ const toStockItem = (variant) => {
     image: variant.images?.[0]?.img_url || "",
     product_id: product?._id || variant.product_id || null,
     product_name: product?.name || "Unknown Product",
+    product_translations: product?.translations || {},
     product_is_deleted: Boolean(product?.is_deleted),
     category_id: product?.category_id?._id || product?.category_id || null,
     // ✅ Fake labels ("Uncategorized" / "No brand") hataye — jab category/brand
     //    assign nahi hai to khaali bhejte hain aur frontend wo line chhupa deta hai.
     category_name: product?.category_id?.name || "",
+    category_translations: product?.category_id?.translations || {},
     brand_id: product?.brand_id?._id || product?.brand_id || null,
     brand_name: product?.brand_id?.name || "",
+    brand_translations: product?.brand_id?.translations || {},
     brand_logo: product?.brand_id?.logo?.img_url || "",
   };
 };
@@ -162,10 +165,10 @@ const getStockOverview = async (req, res) => {
 
     const populateProduct = [{
       path: "product_id",
-      select: "name is_deleted category_id brand_id",
+      select: "name translations is_deleted category_id brand_id",
       populate: [
-        { path: "category_id", select: "name" },
-        { path: "brand_id", select: "name logo" },
+        { path: "category_id", select: "name translations" },
+        { path: "brand_id", select: "name translations logo" },
       ],
     }];
     const variantSelect = "sku title quantity min_qnt max_qnt product_id images";

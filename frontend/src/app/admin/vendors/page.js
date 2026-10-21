@@ -17,7 +17,7 @@ const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--
 const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 const accentBtn = { backgroundColor: "var(--accent)", color: "var(--accent-text)" };
 
-const money = (n) => `Rs. ${(Math.max(0, Number(n) || 0)).toLocaleString()}`;
+const money = (n, locale = "en") => `Rs. ${new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale).format(Math.max(0, Number(n) || 0))}`;
 
 function StatCard({ icon: Icon, tint, label, value, delta }) {
   return (
@@ -108,7 +108,7 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete }) {
 export default function VendorsPage() {
   const qc = useQueryClient();
   const router = useRouter();
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.vendors.page." + k, p);
   const tToast = (k, p) => __t("admin.vendors.toast." + k, p);
   const tShared = (k, p) => __t("admin.shared." + k, p);
@@ -193,10 +193,10 @@ export default function VendorsPage() {
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <StatCard icon={Users} tint="color-mix(in srgb, var(--accent) 14%, transparent)" label={t("totalVendors")} value={stats.total} delta={stats.fresh ? `↑ ${stats.fresh} ${tShared("pagination")}` : "— no change"} />
-        <StatCard icon={UserCheck} tint="var(--success-soft)" label={t("activeVendors")} value={stats.active} delta={stats.freshActive ? `↑ ${stats.freshActive} ${tShared("pagination")}` : "— no change"} />
-        <StatCard icon={UserX} tint="var(--danger-soft)" label={t("inactiveVendors")} value={stats.inactive} delta="— no change" />
-        <StatCard icon={DollarSign} tint="color-mix(in srgb, #f59e0b 16%, transparent)" label={t("totalPurchaseValue")} value={money(stats.purchase)} delta="lifetime purchase value" />
+        <StatCard icon={Users} tint="color-mix(in srgb, var(--accent) 14%, transparent)" label={t("totalVendors")} value={new Intl.NumberFormat(locale).format(stats.total)} delta={stats.fresh ? `↑ ${new Intl.NumberFormat(locale).format(stats.fresh)} ${t("newThisMonth")}` : `— ${t("noChange")}`} />
+        <StatCard icon={UserCheck} tint="var(--success-soft)" label={t("activeVendors")} value={new Intl.NumberFormat(locale).format(stats.active)} delta={stats.freshActive ? `↑ ${new Intl.NumberFormat(locale).format(stats.freshActive)} ${t("newThisMonth")}` : `— ${t("noChange")}`} />
+        <StatCard icon={UserX} tint="var(--danger-soft)" label={t("inactiveVendors")} value={new Intl.NumberFormat(locale).format(stats.inactive)} delta={`— ${t("noChange")}`} />
+        <StatCard icon={DollarSign} tint="color-mix(in srgb, #f59e0b 16%, transparent)" label={t("totalPurchaseValue")} value={money(stats.purchase, locale)} delta={t("lifetimePurchaseValue")} />
       </div>
 
       <div className="rounded-xl overflow-hidden min-w-0" style={cardStyle}>
@@ -242,7 +242,7 @@ export default function VendorsPage() {
                       <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{v.company_name || "—"}</td>
                       <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{v.city || "—"}</td>
                       <td className="px-4 py-2.5 whitespace-nowrap"><span className="inline-flex items-center gap-1"><Star size={12} style={{ color: "#f59e0b" }} />{(Number(v.rating) || 0).toFixed(1)}</span></td>
-                      <td className="px-4 py-2.5 font-semibold">{money(v.balance_payable)}</td>
+                      <td className="px-4 py-2.5 font-semibold">{money(v.balance_payable, locale)}</td>
                       <td className="px-4 py-2.5"><Pill tone={v.is_active ? "active" : "inactive"}>{v.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill></td>
                       <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <VendorRowMenu
