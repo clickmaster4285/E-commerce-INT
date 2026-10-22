@@ -49,6 +49,8 @@ const vendorRoutes = require("./routes/vendorRoutes");
 const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const leadRoutes = require("./routes/leadRoutes");
+const quoteRoutes = require("./routes/quoteRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
 const posRoutes = require("./routes/posRoutes");
 
 // ==========================================
@@ -207,6 +209,8 @@ app.use(`${API_PREFIX}/vendors`, vendorRoutes);
 app.use(`${API_PREFIX}/purchase-orders`, purchaseOrderRoutes);
 app.use(`${API_PREFIX}/customers`, customerRoutes);
 app.use(`${API_PREFIX}/leads`, leadRoutes);
+app.use(`${API_PREFIX}/quotes`, quoteRoutes);
+app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
 app.use(`${API_PREFIX}/pos`, posRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
@@ -279,7 +283,7 @@ const seedDefaultData = async () => {
               profile: true, employees: true, discounts: true,
               deals: true, bundles: true, store: true, banners: true,
               manageStock: true, shipping: true, order: true, attribute: true,
-              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true,
+              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
             },
           });
           log.info("✅ Default Admin Employee Created (employees collection)");
