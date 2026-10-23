@@ -87,6 +87,7 @@ const getPosProducts = async (req, res) => {
         productsByPage.set(productKey, {
           _id: product._id,
           name: product.name,
+          translations: product.translations,
           status: product.status,
           tax: Number(product.tax) || 0,
           category_name: product?.category_id?.name || "",
@@ -141,6 +142,7 @@ const getPosSales = async (req, res) => {
     const sales = await PosSale.find(filter)
       .populate("customer_id", "name phone email")
       .populate("cashier_id", "name email")
+      .populate("items.product_id", "name translations")
       .sort({ created_at: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -157,6 +159,7 @@ const getPosSaleById = async (req, res) => {
     const sale = await PosSale.findById(req.params.id)
       .populate("customer_id", "name phone email address notes")
       .populate("cashier_id", "name email")
+      .populate("items.product_id", "name translations")
       .populate("items.variant_id", "images")
       .lean();
     if (!sale) return res.status(404).json({ success: false, message: "Sale not found" });

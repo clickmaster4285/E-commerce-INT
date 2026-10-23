@@ -449,6 +449,7 @@ export default function PosPage() {
         variant_id: variant._id,
         product_id: product._id,
         product_name: product.name,
+        translations: product.translations,
         variant_title: variant.title || "Default",
         sku: variant.sku || "",
         unit_price: Number(variant.selling_price) || 0,
@@ -911,10 +912,10 @@ export default function PosPage() {
               <article key={item.variant_id} className="border-b border-[var(--border-color)] px-2.5 py-2 last:border-0 hover:bg-[var(--bg-row-hover)]">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-card-alt)]">
-                    {item.image && <Image src={item.image} alt={item.product_name} fill unoptimized className="object-cover" />}
+                    {item.image && <Image src={item.image} alt={productNameOf(item) || item.product_name} fill unoptimized className="object-cover" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{item.product_name}</p>
+                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{productNameOf(item) || item.product_name}</p>
                     <div className="flex min-w-0 items-center justify-between gap-1">
                     <p className="min-w-0 truncate text-[10px] text-[var(--text-secondary)]">{item.variant_title}{item.sku ? ` · ${item.sku}` : ""}</p>
                     <div className="flex shrink-0 items-center gap-1">

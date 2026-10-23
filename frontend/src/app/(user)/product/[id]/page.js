@@ -656,7 +656,7 @@ export default function ProductDetailPage(props) {
 function ProductDetailContent({ params }) {
   const { id } = use(params);
   const { locale, t } = useTranslation();
-  const { productNameOf, fieldOf, reviewTextOf } = useLocalized();
+  const { productNameOf, productDescriptionOf, fieldOf, reviewTextOf } = useLocalized();
   const searchParams = useSearchParams();
   const { product, isLoading, isError } = useProductDetail(id);
   const productName = productNameOf(product) || product?.name || "";
@@ -666,8 +666,8 @@ function ProductDetailContent({ params }) {
   const brandName = product?.brand_id && typeof product.brand_id === "object"
     ? fieldOf(product.brand_id, "name")
     : extractName(product?.brand_id);
-  const fullDescription = fieldOf(product, "description") || "";
-  const shortDescription = fieldOf(product, "short_description") || "";
+  const fullDescription = productDescriptionOf(product) || "";
+  const shortDescription = productDescriptionOf(product, "short_description") || "";
 
   // ✅ User ki apni ratings — product page par sirf apni di hui rating dikhani hai.
   const { data: user = null } = useQuery({
@@ -1175,7 +1175,7 @@ function ProductDetailContent({ params }) {
         </div>
 
         {/* ===== Product details — real description ===== */}
-        {(shortDescription || fullDescription || fieldOf(currentVariant, "description")) && (
+        {(shortDescription || fullDescription || productDescriptionOf(currentVariant)) && (
           <section className="mt-3 bg-[var(--user-bg-card)]">
             <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
               {t("admin.productDetail.page.productDetails")}: {shortDescription || productName}
@@ -1183,10 +1183,10 @@ function ProductDetailContent({ params }) {
             <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-[var(--user-text)]">
               {shortDescription && <p className="font-medium">{shortDescription}</p>}
               {fullDescription && <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">{fullDescription}</p>}
-              {fieldOf(currentVariant, "description") && (
+              {productDescriptionOf(currentVariant) && (
                 <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">
                   <span className="font-semibold text-[var(--user-text)]">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
-                  {fieldOf(currentVariant, "description")}
+                  {productDescriptionOf(currentVariant)}
                 </p>
               )}
             </div>

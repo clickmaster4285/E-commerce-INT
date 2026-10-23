@@ -14,6 +14,7 @@ import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import DealInfoDropdown from "@/components/user/DealInfoDropdown";
 import { useLocalized } from "@/i18n/localize";
+import { useTranslation } from "@/i18n/LanguageProvider";
 import { shippingApi } from "@/apis/user/shippingApi";
 import {
   calculateFreeItems,
@@ -40,17 +41,17 @@ const getImgUrl = (img) => {
   return `${API_ORIGIN}${raw.startsWith("/") ? raw : `/${raw}`}`;
 };
 
-function DealRequirementNotice({ issues }) {
+function DealRequirementNotice({ issues, t, text }) {
   if (!issues.length) return null;
   return (
     <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
       <p className="flex items-center gap-2 font-bold">
         <CircleAlert size={16} />
-        Complete the deal requirement before checkout
+        {t("cart.dealRequirementNotice")}
       </p>
       <ul className="mt-1.5 space-y-1 pl-6 text-xs">
         {issues.map((issue) => (
-          <li key={issue.item.key}>{formatDealRequirementIssue(issue)}</li>
+          <li key={issue.item.key}>{formatDealRequirementIssue(issue, { t, localizedName: text(issue.item?.name, issue.item?.translations?.name) })}</li>
         ))}
       </ul>
     </div>
@@ -77,6 +78,7 @@ function getDealBadgeConfig(deal) {
 export default function CartPage() {
   const router = useRouter();
   const { text } = useLocalized();
+  const { t } = useTranslation();
   const { cart, updateQty, removeFromCart, restoreItems, selectedKeys, isLineSelected, toggleLineSelected, setAllSelected, selectedItems, clearSelection, applyDealToItem } = useCart();
   const { calculateProductDiscount, deals: dealsList = [], getActiveDealsForProduct } = useDiscounts();
   const [collapsedDeals, setCollapsedDeals] = useState(() => new Set());
@@ -302,7 +304,7 @@ export default function CartPage() {
     // ✅ Validate deal requirements BEFORE navigation
     if (dealRequirementIssues.length) {
       const firstIssue = dealRequirementIssues[0];
-      toast.error(formatDealRequirementIssue(firstIssue));
+      toast.error(formatDealRequirementIssue(firstIssue, { t, localizedName: text(firstIssue.item?.name, firstIssue.item?.translations?.name) }));
       // ❌ BLOCK navigation - user stays on cart page
       return;
     }
@@ -544,7 +546,7 @@ export default function CartPage() {
           </span>
         </div>
       )}
-      {hasItems && <div className="mb-5"><DealRequirementNotice issues={dealRequirementIssues} /></div>}
+      {hasItems && <div className="mb-5"><DealRequirementNotice issues={dealRequirementIssues} t={t} text={text} /></div>}
 
       {!hasItems ? (
         <div className="rounded-3xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 sm:p-16 text-center relative overflow-hidden">
@@ -810,7 +812,7 @@ export default function CartPage() {
 
       {/* Content */}
       <div className="bg-[var(--user-bg)] px-3 pt-3 pb-28 min-h-[60vh]">
-        {hasItems && <div className="mb-3"><DealRequirementNotice issues={dealRequirementIssues} /></div>}
+        {hasItems && <div className="mb-3"><DealRequirementNotice issues={dealRequirementIssues} t={t} text={text} /></div>}
         {!hasItems ? (
           <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center">
             <div className="w-20 h-20 rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">

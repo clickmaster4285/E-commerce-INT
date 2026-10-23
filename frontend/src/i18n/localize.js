@@ -92,9 +92,11 @@ function cleanRepeatedProductTitle(text, productName) {
 
 /** Product names fall back as a whole if any English letters remain mixed in. */
 export function localizedProductNameOf(product, locale) {
+  const sourceName = product?.name ?? product?.product_name ?? product?.product_id?.name;
+  const nameTranslations = product?.translations?.name ?? product?.product_id?.translations?.name;
   return localizedContentField(
-    product?.name,
-    product?.translations?.name,
+    sourceName,
+    nameTranslations,
     locale,
     { rejectAnyLatin: true }
   );
@@ -130,19 +132,20 @@ export function useLocalized() {
     const productNameOf = (product) => localizedProductNameOf(product, locale);
 
     /** Replace a repeated English product title with its localized name. */
-    const productDescriptionOf = (product) => {
-      const source = product?.description;
-      let translated = localizedField(source, product?.translations?.description, locale, { allowLatinInTargetScript: true });
+    const productDescriptionOf = (product, field = "description") => {
+      const source = valueAtPath(product, field);
+      const fieldTranslations = valueAtPath(product?.translations, field);
+      let translated = localizedField(source, fieldTranslations, locale, { allowLatinInTargetScript: true });
       const sourceName = String(product?.name || "").trim();
       const hasCurrentTranslation =
         locale !== "en" &&
-        typeof product?.translations?.description?.[locale] === "string" &&
-        product.translations.description[locale].trim();
+        typeof fieldTranslations?.[locale] === "string" &&
+        fieldTranslations[locale].trim();
       if (hasCurrentTranslation) translated = cleanRepeatedProductTitle(translated, sourceName);
       const brandToken = sourceName.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/)?.[0];
       return localizedContentField(
         source,
-        locale === "en" ? product?.translations?.description : { [locale]: translated },
+        locale === "en" ? fieldTranslations : { [locale]: translated },
         locale,
         { allowedLatinWords: brandToken ? [brandToken] : [] }
       );
@@ -239,4 +242,45 @@ export function localizedNameOf(doc, locale) {
 
 export function localizedDescriptionOf(doc, locale) {
   return localizedField(doc?.description, doc?.translations?.description, locale);
+}
+
+const EMPLOYEE_DEPARTMENT_KEYS = {
+  hr: "hr",
+  manager: "manager",
+  it: "it",
+  finance: "finance",
+  marketing: "marketing",
+  customerservice: "customerService",
+  operations: "operations",
+  storemanager: "storeManager",
+};
+
+const EMPLOYEE_ACTIVITY_KEYS = {
+  "employee management": "employeeManagement",
+  "order management": "orderManagement",
+  "product management": "productManagement",
+  "customer management": "customerManagement",
+  "coupon management": "couponManagement",
+  authentication: "authentication",
+  "store management": "storeManagement",
+  "discount management": "discountManagement",
+  "brand management": "brandManagement",
+  "category management": "categoryManagement",
+  "deals management": "dealsManagement",
+  system: "system",
+};
+
+export function employeeDepartmentLabel(value, t) {
+  const normalized = String(value || "").replace(/[^a-z]/gi, "").toLowerCase();
+  const key = EMPLOYEE_DEPARTMENT_KEYS[normalized];
+  return key ? t(`admin.employees.department.${key}`) : value;
+}
+
+export function employeeActivityLabel(value, t) {
+  const key = EMPLOYEE_ACTIVITY_KEYS[String(value || "").trim().toLowerCase()];
+  return key ? t(`admin.employees.activity.${key}`) : value;
+}
+
+export function employeeLocaleTag(locale) {
+  return ({ ur: "ur-PK", hi: "hi-IN", zh: "zh-CN" })[locale] || locale || "en";
 }

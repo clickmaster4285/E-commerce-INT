@@ -453,7 +453,7 @@ export default function ProfilePage() {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--accent)" }} />
           <p className="text-[13px]" style={{ color: "var(--text-muted)" }}>
-            Loading profile...
+            {t("admin.profile.loadingProfile")}
           </p>
         </div>
       </div>
@@ -811,9 +811,7 @@ export default function ProfilePage() {
                       placeholder={t("admin.profile.storeAddressPlaceholder")}
                     />
                     {!hasStorePermission && (
-                      <p className="text-[11px] sm:col-span-2" style={{ color: "var(--text-muted)" }}>
-                        Store name / address change karne ke liye permission chahiye — admin ya kisi authorized staff member se rabta karein.
-                      </p>
+                      <p className="text-[11px] sm:col-span-2" style={{ color: "var(--text-muted)" }}>{t("admin.profile.storeEditPermissionDescription")}</p>
                     )}
                   </div>
                 ) : (

@@ -126,8 +126,13 @@ const REASON_KEYS = {
 
 const stockProductNameOf = (item, locale) => {
   const name = String(item?.product_name || "");
+  // Stock overview returns the whole Product translations object
+  // ({ name: { ur: ... } }), while history passes just the product_name
+  // locale map ({ ur: ... }). Normalize both to the shape the shared helper
+  // expects: translations.name[locale].
+  const nameTranslations = item?.product_translations?.name ?? item?.product_translations;
   const displayName = localizedProductNameOf(
-    { name, translations: { name: item?.product_translations } },
+    { name, translations: { name: nameTranslations } },
     locale
   );
   return /wikipedia|wikipédia|ویکیپیڈیا|维基百科|विकिपीडिया/i.test(displayName || "")

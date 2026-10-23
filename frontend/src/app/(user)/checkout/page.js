@@ -535,7 +535,7 @@ function CheckoutContent() {
     if (draftCreateInFlight.current) return;
     if (!selectedCartItems.length) return toast.error(t("checkout.items.selectAtLeastOne"));
     const dealIssue = getDealRequirementIssues(selectedCartItems)[0];
-    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
 
     draftCreateInFlight.current = true;
     const snap = selectedCartItems.map((i) => ({ ...i }));
@@ -618,7 +618,7 @@ function CheckoutContent() {
     if (!draftReady || placing || step !== 1 || activeItems.length === 0) return;
     const dealIssue = getDealRequirementIssues(activeItems)[0];
     if (dealIssue) {
-      toast.error(formatDealRequirementIssue(dealIssue));
+      toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
       router.replace("/cart");
     }
   }, [activeItems, draftReady, placing, router, step]);
@@ -855,7 +855,7 @@ function CheckoutContent() {
       setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
     }
     const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
-    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
     placingRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);

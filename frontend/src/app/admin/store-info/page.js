@@ -522,10 +522,10 @@ export default function StoreInfoPage() {
       Country.getAllCountries()
         .map((c) => ({
           value: c.isoCode,
-          label: c.name,
+          label: new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale], { type: "region" }).of(c.isoCode) || c.name,
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    []
+    [locale]
   );
 
   const stateOptions = useMemo(() => {
@@ -587,7 +587,7 @@ export default function StoreInfoPage() {
       .codes()
       .map((code) => {
         const currency = cc.code(code);
-        const displayNames = new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en"], { type: "currency" });
+        const displayNames = new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale], { type: "currency" });
         return { value: currency.code, label: `${currency.code} — ${displayNames.of(currency.code) || currency.currency}` };
       })
       .filter((i) => i.value);
@@ -1034,7 +1034,7 @@ export default function StoreInfoPage() {
                     className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
                   />
                   <span style={{ color: "var(--text-muted)" }}>
-                    {isConnected ? "Connected" : "Disconnected"}
+                    {isConnected ? t("admin.storeInfo.page.connected") : t("admin.storeInfo.page.disconnected")}
                   </span>
                 </div>
                 <button
@@ -1052,7 +1052,7 @@ export default function StoreInfoPage() {
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                 >
                   {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  {loading ? "Saving…" : "Save Changes"}
+                  {loading ? t("admin.storeInfo.page.saving") : t("admin.storeInfo.page.saveChanges")}
                 </button>
               </div>
             </div>
@@ -1518,7 +1518,7 @@ export default function StoreInfoPage() {
                   {dv(formData.store_name)}
                 </h2>
                 <p className="text-[13px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
-                  {dv(formData.tagline)}
+                  {formData.tagline === "Welcome to our store" ? t("admin.storeInfo.page.defaultTagline") : dv(formData.tagline)}
                 </p>
               </div>
             </div>
@@ -1548,10 +1548,10 @@ export default function StoreInfoPage() {
               </div>
             </div>
             <div className="p-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <InfoItem icon={Mail} label="Email Address" value={dv(formData.email)} />
-              <InfoItem icon={Phone} label="Phone Number" value={dv(formData.phone)} />
-              <InfoItem icon={Mail} label="Support Email" value={dv(formData.support_email)} />
-              <InfoItem icon={Phone} label="Support Phone" value={dv(formData.support_phone)} />
+              <InfoItem icon={Mail} label={t("admin.storeInfo.page.emailAddress")} value={dv(formData.email)} />
+              <InfoItem icon={Phone} label={t("admin.storeInfo.page.phoneNumber")} value={dv(formData.phone)} />
+              <InfoItem icon={Mail} label={t("admin.storeInfo.page.supportEmail")} value={dv(formData.support_email)} />
+              <InfoItem icon={Phone} label={t("admin.storeInfo.page.supportPhone")} value={dv(formData.support_phone)} />
             </div>
           </div>
 
@@ -1566,12 +1566,12 @@ export default function StoreInfoPage() {
               </div>
             </div>
             <div className="p-4 grid grid-cols-2 gap-4">
-              <InfoItem icon={Globe} label="Country" value={getCountryName(formData.country)} />
-              <InfoItem icon={MapPinned} label="State / Province" value={getStateName(formData.state)} />
-              <InfoItem icon={Building2} label="City" value={dv(formData.city)} />
-              <InfoItem icon={Tag} label="Postal Code" value={dv(formData.zip_code)} />
+              <InfoItem icon={Globe} label={t("admin.storeInfo.page.country")} value={getCountryName(formData.country)} />
+              <InfoItem icon={MapPinned} label={t("admin.storeInfo.page.stateProvince")} value={getStateName(formData.state)} />
+              <InfoItem icon={Building2} label={t("admin.storeInfo.page.city")} value={dv(formData.city)} />
+              <InfoItem icon={Tag} label={t("admin.storeInfo.page.postalCode")} value={dv(formData.zip_code)} />
               <div className="col-span-2">
-                <InfoItem icon={MapPin} label="Store Address" value={dv(formData.address)} />
+                <InfoItem icon={MapPin} label={t("admin.storeInfo.page.storeAddress")} value={dv(formData.address)} />
               </div>
             </div>
           </div>
@@ -1590,12 +1590,12 @@ export default function StoreInfoPage() {
               </div>
             </div>
             <div className="p-4 grid grid-cols-2 gap-4">
-              <InfoItem icon={Briefcase} label="Business Type" value={dv(formData.business_type)} />
-              <InfoItem icon={Users} label="Employees" value={dv(formData.total_employees)} />
-              <InfoItem icon={CalendarDays} label="Year Established" value={dv(formData.year_established)} />
-              <InfoItem icon={Coins} label="Currency" value={getCurrencyName(formData.currency)} />
-              <InfoItem icon={Tag} label="Tax Rate" value={formData.tax_rate !== "" ? `${formData.tax_rate}%` : "—"} />
-              <InfoItem icon={Tag} label="Weight Unit" value={dv(formData.weight_unit)} />
+              <InfoItem icon={Briefcase} label={t("admin.storeInfo.page.businessType")} value={dv(formData.business_type)} />
+              <InfoItem icon={Users} label={t("admin.storeInfo.page.totalEmployees")} value={dv(formData.total_employees)} />
+              <InfoItem icon={CalendarDays} label={t("admin.storeInfo.page.yearEstablished")} value={dv(formData.year_established)} />
+              <InfoItem icon={Coins} label={t("admin.storeInfo.page.currency")} value={getCurrencyName(formData.currency)} />
+              <InfoItem icon={Tag} label={t("admin.storeInfo.page.taxRate")} value={formData.tax_rate !== "" ? `${formData.tax_rate}%` : "—"} />
+              <InfoItem icon={Tag} label={t("admin.storeInfo.page.weightUnit")} value={dv(formData.weight_unit)} />
             </div>
           </div>
 

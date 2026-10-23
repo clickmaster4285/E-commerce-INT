@@ -76,7 +76,7 @@ export default function Footer() {
   });
 
   const storeName = store?.store_name || "";
-  const tagline = store?.tagline || "";
+  const tagline = fieldOf(store, "tagline") || t("store.defaultTagline");
   const supportEmail = store?.support_email || store?.email || "";
   const supportPhone = store?.support_phone || store?.phone || "";
   const country = store?.country || "";
@@ -163,7 +163,7 @@ export default function Footer() {
               {supportEmail && (
                 <li>
                   <Link href={`mailto:${supportEmail}`} className={linkCls}>
-                    Contact Us
+                    {t("footer.contactUs")}
                   </Link>
                 </li>
               )}
@@ -244,7 +244,7 @@ export default function Footer() {
             <div className="flex items-center gap-4 text-xs text-[var(--user-text-muted)]">
               <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.privacyPolicy")}</Link>
               <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.termsConditions")}</Link>
-              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">Cookies</Link>
+              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.cookies")}</Link>
             </div>
           </div>
         </div>

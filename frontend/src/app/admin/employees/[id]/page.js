@@ -48,6 +48,7 @@ import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
 import { useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { employeeActivityLabel, employeeDepartmentLabel, employeeLocaleTag } from "@/i18n/localize";
 
 // ==========================================
 // ✅ ALLOWED PERMISSIONS — sab by default true
@@ -126,6 +127,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   const { t, locale } = useTranslation();
   const [inputValue, setInputValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [filteredOptions, setFilteredOptions] = useState(
     PREDEFINED_DEPARTMENTS
   );
@@ -145,11 +147,12 @@ function DepartmentDropdown({ value, onChange, disabled }) {
     } else {
       setFilteredOptions(
         PREDEFINED_DEPARTMENTS.filter((d) =>
-          d.toLowerCase().includes(inputValue.toLowerCase())
+          d.toLowerCase().includes(inputValue.toLowerCase()) ||
+          employeeDepartmentLabel(d, t).toLowerCase().includes(inputValue.toLowerCase())
         )
       );
     }
-  }, [inputValue]);
+  }, [inputValue, t]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -158,6 +161,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
         !containerRef.current.contains(e.target)
       ) {
         setIsOpen(false);
+        setIsInputFocused(false);
       }
     };
 
@@ -182,13 +186,13 @@ function DepartmentDropdown({ value, onChange, disabled }) {
         <input
           ref={inputRef}
           type="text"
-          value={inputValue}
+          value={!isInputFocused && PREDEFINED_DEPARTMENTS.includes(inputValue) ? employeeDepartmentLabel(inputValue, t) : inputValue}
           onChange={(e) => {
             setInputValue(e.target.value);
             onChange(e.target.value);
             setIsOpen(true);
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => { setIsInputFocused(true); setIsOpen(true); }}
           placeholder={t("admin.employees.form.departmentPlaceholder")}
           disabled={disabled}
           className="w-full h-10 md:h-8 pl-3 pr-7 rounded-md text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 disabled:opacity-50"
@@ -236,7 +240,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
                   setInputValue(dept);
                   onChange(dept);
                   setIsOpen(false);
-                  inputRef.current?.focus();
+                  setIsInputFocused(false);
                 }}
                 className="w-full text-left px-3 py-1.5 text-[13px] transition"
                 style={{
@@ -258,13 +262,16 @@ function DepartmentDropdown({ value, onChange, disabled }) {
                   }
                 }}
               >
-                {dept}
+              {employeeDepartmentLabel(dept, t)}
               </button>
             ))
           )}
 
           {inputValue.trim() &&
-            !PREDEFINED_DEPARTMENTS.includes(inputValue.trim()) && (
+            !PREDEFINED_DEPARTMENTS.some((dept) =>
+              dept.toLowerCase() === inputValue.trim().toLowerCase() ||
+              employeeDepartmentLabel(dept, t).toLowerCase() === inputValue.trim().toLowerCase()
+            ) && (
               <div
                 className="px-3 py-1.5 text-[11px] border-t"
                 style={{
@@ -350,10 +357,10 @@ function EmployeeOverview({
   };
 
   const stats = [
-    { label: t("admin.employees.detail.ordersHandled"), value: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(ordersHandled ?? 0), icon: ShoppingCart, tone: "success", hint: t("admin.employees.detail.lifetimeProcessed") },
-    { label: t("admin.employees.detail.salesGenerated"), value: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(salesGenerated || 0)), icon: DollarSign, tone: "warning", hint: t("admin.employees.detail.totalRevenue") },
-    { label: t("admin.employees.detail.productsAdded"), value: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(productsAdded ?? 0), icon: Package, tone: "info", hint: t("admin.employees.detail.catalogListings") },
-    { label: t("admin.employees.detail.performanceRating"), value: `${new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en", { maximumFractionDigits: 1 }).format(Number(performanceRating || 0))}/5`, icon: Star, tone: "accent", hint: t("admin.employees.detail.averageScore") },
+    { label: t("admin.employees.detail.ordersHandled"), value: new Intl.NumberFormat(employeeLocaleTag(locale)).format(ordersHandled ?? 0), icon: ShoppingCart, tone: "success", hint: t("admin.employees.detail.lifetimeProcessed") },
+    { label: t("admin.employees.detail.salesGenerated"), value: new Intl.NumberFormat(employeeLocaleTag(locale), { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(salesGenerated || 0)), icon: DollarSign, tone: "warning", hint: t("admin.employees.detail.totalRevenue") },
+    { label: t("admin.employees.detail.productsAdded"), value: new Intl.NumberFormat(employeeLocaleTag(locale)).format(productsAdded ?? 0), icon: Package, tone: "info", hint: t("admin.employees.detail.catalogListings") },
+    { label: t("admin.employees.detail.performanceRating"), value: `${new Intl.NumberFormat(employeeLocaleTag(locale), { maximumFractionDigits: 1 }).format(Number(performanceRating || 0))}/5`, icon: Star, tone: "accent", hint: t("admin.employees.detail.averageScore") },
   ];
 
   const enabledPercent =
@@ -514,7 +521,7 @@ function EmployeeOverview({
                       style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                     >
                       <Layers className="h-3 w-3 shrink-0" />
-                      {department}
+                      {employeeDepartmentLabel(department, t)}
                     </span>
                   )}
 
@@ -551,10 +558,10 @@ function EmployeeOverview({
               }}
             >
               {[
-                ["Employee Code", empId, IdCard],
-                ["Department", department, Layers],
-                ["Joined At", joinDate, Calendar],
-                ["Access Level", `${enabledCount}/${totalCount}`, ShieldCheck],
+                [t("admin.employees.detail.employeeCode"), empId, IdCard],
+                [t("admin.employees.form.department"), employeeDepartmentLabel(department, t), Layers],
+                [t("admin.employees.detail.joinedAt"), joinDate, Calendar],
+                [t("admin.employees.detail.accessLevel"), `${enabledCount}/${totalCount}`, ShieldCheck],
               ].map(([label, value, Icon]) => (
                 <div key={label} className="min-w-0">
                   <span
@@ -802,7 +809,7 @@ function EmployeeOverview({
 
           {activityCategories.length > 1 && (
             <div className="no-scrollbar mb-4 flex gap-1.5 overflow-x-auto pb-0.5">
-              {[{ label: t("admin.employees.detail.all"), value: "all" }, ...activityCategories.map((c) => ({ label: c, value: c }))].map(
+              {[{ label: t("admin.employees.detail.all"), value: "all" }, ...activityCategories.map((c) => ({ label: employeeActivityLabel(c, t), value: c }))].map(
                 (chip) => {
                   const activeChip = activityFilter === chip.value;
 
@@ -865,7 +872,7 @@ function EmployeeOverview({
                           className="rounded-full px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wide"
                           style={{ backgroundColor: colors.bg, color: colors.color }}
                         >
-                          {activity.category}
+                          {employeeActivityLabel(activity.category, t)}
                         </span>
 
                         {activity.performedByName && (
@@ -892,7 +899,7 @@ function EmployeeOverview({
                         className="mt-1 text-[9.5px]"
                         style={{ color: "var(--text-muted)", opacity: 0.85 }}
                       >
-                        {new Date(activity.timestamp).toLocaleString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+                        {new Date(activity.timestamp).toLocaleString(employeeLocaleTag(locale), {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -1610,7 +1617,7 @@ export default function EmployeeDetailPage() {
     ? new Date(
         created_at
       ).toLocaleDateString(
-        locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-GB",
+        employeeLocaleTag(locale),
         {
           day: "numeric",
           month: "short",
@@ -1636,7 +1643,7 @@ export default function EmployeeDetailPage() {
         employee.updatedby?.name ||
         employee.updatedby?.email ||
         t("admin.employees.detail.admin"),
-      date: updatedDate.toLocaleString(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US", {
+      date: updatedDate.toLocaleString(employeeLocaleTag(locale), {
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -1691,7 +1698,7 @@ export default function EmployeeDetailPage() {
     ).map(
       ([key, config]) => ({
         key,
-        label: config.label,
+        label: t(`admin.employees.permission.${key}`),
 
         value:
           permissions?.[key] !==
