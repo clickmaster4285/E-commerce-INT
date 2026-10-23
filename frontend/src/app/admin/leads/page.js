@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { CalendarClock, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ContactRound, Eye, MoreHorizontal, Pencil, Plus, Search, Users, X } from "lucide-react";
 
 const emptyForm = { lead_type: "Individual", name: "", phone: "", email: "", company_name: "", business_type: "", business_address: "", city: "", source: "Other", status: "New", assigned_employee_id: "", estimated_deal_value: "", expected_purchase_date: "", next_follow_up_date: "", products: [], custom_requirements: "", notes: "" };
+const PAGE_SIZE = 10;
 const date = (v, locale, t) => v ? new Date(v).toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" }) : t("common.notProvided");
 const statusTone = { New: "bg-[var(--accent-soft)] text-[var(--accent)]", Contacted: "bg-blue-100 text-blue-700", Qualified: "bg-amber-100 text-amber-800", Converted: "bg-[var(--success-soft)] text-[var(--success-text)]", Lost: "bg-[var(--danger-soft)] text-[var(--danger-text)]" };
 const nextLeadStatuses = { New: ["Contacted"], Contacted: ["Qualified"], Qualified: ["Converted", "Lost"] };

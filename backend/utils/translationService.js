@@ -23,9 +23,9 @@
 //    dobara chalane par sirf wahi fields process hote hain.
 //
 // 4. KIS FIELDS TRANSLATE HOTE HAIN / NAHI
-//    Brand, category, attribute aur descriptive product names/descriptions
+//    Brand/category and descriptive product content, plus attribute names,
 //    translate hote hain. Standalone codes/model numbers raw rehte hain.
-//    Category/Attribute ke descriptive `name` translate hote hain.
+//    Attribute options me sirf display `label` translate hota hai.
 //    Attribute option ka `value` machine code hai (variant matching ke liye)
 //    — sirf display wala `label` translate hota hai.
 //
@@ -44,7 +44,7 @@ const TRANSLATABLE_FIELDS = {
   Brand: ["name", "description"],
   Category: ["name", "description"],
   Product: ["name", "description"],
-  Attribute: ["name", "description"], // + values[].label (values[].value raw rehta hai)
+  Attribute: ["name"], // + values[].label (values[].value raw rehta hai)
   Review: ["title", "comment", "storeResponse.message"],
   Discount: ["name", "description"],
   Deal: ["name", "description"],
@@ -65,7 +65,7 @@ const CONTENT_FIELDS = {
   Brand: ["name", "description"],
   Category: ["name", "description"],
   Product: ["name", "description"],
-  Attribute: ["name", "description"],
+  Attribute: ["name"],
   Review: ["title", "comment", "storeResponse.message"],
   Discount: ["name", "description"],
   Deal: ["name", "description"],
@@ -76,6 +76,18 @@ const CONTENT_FIELDS = {
   PurchaseOrder: ["notes", "cancel_reason"],
   Vendor: ["name", "company_name", "address", "city", "state", "country"],
   ShippingMethod: ["name"],
+};
+
+// Translation writes update Mongo directly (outside the normal CRUD routes),
+// so invalidate public API memoized responses as soon as translated data lands.
+const PUBLIC_CACHE_NAMESPACES = {
+  Brand: ["brands", "products"],
+  Category: ["categories", "products"],
+  Product: ["products"],
+  Discount: ["discounts"],
+  Deal: ["deals"],
+  Banner: ["banners"],
+  Variant: ["products"],
 };
 
 /** Chhota, stable hash — staleness detect karne ke liye. */
@@ -196,6 +208,14 @@ function isUsableTranslation(source, translation, locale, options = {}) {
   }[locale];
   if (targetScript && /[a-z]/i.test(original) && !targetScript.test(translated)) {
     return false;
+  }
+
+  if (targetScript && Number.isFinite(options.maxLatinWordRatio)) {
+    const latinWordCount = (translated.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []).length;
+    const translatedWordCount = (translated.match(/[\p{L}\p{N}]+/gu) || []).length;
+    if (translatedWordCount && latinWordCount / translatedWordCount > options.maxLatinWordRatio) {
+      return false;
+    }
   }
 
   if (
@@ -353,7 +373,6 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
     const validationOptions = {
       productName: modelName === "Product" && field === "name",
       rejectAnyLatin:
-        (modelName === "Brand" && field === "name") ||
         ["Discount", "Deal", "Banner", "Variant", "StockHistory", "Order", "PurchaseOrder", "Vendor", "ShippingMethod"].includes(modelName),
       // Brand/product tokens (LuxeCarry, FitPro, ...) must survive translation,
       // same as Product names do via preserveFirstWord. Applies to names of
@@ -364,10 +383,9 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
         (modelName === "StockHistory" && field === "product_name") ||
         (["Discount", "Deal", "Banner"].includes(modelName) && field === "name"),
       rejectSourceWords:
-        (modelName === "Product" && field === "description") ||
         ["Variant", "StockHistory", "Order", "PurchaseOrder"].includes(modelName) ||
+        (modelName === "Brand" && field === "name") ||
         modelName === "Category" ||
-        (modelName === "Brand" && field === "description") ||
         modelName === "Attribute" ||
         ["Review", "Discount", "Deal", "Banner"].includes(modelName),
       allowedLatinWords:
@@ -376,6 +394,11 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
           : modelName === "Brand" && field === "description"
           ? String(getPathValue(doc, "name") || "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []
           : [],
+      maxLatinWordRatio:
+        (modelName === "Product" && field === "description") ||
+        (modelName === "Brand" && field === "description")
+          ? 0.2
+          : undefined,
     };
     const haveTranslation = requestedLocales.every(
       (locale) =>
@@ -561,6 +584,18 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
 
   // ---- PERSIST --------------------------------------------------
   await Model.updateOne({ _id: doc._id }, { $set });
+
+  // Public responses may have been cached before these translations were
+  // saved. Drop affected namespaces so refetches after a locale switch receive
+  // the newly persisted translation maps instead of stale English data.
+  const cacheNamespaces = PUBLIC_CACHE_NAMESPACES[modelName];
+  if (cacheNamespaces?.length) {
+    try {
+      require("./publicCache").invalidate(cacheNamespaces);
+    } catch (error) {
+      log.warn(`[translation] Could not invalidate public ${modelName} cache:`, error?.message || error);
+    }
+  }
 
   return {
     translated: stale.length + labelCount,

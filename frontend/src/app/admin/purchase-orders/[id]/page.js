@@ -134,6 +134,10 @@ export default function PODetailPage({ params }) {
   if (isError || !po) return <div className="rounded-xl border bg-white p-8 text-center" style={edge}><p className="text-sm" style={primary}>{t("admin.purchaseOrders.toast.loadFailed")}</p><button onClick={() => refetch()} className="mt-2 text-sm font-semibold" style={accent}>{t("admin.purchaseOrders.toast.tryAgain")}</button><div><Link href="/admin/purchase-orders" className="mt-3 inline-block text-sm underline" style={muted}>{t("admin.purchaseOrders.detail.poDetails")}</Link></div></div>;
 
   const items = po.items || [];
+  const itemTaxBase = items.reduce((sum, item) => sum + (Number(item.line_total) || 0), 0);
+  const itemTaxPercent = itemTaxBase > 0
+    ? Number(po.tax || 0) / itemTaxBase * 100
+    : 0;
   const vendor = po.vendor_snapshot || {};
   const payments = po.payments || [];
   const status = String(po.status || "pending").toLowerCase();
@@ -196,7 +200,7 @@ export default function PODetailPage({ params }) {
             <Panel title={t("admin.purchaseOrders.view.summary")} icon={FileText}>
               <div className="space-y-2 p-4 text-[13px]">
                 <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.subtotal")}</span><span style={primary}>{money(po.subtotal)}</span></div>
-                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.tax")} ({new Intl.NumberFormat(intlLocale(locale)).format(taxPercent)}%)</span><span style={primary}>{money(po.tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.tax")} ({new Intl.NumberFormat(intlLocale(locale)).format(itemTaxPercent)}%)</span><span style={primary}>{money(po.tax)}</span></div>
                 <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.overallTax")}</span><span style={primary}>{money(po.overall_tax)}</span></div>
                 <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.shipping")}</span><span style={primary}>{money(po.shipping)}</span></div>
                 <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.discount")}</span><span style={primary}>{money(po.discount)}</span></div>

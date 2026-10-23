@@ -137,11 +137,15 @@ function getBannerContent(banner, locale) {
 export default function BannerSlider({ initialBanners = null }) {
   const { locale, dir, t } = useTranslation();
   const { data: banners = [], isLoading } = useQuery({
-    queryKey: ["activeBanners"],
-    queryFn: bannerApi.getActive,
+    // Locale is part of the cache identity so switching languages never
+    // keeps rendering the previous locale's banner snapshot.
+    queryKey: ["activeBanners", locale],
+    queryFn: () => bannerApi.getActive({ limit: 12, locale }),
     // ✅ SSR initialData (R1): key/fn/polling same; server fail → client fetch
     initialData: initialBanners ?? undefined,
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     refetchInterval: 5 * 60 * 1000,
   });
 

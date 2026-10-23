@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
-import axios from "axios";
 import { toast } from "sonner";
+import adminHttp from "../../../apis/axiosInstance";
 import useBannerSocketSync from "../../../hooks/admin/useBannerSocket";
 import { dealApi } from "../../../apis/admin/dealApi";
 import { DealFormModal, SelectionModal } from "../deals/_components/dealModals";
@@ -33,38 +33,6 @@ const getImageUrl = (file) => {
   return `${API_ORIGIN}/${file.replace(/^\/+/, "")}`;
 };
 
-const bannerAxios = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true,
-});
-
-bannerAxios.interceptors.request.use(
-  (config) => {
-    try {
-      const cookies = document.cookie.split(";");
-      const accessTokenCookie = cookies.find((cookie) =>
-        cookie.trim().startsWith("accessToken=")
-      );
-
-      if (accessTokenCookie) {
-        const token = accessTokenCookie
-          .split("=")
-          .slice(1)
-          .join("=")
-          .trim();
-
-        if (token) {
-          config.headers.Authorization = `Bearer ${decodeURIComponent(token)}`;
-        }
-      }
-    } catch (error) {
-      console.error("Banner auth token read error:", error);
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.data)) return response.data;
@@ -88,7 +56,7 @@ const paginated = (res, fallbackLimit) => {
 
 const adminBannerApi = {
   getAll: async () => {
-    const res = await bannerAxios.get("/banners");
+    const res = await adminHttp.get("/banners");
     return res.data.data || [];
   },
 
@@ -97,26 +65,26 @@ const adminBannerApi = {
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (bannerType && bannerType !== "all") params.bannerType = bannerType;
-    const res = await bannerAxios.get("/banners", { params });
+    const res = await adminHttp.get("/banners", { params });
     return paginated(res, limit);
   },
   create: async (data) => {
-    const res = await bannerAxios.post("/banners", data, {
+    const res = await adminHttp.post("/banners", data, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return res.data.data;
   },
   update: async (id, data) => {
-    const res = await bannerAxios.put(`/banners/${id}`, data, {
+    const res = await adminHttp.put(`/banners/${id}`, data, {
       headers: { "Content-Type": "multipart/form-data" },
     });
     return res.data.data;
   },
   delete: async (id) => {
-    await bannerAxios.delete(`/banners/${id}`);
+    await adminHttp.delete(`/banners/${id}`);
   },
   duplicate: async (id) => {
-    const res = await bannerAxios.post(`/banners/${id}/duplicate`);
+    const res = await adminHttp.post(`/banners/${id}/duplicate`);
     return res.data.data;
   },
 };
@@ -1591,7 +1559,7 @@ export default function BannersPage() {
                     {bannerMutation.isPending ? (
                       <span className="flex items-center justify-center gap-2">
                         <Spinner className="w-4 h-4" />{t("common.saving")}</span>
-                    ) : editingBanner ? t("admin.banners.toast.updated") : t("admin.banners.toast.added")}
+                    ) : editingBanner ? t("admin.banners.page.editBanner") : t("admin.banners.page.addBanner")}
                   </button>
                 </div>
               </form>

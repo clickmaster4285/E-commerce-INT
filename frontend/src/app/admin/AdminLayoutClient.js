@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
@@ -113,6 +113,7 @@ const getStoreData = async () => {
 export default function AdminLayout({ children }) {
   const { t: __t, locale, dir } = useTranslation();
   const t = (key, params) => __t(`admin.layout.${key}`, params);
+  const adminMainRef = useRef(null);
 
   const [theme, setTheme] = useState('light');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -120,6 +121,16 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+
+  // A direction change can leave the browser's previous horizontal scroll
+  // offset in place. Since every admin route shares this scrollport, reset it
+  // whenever the locale changes so page headers, toolbars, and buttons remain
+  // in the visible layout area in both LTR and RTL languages.
+  useEffect(() => {
+    const scrollport = adminMainRef.current;
+    if (!scrollport) return;
+    scrollport.scrollLeft = 0;
+  }, [locale]);
 
   // ==========================================
   // LOGIN PAGE
@@ -659,8 +670,11 @@ export default function AdminLayout({ children }) {
         />
 
         {/* Page */}
-        <main dir={dir} lang={locale} className="flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        {/* Keep the scrollport LTR so switching to an RTL locale does not move
+            its horizontal origin and crop the left side of admin pages. Apply
+            locale direction to the content wrapper instead. */}
+        <main ref={adminMainRef} dir="ltr" className="min-w-0 flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
+          <div dir={dir} lang={locale} className="mx-auto min-w-0 w-full max-w-[1600px]">{children}</div>
         </main>
 
       </div>

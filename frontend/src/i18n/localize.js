@@ -56,15 +56,23 @@ const TARGET_SCRIPTS = {
   zh: /\p{Script=Han}/u,
 };
 
-function localizedContentField(source, translations, locale, { preserveFirstWord = false, allowedLatinWords = [], rejectAnyLatin = false } = {}) {
+function localizedContentField(source, translations, locale, { preserveFirstWord = false, allowedLatinWords = [], rejectAnyLatin = false, maxLatinWordRatio = null } = {}) {
   const translated = localizedField(source, translations, locale, { allowLatinInTargetScript: true });
   const targetScript = TARGET_SCRIPTS[locale];
+  const latinWordCount = (String(translated ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []).length;
+  const translatedWordCount = (String(translated ?? "").match(/[\p{L}\p{N}]+/gu) || []).length;
+  const hasExcessLatinWords =
+    maxLatinWordRatio !== null &&
+    translatedWordCount > 0 &&
+    latinWordCount / translatedWordCount > maxLatinWordRatio;
   if (
     translated !== source &&
     targetScript?.test(translated) &&
-    (rejectAnyLatin
-      ? /[A-Za-z]/.test(translated)
-      : hasUntranslatedLatinWords(source, translated, preserveFirstWord, allowedLatinWords))
+    (maxLatinWordRatio !== null
+      ? hasExcessLatinWords
+      : rejectAnyLatin
+        ? /[A-Za-z]/.test(translated)
+        : hasUntranslatedLatinWords(source, translated, preserveFirstWord, allowedLatinWords))
   ) {
     return source;
   }
@@ -150,7 +158,13 @@ export function useLocalized() {
         source,
         locale === "en" ? fieldTranslations : { [locale]: translated },
         locale,
-        { allowedLatinWords: brandToken ? [brandToken] : [] }
+        {
+          allowedLatinWords: brandToken ? [brandToken] : [],
+          // Product copy may correctly retain a brand, model, fabric, or
+          // standard product term in Latin script. Reject only translations
+          // where English still dominates the sentence.
+          maxLatinWordRatio: 0.2,
+        }
       );
     };
 
@@ -166,6 +180,7 @@ export function useLocalized() {
       return localizedContentField(doc?.description, doc?.translations?.description, locale, {
         preserveFirstWord: Boolean(doc?.brand_code),
         allowedLatinWords: brandWords,
+        maxLatinWordRatio: doc?.brand_code ? 0.2 : null,
       });
     };
 

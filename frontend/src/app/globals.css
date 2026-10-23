@@ -393,11 +393,24 @@ html:has([lang="ur"]) :is(
    `truncate` / `whitespace-nowrap` clip Nastaliq mid-glyph and are the single
    biggest source of "text kata hua". Reset on text-bearing tags only. */
 html:has([lang="ur"])
-  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, figcaption, strong, em)
-  :is(.truncate, .whitespace-nowrap) {
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, figcaption, strong, em).truncate,
+html:has([lang="ur"])
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, figcaption, strong, em).whitespace-nowrap {
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
+}
+
+/* Attribute labels use compact text-size utilities; Nastaliq needs taller
+   line boxes and must be allowed to wrap instead of clipping glyphs. */
+html:has([lang="ur"]) :is(.admin-attributes-page, .admin-attributes-detail-panel)
+  :is(h1, h2, h3, h4, p, span, a, label, button, li, td, th, strong, em) {
+  letter-spacing: 0 !important;
+  word-spacing: 0.1em;
+  text-transform: none !important;
+  line-height: 2 !important;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 /* ---- 5. FIXED-HEIGHT TEXT BOXES MUST BE ABLE TO GROW -----------
@@ -429,24 +442,6 @@ html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-8:not
 html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-9:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.25rem; }
 html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-10:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.5rem; }
 html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-11:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.75rem; }
-
-/* Admin actions share a predictable text/icon baseline across locales. Urdu
-   inherits a taller Nastaliq line box, which otherwise pushes icons and labels
-   off-center inside fixed-height Tailwind buttons when the language changes. */
-.admin-panel button {
-  align-items: center;
-  justify-content: center;
-  line-height: 1.35;
-  vertical-align: middle;
-}
-
-/* Let Urdu text buttons grow vertically for Nastaliq marks, while square
-   icon-only controls keep their intentional fixed dimensions. */
-html:has([lang="ur"]) .admin-panel button:not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) {
-  height: auto;
-  min-height: 2.5rem;
-  line-height: 1.8;
-}
 
 /* ---- 6. ADMIN PAGE HEADER (point 3) ----------------------------
    The heading gets line-height 2.2 + padding above, so the subtitle needs a
