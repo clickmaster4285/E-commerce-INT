@@ -1,4 +1,4 @@
-# ADMIN PANEL COMPLETE WORKFLOW REPORT
+rf# ADMIN PANEL COMPLETE WORKFLOW REPORT
 
 ## Is report ko kaise parhein
 
@@ -12,7 +12,7 @@ Sidebar `frontend/src/components/adminComponents/Sidebar.js` mein defined hai. R
 
 | Sidebar section | Page |
 | --- | --- |
-| Dashboard | `frontend/src/app/admin/dashboard/page.js` |
+| Dashboard | `frontend/src/app/admin/dashboard/page.js` |fddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 | Brands | `frontend/src/app/admin/brands/page.js` |
 | Categories | `frontend/src/app/admin/categories/page.js` |
 | Attributes | `frontend/src/app/admin/attributes/page.js` |

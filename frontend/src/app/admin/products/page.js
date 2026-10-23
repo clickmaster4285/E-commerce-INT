@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { productApi } from "@/apis/admin/productApi";
 import { categoryApi } from "@/apis/admin/categoryApi";
@@ -299,6 +300,7 @@ const [viewMode, setViewMode] = useState(() => {
     retry: false,
   });
   const products = productsData?.products || [];
+  usePageTranslations({ model: "Product", records: products, locale, ready: !isFetching && productsData?.pagination?.page === currentPage, queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, PRODUCTS_PER_PAGE], queryClient });
 
   // ✅ NAVIGATION FIX (footer stable rehna chahiye):
   //    Page number click karne par naye page ki query ka apna key hota hai, is liye

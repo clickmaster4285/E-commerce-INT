@@ -12,6 +12,7 @@ import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { translate } from "@/i18n/translations";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
@@ -86,6 +87,8 @@ const formatTarget = (target, t) => {
     category: "admin.discounts.page.categories",
     specific_categories: "admin.discounts.page.categories",
     brand: "admin.discounts.page.brands",
+    specific_brands: "admin.discounts.page.brands",
+    specific_tags: "admin.discounts.page.specificTags",
   };
   return map[target] ? t(map[target]) : String(target).replaceAll("_", " ");
 };
@@ -536,11 +539,12 @@ export default function DiscountsPage() {
   });
   const [formErrors, setFormErrors] = useState({});
 
-  const { data: paginatedDiscountsData, isLoading } = useQuery({
+  const { data: paginatedDiscountsData, isLoading, isFetching } = useQuery({
     queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
     queryFn: () => discountApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: search || "", status: statusFilter === "all" ? "" : statusFilter, applyTo: targetFilter === "all" ? "" : targetFilter }),
   });
   const discounts = paginatedDiscountsData?.items || paginatedDiscountsData || normalizeArrayResponse(paginatedDiscountsData);
+  usePageTranslations({ model: "Discount", records: discounts, locale, ready: !isFetching && paginatedDiscountsData?.pagination?.page === currentPage, queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter], queryClient });
   const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
   const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);

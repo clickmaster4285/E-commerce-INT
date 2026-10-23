@@ -6,6 +6,8 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import { shippingApi } from "@/apis/admin/shippingApi";
 import { useShippingSocketSync } from "@/hooks/admin/useShippingSocketSync";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { localizedStrictField } from "@/i18n/localize";
 
 /* ================= ICONS ================= */
 const TruckIcon = ({ className = "w-4 h-4" }) => (
@@ -439,6 +441,8 @@ export default function ShippingManagementPage() {
     queryFn: shippingApi.getMethods,
     retry: false,
   });
+  usePageTranslations({ model: "ShippingMethod", records: methods, locale, ready: !isLoading, queryKey: ["adminShippingMethods"], queryClient });
+  const shippingMethodName = (method) => localizedStrictField(method?.name, method?.translations?.name, locale);
 
   const configMutation = useMutation({
     mutationFn: (data) => shippingApi.updateConfig(data),
@@ -713,7 +717,7 @@ export default function ShippingManagementPage() {
                           <BoxIcon className="w-4 h-4" />
                         </div>
                         <span className="font-medium text-[13px]" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
-                          {m.name}
+                          {shippingMethodName(m)}
                           {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                         </span>
                       </div>
@@ -742,7 +746,7 @@ export default function ShippingManagementPage() {
                         </button>
                         <button
                           onClick={() => setMethodToDelete(m)}
-                          title={t("admin.shipping.delete.title", { name: m.name })}
+                          title={t("admin.shipping.delete.title", { name: shippingMethodName(m) })}
                           className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
                           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                         >
@@ -761,7 +765,7 @@ export default function ShippingManagementPage() {
         <div className="md:hidden space-y-2.5">
           {/* Standard Mobile Card */}
           <div className="rounded-lg p-3 space-y-2.5 transition" style={cardStyle}>
-            <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--info-soft)", color: "var(--info)" }}>
                 <TruckIcon className="w-4 h-4" />
               </div>
@@ -818,7 +822,7 @@ export default function ShippingManagementPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate leading-tight" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
-                    {m.name}
+                    {shippingMethodName(m)}
                     {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                   </p>
                   <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{formatNumber(m.min_days)}-{formatNumber(m.max_days)} {t("admin.shipping.page.days")}</p>
@@ -845,7 +849,7 @@ export default function ShippingManagementPage() {
                   </button>
                   <button
                     onClick={() => setMethodToDelete(m)}
-                    title={t("admin.shipping.delete.title", { name: m.name })}
+                    title={t("admin.shipping.delete.title", { name: shippingMethodName(m) })}
                     className="h-8 w-8 rounded-lg flex items-center justify-center transition hover:opacity-80 disabled:opacity-50"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--danger)" }}
                   >

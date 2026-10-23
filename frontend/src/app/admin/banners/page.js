@@ -13,6 +13,7 @@ import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 // ==========================================
 // API SETUP
@@ -548,13 +549,15 @@ export default function BannersPage() {
   const [positionDuplicate, setPositionDuplicate] = useState("");
 
   // --- React Query ---
-  const { data: paginatedBannersData, isLoading: loading } = useQuery({
-    queryKey: ["adminBanners", "paginated", currentPage, search, filterStatus, filterType],
+  const bannersQueryKey = ["adminBanners", "paginated", currentPage, search, filterStatus, filterType];
+  const { data: paginatedBannersData, isLoading: loading, isFetching } = useQuery({
+    queryKey: bannersQueryKey,
     queryFn: () => adminBannerApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search, status: filterStatus === "all" ? "" : filterStatus, bannerType: filterType === "all" ? "" : filterType }),
     retry: false,
   });
   const banners = paginatedBannersData?.items || paginatedBannersData || normalizeArrayResponse(paginatedBannersData);
   const pagination = paginatedBannersData?.pagination || { total: banners.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  usePageTranslations({ model: "Banner", records: banners, locale, ready: !isFetching && pagination.page === currentPage, queryKey: bannersQueryKey, queryClient });
 
   // Smallest available positive position (must be after banners is defined)
   const getNextPosition = useCallback(() => {

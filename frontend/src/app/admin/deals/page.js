@@ -14,6 +14,7 @@ import useDealSocketSync from "../../../hooks/admin/useDealSocketSync";
 import { DealFormModal, SelectionModal } from "./_components/dealModals";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== CONSTANTS ==================== */
 // âœ… Server-side pagination â€” ek request par yehi deals aati hain
@@ -82,6 +83,7 @@ const formatTarget = (target, t) => {
     product: "admin.discounts.page.specificProducts",
     category: "admin.discounts.page.categories",
     brand: "admin.discounts.page.brands",
+    collection: "common.collection",
   };
   return map[target] ? t(map[target]) : target;
 };
@@ -315,6 +317,7 @@ export default function DealsPage() {
   });
   // Backend sirf CURRENT PAGE ki deals bhejta hai â†’ { deals, stats, pagination }
   const deals = useMemo(() => normalizeArrayResponse(dealsResponse?.deals ?? dealsResponse), [dealsResponse]);
+  usePageTranslations({ model: "Deal", records: deals, locale, ready: !isFetching && dealsResponse?.pagination?.page === currentPage, queryKey: ["deals", "paginated", currentPage, search, statusFilter, targetFilter], queryClient });
   const pagination = dealsResponse?.pagination || {
     total: 0,
     page: currentPage,

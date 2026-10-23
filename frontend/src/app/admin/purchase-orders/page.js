@@ -6,6 +6,9 @@ import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
 import { vendorApi } from "@/apis/admin/vendorApi";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { localizedStrictField } from "@/i18n/localize";
 import { createPortal } from "react-dom";
 import {
   ClipboardList, Hourglass, CheckCircle2, DollarSign, Plus, Search,
@@ -22,8 +25,8 @@ const fmtDate = (d, locale = "en") => (d ? new Intl.DateTimeFormat(intlLocale(lo
 
 const STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"];
 const PAY_STATUSES = ["unpaid", "partial", "paid"];
-const RANGES = ["all", "7", "30", "90"];
-const PAGE_SIZE = 8;
+const RANGES = [["all", "All time"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]];
+const PAGE_SIZE = 20;
 
 function StatCard({ icon: Icon, tint, label, value, delta, down }) {
   return (
@@ -117,6 +120,7 @@ function PORowMenu({ p, onView, onOpen, onConfirm, onDeliver, onPay, onViewRecei
 
 export default function PurchaseOrdersPage() {
   const { t, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const router = useRouter();
   const qc = useQueryClient();
   const [draft, setDraft] = useState({ search: "", status: "all", vendor: "all", range: "all", payment: "all" });
@@ -145,6 +149,8 @@ export default function PurchaseOrdersPage() {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted);
   }, [vendorsRaw]);
+  usePageTranslations({ model: "Vendor", records: vendorList, locale, ready: !isLoading && !!vendorsRaw, queryKey: ["vendors-all"], queryClient: qc });
+  const vendorById = useMemo(() => new Map(vendorList.map((vendor) => [String(vendor._id), vendor])), [vendorList]);
 
   const now = Date.now(), DAY = 86400000;
   const pctChange = (cur, prev) => {
@@ -183,14 +189,19 @@ export default function PurchaseOrdersPage() {
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pages);
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  usePageTranslations({ model: "PurchaseOrder", records: rows, locale, ready: !isLoading, queryKey: ["pos-all"], queryClient: qc });
+  const poProducts = useMemo(() => rows.flatMap((po) => (po.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id)), [rows]);
+  usePageTranslations({ model: "Product", records: poProducts, locale, ready: !isLoading, queryKey: ["pos-all"], queryClient: qc });
+  const poVariants = useMemo(() => rows.flatMap((po) => (po.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id)), [rows]);
+  usePageTranslations({ model: "Variant", records: poVariants, locale, ready: !isLoading, queryKey: ["pos-all"], queryClient: qc });
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ["pos-all"] }); qc.invalidateQueries({ queryKey: ["po"] }); };
-  const act = (fn, ok) => useMutation({
+  const useActionMutation = (fn, ok) => useMutation({
     mutationFn: fn,
     onSuccess: () => { toast.success(ok); refresh(); },
     onError: () => toast.error(t("admin.purchaseOrders.toast.updateFailed")),
   });
-  const confirmM = act((id) => purchaseOrderApi.confirm(id), t("admin.purchaseOrders.toast.confirmed"));
+  const confirmM = useActionMutation((id) => purchaseOrderApi.confirm(id), t("admin.purchaseOrders.toast.confirmed"));
   const cancelM = useMutation({
     mutationFn: (ids) => Promise.all(ids.map((id) => purchaseOrderApi.cancel(id, "Bulk cancel from list"))),
     onSuccess: () => { toast.success(t("admin.purchaseOrders.toast.cancelledMany")); setSelected([]); refresh(); },
@@ -314,7 +325,7 @@ export default function PurchaseOrdersPage() {
                       <tr key={p._id} onClick={() => router.push(`/admin/purchase-orders/${p._id}`)} className="transition cursor-pointer" style={{ borderBottom: "1px solid var(--border-color)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
                         <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.includes(p._id)} onChange={() => toggleOne(p._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-4 py-2.5 font-mono text-[12px] whitespace-nowrap" style={{ color: "var(--accent)" }}>{p.po_number}</td>
-                        <td className="px-4 py-2.5"><div className="font-medium">{p.vendor_snapshot?.name || p.vendor_id?.name}</div><div className="font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{p.vendor_id?.vendor_code || ""}</div></td>
+                        <td className="px-4 py-2.5"><div className="font-medium">{localizedStrictField(vendorById.get(String(p.vendor_id?._id || p.vendor_id))?.name || p.vendor_snapshot?.name || p.vendor_id?.name, vendorById.get(String(p.vendor_id?._id || p.vendor_id))?.translations?.name || p.vendor_id?.translations?.name, locale)}</div><div className="font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{p.vendor_id?.vendor_code || ""}</div></td>
                         <td className="px-4 py-2.5"><Pill tone={statusTone(p.status)}>{t(`admin.purchaseOrders.status.${p.status}`)}</Pill></td>
                         <td className="px-4 py-2.5"><Pill tone={statusTone(p.payment_status)}>{t(`admin.purchaseOrders.status.${p.payment_status}`)}</Pill></td>
                         <td className="px-4 py-2.5 font-semibold whitespace-nowrap">{money(p.total, locale)}</td>
@@ -342,7 +353,7 @@ export default function PurchaseOrdersPage() {
             </div>
           )}
 
-          <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-[13px]" style={{ color: "var(--text-muted)" }}>
+          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
             <span>{t("admin.purchaseOrders.list.showing", { from: new Intl.NumberFormat(intlLocale(locale)).format(filtered.length ? (safePage - 1) * PAGE_SIZE + 1 : 0), to: new Intl.NumberFormat(intlLocale(locale)).format((safePage - 1) * PAGE_SIZE + rows.length), total: new Intl.NumberFormat(intlLocale(locale)).format(filtered.length) })}</span>
             <div className="flex items-center gap-1">
               <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronLeft size={14} /></button>
@@ -351,7 +362,7 @@ export default function PurchaseOrdersPage() {
               ))}
               <button disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronRight size={14} /></button>
             </div>
-          </div>
+          </footer>}
         </div>
 
       </div>

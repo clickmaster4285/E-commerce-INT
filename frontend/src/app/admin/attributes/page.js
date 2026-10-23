@@ -8,6 +8,7 @@ import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useAttributeSocketSync } from "../../../hooks/admin/useAttributeSocketSync";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 // --- Icons ---
 const SearchIcon = ({ className = "w-4 h-4" }) => (
@@ -724,7 +725,7 @@ export default function AttributesPage() {
   const queryClient = useQueryClient();
   // Static UI labels (headers, stats, buttons, toasts) — database ke nahi,
   // is liye `t()` se aati hain. Nahi milne par English fallback rehta hai.
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
   // `code` aur har option ka raw `value` kabhi translate nahi hote (variant
   // matching unhi par chalti hai) — sirf `name` + option `label` localized.
@@ -803,6 +804,15 @@ export default function AttributesPage() {
   const pagination = Array.isArray(paginatedAttrsData)
     ? { total: attributesRaw.length, page: 1, limit: ATTRS_PER_PAGE, pages: 1 }
     : paginatedAttrsData?.pagination || { total: 0, page: 1, limit: ATTRS_PER_PAGE, pages: 1 };
+
+  usePageTranslations({
+    model: "Attribute",
+    records: attributesRaw,
+    locale,
+    ready: !isFetching && pagination.page === attributePage,
+    queryKey: ["attributes", "paginated", attributePage, search],
+    queryClient,
+  });
 
   // Client-side sort within the current page (server handles search + paging)
   const sortedAttributes = useMemo(() => {

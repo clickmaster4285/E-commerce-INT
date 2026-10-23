@@ -6,7 +6,8 @@ import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
 import { useStockSocketSync } from "../../../hooks/admin/useStockSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { localizedField } from "@/i18n/localize";
+import { localizedField, localizedProductNameOf, useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (url) => {
@@ -123,6 +124,17 @@ const REASON_KEYS = {
   Expired: "expired", "Lost / Stolen": "lost", "Internal Use / Sample": "internal",
 };
 
+const stockProductNameOf = (item, locale) => {
+  const name = String(item?.product_name || "");
+  const displayName = localizedProductNameOf(
+    { name, translations: { name: item?.product_translations } },
+    locale
+  );
+  return /wikipedia|wikipédia|ویکیپیڈیا|维基百科|विकिपीडिया/i.test(displayName || "")
+    ? name
+    : displayName;
+};
+
 // ✅ Stock history ka "Explanation" text:
 // 1) Naya `explanation` field (adjust form ka notes) — agar mojood ho to wahi.
 // 2) Warna purane records ke liye `reason` (custom "Other" reason wahi tha).
@@ -149,7 +161,7 @@ const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
   return image ? (
     <img
       src={image}
-      alt={localizedField(item.product_name, item.product_translations, locale) || t("admin.manageStock.page.product")}
+      alt={stockProductNameOf(item, locale) || t("admin.manageStock.page.product")}
       className={`${size} shrink-0 rounded-lg object-cover`}
       style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
     />
@@ -206,6 +218,7 @@ const FilterPill = ({ value, label, count, active, onSelect }) => (
 /* ================= Main Component ================= */
 export default function ManageStockPage() {
   const { t, locale } = useTranslation();
+  const { contentOf, nameOf } = useLocalized();
   const queryClient = useQueryClient();
   useStockSocketSync();
 
@@ -249,20 +262,31 @@ export default function ManageStockPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  const { data: paginatedStockData, isLoading: loading, isError, error } = useQuery({
-    queryKey: ["stock", "paginated", currentPage, debouncedSearch, statusFilter],
+  const stockQueryKey = ["stock", "paginated", currentPage, debouncedSearch, statusFilter];
+  const { data: paginatedStockData, isLoading: loading, isFetching: stockFetching, isError, error } = useQuery({
+    queryKey: stockQueryKey,
     queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch, status: statusFilter }),
     retry: false,
   });
-  const stockItems = Array.isArray(paginatedStockData?.items)
+  const stockItems = useMemo(() => Array.isArray(paginatedStockData?.items)
     ? paginatedStockData.items
     : Array.isArray(paginatedStockData)
       ? paginatedStockData
-      : [];
+      : [], [paginatedStockData]);
   const stockPagination = paginatedStockData?.pagination || { total: stockItems.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  usePageTranslations({ model: "Variant", records: stockItems, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+  const stockProducts = useMemo(() => stockItems
+    .filter((item) => item.product_id && item.product_name)
+    .map((item) => ({ _id: String(item.product_id), name: item.product_name })), [stockItems]);
+  usePageTranslations({ model: "Product", records: stockProducts, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+  const stockBrands = useMemo(() => stockItems
+    .filter((item) => item.brand_id && item.brand_name)
+    .map((item) => ({ _id: String(item.brand_id), name: item.brand_name })), [stockItems]);
+  usePageTranslations({ model: "Brand", records: stockBrands, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
 
-  const { data: paginatedHistoryData, isLoading: historyLoading } = useQuery({
-    queryKey: ["stock-history", "paginated", historyPage],
+  const historyQueryKey = ["stock-history", "paginated", historyPage];
+  const { data: paginatedHistoryData, isLoading: historyLoading, isFetching: historyFetching } = useQuery({
+    queryKey: historyQueryKey,
     queryFn: () => stockApi.getHistoryPaginated({ page: historyPage, limit: itemsPerPage }),
     enabled: tab === "history",
   });
@@ -272,6 +296,7 @@ export default function ManageStockPage() {
       ? paginatedHistoryData
       : [];
   const historyPagination = paginatedHistoryData?.pagination || { total: historyItems.length, page: historyPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  usePageTranslations({ model: "StockHistory", records: historyItems, locale, ready: tab === "history" && !historyFetching && historyPagination.page === historyPage, queryKey: historyQueryKey, queryClient });
 
   const adjustMutation = useMutation({
     mutationFn: (data) => stockApi.adjust(data),
@@ -289,8 +314,9 @@ export default function ManageStockPage() {
   });
 
   // ===== Stock Details Drawer: variant-specific history (existing API reuse) =====
-  const { data: detailsHistoryData, isLoading: detailsHistoryLoading, isError: detailsHistoryError } = useQuery({
-    queryKey: ["stock-history", "variant", detailsTarget?._id],
+  const detailsHistoryQueryKey = ["stock-history", "variant", detailsTarget?._id];
+  const { data: detailsHistoryData, isLoading: detailsHistoryLoading, isFetching: detailsHistoryFetching, isError: detailsHistoryError } = useQuery({
+    queryKey: detailsHistoryQueryKey,
     queryFn: () => stockApi.getHistoryPaginated({ page: 1, limit: 50, variantId: detailsTarget._id }),
     enabled: !!detailsTarget?._id,
   });
@@ -299,6 +325,7 @@ export default function ManageStockPage() {
     : Array.isArray(detailsHistoryData)
       ? detailsHistoryData
       : [];
+  usePageTranslations({ model: "StockHistory", records: detailsHistory, locale, ready: !!detailsTarget?._id && !detailsHistoryFetching, queryKey: detailsHistoryQueryKey, queryClient });
 
   const openDetails = (item) => setDetailsTarget(item);
   const closeDetails = () => setDetailsTarget(null);
@@ -532,14 +559,14 @@ export default function ManageStockPage() {
                           const status = getStockStatus(item);
                           // ✅ Category/brand assign nahi hai to ye line bilkul render nahi hoti
                           //    (backend ab "Uncategorized"/"No brand" jaisa fake text nahi bhejta).
-                          const metaLine = [localizedField(item.category_name, item.category_translations, locale), localizedField(item.brand_name, item.brand_translations, locale)].filter(Boolean).join(" · ");
+                          const metaLine = [localizedField(item.category_name, item.category_translations, locale), nameOf({ name: item.brand_name, translations: { name: item.brand_translations }, brand_code: true })].filter(Boolean).join(" · ");
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
 <td className="px-4 py-2.5">
   <div className="flex items-center gap-2.5">
     <ProductThumbnail item={item} />
     <div className="flex items-center gap-1.5 min-w-0">
-      <span className="font-medium text-[13px] truncate max-w-[160px] block">{localizedField(item.product_name, item.product_translations, locale)}</span>
+      <span className="font-medium text-[13px] truncate max-w-[160px] block">{stockProductNameOf(item, locale)}</span>
         {metaLine && (
           <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{metaLine}</span>
         )}
@@ -552,7 +579,7 @@ export default function ManageStockPage() {
   </div>
 </td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
-                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{item.title}</span></td>
+                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(item.title, item.translations?.title, locale)}</span></td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{formatNumber(item.quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                               <td className="px-4 py-2.5"><StatusPill status={status} /></td>
                               <td className="px-4 py-2.5 whitespace-nowrap text-right">
@@ -589,7 +616,7 @@ export default function ManageStockPage() {
                           </div>
                                                <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-[13px] font-medium truncate leading-tight">{localizedField(item.product_name, item.product_translations, locale)}</p>
+                            <p className="text-[13px] font-medium truncate leading-tight">{stockProductNameOf(item, locale)}</p>
                               {item.product_is_deleted && (
                                 <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                                   {t("admin.manageStock.page.deleted")}
@@ -675,13 +702,13 @@ export default function ManageStockPage() {
                         const isSet = h.adjustment_type === "set";
                         return (
                           <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistoryItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
-                            <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={localizedField(h.product_name, h.product_translations, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{localizedField(h.product_name, h.product_translations, locale)}</span></div></td>
+                          <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)}</span></div></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
-                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.variant_title}</span></td>
+                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(h.variant_title, h.translations?.variant_title, locale)}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{formatNumber(h.previous_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "var(--warning)" : change > 0 ? "var(--success-text)" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{formatNumber(h.new_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
-                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{h.reason || "—"}</span></td>
+                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{localizedField(h.reason, h.translations?.reason, locale) || "—"}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[12px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDateTime(h.created_at, locale)}</span></td>
                           </tr>
@@ -730,7 +757,7 @@ export default function ManageStockPage() {
                   <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                   <div className="min-w-0">
                     <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.stockDetails")}</h3>
-                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{localizedField(detailsTarget.product_name, detailsTarget.product_translations, locale)}</p>
+                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{stockProductNameOf(detailsTarget, locale)}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-[11px] truncate max-w-[180px]" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</span>
                       <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsTarget.sku}</span>
@@ -754,7 +781,7 @@ export default function ManageStockPage() {
                     <div className="flex items-center gap-3">
                       <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                       <div className="min-w-0">
-                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{localizedField(detailsTarget.product_name, detailsTarget.product_translations, locale)}</p>
+                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{stockProductNameOf(detailsTarget, locale)}</p>
                         <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</p>
                       </div>
                     </div>
@@ -819,7 +846,7 @@ export default function ManageStockPage() {
                                 <span className="text-[13px] font-bold" style={{ color: changeColor(change) }}>
                                   {change > 0 ? `+${formatNumber(change, locale)}` : formatNumber(change, locale)} {t("admin.manageStock.page.units")}
                                 </span>
-                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{h.reason || h.adjustment_type || "—"}</span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{localizedField(h.reason, h.translations?.reason, locale) || h.adjustment_type || "—"}</span>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
                                 <span style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.previousStock")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatNumber(h.previous_quantity, locale)}</span></span>
@@ -830,7 +857,7 @@ export default function ManageStockPage() {
                               {/* ✅ Explanation — adjust form ka notes (full text, wrap ke sath) */}
                               <div className="mt-2.5 pt-2" style={{ borderTop: "1px dashed var(--border-color)" }}>
                                 <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.explanation")}</span>
-                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{explanationOf(h)}</p>
+                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{contentOf(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation : h.translations?.reason)}</p>
                               </div>
                             </div>
                           );
@@ -855,7 +882,7 @@ export default function ManageStockPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.reason")}</span>
-                          <span className="text-[12px] truncate max-w-[200px]" style={{ color: "var(--text-secondary)" }}>{latest.reason || "—"}</span>
+                          <span className="text-[12px] truncate max-w-[200px]" style={{ color: "var(--text-secondary)" }}>{localizedField(latest.reason, latest.translations?.reason, locale) || "—"}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.performedBy")}</span>
@@ -914,7 +941,7 @@ export default function ManageStockPage() {
                   <div className="flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <ProductThumbnail item={adjustTarget} size="h-12 w-12" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{localizedField(adjustTarget.product_name, adjustTarget.product_translations, locale)}</p>
+                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{stockProductNameOf(adjustTarget, locale)}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{adjustTarget.sku}</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{adjustTarget.title}</span>

@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-# Windows console par Urdu/Arabic output ko safely print karne ke liye.
+# Windows console par Urdu/Arabic output ko safely print karne ke liye.gbhghg
 for _stream in ("stdout", "stderr"):
     try:
         getattr(sys, _stream).reconfigure(encoding="utf-8", errors="replace")

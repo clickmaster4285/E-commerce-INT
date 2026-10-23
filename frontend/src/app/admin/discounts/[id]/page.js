@@ -18,6 +18,7 @@ import { validateNonNegative } from "../_components/discountUtils";
 import useDiscountSocketSync from "../../../../hooks/admin/useDiscountSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { translate } from "@/i18n/translations";
 
 /* =========================================================
@@ -57,6 +58,7 @@ function formatTarget(value, locale = "en") {
     specific_products: translate(locale, "admin.discounts.page.specificProducts"), product: translate(locale, "admin.discounts.page.specificProducts"),
     specific_categories: translate(locale, "admin.discounts.page.categories"), category: translate(locale, "admin.discounts.page.categories"),
     specific_brands: translate(locale, "admin.discounts.page.brands"), brand: translate(locale, "admin.discounts.page.brands"),
+    specific_tags: translate(locale, "admin.discounts.page.specificTags"),
     price_range: translate(locale, "admin.discounts.page.priceRange"),
   };
   return map[value] || String(value).replaceAll("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -367,6 +369,10 @@ export default function DiscountDetailPage() {
   const assignedProducts = targetsProducts ? (discount?.selectedProducts || []) : [];
   const assignedCategories = targetsCategories ? (discount?.selectedCategories || []) : [];
   const assignedBrands = targetsBrands ? (discount?.selectedBrands || []) : [];
+  usePageTranslations({ model: "Discount", records: discount ? [discount] : [], locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
+  usePageTranslations({ model: "Product", records: assignedProducts, locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
+  usePageTranslations({ model: "Category", records: assignedCategories, locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
+  usePageTranslations({ model: "Brand", records: assignedBrands, locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
   const targetsEverything = !targetsProducts && !targetsCategories && !targetsBrands;
 
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
@@ -576,7 +582,7 @@ export default function DiscountDetailPage() {
             <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? t("admin.discounts.page.active") : t("admin.discounts.page.inactive")} highlight={isActive} />
           </InfoCard>
           <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")} action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
-            {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{product.name}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
+            {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
               : targetsCategories ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedCategories.length}{" "}{t("admin.promotions.ui.generated.c1c9bccd8a9c")}{assignedCategories.length === 1 ? "y" : "ies"}.</p>
               : targetsBrands ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedBrands.length}{" "}{t("admin.promotions.ui.generated.064e2f5eddac")}{assignedBrands.length === 1 ? "" : "s"}.</p>
               : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.allProducts")}</p>}

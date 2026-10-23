@@ -4,7 +4,10 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
+import { shippingApi } from "@/apis/admin/shippingApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField, useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== ICONS ==================== */
 const ArrowLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
@@ -350,6 +353,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
 /* ==================== MAIN PAGE ==================== */
 export default function OrderDetailPage({ params }) {
   const { t, locale } = useTranslation();
+  const { contentOf, productNameOf } = useLocalized();
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -364,6 +368,13 @@ export default function OrderDetailPage({ params }) {
     },
     retry: 1,
   });
+  usePageTranslations({ model: "Order", records: order ? [order] : [], locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  const { data: shippingMethods = [], isLoading: shippingMethodsLoading } = useQuery({ queryKey: ["adminShippingMethods"], queryFn: shippingApi.getMethods, retry: false });
+  usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient });
+  const orderProducts = useMemo(() => (order?.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id), [order]);
+  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  const orderVariants = useMemo(() => (order?.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id), [order]);
+  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status, cancel_reason }) => orderApi.updateStatus(id, { status, ...(cancel_reason ? { cancel_reason } : {}) }),
@@ -650,12 +661,12 @@ export default function OrderDetailPage({ params }) {
                             <div className="flex items-start gap-3 min-w-0">
                               <OrderItemImage item={item} size={56} />
                               <div className="min-w-0">
-                                <p className="font-semibold" title={item.name}>{item.name}</p>
+                                <p className="font-semibold" title={item.name}>{productNameOf(item.product_id) || item.name}</p>
                                 {item.brand && (
                                   <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.brand", { brand: item.brand })}</p>
                                 )}
-                                {item.variantTitle && (
-                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.variantLabel", { variant: item.variantTitle })}</p>
+                                {(item.variant_id?.title || item.variantTitle) && (
+                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.variantLabel", { variant: contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title) })}</p>
                                 )}
                               </div>
                             </div>
@@ -810,10 +821,11 @@ export default function OrderDetailPage({ params }) {
             <div className="rounded-lg p-4" style={cardStyle}>
               <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.additionalInformation")}</h2>
               <div className="space-y-1.5 text-[13px]">
-                <InfoRow label={t("admin.orders.detail.shippingMethod")} value={order.shipping_method === "standard" ? t("admin.orders.page.standardShipping") : order.shipping_method === "express" ? t("admin.orders.page.expressShipping") : order.shipping_method ? String(order.shipping_method).replace(/_/g, " ") : "—"} capitalize />
+                <InfoRow label={t("admin.orders.detail.shippingMethod")} value={order.shipping_method === "standard" ? t("admin.orders.page.standardShipping") : order.shipping_method === "express" ? t("admin.orders.page.expressShipping") : (shippingMethods.find((method) => method.code === order.shipping_method || String(method._id) === String(order.shipping_method)) ? localizedStrictField(shippingMethods.find((method) => method.code === order.shipping_method || String(method._id) === String(order.shipping_method)).name, shippingMethods.find((method) => method.code === order.shipping_method || String(method._id) === String(order.shipping_method)).translations?.name, locale) : order.shipping_method ? String(order.shipping_method).replace(/_/g, " ") : "—")} capitalize />
                 {order.status === "cancelled" && order.cancel_reason && (
-                  <InfoRow label={t("admin.orders.detail.cancellationReason")} value={order.cancel_reason} />
+                  <InfoRow label={t("admin.purchaseOrders.view.cancelReason")} value={contentOf(order.cancel_reason, order.translations?.cancel_reason)} />
                 )}
+                {order.notes && <InfoRow label={t("admin.customers.detail.notes")} value={contentOf(order.notes, order.translations?.notes)} />}
               </div>
             </div>
           </div>

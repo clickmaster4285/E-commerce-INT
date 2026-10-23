@@ -16,6 +16,7 @@ import { DealFormModal, SelectionModal } from "../_components/dealModals";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import useDealSocketSync from "../../../../hooks/admin/useDealSocketSync";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* =========================================================
    HELPERS
@@ -78,6 +79,7 @@ function formatTarget(target, t) {
     product: "admin.discounts.page.specificProducts",
     category: "admin.discounts.page.categories",
     brand: "admin.discounts.page.brands",
+    collection: "common.collection",
   };
   return map[target] ? t(map[target]) : target;
 }
@@ -502,6 +504,10 @@ export default function DealDetailPage() {
     if (deal?.applyTo !== "brand" || !deal?.brandIds?.length) return [];
     return allBrands.filter((b) => deal.brandIds.some((id) => getId(id) === getId(b)));
   }, [allBrands, deal]);
+  usePageTranslations({ model: "Deal", records: deal ? [deal] : [], locale, ready: !!deal && !loading, queryKey: ["deal", dealId], queryClient });
+  usePageTranslations({ model: "Product", records: selectedProducts, locale, ready: !!deal && !loading, queryKey: ["deal-products"], queryClient });
+  usePageTranslations({ model: "Category", records: selectedCategories, locale, ready: !!deal && !loading, queryKey: ["deal-categories"], queryClient });
+  usePageTranslations({ model: "Brand", records: selectedBrands, locale, ready: !!deal && !loading, queryKey: ["deal-brands"], queryClient });
 
   // ✅ Loading — spinner ki jagah skeleton (real shell: header card + overview cards),
   //    is liye data aane par layout shift nahi hota.
@@ -773,7 +779,7 @@ export default function DealDetailPage() {
                             <div className="w-[68px] h-[68px] rounded-lg overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                               {img ? <img src={img} alt=                              {productNameOf(p) || t("common.product")} className="w-full h-full object-cover" /> : <Box className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
                             </div>
-                            <p className="text-[9px] font-semibold mt-1 truncate text-center" style={{ color: "var(--text-primary)" }}>{p.name || "Product"}</p>
+                            <p className="text-[9px] font-semibold mt-1 truncate text-center" style={{ color: "var(--text-primary)" }}>{productNameOf(p) || t("common.product")}</p>
                           </div>
                         );
                       })}
@@ -802,7 +808,7 @@ export default function DealDetailPage() {
                     {selectedCategories.slice(0, 8).map((c) => (
                       <div key={c._id || c.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                         <Layers className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
-                        <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{c.name || "Category"}</span>
+                        <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{nameOf(c) || t("common.category")}</span>
                       </div>
                     ))}
                     {selectedCategories.length > 8 && (
@@ -831,7 +837,7 @@ export default function DealDetailPage() {
                       return (
                         <div key={b._id || b.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                           {logo ? <img src={logo} alt={b.name || "Brand"} className="w-6 h-6 rounded object-contain shrink-0" /> : <Award className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />}
-                          <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{b.name || "Brand"}</span>
+                          <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{nameOf(b) || t("common.brand")}</span>
                         </div>
                       );
                     })}

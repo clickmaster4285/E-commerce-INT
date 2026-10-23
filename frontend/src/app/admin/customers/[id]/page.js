@@ -9,7 +9,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
   ArrowLeft, CalendarDays, Check, ChevronRight, CreditCard, Mail, MapPin,
-  Eye, Pencil, Phone, Tag, Trash2, UserRound, Users, X,
+  Eye, FilePlus2, Pencil, Phone, Tag, Trash2, UserRound, Users, X,
 } from "lucide-react";
 
 const emptyForm = { name: "", phone: "", email: "", address: "", notes: "" };
@@ -24,6 +24,7 @@ export default function CustomerDetailPage({ params }) {
   const router = useRouter();
   const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [historyTab, setHistoryTab] = useState("pos");
   const [form, setForm] = useState(emptyForm);
   const { data: customer, isLoading, isError } = useQuery({ queryKey: ["customer-detail", id], queryFn: () => customerApi.getById(id) });
 
@@ -100,12 +101,14 @@ export default function CustomerDetailPage({ params }) {
 
     <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
       <PanelHeader icon={CreditCard} title={t("admin.customers.detail.purchaseHistory")} trailing={<span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{t("admin.customers.detail.purchases", { count: customer.total_sales || 0 })}</span>} />
-      <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-start">
+      <div className="flex gap-2 border-b border-[var(--border-color)] px-4 py-3">{[["pos", t("admin.customers.detail.purchaseHistory")], ["quotes", "Quotes"], ["invoices", "Invoices"]].map(([key, label]) => <button key={key} type="button" onClick={() => setHistoryTab(key)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${historyTab === key ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>{label}</button>)}</div>\n      {historyTab === "pos" && <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-start">
         <thead className="bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]"><tr><th className="px-4 py-3">{t("admin.customers.detail.posNumber")}</th><th className="px-4 py-3">{t("common.date")}</th><th className="px-4 py-3">{t("admin.pos.ui.paymentMethod")}</th><th className="px-4 py-3 text-end">{t("common.total")}</th><th className="w-14 px-4 py-3 text-end">{t("admin.customers.detail.view")}</th></tr></thead>
         <tbody>{(customer.recent_sales || []).map((sale) => <tr key={sale._id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]"><td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{sale.sale_number || `POS-${String(sale._id).slice(-6)}`}</td><td className="px-4 py-3 text-xs text-[var(--text-secondary)]">{dateTime(sale.created_at, locale, t)}</td><td className="px-4 py-3 text-xs capitalize text-[var(--text-secondary)]">{paymentLabel(sale.payment?.method, t)}</td><td className="px-4 py-3 text-end text-xs font-bold">{money(sale.total, locale)}</td><td className="px-4 py-3 text-end"><Link href={`/admin/pos/history/${sale._id}`} aria-label={t("admin.customers.detail.viewSale", { sale: sale.sale_number || t("admin.customers.detail.details") })} title={t("admin.customers.detail.viewSaleDetails")} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"><Eye size={15} /></Link></td></tr>)}
           {!(customer.recent_sales || []).length && <tr><td colSpan={5} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">{t("admin.customers.detail.noPurchases")}</td></tr>}
         </tbody>
-      </table></div>
+      </table></div>}
+      {historyTab === "quotes" && <DocumentHistory records={customer.quote_history || []} numberKey="quote_number" dateKey="quote_date" hrefBase="/admin/quotes" emptyText="No quotes recorded for this customer yet." />}
+      {historyTab === "invoices" && <DocumentHistory records={customer.invoice_history || []} numberKey="invoice_number" dateKey="invoice_date" hrefBase="/admin/invoices" emptyText="No invoices recorded for this customer yet." />}
     </section>
 
     {editOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-[fadeIn_180ms_ease-out]" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditOpen(false); }}>
@@ -115,11 +118,26 @@ export default function CustomerDetailPage({ params }) {
         <div className="flex justify-end gap-2 border-t border-[var(--border-color)] px-5 py-3"><button type="button" onClick={() => setEditOpen(false)} className="h-10 rounded-xl border border-[var(--border-color)] px-4 text-xs font-semibold text-[var(--text-secondary)]">{t("common.cancel")}</button><button type="submit" disabled={updateMutation.isPending} className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 text-xs font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"><Check size={14} />{updateMutation.isPending ? t("admin.customers.modal.saving") : t("admin.customers.modal.saveChanges")}</button></div>
       </form>
     </div>}
+
   </div>;
 }
 
 function Metric({ icon: Icon, label, value }) {
   return <div className="flex items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={17} /></span><div className="min-w-0"><p className="text-[10px] font-semibold text-[var(--text-muted)]">{label}</p><p className="mt-1 truncate text-sm font-bold">{value}</p></div></div>;
+}
+function DocumentHistory({ records, numberKey, dateKey, hrefBase, emptyText }) {
+  return <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left">
+      <thead className="bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]"><tr><th className="px-4 py-3">Number</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Total</th><th className="w-14 px-4 py-3 text-right">View</th></tr></thead>
+      <tbody>{records.map((record) => <tr key={record._id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]">
+        <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{record[numberKey] || "—"}</td>
+        <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-secondary)]">{dateTime(record[dateKey] || record.created_at)}</td>
+        <td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{record.status || "—"}</span></td>
+        <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold">{money(record.total)}</td>
+        <td className="px-4 py-3 text-right"><Link href={`${hrefBase}/${record._id}`} aria-label={`View ${record[numberKey] || "record"}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"><Eye size={15} /></Link></td>
+      </tr>)}
+        {!records.length && <tr><td colSpan={5} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">{emptyText}</td></tr>}
+      </tbody>
+    </table></div>;
 }
 function PanelHeader({ icon: Icon, title, trailing }) {
   return <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm"><Icon size={15} /></span><h2 className="text-sm font-bold">{title}</h2><div className="ms-auto">{trailing}</div></div>;

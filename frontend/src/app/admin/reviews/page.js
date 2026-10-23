@@ -23,6 +23,7 @@ import { adminReviewApi } from "@/apis/admin/reviewApi";
 import { useReviewSocketSync } from "../../../hooks/admin/useReviewSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const PER_PAGE = 20;
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -190,6 +191,7 @@ export default function AdminReviewsPage() {
   const reviews = data?.reviews || [];
   const stats = data?.stats || EMPTY_STATS;
   const pagination = data?.pagination || { total: 0, page: 1, pages: 1 };
+  usePageTranslations({ model: "Review", records: reviews, locale, ready: !isFetching && pagination.page === page, queryKey, queryClient });
   const pageList = useMemo(() => buildPageList(pagination.page, pagination.pages), [pagination.page, pagination.pages]);
 
   const handleSearchChange = (value) => {

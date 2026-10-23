@@ -58,6 +58,7 @@ const purchaseOrderSchema = new mongoose.Schema(
     subtotal: { type: Number, required: true, min: 0 },
     tax: { type: Number, default: 0, min: 0 },
     overall_tax: { type: Number, default: 0, min: 0 },
+    overall_tax_rate: { type: Number, default: 0, min: 0, max: 100 },
     shipping: { type: Number, default: 0, min: 0 },
     discount: { type: Number, default: 0, min: 0 },
     total: { type: Number, required: true, min: 0 },
@@ -74,6 +75,18 @@ const purchaseOrderSchema = new mongoose.Schema(
     due_date: { type: Date, default: null },
     notes: { type: String, default: "", trim: true },
     cancel_reason: { type: String, default: "", trim: true },
+    translations: {
+      notes: { type: Map, of: String, default: () => ({}) },
+      cancel_reason: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      notes: { type: String, default: "" },
+      cancel_reason: { type: String, default: "" },
+    },
+    translation_status: {
+      notes: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      cancel_reason: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
     receivings: { type: [receivingSchema], default: [] },
     is_deleted: { type: Boolean, default: false, index: true },
     deleted_at: { type: Date, default: null },

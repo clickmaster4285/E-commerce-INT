@@ -1,11 +1,21 @@
 const mongoose = require("mongoose");
 const Customer = require("../models/Customer");
+const Lead = require("../models/Lead");
 const PosSale = require("../models/PosSale");
+const Quote = require("../models/Quote");
+const Invoice = require("../models/Invoice");
+const syncLeadCustomer = require("../utils/syncLeadCustomer");
 
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getCustomersAdmin = async (req, res) => {
   try {
+    const convertedLeads = await Lead.find({
+      status: { $in: ["Customer", "Converted"] },
+      is_deleted: { $ne: true },
+    });
+    for (const lead of convertedLeads) await syncLeadCustomer(lead, req.user?._id || null);
+
     const search = String(req.query.search || "").trim();
     const q = { is_deleted: { $ne: true } };
     if (search) {
@@ -50,7 +60,11 @@ const getCustomerById = async (req, res) => {
     const customer = await Customer.findOne({ _id: req.params.id, is_deleted: { $ne: true } }).lean();
     if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
 
-    const sales = await PosSale.find({ customer_id: customer._id }).sort({ created_at: -1 }).lean();
+    const [sales, quotes, invoices] = await Promise.all([
+      PosSale.find({ customer_id: customer._id }).sort({ created_at: -1 }).lean(),
+      Quote.find({ customer_id: customer._id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
+      Invoice.find({ customer_id: customer._id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
+    ]);
     const totalSpent = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
 
     res.status(200).json({
@@ -59,7 +73,11 @@ const getCustomerById = async (req, res) => {
         ...customer,
         total_sales: sales.length,
         total_spent: totalSpent,
-        recent_sales: sales.slice(0, 10),
+        recent_sales: sales,
+        quote_count: quotes.length,
+        quote_history: quotes,
+        invoice_count: invoices.length,
+        invoice_history: invoices,
       },
     });
   } catch (error) {
@@ -95,12 +113,28 @@ const updateCustomer = async (req, res) => {
     if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
 
     const allowed = ["name", "phone", "email", "address", "notes"];
+    const before = Object.fromEntries(allowed.map((key) => [key, customer[key] || ""]));
     for (const key of allowed) {
       if (req.body[key] !== undefined) customer[key] = req.body[key];
     }
 
     customer.updatedby = req.user?._id || null;
     await customer.save();
+    const changes = allowed.filter((key) => String(before[key]) !== String(customer[key] || "")).map((key) => ({ field: key[0].toUpperCase() + key.slice(1), from: before[key] || "—", to: customer[key] || "—" }));
+    if (changes.length) {
+      const linkedLead = await Lead.findOne({ customer_id: customer._id, is_deleted: { $ne: true } });
+      if (linkedLead) {
+        linkedLead.history.push({
+          action: "customer",
+          summary: "Customer profile updated",
+          changes,
+          employee_id: req.user?._id || null,
+          employee_name: req.user?.name || "Staff",
+          created_at: new Date(),
+        });
+        await linkedLead.save();
+      }
+    }
     res.status(200).json({ success: true, data: customer });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

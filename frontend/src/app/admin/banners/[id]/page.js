@@ -27,6 +27,7 @@ import {
 import bannerAPI from "@/apis/admin/bannerApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -339,6 +340,7 @@ export default function BannerDetailPage() {
     enabled: !!bannerId,
     retry: false,
   });
+  usePageTranslations({ model: "Banner", records: banner ? [banner] : [], locale, ready: !!banner && !isLoading, queryKey: ["banner", bannerId], queryClient });
 
   const deleteMutation = useMutation({
     mutationFn: () => bannerAPI.delete(bannerId),

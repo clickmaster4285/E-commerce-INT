@@ -49,6 +49,12 @@ const TRANSLATABLE_FIELDS = {
   Discount: ["name", "description"],
   Deal: ["name", "description"],
   Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
+  Variant: ["title"],
+  StockHistory: ["product_name", "variant_title", "reason", "explanation"],
+  Order: ["notes", "cancel_reason"],
+  PurchaseOrder: ["notes", "cancel_reason"],
+  Vendor: ["name", "company_name", "address", "city", "state", "country"],
+  ShippingMethod: ["name"],
 };
 
 // Ye sab translatable *content* fields hain. Jo is list me hain par
@@ -64,6 +70,12 @@ const CONTENT_FIELDS = {
   Discount: ["name", "description"],
   Deal: ["name", "description"],
   Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
+  Variant: ["title"],
+  StockHistory: ["product_name", "variant_title", "reason", "explanation"],
+  Order: ["notes", "cancel_reason"],
+  PurchaseOrder: ["notes", "cancel_reason"],
+  Vendor: ["name", "company_name", "address", "city", "state", "country"],
+  ShippingMethod: ["name"],
 };
 
 /** Chhota, stable hash — staleness detect karne ke liye. */
@@ -92,22 +104,81 @@ function isProductNameIdentifier(value) {
   );
 }
 
-function containsUntranslatedLatinWords(source, translation, { preserveFirstWord = false } = {}) {
+function isGeneratedBrandName(value) {
+  return /^Brand\s+\d+$/i.test(String(value ?? "").trim());
+}
+
+function isGeneratedBannerTitle(value) {
+  return /^(?:Promo\s+)?Banner\s+\d+$/i.test(String(value ?? "").trim());
+}
+
+function containsUntranslatedLatinWords(source, translation, { preserveFirstWord = false, allowedLatinWords = [] } = {}) {
   const sourceWords = String(source ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
   const translatedWords = String(translation ?? "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
   const firstSourceWord = sourceWords[0]?.toLocaleLowerCase();
+  const allowed = new Set(allowedLatinWords.map((word) => String(word).toLocaleLowerCase()));
 
   return translatedWords.some((word, index) => {
     if (/\d/.test(word) || /^[A-Z]{2,6}$/.test(word) || /[a-z][A-Z]/.test(word)) return false;
+    if (allowed.has(word.toLocaleLowerCase())) return false;
     if (preserveFirstWord && index === 0 && word.toLocaleLowerCase() === firstSourceWord) return false;
     return true;
   });
+}
+
+function containsLatinLetters(value) {
+  return /[A-Za-z]/.test(String(value ?? ""));
+}
+
+function cleanRepeatedProductTitle(text, productName) {
+  let output = String(text || "");
+  const title = String(productName || "").trim();
+  if (!output || !title) return output;
+  const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const brand = title.match(/[A-Za-z]+(?:['’][A-Za-z]+)?/)?.[0];
+  output = output.replace(new RegExp(escapedTitle, "gi"), " ");
+  if (brand) {
+    const escapedBrand = brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    output = output.replace(new RegExp(`(?:by|کی طرف سے|بذریعہ)\\s*${escapedBrand}\\.?`, "gi"), " ");
+  }
+  return output.replace(/[.،,:;\s]+/g, " ").trim();
+}
+
+function cleanCategoryDescription(text, sourceDescription, translatedName, locale) {
+  const template = String(sourceDescription || "").trim().match(/^Shop\s+(.+?)\s+products$/i);
+  const localizedName = String(translatedName || "").trim();
+  if (!template || !localizedName) return text;
+
+  let output = String(text || "");
+  const sourceCategoryWords = template[1].match(/[A-Za-z]+/g) || [];
+  const hasUntranslatedCategoryWord = sourceCategoryWords.some((word) =>
+    new RegExp("\\b" + word + "\\b", "i").test(output)
+  );
+  if (!hasUntranslatedCategoryWord) return output;
+
+  for (const word of [...sourceCategoryWords, "shop", "products"]) {
+    output = output.replace(new RegExp("\\b" + word + "\\b", "gi"), " ");
+  }
+  output = output.replace(/[&.,]+/g, " ").replace(/\s+/g, " ").trim();
+  const categoryDescriptions = {
+    ur: (name) => name + " کی مصنوعات",
+    ar: (name) => "منتجات " + name,
+    es: (name) => "Productos de " + name,
+    fr: (name) => "Produits " + name,
+    de: (name) => "Produkte aus " + name,
+    hi: (name) => name + " के उत्पाद",
+    pt: (name) => "Produtos de " + name,
+    tr: (name) => name + " ürünleri",
+    zh: (name) => name + "商品",
+  };
+  return categoryDescriptions[locale]?.(localizedName) || (localizedName + (output ? " " + output : ""));
 }
 
 function isUsableTranslation(source, translation, locale, options = {}) {
   const original = String(source ?? "").trim();
   const translated = String(translation ?? "").trim();
   if (!translated) return false;
+  if (/wikipedia|wikipédia|ویکیپیڈیا|维基百科|विकिपीडिया/i.test(translated)) return false;
 
   if (
     /\p{L}/u.test(original) &&
@@ -129,9 +200,18 @@ function isUsableTranslation(source, translation, locale, options = {}) {
 
   if (
     targetScript &&
+    options.rejectAnyLatin &&
+    containsLatinLetters(translated)
+  ) {
+    return false;
+  }
+
+  if (
+    targetScript &&
     (options.rejectSourceWords || options.productName) &&
     containsUntranslatedLatinWords(original, translated, {
       preserveFirstWord: options.preserveFirstWord === true,
+      allowedLatinWords: options.allowedLatinWords || [],
     })
   ) {
     return false;
@@ -143,7 +223,7 @@ function isUsableTranslation(source, translation, locale, options = {}) {
 
 /** Mongoose Map bhi object ho sakta hai — dono ko plain object bana do. */
 function toPlain(mapOrObject) {
-  if (!mapOrObject) return {};
+  if (mapOrObject == null) return {};
   const plain = typeof mapOrObject.toObject === "function" ? mapOrObject.toObject() : mapOrObject;
   if (Array.isArray(plain)) return plain.map(toPlain);
   if (typeof plain !== "object") return plain;
@@ -194,6 +274,9 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
   if (!isEnabled()) return { translated: 0, failed: false };
 
   const force = opts.force === true;
+  const requestedLocales = Array.isArray(opts.locales)
+    ? [...new Set(opts.locales.filter((locale) => TARGET_LOCALES.includes(locale)))]
+    : TARGET_LOCALES;
   const modelName = Model.modelName;
 
   // Doc-like (has `_id`) → use as-is; warna id se load karo.
@@ -227,6 +310,20 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
     }
 
     const text = String(getPathValue(doc, field) ?? "").trim();
+    // Seed/demo labels are identifiers, not natural-language brand names.
+    // Translation engines often hallucinate unrelated phrases for these.
+    if (modelName === "Brand" && field === "name" && isGeneratedBrandName(text)) {
+      setPathValue(nextStatus, field, "skipped");
+      deletePathValue(nextTranslations, field);
+      deletePathValue(nextSource, field);
+      continue;
+    }
+    if (modelName === "Banner" && field === "title" && isGeneratedBannerTitle(text)) {
+      setPathValue(nextStatus, field, "skipped");
+      deletePathValue(nextTranslations, field);
+      deletePathValue(nextSource, field);
+      continue;
+    }
     if (modelName === "Product" && field === "name" && isProductNameIdentifier(text)) {
       setPathValue(nextStatus, field, "skipped");
       deletePathValue(nextTranslations, field);
@@ -252,19 +349,35 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
 
     const currentHash = hashText(text);
     const storedHash = getPathValue(nextSource, field) || "";
+    const translationText = text;
     const validationOptions = {
       productName: modelName === "Product" && field === "name",
+      rejectAnyLatin:
+        (modelName === "Product" && field === "name") ||
+        (modelName === "Brand" && field === "name") ||
+        ["Discount", "Deal", "Banner", "Variant", "StockHistory", "Order", "PurchaseOrder", "Vendor", "ShippingMethod"].includes(modelName),
       // Brand/product tokens (LuxeCarry, FitPro, ...) must survive translation,
       // same as Product names do via preserveFirstWord. Applies to names of
       // Discount/Deal/Banner too, which frequently embed brand names.
       preserveFirstWord:
-        (modelName === "Product" && field === "name") ||
+        (modelName === "Brand" && (field === "name" || field === "description")) ||
+        (modelName === "StockHistory" && field === "product_name") ||
         (["Discount", "Deal", "Banner"].includes(modelName) && field === "name"),
       rejectSourceWords:
         (modelName === "Product" && field === "description") ||
+        ["Variant", "StockHistory", "Order", "PurchaseOrder"].includes(modelName) ||
+        modelName === "Category" ||
+        (modelName === "Brand" && field === "description") ||
+        modelName === "Attribute" ||
         ["Review", "Discount", "Deal", "Banner"].includes(modelName),
+      allowedLatinWords:
+        modelName === "Product" && field === "description"
+          ? [String(getPathValue(doc, "name") || "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/)?.[0] || ""]
+          : modelName === "Brand" && field === "description"
+          ? String(getPathValue(doc, "name") || "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || []
+          : [],
     };
-    const haveTranslation = TARGET_LOCALES.every(
+    const haveTranslation = requestedLocales.every(
       (locale) =>
         isUsableTranslation(
           text,
@@ -280,11 +393,15 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
       continue;
     }
 
+    // English source badla ho to purani translations ab stale hain; clear
+    // unhein warna doosri language purana text dikha sakti hai.
+    if (storedHash && storedHash !== currentHash) setPathValue(nextTranslations, field, {});
     setPathValue(nextSource, field, currentHash);
     setPathValue(nextStatus, field, "pending");
     stale.push({
       field,
       text,
+      translationText,
       validationOptions,
       preserveValidTranslations: !force && storedHash === currentHash,
     });
@@ -292,15 +409,15 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
 
   // ---- TRANSLATE ------------------------------------------------
   // Document ke andar same text ek hi baar translate hoga.
-  const uniqueTexts = [...new Set(stale.map((item) => item.text))];
+  const uniqueTexts = [...new Set(stale.map((item) => item.translationText || item.text))];
   /** @type {Map<string, Map<string,string>>} english -> (locale -> urdu) */
   const results = new Map();
   let failed = false;
   let invalidTranslation = false;
 
   if (uniqueTexts.length) {
-    for (const locale of TARGET_LOCALES) {
-      const translated = await translateBatch(uniqueTexts, locale);
+    for (const locale of requestedLocales) {
+    const translated = await translateBatch(uniqueTexts, locale);
       if (translated === null) {
         failed = true;
         break;
@@ -312,9 +429,9 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
   }
 
   if (!failed) {
-    for (const { field, text, validationOptions, preserveValidTranslations } of stale) {
+    for (const { field, text, translationText, validationOptions, preserveValidTranslations } of stale) {
       const perLocale = toPlain(getPathValue(nextTranslations, field));
-      for (const locale of TARGET_LOCALES) {
+      for (const locale of requestedLocales) {
         if (
           preserveValidTranslations &&
           isUsableTranslation(text, perLocale[locale], locale, validationOptions)
@@ -322,7 +439,20 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
           continue;
         }
 
-        const out = results.get(locale)?.get(text);
+        let out = results.get(locale)?.get(translationText || text);
+        // Product title alag column me dikh raha hai; description ke andar
+        // repeat hua title aur "by Brand" boilerplate hata do.
+        if (modelName === "Product" && field === "description" && out) {
+          out = cleanRepeatedProductTitle(out, getPathValue(doc, "name"));
+        }
+        if (modelName === "Category" && field === "description" && out) {
+          out = cleanCategoryDescription(
+            out,
+            text,
+            getPathValue(nextTranslations, "name")?.[locale],
+            locale
+          );
+        }
         if (
           isUsableTranslation(text, out, locale, validationOptions)
         ) {
@@ -371,7 +501,7 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
       if (force) return true;
       if ((v?.label_source || "") !== hashText(entry.label)) return true;
       const have = toPlain(v?.label_translations);
-      return TARGET_LOCALES.some(
+      return requestedLocales.some(
         (locale) => !isUsableTranslation(entry.label, have[locale], locale)
       );
     });
@@ -383,7 +513,7 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
       // hardcode tha, jis se sirf Urdu banta tha aur Arabic chhoot jata tha.
       /** @type {Map<string, Map<string,string>>} english -> (locale -> text) */
       const labelResults = new Map();
-      for (const locale of TARGET_LOCALES) {
+      for (const locale of requestedLocales) {
         const translated = await translateBatch(uniqueLabels, locale);
         if (translated === null) {
           // Engine down → labels raw (English) rehengi, retry backfill me.
@@ -435,6 +565,7 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
   return {
     translated: stale.length + labelCount,
     failed: failed || invalidTranslation,
+    serviceUnavailable: failed,
   };
 }
 
@@ -524,6 +655,8 @@ module.exports = {
   hashText,
   isTranslatableText,
   isProductNameIdentifier,
+  cleanRepeatedProductTitle,
+  cleanCategoryDescription,
   syncDocumentTranslations,
   queueTranslationSync,
   backfillTranslations,

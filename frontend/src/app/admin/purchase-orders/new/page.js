@@ -12,6 +12,8 @@ import VariantForm from "@/components/admin/VariantForm";
 import VendorFormModal, { emptyVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { Plus, Search, Building2, CalendarDays, ChevronDown, MoreVertical, Package } from "lucide-react";
 
 // Same tokens as the rest of the admin — no new design system.
@@ -74,11 +76,25 @@ function NewPOPage() {
   const [lines, setLines] = useState([]); // each line: { ..., included: true }
   const [shipping, setShipping] = useState(0);
   const [discount, setDiscount] = useState(0);
-  const [overallTax, setOverallTax] = useState(0);
+  const [overallTaxRate, setOverallTaxRate] = useState(0);
   const [notes, setNotes] = useState("");
   const [sideTab, setSideTab] = useState("items");
   const [events, setEvents] = useState([{ t: nowStamp(locale), label: t("admin.purchaseOrders.create.event.started") }]);
   const vendorBoxRef = useRef(null);
+  const expectedDateRef = useRef(null);
+
+  const openExpectedDatePicker = () => {
+    const input = expectedDateRef.current;
+    if (!input) return;
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+        return;
+      }
+    } catch {}
+    input.focus();
+    input.click();
+  };
 
   const pushEvent = (label) => setEvents((e) => [...e, { t: nowStamp(locale), label }]);
 
@@ -87,6 +103,9 @@ function NewPOPage() {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted && v.is_active);
   }, [vendorsRaw]);
+  usePageTranslations({ model: "Vendor", records: vendorList, locale, ready: !!vendorsRaw, queryKey: ["vendors-all"], queryClient: qc });
+  const vendorNameOf = (vendor) => localizedStrictField(vendor?.name, vendor?.translations?.name, locale);
+  const vendorCompanyOf = (vendor) => localizedStrictField(vendor?.company_name, vendor?.translations?.company_name, locale);
   const vendorOptions = useMemo(() => {
     const q = vendorSearch.trim().toLowerCase();
     if (!q) return vendorList;
@@ -107,7 +126,7 @@ function NewPOPage() {
       setVendorId(vendor._id);
       setVendorFormOpen(false);
       setVendorForm({ ...emptyVendorForm, country: "Pakistan" });
-      pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: vendor.name }));
+      pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: vendorNameOf(vendor) }));
       toast.success(t("admin.purchaseOrders.create.toast.vendorCreated"));
     },
     onError: () => toast.error(t("admin.purchaseOrders.create.toast.vendorFailed")),
@@ -322,9 +341,12 @@ function NewPOPage() {
     }
     const ship = Math.max(0, Number(shipping) || 0);
     const disc = Math.max(0, Number(discount) || 0);
-    const extraTax = Math.max(0, Number(overallTax) || 0);
-    return { subtotal, tax, overallTax: extraTax, shipping: ship, discount: disc, total: Math.max(0, Math.round(subtotal + tax + extraTax + ship - disc)) };
-  }, [includedLines, shipping, discount, overallTax]);
+    const taxBase = Math.max(0, subtotal - disc);
+    const extraTaxRate = Math.min(100, Math.max(0, Number(overallTaxRate) || 0));
+    const extraTax = Math.round(taxBase * extraTaxRate / 100);
+    const totalTax = tax + extraTax;
+    return { subtotal, tax: totalTax, overallTaxAmount: extraTax, shipping: ship, discount: disc, total: Math.max(0, Math.round(subtotal + totalTax + ship - disc)) };
+  }, [includedLines, shipping, discount, overallTaxRate]);
 
   const buildPayload = () => ({
     vendor_id: vendorId,
@@ -339,7 +361,8 @@ function NewPOPage() {
     })),
     shipping: Math.max(0, Number(shipping) || 0),
     discount: Math.max(0, Number(discount) || 0),
-    overall_tax: Math.max(0, Number(overallTax) || 0),
+    overall_tax: totals.overallTaxAmount,
+    overall_tax_rate: Math.min(100, Math.max(0, Number(overallTaxRate) || 0)),
     expected_date: expectedDate || undefined,
     notes: notes.trim() || undefined,
   });
@@ -447,7 +470,7 @@ function NewPOPage() {
                 <FieldLabel required>{t("admin.purchaseOrders.create.vendor")}</FieldLabel>
                 <button type="button" onClick={() => setVendorOpen((o) => !o)} className="w-full h-10 px-4 rounded-xl text-sm flex items-center justify-between gap-2 outline-none shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: selectedVendor ? "#0f172a" : "#64748b" }}>
                   <span className="flex items-center gap-2.5 truncate font-medium">
-                    <Search size={14} className="shrink-0" style={{ color: "#2563eb" }} />{selectedVendor ? `${selectedVendor.name} (${selectedVendor.vendor_code})` : t("admin.purchaseOrders.create.selectVendor")}
+                    <Search size={14} className="shrink-0" style={{ color: "#2563eb" }} />{selectedVendor ? `${vendorNameOf(selectedVendor)} (${selectedVendor.vendor_code})` : t("admin.purchaseOrders.create.selectVendor")}
                   </span>
                   <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{ color: "#94a3b8", background: "#f1f5f9" }}>▾</span>
                 </button>
@@ -459,8 +482,8 @@ function NewPOPage() {
                     <div className="max-h-[240px] overflow-x-hidden overflow-y-auto py-1 px-2">
                       {vendorOptions.map((v) => (
                         <button key={v._id} type="button" onClick={() => { setVendorId(v._id); setVendorOpen(false); setVendorSearch(""); pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: v.name })); }} className="w-full px-4 py-3 text-left text-[13px] transition-all duration-150 rounded-xl my-0.5" style={{ backgroundColor: v._id === vendorId ? "rgba(37,99,235,0.08)" : "transparent", border: v._id === vendorId ? "1px solid rgba(37,99,235,0.2)" : "1px solid transparent" }} onMouseEnter={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "#f8fafc"; e.currentTarget.style.borderColor = "#e2e8f0"; } }} onMouseLeave={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "transparent"; } }}>
-                          <div className="font-bold text-sm" style={{ color: v._id === vendorId ? "#2563eb" : "#0f172a" }}>{v.name} <span className="font-mono font-normal text-[11px]" style={{ color: "#64748b" }}>{v.vendor_code}</span></div>
-                          <div className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{[v.company_name, v.city].filter(Boolean).join(" · ")}</div>
+                          <div className="font-bold text-sm" style={{ color: v._id === vendorId ? "#2563eb" : "#0f172a" }}>{vendorNameOf(v)} <span className="font-mono font-normal text-[11px]" style={{ color: "#64748b" }}>{v.vendor_code}</span></div>
+                          <div className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{[vendorCompanyOf(v), localizedStrictField(v.city, v.translations?.city, locale)].filter(Boolean).join(" · ")}</div>
                         </button>
                       ))}
                       {!vendorOptions.length && <p className="px-4 py-6 text-center text-sm font-medium" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.noVendor")}</p>}
@@ -476,8 +499,10 @@ function NewPOPage() {
               <div>
                 <FieldLabel>{t("admin.purchaseOrders.create.expectedDelivery")}</FieldLabel>
                 <div className="relative">
-                  <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
-                  <CalendarDays size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#94a3b8" }} />
+                  <input ref={expectedDateRef} type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="po-expected-date w-full h-10 px-4 pr-10 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                  <button type="button" onClick={openExpectedDatePicker} aria-label="Open expected delivery date calendar" className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-600 transition hover:bg-blue-50 hover:text-blue-700">
+                    <CalendarDays size={16} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -489,7 +514,7 @@ function NewPOPage() {
                 <p className="text-xs font-extrabold tracking-wide uppercase" style={{ color: "#2563eb" }}>{t("admin.purchaseOrders.create.vendorDetails")}</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-[13px]">
-                {[ ["admin.purchaseOrders.detail.name", selectedVendor?.name], ["admin.purchaseOrders.view.companyName", selectedVendor?.company_name], ["admin.purchaseOrders.detail.email", selectedVendor?.email], ["admin.purchaseOrders.detail.phone", selectedVendor?.phone], ["admin.purchaseOrders.view.city", selectedVendor?.city] ].map(([key, val]) => (
+                {[ ["admin.purchaseOrders.detail.name", vendorNameOf(selectedVendor)], ["admin.purchaseOrders.view.companyName", vendorCompanyOf(selectedVendor)], ["admin.purchaseOrders.detail.email", selectedVendor?.email], ["admin.purchaseOrders.detail.phone", selectedVendor?.phone], ["admin.purchaseOrders.view.city", localizedStrictField(selectedVendor?.city, selectedVendor?.translations?.city, locale)] ].map(([key, val]) => (
                   <div key={key} className="rounded-xl p-3 shadow-sm transition hover:shadow-md" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
                     <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1" style={{ color: "#94a3b8" }}>{t(key)}</div>
                     <div className="font-bold text-sm truncate" style={{ color: "#0f172a" }}>{val || "—"}</div>
@@ -521,10 +546,6 @@ function NewPOPage() {
               <>
                 <div className="flex items-center justify-between gap-2 px-1 py-2 text-[12px] rounded-lg" style={{ backgroundColor: "rgba(37,99,235,0.04)", border: "1px solid rgba(37,99,235,0.1)" }}>
                   <span className="font-semibold px-2" style={{ color: "#2563eb" }}>{t("admin.purchaseOrders.create.variantsIncluded", { included: includedLines.length, total: lines.length })}</span>
-                  <div className="flex items-center gap-3">
-                    <button onClick={() => setLines((prev) => prev.map((line) => ({ ...line, included: true })))} className="underline font-bold text-[11px] transition hover:text-blue-700" style={{ color: "#2563eb" }}>{t("admin.purchaseOrders.create.selectAll")}</button>
-                    <button onClick={() => setLines((prev) => prev.map((line) => ({ ...line, included: false })))} className="underline font-medium text-[11px] transition hover:text-slate-500" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.deselectAll")}</button>
-                  </div>
                 </div>
                 <div className="mt-2 space-y-3">
                   {groupedLines.map((group) => (
@@ -585,9 +606,9 @@ function NewPOPage() {
               </>
             )}
           </section>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid items-stretch md:grid-cols-2 gap-4">
             {/* 3. Additional Details */}
-            <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
+            <section className="flex h-full flex-col rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}>
                   <Plus size={16} color="#fff" />
@@ -604,8 +625,11 @@ function NewPOPage() {
                   <input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
                 </div>
                 <div>
-                  <FieldLabel>{t("admin.purchaseOrders.create.overallTax")} (Rs.)</FieldLabel>
-                  <input type="number" min={0} value={overallTax} onChange={(e) => setOverallTax(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                  <FieldLabel>Overall Tax (%)</FieldLabel>
+                  <div className="relative">
+                    <input type="number" min={0} max={100} step="0.01" value={overallTaxRate} onChange={(e) => setOverallTaxRate(e.target.value)} className="w-full h-10 pl-4 pr-10 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
+                    <span className="absolute inset-y-0 right-4 flex items-center text-sm font-medium" style={{ color: "#64748b" }}>%</span>
+                  </div>
                 </div>
               </div>
               <div className="mt-4">
@@ -614,7 +638,7 @@ function NewPOPage() {
               </div>
             </section>
             {/* 4. Summary */}
-            <section className="rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
+            <section className="flex h-full flex-col rounded-2xl p-5 shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
               <div className="flex items-center gap-2.5 mb-4">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}>
                   <span className="text-[10px] font-extrabold text-white">Rs</span>
@@ -624,7 +648,7 @@ function NewPOPage() {
               <div className="text-sm space-y-2.5">
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.subtotal")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.tax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTaxAmount)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.shipping")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.discount")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
                 <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>{t("admin.purchaseOrders.create.total")}</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
@@ -686,7 +710,7 @@ function NewPOPage() {
                 <div className="text-sm space-y-1.5">
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.subtotal")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.tax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTaxAmount)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.shipping")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.discount")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
                   <div className="flex justify-between items-center pt-2 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span style={{ color: "#059669" }}>{t("admin.purchaseOrders.create.total")}</span><span style={{ color: "#059669" }}>{money(totals.total)}</span></div>
@@ -718,7 +742,7 @@ function NewPOPage() {
                   <Building2 size={20} color="#fff" />
                 </div>
                 <div className="min-w-0">
-                  <div className="font-extrabold text-base truncate" style={{ color: "#0f172a" }}>{selectedVendor.name}</div>
+                  <div className="font-extrabold text-base truncate" style={{ color: "#0f172a" }}>{vendorNameOf(selectedVendor)}</div>
                   <div className="font-mono text-[11px] font-bold" style={{ color: "#64748b" }}>{selectedVendor.vendor_code}</div>
                 </div>
               </div>
