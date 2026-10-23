@@ -924,7 +924,7 @@ function CheckoutContent() {
       ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
       : "border-[var(--user-border)] focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
   }`;
-  const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
+  const labelCls = "block text-xs font-bold leading-snug text-start text-[var(--user-text-secondary)] mb-2";
   const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
   const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
   // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)

@@ -353,13 +353,13 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
     const validationOptions = {
       productName: modelName === "Product" && field === "name",
       rejectAnyLatin:
-        (modelName === "Product" && field === "name") ||
         (modelName === "Brand" && field === "name") ||
         ["Discount", "Deal", "Banner", "Variant", "StockHistory", "Order", "PurchaseOrder", "Vendor", "ShippingMethod"].includes(modelName),
       // Brand/product tokens (LuxeCarry, FitPro, ...) must survive translation,
       // same as Product names do via preserveFirstWord. Applies to names of
       // Discount/Deal/Banner too, which frequently embed brand names.
       preserveFirstWord:
+        (modelName === "Product" && field === "name") ||
         (modelName === "Brand" && (field === "name" || field === "description")) ||
         (modelName === "StockHistory" && field === "product_name") ||
         (["Discount", "Deal", "Banner"].includes(modelName) && field === "name"),

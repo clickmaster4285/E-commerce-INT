@@ -98,7 +98,10 @@ export function localizedProductNameOf(product, locale) {
     sourceName,
     nameTranslations,
     locale,
-    { rejectAnyLatin: true }
+    // Product titles commonly begin with a brand/model token (e.g. "Yonex",
+    // "Cybex"). Keep that first token, but reject any other untranslated
+    // English words so incomplete translations still fall back as a whole.
+    { preserveFirstWord: true }
   );
 }
 

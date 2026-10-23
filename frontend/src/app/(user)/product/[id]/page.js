@@ -1319,17 +1319,18 @@ function ProductDetailContent({ params }) {
               {related.slice(0, 10).map((p) => {
                 const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
                 const price = p?.variants?.[0]?.selling_price ?? p?.selling_price ?? p?.price;
+                const relatedName = productNameOf(p) || p?.name || "";
                 return (
                   <Link key={p._id} href={`/product/${p._id}`} className="group bg-[var(--user-bg-card)] hover:shadow-lg transition-shadow">
                     <div className="relative aspect-square overflow-hidden bg-white">
                       {image ? (
-                        <img src={image} alt={p.name || ""} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
+                        <img src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center"><Package size={28} className="text-gray-300" /></div>
                       )}
                     </div>
                     <div className="p-2.5">
-                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{productNameOf(p)}</p>
+                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{relatedName}</p>
                       {price != null && <p className="mt-1.5 text-sm font-medium text-[var(--user-accent)]">Rs. {toNum(price).toLocaleString()}</p>}
                       <div className="mt-1"><Stars value={0} size={10} /></div>
                     </div>
