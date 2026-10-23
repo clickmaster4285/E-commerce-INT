@@ -313,13 +313,21 @@ export default function AdminReviewsPage() {
             <table className="w-full min-w-[880px] border-collapse text-start">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                  {[t("admin.reviews.ui.reviewer"), t("admin.reviews.page.product"), t("admin.reviews.page.rating"), t("admin.reviews.ui.review"), t("admin.reviews.ui.visibility"), t("admin.reviews.ui.submitted"), t("admin.reviews.page.actions")].map((h) => (
+                  {[
+                    ["reviewer", t("admin.reviews.ui.reviewer")],
+                    ["product", t("admin.reviews.page.product")],
+                    ["rating", t("admin.reviews.page.rating")],
+                    ["review", t("admin.reviews.ui.review")],
+                    ["visibility", t("admin.reviews.ui.visibility")],
+                    ["submitted", t("admin.reviews.ui.submitted")],
+                    ["actions", t("admin.reviews.page.actions")],
+                  ].map(([key, label]) => (
                     <th
-                      key={h}
-                      className={`px-4 py-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap ${h === t("admin.reviews.page.actions") ? "text-end" : "text-start"}`}
+                      key={key}
+                      className={`px-4 py-3 text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap ${key === "actions" ? "text-end" : "text-start"}`}
                       style={{ color: "var(--text-muted)" }}
                     >
-                      {h}
+                      {label}
                     </th>
                   ))}
                 </tr>

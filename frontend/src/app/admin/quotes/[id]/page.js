@@ -1,7 +1,7 @@
 "use client";import { useTranslation } from "@/i18n/LanguageProvider";
 
-import { use, useState } from "react";
-import { useRouter } from "next/navigation";
+import { use, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { quoteApi } from "@/apis/admin/quoteApi";
@@ -9,7 +9,7 @@ import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import { toast } from "sonner";
 import {
-  ArrowLeft, BadgeCheck, CalendarDays, Check, Clock3, Download, FileText,
+  ArrowLeft, BadgeCheck, CalendarDays, Check, Clock3, Download, FileText, Printer,
   FilePlus2, Mail, MapPin, Package, Pencil, Phone, ReceiptText, UserRound, X,
   Send } from
 "lucide-react";
@@ -215,12 +215,23 @@ function createQuotePdf(quote, store, JsPDF) {
 export default function QuoteDetailPage({ params }) {const { t } = useTranslation();
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const qc = useQueryClient();
   const [showAllItems, setShowAllItems] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const printHandled = useRef(false);
   const { data: quote, isLoading, isError, error } = useQuery({ queryKey: ["quote-admin", id], queryFn: () => quoteApi.getById(id) });
   const { data: store = null, isLoading: isStoreLoading } = useQuery({ queryKey: ["store-public"], queryFn: () => storeApi.getPublic(), staleTime: 5 * 60 * 1000 });
   const { data: variants = [] } = useQuery({ queryKey: ["quote-all-variants"], queryFn: () => variantApi.getAll(), staleTime: 2 * 60 * 1000 });
+  useEffect(() => {
+    if (searchParams.get("print") !== "1" || !quote || isLoading || printHandled.current) return undefined;
+    printHandled.current = true;
+    const timer = window.setTimeout(() => {
+      window.print();
+      router.replace(`/admin/quotes/${id}`, { scroll: false });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [id, isLoading, quote, router, searchParams]);
   const variantsById = new Map(variants.map((variant) => [String(variant._id), variant]));
   const visibleItems = showAllItems ? quote?.items || [] : (quote?.items || []).slice(0, 10);
   const statusMutation = useMutation({
@@ -251,11 +262,12 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
       setIsGeneratingPdf(false);
     }
   };
+  const printQuote = () => window.print();
 
   if (isLoading) return <div className={`${card} p-10 text-center text-sm text-[var(--text-muted)]`}>{t("admin.quoteInvoice.ui.loading_quote_674da72a")}</div>;
   if (isError || !quote) return <div className={`${card} p-8 text-center`}><p className="text-sm font-semibold">{error?.response?.data?.message || "Quote not found"}</p><button type="button" onClick={() => router.push("/admin/quotes")} className="mt-3 text-sm font-semibold text-[var(--accent)]">{t("admin.quoteInvoice.ui.back_to_quotes_433f26bf")}</button></div>;
 
-  return <div className="-mx-3 w-[calc(100%+1.5rem)] max-w-none space-y-3 pb-6 text-[var(--text-primary)] sm:-mx-5 sm:w-[calc(100%+2.5rem)]">
+  return <div id="quote-print-area" className="-mx-3 w-[calc(100%+1.5rem)] max-w-none space-y-3 pb-6 text-[var(--text-primary)] sm:-mx-5 sm:w-[calc(100%+2.5rem)]">
     <header className={`${card} overflow-hidden`}>
       <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500" />
       <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4">
@@ -264,6 +276,7 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
           <div className="flex items-center gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><ReceiptText size={21} /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">{quote.quote_number}</h1><span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${statusStyle[quote.status] || statusStyle.Draft}`}>{quote.status}</span></div><p className="mt-1 truncate text-xs text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.quote_for_aaca8b54")} {quote.customer_name}</p></div></div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={printQuote} className="quote-no-print inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-white px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700"><Printer size={14} /> {t("admin.pos.ui.print")}</button>
           <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={downloadPdf} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60"><Download size={14} /> {isGeneratingPdf || isStoreLoading ? "Preparing PDF..." : "Download PDF"}</button>
           <button type="button" onClick={() => router.push("/admin/quotes")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-white px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700"><ArrowLeft size={14} /> {t("admin.quoteInvoice.ui.all_quotes_0900db5f")}</button>
           {["Pending", "Draft"].includes(quote.status) && <><button type="button" onClick={() => router.push(`/admin/quotes/new?quote=${quote._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-white px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700"><Pencil size={13} /> {t("admin.quoteInvoice.ui.edit_quote_540f4206")}</button><button type="button" disabled={sendMutation.isPending} onClick={() => sendMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 text-xs font-bold text-white shadow-sm transition hover:shadow-md disabled:cursor-wait disabled:opacity-60"><Send size={13} /> {sendMutation.isPending ? "Updating..." : "Mark as Sent"}</button></>}
@@ -324,6 +337,20 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
         </section>
       </aside>
     </div>
+    <style jsx global>{`
+      @page { size: A4 portrait; margin: 14mm; }
+      @media print {
+        html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+        body * { visibility: hidden !important; }
+        #quote-print-area, #quote-print-area * { visibility: visible !important; }
+        #quote-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
+        #quote-print-area .quote-no-print, #quote-print-area button, #quote-print-area a { display: none !important; }
+        #quote-print-area section, #quote-print-area header, #quote-print-area aside { break-inside: avoid; box-shadow: none !important; }
+        #quote-print-area table { width: 100% !important; min-width: 0 !important; border-collapse: collapse !important; }
+        #quote-print-area th, #quote-print-area td { color: #111827 !important; border-color: #d1d5db !important; }
+        #quote-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      }
+    `}</style>
   </div>;
 }
 

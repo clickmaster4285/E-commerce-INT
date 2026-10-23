@@ -10,9 +10,9 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 import { toast } from "sonner";
 import {
-  ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2, FilePlus2,
-  ChevronRight, ContactRound, Eye, History, Mail, MapPin, Pencil, Phone,
-  RotateCcw, StickyNote, Tag, UserRound, Users,
+  Activity, ArrowLeft, ArrowRight, BadgeDollarSign, Building2, CalendarDays, CheckCircle2, FilePlus2,
+  ChevronRight, Clock3, ContactRound, Eye, History, Mail, MapPin, Pencil, Phone,
+  Package, Plus, RotateCcw, StickyNote, Tag, UserRound, Users,
 } from "lucide-react";
 
 const activityTypes = ["Call", "WhatsApp", "Email", "Meeting", "Other"];
@@ -38,6 +38,7 @@ export default function LeadDetailPage({ params }) {
   const [lostReasonOpen, setLostReasonOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [historyTab, setHistoryTab] = useState("overview");
+  const [activity, setActivity] = useState({ type: "Call", notes: "", follow_up_date: "" });
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey: ["lead-detail", id],
     queryFn: () => leadApi.getById(id),
@@ -76,6 +77,12 @@ export default function LeadDetailPage({ params }) {
   if (isLoading) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center text-sm text-[var(--text-muted)]">{t("admin.leads.ui.loadingLeadDetails")}</div>;
   if (isError || !lead) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center"><p className="text-sm font-semibold">{error?.response?.data?.message || t("admin.leads.ui.leadNotFound")}</p><Link href="/admin/leads" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"><ArrowLeft size={14} /> {t("admin.leads.ui.backToLeads")}</Link></div>;
 
+  const products = Array.isArray(lead.products) ? lead.products : [];
+  const recordActivity = (event) => {
+    event.preventDefault();
+    if (!activity.notes.trim()) return;
+    activityMutation.mutate({ ...activity, notes: activity.notes.trim(), follow_up_date: activity.follow_up_date || null });
+  };
   const changeStatus = (status) => {
     if (status === "Lost") {
       setLostReason(lead.lost_reason || "");
@@ -248,6 +255,12 @@ export default function LeadDetailPage({ params }) {
 
 function PanelHeader({ icon: Icon, title, trailing }) {
   return <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm"><Icon size={15} /></span><h2 className="text-sm font-bold">{title}</h2><div className="ms-auto">{trailing}</div></div>;
+}
+function Metric({ icon: Icon, label, value }) {
+  return <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={17} /></span>
+    <div className="min-w-0"><p className="truncate text-[11px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm font-semibold text-[var(--text-primary)]">{value}</p></div>
+  </div>;
 }
 function Fact({ icon: Icon, label, value }) {
   const { t } = useTranslation();

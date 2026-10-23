@@ -897,6 +897,7 @@ if (lastProductId !== productId) {
                   <OrderCard
                     key={order._id}
                     order={order}
+                    shippingMethods={shippingMethods}
                     isSelected={isSelected}
                     payStatus={payStatus}
                     menuOpen={actionMenuFor === order._id}
@@ -1148,7 +1149,7 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
 }
 
 // Mobile Order Card - Optimized for touch
-function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
+function OrderCard({ order, shippingMethods = [], isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
   const { t, locale } = useTranslation();
   return (
     <div className="rounded-xl p-4 space-y-3 cursor-pointer transition box-border max-w-full"

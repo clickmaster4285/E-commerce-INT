@@ -1,6 +1,6 @@
 "use client";import { useTranslation } from "@/i18n/LanguageProvider";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight,
   Clock3, CreditCard, FileText, Mail, MapPin,
-  Package, Percent, Phone, Receipt, RotateCcw, Send, UserRound } from
+  Package, Percent, Phone, Printer, Receipt, RotateCcw, Send, UserRound } from
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
@@ -82,6 +82,7 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
   const queryClient = useQueryClient();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const printHandled = useRef(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_time: new Date().toTimeString().slice(0, 5), payment_method: "Cash", note: "" });
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ["invoice-admin", id],
@@ -95,6 +96,16 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
     toast.error("Refund not possible. No payment received yet.");
     router.replace(`/admin/invoices/${id}`, { scroll: false });
   }, [invoice, id, router, searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("print") !== "1" || !invoice || isLoading || printHandled.current) return undefined;
+    printHandled.current = true;
+    const timer = window.setTimeout(() => {
+      window.print();
+      router.replace(`/admin/invoices/${id}`, { scroll: false });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [id, invoice, isLoading, router, searchParams]);
 
   const paymentMutation = useMutation({
     mutationFn: (payment) => invoiceApi.recordPayment(id, payment),
@@ -160,7 +171,8 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
       {Icon && <Icon size={16} />}{label}</button>;
     return disabled && title ? <span key={label} title={title} className="inline-flex">{button}</span> : <span key={label} title={title}>{button}</span>;
   };
-  return <div className="space-y-4 pb-8">
+  const printInvoice = () => window.print();
+  return <div id="invoice-print-area" className="space-y-4 pb-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
         <div className="mb-1.5 flex items-center gap-1.5 text-sm" style={muted}>
@@ -181,6 +193,7 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
         {smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true, !canRefund, !canRefund ? "Refund not possible. No payment received yet." : undefined)}
+        {smallAction(t("admin.pos.ui.print"), printInvoice, Printer)}
         {smallAction("Download PDF", () => downloadInvoicePdf(invoice).catch(() => toast.error("Could not generate invoice PDF")), FileText)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? "Saving..." : "Send to Customer",
@@ -340,5 +353,19 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
     {returnOpen && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
+    <style jsx global>{`
+      @page { size: A4 portrait; margin: 14mm; }
+      @media print {
+        html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+        body * { visibility: hidden !important; }
+        #invoice-print-area, #invoice-print-area * { visibility: visible !important; }
+        #invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
+        #invoice-print-area button, #invoice-print-area a, #invoice-print-area [role="dialog"] { display: none !important; }
+        #invoice-print-area section, #invoice-print-area main, #invoice-print-area aside { break-inside: avoid; box-shadow: none !important; }
+        #invoice-print-area table { width: 100% !important; border-collapse: collapse !important; }
+        #invoice-print-area th, #invoice-print-area td { color: #111827 !important; border-color: #d1d5db !important; }
+        #invoice-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      }
+    `}</style>
   </div>;
 }

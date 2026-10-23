@@ -354,12 +354,12 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
       <div className="absolute inset-0 bg-black/35" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
 
-      <div dir={dir} className="relative z-10 flex h-full items-center justify-start px-4 sm:px-6 lg:px-8 xl:px-10">
+      <div dir={dir} className="relative z-10 flex h-full items-center justify-start px-5 sm:px-8 lg:px-12 xl:px-14">
         {/* COPY — ab image ke upar hi text aa raha hai */}
         <div dir={dir} className="w-full max-w-3xl text-start">
           {banner.eyebrow && (
             <span
-              className="bn-anim mb-2 inline-block rounded-md border border-white/40 bg-white/15 px-2.5 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-white sm:mb-2.5 sm:text-xs"
+              className={`bn-anim mb-2 inline-block rounded-md border border-white/40 bg-white/15 px-2.5 py-1 text-[0.625rem] font-semibold text-white sm:mb-2.5 sm:text-xs ${dir === "rtl" ? "normal-case" : "uppercase tracking-[0.12em]"}`}
               style={anim(isActive, "bnSlideDown", 0.05, 0.6)}
             >
               {banner.eyebrow}
@@ -369,8 +369,8 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
           {words.length > 0 && (
             <h2
               dir={dir}
-              className="mb-2 text-2xl font-black uppercase italic leading-[0.95] tracking-tight text-white sm:mb-2.5 sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"
-              style={{ overflowWrap: "anywhere", textShadow: extrude }}
+              className={`mb-2 font-black text-white sm:mb-3 ${dir === "rtl" ? "text-2xl leading-[1.65] sm:text-4xl lg:text-5xl xl:text-6xl" : "text-2xl uppercase italic leading-[0.95] tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"}`}
+              style={{ overflowWrap: "normal", wordBreak: "normal", textShadow: extrude }}
             >
               {dir === "rtl"
                 ? <span className="bn-anim inline-block" style={anim(isActive, "bnSlideLeft", 0.15, 0.6)}>{banner.heading}</span>
@@ -389,8 +389,8 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
           {banner.description && (
             <p
               dir={dir}
-              className="bn-anim mb-2 hidden max-w-lg text-sm leading-relaxed text-white/85 sm:block sm:text-base lg:mb-3 lg:text-lg line-clamp-2"
-              style={anim(isActive, "bnSlideLeft", 0.35)}
+              className={`bn-anim mb-4 hidden max-w-xl text-sm text-white/85 sm:block sm:text-base lg:mb-5 lg:text-lg ${dir === "rtl" ? "line-clamp-3 leading-[2]" : "line-clamp-2 leading-relaxed"}`}
+              style={{ lineHeight: dir === "rtl" ? 2 : undefined, ...anim(isActive, "bnSlideLeft", 0.35) }}
             >
               {banner.description}
             </p>
@@ -453,7 +453,8 @@ function ButtonLink({ button, palette, primary = false, isActive, delay = 0, loc
   return (
     <Link
       href={href}
-      className={`bn-anim group/btn inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
+      dir={dirForLocale(locale)}
+      className={`bn-anim group/btn inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${dirForLocale(locale) === "rtl" ? "normal-case tracking-normal leading-[1.8]" : "uppercase tracking-wide"} ${
         primary ? "bg-white" : "border-2 border-white/80 hover:bg-white/15"
       }`}
       style={{ color: primary ? palette.from : "#ffffff", ...anim(isActive, "bnSlideLeft", delay, 0.6) }}

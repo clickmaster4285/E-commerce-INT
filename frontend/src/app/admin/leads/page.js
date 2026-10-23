@@ -67,7 +67,7 @@ export default function LeadsPage() {
 
 function Stat({ label, value, meta, Icon }) { const { locale } = useTranslation(); return <div className="group flex min-w-0 items-center gap-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/30 hover:shadow-lg sm:p-5"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm transition-transform duration-200 group-hover:scale-105"><Icon size={19} /></span><div className="min-w-0"><p className="truncate text-xs font-semibold text-[var(--text-muted)]">{label}</p><div className="mt-1 flex flex-wrap items-baseline gap-x-2.5"><span className="text-2xl font-extrabold leading-none tracking-tight">{value.toLocaleString(locale)}</span><span className="text-[10px] font-medium text-[var(--text-muted)]">{meta}</span></div></div></div>; }
 function RowActions({ lead, onView, onEdit, onStatusChange, onAddCustomer, onOpenCustomer, isConvertingCustomer }) {
-  const { t } = useTranslation();
+  const { t, dir } = useTranslation();
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -97,7 +97,10 @@ function RowActions({ lead, onView, onEdit, onStatusChange, onAddCustomer, onOpe
     const top = window.innerHeight - rect.bottom < menuHeight + 8
       ? Math.max(8, rect.top - menuHeight - 4)
       : Math.min(rect.bottom + 4, window.innerHeight - menuHeight - 8);
-    const left = dir === "rtl" ? Math.min(Math.max(8, rect.left), window.innerWidth - menuWidth - 8) : Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    const maxLeft = Math.max(8, window.innerWidth - menuWidth - 8);
+    const left = dir === "rtl"
+      ? Math.min(Math.max(8, rect.left), maxLeft)
+      : Math.min(Math.max(8, rect.right - menuWidth), maxLeft);
     setPosition({ top, left });
     setOpen(true);
   };

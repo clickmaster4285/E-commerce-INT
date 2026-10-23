@@ -2,6 +2,7 @@ import "./globals.css";
 import "./user.css";
 import Providers from "./providers";
 import { LanguageProvider } from "@/i18n/LanguageProvider";
+import Script from "next/script";
 
 export const metadata = {
   title: "Store",
@@ -31,8 +32,16 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
         />
-        <script dangerouslySetInnerHTML={{ __html: adminThemeScript }} />
-        <script dangerouslySetInnerHTML={{ __html: userThemeScript }} />
+        <Script
+          id="admin-theme-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: adminThemeScript }}
+        />
+        <Script
+          id="user-theme-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: userThemeScript }}
+        />
       </head>
       <body>
         <Providers>

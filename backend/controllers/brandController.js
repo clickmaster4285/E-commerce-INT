@@ -376,13 +376,13 @@ const deleteBrand = async (req, res) => {
 // ==========================================
 const getBrandsPublic = async (req, res) => {
   try {
-    // ✅ slim=1 (opt-in, storefront): _id/name/logo hi chahiye hota hai
-    // (brand_code/country/is_active sirf admin padhta hai). Default same.
+    // Storefront needs translations alongside the brand name so the active
+    // locale can be rendered without a second request.
     const slim = req.query.slim === "1";
     // ⚠️ is_active filter zaroori — admin me brand deactivate karne par
     // wo storefront se gayab hona chahiye
     const brands = await Brand.find({ is_deleted: false, is_active: true })
-      .select(slim ? "_id name logo.img_url" : "brand_code name logo country is_active")
+      .select(slim ? "_id name translations logo.img_url" : "brand_code name translations logo country is_active")
       .sort({ created_at: -1 })
       .lean()
       .exec();
@@ -520,4 +520,4 @@ module.exports = {
   getBrandWithProducts,
   updateBrand,
   deleteBrand,
-};  
+};

@@ -299,6 +299,7 @@ const [viewMode, setViewMode] = useState(() => {
     queryFn: () => productApi.getPaginated({ page: currentPage, limit: PRODUCTS_PER_PAGE, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
     retry: false,
   });
+  console.log(productsData);
   const products = productsData?.products || [];
   usePageTranslations({ model: "Product", records: products, locale, ready: !isFetching && productsData?.pagination?.page === currentPage, queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, PRODUCTS_PER_PAGE], queryClient });
 

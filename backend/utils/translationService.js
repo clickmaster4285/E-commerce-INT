@@ -440,13 +440,26 @@ async function syncDocumentTranslations(Model, docOrId, opts = {}) {
 
   if (uniqueTexts.length) {
     for (const locale of requestedLocales) {
-    const translated = await translateBatch(uniqueTexts, locale);
+      // Keep already valid locale values and avoid translating them again.
+      // Backfills often need to repair only one missing locale; repeating all
+      // nine model calls for every retry made that path unnecessarily slow.
+      const textsForLocale = uniqueTexts.filter((translationText) =>
+        stale.some((item) => {
+          if ((item.translationText || item.text) !== translationText) return false;
+          if (!item.preserveValidTranslations) return true;
+          const current = getPathValue(nextTranslations, item.field)?.[locale];
+          return !isUsableTranslation(item.text, current, locale, item.validationOptions);
+        })
+      );
+      if (!textsForLocale.length) continue;
+
+      const translated = await translateBatch(textsForLocale, locale);
       if (translated === null) {
         failed = true;
         break;
       }
       const bySource = new Map();
-      uniqueTexts.forEach((text, i) => bySource.set(text, String(translated[i] ?? "").trim()));
+      textsForLocale.forEach((text, i) => bySource.set(text, String(translated[i] ?? "").trim()));
       results.set(locale, bySource);
     }
   }
