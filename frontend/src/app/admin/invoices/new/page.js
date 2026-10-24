@@ -10,7 +10,7 @@ import {
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
-import { quoteApi } from "@/apis/admin/quoteApi";
+import { quoteApi } from "@/apis/admin/quoteApi";import { storeApi } from "@/apis/admin/storeApi";
 import { customerApi } from "@/apis/admin/customerApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { stockApi } from "@/apis/admin/stockApi";
@@ -57,10 +57,10 @@ export default function NewInvoicePage() {const { t } = useTranslation();
 
   const { data: rawCustomers = [] } = useQuery({ queryKey: ["invoice-customers"], queryFn: () => customerApi.getAll({ limit: 500 }) });
   const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });
-  const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });
+  const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });const { data: companySettings } = useQuery({ queryKey: ["admin-store-info"], queryFn: storeApi.get });
   const { data: rawStock = [] } = useQuery({ queryKey: ["invoice-product-stock"], queryFn: stockApi.getAll, staleTime: 2 * 60 * 1000 });
   const { data: rawVariants = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variants"], queryFn: variantApi.getAll, staleTime: 2 * 60 * 1000 });
-  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);
+  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_conditions; if (!prefillQuoteId && defaultTerms) setForm((current) => current.terms ? current : { ...current, terms: defaultTerms }); }, [prefillQuoteId, companySettings?.invoice_terms_conditions]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setPrefillCustomerId(params.get("customer") || "");

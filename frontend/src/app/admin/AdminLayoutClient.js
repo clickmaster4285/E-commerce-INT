@@ -29,6 +29,7 @@ const ROUTE_PERMISSIONS = {
   // ✅ Reviews — alag permission (legacy: products se fallback, backend undefined = allow)
   '/admin/reviews': 'reviews',
   '/admin/store-info': 'store',
+  '/admin/terms-conditions': 'store',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',

@@ -98,7 +98,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const tableHeaderText = templateEmphasis ? [255, 255, 255] : accent;
   let fontFamily = ({ helvetica: "helvetica", times: "times", courier: "courier", lato: "Lato", ubuntu: "Ubuntu" })[design.fontFamily] || "helvetica";
   const fontScale = isQuote ? Math.max(0.75, Math.min(1.45, (Number(design.fontSize) || 9) / 9)) : 1;
-  const documentTitle = isQuote ? "QUOTATION" : "INVOICE";
+  const documentTitle = isQuote ? "QUOTE" : "INVOICE";
   const documentNumber = safeText(isQuote ? invoice.quote_number : invoice.invoice_number, "DRAFT");
   const pageFormat = isQuote && design.pageSize === "letter" ? "letter" : "a4";
   const pageOrientation = isQuote && design.orientation === "landscape" ? "landscape" : "portrait";
@@ -112,7 +112,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const agencySidebar = isQuote && template === "agency";
   const sidebarWidth = agencySidebar ? Math.min(66, requestedPageWidth * 0.3) : 0;
   const margin = baseMargin + sidebarWidth;
-  const spacingScale = 1;
+  const spacingScale = isQuote ? fontScale : 1;
   const pdf = new jsPDF({ orientation: isQuote ? "portrait" : pageOrientation, unit: "mm", format: isQuote ? [requestedPageWidth, requestedPageHeight] : pageFormat, compress: true });
   if (isQuote && EMBEDDED_QUOTE_FONTS[fontFamily.toLowerCase()]) {
     try { await registerEmbeddedFont(pdf, fontFamily); }
@@ -132,7 +132,9 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const companyEmail = store.support_email || store.email || "";
   const companyPhone = store.support_phone || store.phone || "";
   const companyWebsite = store.website || store.website_url || store.store_url || "";
-  const logoUrl = isQuote ? (design.logoData || store.logo?.img_url || "") : (store.logo?.img_url || "");
+  const logoUrl = isQuote
+    ? (design.logoData || (design.useCompanyLogo === false ? "" : store.logo?.img_url || ""))
+    : (store.logo?.img_url || "");
   const logo = await loadImageData(logoUrl);
   const logoTargetWidth = isQuote ? Math.max(12, Math.min(50, Number(design.logoWidth) || 24)) : 23;
   const logoAlignment = isQuote ? (design.logoAlignment || "left") : "left";
@@ -143,8 +145,8 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       : logoAlignment === "right" ? slotX + slotWidth - logoWidth : slotX;
     return Math.max(slotX, Math.min(slotX + slotWidth - logoWidth, baseX + logoOffset));
   };
-  const watermarkLogo = isQuote && design.watermark
-    ? await loadImageData(logoUrl, Math.max(0.03, Math.min(0.25, (Number(design.watermarkOpacity) || 8) / 100)))
+  const watermarkLogo = isQuote && design.watermark && design.watermarkUseLogo !== false
+    ? await loadImageData(logoUrl, Math.max(0.03, Math.min(0.4, (Number(design.watermarkOpacity) || 8) / 100)))
     : null;
   const signatureImage = isQuote && design.showSignature && design.signatureMode === "draw" && design.signatureData
     ? await loadImageData(design.signatureData)
@@ -190,6 +192,10 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     pdf.text(initials, alignedLogoX(margin, 40, 10), 23);
   };
   const drawFirstPageHeader = () => {
+    if (isQuote && template === "mono") {
+      pdf.setFillColor(24, 24, 27);
+      pdf.rect(0, 0, pageWidth, 2, "F");
+    }
     if (isQuote && template === "elegant") {
       pdf.setFillColor(252, 249, 243);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
@@ -207,8 +213,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       setText(11, [255, 255, 255], "bold");
       pdf.text(pdf.splitTextToSize(companyName, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 37);
       setText(6.5, [235, 238, 255]);
-      if (companyEmail) pdf.text(pdf.splitTextToSize(companyEmail, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 47);
-      setText(16, [255, 255, 255], "bold");
+      setText(22, [255, 255, 255], "bold");
       pdf.text("QUOTE", baseMargin, 75);
       const sidebarDetails = [["QUOTE #", documentNumber], ["ISSUED", formatDate(invoice.invoice_date)], ["VALID UNTIL", formatDate(invoice.due_date)], ["TOTAL", money(invoice.total)]];
       sidebarDetails.forEach(([label, value], index) => {
@@ -227,14 +232,12 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       pdf.triangle(pageWidth - 84, 0, pageWidth - 55, 0, pageWidth - 55, 65, "F");
       drawLogoOrMonogram();
       const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
-      setText(14, COLORS.ink, "bold");
+      setText(12, COLORS.ink, "bold");
       pdf.text(companyName, textX, 17);
-      setText(7.5, COLORS.muted);
-      if (companyPhone) pdf.text(companyPhone, textX, 24);
-      setText(9, [255, 255, 255], "bold");
+      setText(23, [255, 255, 255], "bold");
       pdf.text("QUOTE", pageWidth - baseMargin, 18, { align: "right" });
-      setText(7.5, [255, 255, 255], "bold");
-      pdf.text(documentNumber, pageWidth - baseMargin, 27, { align: "right" });
+      setText(8, [255, 255, 255], "bold");
+      pdf.text(`Quote # ${documentNumber}`, pageWidth - baseMargin, 27, { align: "right" });
       setText(6.2, [255, 255, 255]);
       pdf.text(`Issued ${formatDate(invoice.invoice_date)}`, pageWidth - baseMargin, 35, { align: "right" });
       pdf.text(`Valid until ${formatDate(invoice.due_date)}`, pageWidth - baseMargin, 41, { align: "right" });
@@ -265,25 +268,25 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       const elegant = isQuote && template === "elegant";
       if (logo) pdf.addImage(logo.data, "PNG", pageWidth / 2 - logoWidth / 2, elegant ? 4 : 5, logoWidth, logoHeight);
       if (elegant) {
-        setText(16, accent, "bold");
-        pdf.text(documentTitle.toUpperCase(), pageWidth / 2, logo ? 29 : 18, { align: "center" });
+        setText(9, COLORS.ink, "bold");
+        pdf.text(companyName, pageWidth / 2, logo ? 25 : 14, { align: "center" });
+        setText(26, accent, "bold");
+        pdf.text(documentTitle.toUpperCase(), pageWidth / 2, logo ? 37 : 25, { align: "center" });
         setText(8, COLORS.muted, "bold");
-        pdf.text(`${companyName}  ·  ${documentNumber}`, pageWidth / 2, logo ? 36 : 25, { align: "center" });
-        setText(7, COLORS.muted);
-        pdf.text(`Issued ${formatDate(invoice.invoice_date)}  ·  Valid until ${formatDate(invoice.due_date)}`, pageWidth / 2, logo ? 42 : 31, { align: "center" });
-        y = 55;
+        pdf.text(`Quote # ${documentNumber}`, pageWidth / 2, logo ? 44 : 32, { align: "center" });
+        y = 58;
       } else {
         const titleY = logo ? 30 : 17;
-        setText(14, accent, "bold");
+        setText(isQuote ? 20 : 14, accent, "bold");
         pdf.text(companyName, pageWidth / 2, titleY, { align: "center" });
-        setText(8, accent, "bold");
+        setText(isQuote ? 18 : 8, accent, "bold");
         pdf.text(`${documentTitle}  ${documentNumber}`, pageWidth / 2, titleY + 6, { align: "center" });
-        if (!minimalHeader && store.tagline) {
+        if (!isQuote && !minimalHeader && store.tagline) {
           setText(7, COLORS.muted);
           pdf.text(String(store.tagline), pageWidth / 2, titleY + 10, { align: "center" });
         }
         setText(7, COLORS.muted);
-        if (companyEmail && !minimalHeader) pdf.text(companyEmail, pageWidth / 2, titleY + 14, { align: "center" });
+        if (!isQuote && companyEmail && !minimalHeader) pdf.text(companyEmail, pageWidth / 2, titleY + 14, { align: "center" });
         y = logo ? 48 : 42;
       }
       return;
@@ -296,25 +299,25 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     const secondaryHeaderColor = bandHeader ? [232, 238, 248] : COLORS.muted;
     setText(14, headerColor, "bold");
     pdf.text(pdf.splitTextToSize(companyName, 78).slice(0, 1), textX, 17);
-    if (store.tagline && !minimalHeader) {
+    if (!isQuote && store.tagline && !minimalHeader) {
       setText(7.5, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(String(store.tagline), 78).slice(0, 1), textX, 23);
     }
     const contact = [companyPhone && `Phone: ${companyPhone}`, companyEmail && `Email: ${companyEmail}`, companyWebsite].filter(Boolean).join("  |  ");
-    if (contact && !minimalHeader) {
+    if (!isQuote && contact && !minimalHeader) {
       setText(6.4, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(contact, 96).slice(0, 2), textX, 29);
     }
-    if (companyAddress && !minimalHeader) {
+    if (!isQuote && companyAddress && !minimalHeader) {
       setText(6.4, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(companyAddress, 82).slice(0, 2), textX, 35);
     }
 
     const rightX = pageWidth - margin;
-    setText(8, headerColor, "bold");
+    setText(isQuote ? 22 : 8, headerColor, "bold");
     pdf.text(documentTitle, rightX, 13, { align: "right" });
-    setText(isQuote ? Math.max(14, Number(design.titleSize) || 18) : 17, headerColor, "bold");
-    pdf.text(pdf.splitTextToSize(documentNumber, 58), rightX, 21, { align: "right" });
+    setText(isQuote ? 8 : 17, headerColor, "bold");
+    pdf.text(isQuote ? `Quote # ${documentNumber}` : pdf.splitTextToSize(documentNumber, 58), rightX, 21, { align: "right" });
     const status = safeText(invoice.status, "Unpaid").toUpperCase();
     if (!minimalHeader) {
       setText(7.5, headerColor, "bold");
@@ -386,21 +389,52 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   ]).map(([label, value]) => ({ label, value, lines: split(value, panelWidth - 42, 6.5) }));
   const detailLineCount = detailRows.reduce((total, row) => total + row.lines.length, 0);
   const panelHeight = Math.max(40 * spacingScale, (15 + Math.max(customerLineCount * 3.8, detailLineCount * 5.2)) * spacingScale);
-  if (agencySidebar) {
-    const mid = margin + contentWidth * 0.56;
-    drawLabel("From", margin + 3, y + 6);
-    setText(8.5, COLORS.ink, "bold");
-    pdf.text(companyName, margin + 3, y + 12);
-    setText(6.8, COLORS.muted);
-    if (companyEmail) pdf.text(companyEmail, margin + 3, y + 17);
-    drawLabel("Bill To", mid, y + 6);
-    setText(8.5, COLORS.ink, "bold");
-    pdf.text(pdf.splitTextToSize(safeText(invoice.customer_name), pageWidth - baseMargin - mid), mid, y + 12);
-    setText(6.8, COLORS.muted);
-    if (invoice.customer_email) pdf.text(pdf.splitTextToSize(invoice.customer_email, pageWidth - baseMargin - mid), mid, y + 17);
-    y += 26 * spacingScale;
+  if (isQuote) {
+    const infoGap = 4;
+    const infoWidth = (contentWidth - infoGap * 2) / 3;
+    const fromLines = [
+      companyName && { value: companyName, primary: true },
+      companyPhone && { value: `Phone: ${companyPhone}` },
+      companyEmail && { value: `Email: ${companyEmail}` },
+      companyAddress && { value: companyAddress },
+      companyWebsite && { value: companyWebsite },
+    ].filter(Boolean);
+    const quoteDetails = [
+      { label: "Quote #", value: documentNumber },
+      { label: "Quote date", value: formatDate(invoice.invoice_date) },
+      { label: "Valid until", value: formatDate(invoice.due_date) },
+    ];
+    const columns = [
+      { label: "From", x: margin + 3, lines: fromLines },
+      { label: "Bill To", x: margin + infoWidth + infoGap + 2, lines: customerLines },
+      { label: "Quote details", x: margin + (infoWidth + infoGap) * 2 + 1, details: quoteDetails },
+    ];
+    let infoBottom = y + 12;
+    columns.forEach((column) => {
+      drawLabel(column.label, column.x, y + 6);
+      let lineY = y + 12;
+      if (column.lines) {
+        column.lines.forEach((line) => {
+          const wrapped = split(line.value, infoWidth - 5, line.primary ? 8.5 : 6.8);
+          setText(line.primary ? 8.5 : 6.8, line.primary ? COLORS.ink : COLORS.muted, line.primary ? "bold" : "normal");
+          pdf.text(wrapped, column.x, lineY);
+          lineY += wrapped.length * (line.primary ? 4 : 3.4) * spacingScale;
+        });
+      } else {
+        column.details.forEach(({ label, value }) => {
+          setText(6.1, COLORS.muted);
+          pdf.text(label, column.x, lineY);
+          const wrapped = split(value, infoWidth - 5, 6.7);
+          setText(6.7, COLORS.ink, "bold");
+          pdf.text(wrapped, column.x, lineY + 4);
+          lineY += 10 * spacingScale;
+        });
+      }
+      infoBottom = Math.max(infoBottom, lineY);
+    });
+    y = infoBottom + 5 * spacingScale;
   } else {
-    drawLabel(isQuote ? "Prepared For" : "Bill To", margin + 5, y + 7);
+    drawLabel("Bill To", margin + 5, y + 7);
     let customerY = y + 14 * spacingScale;
     customerLines.forEach((line) => {
       const lines = split(line.value, panelWidth - 10, line.primary ? 9 : 7.2);
@@ -410,7 +444,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     });
     const customerX = margin + panelWidth + gap + 5;
     const detailsRight = margin + contentWidth - 5;
-    drawLabel(isQuote ? "Quote Details" : "Invoice Details", customerX, y + 7);
+    drawLabel("Invoice Details", customerX, y + 7);
     let detailsY = y + 12 * spacingScale;
     detailRows.forEach(({ label, lines }) => {
       const rowY = detailsY;
@@ -612,7 +646,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const pageCount = pdf.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
-    if (isQuote && design.watermark) {
+    if (isQuote && design.watermark && (watermarkLogo || String(design.watermarkText || "").trim())) {
       if (watermarkLogo) {
         const requestedWidth = contentWidth * Math.max(0.2, Math.min(0.85, (Number(design.watermarkSize) || 50) / 100));
         const requestedHeight = pageHeight * 0.38;
@@ -624,11 +658,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
         const yPosition = position === "top-right" ? pageHeight * 0.25 - height / 2 : position === "bottom-right" ? pageHeight * 0.72 - height / 2 : (pageHeight - height) / 2;
         pdf.addImage(watermarkLogo.data, "PNG", x, yPosition, width, height, undefined, "FAST", position === "diagonal" ? 35 : 0);
       } else {
-        const opacity = Math.max(0.03, Math.min(0.25, (Number(design.watermarkOpacity) || 8) / 100));
+        const opacity = Math.max(0.03, Math.min(0.4, (Number(design.watermarkOpacity) || 8) / 100));
         const paleAccent = accent.map((channel) => Math.round(255 - (255 - channel) * opacity));
         setText(28 * Math.max(0.5, Math.min(1.3, (Number(design.watermarkSize) || 50) / 50)), paleAccent, "bold");
         const position = design.watermarkPosition || "center";
-        pdf.text(companyName.toUpperCase(), position.endsWith("right") ? pageWidth - margin - 10 : pageWidth / 2, position === "top-right" ? pageHeight * 0.25 : position === "bottom-right" ? pageHeight * 0.72 : pageHeight / 2, { align: "center", angle: position === "diagonal" ? 35 : 0 });
+        pdf.text(String(design.watermarkText || companyName).toUpperCase(), position.endsWith("right") ? pageWidth - margin - 10 : pageWidth / 2, position === "top-right" ? pageHeight * 0.25 : position === "bottom-right" ? pageHeight * 0.72 : pageHeight / 2, { align: "center", angle: position === "diagonal" ? 35 : 0 });
       }
     }
     setText(7, COLORS.ink, "bold");

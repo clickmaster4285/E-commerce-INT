@@ -127,7 +127,7 @@ const sidebarSections = [
   },
   {
     title: "STORE",
-    items: ["Store Info"],
+    items: ["Store Info", "Terms & Conditions"],
   },
   {
     title: "TEAM & ACCOUNT",
@@ -169,6 +169,7 @@ const allMenuItems = [
   { name: "Invoices", icon: Receipt, path: "/admin/invoices", permissionKey: "invoices", fallbackKey: "quotes" },
   { name: "POS", icon: ShoppingCart, path: "/admin/pos", permissionKey: "pos" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
+  { name: "Terms & Conditions", icon: FileText, path: "/admin/terms-conditions", permissionKey: "store" },
   { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },
 ];
 
