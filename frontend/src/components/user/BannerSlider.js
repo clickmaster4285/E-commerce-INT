@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { bannerApi } from "@/apis/user/bannerApi";
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { useLocalized } from "@/i18n/localize";
+import { dirForLocale } from "@/i18n/config";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const getImageUrl = (img) => {
@@ -64,35 +64,88 @@ function valueAtPath(value, path) {
   return path.split(".").reduce((current, part) => current?.[part], value);
 }
 
-function getText(field, locale) {
-  const localized = field?.[locale];
-  const english = field?.en;
-  return (
-    (typeof localized === "string" && localized.trim()) ||
-    (typeof english === "string" && english.trim()) ||
-    ""
-  );
+function getBannerTranslation(banner, field, locale) {
+  const translations = valueAtPath(banner?.translations, field);
+  const translated = translations instanceof Map ? translations.get(locale) : translations?.[locale];
+  return typeof translated === "string" ? translated.trim() : "";
 }
 
-function localizedBannerField(banner, field, locale, fieldOf) {
-  const source = valueAtPath(banner, field);
-  const translationMap = valueAtPath(banner?.translations, field);
-  const resolved = fieldOf(banner, field);
-  return (
-    (typeof resolved === "string" && resolved.trim()) ||
-    getText({ ...(translationMap || {}), en: source }, locale)
+function hasUntranslatedSourceWords(source, translated) {
+  const sourceWords = String(source || "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [];
+  const translatedWords = new Set(
+    (String(translated || "").match(/[A-Za-z]+(?:['’][A-Za-z]+)?/g) || [])
+      .map((word) => word.toLocaleLowerCase())
   );
+  return sourceWords.some((word) => word.length >= 4 && translatedWords.has(word.toLocaleLowerCase()));
+}
+
+function hasTargetScript(text, locale) {
+  const targetScript = {
+    ur: /\p{Script=Arabic}/u,
+    ar: /\p{Script=Arabic}/u,
+    hi: /\p{Script=Devanagari}/u,
+    zh: /\p{Script=Han}/u,
+  }[locale];
+  return !targetScript || !/\p{Script=Latin}/u.test(text) && targetScript.test(text);
+}
+
+function getBannerContent(banner, locale) {
+  const fields = [
+    "eyebrow",
+    "heading",
+    "description",
+    "primaryButton.text",
+    "secondaryButton.text",
+  ];
+  const hasMissingOrMixedTranslation = locale !== "en" && fields.some((field) => {
+    const source = valueAtPath(banner, field);
+    if (typeof source !== "string" || !source.trim()) return false;
+    const translated = getBannerTranslation(banner, field, locale);
+    return (
+      !translated ||
+      translated.toLocaleLowerCase() === source.trim().toLocaleLowerCase() ||
+      !hasTargetScript(translated, locale) ||
+      hasUntranslatedSourceWords(source, translated)
+    );
+  });
+  const contentLocale = hasMissingOrMixedTranslation ? "en" : locale;
+  const textFor = (field) =>
+    contentLocale === "en"
+      ? String(valueAtPath(banner, field) || "").trim()
+      : getBannerTranslation(banner, field, contentLocale);
+
+  return {
+    locale: contentLocale,
+    dir: dirForLocale(contentLocale),
+    banner: {
+      ...banner,
+      title: textFor("title"),
+      eyebrow: textFor("eyebrow"),
+      heading: textFor("heading"),
+      description: textFor("description"),
+      altText: textFor("altText"),
+      primaryButton: banner.primaryButton
+        ? { ...banner.primaryButton, text: textFor("primaryButton.text") }
+        : banner.primaryButton,
+      secondaryButton: banner.secondaryButton
+        ? { ...banner.secondaryButton, text: textFor("secondaryButton.text") }
+        : banner.secondaryButton,
+    },
+  };
 }
 
 export default function BannerSlider({ initialBanners = null }) {
   const { locale, dir, t } = useTranslation();
-  const { fieldOf } = useLocalized();
   const { data: banners = [], isLoading } = useQuery({
-    queryKey: ["activeBanners"],
-    queryFn: bannerApi.getActive,
+    // Locale is part of the cache identity so switching languages never
+    // keeps rendering the previous locale's banner snapshot.
+    queryKey: ["activeBanners", locale],
+    queryFn: () => bannerApi.getActive({ limit: 12, locale }),
     // ✅ SSR initialData (R1): key/fn/polling same; server fail → client fetch
     initialData: initialBanners ?? undefined,
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     refetchInterval: 5 * 60 * 1000,
   });
 
@@ -174,20 +227,8 @@ export default function BannerSlider({ initialBanners = null }) {
       >
         {/* SLIDES */}
         {slides.map((banner, i) => {
-          const localizedBanner = {
-            ...banner,
-            title: localizedBannerField(banner, "title", locale, fieldOf),
-            eyebrow: localizedBannerField(banner, "eyebrow", locale, fieldOf),
-            heading: localizedBannerField(banner, "heading", locale, fieldOf),
-            description: localizedBannerField(banner, "description", locale, fieldOf),
-            altText: localizedBannerField(banner, "altText", locale, fieldOf),
-            primaryButton: banner.primaryButton
-              ? { ...banner.primaryButton, text: localizedBannerField(banner, "primaryButton.text", locale, fieldOf) }
-              : banner.primaryButton,
-            secondaryButton: banner.secondaryButton
-              ? { ...banner.secondaryButton, text: localizedBannerField(banner, "secondaryButton.text", locale, fieldOf) }
-              : banner.secondaryButton,
-          };
+          const { banner: localizedBanner, locale: contentLocale, dir: contentDir } =
+            getBannerContent(banner, locale);
           const imgUrl = getImageUrl(banner.desktopImage || banner.tabletImage || banner.mobileImage);
           const isActive = i === active;
           const hasCopy = Boolean(
@@ -209,8 +250,9 @@ export default function BannerSlider({ initialBanners = null }) {
                   isActive={isActive}
                   palette={PALETTES[i % PALETTES.length]}
                   priority={i === 0}
-                  dateLabel={getDateLabel(banner, now, locale)}
-                  dir={dir}
+                  dateLabel={getDateLabel(banner, now, contentLocale)}
+                  dir={contentDir}
+                  locale={contentLocale}
                 />
               ) : (
                 <ImageSlide banner={localizedBanner} imgUrl={imgUrl} mountImage={isMounted(i)} isActive={isActive} priority={i === 0} fallbackAlt={t("banner.imageAlt")} />
@@ -281,10 +323,10 @@ export default function BannerSlider({ initialBanners = null }) {
    Banner image poori slide ka background hai, text iske upar overlay jaisa —
    word-by-word heading, date pill, CTA. Koi alag card/fan nahi.
 ===================================================== */
-function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, dateLabel, dir }) {
+function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, dateLabel, dir, locale }) {
   const words = (banner.heading || "").split(/\s+/).filter(Boolean);
   const { t } = useTranslation();
-  const alt = banner.altText || banner.title || banner.heading || t("banner.imageAlt");
+  const alt = banner.altText || t("banner.imageAlt");
   const extrude = `1px 1px 0 ${palette.extrude}, 2px 2px 0 ${palette.extrude}, 3px 3px 0 ${palette.extrude}, 4px 4px 0 ${palette.extrude}, 5px 5px 0 rgba(0,0,0,0.3)`;
 
   return (
@@ -312,12 +354,12 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
       <div className="absolute inset-0 bg-black/35" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/60 to-transparent" />
 
-      <div dir="ltr" className="relative z-10 flex h-full items-center px-4 sm:px-6 lg:px-8 xl:px-10">
+      <div dir={dir} className="relative z-10 flex h-full items-center justify-start px-5 sm:px-8 lg:px-12 xl:px-14">
         {/* COPY — ab image ke upar hi text aa raha hai */}
-        <div dir={dir} className="w-full max-w-xl sm:w-[58%]">
+        <div dir={dir} className="w-full max-w-3xl text-start">
           {banner.eyebrow && (
             <span
-              className="bn-anim mb-2 inline-block rounded-md border border-white/40 bg-white/15 px-2.5 py-1 text-[0.625rem] font-semibold uppercase tracking-[0.12em] text-white sm:mb-2.5 sm:text-xs"
+              className={`bn-anim mb-2 inline-block rounded-md border border-white/40 bg-white/15 px-2.5 py-1 text-[0.625rem] font-semibold text-white sm:mb-2.5 sm:text-xs ${dir === "rtl" ? "normal-case" : "uppercase tracking-[0.12em]"}`}
               style={anim(isActive, "bnSlideDown", 0.05, 0.6)}
             >
               {banner.eyebrow}
@@ -327,8 +369,8 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
           {words.length > 0 && (
             <h2
               dir={dir}
-              className="mb-2 text-2xl font-black uppercase italic leading-[0.95] tracking-tight text-white sm:mb-2.5 sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"
-              style={{ overflowWrap: "anywhere", textShadow: extrude }}
+              className={`mb-2 font-black text-white sm:mb-3 ${dir === "rtl" ? "text-2xl leading-[1.65] sm:text-4xl lg:text-5xl xl:text-6xl" : "text-2xl uppercase italic leading-[0.95] tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl 2xl:text-7xl"}`}
+              style={{ overflowWrap: "normal", wordBreak: "normal", textShadow: extrude }}
             >
               {dir === "rtl"
                 ? <span className="bn-anim inline-block" style={anim(isActive, "bnSlideLeft", 0.15, 0.6)}>{banner.heading}</span>
@@ -347,8 +389,8 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
           {banner.description && (
             <p
               dir={dir}
-              className="bn-anim mb-2 hidden max-w-lg text-sm leading-relaxed text-white/85 sm:block sm:text-base lg:mb-3 lg:text-lg line-clamp-2"
-              style={anim(isActive, "bnSlideLeft", 0.35)}
+              className={`bn-anim hidden max-w-xl text-sm text-white/85 sm:block sm:text-base lg:text-lg ${dir === "rtl" ? "mb-6 sm:mb-7 lg:mb-8 line-clamp-3 leading-[2]" : "mb-4 lg:mb-5 line-clamp-2 leading-relaxed"}`}
+              style={{ lineHeight: dir === "rtl" ? 2 : undefined, ...anim(isActive, "bnSlideLeft", 0.35) }}
             >
               {banner.description}
             </p>
@@ -363,12 +405,12 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
             </span>
           )}
 
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="flex flex-wrap justify-start gap-2 sm:gap-3">
             {banner.primaryButton?.text && (
-              <ButtonLink button={banner.primaryButton} palette={palette} primary isActive={isActive} delay={0.55} />
+              <ButtonLink button={banner.primaryButton} palette={palette} primary isActive={isActive} delay={0.55} locale={locale} />
             )}
             {banner.secondaryButton?.text && (
-              <ButtonLink button={banner.secondaryButton} palette={palette} isActive={isActive} delay={0.65} />
+              <ButtonLink button={banner.secondaryButton} palette={palette} isActive={isActive} delay={0.65} locale={locale} />
             )}
           </div>
         </div>
@@ -385,7 +427,7 @@ function ImageSlide({ banner, imgUrl, mountImage, isActive, priority, fallbackAl
       {imgUrl && mountImage ? (
         <Image
           src={imgUrl}
-          alt={banner.altText || banner.title || banner.heading || fallbackAlt}
+          alt={banner.altText || fallbackAlt}
           fill
           loader={smartImageLoader}
           sizes="100vw"
@@ -403,21 +445,22 @@ function ImageSlide({ banner, imgUrl, mountImage, isActive, priority, fallbackAl
   );
 }
 
-function ButtonLink({ button, palette, primary = false, isActive, delay = 0 }) {
-  const { dir, t } = useTranslation();
+function ButtonLink({ button, palette, primary = false, isActive, delay = 0, locale }) {
+  const { t } = useTranslation();
   const href = button.link || "#";
 
   // Inline color: `.user-theme a { color: inherit }` Tailwind text-* ko override kar deta hai
   return (
     <Link
       href={href}
-      className={`bn-anim group/btn inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${
+      dir={dirForLocale(locale)}
+      className={`bn-anim group/btn inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98] sm:px-4 sm:py-2 sm:text-sm ${dirForLocale(locale) === "rtl" ? "normal-case tracking-normal leading-[1.8]" : "uppercase tracking-wide"} ${
         primary ? "bg-white" : "border-2 border-white/80 hover:bg-white/15"
       }`}
       style={{ color: primary ? palette.from : "#ffffff", ...anim(isActive, "bnSlideLeft", delay, 0.6) }}
     >
-      {primary ? t("banner.shopNow") : button.text}
-      {primary && (dir === "rtl" ? <ArrowLeft
+      {primary ? (locale === "en" ? "Shop Now" : t("banner.shopNow")) : button.text}
+      {primary && (dirForLocale(locale) === "rtl" ? <ArrowLeft
           size={15}
           className="bn-anim"
           style={{ animation: isActive ? "bnNudge 1.6s ease-in-out 1.2s infinite" : undefined }}

@@ -10,6 +10,7 @@ import { useAttributeSocketSync } from "../../../../hooks/admin/useAttributeSock
 import { toast } from "sonner";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import AttributeFormModal from "@/components/admin/AttributeFormModal";
 
 /* =========================================================
    ICONS
@@ -276,35 +277,23 @@ function getAttributeId(attribute) {
 }
 
 // ✅ FIX ISSUE 2: Robustly extract string labels from mixed option formats
-function sanitizeOptionLabels(raw) {
+function sanitizeOptionLabels(raw, locale = "en") {
   if (!Array.isArray(raw)) return [];
   const seen = new Set();
   const result = [];
+  const toText = (candidate, depth = 0) => {
+    if (typeof candidate === "string" || typeof candidate === "number") return String(candidate).trim();
+    if (!candidate || typeof candidate !== "object" || depth > 3) return "";
+    const nested = candidate[locale] || candidate.en || candidate.label || candidate.value || candidate.name;
+    return nested && nested !== candidate ? toText(nested, depth + 1) : "";
+  };
   for (const item of raw) {
     if (!item) continue;
-
-    let label = "";
-    if (typeof item === "string") {
-      label = item;
-    } else if (typeof item === "object" && item !== null) {
-      const labelStr = typeof item.label === "string" ? item.label : (typeof item.value === "string" ? item.value : (typeof item.name === "string" ? item.name : ""));
-      const valueStr = typeof item.value === "string" ? item.value : (typeof item.label === "string" ? item.label : (typeof item.name === "string" ? item.name : ""));
-      label = labelStr || valueStr || "";
-      // If label is still an object (corrupted nested data), coerce to string and filter
-      if (typeof label !== "string") {
-        label = String(label || "");
-      }
-      // If after coercion it still looks like [object Object], try to recover from nested properties
-      if (label.trim() === "[object Object]" || label.trim() === "[object object]") {
-        const nestedLabel = item.label?.label || item.label?.value || item.value?.label || item.value?.value || item.name?.label || item.name?.value || "";
-        label = (typeof nestedLabel === "string" ? nestedLabel : String(nestedLabel || "")).trim();
-      }
-    } else {
-      label = String(item);
-    }
-
-    if (typeof label !== "string") continue;
-
+    const label = toText(item.label_translations?.[locale])
+      || toText(item.label)
+      || toText(item.value)
+      || toText(item.name)
+      || toText(item);
     const trimmed = label.trim();
     if (trimmed && !seen.has(trimmed)) {
       seen.add(trimmed);
@@ -400,7 +389,7 @@ function AttributeOptionsPanel({ attr, onClose }) {
   const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, params);
   const { attributeOf } = useLocalized();
   const localizedAttr = attributeOf(attr);
-  const optionLabels = sanitizeOptionLabels(localizedAttr.values);
+  const optionLabels = sanitizeOptionLabels(localizedAttr.values, locale);
 
   if (!attr) return null;
 
@@ -512,308 +501,14 @@ function AttributeOptionsPanel({ attr, onClose }) {
    MAIN PAGE
 ======================================================== */
 
-function AttributeFormModal({ open, onClose, mode = "create", initialData, onSave, isSaving = false }) {
-  const isEdit = mode === "edit";
-  const { t: __t } = useTranslation();
-  const t = (key, params) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, params);
-
-  const [form, setForm] = useState({
-    name: "",
-    data_type: "multi_select",
-    values: [],
-    value: isEdit ? false : "",
-    is_active: true,
-  });
-  const [optionInput, setOptionInput] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      if (isEdit && initialData) {
-        const dataType = initialData.data_type || "multi_select";
-        let booleanValue = false;
-        if (dataType === "boolean") {
-          const vals = initialData.values || [];
-          const trueEntry = vals.find(
-            (v) =>
-              (v?.value || v)?.toString() === "true" ||
-              (v?.label || v)?.toString()?.toLowerCase() === "yes"
-          );
-          if (trueEntry) booleanValue = true;
-        }
-        // ✅ FIX ISSUE 2: Ensure we extract strings correctly when loading into form
-        const values = (initialData.values || [])
-          .map((v) => {
-            if (typeof v === "string") return v.trim();
-            if (typeof v === "object" && v !== null) {
-              const labelStr = typeof v.label === "string" ? v.label : (typeof v.value === "string" ? v.value : (typeof v.name === "string" ? v.name : ""));
-              const valueStr = typeof v.value === "string" ? v.value : (typeof v.label === "string" ? v.label : (typeof v.name === "string" ? v.name : ""));
-              let label = (labelStr || valueStr || "").trim();
-              if (label === "[object Object]" || label === "[object object]") {
-                const nestedLabel = v.label?.label || v.label?.value || v.value?.label || v.value?.value || v.name?.label || v.name?.value || "";
-                label = (typeof nestedLabel === "string" ? nestedLabel : String(nestedLabel || "")).trim();
-              }
-              return label || "";
-            }
-            return String(v || "").trim();
-          })
-          .filter((s) => s && s !== "[object Object]" && s !== "[object object]");
-        setForm({
-          name: initialData.name || "",
-          data_type: dataType,
-          values,
-          value: booleanValue,
-          is_active: initialData.is_active !== false,
-        });
-        setOptionInput("");
-      } else {
-        setForm({
-          name: "",
-          data_type: "multi_select",
-          values: [],
-          value: "",
-          is_active: true,
-        });
-        setOptionInput("");
-      }
-    }
-  }, [open, isEdit, initialData]);
-
-  if (!open) return null;
-
-  const handleSave = () => {
-    if (!form.name || !form.name.trim()) return;
-    const valuesPayload = form.data_type === "multi_select"
-      ? (form.values || []).map((opt) => {
-          const label = String(opt || "").trim();
-          return { label, value: label.toLowerCase() };
-        })
-      : form.data_type === "boolean"
-        ? [
-            {
-              label: form.value ? "Yes" : "No",
-              value: form.value ? "true" : "false",
-              sort_order: 0,
-              is_active: true,
-            },
-          ]
-        : [];
-    const payload = {
-      name: form.name.trim(),
-      data_type: form.data_type,
-      values: valuesPayload,
-      is_active: form.is_active !== false,
-    };
-    if (!isEdit && !payload.name) return;
-    if (isEdit) {
-      payload.value = form.value;
-    }
-    onSave && onSave(payload);
-  };
-
-  const addOption = () => {
-    const val = optionInput.trim();
-    if (!val) return;
-    if (form.data_type === "multi_select" && form.values.some((v) => v.toLowerCase() === val.toLowerCase())) {
-      setOptionInput("");
-      return;
-    }
-    setForm({ ...form, values: [...(form.values || []), val] });
-    setOptionInput("");
-  };
-
-  const removeOption = (idx) => {
-    setForm({ ...form, values: (form.values || []).filter((_, i) => i !== idx) });
-  };
-
-  const title = isEdit ? t("admin.attributes.form.editTitle") : t("admin.attributes.form.createTitle");
-  const subtitle = isEdit ? t("admin.attributes.form.editSubtitle") : t("admin.attributes.form.createSubtitle");
-  const saveText = isEdit
-    ? isSaving ? t("admin.attributes.form.saving") : t("admin.attributes.form.save")
-    : isSaving ? t("admin.attributes.form.adding") : t("admin.attributes.form.create");
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 85vh)" }}>
-        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
-              <ModalLayersIcon className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 pt-0.5">
-              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h3>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
-          >
-            <ModalCloseIcon className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {t("admin.attributes.form.name")} <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              autoFocus
-              className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-              placeholder={t("admin.attributes.form.namePlaceholder")}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-              {t("admin.attributes.form.type")}
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: "multi_select", label: t("admin.attributes.form.typeMulti") },
-                { id: "boolean", label: t("admin.attributes.form.typeYesNo") },
-              ].map((type) => {
-                const isActive = form.data_type === type.id;
-                return (
-                  <button
-                    key={type.id}
-                    type="button"
-                    onClick={() =>
-                      setForm({
-                        ...form,
-                        data_type: type.id,
-                        values: type.id === "boolean" ? form.values : form.values,
-                      })
-                    }
-                    className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${
-                      isActive
-                        ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    <span>{type.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {form.data_type === "multi_select" && (
-            <div className="space-y-2.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.categories.detail.options")}</label>
-              {(form.values || []).length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {(form.values || []).map((val, idx) => (
-                    <span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15">
-                      {val}
-                      <button
-                        type="button"
-                        onClick={() => removeOption(idx)}
-                        className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"
-                      >
-                        <ModalCloseIcon className="w-2.5 h-2.5" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={optionInput}
-                  onChange={(e) => setOptionInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addOption();
-                    }
-                  }}
-                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
-                  placeholder={t("admin.categories.addAttr.optionPlaceholder")}
-                />
-                <button
-                  type="button"
-                  onClick={addOption}
-                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
-                >
-                  <ModalPlusIcon className="w-3 h-3" /> {t("admin.categories.addAttr.addOption")}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {form.data_type === "boolean" && (
-            <div className="space-y-2.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                {t("admin.attributes.form.defaultValue")}
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { id: "yes", label: t("admin.categories.addAttr.yes") },
-                  { id: "no", label: t("admin.categories.addAttr.no") },
-                ].map((opt) => {
-                  const isActive = (opt.id === "yes" && form.value === true) || (opt.id === "no" && form.value === false);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setForm({ ...form, value: opt.id === "yes" })}
-                      className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${
-                        isActive
-                          ? opt.id === "yes"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10"
-                            : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm"
-                          : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                      }`}
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${
-                        isActive
-                          ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]"
-                          : "border-[var(--border-color)] bg-transparent"
-                      }`} />
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
-          >
-            {t("admin.categories.addAttr.cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || !form.name || !form.name.trim()}
-            className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saveText}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function CategoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const queryClient = useQueryClient();
   const { t: __t, dir, locale } = useTranslation();
   const t = (key, values) => __t(key.startsWith("admin.") || key.startsWith("common.") ? key : `admin.categories.${key}`, values);
-  // Database-sourced content (category / attribute names + descriptions) —
-  // active locale me render hota hai, English fallback helper ke andar hai.
+  // Database-sourced category descriptions and category/attribute names are
+  // shown in the active locale, with English fallback in the localization helpers.
   const { nameOf, descriptionOf, attributeOf } = useLocalized();
 
   const categoryId = getId(params?.id);
@@ -1248,8 +943,8 @@ export default function CategoryDetailPage() {
                       // detect karne ke liye chahiye — wo raw values par match karta
                       // hai, is liye usse localized list se alag rakha hai.
                       const localizedAttr = attributeOf(attr);
-                      const rawOptionLabels = sanitizeOptionLabels(attr.values);
-                      const optionLabels = sanitizeOptionLabels(localizedAttr.values);
+                      const rawOptionLabels = sanitizeOptionLabels(attr.values, "en");
+                      const optionLabels = sanitizeOptionLabels(localizedAttr.values, locale);
                       const optionCount = optionLabels.length;
                       const isMultiSelect = attr.data_type === "multi_select" || attr.data_type === "select";
                       const isBoolean = attr.data_type === "boolean";
@@ -1297,11 +992,6 @@ export default function CategoryDetailPage() {
                                     </span>
                                   )}
                                 </div>
-                                {localizedAttr.description && (
-                                  <p className="mt-0.5 text-[10px] text-[var(--text-muted)] truncate">
-                                    {localizedAttr.description}
-                                  </p>
-                                )}
                                 <p className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.code}</p>
                               </div>
                             </div>
@@ -1645,11 +1335,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   const [attrSearch, setAttrSearch] = useState("");
   const [tempSelectedAttrIds, setTempSelectedAttrIds] = useState([]);
   const [showCreateAttrModal, setShowCreateAttrModal] = useState(false);
-  const [newAttrName, setNewAttrName] = useState("");
-  const [newAttrType, setNewAttrType] = useState("multi_select");
-  const [newAttrValues, setNewAttrValues] = useState([]);
-  const [newAttrValueInput, setNewAttrValueInput] = useState("");
-  const [newAttrDefaultValue, setNewAttrDefaultValue] = useState("yes");
+  const [createAttributeInitialName, setCreateAttributeInitialName] = useState("");
   const [creatingAttribute, setCreatingAttribute] = useState(false);
   const [showParentDropdown, setShowParentDropdown] = useState(false);
   // ✅ DIRTY-FLAG: Status control chhua gaya ya nahi. `is_active` sirf tab
@@ -1750,22 +1436,43 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
     setFormData((p) => ({ ...p, attributes: newAttrs })); setShowAttrSelectModal(false);
   };
 
-  const handleCreateAttribute = async () => {
-    if (!newAttrName.trim() || creatingAttribute) return;
-    if (newAttrType === "multi_select" && newAttrValues.length === 0) { toast.error(t("attrs.multiRequired")); return; }
+  const handleCreateAttribute = async (payload) => {
+    if (!payload?.name?.trim() || creatingAttribute) return;
+    if (payload.data_type === "multi_select" && !(payload.values || []).length) {
+      toast.error(t("attrs.multiRequired"));
+      return;
+    }
     setCreatingAttribute(true);
     try {
-      const code = newAttrName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-      const payload = { name: newAttrName.trim(), code, data_type: newAttrType, description: "", values: newAttrType === "multi_select" ? newAttrValues.map((v) => ({ label: v, value: v })) : [{ label: newAttrDefaultValue === "yes" ? "Yes" : "No", value: newAttrDefaultValue }] };
-      const created = await attributeApi.create(payload); queryClient.invalidateQueries({ queryKey: ["all-attributes"] });
+      const code = payload.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const created = await attributeApi.create({ ...payload, name: payload.name.trim(), code });
+      queryClient.invalidateQueries({ queryKey: ["all-attributes"] });
       if (created && created._id) {
         const mappedType = created.data_type === "select" || created.data_type === "color" ? "multi_select" : created.data_type;
-        const newAttrEntry = { ui_key: `sel-${created._id}-${Date.now()}`, attribute_id: created._id, seed_code: created.code, seed_name: created.name, seed_type: mappedType, seed_options: (created.values || []).map(v => v.label || v.value || v), is_visible: true, is_searchable: true, sort_order: formData.attributes.length, value: mappedType === "multi_select" ? [] : (newAttrDefaultValue === "yes" ? true : false) };
-        setFormData((p) => ({ ...p, attributes: [...p.attributes, newAttrEntry] })); setTempSelectedAttrIds((prev) => [...prev, created._id]);
+        const newAttrEntry = {
+          ui_key: "sel-" + created._id + "-" + Date.now(),
+          attribute_id: created._id,
+          seed_code: created.code,
+          seed_name: created.name,
+          seed_type: mappedType,
+          seed_options: (created.values || []).map((v) => v.label || v.value || v),
+          is_visible: true,
+          is_searchable: true,
+          sort_order: formData.attributes.length,
+          value: mappedType === "multi_select" ? [] : Boolean(payload.value),
+        };
+        setFormData((current) => ({ ...current, attributes: [...current.attributes, newAttrEntry] }));
+        setTempSelectedAttrIds((current) => [...current, created._id]);
       }
-      setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); setAttrSearch("");
-      toast.success(t("addAttr.created", { name: created?.name || "" }));
-    } catch (err) { toast.error(err.response?.data?.message || t("addAttr.createFailed")); } finally { setCreatingAttribute(false); }
+      setShowCreateAttrModal(false);
+      setCreateAttributeInitialName("");
+      setAttrSearch("");
+      toast.success(t("addAttr.created", { name: created?.name || payload.name }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || t("addAttr.createFailed"));
+    } finally {
+      setCreatingAttribute(false);
+    }
   };
 
   const filteredAllAttributes = useMemo(() => !attrSearch.trim() ? allAttributes : allAttributes.filter((a) => a.name?.toLowerCase().includes(attrSearch.toLowerCase()) || a.code?.toLowerCase().includes(attrSearch.toLowerCase())), [allAttributes, attrSearch]);
@@ -1961,26 +1668,19 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
             <div className="flex-1 overflow-y-auto min-h-0">
               {allAttributes.length > 0 ? (filteredAllAttributes.length > 0 ? filteredAllAttributes.map((attr) => { const isChecked = tempSelectedAttrIds.includes(attr._id); return (<button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)} className={`w-full px-5 py-2.5 flex items-center gap-3 text-start transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}><div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>{isChecked && <Ico d={D.check} className="w-3 h-3 text-white" />}</div><div className="flex-1 min-w-0"><p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attributeOf(attr).name}</p><p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {t(getDataTypeLabel(attr.data_type))}</p></div>{attr.values && attr.values.length > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{t("attrs.valuesCount", { count: attr.values.length })}</span>}</button>); }) : <div className="px-5 py-6 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noMatch")}</p></div>) : <div className="px-5 py-8 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noneYet")}</p><p className="text-[11px] text-[var(--text-muted)]">{t("attrs.noneYetBody")}</p></div>}
             </div>
-            {!showCreateAttrModal && (<div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(""); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNewGeneric")}</span></button></div>) : null}</div>)}
+            {!showCreateAttrModal && (<div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setCreateAttributeInitialName(attrSearch.trim()); setShowCreateAttrModal(true); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setCreateAttributeInitialName(""); setShowCreateAttrModal(true); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNewGeneric")}</span></button></div>) : null}</div>)}
             <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0"><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">{t("attrs.cancel")}</button><button type="button" onClick={applyAttributeSelection} className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">{t("attrs.apply")}{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}</button></div>
           </div>
         </div>, document.body
       )}
 
-      {showCreateAttrModal && createPortal(
-        <div dir={dir} lang={locale} className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 85vh)" }}>
-            <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between shrink-0"><div className="flex items-start gap-3 min-w-0"><div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0"><ModalLayersIcon className="w-4 h-4" /></div><div className="min-w-0 pt-0.5"><h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{t("addAttr.title")}</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("addAttr.subtitle")}</p></div></div><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
-            <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0">
-              <div className="space-y-1.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.name")} <span className="text-red-500">*</span></label><input type="text" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} autoFocus className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder={t("addAttr.namePlaceholder")} /></div>
-              <div className="space-y-2"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.categories.addAttr.type")}</label><div className="grid grid-cols-2 gap-3">{[{ id: "multi_select", label: t("admin.categories.addAttr.typeMulti") }, { id: "boolean", label: t("admin.categories.addAttr.typeYesNo") }].map((type) => { const isActive = newAttrType === type.id; return (<button key={type.id} type="button" onClick={() => { setNewAttrType(type.id); setNewAttrValues([]); setNewAttrValueInput(""); if (type.id === "boolean") setNewAttrDefaultValue("yes"); }} className={`h-auto py-3 px-3 text-[12px] font-semibold rounded-lg border transition-all text-left flex flex-col gap-0.5 ${isActive ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span>{type.label}</span></button>); })}</div></div>
-              {newAttrType === "multi_select" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("addAttr.options")}</label>{newAttrValues.length > 0 && (<div className="flex flex-wrap gap-1.5">{newAttrValues.map((val, idx) => (<span key={idx} className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"><span className="w-4 h-4 flex items-center justify-center rounded bg-[var(--accent)]/10 text-[9px] font-bold text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">{idx + 1}</span>{val}<button type="button" onClick={() => setNewAttrValues((p) => p.filter((_, i) => i !== idx))} className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ms-0.5"><Ico d={D.close} className="w-2.5 h-2.5" /></button></span>))}</div>)}<div className="flex gap-2"><input type="text" value={newAttrValueInput} onChange={(e) => setNewAttrValueInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error(t("addAttr.optionExists")); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); } }} className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" placeholder={t("addAttr.optionPlaceholder")} /><button type="button" onClick={() => { const val = newAttrValueInput.trim(); if (!val) return; if (newAttrValues.some((v) => v.toLowerCase() === val.toLowerCase())) { toast.error(t("addAttr.optionExists")); setNewAttrValueInput(""); return; } setNewAttrValues((p) => [...p, val]); setNewAttrValueInput(""); }} className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"><ModalPlusIcon className="w-3 h-3" /> {t("addAttr.addOption")}</button></div></div>)}
-              {newAttrType === "boolean" && (<div className="space-y-2.5"><label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.categories.addAttr.defaultValue")}</label><div className="grid grid-cols-2 gap-3">{[{ id: "yes", label: t("admin.categories.addAttr.yes") }, { id: "no", label: t("admin.categories.addAttr.no") }].map((opt) => { const isActive = newAttrDefaultValue === opt.id; return (<button key={opt.id} type="button" onClick={() => setNewAttrDefaultValue(opt.id)} className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive ? opt.id === "yes" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10" : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive ? opt.id === "yes" ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]" : "border-[var(--border-color)] bg-transparent"}`} />{opt.label}</button>); })}</div></div>)}
-            </div>
-            <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 shrink-0"><button type="button" onClick={() => { setShowCreateAttrModal(false); setNewAttrName(""); setNewAttrType("multi_select"); setNewAttrValues([]); setNewAttrValueInput(""); setNewAttrDefaultValue("yes"); }} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors">{t("admin.categories.addAttr.cancel")}</button><button type="button" onClick={handleCreateAttribute} disabled={!newAttrName.trim() || creatingAttribute} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">{creatingAttribute ? <span className="flex items-center gap-1.5"><ModalSpinner className="w-3.5 h-3.5" /> {t("admin.categories.addAttr.creating")}</span> : t("admin.categories.addAttr.create")}</button></div>
-          </div>
-        </div>, document.body
-      )}
+      <AttributeFormModal
+        open={showCreateAttrModal}
+        onClose={() => { setShowCreateAttrModal(false); setCreateAttributeInitialName(""); }}
+        initialName={createAttributeInitialName}
+        isSaving={creatingAttribute}
+        onSave={handleCreateAttribute}
+      />
     </>
   );
 }

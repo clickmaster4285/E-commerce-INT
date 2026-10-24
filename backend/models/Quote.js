@@ -35,6 +35,7 @@ const quoteSchema = new mongoose.Schema({
   total: { type: Number, required: true, min: 0 },
   terms: { type: String, trim: true, default: "", maxlength: 5000 },
   notes: { type: String, trim: true, default: "", maxlength: 1000 },
+  pdf_design: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   status: { type: String, enum: ["Pending", "Draft", "Sent", "Accepted", "Rejected"], default: "Pending", index: true },
   createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },

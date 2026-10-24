@@ -32,6 +32,7 @@ import { productApi } from "@/apis/admin/productApi";
 import { useProductSocketSync } from "../../../hooks/admin/useProductSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const PER_PAGE = 20;
 const MODAL_PER_PAGE = 8;
@@ -382,6 +383,32 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
   const pagination = data?.pagination || {};
   const totalPages = Math.max(1, Number(pagination.pages) || 1);
   const totalRecords = Number(pagination.total) || 0;
+  const categories = useMemo(() => products.map((product) => product?.category_id).filter((item) => item?._id), [products]);
+  const brands = useMemo(() => products.map((product) => product?.brand_id).filter((item) => item?._id), [products]);
+  usePageTranslations({
+    model: "Product",
+    records: products,
+    locale,
+    ready: open && !isFetching && Number(pagination.page || page) === page,
+    queryKey: ["manage-featured", page, debounced],
+    queryClient,
+  });
+  usePageTranslations({
+    model: "Category",
+    records: categories,
+    locale,
+    ready: open && !isFetching && Number(pagination.page || page) === page,
+    queryKey: ["manage-featured", page, debounced],
+    queryClient,
+  });
+  usePageTranslations({
+    model: "Brand",
+    records: brands,
+    locale,
+    ready: open && !isFetching && Number(pagination.page || page) === page,
+    queryKey: ["manage-featured", page, debounced],
+    queryClient,
+  });
 
   // Naye loaded products ke original state capture karo (draft ko touch na karo)
   useEffect(() => {
@@ -717,6 +744,32 @@ export default function FeaturedProductsPage() {
 
   const products = useMemo(() => data?.products || [], [data]);
   const pagination = data?.pagination || { total: 0, pages: 1, limit: PER_PAGE };
+  const categories = useMemo(() => products.map((product) => product?.category_id).filter((item) => item?._id), [products]);
+  const brands = useMemo(() => products.map((product) => product?.brand_id).filter((item) => item?._id), [products]);
+  usePageTranslations({
+    model: "Product",
+    records: products,
+    locale,
+    ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
+    queryKey: ["featured-products", currentPage, search],
+    queryClient,
+  });
+  usePageTranslations({
+    model: "Category",
+    records: categories,
+    locale,
+    ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
+    queryKey: ["featured-products", currentPage, search],
+    queryClient,
+  });
+  usePageTranslations({
+    model: "Brand",
+    records: brands,
+    locale,
+    ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
+    queryKey: ["featured-products", currentPage, search],
+    queryClient,
+  });
   const totalRecords = Number(pagination.total) || 0;
   const totalPages = Math.max(1, Number(pagination.pages) || 1);
   const pageLimit = Number(pagination.limit) || PER_PAGE;

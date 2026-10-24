@@ -601,6 +601,54 @@ html:has(.user-theme) {
   background-color: var(--user-bg);
 }
 
+/* Nastaliq needs more vertical room, and Tailwind tracking classes must not
+   squeeze its connected glyphs. Keep checkout labels readable in Urdu. */
+html:has([lang="ur"]) .checkout-premium :is(
+  h1, h2, h3, h4, h5, h6, p, a, label, button, li, td, th, strong, em, span
+) {
+  letter-spacing: 0 !important;
+  word-spacing: 0.12em;
+  text-transform: none;
+  line-height: 2.1;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ur"]) .checkout-premium :is(button, a) {
+  white-space: normal;
+}
+
+html:has([lang="ur"]) .checkout-premium .checkout-step-marker {
+  line-height: 1 !important;
+}
+
+/* Nastaliq phone-required checkout card: fixed text leading and button heights
+   clip Urdu marks, so give copy and CTA enough vertical room in both layouts. */
+html:has([lang="ur"]) .checkout-premium .checkout-phone-required
+  :is(h2, p, label, button, button span) {
+  letter-spacing: 0 !important;
+  word-spacing: 0.1em;
+  text-transform: none !important;
+  line-height: 2 !important;
+}
+
+html:has([lang="ur"]) .checkout-premium .checkout-phone-required h2 {
+  line-height: 2.2 !important;
+  padding-block: 2px;
+}
+
+html:has([lang="ur"]) .checkout-premium .checkout-phone-required p {
+  line-height: 2.1 !important;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
+  height: auto !important;
+  min-height: 3rem;
+  padding-block: 0.55rem;
+  white-space: normal;
+}
+
 /* Preserve checkout's existing light palette (default theme) while dark mode inherits the storefront theme. */
 :root:not(.user-dark) .checkout-premium {
   --user-bg: #f7f7f8;

@@ -76,6 +76,7 @@ function CategorySkeletonCard() {
 }
 
 export function CategoryCarousel({ categories = [], header, isLoading = false }) {
+  const { t } = useTranslation();
   const viewportRef = useRef(null);
   const trackRef = useRef(null);
   const segmentWidthRef = useRef(0);
@@ -274,9 +275,9 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
   return (
     <div>
       <SectionHeading
-        title="Explore Our Categories"
+        title={t("home.exploreCategories")}
         titleId="home-categories-heading"
-        subtitle="Find everything you need in one place."
+        subtitle={t("home.categoriesSubtitle")}
         className="mb-5 px-1"
       >
         <div className="flex shrink-0 items-end gap-4">
@@ -284,7 +285,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
             href="/filtering-product"
             className="group inline-flex items-center gap-1 text-[13px] font-medium text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
           >
-            View All
+            {t("common.viewAll")}
             <ArrowRight size={16} className="transition-transform duration-150 group-hover:translate-x-0.5" />
           </Link>
           <span
@@ -296,7 +297,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
               type="button"
               onClick={() => scrollByCards(-1)}
               disabled={!canScrollLeft || categories.length < 2}
-              aria-label="Previous categories"
+              aria-label={t("home.previousCategories")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] shadow-sm transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
             >
               <ChevronLeft size={16} strokeWidth={2} />
@@ -305,7 +306,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
               type="button"
               onClick={() => scrollByCards(1)}
               disabled={!canScrollRight || categories.length < 2}
-              aria-label="Next categories"
+              aria-label={t("home.nextCategories")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] shadow-sm transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
             >
               <ChevronRight size={16} strokeWidth={2} />
@@ -316,7 +317,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
       <div
         ref={viewportRef}
         role="region"
-        aria-label="Scrollable product categories"
+        aria-label={t("home.scrollableCategories")}
         aria-busy={showSkeletons}
         tabIndex={0}
         onKeyDown={onKeyDown}

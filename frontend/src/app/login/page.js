@@ -15,6 +15,9 @@ import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phon
 import OtpVerifyCard from "@/components/user/OtpVerifyCard";
 import ResetPasswordCard from "@/components/user/ResetPasswordCard";
 import { toast } from "sonner";
+import LanguageSwitcher from "@/components/user/LanguageSwitcher";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -39,6 +42,8 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 
 export default function UserLoginPage() {
   const router = useRouter();
+  const { t } = useTranslation();
+  const { nameOf } = useLocalized();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
@@ -73,7 +78,9 @@ export default function UserLoginPage() {
   });
 
   const storeName = store?.store_name || "ClickMasters";
-  const tagline = store?.tagline || "Mobiles · Laptops · Watches · Accessories — shop everything from one trusted store.";
+  const tagline = !store?.tagline || store.tagline === "Welcome to our store"
+    ? t("store.defaultTagline")
+    : store.tagline;
   const topCategories = categories.slice(0, 3);
 
   // ✅ Backend 400 field errors ko form fields par dikhao (LoginModal jaisa)
@@ -123,7 +130,7 @@ export default function UserLoginPage() {
       setGeneralError(message);
       return;
     }
-    setGeneralError(`${isLogin ? "Login" : "Registration"} failed. Please try again.`);
+    setGeneralError(t(isLogin ? "auth.login.loginFailed" : "auth.login.registrationFailed"));
   };
 
   const handleSubmit = async (e) => {
@@ -133,10 +140,10 @@ export default function UserLoginPage() {
     if (!isLogin && !isValidPhone(phone)) {
       setErrors({
         phone: !phone
-          ? "Phone number is required"
+          ? t("auth.login.phoneRequired")
           : phone.length < PHONE_MIN
-            ? `Phone number must be at least ${PHONE_MIN} digits`
-            : `Phone number must be at most ${PHONE_MAX} digits`,
+            ? t("auth.login.phoneMin", { count: PHONE_MIN })
+            : t("auth.login.phoneMax", { count: PHONE_MAX }),
       });
       return;
     }
@@ -152,19 +159,19 @@ export default function UserLoginPage() {
       const res = await authApi.register({ name, username, phone, email, password });
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      toast.success(res?.message || `Verification code sent to ${res?.email || email}`);
+      toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
       setLoading(false);
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen dikhao
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
-        toast.info(err.response.data.message || "Please verify your email first.");
+        toast.info(t("auth.login.verifyEmail"));
         setLoading(false);
         return;
       }
       parseBackendError(err);
-      toast.error(getApiErrorMessage(err, `${isLogin ? "Login" : "Registration"} failed.`));
+      toast.error(getApiErrorMessage(err, t(isLogin ? "auth.login.loginFailed" : "auth.login.registrationFailed")));
       setLoading(false);
     }
   };
@@ -174,13 +181,13 @@ export default function UserLoginPage() {
   // ==========================================
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
-    toast.success("Email verified successfully! Welcome aboard.");
+    toast.success(t("auth.login.emailVerified"));
     window.location.href = "/";
   };
 
   const handleResendEmailOtp = async () => {
     const res = await authApi.sendEmailOtp(otpEmail);
-    toast.success(res?.message || "A new verification code has been sent.");
+    toast.success(t("auth.login.verificationResent"));
   };
 
   // ==========================================
@@ -189,7 +196,7 @@ export default function UserLoginPage() {
   const handleForgotSubmit = async (e) => {
     e.preventDefault();
     if (!isValidEmail(forgotEmail)) {
-      setForgotError("Please enter a valid email address.");
+      setForgotError(t("auth.login.invalidEmail"));
       return;
     }
     setForgotError("");
@@ -198,9 +205,9 @@ export default function UserLoginPage() {
       const res = await authApi.sendForgotOtp(forgotEmail.trim());
       setOtpEmail(forgotEmail.trim());
       setStep("forgot-otp");
-      toast.success(res?.message || "Password reset code sent to your email.");
+      toast.success(t("auth.login.resetCodeSent"));
     } catch (err) {
-      setForgotError(getApiErrorMessage(err, "Could not send the reset code."));
+      setForgotError(getApiErrorMessage(err, t("auth.login.resetCodeFailed")));
     } finally {
       setForgotLoading(false);
     }
@@ -210,17 +217,17 @@ export default function UserLoginPage() {
     const res = await authApi.verifyResetOtp(otpEmail, otp);
     setResetToken(res?.resetToken || "");
     setStep("reset");
-    toast.success(res?.message || "Code verified. Please set a new password.");
+    toast.success(t("auth.login.resetCodeVerified"));
   };
 
   const handleResendResetOtp = async () => {
     const res = await authApi.sendForgotOtp(otpEmail);
-    toast.success(res?.message || "A new reset code has been sent.");
+    toast.success(t("auth.login.resetCodeResent"));
   };
 
   const handleResetPassword = async (newPassword) => {
     await authApi.resetPassword({ email: otpEmail, resetToken, newPassword });
-    toast.success("Password reset successfully. Please log in with your new password.");
+    toast.success(t("auth.login.passwordResetSuccess"));
     setPassword("");
     setResetToken("");
     setOtpEmail("");
@@ -236,7 +243,7 @@ export default function UserLoginPage() {
       await authApi.googleCustomerLogin(credential);
       window.location.href = "/";
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Google login failed."));
+      toast.error(getApiErrorMessage(err, t("auth.login.googleFailed")));
       setLoading(false);
     }
   };
@@ -265,6 +272,9 @@ export default function UserLoginPage() {
 
   return (
     <main className="user-theme h-screen flex bg-[var(--user-bg)] overflow-y-auto lg:overflow-hidden">
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
       {/* ═══════════ LEFT — BRANDING (Desktop) ═══════════ */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 xl:p-14 bg-[var(--user-bg-elevated)] relative overflow-hidden border-r border-[var(--user-border)] shrink-0">
         {/* Glows */}
@@ -288,15 +298,15 @@ export default function UserLoginPage() {
           <div className="flex items-center gap-2 mb-5">
             <Sparkles size={14} className="text-[var(--user-accent)]" />
             <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--user-accent)]">
-              Trusted by thousands of customers
+              {t("auth.login.trustedByCustomers")}
             </span>
           </div>
 
           <h1 className="text-5xl xl:text-[3.4rem] font-black text-[var(--user-text)] mb-5 leading-[1.08] tracking-tight">
-            Premium Shopping
+            {t("auth.login.premiumShopping")}
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--user-accent)] to-emerald-300">
-              Experience
+              {t("auth.login.experience")}
             </span>
           </h1>
 
@@ -313,9 +323,9 @@ export default function UserLoginPage() {
                   className="flex items-center gap-2.5 px-4 py-2.5 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl text-[var(--user-text-secondary)] text-sm"
                 >
                   <span className="w-6 h-6 rounded-md bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center text-xs font-black">
-                    {cat.name.charAt(0)}
+                    {nameOf(cat).charAt(0)}
                   </span>
-                  {cat.name}
+                  {nameOf(cat)}
                 </div>
               ))}
             </div>
@@ -324,22 +334,22 @@ export default function UserLoginPage() {
           {/* Feature row */}
           <div className="flex items-center gap-7">
             <div className="flex items-center gap-2 text-xs font-semibold text-[var(--user-text-muted)]">
-              <Truck size={15} className="text-[var(--user-accent)]" /> Free Delivery
+              <Truck size={15} className="text-[var(--user-accent)]" /> {t("auth.login.freeDelivery")}
             </div>
             <div className="w-1 h-1 rounded-full bg-[var(--user-border)]" />
             <div className="flex items-center gap-2 text-xs font-semibold text-[var(--user-text-muted)]">
-              <ShieldCheck size={15} className="text-[var(--user-accent)]" /> Secure Payment
+              <ShieldCheck size={15} className="text-[var(--user-accent)]" /> {t("auth.login.securePayment")}
             </div>
             <div className="w-1 h-1 rounded-full bg-[var(--user-border)]" />
             <div className="flex items-center gap-2 text-xs font-semibold text-[var(--user-text-muted)]">
-              <RotateCcw size={15} className="text-[var(--user-accent)]" /> Easy Returns
+              <RotateCcw size={15} className="text-[var(--user-accent)]" /> {t("auth.login.easyReturns")}
             </div>
           </div>
         </div>
 
         {/* Bottom */}
         <div className="text-[var(--user-text-subtle)] text-sm relative">
-          © {new Date().getFullYear()} {storeName}. All rights reserved.
+          © {new Date().getFullYear()} {storeName}. {t("auth.login.allRightsReserved")}
         </div>
       </div>
 
@@ -365,13 +375,13 @@ export default function UserLoginPage() {
               <OtpVerifyCard
                 email={otpEmail}
                 icon={MailCheck}
-                title="Verify your email"
-                subtitle="Enter the 6-digit code we sent to"
-                submitLabel="Verify & Continue"
+                title={t("auth.login.verifyEmail")}
+                subtitle={t("auth.login.otpSentSubtitle")}
+                submitLabel={t("auth.login.verifyContinue")}
                 onVerify={handleVerifyEmailOtp}
                 onResend={handleResendEmailOtp}
                 onBack={() => setStep("auth")}
-                backLabel="Use a different email"
+                backLabel={t("auth.login.useDifferentEmail")}
                 expiresInMinutes={5}
               />
             )}
@@ -383,12 +393,12 @@ export default function UserLoginPage() {
                   <div className="flex items-center gap-2 mb-3">
                     <KeyRound size={16} className="text-[var(--user-accent)]" />
                     <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
-                      Forgot Password
+                      {t("auth.login.forgotPassword")}
                     </span>
                   </div>
-                  <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">Reset your password</h2>
+                  <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">{t("auth.login.resetPassword")}</h2>
                   <p className="text-[var(--user-text-muted)] text-sm">
-                    Enter your registered email and we&apos;ll send you a 6-digit code.
+                    {t("auth.login.resetEmailHelp")}
                   </p>
                 </div>
 
@@ -403,7 +413,7 @@ export default function UserLoginPage() {
                         setForgotEmail(e.target.value);
                         setForgotError("");
                       }}
-                      placeholder="Email address"
+                      placeholder={t("auth.login.emailAddress")}
                       className={inputCls}
                     />
                   </div>
@@ -421,7 +431,7 @@ export default function UserLoginPage() {
                     className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
-                    {forgotLoading ? "Sending code..." : "Send reset code"}
+                    {forgotLoading ? t("auth.login.sendingCode") : t("auth.login.sendResetCode")}
                   </button>
 
                   <button
@@ -432,7 +442,7 @@ export default function UserLoginPage() {
                     }}
                     className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition"
                   >
-                    <ArrowLeft size={13} /> Back to login
+                    <ArrowLeft size={13} /> {t("auth.login.backToLogin")}
                   </button>
                 </form>
               </div>
@@ -443,13 +453,13 @@ export default function UserLoginPage() {
               <OtpVerifyCard
                 email={otpEmail}
                 icon={KeyRound}
-                title="Enter reset code"
-                subtitle="Enter the 6-digit code we sent to"
-                submitLabel="Verify code"
+                title={t("auth.login.enterResetCode")}
+                subtitle={t("auth.login.otpSentSubtitle")}
+                submitLabel={t("auth.login.verifyCode")}
                 onVerify={handleVerifyResetOtp}
                 onResend={handleResendResetOtp}
                 onBack={() => setStep("forgot")}
-                backLabel="Change email"
+                backLabel={t("auth.login.changeEmail")}
                 expiresInMinutes={5}
               />
             )}
@@ -471,14 +481,14 @@ export default function UserLoginPage() {
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={16} className="text-[var(--user-accent)]" />
                 <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
-                  {isLogin ? "User Sign-In" : "Create Account"}
+                  {isLogin ? t("auth.login.userSignIn") : t("auth.login.createAccount")}
                 </span>
               </div>
               <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">
-                {isLogin ? "Welcome Back" : "Create Account"}
+                {isLogin ? t("auth.login.welcomeBack") : t("auth.login.createAccount")}
               </h2>
               <p className="text-[var(--user-text-muted)] py-2 text-sm">
-                {isLogin ? "Continue shopping with your account." : "Create your account in just 30 seconds."}
+                {isLogin ? t("auth.login.continueShoppingSubtitle") : t("auth.login.createAccountSubtitle")}
               </p>
             </div>
 
@@ -490,7 +500,7 @@ export default function UserLoginPage() {
                     <LazyGoogleLogin
                       clientId={googleClientId}
                       onSuccess={(res) => handleGoogleLogin(res.credential)}
-                      onError={() => toast.error("Google login failed. Try again.")}
+                      onError={() => toast.error(t("auth.login.googleFailed"))}
                       theme="filled_black"
                       shape="pill"
                       size="large"
@@ -499,14 +509,14 @@ export default function UserLoginPage() {
                     />
                   ) : (
                     <div className="w-full py-3 rounded-full border border-[var(--user-border)] text-center text-[var(--user-text-muted)] text-sm">
-                      Google login unavailable
+                      {t("auth.login.googleUnavailable")}
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center gap-3 mb-6">
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
-                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">or with email</span>
+                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">{t("auth.login.orWithEmail")}</span>
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
                 </div>
               </>
@@ -526,14 +536,14 @@ export default function UserLoginPage() {
                   <div>
                     <div className="relative">
                       <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
-                      <input type="text" required value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }} placeholder="Full name" className={getInputCls("name")} />
+                      <input type="text" required value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }} placeholder={t("auth.login.fullName")} className={getInputCls("name")} />
                     </div>
                     {renderFieldError("name")}
                   </div>
                   <div>
                     <div className="relative">
                       <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
-                      <input type="text" required value={username} onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: "" })); }} placeholder="Username" className={getInputCls("username")} />
+                      <input type="text" required value={username} onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: "" })); }} placeholder={t("auth.login.username")} className={getInputCls("username")} />
                     </div>
                     {renderFieldError("username")}
                   </div>
@@ -552,7 +562,7 @@ export default function UserLoginPage() {
                         }}
                         inputMode="numeric"
                         maxLength={PHONE_MAX}
-                        placeholder="Phone number"
+                        placeholder={t("auth.login.phoneNumber")}
                         className={getInputCls("phone")}
                       />
                     </div>
@@ -573,7 +583,7 @@ export default function UserLoginPage() {
                       setEmail(e.target.value);
                       setErrors((p) => ({ ...p, email: "" }));
                     }}
-                    placeholder="Email address"
+                    placeholder={t("auth.login.emailAddress")}
                     className={getInputCls("email")}
                   />
                 </div>
@@ -583,7 +593,7 @@ export default function UserLoginPage() {
               <div>
                 <div className="relative">
                   <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
-                  <input type="password" required value={password} onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "" })); }} placeholder="Password" minLength={6} className={getInputCls("password")} />
+                  <input type="password" required value={password} onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "" })); }} placeholder={t("auth.login.password")} minLength={6} className={getInputCls("password")} />
                 </div>
                 {renderFieldError("password")}
               </div>
@@ -601,7 +611,7 @@ export default function UserLoginPage() {
                     }}
                     className="text-[0.75rem] font-semibold text-[var(--user-accent)] hover:underline bg-transparent border-0 p-0 outline-none"
                   >
-                    Forgot password?
+                    {t("auth.login.forgotPassword")}
                   </button>
                 </div>
               )}
@@ -612,17 +622,17 @@ export default function UserLoginPage() {
                 className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed mt-1"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-                {loading ? (isLogin ? "Logging in..." : "Creating account...") : isLogin ? "Login" : "Create Account"}
+                {loading ? (isLogin ? t("auth.login.loggingIn") : t("auth.login.creatingAccount")) : isLogin ? t("auth.login.login") : t("auth.login.createAccount")}
               </button>
             </form>
 
             <p className="text-center mt-5 text-[var(--user-text-muted)] text-sm">
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              {isLogin ? t("auth.login.noAccount") : t("auth.login.haveAccount")}{" "}
               <button
                 onClick={() => { setIsLogin(!isLogin); setErrors({}); setGeneralError(""); }}
                 className="text-[var(--user-accent)] pt-2 hover:underline font-semibold bg-transparent border-0 p-0 outline-none"
               >
-                {isLogin ? "Register" : "Login"}
+                {isLogin ? t("auth.login.register") : t("auth.login.login")}
               </button>
             </p>
               </>
@@ -630,7 +640,7 @@ export default function UserLoginPage() {
           </div>
 
           <p className="text-center mt-4 text-[0.6875rem] text-[var(--user-text-subtle)]">
-            By continuing, you agree to our Terms & Privacy Policy.
+            {t("auth.login.termsNotice")}
           </p>
         </div>
       </div>

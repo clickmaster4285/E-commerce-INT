@@ -33,7 +33,7 @@ Sidebar `frontend/src/components/adminComponents/Sidebar.js` mein defined hai. R
 | Store Info | `frontend/src/app/admin/store-info/page.js` |
 | Employees | `frontend/src/app/admin/employees/page.js` |
 | Profile | `frontend/src/app/admin/profile/page.js` |
-
+fdg
 Sidebar mein Customers, Leads aur POS ka group **POS & Customer Management** hai; Vendors/Purchase Orders ka group **Purchasing** hai. Dono pages aur routes alag features hain.
 
 ## 2. Login, session aur dashboard tak ka safar

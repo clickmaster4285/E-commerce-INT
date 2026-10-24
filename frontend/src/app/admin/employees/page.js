@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { employeeDepartmentLabel, employeeLocaleTag } from "@/i18n/localize";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
@@ -49,9 +50,10 @@ const normalizeArrayResponse = (response) => {
 // DEPARTMENT DROPDOWN COMPONENT (UPDATED)
 // ==========================================
 function DepartmentDropdown({ value, onChange, disabled }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [inputValue, setInputValue] = useState(value || "");
   const [isOpen, setIsOpen] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -61,7 +63,10 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   // Close on click outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) setIsOpen(false);
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setIsInputFocused(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -78,7 +83,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
     setInputValue(option);
     onChange(option);
     setIsOpen(false);
-    inputRef.current?.focus();
+    setIsInputFocused(false);
   };
 
   const handleKeyDown = (e) => {
@@ -91,7 +96,10 @@ function DepartmentDropdown({ value, onChange, disabled }) {
   };
 
   // Check if current input matches any existing department
-  const exactMatch = PREDEFINED_DEPARTMENTS.some(d => d.toLowerCase() === inputValue.trim().toLowerCase());
+  const exactMatch = PREDEFINED_DEPARTMENTS.some((d) =>
+    d.toLowerCase() === inputValue.trim().toLowerCase() ||
+    employeeDepartmentLabel(d, t).toLowerCase() === inputValue.trim().toLowerCase()
+  );
   const hasInput = inputValue.trim().length > 0;
 
   const inputStyle = {
@@ -109,9 +117,9 @@ function DepartmentDropdown({ value, onChange, disabled }) {
         <input
           ref={inputRef}
           type="text"
-          value={inputValue}
+          value={!isInputFocused && PREDEFINED_DEPARTMENTS.includes(inputValue) ? employeeDepartmentLabel(inputValue, t) : inputValue}
           onChange={handleInputChange}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => { setIsInputFocused(true); setIsOpen(true); }}
           onKeyDown={handleKeyDown}
           placeholder={t("admin.employees.form.departmentPlaceholder")}
           disabled={disabled}
@@ -148,7 +156,10 @@ function DepartmentDropdown({ value, onChange, disabled }) {
           )}
 
           {/* Filtered List of Existing Departments */}
-          {PREDEFINED_DEPARTMENTS.filter((d) => d.toLowerCase().includes(inputValue.toLowerCase())).map((dept) => (
+          {PREDEFINED_DEPARTMENTS.filter((d) =>
+            d.toLowerCase().includes(inputValue.toLowerCase()) ||
+            employeeDepartmentLabel(d, t).toLowerCase().includes(inputValue.toLowerCase())
+          ).map((dept) => (
             <button
               key={dept}
               type="button"
@@ -159,7 +170,7 @@ function DepartmentDropdown({ value, onChange, disabled }) {
                 backgroundColor: inputValue === dept ? "var(--success-soft)" : "transparent",
               }}
             >
-              {dept}
+              {employeeDepartmentLabel(dept, t)}
             </button>
           ))}
 
@@ -330,7 +341,7 @@ export default function EmployeesPage() {
     mutationFn: (ids) => Promise.all(ids.map((id) => employeeSocketApi.delete(id))),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
-      toast.success(t("admin.employees.toast.bulkDeleted", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) }));
+      toast.success(t("admin.employees.toast.bulkDeleted", { count: new Intl.NumberFormat(employeeLocaleTag(locale)).format(selectedIds.length) }));
       setSelectedIds([]);
       setShowBulkDeleteModal(false);
     },
@@ -668,18 +679,18 @@ export default function EmployeesPage() {
             >
               <MenuItem
                 icon={<Eye className="w-4 h-4" />}
-                label="View Details"
+                label={t("admin.employees.page.viewDetails")}
                 onClick={() => { setActionMenu(null); router.push(`/admin/employees/${id}`); }}
               />
               <MenuItem
                 icon={<Pencil className="w-4 h-4" />}
-                label="Edit Employee"
+                label={t("admin.employees.page.editEmployee")}
                 onClick={() => { setActionMenu(null); if (!canManageEmployees) return denyEmployeesAccess(); openEditModal(employee); }}
               />
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<Trash2 className="w-4 h-4" />}
-                label="Delete"
+                label={t("admin.employees.page.delete")}
                 danger
                 onClick={() => { setActionMenu(null); if (!canManageEmployees) return denyEmployeesAccess(); setEmployeeToDelete(employee); setShowDeleteModal(true); }}
               />
@@ -749,9 +760,9 @@ export default function EmployeesPage() {
       {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
-          { label: "Total", value: staffEmployees.length, color: "var(--text-primary)" },
-          { label: "Active", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "var(--success-text)" },
-          { label: "Inactive", value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "var(--danger-text)" },
+          { label: t("admin.employees.page.total"), value: staffEmployees.length, color: "var(--text-primary)" },
+          { label: t("admin.employees.page.active"), value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "var(--success-text)" },
+          { label: t("admin.employees.page.inactive"), value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "var(--danger-text)" },
         ].map((stat, idx) => (
           <div key={idx} className="rounded-lg px-4 py-3" style={cardStyle}>
             <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
@@ -804,7 +815,7 @@ export default function EmployeesPage() {
           }}
         >
           <p className="text-sm font-medium" style={{ color: "var(--success-text)" }}>
-            {t("admin.employees.page.selected", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) })}
+            {t("admin.employees.page.selected", { count: new Intl.NumberFormat(employeeLocaleTag(locale)).format(selectedIds.length) })}
           </p>
           <div className="flex items-center gap-3">
             <button
@@ -936,7 +947,7 @@ export default function EmployeesPage() {
                             border: "1px solid var(--border-color)",
                           }}
                         >
-                          {emp.department || "—"}
+                          {employeeDepartmentLabel(emp.department, t) || "—"}
                         </span>
                       </td>
                       <td className="px-4 py-2.5">
@@ -967,9 +978,9 @@ export default function EmployeesPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             {t("admin.employees.page.showingRange", {
-              from: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format((currentPage - 1) * ITEMS_PER_PAGE + 1),
-              to: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)),
-              total: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(pagination.total || employees.length),
+              from: new Intl.NumberFormat(employeeLocaleTag(locale)).format((currentPage - 1) * ITEMS_PER_PAGE + 1),
+              to: new Intl.NumberFormat(employeeLocaleTag(locale)).format(Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)),
+              total: new Intl.NumberFormat(employeeLocaleTag(locale)).format(pagination.total || employees.length),
             })}
           </p>
           <div className="flex items-center gap-2">
@@ -983,8 +994,8 @@ export default function EmployeesPage() {
             </button>
             <span className="hidden sm:inline-flex px-2 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
               {t("admin.employees.page.pageOf", {
-                page: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(currentPage),
-                total: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(totalPages),
+                page: new Intl.NumberFormat(employeeLocaleTag(locale)).format(currentPage),
+                total: new Intl.NumberFormat(employeeLocaleTag(locale)).format(totalPages),
               })}
             </span>
             <button
@@ -1007,7 +1018,7 @@ export default function EmployeesPage() {
               <div>
                 <h3 className="text-base font-semibold">{editingEmployee ? t("admin.employees.form.editTitle") : t("admin.employees.form.addTitle")}</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  {editingEmployee ? "Update employee details" : "Create a new team member"}
+                  {editingEmployee ? t("admin.employees.form.editSubtitle") : t("admin.employees.form.addSubtitle")}
                 </p>
               </div>
               <button onClick={closeModal} disabled={isSubmitting} className="p-1 rounded transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)" }}>
@@ -1277,7 +1288,7 @@ export default function EmployeesPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-semibold">
-                  {t("admin.employees.modal.deleteManyTitle", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) })}
+                  {t("admin.employees.modal.deleteManyTitle", { count: new Intl.NumberFormat(employeeLocaleTag(locale)).format(selectedIds.length) })}
                 </h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
                   {t("admin.employees.modal.deleteManyBody")}
@@ -1306,7 +1317,7 @@ export default function EmployeesPage() {
                 {bulkDeleteMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  t("admin.employees.modal.confirmDeleteMany", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en").format(selectedIds.length) })
+                  t("admin.employees.modal.confirmDeleteMany", { count: new Intl.NumberFormat(employeeLocaleTag(locale)).format(selectedIds.length) })
                 )}
               </button>
             </div>

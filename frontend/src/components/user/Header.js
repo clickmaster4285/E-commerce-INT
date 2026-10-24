@@ -248,7 +248,7 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
 
 export default function Header() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, dir, locale } = useTranslation();
   const { fieldOf } = useLocalized();
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -555,7 +555,7 @@ export default function Header() {
                         className="fixed inset-0 z-40"
                         onClick={() => setProfileOpen(false)}
                       />
-                      <div className="absolute right-0 top-11 z-50 w-60 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 shadow-[var(--user-shadow-lg)]">
+                      <div dir={dir} lang={locale} className="absolute end-0 top-11 z-50 w-60 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 shadow-[var(--user-shadow-lg)]">
                         <div className="px-3 py-2.5 border-b border-[var(--user-border)] mb-1">
                           <p className="truncate text-sm font-medium text-[var(--user-text)]">
                             {user.name || user.username}
@@ -573,7 +573,7 @@ export default function Header() {
                             size={16}
                             className="text-[var(--user-accent)]"
                           />
-                          My Account
+                          {t("header.myAccount")}
                         </Link>
                         <Link
                           href="/orders"
@@ -584,7 +584,7 @@ export default function Header() {
                             size={16}
                             className="text-[var(--user-accent)]"
                           />
-                          My Orders
+                          {t("header.myOrders")}
                         </Link>
                         <div className="h-px bg-[var(--user-border)] my-1" />
                         <button
@@ -625,19 +625,26 @@ export default function Header() {
       </header>
 
       <div
-        className={`fixed top-0 left-0 h-full w-[85%] max-w-[21.25rem] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
-          open ? "translate-x-0" : "-translate-x-full"
+        dir={dir}
+        lang={locale}
+        className={`fixed top-0 ${dir === "rtl" ? "right-0 left-auto" : "left-0 right-auto"} h-full w-[85%] max-w-[21.25rem] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
+          open ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full"
         }`}
-        style={{ transformOrigin: "left center" }}
+        style={{ transformOrigin: dir === "rtl" ? "right center" : "left center" }}
       >
         <style>{`
           @keyframes sidebarSlideIn {
             from { opacity: 0; transform: translateX(-20px); }
             to { opacity: 1; transform: translateX(0); }
           }
+          @keyframes sidebarSlideInRtl {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
           .sidebar-item {
             animation: sidebarSlideIn 0.4s ease-out backwards;
           }
+          [dir="rtl"] .sidebar-item { animation-name: sidebarSlideInRtl; }
           .sidebar-item:nth-child(1) { animation-delay: 0.05s; }
           .sidebar-item:nth-child(2) { animation-delay: 0.1s; }
           .sidebar-item:nth-child(3) { animation-delay: 0.15s; }

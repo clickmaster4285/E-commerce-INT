@@ -4,12 +4,14 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { vendorApi } from "@/apis/admin/vendorApi";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { localizedStrictField } from "@/i18n/localize";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import VendorFormModal, { emptyVendorForm, toVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import {
   Users, UserCheck, UserX, DollarSign, Star, Plus, Search,
-  MoreHorizontal, ChevronLeft, ChevronRight,
+  MoreVertical, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // Same tokens as Brands/Products pages — no new design system.
@@ -90,8 +92,8 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete }) {
   ];
   return (
     <>
-      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="p-1.5 rounded-md transition hover:opacity-70" style={{ color: "var(--text-muted)" }} aria-label={t("more")} aria-haspopup="true" aria-expanded={open}>
-        <MoreHorizontal size={16} />
+      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150 hover:bg-[var(--bg-row-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--text-secondary)" }} aria-label={t("more")} aria-haspopup="true" aria-expanded={open}>
+        <MoreVertical size={18} />
       </button>
       {open && createPortal(
         <div ref={menuRef} className="fixed z-[9999] w-[170px] rounded-lg py-1" style={{ top: pos.top, left: pos.left, ...cardStyle, boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}>
@@ -127,6 +129,7 @@ export default function VendorsPage() {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted);
   }, [vendorsRaw]);
+  usePageTranslations({ model: "Vendor", records: vendors, locale, ready: !isLoading, queryKey: ["vendors"], queryClient: qc });
 
   const monthStart = useMemo(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; }, []);
   const stats = useMemo(() => {
@@ -238,9 +241,9 @@ export default function VendorsPage() {
                     <tr key={v._id} onClick={() => router.push(`/admin/vendors/${v._id}`)} className="transition cursor-pointer" style={{ borderBottom: "1px solid var(--border-color)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
                       <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.includes(v._id)} onChange={() => toggleOne(v._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                       <td className="px-4 py-2.5 font-mono text-[12px]" style={{ color: "var(--text-secondary)" }}>{v.vendor_code}</td>
-                      <td className="px-4 py-2.5 font-medium">{v.name}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{v.company_name || "—"}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{v.city || "—"}</td>
+                      <td className="px-4 py-2.5 font-medium">{localizedStrictField(v.name, v.translations?.name, locale)}</td>
+                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{localizedStrictField(v.company_name, v.translations?.company_name, locale) || "—"}</td>
+                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{localizedStrictField(v.city, v.translations?.city, locale) || "—"}</td>
                       <td className="px-4 py-2.5 whitespace-nowrap"><span className="inline-flex items-center gap-1"><Star size={12} style={{ color: "#f59e0b" }} />{(Number(v.rating) || 0).toFixed(1)}</span></td>
                       <td className="px-4 py-2.5 font-semibold">{money(v.balance_payable, locale)}</td>
                       <td className="px-4 py-2.5"><Pill tone={v.is_active ? "active" : "inactive"}>{v.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill></td>

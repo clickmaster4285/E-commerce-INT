@@ -12,6 +12,8 @@ import VariantForm from "@/components/admin/VariantForm";
 import VendorFormModal, { emptyVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { Plus, Search, Building2, CalendarDays, ChevronDown, MoreVertical, Package } from "lucide-react";
 
 // Same tokens as the rest of the admin — no new design system.
@@ -101,6 +103,9 @@ function NewPOPage() {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted && v.is_active);
   }, [vendorsRaw]);
+  usePageTranslations({ model: "Vendor", records: vendorList, locale, ready: !!vendorsRaw, queryKey: ["vendors-all"], queryClient: qc });
+  const vendorNameOf = (vendor) => localizedStrictField(vendor?.name, vendor?.translations?.name, locale);
+  const vendorCompanyOf = (vendor) => localizedStrictField(vendor?.company_name, vendor?.translations?.company_name, locale);
   const vendorOptions = useMemo(() => {
     const q = vendorSearch.trim().toLowerCase();
     if (!q) return vendorList;
@@ -121,7 +126,7 @@ function NewPOPage() {
       setVendorId(vendor._id);
       setVendorFormOpen(false);
       setVendorForm({ ...emptyVendorForm, country: "Pakistan" });
-      pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: vendor.name }));
+      pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: vendorNameOf(vendor) }));
       toast.success(t("admin.purchaseOrders.create.toast.vendorCreated"));
     },
     onError: () => toast.error(t("admin.purchaseOrders.create.toast.vendorFailed")),
@@ -465,7 +470,7 @@ function NewPOPage() {
                 <FieldLabel required>{t("admin.purchaseOrders.create.vendor")}</FieldLabel>
                 <button type="button" onClick={() => setVendorOpen((o) => !o)} className="w-full h-10 px-4 rounded-xl text-sm flex items-center justify-between gap-2 outline-none shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: selectedVendor ? "#0f172a" : "#64748b" }}>
                   <span className="flex items-center gap-2.5 truncate font-medium">
-                    <Search size={14} className="shrink-0" style={{ color: "#2563eb" }} />{selectedVendor ? `${selectedVendor.name} (${selectedVendor.vendor_code})` : t("admin.purchaseOrders.create.selectVendor")}
+                    <Search size={14} className="shrink-0" style={{ color: "#2563eb" }} />{selectedVendor ? `${vendorNameOf(selectedVendor)} (${selectedVendor.vendor_code})` : t("admin.purchaseOrders.create.selectVendor")}
                   </span>
                   <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{ color: "#94a3b8", background: "#f1f5f9" }}>▾</span>
                 </button>
@@ -477,8 +482,8 @@ function NewPOPage() {
                     <div className="max-h-[240px] overflow-x-hidden overflow-y-auto py-1 px-2">
                       {vendorOptions.map((v) => (
                         <button key={v._id} type="button" onClick={() => { setVendorId(v._id); setVendorOpen(false); setVendorSearch(""); pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: v.name })); }} className="w-full px-4 py-3 text-left text-[13px] transition-all duration-150 rounded-xl my-0.5" style={{ backgroundColor: v._id === vendorId ? "rgba(37,99,235,0.08)" : "transparent", border: v._id === vendorId ? "1px solid rgba(37,99,235,0.2)" : "1px solid transparent" }} onMouseEnter={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "#f8fafc"; e.currentTarget.style.borderColor = "#e2e8f0"; } }} onMouseLeave={(e) => { if (v._id !== vendorId) { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "transparent"; } }}>
-                          <div className="font-bold text-sm" style={{ color: v._id === vendorId ? "#2563eb" : "#0f172a" }}>{v.name} <span className="font-mono font-normal text-[11px]" style={{ color: "#64748b" }}>{v.vendor_code}</span></div>
-                          <div className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{[v.company_name, v.city].filter(Boolean).join(" · ")}</div>
+                          <div className="font-bold text-sm" style={{ color: v._id === vendorId ? "#2563eb" : "#0f172a" }}>{vendorNameOf(v)} <span className="font-mono font-normal text-[11px]" style={{ color: "#64748b" }}>{v.vendor_code}</span></div>
+                          <div className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{[vendorCompanyOf(v), localizedStrictField(v.city, v.translations?.city, locale)].filter(Boolean).join(" · ")}</div>
                         </button>
                       ))}
                       {!vendorOptions.length && <p className="px-4 py-6 text-center text-sm font-medium" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.noVendor")}</p>}
@@ -509,7 +514,7 @@ function NewPOPage() {
                 <p className="text-xs font-extrabold tracking-wide uppercase" style={{ color: "#2563eb" }}>{t("admin.purchaseOrders.create.vendorDetails")}</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-[13px]">
-                {[ ["admin.purchaseOrders.detail.name", selectedVendor?.name], ["admin.purchaseOrders.view.companyName", selectedVendor?.company_name], ["admin.purchaseOrders.detail.email", selectedVendor?.email], ["admin.purchaseOrders.detail.phone", selectedVendor?.phone], ["admin.purchaseOrders.view.city", selectedVendor?.city] ].map(([key, val]) => (
+                {[ ["admin.purchaseOrders.detail.name", vendorNameOf(selectedVendor)], ["admin.purchaseOrders.view.companyName", vendorCompanyOf(selectedVendor)], ["admin.purchaseOrders.detail.email", selectedVendor?.email], ["admin.purchaseOrders.detail.phone", selectedVendor?.phone], ["admin.purchaseOrders.view.city", localizedStrictField(selectedVendor?.city, selectedVendor?.translations?.city, locale)] ].map(([key, val]) => (
                   <div key={key} className="rounded-xl p-3 shadow-sm transition hover:shadow-md" style={{ background: "#fff", border: "1px solid #e2e8f0" }}>
                     <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1" style={{ color: "#94a3b8" }}>{t(key)}</div>
                     <div className="font-bold text-sm truncate" style={{ color: "#0f172a" }}>{val || "—"}</div>
@@ -620,16 +625,11 @@ function NewPOPage() {
                   <input type="number" min={0} value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
                 </div>
                 <div>
-<<<<<<< HEAD
                   <FieldLabel>Overall Tax (%)</FieldLabel>
                   <div className="relative">
                     <input type="number" min={0} max={100} step="0.01" value={overallTaxRate} onChange={(e) => setOverallTaxRate(e.target.value)} className="w-full h-10 pl-4 pr-10 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
                     <span className="absolute inset-y-0 right-4 flex items-center text-sm font-medium" style={{ color: "#64748b" }}>%</span>
                   </div>
-=======
-                  <FieldLabel>{t("admin.purchaseOrders.create.overallTax")} (Rs.)</FieldLabel>
-                  <input type="number" min={0} value={overallTax} onChange={(e) => setOverallTax(e.target.value)} className="w-full h-10 px-4 rounded-xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
->>>>>>> 2e3f0d01943d374997bd89fc3c0e0f7e0754f66e
                 </div>
               </div>
               <div className="mt-4">
@@ -645,22 +645,13 @@ function NewPOPage() {
                 </div>
                 <h2 className="text-base font-extrabold tracking-tight" style={{ color: "#0f172a" }}>{t("admin.purchaseOrders.create.summary")}</h2>
               </div>
-<<<<<<< HEAD
-              <div className="flex flex-1 flex-col justify-between gap-2 text-sm">
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Subtotal</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
-                <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>Total</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
-=======
               <div className="text-sm space-y-2.5">
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.subtotal")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.tax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
+                <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTaxAmount)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.shipping")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                 <div className="flex justify-between items-center py-1.5 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.discount")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
                 <div className="flex min-w-0 items-center justify-between gap-3 pt-3 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span className="min-w-0" style={{ color: "#059669" }}>{t("admin.purchaseOrders.create.total")}</span><span className="shrink-0 whitespace-nowrap text-right" style={{ color: "#059669" }}>{money(totals.total)}</span></div>
->>>>>>> 2e3f0d01943d374997bd89fc3c0e0f7e0754f66e
               </div>
             </section>
           </div>
@@ -711,26 +702,18 @@ function NewPOPage() {
                         <div className="font-extrabold text-sm truncate" style={{ color: "#0f172a" }}>{l.product_name}</div>
                       <div className="text-[11px] font-medium" style={{ color: "#64748b" }}>{l.sku} × {new Intl.NumberFormat(intlLocale(locale)).format(l.qty_ordered)}</div>
                       </div>
-                      <b className="font-extrabold text-sm whitespace-nowrap" style={{ color: "#0f172a" }}>{(Math.round(Math.max(0, Number(l.cost_price) || 0) * Math.max(1, Math.floor(Number(l.qty_ordered) || 1)))).toLocaleString()}</b>
+                      <b className="font-extrabold text-sm whitespace-nowrap" style={{ color: "#0f172a" }}>{new Intl.NumberFormat(intlLocale(locale)).format(Math.round(Math.max(0, Number(l.cost_price) || 0) * Math.max(1, Math.floor(Number(l.qty_ordered) || 1))))}</b>
                     </div>
                   ))}</div>
               )}
               {sideTab === "summary" && (
                 <div className="text-sm space-y-1.5">
-<<<<<<< HEAD
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Subtotal</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Tax</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Shipping</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>Discount</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
-                  <div className="flex justify-between items-center pt-2 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span style={{ color: "#059669" }}>Total</span><span style={{ color: "#059669" }}>{money(totals.total)}</span></div>
-=======
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.subtotal")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.subtotal)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.tax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.tax)}</b></div>
-                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTax)}</b></div>
+                  <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.overallTax")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.overallTaxAmount)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.shipping")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.shipping)}</b></div>
                   <div className="flex justify-between items-center py-2 px-3 rounded-xl" style={{ background: "#f8fafc" }}><span className="font-semibold" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.create.discount")}</span><b className="font-extrabold" style={{ color: "#0f172a" }}>{money(totals.discount)}</b></div>
                   <div className="flex justify-between items-center pt-2 px-3 font-extrabold text-base rounded-xl" style={{ borderTop: "2px solid #e2e8f0", background: "#ecfdf5" }}><span style={{ color: "#059669" }}>{t("admin.purchaseOrders.create.total")}</span><span style={{ color: "#059669" }}>{money(totals.total)}</span></div>
->>>>>>> 2e3f0d01943d374997bd89fc3c0e0f7e0754f66e
                 </div>
               )}
               {sideTab === "history" && (
@@ -759,7 +742,7 @@ function NewPOPage() {
                   <Building2 size={20} color="#fff" />
                 </div>
                 <div className="min-w-0">
-                  <div className="font-extrabold text-base truncate" style={{ color: "#0f172a" }}>{selectedVendor.name}</div>
+                  <div className="font-extrabold text-base truncate" style={{ color: "#0f172a" }}>{vendorNameOf(selectedVendor)}</div>
                   <div className="font-mono text-[11px] font-bold" style={{ color: "#64748b" }}>{selectedVendor.vendor_code}</div>
                 </div>
               </div>
@@ -818,7 +801,7 @@ function NewPOPage() {
                       <Thumb src={g.image} alt={g.product_name} size="w-12 h-12" />
                       <div className="min-w-0 flex-1">
                         <div className="font-extrabold text-[14px] truncate" style={{ color: ticked ? "#2563eb" : "#0f172a" }}>{g.product_name}</div>
-                        <div className="text-[11px] font-medium truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.variantsCount", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(g.variants.length) })} · {t("admin.purchaseOrders.create.stockCount", { count: new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-US").format(stock) })}{g.category_name ? ` · ${g.category_name}` : ""}</div>
+                        <div className="text-[11px] font-medium truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.variantsCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(g.variants.length) })} · {t("admin.purchaseOrders.create.stockCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(stock) })}{g.category_name ? ` · ${g.category_name}` : ""}</div>
                       </div>
                     </div>
                   );

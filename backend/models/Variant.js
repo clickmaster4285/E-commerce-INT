@@ -46,6 +46,15 @@ const variantSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    translations: {
+      title: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      title: { type: String, default: "" },
+    },
+    translation_status: {
+      title: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
     description: {
       type: String,
       trim: true,
