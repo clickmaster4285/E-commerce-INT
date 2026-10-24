@@ -480,6 +480,51 @@ html:has([lang="ur"]) [data-sonner-toast] [data-description] {
   white-space: normal;
 }
 
+/* ==========================================
+   ARABIC RTL TYPOGRAPHY
+   ------------------------------------------
+   Arabic uses Cairo and a tighter rhythm than Urdu Nastaliq. Normalize
+   tracking and line boxes across both storefront and admin text so labels,
+   buttons and headings stay readable without making the UI feel oversized.
+   ========================================== */
+html:has([lang="ar"]) {
+  letter-spacing: 0 !important;
+  word-spacing: 0.02em;
+  text-transform: none !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ar"]) body,
+html:has([lang="ar"]) [lang="ar"],
+html:has([lang="ar"]) [data-sonner-toaster] {
+  font-family: "Noto Naskh Arabic", "Cairo", serif !important;
+}
+
+html:has([lang="ar"]) :is(p, span, a, label, button, li, td, th, dd, dt, strong, em) {
+  letter-spacing: 0 !important;
+  line-height: 1.9;
+  text-transform: none !important;
+}
+
+html:has([lang="ar"]) :is(h1, h2, h3, h4, h5, h6) {
+  letter-spacing: 0 !important;
+  line-height: 1.8 !important;
+  padding-block: 0.04em;
+  text-transform: none !important;
+}
+
+html:has([lang="ar"]) :is(.leading-none, .leading-tight, .leading-snug, .leading-4, .leading-5, .leading-6) {
+  line-height: 1.9 !important;
+}
+
+html:has([lang="ar"]) [data-sonner-toaster],
+html:has([lang="ar"]) [data-sonner-toast][data-styled="true"] {
+  font-family: "Noto Naskh Arabic", "Cairo", serif !important;
+  letter-spacing: 0;
+  line-height: 1.9;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -589,6 +634,17 @@ input[type="radio"] {
 
 main {
   min-width: 0;
+}
+
+/* Admin pages used min-h-screen inside a viewport-sized scrollport, which made
+   even short pages taller than the space below the navbar. Let the shell fill
+   the available scroll area while each page grows only when its content does. */
+.admin-panel main > div {
+  min-height: 100%;
+}
+
+.admin-panel main > div > [class~="min-h-screen"] {
+  min-height: auto !important;
 }
 
 .sidebar-wrapper {
@@ -1366,3 +1422,60 @@ html.dark .admin-pos-workspace :is(
 ) {
   border-color: var(--border-color) !important;
 }
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-Italic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-BoldItalic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-Italic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-BoldItalic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+

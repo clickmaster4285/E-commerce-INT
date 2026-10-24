@@ -225,7 +225,7 @@ function ReviewComment({ comment }) {
   );
 }
 
-const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
+const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom, dir }) => {
   const { t } = useTranslation();
   const stripRef = useRef(null);
   const imageFrameRef = useRef(null);
@@ -374,7 +374,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
   );
 
   return (
-    <div className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
+    <div dir={dir} className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
       <div className="product-gallery-main relative">
       <div
         ref={imageFrameRef}
@@ -421,7 +421,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         <div
           ref={zoomPanelRef}
           aria-hidden="true"
-          className={`product-image-zoom-panel pointer-events-none absolute left-full top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          className={`product-image-zoom-panel pointer-events-none absolute ${dir === "rtl" ? "right-full left-auto" : "left-full right-auto"} top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
           style={{ backgroundImage: `url("${mainImage}")`, backgroundRepeat: "no-repeat" }}
         >
           {!zoomLoaded ? (
@@ -655,7 +655,7 @@ export default function ProductDetailPage(props) {
 
 function ProductDetailContent({ params }) {
   const { id } = use(params);
-  const { locale, t } = useTranslation();
+  const { locale, dir, t } = useTranslation();
   const { productNameOf, productDescriptionOf, fieldOf, reviewTextOf } = useLocalized();
   const searchParams = useSearchParams();
   const { product, isLoading, isError } = useProductDetail(id);
@@ -842,7 +842,7 @@ function ProductDetailContent({ params }) {
   if (isError || !product) return <ErrorState isError={isError} />;
 
   return (
-    <main className="min-h-screen bg-[var(--user-bg-hover)] pb-16 md:pb-8">
+    <main dir={dir} lang={locale} className="min-h-screen bg-[var(--user-bg-hover)] pb-16 md:pb-8">
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
@@ -851,7 +851,7 @@ function ProductDetailContent({ params }) {
         <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={productName} />
 
         {/* ===== Top card: gallery + info + sold-by (Daraz 3-col) ===== */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <div dir={dir} className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <section className="bg-[var(--user-bg-card)] p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
               <Gallery
@@ -861,6 +861,7 @@ function ProductDetailContent({ params }) {
                 onImageSelect={selectImageByUrl}
                 stock={stock}
                 onZoom={openLightbox}
+                dir={dir}
               />
 
               <div className="min-w-0" ref={sentinelRef}>

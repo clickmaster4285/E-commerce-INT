@@ -9,7 +9,7 @@ import CustomerFormModal from "@/components/admin/CustomerFormModal";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreHorizontal, Pencil, Plus, Search,
+  ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreVertical, Pencil, Plus, Search,
   SlidersHorizontal, Smartphone, Trash2, Users, X,
 } from "lucide-react";
 
@@ -129,18 +129,18 @@ export default function CustomersPage() {
 
       <div className="grid grid-cols-1 items-start gap-4">
         <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-lg shadow-slate-900/5">
-          <div className="grid gap-2 border-b border-slate-200 bg-slate-50 p-3 sm:grid-cols-[minmax(220px,1fr)_150px_170px_40px]">
-            <label className="relative block">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search by name, phone, or email..." aria-label="Search customers" className="h-10 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white pl-9 pr-3 text-sm font-medium text-slate-900 outline-none shadow-sm transition-all placeholder:text-slate-400 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" />
+          <div className="grid min-w-0 grid-cols-1 gap-2 border-b border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_160px_170px_40px]">
+            <label className="relative block min-w-0 sm:col-span-2 xl:col-span-1">
+              <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search by name, phone, or email..." aria-label="Search customers" className="h-10 min-w-0 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white ps-9 pe-3 text-sm font-medium text-slate-900 outline-none shadow-sm transition-all placeholder:text-slate-400 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" />
             </label>
-            <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value); }} aria-label="Filter customers" className="h-10 rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
+            <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value); }} aria-label="Filter customers" className="h-10 min-w-0 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
               <option value="all">All Customers</option><option value="phone">With Phone</option><option value="email">With Email</option>
             </select>
-            <select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value); }} aria-label="Sort customers" className="h-10 rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
+            <select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value); }} aria-label="Sort customers" className="h-10 min-w-0 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
               <option value="newest">Newest First</option><option value="oldest">Oldest First</option>
             </select>
-            <span className="hidden h-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 sm:flex" title="Customer filters"><SlidersHorizontal size={15} /></span>
+            <span className="hidden h-10 w-10 shrink-0 items-center justify-center justify-self-start rounded-2xl border border-slate-200 bg-white text-slate-500 sm:flex xl:justify-self-end" title="Customer filters"><SlidersHorizontal size={15} /></span>
           </div>
 
           <div className="overflow-x-auto">
@@ -160,7 +160,7 @@ export default function CustomersPage() {
                         <td className="px-4 py-2.5 text-xs text-slate-600"><span className="block max-w-40 truncate">{customer.address || "—"}</span></td>
                         <td className="px-4 py-2.5 text-xs text-slate-600">{dateTime(customer.created_at)}</td>
                         <td className="px-4 py-2.5"><div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
-                          <CustomerRowMenu customer={customer} onView={(record) => router.push(`/admin/customers/${record._id}`)} onEdit={openEdit} onDelete={(record) => { if (window.confirm(`Delete ${record.name}?`)) deleteMutation.mutate(record._id); }} onCreateQuote={(record) => router.push(`/admin/quotes/new?customer=${record._id}`)} onCreateInvoice={(record) => router.push(`/admin/invoices/new?customer=${record._id}`)} />
+                          <CustomerRowMenu dir={dir} customer={customer} onView={(record) => router.push(`/admin/customers/${record._id}`)} onEdit={openEdit} onDelete={(record) => { if (window.confirm(`Delete ${record.name}?`)) deleteMutation.mutate(record._id); }} onCreateQuote={(record) => router.push(`/admin/quotes/new?customer=${record._id}`)} onCreateInvoice={(record) => router.push(`/admin/invoices/new?customer=${record._id}`)} />
                         </div></td>
                       </tr>
                     ))}
@@ -180,7 +180,7 @@ export default function CustomersPage() {
   );
 }
 
-function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, onCreateInvoice }) {
+function CustomerRowMenu({ dir = "ltr", customer, onView, onEdit, onDelete, onCreateQuote, onCreateInvoice }) {
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
   const [open, setOpen] = useState(false);
@@ -208,11 +208,12 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, on
     if (!rect) return;
     const menuWidth = 180;
     const menuHeight = 220;
-    const flipUp = window.innerHeight - rect.bottom < menuHeight;
-    const top = flipUp
-      ? Math.max(8, rect.top - menuHeight - 4)
-      : Math.min(rect.bottom + 4, window.innerHeight - menuHeight - 8);
-    const left = dir === "rtl" ? Math.min(Math.max(8, rect.left), window.innerWidth - menuWidth - 8) : Math.min(Math.max(8, rect.right - menuWidth), window.innerWidth - menuWidth - 8);
+    const maxTop = Math.max(8, window.innerHeight - menuHeight - 8);
+    const flipUp = window.innerHeight - rect.bottom < menuHeight + 8;
+    const top = Math.min(maxTop, Math.max(8, flipUp ? rect.top - menuHeight - 4 : rect.bottom + 4));
+    const maxLeft = Math.max(8, window.innerWidth - menuWidth - 8);
+    const preferredLeft = dir === "rtl" ? rect.left : rect.right - menuWidth;
+    const left = Math.min(maxLeft, Math.max(8, preferredLeft));
     setPosition({ top, left });
     setOpen(true);
   };
@@ -228,7 +229,7 @@ function CustomerRowMenu({ customer, onView, onEdit, onDelete, onCreateQuote, on
   };
 
   return <>
-    <button ref={buttonRef} type="button" onClick={toggleMenu} className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--bg-row-hover)] hover:text-[var(--text-primary)]" aria-label={`Actions for ${customer.name}`} aria-haspopup="true" aria-expanded={open}><MoreHorizontal size={16} /></button>
+    <button ref={buttonRef} type="button" onClick={toggleMenu} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-secondary)] transition hover:bg-[var(--bg-row-hover)] hover:text-[var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" aria-label={`Actions for ${customer.name}`} aria-haspopup="true" aria-expanded={open}><MoreVertical size={18} /></button>
     {open && createPortal(<div ref={menuRef} className="fixed z-[9999] w-44 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[0_8px_28px_rgba(15,23,42,0.2)]" style={{ top: position.top, left: position.left }}>
       <button type="button" onClick={run(onView)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><Eye size={14} />View details</button>
       <button type="button" onClick={run(onCreateQuote)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><ContactRound size={14} />Create quote</button>

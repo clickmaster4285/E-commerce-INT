@@ -16,7 +16,6 @@ export default function LanguageSwitcher({ className = "" }) {
   // Target locale while a switch is in flight — the curtain is mounted for it.
   const [switchingTo, setSwitchingTo] = useState(null);
   const ref = useRef(null);
-  const hoverTimer = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -34,23 +33,12 @@ export default function LanguageSwitcher({ className = "" }) {
     };
   }, [open]);
 
-  // Hover-to-open, mouse-leave-to-close (with small delay to avoid flicker).
-  const handleMouseEnter = () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setOpen(true);
-  };
-  const handleMouseLeave = () => {
-    hoverTimer.current = setTimeout(() => setOpen(false), 150);
-  };
-
   const current = locales.find((l) => l.code === locale) || locales[0];
 
   return (
     <div
       className={`relative ${className}`}
       ref={ref}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       <button
         type="button"

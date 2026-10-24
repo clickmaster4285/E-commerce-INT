@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import VendorFormModal, { emptyVendorForm, toVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import {
   Users, UserCheck, UserX, DollarSign, Star, Plus, Search,
-  MoreHorizontal, ChevronLeft, ChevronRight,
+  MoreVertical, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // Same tokens as Brands/Products pages — no new design system.
@@ -92,8 +92,8 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete }) {
   ];
   return (
     <>
-      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="p-1.5 rounded-md transition hover:opacity-70" style={{ color: "var(--text-muted)" }} aria-label={t("more")} aria-haspopup="true" aria-expanded={open}>
-        <MoreHorizontal size={16} />
+      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150 hover:bg-[var(--bg-row-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--text-secondary)" }} aria-label={t("more")} aria-haspopup="true" aria-expanded={open}>
+        <MoreVertical size={18} />
       </button>
       {open && createPortal(
         <div ref={menuRef} className="fixed z-[9999] w-[170px] rounded-lg py-1" style={{ top: pos.top, left: pos.left, ...cardStyle, boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}>

@@ -389,7 +389,7 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
           {banner.description && (
             <p
               dir={dir}
-              className={`bn-anim mb-4 hidden max-w-xl text-sm text-white/85 sm:block sm:text-base lg:mb-5 lg:text-lg ${dir === "rtl" ? "line-clamp-3 leading-[2]" : "line-clamp-2 leading-relaxed"}`}
+              className={`bn-anim hidden max-w-xl text-sm text-white/85 sm:block sm:text-base lg:text-lg ${dir === "rtl" ? "mb-6 sm:mb-7 lg:mb-8 line-clamp-3 leading-[2]" : "mb-4 lg:mb-5 line-clamp-2 leading-relaxed"}`}
               style={{ lineHeight: dir === "rtl" ? 2 : undefined, ...anim(isActive, "bnSlideLeft", 0.35) }}
             >
               {banner.description}

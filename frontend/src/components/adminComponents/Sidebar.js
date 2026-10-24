@@ -468,7 +468,7 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
   // `name` / `title` stay the stable lookup key — paths, permissionKey and icons
   // are untouched. If a key is ever missing we fall back to the English label.
-  const { t } = useTranslation();
+  const { t, dir, locale } = useTranslation();
   const navLabel = useCallback(
     (kind, label) => {
       const key = `admin.nav.${kind}.${slugKey(label)}`;
@@ -626,8 +626,8 @@ export default function Sidebar({ onNavigate, userData }) {
           type="button"
           onClick={() => setIsMobileOpen(true)}
           aria-label={t("admin.sidebar.open")}
-          className="
-            fixed top-4 left-4 z-[60]
+          className={`
+            fixed top-4 ${dir === "rtl" ? "right-4 left-auto" : "left-4 right-auto"} z-[60]
             flex h-10 w-10 items-center justify-center
             rounded-lg
             bg-[var(--bg-sidebar)]
@@ -636,7 +636,7 @@ export default function Sidebar({ onNavigate, userData }) {
             transition-all duration-300
             hover:bg-[var(--bg-sidebar-hover)]
             md:hidden
-          "
+          `}
         >
           <Menu size={20} />
         </button>
@@ -661,16 +661,18 @@ export default function Sidebar({ onNavigate, userData }) {
           SIDEBAR
       ====================================================== */}
       <aside
+        dir={dir}
+        lang={locale}
         className={`
-          fixed inset-y-0 left-0 z-50
+          fixed inset-y-0 ${dir === "rtl" ? "right-0 left-auto border-l border-r-0" : "left-0 right-auto border-r border-l-0"} z-50
           flex h-screen w-[280px] flex-col
-          border-r border-[var(--border-sidebar)]
+          border-[var(--border-sidebar)]
           bg-[var(--bg-sidebar)]
           text-[var(--text-sidebar)]
           transition-[width,transform] duration-300 ease-in-out
           md:relative md:translate-x-0
           ${iconOnly ? "md:w-[64px]" : "md:w-[var(--sidebar-width)]"}
-          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+          ${isMobileOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full"}
         `}
       >
         {/* ==================================================

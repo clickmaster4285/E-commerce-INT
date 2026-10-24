@@ -103,7 +103,7 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
     const timer = window.setTimeout(() => {
       window.print();
       router.replace(`/admin/invoices/${id}`, { scroll: false });
-    }, 350);
+    }, 500);
     return () => window.clearTimeout(timer);
   }, [id, invoice, isLoading, router, searchParams]);
 
@@ -361,7 +361,12 @@ export default function InvoiceDetailsPage({ params }) {const { t } = useTransla
         #invoice-print-area, #invoice-print-area * { visibility: visible !important; }
         #invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
         #invoice-print-area button, #invoice-print-area a, #invoice-print-area [role="dialog"] { display: none !important; }
-        #invoice-print-area section, #invoice-print-area main, #invoice-print-area aside { break-inside: avoid; box-shadow: none !important; }
+        #invoice-print-area > .grid { display: block !important; }
+        #invoice-print-area main, #invoice-print-area aside { display: block !important; break-inside: auto !important; }
+        #invoice-print-area section { break-inside: auto !important; box-shadow: none !important; }
+        #invoice-print-area section > div:first-child { break-after: avoid; }
+        #invoice-print-area tr { break-inside: avoid; }
+        #invoice-print-area .overflow-x-auto { overflow: visible !important; }
         #invoice-print-area table { width: 100% !important; border-collapse: collapse !important; }
         #invoice-print-area th, #invoice-print-area td { color: #111827 !important; border-color: #d1d5db !important; }
         #invoice-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }

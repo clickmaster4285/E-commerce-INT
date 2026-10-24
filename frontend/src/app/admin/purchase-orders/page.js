@@ -12,7 +12,7 @@ import { localizedStrictField } from "@/i18n/localize";
 import { createPortal } from "react-dom";
 import {
   ClipboardList, Hourglass, CheckCircle2, DollarSign, Plus, Search,
-  X, ChevronLeft, ChevronRight, MoreHorizontal, Printer,
+  X, ChevronLeft, ChevronRight, MoreVertical, Printer,
 } from "lucide-react";
 
 // Same tokens as Vendors/Brands pages — no new design system.
@@ -99,8 +99,8 @@ function PORowMenu({ p, onView, onOpen, onConfirm, onDeliver, onPay, onViewRecei
   const run = (fn) => (e) => { e.stopPropagation(); setOpen(false); fn(); };
   return (
     <>
-      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="p-1.5 rounded-md transition hover:opacity-70" style={{ color: "var(--text-muted)" }} aria-label={t("admin.purchaseOrders.list.moreActions")} aria-haspopup="true" aria-expanded={open}>
-        <MoreHorizontal size={16} />
+      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150 hover:bg-[var(--bg-row-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--text-secondary)" }} aria-label={t("admin.purchaseOrders.list.moreActions")} aria-haspopup="true" aria-expanded={open}>
+        <MoreVertical size={18} />
       </button>
       {open && createPortal(
         <div ref={menuRef} className="fixed z-[9999] w-[180px] rounded-lg py-1" style={{ top: pos.top, left: pos.left, ...cardStyle, boxShadow: "0 4px 24px rgba(0,0,0,0.25)" }}>

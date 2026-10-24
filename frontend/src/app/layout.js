@@ -26,11 +26,11 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Arabic -> Cairo/Tajawal, Urdu -> Noto Nastaliq Urdu. Loaded on demand
+        {/* Arabic -> Noto Naskh Arabic, Urdu -> Noto Nastaliq Urdu. Loaded on demand
             via the media trick so English (LTR) never blocks on them. */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
         />
         <Script
           id="admin-theme-script"

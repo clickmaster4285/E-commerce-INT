@@ -7,6 +7,7 @@ import Image from "next/image";
 import { quoteApi } from "@/apis/admin/quoteApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
+import { downloadQuotePdf } from "@/lib/invoicePdf";
 import { toast } from "sonner";
 import {
   ArrowLeft, BadgeCheck, CalendarDays, Check, Clock3, Download, FileText, Printer,
@@ -20,197 +21,6 @@ const card = "rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)
 const statusStyle = { Pending: "border-amber-200 bg-amber-50 text-amber-700", Draft: "border-slate-200 bg-slate-100 text-slate-700", Sent: "border-blue-200 bg-blue-50 text-blue-700", Accepted: "border-emerald-200 bg-emerald-50 text-emerald-700", Rejected: "border-rose-200 bg-rose-50 text-rose-700" };
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const getImageUrl = (url) => !url || /^(https?:|blob:|data:)/i.test(url) ? url || "" : API_ORIGIN ? `${API_ORIGIN}${url.startsWith("/") ? url : `/${url}`}` : url;
-
-function createQuotePdf(quote, store, JsPDF) {
-  const pdf = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 16;
-  const contentWidth = pageWidth - margin * 2;
-  const columns = [57, 25, 12, 25, 20, 15, 24];
-  let y = 0;
-
-  const write = (value, x, yPosition, width, size = 8, style = "normal", color = [15, 23, 42], align = "left") => {
-    pdf.setFont("helvetica", style);
-    pdf.setFontSize(size);
-    pdf.setTextColor(...color);
-    const lines = pdf.splitTextToSize(String(value || "—").replace(/\u00a0/g, " "), width);
-    pdf.text(lines, x, yPosition, align === "right" ? { align: "right" } : undefined);
-    return lines.length;
-  };
-  const pageHeading = (continued = false) => {
-    pdf.setFillColor(15, 35, 70);
-    pdf.rect(0, 0, pageWidth, continued ? 23 : 42, "F");
-    pdf.setFillColor(37, 99, 235);
-    pdf.rect(0, 0, pageWidth, 3, "F");
-    const companyName = store?.store_name || "Your Company";
-    if (continued) {
-      write(companyName, margin, 11, 100, 10, "bold", [255, 255, 255]);
-      write(`QUOTE ${quote.quote_number}  |  CONTINUED`, margin, 18, contentWidth, 7, "normal", [191, 219, 254]);
-      return 30;
-    }
-
-    const initials = companyName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "CO";
-    pdf.setFillColor(37, 99, 235);
-    pdf.roundedRect(margin, 9, 14, 14, 3, 3, "F");
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(8);
-    pdf.setTextColor(255, 255, 255);
-    pdf.text(initials, margin + 7, 18, { align: "center" });
-    write(companyName, margin + 19, 12, 95, 12, "bold", [255, 255, 255]);
-    if (store?.tagline) write(store.tagline, margin + 19, 18, 95, 6.5, "normal", [203, 213, 225]);
-    const companyPhone = store?.phone || store?.support_phone;
-    const companyEmail = store?.email || store?.support_email;
-    if (companyPhone) write(`Phone: ${companyPhone}`, margin + 19, 24, 94, 6.5, "normal", [226, 232, 240]);
-    if (companyEmail) write(`Email: ${companyEmail}`, margin + 19, 30, 94, 6.5, "normal", [226, 232, 240]);
-    const companyAddress = [store?.address, store?.city, store?.state, store?.zip_code, store?.country].filter(Boolean).join(", ");
-    if (companyAddress) write(companyAddress, margin + 19, 36, 94, 6, "normal", [203, 213, 225]);
-
-    const quoteBlockRight = pageWidth - margin;
-    write("QUOTATION", quoteBlockRight, 11, 58, 7, "bold", [147, 197, 253], "right");
-    write(quote.quote_number, quoteBlockRight, 20, 58, 13, "bold", [255, 255, 255], "right");
-    write(String(quote.status || "Pending").toUpperCase(), quoteBlockRight, 28, 58, 6.5, "bold", [191, 219, 254], "right");
-
-    const cardY = 47;
-    const gap = 5;
-    const leftWidth = 104;
-    const rightX = margin + leftWidth + gap;
-    const rightWidth = contentWidth - leftWidth - gap;
-    pdf.setDrawColor(219, 228, 241);
-    pdf.setFillColor(248, 250, 253);
-    pdf.roundedRect(margin, cardY, leftWidth, 35, 3, 3, "FD");
-    pdf.roundedRect(rightX, cardY, rightWidth, 35, 3, 3, "FD");
-    write("PREPARED FOR", margin + 5, cardY + 7, leftWidth - 10, 6.5, "bold", [100, 116, 139]);
-    write(quote.customer_name, margin + 5, cardY + 14, leftWidth - 10, 10, "bold");
-    const customerContact = [quote.customer_email, quote.customer_phone].filter(Boolean).join("  |  ");
-    if (customerContact) write(customerContact, margin + 5, cardY + 21, leftWidth - 10, 7, "normal", [71, 85, 105]);
-    if (quote.customer_address) write(quote.customer_address, margin + 5, cardY + 28, leftWidth - 10, 6.5, "normal", [71, 85, 105]);
-
-    const metadata = [
-    ["QUOTE DATE", date(quote.quote_date)],
-    ["VALID UNTIL", date(quote.expiry_date)],
-    ["CUSTOMER TYPE", quote.customer_type || "Other"],
-    ["PREPARED BY", quote.createdby?.name || "Staff"]];
-
-    metadata.forEach(([label, value], index) => {
-      const rowY = cardY + 7 + index * 7;
-      write(label, rightX + 5, rowY, 27, 5.2, "bold", [100, 116, 139]);
-      write(value, rightX + 33, rowY, rightWidth - 38, 6.2, "bold", [15, 23, 42]);
-    });
-    return 89;
-  };
-  const drawTableHeading = () => {
-    const headerHeight = 10;
-    pdf.setFillColor(30, 64, 175);
-    pdf.roundedRect(margin, y, contentWidth, headerHeight, 2, 2, "F");
-    const labels = ["PRODUCT / VARIANT", "SKU", "QTY", "UNIT PRICE", "DISCOUNT", "TAX", "TOTAL"];
-    let x = margin;
-    labels.forEach((label, index) => {
-      const rightAligned = index > 1;
-      write(label, rightAligned ? x + columns[index] - 3 : x + 3, y + 6.5, columns[index] - 6, 6.5, "bold", [255, 255, 255], rightAligned ? "right" : "left");
-      x += columns[index];
-    });
-    y += headerHeight;
-  };
-  const nextItemsPage = () => {
-    pdf.addPage();
-    y = pageHeading(true);
-    drawTableHeading();
-  };
-
-  y = pageHeading();
-  drawTableHeading();
-  (quote.items || []).forEach((item, index) => {
-    const nameLines = pdf.splitTextToSize(String(item.name || `Item ${index + 1}`).replace(/\u00a0/g, " "), columns[0] - 8);
-    const rowHeight = Math.max(11, nameLines.length * 4.2 + 5);
-    if (y + rowHeight > pageHeight - 17) nextItemsPage();
-    if (index % 2 === 0) {
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(margin, y, contentWidth, rowHeight, "F");
-    }
-    pdf.setDrawColor(226, 232, 240);
-    pdf.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
-    const cells = [item.name || `Item ${index + 1}`, item.sku || "—", String(item.quantity ?? 0), money(item.unit_price), money(item.discount), money(item.tax), money(item.total)];
-    let x = margin;
-    cells.forEach((value, cellIndex) => {
-      const rightAligned = cellIndex > 1;
-      const textX = rightAligned ? x + columns[cellIndex] - 3 : x + 3;
-      write(value, textX, y + 5.5, columns[cellIndex] - 7, 7.5, cellIndex === 6 ? "bold" : "normal", [15, 23, 42], rightAligned ? "right" : "left");
-      x += columns[cellIndex];
-    });
-    y += rowHeight;
-  });
-
-  const summaryRows = [["Subtotal", money(quote.subtotal)]];
-  if (Number(quote.overall_discount) > 0) summaryRows.push([`Overall discount (${Number(quote.overall_discount_rate) || 0}%)`, `- ${money(quote.overall_discount)}`]);
-  const itemDiscount = Number(quote.discount || 0) - Number(quote.overall_discount || 0);
-  if (itemDiscount > 0) summaryRows.push(["Item discounts", `- ${money(itemDiscount)}`]);
-  summaryRows.push([`Tax${Number(quote.tax_rate) ? ` (${Number(quote.tax_rate)}%)` : ""}`, `+ ${money(quote.tax)}`]);
-  if (y + 30 + summaryRows.length * 6 > pageHeight - 15) {
-    pdf.addPage();
-    y = pageHeading(true);
-  }
-  y += 7;
-  const summaryWidth = 88;
-  const summaryX = pageWidth - margin - summaryWidth;
-  const summaryTop = y;
-  const summaryBoxHeight = summaryRows.length * 6 + 19;
-  pdf.setDrawColor(219, 234, 254);
-  pdf.setFillColor(248, 250, 252);
-  pdf.roundedRect(summaryX, summaryTop, summaryWidth, summaryBoxHeight, 3, 3, "FD");
-  summaryRows.forEach(([label, value], index) => {
-    const rowY = summaryTop + 7 + index * 6;
-    write(label, summaryX + 5, rowY, 45, 7, "normal", [71, 85, 105]);
-    pdf.text(value.replace(/\u00a0/g, " "), summaryX + summaryWidth - 5, rowY, { align: "right" });
-  });
-  const totalY = summaryTop + summaryRows.length * 6 + 10;
-  pdf.setFillColor(37, 99, 235);
-  pdf.roundedRect(summaryX + 3, totalY - 5, summaryWidth - 6, 12, 2, 2, "F");
-  write("GRAND TOTAL", summaryX + 6, totalY + 2, 42, 7, "bold", [255, 255, 255]);
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(9);
-  pdf.setTextColor(255, 255, 255);
-  pdf.text(money(quote.total).replace(/\u00a0/g, " "), summaryX + summaryWidth - 6, totalY + 2, { align: "right" });
-  y = totalY + 13;
-
-  const paragraphs = [["Terms & Conditions", quote.terms], ["Additional Notes", quote.notes]].filter(([, value]) => value);
-  paragraphs.forEach(([title, body]) => {
-    const lines = pdf.splitTextToSize(String(body).replace(/\u00a0/g, " "), contentWidth - 10);
-    let cursor = 0;
-    while (cursor < lines.length) {
-      if (y + 20 > pageHeight - 15) {
-        pdf.addPage();
-        y = pageHeading(true);
-      }
-      const availableLines = Math.max(1, Math.floor((pageHeight - 18 - (y + 12)) / 4.2));
-      const pageLines = lines.slice(cursor, cursor + availableLines);
-      const boxHeight = 12 + pageLines.length * 4.2;
-      pdf.setDrawColor(226, 232, 240);
-      pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, "FD");
-      write(cursor === 0 ? title : `${title} (continued)`, margin + 5, y + 6, contentWidth - 10, 7.5, "bold", [51, 65, 85]);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(51, 65, 85);
-      pdf.text(pageLines, margin + 5, y + 11);
-      cursor += pageLines.length;
-      y += boxHeight + 4;
-    }
-  });
-
-  const pageCount = pdf.getNumberOfPages();
-  for (let page = 1; page <= pageCount; page += 1) {
-    pdf.setPage(page);
-    pdf.setDrawColor(226, 232, 240);
-    pdf.line(margin, pageHeight - 11, pageWidth - margin, pageHeight - 11);
-    write("Thank you for considering our offer.", margin, pageHeight - 6, contentWidth - 20, 6.5, "normal", [100, 116, 139]);
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(6.5);
-    pdf.setTextColor(100, 116, 139);
-    pdf.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 6, { align: "right" });
-  }
-  return pdf;
-}
 
 export default function QuoteDetailPage({ params }) {const { t } = useTranslation();
   const { id } = use(params);
@@ -229,7 +39,7 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
     const timer = window.setTimeout(() => {
       window.print();
       router.replace(`/admin/quotes/${id}`, { scroll: false });
-    }, 350);
+    }, 500);
     return () => window.clearTimeout(timer);
   }, [id, isLoading, quote, router, searchParams]);
   const variantsById = new Map(variants.map((variant) => [String(variant._id), variant]));
@@ -252,8 +62,7 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
     if (isGeneratingPdf) return;
     setIsGeneratingPdf(true);
     try {
-      const { jsPDF } = await import("jspdf");
-      createQuotePdf(quote, store, jsPDF).save(`${String(quote.quote_number || "quote").replace(/[^a-z0-9_-]/gi, "_")}.pdf`);
+      await downloadQuotePdf(quote, store);
       toast.success("Quote PDF downloaded");
     } catch (downloadError) {
       console.error("Could not generate quote PDF:", downloadError);
@@ -269,7 +78,6 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
 
   return <div id="quote-print-area" className="-mx-3 w-[calc(100%+1.5rem)] max-w-none space-y-3 pb-6 text-[var(--text-primary)] sm:-mx-5 sm:w-[calc(100%+2.5rem)]">
     <header className={`${card} overflow-hidden`}>
-      <div className="h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500" />
       <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4">
         <div className="min-w-0">
           <nav aria-label={t("admin.quoteInvoice.ui.breadcrumb_c766e665")} className="mb-3 flex items-center gap-2 text-[10px] font-medium text-[var(--text-muted)]"><button type="button" onClick={() => router.push("/admin/quotes")} className="hover:text-blue-600">{t("admin.quoteInvoice.ui.quotes_7b0257ce")}</button><span aria-hidden="true">›</span><span>{t("admin.quoteInvoice.ui.quote_details_4443d16a")}</span></nav>
@@ -345,7 +153,13 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
         #quote-print-area, #quote-print-area * { visibility: visible !important; }
         #quote-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
         #quote-print-area .quote-no-print, #quote-print-area button, #quote-print-area a { display: none !important; }
-        #quote-print-area section, #quote-print-area header, #quote-print-area aside { break-inside: avoid; box-shadow: none !important; }
+        #quote-print-area > div.grid { display: block !important; }
+        #quote-print-area > div.grid > div, #quote-print-area aside { display: block !important; break-inside: auto !important; }
+        #quote-print-area section { break-inside: auto !important; box-shadow: none !important; }
+        #quote-print-area header { break-inside: avoid; box-shadow: none !important; }
+        #quote-print-area section > div:first-child { break-after: avoid; }
+        #quote-print-area tr { break-inside: avoid; }
+        #quote-print-area .overflow-x-auto { overflow: visible !important; }
         #quote-print-area table { width: 100% !important; min-width: 0 !important; border-collapse: collapse !important; }
         #quote-print-area th, #quote-print-area td { color: #111827 !important; border-color: #d1d5db !important; }
         #quote-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }

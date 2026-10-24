@@ -3,23 +3,50 @@ import { storeApi } from "@/apis/admin/storeApi";
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const PAGE_MARGIN = 14;
 const COLORS = {
-  navy: [18, 48, 91],
-  blue: [37, 99, 235],
-  ink: [23, 37, 62],
-  muted: [100, 116, 139],
-  line: [218, 227, 239],
-  pale: [245, 248, 252],
-  watermark: [232, 239, 249],
-  white: [255, 255, 255],
-  green: [5, 150, 105],
+  ink: [20, 20, 20],
+  muted: [85, 85, 85],
+  line: [190, 190, 190],
 };
+const EMBEDDED_QUOTE_FONTS = {
+  lato: { normal: "Lato-Regular.ttf", bold: "Lato-Bold.ttf", italic: "Lato-Italic.ttf", bolditalic: "Lato-BoldItalic.ttf" },
+  ubuntu: { normal: "Ubuntu-Regular.ttf", bold: "Ubuntu-Bold.ttf", italic: "Ubuntu-Italic.ttf", bolditalic: "Ubuntu-BoldItalic.ttf" },
+};
+const fontAssetCache = new Map();
+
+async function loadFontAsset(filename) {
+  if (!fontAssetCache.has(filename)) {
+    fontAssetCache.set(filename, fetch(`/fonts/${filename}`).then(async (response) => {
+      if (!response.ok) throw new Error(`Could not load PDF font: ${filename}`);
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      }
+      return binary;
+    }).catch((error) => {
+      fontAssetCache.delete(filename);
+      throw error;
+    }));
+  }
+  return fontAssetCache.get(filename);
+}
+
+async function registerEmbeddedFont(pdf, fontFamily) {
+  const fontFiles = EMBEDDED_QUOTE_FONTS[fontFamily.toLowerCase()];
+  if (!fontFiles) return;
+  await Promise.all(Object.entries(fontFiles).map(async ([style, filename]) => {
+    const binary = await loadFontAsset(filename);
+    pdf.addFileToVFS(filename, binary);
+    pdf.addFont(filename, fontFamily, style);
+  }));
+}
 
 const resolveAssetUrl = (url) => {
   if (!url || /^(https?:|data:|blob:)/i.test(url)) return url || "";
   return API_ORIGIN ? `${API_ORIGIN}${url.startsWith("/") ? url : `/${url}`}` : url;
 };
 
-async function loadImageData(url) {
+async function loadImageData(url, opacity = 1) {
   if (!url || typeof window === "undefined") return null;
   return new Promise((resolve) => {
     const image = new window.Image();
@@ -29,19 +56,10 @@ async function loadImageData(url) {
         const canvas = document.createElement("canvas");
         canvas.width = image.naturalWidth;
         canvas.height = image.naturalHeight;
-        canvas.getContext("2d").drawImage(image, 0, 0);
-        const watermarkCanvas = document.createElement("canvas");
-        watermarkCanvas.width = image.naturalWidth;
-        watermarkCanvas.height = image.naturalHeight;
-        const watermarkContext = watermarkCanvas.getContext("2d");
-        watermarkContext.globalAlpha = 0.11;
-        watermarkContext.drawImage(image, 0, 0);
-        resolve({
-          data: canvas.toDataURL("image/png"),
-          watermarkData: watermarkCanvas.toDataURL("image/png"),
-          width: image.naturalWidth,
-          height: image.naturalHeight,
-        });
+        const context = canvas.getContext("2d");
+        context.globalAlpha = Math.max(0, Math.min(1, opacity));
+        context.drawImage(image, 0, 0);
+        resolve({ data: canvas.toDataURL("image/png"), width: image.naturalWidth, height: image.naturalHeight });
       } catch {
         resolve(null);
       }
@@ -55,18 +73,56 @@ const safeText = (value, fallback = "-") => String(value ?? "").trim() || fallba
 const dateLabel = (value) => value && !Number.isNaN(new Date(value).getTime())
   ? new Date(value).toLocaleDateString("en-PK", { year: "numeric", month: "short", day: "numeric" })
   : "-";
+const hexToRgb = (value, fallback = [36, 63, 103]) => {
+  const match = /^#?([0-9a-f]{6})$/i.exec(String(value || ""));
+  return match ? [parseInt(match[1].slice(0, 2), 16), parseInt(match[1].slice(2, 4), 16), parseInt(match[1].slice(4, 6), 16)] : fallback;
+};
+const tintRgb = (color, whiteRatio = 0.9) => color.map((channel) => Math.round(channel + (255 - channel) * whiteRatio));
 
-export async function downloadInvoicePdf(invoice, suppliedStore = null) {
+export async function createBusinessDocumentPdf(invoice, suppliedStore = null, options = {}) {
   const [{ jsPDF }, storeResult] = await Promise.all([
     import("jspdf"),
     suppliedStore ? Promise.resolve(suppliedStore) : storeApi.getPublic().catch(() => null),
   ]);
   const store = storeResult?.data || storeResult || {};
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const isQuote = options.documentType === "quote";
+  const design = isQuote ? (options.design || {}) : {};
+  const headerLayout = design.headerLayout || "split";
+  const template = design.template || "corporate";
+  const bandHeader = isQuote && headerLayout === "band";
+  const minimalHeader = isQuote && headerLayout === "minimal";
+  const centeredHeader = isQuote && headerLayout === "centered";
+  const accent = isQuote ? hexToRgb(design.accentColor) : [20, 20, 20];
+  const templateEmphasis = isQuote && ["dark", "bold", "sunset", "agency", "creative"].includes(template);
+  const tableHeaderFill = templateEmphasis ? accent : tintRgb(accent, 0.92);
+  const tableHeaderText = templateEmphasis ? [255, 255, 255] : accent;
+  let fontFamily = ({ helvetica: "helvetica", times: "times", courier: "courier", lato: "Lato", ubuntu: "Ubuntu" })[design.fontFamily] || "helvetica";
+  const fontScale = isQuote ? Math.max(0.75, Math.min(1.45, (Number(design.fontSize) || 9) / 9)) : 1;
+  const documentTitle = isQuote ? "QUOTATION" : "INVOICE";
+  const documentNumber = safeText(isQuote ? invoice.quote_number : invoice.invoice_number, "DRAFT");
+  const pageFormat = isQuote && design.pageSize === "letter" ? "letter" : "a4";
+  const pageOrientation = isQuote && design.orientation === "landscape" ? "landscape" : "portrait";
+  const [shortPageSide, longPageSide] = pageFormat === "letter" ? [215.9, 279.4] : [210, 297];
+  const requestedPageWidth = isQuote && pageOrientation === "landscape" ? longPageSide : shortPageSide;
+  const defaultPageHeight = isQuote && pageOrientation === "landscape" ? shortPageSide : longPageSide;
+  const requestedPageHeight = isQuote && Number(design.pageHeight) > 0
+    ? Math.max(180, Math.min(420, Number(design.pageHeight)))
+    : defaultPageHeight;
+  const baseMargin = PAGE_MARGIN;
+  const agencySidebar = isQuote && template === "agency";
+  const sidebarWidth = agencySidebar ? Math.min(66, requestedPageWidth * 0.3) : 0;
+  const margin = baseMargin + sidebarWidth;
+  const spacingScale = 1;
+  const pdf = new jsPDF({ orientation: isQuote ? "portrait" : pageOrientation, unit: "mm", format: isQuote ? [requestedPageWidth, requestedPageHeight] : pageFormat, compress: true });
+  if (isQuote && EMBEDDED_QUOTE_FONTS[fontFamily.toLowerCase()]) {
+    try { await registerEmbeddedFont(pdf, fontFamily); }
+    catch { fontFamily = "helvetica"; }
+  }
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const contentWidth = pageWidth - PAGE_MARGIN * 2;
-  const bottomLimit = pageHeight - 19;
+  const contentWidth = pageWidth - margin - baseMargin;
+  const footerY = pageHeight - Math.max(8, baseMargin * 0.65);
+  const bottomLimit = footerY - 8;
   const companyName = safeText(store.store_name, "My Store");
   const companyAddressParts = [store.address, store.city, store.state, store.zip_code].filter(Boolean);
   const countryCodes = { PK: "Pakistan", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", IN: "India", CA: "Canada", AU: "Australia" };
@@ -75,99 +131,220 @@ export async function downloadInvoicePdf(invoice, suppliedStore = null) {
   const companyAddress = companyAddressParts.join(", ");
   const companyEmail = store.support_email || store.email || "";
   const companyPhone = store.support_phone || store.phone || "";
-  const logo = await loadImageData(store.logo?.img_url || "");
-  const money = (value) => `PKR ${Number(value || 0).toLocaleString("en-PK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const companyWebsite = store.website || store.website_url || store.store_url || "";
+  const logoUrl = isQuote ? (design.logoData || store.logo?.img_url || "") : (store.logo?.img_url || "");
+  const logo = await loadImageData(logoUrl);
+  const logoTargetWidth = isQuote ? Math.max(12, Math.min(50, Number(design.logoWidth) || 24)) : 23;
+  const logoAlignment = isQuote ? (design.logoAlignment || "left") : "left";
+  const logoOffset = isQuote ? Math.max(-16, Math.min(16, Number(design.logoOffset) || 0)) : 0;
+  const alignedLogoX = (slotX, slotWidth, logoWidth) => {
+    const baseX = logoAlignment === "center"
+      ? slotX + (slotWidth - logoWidth) / 2
+      : logoAlignment === "right" ? slotX + slotWidth - logoWidth : slotX;
+    return Math.max(slotX, Math.min(slotX + slotWidth - logoWidth, baseX + logoOffset));
+  };
+  const watermarkLogo = isQuote && design.watermark
+    ? await loadImageData(logoUrl, Math.max(0.03, Math.min(0.25, (Number(design.watermarkOpacity) || 8) / 100)))
+    : null;
+  const signatureImage = isQuote && design.showSignature && design.signatureMode === "draw" && design.signatureData
+    ? await loadImageData(design.signatureData)
+    : null;
+  const currencyCode = safeText(store.currency, "PKR").toUpperCase();
+  const currencySymbol = isQuote && design.currencySymbol ? String(design.currencySymbol).trim().slice(0, 3) : currencyCode;
+  const precision = isQuote ? Math.max(0, Math.min(3, Number(design.decimalPrecision ?? 2))) : 2;
+  const money = (value) => `${currencySymbol} ${Number(value || 0).toLocaleString("en", { minimumFractionDigits: precision, maximumFractionDigits: precision })}`;
+  const formatDate = (value) => {
+    if (!value || Number.isNaN(new Date(value).getTime())) return "-";
+    if (!isQuote || design.dateFormat === "locale") return dateLabel(value);
+    const rawDate = String(value).slice(0, 10);
+    const [year, month, day] = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+      ? rawDate.split("-")
+      : (() => { const date = new Date(value); return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, "0"), String(date.getUTCDate()).padStart(2, "0")]; })();
+    if (design.dateFormat === "iso") return `${year}-${month}-${day}`;
+    return design.dateFormat === "month-first" ? `${month}/${day}/${year}` : `${day}/${month}/${year}`;
+  };
   let y = 0;
 
   const setText = (size, color = COLORS.ink, style = "normal") => {
-    pdf.setFont("helvetica", style);
-    pdf.setFontSize(size);
+    const bold = style === "bold" ? (!isQuote || design.boldTitles !== false) : isQuote && Boolean(design.boldBody);
+    const italic = style === "italic" || (isQuote && style === "normal" && Boolean(design.italicBody));
+    const adjustedStyle = bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal";
+    pdf.setFont(fontFamily, adjustedStyle);
+    const bodyScale = isQuote && style !== "bold" && style !== "italic"
+      ? Math.max(0.75, Math.min(1.45, ((Number(design.bodyFontSize) || 9) / 9) * fontScale))
+      : fontScale;
+    pdf.setFontSize(size * bodyScale);
     pdf.setTextColor(...color);
-  };
-  const drawWatermark = () => {
-    if (logo?.watermarkData) {
-      // Keep the mark visible in the open area beside the totals instead of
-      // letting the opaque totals card cover its center.
-      const openAreaWidth = contentWidth - 89;
-      const maxWidth = openAreaWidth * 0.96;
-      const maxHeight = pageHeight * 0.27;
-      const scale = Math.min(maxWidth / logo.width, maxHeight / logo.height);
-      const width = logo.width * scale;
-      const height = logo.height * scale;
-      const x = PAGE_MARGIN + (openAreaWidth - width) / 2;
-      const y = pageHeight * 0.64 - height / 2;
-      pdf.addImage(logo.watermarkData, "PNG", x, y, width, height);
-      return;
-    }
-    setText(27, COLORS.watermark, "bold");
-    pdf.text(companyName.toUpperCase(), pageWidth / 2, pageHeight / 2, { align: "center", angle: 32, charSpace: 0.7 });
   };
   const drawLogoOrMonogram = () => {
     if (logo) {
       const ratio = logo.width / Math.max(logo.height, 1);
-      const width = ratio >= 1 ? 23 : 20 * ratio;
-      const height = ratio >= 1 ? 23 / ratio : 20;
-      pdf.addImage(logo.data, "PNG", PAGE_MARGIN + (23 - width) / 2, 10 + (23 - height) / 2, width, height);
+      const width = logoTargetWidth;
+      const height = Math.min(23, width / ratio);
+      const logoX = alignedLogoX(margin, Math.max(40, logoTargetWidth), width);
+      pdf.addImage(logo.data, "PNG", logoX, 10 + (23 - height) / 2, width, height);
       return;
     }
-    pdf.setFillColor(...COLORS.blue);
-    pdf.roundedRect(PAGE_MARGIN, 10, 23, 23, 4, 4, "F");
     const initials = companyName.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "MS";
-    setText(11, COLORS.white, "bold");
-    pdf.text(initials, PAGE_MARGIN + 11.5, 24.5, { align: "center" });
+    setText(13, bandHeader ? [255, 255, 255] : COLORS.ink, "bold");
+    pdf.text(initials, alignedLogoX(margin, 40, 10), 23);
   };
   const drawFirstPageHeader = () => {
-    pdf.setFillColor(...COLORS.navy);
-    pdf.rect(0, 0, pageWidth, 3, "F");
-    pdf.setFillColor(...COLORS.blue);
-    pdf.rect(pageWidth - 27, 3, 27, 3, "F");
+    if (isQuote && template === "elegant") {
+      pdf.setFillColor(252, 249, 243);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      pdf.setFillColor(247, 242, 233);
+      pdf.rect(0, 0, pageWidth, 48, "F");
+    }
+    if (agencySidebar) {
+      pdf.setFillColor(...accent);
+      pdf.rect(0, 0, sidebarWidth, pageHeight, "F");
+      if (logo) {
+        const width = Math.min(34, logoTargetWidth);
+        const height = Math.min(18, width * logo.height / Math.max(1, logo.width));
+        pdf.addImage(logo.data, "PNG", baseMargin, 10, width, height);
+      }
+      setText(11, [255, 255, 255], "bold");
+      pdf.text(pdf.splitTextToSize(companyName, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 37);
+      setText(6.5, [235, 238, 255]);
+      if (companyEmail) pdf.text(pdf.splitTextToSize(companyEmail, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 47);
+      setText(16, [255, 255, 255], "bold");
+      pdf.text("QUOTE", baseMargin, 75);
+      const sidebarDetails = [["QUOTE #", documentNumber], ["ISSUED", formatDate(invoice.invoice_date)], ["VALID UNTIL", formatDate(invoice.due_date)], ["TOTAL", money(invoice.total)]];
+      sidebarDetails.forEach(([label, value], index) => {
+        const top = 89 + index * 24;
+        setText(6, [222, 228, 248], "bold");
+        pdf.text(label, baseMargin, top);
+        setText(index === 3 ? 11 : 8, [255, 255, 255], "bold");
+        pdf.text(pdf.splitTextToSize(String(value), sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, top + 6);
+      });
+      y = 12;
+      return;
+    }
+    if (isQuote && template === "bold") {
+      pdf.setFillColor(...accent);
+      pdf.rect(pageWidth - 55, 0, 55, 65, "F");
+      pdf.triangle(pageWidth - 84, 0, pageWidth - 55, 0, pageWidth - 55, 65, "F");
+      drawLogoOrMonogram();
+      const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
+      setText(14, COLORS.ink, "bold");
+      pdf.text(companyName, textX, 17);
+      setText(7.5, COLORS.muted);
+      if (companyPhone) pdf.text(companyPhone, textX, 24);
+      setText(9, [255, 255, 255], "bold");
+      pdf.text("QUOTE", pageWidth - baseMargin, 18, { align: "right" });
+      setText(7.5, [255, 255, 255], "bold");
+      pdf.text(documentNumber, pageWidth - baseMargin, 27, { align: "right" });
+      setText(6.2, [255, 255, 255]);
+      pdf.text(`Issued ${formatDate(invoice.invoice_date)}`, pageWidth - baseMargin, 35, { align: "right" });
+      pdf.text(`Valid until ${formatDate(invoice.due_date)}`, pageWidth - baseMargin, 41, { align: "right" });
+      pdf.setDrawColor(...accent);
+      pdf.setLineWidth(0.7);
+      pdf.line(margin, 44, pageWidth - baseMargin, 44);
+      y = 50;
+      return;
+    }
+    if (bandHeader) {
+      pdf.setFillColor(...accent);
+      pdf.rect(0, 0, pageWidth, 42, "F");
+    } else if (isQuote && headerLayout === "split") {
+      pdf.setFillColor(242, 245, 249);
+      pdf.rect(pageWidth - 78, 0, 78, 42, "F");
+      pdf.setDrawColor(...accent);
+      pdf.setLineWidth(0.7);
+      pdf.line(0, 42, pageWidth, 42);
+    } else if (isQuote && headerLayout === "plain") {
+      pdf.setDrawColor(...accent);
+      pdf.setLineWidth(0.7);
+      pdf.line(0, 42, pageWidth, 42);
+    }
+    if (centeredHeader) {
+      const ratio = logo ? logo.width / Math.max(logo.height, 1) : 1;
+      const logoWidth = logo ? Math.min(logoTargetWidth, 50) : 0;
+      const logoHeight = logo ? Math.min(18, logoWidth / ratio) : 0;
+      const elegant = isQuote && template === "elegant";
+      if (logo) pdf.addImage(logo.data, "PNG", pageWidth / 2 - logoWidth / 2, elegant ? 4 : 5, logoWidth, logoHeight);
+      if (elegant) {
+        setText(16, accent, "bold");
+        pdf.text(documentTitle.toUpperCase(), pageWidth / 2, logo ? 29 : 18, { align: "center" });
+        setText(8, COLORS.muted, "bold");
+        pdf.text(`${companyName}  ·  ${documentNumber}`, pageWidth / 2, logo ? 36 : 25, { align: "center" });
+        setText(7, COLORS.muted);
+        pdf.text(`Issued ${formatDate(invoice.invoice_date)}  ·  Valid until ${formatDate(invoice.due_date)}`, pageWidth / 2, logo ? 42 : 31, { align: "center" });
+        y = 55;
+      } else {
+        const titleY = logo ? 30 : 17;
+        setText(14, accent, "bold");
+        pdf.text(companyName, pageWidth / 2, titleY, { align: "center" });
+        setText(8, accent, "bold");
+        pdf.text(`${documentTitle}  ${documentNumber}`, pageWidth / 2, titleY + 6, { align: "center" });
+        if (!minimalHeader && store.tagline) {
+          setText(7, COLORS.muted);
+          pdf.text(String(store.tagline), pageWidth / 2, titleY + 10, { align: "center" });
+        }
+        setText(7, COLORS.muted);
+        if (companyEmail && !minimalHeader) pdf.text(companyEmail, pageWidth / 2, titleY + 14, { align: "center" });
+        y = logo ? 48 : 42;
+      }
+      return;
+    }
+
     drawLogoOrMonogram();
 
-    const textX = PAGE_MARGIN + 29;
-    setText(14, COLORS.navy, "bold");
+    const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
+    const headerColor = bandHeader ? [255, 255, 255] : isQuote ? accent : COLORS.ink;
+    const secondaryHeaderColor = bandHeader ? [232, 238, 248] : COLORS.muted;
+    setText(14, headerColor, "bold");
     pdf.text(pdf.splitTextToSize(companyName, 78).slice(0, 1), textX, 17);
-    if (store.tagline) {
-      setText(7.5, COLORS.muted);
+    if (store.tagline && !minimalHeader) {
+      setText(7.5, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(String(store.tagline), 78).slice(0, 1), textX, 23);
     }
-    const contact = [companyPhone && `Phone: ${companyPhone}`, companyEmail && `Email: ${companyEmail}`].filter(Boolean).join("  |  ");
-    if (contact) {
-      setText(6.4, COLORS.muted);
-      pdf.text(pdf.splitTextToSize(contact, 82).slice(0, 1), textX, 29);
+    const contact = [companyPhone && `Phone: ${companyPhone}`, companyEmail && `Email: ${companyEmail}`, companyWebsite].filter(Boolean).join("  |  ");
+    if (contact && !minimalHeader) {
+      setText(6.4, secondaryHeaderColor);
+      pdf.text(pdf.splitTextToSize(contact, 96).slice(0, 2), textX, 29);
     }
-    if (companyAddress) {
-      setText(6.4, COLORS.muted);
+    if (companyAddress && !minimalHeader) {
+      setText(6.4, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(companyAddress, 82).slice(0, 2), textX, 35);
     }
 
-    const rightX = pageWidth - PAGE_MARGIN;
-    setText(8, COLORS.blue, "bold");
-    pdf.text("INVOICE", rightX, 13, { align: "right" });
-    setText(17, COLORS.navy, "bold");
-    pdf.text(pdf.splitTextToSize(safeText(invoice.invoice_number, "DRAFT"), 58), rightX, 21, { align: "right" });
+    const rightX = pageWidth - margin;
+    setText(8, headerColor, "bold");
+    pdf.text(documentTitle, rightX, 13, { align: "right" });
+    setText(isQuote ? Math.max(14, Number(design.titleSize) || 18) : 17, headerColor, "bold");
+    pdf.text(pdf.splitTextToSize(documentNumber, 58), rightX, 21, { align: "right" });
     const status = safeText(invoice.status, "Unpaid").toUpperCase();
-    pdf.setFillColor(...(status === "PAID" ? [225, 248, 240] : [239, 246, 255]));
-    pdf.roundedRect(pageWidth - PAGE_MARGIN - 38, 25, 38, 7, 3.5, 3.5, "F");
-    setText(6.5, status === "PAID" ? COLORS.green : COLORS.blue, "bold");
-    pdf.text(status, rightX - 19, 29.7, { align: "center" });
-    pdf.setDrawColor(...COLORS.line);
-    pdf.line(PAGE_MARGIN, 46, pageWidth - PAGE_MARGIN, 46);
-    y = 53;
+    if (!minimalHeader) {
+      setText(7.5, headerColor, "bold");
+      pdf.text(`Status: ${status}`, rightX, 29, { align: "right" });
+    }
+    y = 46;
   };
   const drawContinuedHeader = () => {
-    pdf.setFillColor(...COLORS.navy);
-    pdf.rect(0, 0, pageWidth, 3, "F");
-    setText(9, COLORS.navy, "bold");
-    pdf.text(companyName, PAGE_MARGIN, 12);
+    if (agencySidebar) {
+      pdf.setFillColor(...accent);
+      pdf.rect(0, 0, sidebarWidth, pageHeight, "F");
+      setText(9, [255, 255, 255], "bold");
+      pdf.text(pdf.splitTextToSize(companyName, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 16);
+      setText(6.5, [235, 238, 255]);
+      pdf.text(`${documentTitle} ${documentNumber}`, baseMargin, 30);
+      y = 12;
+      return;
+    }
+    if (isQuote && template === "elegant") {
+      pdf.setFillColor(252, 249, 243);
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+    }
+    setText(9, COLORS.ink, "bold");
+    pdf.text(companyName, margin, 12);
     setText(7, COLORS.muted);
-    pdf.text(`INVOICE ${safeText(invoice.invoice_number, "DRAFT")}  |  CONTINUED`, PAGE_MARGIN, 18);
-    pdf.setDrawColor(...COLORS.line);
-    pdf.line(PAGE_MARGIN, 23, pageWidth - PAGE_MARGIN, 23);
-    y = 29;
+    pdf.text(`${documentTitle} ${documentNumber}  |  CONTINUED`, margin, 18);
+    y = 25;
   };
   const addPage = () => {
-    pdf.addPage("a4", "portrait");
-    drawWatermark();
+    pdf.addPage(isQuote ? [pageWidth, pageHeight] : pageFormat, isQuote ? "portrait" : pageOrientation);
     drawContinuedHeader();
   };
   const ensureSpace = (height) => {
@@ -182,216 +359,358 @@ export async function downloadInvoicePdf(invoice, suppliedStore = null) {
     pdf.text(value.toUpperCase(), x, yPos);
   };
 
-  drawWatermark();
   drawFirstPageHeader();
 
   // Place the customer's information beside the invoice metadata.
   const gap = 5;
   const panelWidth = (contentWidth - gap) / 2;
-  const customerLines = [invoice.customer_name, invoice.customer_email, invoice.customer_phone, invoice.customer_address].filter(Boolean);
-  const customerLineCount = customerLines.reduce((total, value, index) => total + split(value, panelWidth - 10, index === 0 ? 9 : 7.2).length, 0);
-  const panelHeight = Math.max(37, 15 + customerLineCount * 4.1);
-  pdf.setDrawColor(...COLORS.line);
-  pdf.setFillColor(...COLORS.pale);
-  pdf.roundedRect(PAGE_MARGIN, y, panelWidth, panelHeight, 2.5, 2.5, "FD");
-  pdf.roundedRect(PAGE_MARGIN + panelWidth + gap, y, panelWidth, panelHeight, 2.5, 2.5, "FD");
-  drawLabel("Bill To", PAGE_MARGIN + 5, y + 7);
-  let customerY = y + 14;
-  customerLines.forEach((value, index) => {
-    const lines = split(value, panelWidth - 10, index === 0 ? 9 : 7.2);
-    setText(index === 0 ? 9 : 7.2, index === 0 ? COLORS.ink : COLORS.muted, index === 0 ? "bold" : "normal");
-    pdf.text(lines, PAGE_MARGIN + 5, customerY);
-    customerY += lines.length * (index === 0 ? 4 : 3.5);
-  });
-  const customerX = PAGE_MARGIN + panelWidth + gap + 5;
-  const detailsRight = PAGE_MARGIN + contentWidth - 5;
-  drawLabel("Invoice Details", customerX, y + 7);
-  const details = [
-    ["Invoice date", dateLabel(invoice.invoice_date)],
-    ["Due date", dateLabel(invoice.due_date)],
+  const customerLines = [
+    invoice.customer_name && { value: invoice.customer_name, primary: true },
+    invoice.customer_email && { value: invoice.customer_email },
+    invoice.customer_phone && { value: `Phone: ${invoice.customer_phone}` },
+    invoice.customer_address && { value: invoice.customer_address },
+  ].filter(Boolean);
+  const customerLineCount = customerLines.reduce((total, line) => total + split(line.value, panelWidth - 10, line.primary ? 9 : 7.2).length, 0);
+  const detailRows = (isQuote ? [
+    ["Quote date", formatDate(invoice.invoice_date)],
+    ["Valid until", formatDate(invoice.due_date)],
+    ["Customer type", safeText(invoice.customer_type, "Other")],
+    ["Prepared by", safeText(invoice.prepared_by, "Staff")],
+    ["Status", safeText(invoice.status, "Pending")],
+  ] : [
+    ["Invoice date", formatDate(invoice.invoice_date)],
+    ["Due date", formatDate(invoice.due_date)],
     ["Payment terms", safeText(invoice.payment_terms, "Due on receipt")],
-    ["Currency", safeText(store.currency, "PKR")],
-  ];
-  details.forEach(([label, value], index) => {
-    const rowY = y + 14 + index * 5.2;
-    setText(7, COLORS.muted);
-    pdf.text(label, customerX, rowY);
-    setText(7.2, COLORS.ink, "bold");
-    pdf.text(pdf.splitTextToSize(value, panelWidth - 42), detailsRight, rowY, { align: "right" });
-  });
-  y += panelHeight + 7;
+    ["Currency", currencyCode],
+    ["Payment status", safeText(invoice.status, "Unpaid")],
+  ]).map(([label, value]) => ({ label, value, lines: split(value, panelWidth - 42, 6.5) }));
+  const detailLineCount = detailRows.reduce((total, row) => total + row.lines.length, 0);
+  const panelHeight = Math.max(40 * spacingScale, (15 + Math.max(customerLineCount * 3.8, detailLineCount * 5.2)) * spacingScale);
+  if (agencySidebar) {
+    const mid = margin + contentWidth * 0.56;
+    drawLabel("From", margin + 3, y + 6);
+    setText(8.5, COLORS.ink, "bold");
+    pdf.text(companyName, margin + 3, y + 12);
+    setText(6.8, COLORS.muted);
+    if (companyEmail) pdf.text(companyEmail, margin + 3, y + 17);
+    drawLabel("Bill To", mid, y + 6);
+    setText(8.5, COLORS.ink, "bold");
+    pdf.text(pdf.splitTextToSize(safeText(invoice.customer_name), pageWidth - baseMargin - mid), mid, y + 12);
+    setText(6.8, COLORS.muted);
+    if (invoice.customer_email) pdf.text(pdf.splitTextToSize(invoice.customer_email, pageWidth - baseMargin - mid), mid, y + 17);
+    y += 26 * spacingScale;
+  } else {
+    drawLabel(isQuote ? "Prepared For" : "Bill To", margin + 5, y + 7);
+    let customerY = y + 14 * spacingScale;
+    customerLines.forEach((line) => {
+      const lines = split(line.value, panelWidth - 10, line.primary ? 9 : 7.2);
+      setText(line.primary ? 9 : 7.2, line.primary ? COLORS.ink : COLORS.muted, line.primary ? "bold" : "normal");
+      pdf.text(lines, margin + 5, customerY);
+      customerY += lines.length * (line.primary ? 4 : 3.5) * spacingScale;
+    });
+    const customerX = margin + panelWidth + gap + 5;
+    const detailsRight = margin + contentWidth - 5;
+    drawLabel(isQuote ? "Quote Details" : "Invoice Details", customerX, y + 7);
+    let detailsY = y + 12 * spacingScale;
+    detailRows.forEach(({ label, lines }) => {
+      const rowY = detailsY;
+      setText(6.2, COLORS.muted);
+      pdf.text(label, customerX, rowY);
+      setText(6.5, COLORS.ink, "bold");
+      pdf.text(lines, detailsRight, rowY, { align: "right" });
+      detailsY += Math.max(5.2, lines.length * 3.2) * spacingScale;
+    });
+    y += panelHeight + 7 * spacingScale;
+  }
 
   // Detailed line item table, with repeated heading on every page.
-  const columns = [54, 24, 12, 25, 22, 18, 27];
-  const headings = ["DESCRIPTION", "SKU", "QTY", "UNIT PRICE", "DISCOUNT", "TAX", "LINE TOTAL"];
+  const tableColumns = [
+    { key: "description", label: "DESCRIPTION", weight: 4.2, visible: !isQuote || design.showDescription !== false },
+    { key: "sku", label: "SKU", weight: 1.3, visible: !isQuote || design.showSku !== false },
+    { key: "quantity", label: "QTY", weight: 0.8, visible: true },
+    { key: "unit", label: "UNIT PRICE", weight: 1.45, visible: true },
+    { key: "discount", label: "DISCOUNT", weight: 1.3, visible: !isQuote || design.showDiscount !== false },
+    { key: "tax", label: "TAX", weight: 1.1, visible: !isQuote || design.showTax !== false },
+    { key: "total", label: isQuote ? "TOTAL" : "LINE TOTAL", weight: 1.55, visible: true },
+  ].filter((column) => column.visible);
+  const totalWeight = tableColumns.reduce((sum, column) => sum + column.weight, 0);
+  const columns = tableColumns.map((column) => contentWidth * column.weight / totalWeight);
   const drawTableHeader = () => {
-    pdf.setFillColor(...COLORS.navy);
-    pdf.roundedRect(PAGE_MARGIN, y, contentWidth, 9, 1.8, 1.8, "F");
-    let x = PAGE_MARGIN;
-    headings.forEach((heading, index) => {
-      setText(6.1, COLORS.white, "bold");
-      const right = index >= 2;
-      pdf.text(heading, right ? x + columns[index] - 2 : x + 2, y + 5.8, { align: right ? "right" : "left" });
+    if (isQuote) {
+      pdf.setFillColor(...tableHeaderFill);
+      pdf.rect(margin, y, contentWidth, 8 * spacingScale, "F");
+    }
+    pdf.setDrawColor(...(isQuote ? accent : COLORS.ink));
+    pdf.setLineWidth(isQuote ? 0.45 : 0.35);
+    let x = margin;
+    tableColumns.forEach((column, index) => {
+      setText(6.5, isQuote ? tableHeaderText : COLORS.ink, "bold");
+      const right = ["quantity", "unit", "discount", "tax", "total"].includes(column.key);
+      pdf.text(column.label, right ? x + columns[index] - 2 : x + 2, y + 5.5, { align: right ? "right" : "left" });
       x += columns[index];
     });
-    y += 9;
+    pdf.line(margin, y + 8, margin + contentWidth, y + 8);
+    y += 9 * spacingScale;
   };
   drawTableHeader();
   const items = Array.isArray(invoice.items) ? invoice.items : [];
   items.forEach((item, index) => {
-    const description = split(item.name || `Item ${index + 1}`, columns[0] - 5, 7.4);
-    const rowHeight = Math.max(10, description.length * 3.8 + 4.5);
-    if (y + rowHeight > bottomLimit) {
-      addPage();
-      drawTableHeader();
+    const descriptionIndex = tableColumns.findIndex((column) => column.key === "description");
+    const description = descriptionIndex < 0 ? [""] : split(item.name || `Item ${index + 1}`, columns[descriptionIndex] - 5, Number(design.bodyFontSize) || 7.4);
+    const cells = tableColumns.map((column) => ({
+      description: item.name || `Item ${index + 1}`,
+      sku: item.sku || "-",
+      quantity: String(item.quantity ?? 0),
+      unit: money(item.unit_price),
+      discount: `${money(item.discount)}${Number(item.discount_rate) ? ` (${Number(item.discount_rate)}%)` : ""}`,
+      tax: `${money(item.tax)}${Number(item.tax_rate) ? ` (${Number(item.tax_rate)}%)` : ""}`,
+      total: money(item.total),
+    })[column.key]);
+    let offset = 0;
+    let firstChunk = true;
+    while (offset < description.length) {
+      if (bottomLimit - y < 10) {
+        addPage();
+        drawTableHeader();
+      }
+      const lineHeight = 3.8 * spacingScale * (Number(design.lineSpacing) || 1.15);
+      const rowPadding = 4.5 * spacingScale;
+      const availableLines = Math.max(1, Math.floor((bottomLimit - y - rowPadding) / lineHeight));
+      const chunk = description.slice(offset, offset + availableLines);
+      const rowHeight = Math.max(10 * spacingScale, chunk.length * lineHeight + rowPadding);
+      pdf.setDrawColor(...COLORS.line);
+      pdf.setLineWidth(0.2);
+      pdf.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
+      let x = margin;
+      if (firstChunk) {
+        cells.forEach((value, columnIndex) => {
+          const column = tableColumns[columnIndex];
+          const right = ["quantity", "unit", "discount", "tax", "total"].includes(column.key);
+          setText(column.key === "description" ? Number(design.bodyFontSize) || 7.4 : 6.8, COLORS.ink, column.key === "total" ? "bold" : "normal");
+          const maxWidth = columns[columnIndex] - 4;
+          const lines = pdf.splitTextToSize(String(value), maxWidth);
+          const displayLines = column.key === "description" ? chunk : lines.slice(0, 2);
+          pdf.text(displayLines, right ? x + columns[columnIndex] - 2 : x + 2, y + 5.2, { align: right ? "right" : "left" });
+          x += columns[columnIndex];
+        });
+      }
+      y += rowHeight;
+      offset += chunk.length;
+      firstChunk = false;
+      if (offset < description.length) {
+        addPage();
+        drawTableHeader();
+      }
     }
-    if (index % 2 === 0) {
-      pdf.setFillColor(249, 251, 254);
-      pdf.rect(PAGE_MARGIN, y, contentWidth, rowHeight, "F");
-    }
-    pdf.setDrawColor(...COLORS.line);
-    pdf.line(PAGE_MARGIN, y + rowHeight, PAGE_MARGIN + contentWidth, y + rowHeight);
-    setText(7.4, COLORS.ink, "bold");
-    pdf.text(description, PAGE_MARGIN + 2.5, y + 5.3);
-    const cells = [
-      item.sku || "-",
-      String(item.quantity ?? 0),
-      money(item.unit_price),
-      `${money(item.discount)}${Number(item.discount_rate) ? ` (${Number(item.discount_rate)}%)` : ""}`,
-      `${money(item.tax)}${Number(item.tax_rate) ? ` (${Number(item.tax_rate)}%)` : ""}`,
-      money(item.total),
-    ];
-    let x = PAGE_MARGIN + columns[0];
-    cells.forEach((value, cellIndex) => {
-      const columnIndex = cellIndex + 1;
-      const right = columnIndex >= 2;
-      setText(6.6, columnIndex === 6 ? COLORS.navy : COLORS.ink, columnIndex === 6 ? "bold" : "normal");
-      const maxWidth = columns[columnIndex] - 4;
-      const lines = pdf.splitTextToSize(String(value), maxWidth);
-      pdf.text(lines.slice(0, 2), right ? x + columns[columnIndex] - 2 : x + 2, y + 5.2, { align: right ? "right" : "left" });
-      x += columns[columnIndex];
-    });
-    y += rowHeight;
   });
   if (!items.length) {
     setText(8, COLORS.muted);
-    pdf.text("No line items are recorded on this invoice.", PAGE_MARGIN + 3, y + 7);
+    pdf.text("No line items are recorded on this invoice.", margin + 3, y + 7);
     y += 14;
   }
 
-  // Bank instructions and totals are placed side by side on the first available page.
+  // Keep only the essential payment summary; omit bank instructions and notes.
   const paymentRecords = Array.isArray(invoice.payments) ? invoice.payments : [];
-  const paymentRowsHeight = paymentRecords.length ? Math.min(paymentRecords.length, 4) * 5 + 9 : 0;
-  y += 7;
+  y += 7 * spacingScale;
   const summaryWidth = 82;
-  const summaryX = PAGE_MARGIN + contentWidth - summaryWidth;
-  const infoWidth = contentWidth - summaryWidth - 7;
-  let infoY = y + 6;
-  if (invoice.bank_details) {
-    drawLabel("Payment / Bank Details", PAGE_MARGIN + 2, infoY);
-    infoY += 5;
-    const lines = split(invoice.bank_details, infoWidth - 4, 7.2);
-    setText(7.2, COLORS.ink);
-    pdf.text(lines, PAGE_MARGIN + 2, infoY);
-    infoY += lines.length * 3.7 + 4;
-  }
-  if (invoice.notes) {
-    drawLabel("Notes", PAGE_MARGIN + 2, infoY);
-    infoY += 5;
-    const lines = split(invoice.notes, infoWidth - 4, 7.2);
-    setText(7.2, COLORS.ink);
-    pdf.text(lines, PAGE_MARGIN + 2, infoY);
-    infoY += lines.length * 3.7 + 4;
-  }
-
-  const summaryRows = [
-    ["Subtotal", money(invoice.subtotal)],
-    ["Discount", `- ${money(invoice.discount)}`],
-    [`Tax${Number(invoice.tax_rate) ? ` (${Number(invoice.tax_rate)}%)` : ""}`, `+ ${money(invoice.tax)}`],
-  ];
+  const summaryX = margin + contentWidth - summaryWidth;
+  const summaryRows = [["Subtotal", money(invoice.subtotal)]];
+  if (!isQuote || design.showDiscount !== false) summaryRows.push(["Discount", `- ${money(invoice.discount)}`]);
+  if (!isQuote || design.showTax !== false) summaryRows.push([`Tax${Number(invoice.tax_rate) ? ` (${Number(invoice.tax_rate)}%)` : ""}`, `+ ${money(invoice.tax)}`]);
   if (Number(invoice.shipping)) summaryRows.push(["Shipping", `+ ${money(invoice.shipping)}`]);
-  const paidAmount = Number(invoice.amount_paid) || 0;
+  const paidAmount = invoice.amount_paid == null
+    ? paymentRecords.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
+    : Number(invoice.amount_paid) || 0;
   const balanceDue = Math.max(0, Number(invoice.remaining_balance ?? (Number(invoice.total) - paidAmount)) || 0);
   const showBalanceRows = paidAmount > 0 || balanceDue > 0;
-  const summaryHeight = summaryRows.length * 6.5 + 22 + (showBalanceRows ? 15 : 0);
-  ensureSpace(Math.max(45, summaryHeight + paymentRowsHeight + 10));
+  const summaryRowHeight = 6.5 * spacingScale;
+  const summaryHeight = summaryRows.length * summaryRowHeight + 22 * spacingScale + (showBalanceRows ? 15 * spacingScale : 0);
+  const termsText = String(invoice.terms || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .split("\n")
+    .filter((line) => !/^\s*terms\s*&\s*conditions\s*:?\s*$/i.test(line))
+    .join("\n")
+    .trim();
+  const termsLines = termsText ? split(termsText, contentWidth, 7) : [];
+  ensureSpace(Math.max(45, summaryHeight + 10));
   pdf.setDrawColor(...COLORS.line);
-  pdf.setFillColor(...COLORS.pale);
-  pdf.roundedRect(summaryX, y, summaryWidth, summaryHeight, 2.5, 2.5, "FD");
+  pdf.setLineWidth(0.35);
+  pdf.line(summaryX, y, summaryX + summaryWidth, y);
   summaryRows.forEach(([label, value], index) => {
-    const rowY = y + 7 + index * 6.5;
+    const rowY = y + 7 * spacingScale + index * summaryRowHeight;
     setText(7, COLORS.muted);
     pdf.text(label, summaryX + 4, rowY);
     setText(7, COLORS.ink, "bold");
     pdf.text(value, summaryX + summaryWidth - 4, rowY, { align: "right" });
   });
-  const totalBarY = y + summaryHeight - (showBalanceRows ? 28 : 13);
-  pdf.setFillColor(...COLORS.navy);
-  pdf.roundedRect(summaryX + 2, totalBarY, summaryWidth - 4, 11, 1.5, 1.5, "F");
-  setText(7, COLORS.white, "bold");
-  pdf.text("GRAND TOTAL", summaryX + 5, totalBarY + 7);
-  pdf.text(money(invoice.total), summaryX + summaryWidth - 5, totalBarY + 7, { align: "right" });
+  const totalBarY = y + summaryHeight - (showBalanceRows ? 28 : 13) * spacingScale;
+  if (isQuote) {
+    pdf.setFillColor(...tableHeaderFill);
+    pdf.roundedRect(summaryX, totalBarY, summaryWidth, 8 * spacingScale, 1, 1, "F");
+  }
+  setText(8, isQuote ? tableHeaderText : COLORS.ink, "bold");
+  pdf.text(isQuote ? "GRAND TOTAL" : "TOTAL", summaryX + 2, totalBarY + 5);
+  pdf.text(money(invoice.total), summaryX + summaryWidth - 2, totalBarY + 5, { align: "right" });
   if (showBalanceRows) {
-    const paidY = totalBarY + 16;
+    const paidY = totalBarY + 16 * spacingScale;
     setText(7, COLORS.muted);
     pdf.text("Amount paid", summaryX + 3, paidY);
-    setText(7, COLORS.green, "bold");
+    setText(7, COLORS.ink, "bold");
     pdf.text(money(paidAmount), summaryX + summaryWidth - 3, paidY, { align: "right" });
     setText(7, COLORS.muted);
     pdf.text("Balance due", summaryX + 3, paidY + 6);
-    setText(7, COLORS.navy, "bold");
-    pdf.text(money(balanceDue), summaryX + summaryWidth - 3, paidY + 6, { align: "right" });
+    setText(7, COLORS.ink, "bold");
+    pdf.text(money(balanceDue), summaryX + summaryWidth - 3, paidY + 6 * spacingScale, { align: "right" });
   }
-  y += summaryHeight + 5;
+  y += summaryHeight + 5 * spacingScale;
 
-  if (paymentRecords.length) {
-    ensureSpace(14 + Math.min(paymentRecords.length, 4) * 5);
-    y += 3;
-    drawLabel("Payment History", PAGE_MARGIN, y + 4);
-    y += 8;
-    paymentRecords.slice(-4).forEach((payment) => {
-      ensureSpace(6);
-      setText(7, COLORS.muted);
-      const label = `${dateLabel(payment.payment_date)}  |  ${safeText(payment.payment_method, "Payment")}`;
-      pdf.text(pdf.splitTextToSize(label, infoWidth - 5), PAGE_MARGIN, y + 4);
-      setText(7, COLORS.ink, "bold");
-      pdf.text(money(payment.amount), PAGE_MARGIN + infoWidth, y + 4, { align: "right" });
-      y += 5;
-    });
-  }
-
-  for (const [heading, body] of [["Terms & Conditions", invoice.terms]]) {
-    if (!body) continue;
-    const lines = split(body, contentWidth - 10, 7.2);
+  if (termsLines.length) {
+    const termsLineHeight = 3.7 * spacingScale * (Number(design.lineSpacing) || 1.15);
+    const termsBlockHeight = (14 + termsLines.length * 3.7) * spacingScale * (Number(design.lineSpacing) || 1.15);
+    const fitsOnOnePage = termsBlockHeight <= bottomLimit - 25;
+    if (fitsOnOnePage && y + termsBlockHeight > bottomLimit) addPage();
     let offset = 0;
-    while (offset < lines.length) {
-      if (y + 20 > bottomLimit) addPage();
-      const maxLines = Math.max(1, Math.floor((bottomLimit - y - 12) / 3.8));
-      const chunk = lines.slice(offset, offset + maxLines);
-      const blockHeight = 12 + chunk.length * 3.8;
-      pdf.setDrawColor(...COLORS.line);
-      pdf.setFillColor(...COLORS.pale);
-      pdf.roundedRect(PAGE_MARGIN, y, contentWidth, blockHeight, 2, 2, "FD");
-      drawLabel(offset ? `${heading} (continued)` : heading, PAGE_MARGIN + 4, y + 6);
-      setText(7.2, COLORS.ink);
-      pdf.text(chunk, PAGE_MARGIN + 4, y + 11);
-      y += blockHeight + 4;
+    while (offset < termsLines.length) {
+      if (y + 14 > bottomLimit) addPage();
+      const availableLines = fitsOnOnePage
+        ? termsLines.length
+        : Math.max(1, Math.floor((bottomLimit - y - 12) / termsLineHeight));
+      const chunk = termsLines.slice(offset, offset + availableLines);
+      setText(8, COLORS.ink, "bold");
+      pdf.text(offset ? "Terms & Conditions (continued)" : "Terms & Conditions", margin, y + 5);
+      setText(7.2, COLORS.muted, isQuote && design.italicNotes ? "italic" : "normal");
+      pdf.text(chunk, margin, y + 10);
+      y += (10 + chunk.length * 3.7 + 4) * spacingScale * (Number(design.lineSpacing) || 1.15);
       offset += chunk.length;
     }
   }
 
-  // Consistent branded footer and page numbering on every page.
+  if (isQuote && design.showSignature) {
+    ensureSpace(25);
+    const signatureX = pageWidth - margin - 62;
+    const signatureCenterX = signatureX + 31;
+    if (signatureImage) {
+      const scale = Math.min(58 / Math.max(1, signatureImage.width), 11 / Math.max(1, signatureImage.height));
+      const width = signatureImage.width * scale;
+      const height = signatureImage.height * scale;
+      pdf.addImage(signatureImage.data, "PNG", signatureCenterX - width / 2, y, width, height);
+    } else if (design.signatureMode !== "draw" && design.signatureName) {
+      setText(10, COLORS.ink, "italic");
+      pdf.text(String(design.signatureName).slice(0, 100), signatureCenterX, y + 8, { align: "center", maxWidth: 60 });
+    }
+    pdf.setDrawColor(...COLORS.muted);
+    pdf.setLineWidth(0.25);
+    pdf.line(signatureX, y + 13, pageWidth - margin, y + 13);
+    setText(6.5, COLORS.muted);
+    pdf.text("Authorized signature", signatureCenterX, y + 17, { align: "center" });
+    y += 23;
+  }
+
+  // Plain text footer and page numbering on every page.
   const pageCount = pdf.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
-    pdf.setDrawColor(...COLORS.line);
-    pdf.line(PAGE_MARGIN, pageHeight - 14, pageWidth - PAGE_MARGIN, pageHeight - 14);
-    setText(6.5, COLORS.muted);
-    pdf.text(companyName, PAGE_MARGIN, pageHeight - 8);
-    pdf.text("Thank you for your business", pageWidth / 2, pageHeight - 8, { align: "center" });
-    pdf.text(`Page ${page} of ${pageCount}`, pageWidth - PAGE_MARGIN, pageHeight - 8, { align: "right" });
+    if (isQuote && design.watermark) {
+      if (watermarkLogo) {
+        const requestedWidth = contentWidth * Math.max(0.2, Math.min(0.85, (Number(design.watermarkSize) || 50) / 100));
+        const requestedHeight = pageHeight * 0.38;
+        const scale = Math.min(requestedWidth / Math.max(1, watermarkLogo.width), requestedHeight / Math.max(1, watermarkLogo.height));
+        const width = watermarkLogo.width * scale;
+        const height = watermarkLogo.height * scale;
+        const position = design.watermarkPosition || "center";
+        const x = position.endsWith("right") ? pageWidth - margin - width : position === "center" || position === "diagonal" ? (pageWidth - width) / 2 : margin;
+        const yPosition = position === "top-right" ? pageHeight * 0.25 - height / 2 : position === "bottom-right" ? pageHeight * 0.72 - height / 2 : (pageHeight - height) / 2;
+        pdf.addImage(watermarkLogo.data, "PNG", x, yPosition, width, height, undefined, "FAST", position === "diagonal" ? 35 : 0);
+      } else {
+        const opacity = Math.max(0.03, Math.min(0.25, (Number(design.watermarkOpacity) || 8) / 100));
+        const paleAccent = accent.map((channel) => Math.round(255 - (255 - channel) * opacity));
+        setText(28 * Math.max(0.5, Math.min(1.3, (Number(design.watermarkSize) || 50) / 50)), paleAccent, "bold");
+        const position = design.watermarkPosition || "center";
+        pdf.text(companyName.toUpperCase(), position.endsWith("right") ? pageWidth - margin - 10 : pageWidth / 2, position === "top-right" ? pageHeight * 0.25 : position === "bottom-right" ? pageHeight * 0.72 : pageHeight / 2, { align: "center", angle: position === "diagonal" ? 35 : 0 });
+      }
+    }
+    setText(7, COLORS.ink, "bold");
+    if (!isQuote || design.showPageNumbers !== false) {
+      pdf.text(`${page} / ${pageCount}`, pageWidth - margin, footerY, { align: "right" });
+    }
   }
 
+  return pdf;
+}
+
+export async function createInvoicePdf(invoice, suppliedStore = null) {
+  return createBusinessDocumentPdf(invoice, suppliedStore);
+}
+
+export async function downloadInvoicePdf(invoice, suppliedStore = null) {
+  const pdf = await createBusinessDocumentPdf(invoice, suppliedStore);
   const fileName = String(invoice.invoice_number || "invoice-draft").replace(/[^a-z0-9_-]/gi, "_");
   pdf.save(`${fileName}.pdf`);
+}
+
+async function createQuoteBusinessPdf(quote, suppliedStore = null) {
+  const normalizedQuote = {
+    ...quote,
+    invoice_date: quote.quote_date,
+    due_date: quote.expiry_date,
+    payment_terms: "Quote",
+    prepared_by: quote.createdby?.name || "Staff",
+    terms: quote.pdf_design?.showTerms === false
+      ? ""
+      : [quote.terms, quote.notes && `Additional Notes: ${quote.notes}`].filter(Boolean).join("\n\n"),
+    items: (quote.items || []).map((item) => ({ ...item, total: item.total ?? item.line_total })),
+    shipping: 0,
+    amount_paid: 0,
+    remaining_balance: 0,
+  };
+  return createBusinessDocumentPdf(normalizedQuote, suppliedStore, { documentType: "quote", design: quote.pdf_design || {} });
+}
+
+export async function downloadQuotePdf(quote, suppliedStore = null) {
+  const pdf = await createQuoteBusinessPdf(quote, suppliedStore);
+  const fileName = String(quote.quote_number || "quote").replace(/[^a-z0-9_-]/gi, "_");
+  pdf.save(`${fileName}.pdf`);
+}
+
+export async function printQuotePdf(quote, suppliedStore = null) {
+  if (typeof window === "undefined") throw new Error("Quote printing is only available in a browser.");
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.tabIndex = -1;
+  Object.assign(frame.style, {
+    position: "fixed",
+    insetInlineEnd: "0",
+    bottom: "0",
+    width: "1px",
+    height: "1px",
+    border: "0",
+    opacity: "0",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(frame);
+
+  let pdfUrl;
+  const cleanup = () => {
+    frame.remove();
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+  };
+
+  try {
+    const pdf = await createQuoteBusinessPdf(quote, suppliedStore);
+    pdfUrl = URL.createObjectURL(pdf.output("blob"));
+    frame.onload = () => {
+      window.setTimeout(() => {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      }, 250);
+    };
+    frame.src = pdfUrl;
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.setTimeout(cleanup, 5 * 60 * 1000);
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }

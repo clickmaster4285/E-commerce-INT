@@ -33,11 +33,11 @@ function getNavbarSocket() {
 }
 
 const profileOptions = [
-  { name: "Profile Settings", icon: User, path: "/admin/profile?tab=general" },
+  { name: "admin.navbar.profile", icon: User, path: "/admin/profile?tab=general" },
 ];
 
 export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
-  const { t } = useTranslation();
+  const { t, dir, locale } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const isDark = theme === 'dark';
@@ -292,6 +292,8 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setIsOpen(false)} />
 
               <div
+                dir={dir}
+                lang={locale}
                 className="absolute end-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl"
                 style={{
                   backgroundColor: 'var(--bg-card)',
@@ -388,7 +390,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                           className="shrink-0"
                           style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
                         />
-                        {option.name}
+                        {t(option.name)}
                       </Link>
                     );
                   })}
@@ -414,7 +416,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                     }}
                   >
                     <LogOut size={15} className="shrink-0" />
-                    Sign Out
+                    {t("admin.navbar.logout")}
                   </button>
                 </div>
               </div>

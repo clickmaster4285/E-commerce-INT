@@ -61,6 +61,7 @@ const buildQuote = (body = {}) => {
     tax_rate: taxRate, tax, discount, total,
     terms: String(body.terms || "").trim(),
     notes: String(body.notes || "").trim(),
+    pdf_design: body.pdf_design && typeof body.pdf_design === "object" ? body.pdf_design : {},
   };
 };
 
