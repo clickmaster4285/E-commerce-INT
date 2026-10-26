@@ -88,38 +88,42 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   ]);
   const store = storeResult?.data || storeResult || {};
   const isQuote = options.documentType === "quote";
+  const isDesigned = isQuote || options.applyDesign === true;
   const quoteHeader = isQuote ? getQuoteHeaderData(invoice) : null;
-  const design = isQuote ? (options.design || {}) : {};
+  const design = isDesigned ? (options.design || {}) : {};
   const headerLayout = design.headerLayout || "split";
   const template = design.template || "corporate";
-  const bandHeader = isQuote && headerLayout === "band";
-  const minimalHeader = isQuote && headerLayout === "minimal";
-  const centeredHeader = isQuote && headerLayout === "centered";
-  const accent = isQuote ? hexToRgb(design.accentColor) : [20, 20, 20];
-  const templateEmphasis = isQuote && ["dark", "bold", "sunset", "agency", "creative"].includes(template);
+  const bandHeader = isDesigned && headerLayout === "band";
+  const minimalHeader = isDesigned && headerLayout === "minimal";
+  const centeredHeader = isDesigned && headerLayout === "centered";
+  const accent = isDesigned ? hexToRgb(design.accentColor) : [20, 20, 20];
+  const templateEmphasis = isDesigned && ["dark", "bold", "sunset", "agency", "creative"].includes(template);
   const tableHeaderFill = templateEmphasis ? accent : tintRgb(accent, 0.92);
   const tableHeaderText = templateEmphasis ? [255, 255, 255] : accent;
   let fontFamily = ({ helvetica: "helvetica", times: "times", courier: "courier", lato: "Lato", ubuntu: "Ubuntu" })[design.fontFamily] || "helvetica";
-  const fontScale = isQuote ? Math.max(0.75, Math.min(1.45, (Number(design.fontSize) || 9) / 9)) : 1;
+  const fontScale = isDesigned ? Math.max(0.75, Math.min(1.45, (Number(design.fontSize) || 9) / 9)) : 1;
   const documentTitle = isQuote ? "QUOTE" : "INVOICE";
   const documentNumber = isQuote
     ? quoteHeader.quoteNumber
     : safeText(invoice.invoice_number, "DRAFT");
-  const pageFormat = isQuote && design.pageSize === "letter" ? "letter" : "a4";
-  const pageOrientation = isQuote && design.orientation === "landscape" ? "landscape" : "portrait";
+  const numberLabel = isQuote ? "Quote Number" : "Invoice Number";
+  const dateLabelText = isQuote ? "Quote Date" : "Invoice Date";
+  const dueLabelText = isQuote ? "Valid Until" : "Due Date";
+  const pageFormat = isDesigned && design.pageSize === "letter" ? "letter" : "a4";
+  const pageOrientation = isDesigned && design.orientation === "landscape" ? "landscape" : "portrait";
   const [shortPageSide, longPageSide] = pageFormat === "letter" ? [215.9, 279.4] : [210, 297];
-  const requestedPageWidth = isQuote && pageOrientation === "landscape" ? longPageSide : shortPageSide;
-  const defaultPageHeight = isQuote && pageOrientation === "landscape" ? shortPageSide : longPageSide;
-  const requestedPageHeight = isQuote && Number(design.pageHeight) > 0
+  const requestedPageWidth = isDesigned && pageOrientation === "landscape" ? longPageSide : shortPageSide;
+  const defaultPageHeight = isDesigned && pageOrientation === "landscape" ? shortPageSide : longPageSide;
+  const requestedPageHeight = isDesigned && Number(design.pageHeight) > 0
     ? Math.max(180, Math.min(420, Number(design.pageHeight)))
     : defaultPageHeight;
   const baseMargin = PAGE_MARGIN;
-  const agencySidebar = isQuote && template === "agency";
+  const agencySidebar = isDesigned && template === "agency";
   const sidebarWidth = agencySidebar ? Math.min(66, requestedPageWidth * 0.3) : 0;
   const margin = baseMargin + sidebarWidth;
-  const spacingScale = isQuote ? fontScale : 1;
-  const pdf = new jsPDF({ orientation: isQuote ? "portrait" : pageOrientation, unit: "mm", format: isQuote ? [requestedPageWidth, requestedPageHeight] : pageFormat, compress: true });
-  if (isQuote && EMBEDDED_QUOTE_FONTS[fontFamily.toLowerCase()]) {
+  const spacingScale = isDesigned ? fontScale : 1;
+  const pdf = new jsPDF({ orientation: pageOrientation, unit: "mm", format: isDesigned ? [requestedPageWidth, requestedPageHeight] : pageFormat, compress: true });
+  if (isDesigned && EMBEDDED_QUOTE_FONTS[fontFamily.toLowerCase()]) {
     try { await registerEmbeddedFont(pdf, fontFamily); }
     catch { fontFamily = "helvetica"; }
   }
@@ -137,29 +141,29 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const companyEmail = store.support_email || store.email || "";
   const companyPhone = store.support_phone || store.phone || "";
   const companyWebsite = store.website || store.website_url || store.store_url || "";
-  const logoUrl = isQuote
+  const logoUrl = isDesigned
     ? (design.logoData || store.logo?.img_url || "")
     : (store.logo?.img_url || "");
   const logo = await loadImageData(logoUrl);
-  const logoTargetWidth = isQuote ? Math.max(12, Math.min(50, Number(design.logoWidth) || 24)) : 23;
-  const logoAlignment = isQuote ? (design.logoAlignment || "left") : "left";
-  const logoOffset = isQuote ? Math.max(-16, Math.min(16, Number(design.logoOffset) || 0)) : 0;
+  const logoTargetWidth = isDesigned ? Math.max(12, Math.min(50, Number(design.logoWidth) || 24)) : 23;
+  const logoAlignment = isDesigned ? (design.logoAlignment || "left") : "left";
+  const logoOffset = isDesigned ? Math.max(-16, Math.min(16, Number(design.logoOffset) || 0)) : 0;
   const alignedLogoX = (slotX, slotWidth, logoWidth) => {
     const baseX = logoAlignment === "center"
       ? slotX + (slotWidth - logoWidth) / 2
       : logoAlignment === "right" ? slotX + slotWidth - logoWidth : slotX;
     return Math.max(slotX, Math.min(slotX + slotWidth - logoWidth, baseX + logoOffset));
   };
-  const watermarkLogo = isQuote && design.watermark && design.watermarkUseLogo !== false
+  const watermarkLogo = isDesigned && design.watermark && design.watermarkUseLogo !== false
     ? await loadImageData(logoUrl, Math.max(0.03, Math.min(0.4, (Number(design.watermarkOpacity) || 8) / 100)))
     : null;
   const currencyCode = safeText(store.currency, "PKR").toUpperCase();
-  const currencySymbol = isQuote && design.currencySymbol ? String(design.currencySymbol).trim().slice(0, 3) : currencyCode;
-  const precision = isQuote ? Math.max(0, Math.min(3, Number(design.decimalPrecision ?? 2))) : 2;
+  const currencySymbol = isDesigned && design.currencySymbol ? String(design.currencySymbol).trim().slice(0, 3) : currencyCode;
+  const precision = isDesigned ? Math.max(0, Math.min(3, Number(design.decimalPrecision ?? 2))) : 2;
   const money = (value) => `${currencySymbol} ${Number(value || 0).toLocaleString("en", { minimumFractionDigits: precision, maximumFractionDigits: precision })}`;
   const formatDate = (value) => {
     if (!value || Number.isNaN(new Date(value).getTime())) return "-";
-    if (!isQuote || design.dateFormat === "locale") return dateLabel(value);
+    if (!isDesigned || design.dateFormat === "locale") return dateLabel(value);
     const rawDate = String(value).slice(0, 10);
     const [year, month, day] = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
       ? rawDate.split("-")
@@ -170,11 +174,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   let y = 0;
 
   const setText = (size, color = COLORS.ink, style = "normal") => {
-    const bold = style === "bold" ? (!isQuote || design.boldTitles !== false) : isQuote && Boolean(design.boldBody);
-    const italic = style === "italic" || (isQuote && style === "normal" && Boolean(design.italicBody));
+    const bold = style === "bold" ? (!isDesigned || design.boldTitles !== false) : isDesigned && Boolean(design.boldBody);
+    const italic = style === "italic" || (isDesigned && style === "normal" && Boolean(design.italicBody));
     const adjustedStyle = bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal";
     pdf.setFont(fontFamily, adjustedStyle);
-    const bodyScale = isQuote && style !== "bold" && style !== "italic"
+    const bodyScale = isDesigned && style !== "bold" && style !== "italic"
       ? Math.max(0.75, Math.min(1.45, ((Number(design.bodyFontSize) || 9) / 9) * fontScale))
       : fontScale;
     pdf.setFontSize(size * bodyScale);
@@ -194,11 +198,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     pdf.text(initials, alignedLogoX(margin, 40, 10), 23);
   };
   const drawFirstPageHeader = () => {
-    if (isQuote && template === "mono") {
+    if (isDesigned && template === "mono") {
       pdf.setFillColor(24, 24, 27);
       pdf.rect(0, 0, pageWidth, 2, "F");
     }
-    if (isQuote && template === "elegant") {
+    if (isDesigned && template === "elegant") {
       pdf.setFillColor(252, 249, 243);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
       pdf.setFillColor(247, 242, 233);
@@ -216,11 +220,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       pdf.text(pdf.splitTextToSize(companyName, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 37);
       setText(6.5, [235, 238, 255]);
       setText(22, accent, "bold");
-      pdf.text("QUOTE", pageWidth - baseMargin, 18, { align: "right" });
+      pdf.text(documentTitle, pageWidth - baseMargin, 18, { align: "right" });
       setText(6.5, COLORS.muted, "bold");
-      pdf.text(`Quote Number: ${documentNumber}`, pageWidth - baseMargin, 25, { align: "right" });
-      pdf.text(`Quote Date: ${formatDate(invoice.invoice_date)}`, pageWidth - baseMargin, 31, { align: "right" });
-      pdf.text(`Valid Until: ${formatDate(invoice.due_date)}`, pageWidth - baseMargin, 37, { align: "right" });
+      pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - baseMargin, 25, { align: "right" });
+      pdf.text(`${dateLabelText}: ${formatDate(invoice.invoice_date)}`, pageWidth - baseMargin, 31, { align: "right" });
+      pdf.text(`${dueLabelText}: ${formatDate(invoice.due_date)}`, pageWidth - baseMargin, 37, { align: "right" });
       const sidebarDetails = [["TOTAL", money(invoice.total)]];
       sidebarDetails.forEach(([label, value], index) => {
         const top = pageHeight - 42 + index * 12;
@@ -232,7 +236,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       y = 48;
       return;
     }
-    if (isQuote && template === "bold") {
+    if (isDesigned && template === "bold") {
       pdf.setFillColor(...accent);
       pdf.rect(pageWidth - 55, 0, 55, 65, "F");
       pdf.triangle(pageWidth - 84, 0, pageWidth - 55, 0, pageWidth - 55, 65, "F");
@@ -241,11 +245,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       setText(12, COLORS.ink, "bold");
       pdf.text(companyName, textX, 17);
       setText(23, [255, 255, 255], "bold");
-      pdf.text("QUOTE", pageWidth - baseMargin, 18, { align: "right" });
+      pdf.text(documentTitle, pageWidth - baseMargin, 18, { align: "right" });
       setText(6.2, [255, 255, 255], "bold");
-      pdf.text(`Quote Number: ${documentNumber}`, pageWidth - baseMargin, 27, { align: "right" });
-      pdf.text(`Quote Date: ${formatDate(invoice.invoice_date)}`, pageWidth - baseMargin, 34, { align: "right" });
-      pdf.text(`Valid Until: ${formatDate(invoice.due_date)}`, pageWidth - baseMargin, 41, { align: "right" });
+      pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - baseMargin, 27, { align: "right" });
+      pdf.text(`${dateLabelText}: ${formatDate(invoice.invoice_date)}`, pageWidth - baseMargin, 34, { align: "right" });
+      pdf.text(`${dueLabelText}: ${formatDate(invoice.due_date)}`, pageWidth - baseMargin, 41, { align: "right" });
       pdf.setDrawColor(...accent);
       pdf.setLineWidth(0.7);
       pdf.line(margin, 49, pageWidth - baseMargin, 49);
@@ -255,13 +259,13 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     if (bandHeader) {
       pdf.setFillColor(...accent);
       pdf.rect(0, 0, pageWidth, 42, "F");
-    } else if (isQuote && headerLayout === "split") {
+    } else if (isDesigned && headerLayout === "split") {
       pdf.setFillColor(242, 245, 249);
       pdf.rect(pageWidth - 78, 0, 78, 42, "F");
       pdf.setDrawColor(...accent);
       pdf.setLineWidth(0.7);
       pdf.line(0, 42, pageWidth, 42);
-    } else if (isQuote && headerLayout === "plain") {
+    } else if (isDesigned && headerLayout === "plain") {
       pdf.setDrawColor(...accent);
       pdf.setLineWidth(0.7);
       pdf.line(0, 42, pageWidth, 42);
@@ -270,36 +274,36 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       const ratio = logo ? logo.width / Math.max(logo.height, 1) : 1;
       const logoWidth = logo ? Math.min(logoTargetWidth, 50) : 0;
       const logoHeight = logo ? Math.min(18, logoWidth / ratio) : 0;
-      const elegant = isQuote && template === "elegant";
+      const elegant = isDesigned && template === "elegant";
       if (logo) pdf.addImage(logo.data, "PNG", pageWidth / 2 - logoWidth / 2, elegant ? 4 : 5, logoWidth, logoHeight);
       if (elegant) {
         setText(9, COLORS.ink, "bold");
         pdf.text(companyName, pageWidth / 2, logo ? 25 : 14, { align: "center" });
         setText(26, accent, "bold");
-        pdf.text("QUOTE", pageWidth - margin, logo ? 23 : 18, { align: "right" });
+        pdf.text(documentTitle, pageWidth - margin, logo ? 23 : 18, { align: "right" });
         setText(6.5, COLORS.muted, "bold");
-        pdf.text(`Quote Number: ${documentNumber}`, pageWidth - margin, logo ? 30 : 25, { align: "right" });
-        pdf.text(`Quote Date: ${formatDate(invoice.invoice_date)}`, pageWidth - margin, logo ? 35 : 30, { align: "right" });
-        pdf.text(`Valid Until: ${formatDate(invoice.due_date)}`, pageWidth - margin, logo ? 40 : 35, { align: "right" });
+        pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - margin, logo ? 30 : 25, { align: "right" });
+        pdf.text(`${dateLabelText}: ${formatDate(invoice.invoice_date)}`, pageWidth - margin, logo ? 35 : 30, { align: "right" });
+        pdf.text(`${dueLabelText}: ${formatDate(invoice.due_date)}`, pageWidth - margin, logo ? 40 : 35, { align: "right" });
         y = 64;
       } else {
         const titleY = logo ? 30 : 17;
-        setText(isQuote ? 20 : 14, accent, "bold");
+        setText(isDesigned ? 20 : 14, accent, "bold");
         pdf.text(companyName, pageWidth / 2, titleY, { align: "center" });
-        setText(isQuote ? 18 : 8, accent, "bold");
-        if (isQuote) {
-          pdf.text("QUOTE", pageWidth - margin, titleY, { align: "right" });
+        setText(isDesigned ? 18 : 8, accent, "bold");
+        if (isDesigned) {
+          pdf.text(documentTitle, pageWidth - margin, titleY, { align: "right" });
           setText(6.5, COLORS.muted, "bold");
-          pdf.text(`Quote Number: ${documentNumber}`, pageWidth - margin, titleY + 6, { align: "right" });
-          pdf.text(`Quote Date: ${formatDate(invoice.invoice_date)}`, pageWidth - margin, titleY + 11, { align: "right" });
-          pdf.text(`Valid Until: ${formatDate(invoice.due_date)}`, pageWidth - margin, titleY + 16, { align: "right" });
+          pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - margin, titleY + 6, { align: "right" });
+          pdf.text(`${dateLabelText}: ${formatDate(invoice.invoice_date)}`, pageWidth - margin, titleY + 11, { align: "right" });
+          pdf.text(`${dueLabelText}: ${formatDate(invoice.due_date)}`, pageWidth - margin, titleY + 16, { align: "right" });
         } else pdf.text(`${documentTitle}  ${documentNumber}`, pageWidth / 2, titleY + 6, { align: "center" });
-        if (!isQuote && !minimalHeader && store.tagline) {
+        if (!isDesigned && !minimalHeader && store.tagline) {
           setText(7, COLORS.muted);
           pdf.text(String(store.tagline), pageWidth / 2, titleY + 10, { align: "center" });
         }
         setText(7, COLORS.muted);
-        if (!isQuote && companyEmail && !minimalHeader) pdf.text(companyEmail, pageWidth / 2, titleY + 14, { align: "center" });
+        if (!isDesigned && companyEmail && !minimalHeader) pdf.text(companyEmail, pageWidth / 2, titleY + 14, { align: "center" });
         y = logo ? 48 : 42;
       }
       return;
@@ -308,32 +312,32 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     drawLogoOrMonogram();
 
     const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
-    const headerColor = bandHeader ? [255, 255, 255] : isQuote ? accent : COLORS.ink;
+    const headerColor = bandHeader ? [255, 255, 255] : isDesigned ? accent : COLORS.ink;
     const secondaryHeaderColor = bandHeader ? [232, 238, 248] : COLORS.muted;
     setText(14, headerColor, "bold");
     pdf.text(pdf.splitTextToSize(companyName, 78).slice(0, 1), textX, 17);
-    if (!isQuote && store.tagline && !minimalHeader) {
+    if (!isDesigned && store.tagline && !minimalHeader) {
       setText(7.5, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(String(store.tagline), 78).slice(0, 1), textX, 23);
     }
     const contact = [companyPhone && `Phone: ${companyPhone}`, companyEmail && `Email: ${companyEmail}`, companyWebsite].filter(Boolean).join("  |  ");
-    if (!isQuote && contact && !minimalHeader) {
+    if (!isDesigned && contact && !minimalHeader) {
       setText(6.4, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(contact, 96).slice(0, 2), textX, 29);
     }
-    if (!isQuote && companyAddress && !minimalHeader) {
+    if (!isDesigned && companyAddress && !minimalHeader) {
       setText(6.4, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(companyAddress, 82).slice(0, 2), textX, 35);
     }
 
     const rightX = pageWidth - margin;
-    if (isQuote) {
+    if (isDesigned) {
       setText(17, headerColor, "bold");
-      pdf.text("QUOTE", rightX, 13, { align: "right" });
+      pdf.text(documentTitle, rightX, 13, { align: "right" });
       setText(6.5, headerColor, "bold");
-      pdf.text(`Quote Number: ${documentNumber}`, rightX, 21, { align: "right" });
-      pdf.text(`Quote Date: ${formatDate(invoice.invoice_date)}`, rightX, 27, { align: "right" });
-      pdf.text(`Valid Until: ${formatDate(invoice.due_date)}`, rightX, 33, { align: "right" });
+      pdf.text(`${numberLabel}: ${documentNumber}`, rightX, 21, { align: "right" });
+      pdf.text(`${dateLabelText}: ${formatDate(invoice.invoice_date)}`, rightX, 27, { align: "right" });
+      pdf.text(`${dueLabelText}: ${formatDate(invoice.due_date)}`, rightX, 33, { align: "right" });
     } else {
       setText(8, headerColor, "bold");
       pdf.text(documentTitle, rightX, 13, { align: "right" });
@@ -341,7 +345,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       pdf.text(pdf.splitTextToSize(documentNumber, 58), rightX, 21, { align: "right" });
     }
     const status = safeText(invoice.status, "Unpaid").toUpperCase();
-    if (!isQuote && !minimalHeader) {
+    if (!isDesigned && !minimalHeader) {
       setText(7.5, headerColor, "bold");
       pdf.text(`Status: ${status}`, rightX, 29, { align: "right" });
     }
@@ -360,7 +364,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       y = 12;
       return;
     }
-    if (isQuote && template === "elegant") {
+    if (isDesigned && template === "elegant") {
       pdf.setFillColor(252, 249, 243);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
     }
@@ -371,7 +375,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     y = 25;
   };
   const addPage = () => {
-    pdf.addPage(isQuote ? [pageWidth, pageHeight] : pageFormat, isQuote ? "portrait" : pageOrientation);
+    pdf.addPage(isDesigned ? [pageWidth, pageHeight] : pageFormat, pageOrientation);
     drawContinuedHeader();
   };
   const ensureSpace = (height) => {
@@ -413,7 +417,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   ]).map(([label, value]) => ({ label, value, lines: split(value, panelWidth - 42, 6.5) }));
   const detailLineCount = detailRows.reduce((total, row) => total + row.lines.length, 0);
   const panelHeight = Math.max(40 * spacingScale, (15 + Math.max(customerLineCount * 3.8, detailLineCount * 5.2)) * spacingScale);
-  if (isQuote) {
+  if (isDesigned) {
     const infoGap = 4;
     const infoWidth = (contentWidth - infoGap * 2) / 3;
     const fromLines = [
@@ -424,8 +428,9 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       companyWebsite && { value: companyWebsite },
     ].filter(Boolean);
     const quoteDetails = [
-      { label: "Quote date", value: formatDate(invoice.invoice_date) },
-      { label: "Valid until", value: formatDate(invoice.due_date) },
+      { label: dateLabelText, value: formatDate(invoice.invoice_date) },
+      { label: dueLabelText, value: formatDate(invoice.due_date) },
+      ...(!isQuote ? [{ label: "Payment terms", value: safeText(invoice.payment_terms, "Due on receipt") }, { label: "Status", value: safeText(invoice.status, "Unpaid") }] : []),
     ];
     const columns = [
       { label: "From", x: margin + 3, lines: fromLines },
@@ -482,26 +487,26 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
 
   // Detailed line item table, with repeated heading on every page.
   const tableColumns = [
-    { key: "description", label: "DESCRIPTION", weight: 4.2, visible: !isQuote || design.showDescription !== false },
-    { key: "sku", label: "SKU", weight: 1.3, visible: !isQuote || design.showSku !== false },
+    { key: "description", label: "DESCRIPTION", weight: 4.2, visible: !isDesigned || design.showDescription !== false },
+    { key: "sku", label: "SKU", weight: 1.3, visible: !isDesigned || design.showSku !== false },
     { key: "quantity", label: "QTY", weight: 0.8, visible: true },
     { key: "unit", label: "UNIT PRICE", weight: 1.45, visible: true },
-    { key: "discount", label: "DISCOUNT", weight: 1.3, visible: !isQuote || design.showDiscount !== false },
-    { key: "tax", label: "TAX", weight: 1.1, visible: !isQuote || design.showTax !== false },
+    { key: "discount", label: "DISCOUNT", weight: 1.3, visible: !isDesigned || design.showDiscount !== false },
+    { key: "tax", label: "TAX", weight: 1.1, visible: !isDesigned || design.showTax !== false },
     { key: "total", label: isQuote ? "TOTAL" : "LINE TOTAL", weight: 1.55, visible: true },
   ].filter((column) => column.visible);
   const totalWeight = tableColumns.reduce((sum, column) => sum + column.weight, 0);
   const columns = tableColumns.map((column) => contentWidth * column.weight / totalWeight);
   const drawTableHeader = () => {
-    if (isQuote) {
+    if (isDesigned) {
       pdf.setFillColor(...tableHeaderFill);
       pdf.rect(margin, y, contentWidth, 8 * spacingScale, "F");
     }
-    pdf.setDrawColor(...(isQuote ? accent : COLORS.ink));
-    pdf.setLineWidth(isQuote ? 0.45 : 0.35);
+    pdf.setDrawColor(...(isDesigned ? accent : COLORS.ink));
+    pdf.setLineWidth(isDesigned ? 0.45 : 0.35);
     let x = margin;
     tableColumns.forEach((column, index) => {
-      setText(6.5, isQuote ? tableHeaderText : COLORS.ink, "bold");
+      setText(6.5, isDesigned ? tableHeaderText : COLORS.ink, "bold");
       const right = ["quantity", "unit", "discount", "tax", "total"].includes(column.key);
       pdf.text(column.label, right ? x + columns[index] - 2 : x + 2, y + 5.5, { align: right ? "right" : "left" });
       x += columns[index];
@@ -573,8 +578,8 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const summaryWidth = 82;
   const summaryX = margin + contentWidth - summaryWidth;
   const summaryRows = [["Subtotal", money(invoice.subtotal)]];
-  if (!isQuote || design.showDiscount !== false) summaryRows.push(["Discount", `- ${money(invoice.discount)}`]);
-  if (!isQuote || design.showTax !== false) summaryRows.push([`Tax${Number(invoice.tax_rate) ? ` (${Number(invoice.tax_rate)}%)` : ""}`, `+ ${money(invoice.tax)}`]);
+  if (!isDesigned || design.showDiscount !== false) summaryRows.push(["Discount", `- ${money(invoice.discount)}`]);
+  if (!isDesigned || design.showTax !== false) summaryRows.push([`Tax${Number(invoice.tax_rate) ? ` (${Number(invoice.tax_rate)}%)` : ""}`, `+ ${money(invoice.tax)}`]);
   if (Number(invoice.shipping)) summaryRows.push(["Shipping", `+ ${money(invoice.shipping)}`]);
   const paidAmount = invoice.amount_paid == null
     ? paymentRecords.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
@@ -583,7 +588,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const showBalanceRows = paidAmount > 0 || balanceDue > 0;
   const summaryRowHeight = 6.5 * spacingScale;
   const summaryHeight = summaryRows.length * summaryRowHeight + 22 * spacingScale + (showBalanceRows ? 15 * spacingScale : 0);
-  const termsText = htmlToPlainText(invoice.terms)
+  const termsText = String(isDesigned && design.showTerms === false ? "" : invoice.terms || "")
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
@@ -604,11 +609,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     pdf.text(value, summaryX + summaryWidth - 4, rowY, { align: "right" });
   });
   const totalBarY = y + summaryHeight - (showBalanceRows ? 28 : 13) * spacingScale;
-  if (isQuote) {
+  if (isDesigned) {
     pdf.setFillColor(...tableHeaderFill);
     pdf.roundedRect(summaryX, totalBarY, summaryWidth, 8 * spacingScale, 1, 1, "F");
   }
-  setText(8, isQuote ? tableHeaderText : COLORS.ink, "bold");
+  setText(8, isDesigned ? tableHeaderText : COLORS.ink, "bold");
   pdf.text(isQuote ? "GRAND TOTAL" : "TOTAL", summaryX + 2, totalBarY + 5);
   pdf.text(money(invoice.total), summaryX + summaryWidth - 2, totalBarY + 5, { align: "right" });
   if (showBalanceRows) {
@@ -629,7 +634,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     const termsBlockHeight = (14 + termsLines.length * 3.7) * spacingScale * (Number(design.lineSpacing) || 1.15);
     const fitsOnOnePage = termsBlockHeight <= bottomLimit - 25;
     const termsParagraphCount = termsText.split(/\n\s*\n/).filter((paragraph) => paragraph.trim()).length;
-    const termsNeedOwnPage = isQuote && (termsText.length > 650 || termsParagraphCount > 8);
+    const termsNeedOwnPage = isDesigned && (termsText.length > 650 || termsParagraphCount > 8);
     if ((termsNeedOwnPage && y > 35) || (fitsOnOnePage && y + termsBlockHeight > bottomLimit)) addPage();
     let offset = 0;
     while (offset < termsLines.length) {
@@ -640,7 +645,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       const chunk = termsLines.slice(offset, offset + availableLines);
       setText(8, COLORS.ink, "bold");
       pdf.text(offset ? "Terms & Conditions (continued)" : "Terms & Conditions", margin, y + 5);
-      setText(7.2, COLORS.muted, isQuote && design.italicNotes ? "italic" : "normal");
+      setText(7.2, COLORS.muted, isDesigned && design.italicNotes ? "italic" : "normal");
       pdf.text(chunk, margin, y + 10);
       y += (10 + chunk.length * 3.7 + 4) * spacingScale * (Number(design.lineSpacing) || 1.15);
       offset += chunk.length;
@@ -651,7 +656,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const pageCount = pdf.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
-    if (isQuote && design.watermark && (watermarkLogo || String(design.watermarkText || "").trim())) {
+    if (isDesigned && design.watermark && (watermarkLogo || String(design.watermarkText || "").trim())) {
       if (watermarkLogo) {
         const requestedWidth = contentWidth * Math.max(0.2, Math.min(0.85, (Number(design.watermarkSize) || 50) / 100));
         const requestedHeight = pageHeight * 0.38;
@@ -673,7 +678,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       }
     }
     setText(7, COLORS.ink, "bold");
-    if (!isQuote || design.showPageNumbers !== false) {
+    if (!isDesigned || design.showPageNumbers !== false) {
       pdf.text(`${page} / ${pageCount}`, pageWidth - margin, footerY, { align: "right" });
     }
   }
@@ -682,13 +687,54 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
 }
 
 export async function createInvoicePdf(invoice, suppliedStore = null) {
-  return createBusinessDocumentPdf(invoice, suppliedStore);
+  return createBusinessDocumentPdf(invoice, suppliedStore, {
+    design: invoice.pdf_design || {},
+    applyDesign: Boolean(invoice.pdf_design && Object.keys(invoice.pdf_design).length),
+  });
 }
 
-export async function downloadInvoicePdf(invoice, suppliedStore = null) {
-  const pdf = await createBusinessDocumentPdf(invoice, suppliedStore);
+export async function downloadInvoicePdf(invoice, suppliedStore = null, previewRoot = null) {
+  const pdf = await createInvoicePdfDocument(invoice, suppliedStore, previewRoot);
   const fileName = String(invoice.invoice_number || "invoice-draft").replace(/[^a-z0-9_-]/gi, "_");
   pdf.save(`${fileName}.pdf`);
+}
+
+export async function printInvoicePdf(invoice, suppliedStore = null, previewRoot = null) {
+  if (typeof window === "undefined") throw new Error("Invoice printing is only available in a browser.");
+  const pdf = await createInvoicePdfDocument(invoice, suppliedStore, previewRoot);
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.tabIndex = -1;
+  Object.assign(frame.style, {
+    position: "fixed",
+    insetInlineEnd: "0",
+    bottom: "0",
+    width: "1px",
+    height: "1px",
+    border: "0",
+    opacity: "0",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(frame);
+
+  const pdfUrl = URL.createObjectURL(pdf.output("blob"));
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    frame.remove();
+    URL.revokeObjectURL(pdfUrl);
+  };
+
+  frame.onload = () => {
+    window.setTimeout(() => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    }, 250);
+  };
+  frame.src = pdfUrl;
+  window.addEventListener("afterprint", cleanup, { once: true });
+  window.setTimeout(cleanup, 5 * 60 * 1000);
 }
 
 async function createQuoteBusinessPdf(quote, suppliedStore = null) {
@@ -713,7 +759,7 @@ async function createQuoteBusinessPdf(quote, suppliedStore = null) {
   return createBusinessDocumentPdf(normalizedQuote, suppliedStore, { documentType: "quote", design: quote.pdf_design || {} });
 }
 
-async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot = null) {
+async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot, fallbackPdf) {
   let pdf;
   const pages = previewRoot?.querySelectorAll?.("[data-quote-document-page='true']");
   if (pages?.length) {
@@ -722,7 +768,7 @@ async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot =
       import("html2canvas"),
     ]);
     const html2canvas = html2canvasModule.default;
-    const design = quote.pdf_design || {};
+    const design = documentData.pdf_design || {};
     const format = design.pageSize === "letter" ? "letter" : "a4";
     const orientation = design.orientation === "landscape" ? "landscape" : "portrait";
     pdf = new jsPDF({ orientation, unit: "mm", format, compress: true });
@@ -777,13 +823,21 @@ async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot =
         pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, margin, width, height, undefined, "FAST");
       }
     } catch (captureError) {
-      console.error("Quote preview capture failed; using the PDF renderer instead:", captureError);
-      return createQuoteBusinessPdf(quote, suppliedStore);
+      console.error("Document preview capture failed; using the PDF renderer instead:", captureError);
+      return fallbackPdf(documentData, suppliedStore);
     }
   } else {
-    pdf = await createQuoteBusinessPdf(quote, suppliedStore);
+    pdf = await fallbackPdf(documentData, suppliedStore);
   }
   return pdf;
+}
+
+async function createInvoicePdfDocument(invoice, suppliedStore = null, previewRoot = null) {
+  return createPreviewDocumentPdf(invoice, suppliedStore, previewRoot, createInvoicePdf);
+}
+
+async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot = null) {
+  return createPreviewDocumentPdf(quote, suppliedStore, previewRoot, createQuoteBusinessPdf);
 }
 
 export async function downloadQuotePdf(quote, suppliedStore = null, previewRoot = null) {

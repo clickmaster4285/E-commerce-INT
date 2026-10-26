@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import {
   CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign,
-  Download, Eye, FileText, MoreHorizontal, Plus, Printer, Receipt, RotateCcw, Search, Send, X } from
+  Download, Eye, FileText, MoreVertical, Plus, Printer, Receipt, RotateCcw, Search, Send, X } from
 "lucide-react";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
 import { downloadInvoicePdf } from "@/lib/invoicePdf";
@@ -33,6 +33,29 @@ const getStatus = (invoice) => {
   const status = invoice.status === "Draft" || !invoice.status ? "Unpaid" : invoice.status;
   return ["Unpaid", "Partially Paid"].includes(status) && new Date(invoice.due_date) < new Date(new Date().setHours(0, 0, 0, 0)) ? "Overdue" : status;
 };
+const originalTotal = (invoice) => Number(invoice.original_total ?? (
+  Number(invoice.total || 0) + (invoice.returns || []).reduce(
+    (sum, record) => sum + Number(record.total_adjustment ?? record.refund_amount ?? 0),
+    0,
+  )
+));
+const areAllInvoiceItemsReturned = (invoice) => {
+  const items = invoice.items || [];
+  const returns = invoice.returns || [];
+  if (!items.length || !returns.length) return false;
+
+  const returnedQuantities = new Map();
+  returns.forEach((record) => (record.items_returned || []).forEach((returned) => {
+    const itemId = String(returned.item_id?._id || returned.item_id || "");
+    returnedQuantities.set(itemId, (returnedQuantities.get(itemId) || 0) + Number(returned.qty || 0));
+  }));
+
+  return items.every((item) => {
+    const itemId = String(item._id || "");
+    if (!itemId) return false;
+    return (returnedQuantities.get(itemId) || 0) >= Number(item.quantity || 0);
+  });
+};
 const today = () => {const d = new Date();return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;};
 
 function InvoiceRowMenu({ invoice, onView, onPrint, onPayment, onReturnRefund, onDownload, onSend, isSending }) {const { t } = useTranslation();
@@ -57,7 +80,7 @@ function InvoiceRowMenu({ invoice, onView, onPrint, onPayment, onReturnRefund, o
   };
   const action = (fn) => (event) => {event.stopPropagation();setOpen(false);fn();};
   const item = "flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700";
-  return <><button ref={buttonRef} type="button" onClick={(event) => { event.stopPropagation(); open ? setOpen(false) : showMenu(); }} aria-label={`Actions for ${invoice.invoice_number}`} aria-expanded={open} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"><MoreHorizontal size={17}/></button>{open && createPortal(<div ref={menuRef} style={{ top: position.top, left: position.left }} className="fixed z-[12000] w-[205px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"><button className={item} onClick={action(onView)}><Eye size={14}/> View Details</button><button className={item} onClick={action(onPrint)}><Printer size={14}/> {t("admin.pos.ui.print")}</button>{!invoice.sent_at && <button className={item} onClick={action(onSend)} disabled={isSending}><Send size={14}/>{isSending ? "Sending..." : "Send to Customer"}</button>}{Number(invoice.remaining_balance ?? invoice.total) > 0 && <button className={item} onClick={action(onPayment)}><CircleDollarSign size={14}/> Add Payment</button>}{invoice.sent_at && <button className={item} onClick={action(onReturnRefund)}><RotateCcw size={14}/> Return &amp; Refund</button>}<button className={item} onClick={action(onDownload)}><Download size={14}/> Download PDF</button></div>, document.body)}</>;
+  return <><button ref={buttonRef} type="button" onClick={(event) => { event.stopPropagation(); open ? setOpen(false) : showMenu(); }} aria-label={`Actions for ${invoice.invoice_number}`} aria-expanded={open} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-blue-700"><MoreVertical size={18}/></button>{open && createPortal(<div ref={menuRef} style={{ top: position.top, left: position.left }} className="fixed z-[12000] w-[205px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"><button className={item} onClick={action(onView)}><Eye size={14}/> View Details</button><button className={item} onClick={action(onPrint)}><Printer size={14}/> {t("admin.pos.ui.print")}</button>{!invoice.sent_at && <button className={item} onClick={action(onSend)} disabled={isSending}><Send size={14}/>{isSending ? "Sending..." : "Send to Customer"}</button>}{Number(invoice.remaining_balance ?? invoice.total) > 0 && <button className={item} onClick={action(onPayment)}><CircleDollarSign size={14}/> Add Payment</button>}{invoice.sent_at && <button className={item} onClick={action(onReturnRefund)}><RotateCcw size={14}/> Return &amp; Refund</button>}<button className={item} onClick={action(onDownload)}><Download size={14}/> Download PDF</button></div>, document.body)}</>;
 }
 
 export default function InvoicesPage() {const { t } = useTranslation();
@@ -69,9 +92,15 @@ export default function InvoicesPage() {const { t } = useTranslation();
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [returnInvoiceId, setReturnInvoiceId] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });
   const { data: rawInvoices, isLoading, isError, refetch } = useQuery({ queryKey: ["invoices-admin"], queryFn: invoiceApi.list });
+  const { data: returnInvoice, isLoading: isReturnInvoiceLoading, isError: isReturnInvoiceError } = useQuery({
+    queryKey: ["invoice-admin", returnInvoiceId],
+    queryFn: () => invoiceApi.getById(returnInvoiceId),
+    enabled: Boolean(returnInvoiceId),
+  });
   const invoices = useMemo(() => Array.isArray(rawInvoices) ? rawInvoices : rawInvoices?.invoices || [], [rawInvoices]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -106,6 +135,16 @@ export default function InvoicesPage() {const { t } = useTranslation();
       queryClient.invalidateQueries({ queryKey: ["invoices-admin"] });
     },
     onError: (error) => toast.error(error?.response?.data?.message || "Could not record payment")
+  });
+  const returnMutation = useMutation({
+    mutationFn: ({ id, payload }) => invoiceApi.recordReturn(id, payload),
+    onSuccess: (updated, { id }) => {
+      queryClient.setQueryData(["invoice-admin", id], updated);
+      queryClient.invalidateQueries({ queryKey: ["invoices-admin"] });
+      setReturnInvoiceId("");
+      toast.success("Return and refund recorded");
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || "Could not record return and refund"),
   });
   const sendMutation = useMutation({
     mutationFn: (id) => invoiceApi.send(id),
@@ -168,7 +207,7 @@ export default function InvoicesPage() {const { t } = useTranslation();
     {selectedInvoice && !paymentOpen && <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-5" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedInvoice(null);}}>
       <section role="dialog" aria-modal="true" aria-labelledby="invoice-view-title" className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
         <header className="flex items-start justify-between gap-3 border-b border-[var(--border-color)] p-5"><div><p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">{t("admin.quoteInvoice.ui.invoice_details_2325ca61")}</p><h2 id="invoice-view-title" className="mt-1 text-xl font-extrabold">{selectedInvoice.invoice_number}</h2><p className="mt-1 text-xs text-[var(--text-muted)]">{selectedInvoice.customer_name} Â· {getStatus(selectedInvoice)}</p></div><button type="button" onClick={() => setSelectedInvoice(null)} className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--bg-tertiary)]" aria-label={t("admin.quoteInvoice.ui.close_invoice_details_fc5e1f36")}><X size={17} /></button></header>
-        <div className="space-y-4 p-5"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{[["Total Amount", money(selectedInvoice.total)], ["Amount Paid", money(selectedInvoice.amount_paid)], ["Remaining Balance", money(selectedInvoice.remaining_balance ?? selectedInvoice.total)]].map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-3"><p className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">{label}</p><p className="mt-1 text-xs font-bold">{value}</p></div>)}</div>
+        <div className="space-y-4 p-5"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{[["Original Total", money(originalTotal(selectedInvoice))], ["Amount Paid", money(selectedInvoice.amount_paid)], ["Remaining Balance", money(selectedInvoice.remaining_balance ?? selectedInvoice.total)]].map(([label, value]) => <div key={label} className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-3"><p className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">{label}</p><p className="mt-1 text-xs font-bold">{value}</p></div>)}</div>
           <div className="flex flex-wrap items-center justify-between gap-3"><div className="text-xs text-[var(--text-muted)]">Invoice date: {date(selectedInvoice.invoice_date)} Â· Due: {date(selectedInvoice.due_date)} Â· {selectedInvoice.payment_terms}</div>{Number(selectedInvoice.remaining_balance ?? selectedInvoice.total) > 0 && <button type="button" onClick={() => { setPaymentForm({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" }); setPaymentOpen(true); }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-blue-700"><CircleDollarSign size={15}/> Record Payment</button>}</div>
           <div className="overflow-x-auto rounded-xl border border-[var(--border-color)]"><table className="w-full min-w-[520px] text-left text-xs"><thead className="bg-[var(--bg-tertiary)] text-[10px] uppercase text-[var(--text-muted)]"><tr><th className="px-3 py-2.5">Product</th><th className="px-3 py-2.5 text-right">Qty</th><th className="px-3 py-2.5 text-right">Unit price</th><th className="px-3 py-2.5 text-right">Discount</th><th className="px-3 py-2.5 text-right">Tax</th><th className="px-3 py-2.5 text-right">Total</th></tr></thead><tbody className="divide-y divide-[var(--border-color)]">{(selectedInvoice.items || []).map((item, index) => <tr key={item._id || index}><td className="px-3 py-2.5 font-semibold">{item.name}</td><td className="px-3 py-2.5 text-right">{item.quantity}</td><td className="px-3 py-2.5 text-right">{money(item.unit_price)}</td><td className="px-3 py-2.5 text-right">{money(item.discount)}</td><td className="px-3 py-2.5 text-right">{money(item.tax)}</td><td className="px-3 py-2.5 text-right font-bold">{money(item.total)}</td></tr>)}</tbody></table></div>
           <section><h3 className="mb-2 text-sm font-bold">Payment History</h3><div className="overflow-x-auto rounded-xl border border-[var(--border-color)]"><table className="w-full min-w-[520px] text-left text-xs"><thead className="bg-[var(--bg-tertiary)] text-[10px] uppercase text-[var(--text-muted)]"><tr><th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">Method</th><th className="px-3 py-2.5">Note</th><th className="px-3 py-2.5 text-right">Amount</th></tr></thead><tbody className="divide-y divide-[var(--border-color)]">{(selectedInvoice.payments || []).length ? selectedInvoice.payments.map((payment, index) => <tr key={payment._id || index}><td className="px-3 py-2.5">{date(payment.payment_date)}</td><td className="px-3 py-2.5">{payment.payment_method}</td><td className="px-3 py-2.5">{payment.note || "â€”"}</td><td className={`px-3 py-2.5 text-right font-bold ${Number(payment.amount) < 0 ? "text-rose-600" : ""}`}>{money(payment.amount)}</td></tr>) : <tr><td colSpan={4} className="px-3 py-5 text-center text-[var(--text-muted)]">No payments recorded yet.</td></tr>}</tbody></table></div></section>
@@ -178,5 +217,6 @@ export default function InvoicesPage() {const { t } = useTranslation();
       </section>
     </div>}
     {paymentOpen && selectedInvoice && <InvoicePaymentModal invoice={selectedInvoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => {setPaymentOpen(false);setSelectedInvoice(null);}} onSubmit={() => paymentMutation.mutate({ id: selectedInvoice._id, payment: paymentForm })} />}
+    {returnInvoiceId && (isReturnInvoiceLoading || !returnInvoice ? <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-slate-950/55 p-4" role="status"><div className="rounded-xl bg-white px-5 py-4 text-sm text-slate-700 shadow-xl">{isReturnInvoiceError ? <><p>Could not load this invoice.</p><button type="button" onClick={() => setReturnInvoiceId("")} className="mt-3 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Close</button></> : "Loading invoice…"}</div></div> : <InvoiceReturnModal invoice={returnInvoice} isPending={returnMutation.isPending} onClose={() => setReturnInvoiceId("")} onSubmit={(payload) => returnMutation.mutate({ id: returnInvoiceId, payload })} />)}
   </div>;
 }

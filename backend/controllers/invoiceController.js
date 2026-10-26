@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 const Invoice = require("../models/Invoice");
 const Customer = require("../models/Customer");
 const Variant = require("../models/Variant");
-const { calculateReturnLine, capReturnLines, calculateReturnSettlement } = require("../utils/invoiceReturnMath");
+const { calculateReturnLine, capReturnLines, calculateReturnSettlement, getOriginalInvoiceTotal } = require("../utils/invoiceReturnMath");
+const StockHistory = require("../models/StockHistory");
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const nextInvoiceNumber = async () => {
@@ -69,6 +70,7 @@ const buildInvoice = (body = {}) => {
     item.tax = round(item.tax + taxShares[index]);
     item.total = round(item.quantity * item.unit_price - item.discount + item.tax);
   });
+  const total = round(subtotal - discount + tax);
   return {
     customer_id: mongoose.isValidObjectId(body.customer_id) ? body.customer_id : null,
     customer_name: customerName,
@@ -77,14 +79,16 @@ const buildInvoice = (body = {}) => {
     customer_address: String(body.customer_address || "").trim(),
     invoice_date: invoiceDate, due_date: dueDate,
     payment_terms: String(body.payment_terms || "Due on receipt").trim(),
-    items, subtotal, discount, tax, total: round(subtotal - discount + tax),
+    items, subtotal, discount, tax, original_total: total, total,
     bank_details: String(body.bank_details || "").trim(), terms: String(body.terms || "").trim(),
+    pdf_design: body.pdf_design && typeof body.pdf_design === "object" && !Array.isArray(body.pdf_design) ? body.pdf_design : {},
   };
 };
 
 exports.listInvoices = async (_req, res) => {
   try {
-    const invoices = await Invoice.find({ is_deleted: false }).sort({ created_at: -1 }).lean();
+    const invoices = (await Invoice.find({ is_deleted: false }).sort({ created_at: -1 }).lean())
+      .map((invoice) => ({ ...invoice, original_total: getOriginalInvoiceTotal(invoice) }));
     res.json({ success: true, data: invoices });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -93,7 +97,7 @@ exports.getInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false }).lean();
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
-    res.json({ success: true, data: invoice });
+    res.json({ success: true, data: { ...invoice, original_total: getOriginalInvoiceTotal(invoice) } });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
@@ -180,6 +184,20 @@ exports.recordPayment = async (req, res) => {
 };
 
 exports.recordReturn = async (req, res) => {
+  const stockChanges = [];
+  let stockHistoryExplanation = "";
+  const rollbackRestock = async () => {
+    let failed = false;
+    if (stockHistoryExplanation) {
+      await StockHistory.deleteMany({ explanation: stockHistoryExplanation }).catch(() => { failed = true; });
+    }
+    for (const change of [...stockChanges].reverse()) {
+      await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.quantity } })
+        .catch(() => { failed = true; });
+    }
+    stockChanges.length = 0;
+    return failed;
+  };
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false });
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
@@ -187,6 +205,7 @@ exports.recordReturn = async (req, res) => {
 
     const priorPaid = round(Number(invoice.amount_paid || 0));
     const priorTotal = round(Number(invoice.total || 0));
+    const originalTotal = getOriginalInvoiceTotal(invoice);
     const refundMethod = String(req.body.refund_method || "").trim();
     if (!["Cash Refund", "Balance Adjustment"].includes(refundMethod)) {
       return res.status(400).json({ success: false, message: "Choose a valid refund method" });
@@ -262,9 +281,55 @@ exports.recordReturn = async (req, res) => {
       date: new Date(),
       refunded_by: req.user?._id || null,
     };
+
+    const restockByVariant = new Map();
+    for (const returnedItem of itemsReturned) {
+      const invoiceItem = invoice.items.id(returnedItem.item_id);
+      let variantId = invoiceItem?.variant_id;
+      if (!mongoose.isValidObjectId(variantId) && invoiceItem?.product_id && invoiceItem?.sku) {
+        const matchingVariant = await Variant.findOne({ product_id: invoiceItem.product_id, sku: invoiceItem.sku }).select("_id").lean();
+        variantId = matchingVariant?._id;
+      }
+      if (!mongoose.isValidObjectId(variantId)) {
+        return res.status(400).json({ success: false, message: `Cannot restore stock for ${returnedItem.name}: its product variant is missing` });
+      }
+      const key = String(variantId);
+      const current = restockByVariant.get(key);
+      restockByVariant.set(key, current
+        ? { ...current, quantity: current.quantity + returnedItem.qty }
+        : { variant_id: variantId, product_id: invoiceItem.product_id, quantity: returnedItem.qty, name: invoiceItem.name, sku: invoiceItem.sku, title: invoiceItem.name });
+    }
+    stockHistoryExplanation = `Invoice return ${returnRecord.return_id} for ${invoice.invoice_number}: ${reason}`;
+    const stockHistoryRows = [];
+    for (const restore of restockByVariant.values()) {
+      const variant = await Variant.findOneAndUpdate(
+        { _id: restore.variant_id, product_id: restore.product_id },
+        { $inc: { quantity: restore.quantity } },
+        { new: true, select: "_id quantity product_id title sku" },
+      );
+      if (!variant) throw new Error(`Could not restore stock for ${restore.name}`);
+      stockChanges.push({ variant_id: variant._id, quantity: restore.quantity });
+      stockHistoryRows.push({
+        variant_id: variant._id,
+        product_id: variant.product_id,
+        product_name: restore.name,
+        sku: restore.sku || variant.sku || "",
+        variant_title: variant.title || restore.title,
+        previous_quantity: variant.quantity - restore.quantity,
+        new_quantity: variant.quantity,
+        change_quantity: restore.quantity,
+        adjustment_type: "add",
+        reason: "Invoice return",
+        explanation: stockHistoryExplanation,
+        performed_by: req.user?._id || null,
+        performed_by_name: req.user?.name || "Administrator",
+      });
+    }
+    if (stockHistoryRows.length) await StockHistory.insertMany(stockHistoryRows);
+
     const update = {
       $push: { returns: returnRecord },
-      $set: { amount_paid: paid, total: adjustedTotal, remaining_balance: remaining, status: nextStatus, paid_at: nextStatus === "Paid" ? invoice.paid_at || new Date() : null, updatedby: req.user?._id || null },
+      $set: { original_total: originalTotal, amount_paid: paid, total: adjustedTotal, remaining_balance: remaining, status: nextStatus, paid_at: nextStatus === "Paid" ? invoice.paid_at || new Date() : null, updatedby: req.user?._id || null },
       $inc: { __v: 1 },
     };
     if (cashRefundAmount > 0) {
@@ -281,9 +346,18 @@ exports.recordReturn = async (req, res) => {
       update,
       { new: true, runValidators: true }
     );
-    if (!updatedInvoice) return res.status(409).json({ success: false, message: "Invoice changed while processing. Refresh and try again." });
+    if (!updatedInvoice) {
+      const rollbackFailed = await rollbackRestock();
+      return res.status(409).json({ success: false, message: rollbackFailed ? "Invoice changed and stock rollback needs review. Refresh stock history." : "Invoice changed while processing. Refresh and try again." });
+    }
+    try {
+      const io = require("../utils/socket").getIO();
+      if (io) io.emit("stockUpdated", { variants: stockChanges.map(({ variant_id, quantity }) => ({ variant_id, change: quantity })), source: "invoice_return" });
+    } catch (socketError) {}
     return res.json({ success: true, data: updatedInvoice });
   } catch (error) {
+    const rollbackFailed = await rollbackRestock();
+    if (rollbackFailed) return res.status(500).json({ success: false, message: `${error.message}. Stock rollback needs review; check stock history.` });
     return res.status(400).json({ success: false, message: error.message });
   }
 };

@@ -7,6 +7,7 @@ const {
   getProductFacets,
   getCategoryTiles,
   getProductById,
+  getProductDocumentHistory,
   updateProduct,
   deleteProduct,
   toggleProductStatus,
@@ -54,6 +55,7 @@ router.get("/stats", getProductStats);
 //    liye conditional GET deta hai (cheap), aur fresh data hamesha server se aata hai.
 router.get("/facets", publicCache(30 * 1000), getProductFacets);
 router.get("/category-tiles", publicCache(60 * 1000), getCategoryTiles);
+router.get("/admin/:id/history", authMiddleware, checkPermission("products"), getProductDocumentHistory);
 router.get("/:id", getProductById);
 
 // ==========================================

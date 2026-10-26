@@ -5,9 +5,7 @@ import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
-import { htmlToPlainText } from "@/lib/termsContent";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Check, ChevronDown, Palette } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -15,6 +13,7 @@ import { Check, ChevronDown, Palette } from "lucide-react";
 /* ------------------------------------------------------------------ */
 
 const STORAGE_KEY = "quote-template-settings-v1";
+export const INVOICE_TEMPLATE_STORAGE_KEY = "invoice-template-settings-v1";
 const DEFAULT_DESIGN = {
   template: "Bold",
   headerLayout: "band",
@@ -117,10 +116,10 @@ function tintRgb(hex, ratio) {
 /*  Helper to read and save design settings                             */
 /* ------------------------------------------------------------------ */
 
-function readSaved() {
+function readSaved(storageKey = STORAGE_KEY) {
   if (typeof window === "undefined") return DEFAULT_DESIGN;
   try {
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "{}");
+    const saved = JSON.parse(window.localStorage.getItem(storageKey) || "{}");
     const selectedName = QUOTE_TEMPLATES.some((t) => t.name === saved.selected) ? saved.selected : DEFAULT_DESIGN.template;
     const theme = QUOTE_TEMPLATES.find((t) => t.name === selectedName) || QUOTE_TEMPLATES[0];
     return {
@@ -140,8 +139,8 @@ function readSaved() {
 }
 
 /* The function the page needs to build the PDF design payload */
-export function getSavedQuotePdfDesign() {
-  const saved = readSaved();
+export function getSavedQuotePdfDesign(storageKey = STORAGE_KEY) {
+  const saved = readSaved(storageKey);
   const theme = QUOTE_TEMPLATES.find((t) => t.name.toLowerCase() === (saved.template || saved.selected?.toLowerCase())) || QUOTE_TEMPLATES[0];
   const scale = clamp((saved.baseFontSize || 13) / 13, 0.75, 1.45);
   return {
@@ -211,9 +210,10 @@ function QuoteHeaderDetails({ number, status, date, validUntil, labels, classNam
 /*  Component                                                            */
 /* ------------------------------------------------------------------ */
 
-export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quoteStatus, savedDesign, money, previewOnly = false, onBrowseProducts, onFieldChange, onUpdateItem, onRemoveItem, discountType, discountValue, onDiscountTypeChange, onDiscountValueChange, taxRate, onTaxRateChange }) {
+export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quoteStatus, savedDesign, money, previewOnly = false, onBrowseProducts, onFieldChange, onUpdateItem, onRemoveItem, discountType, discountValue, onDiscountTypeChange, onDiscountValueChange, taxRate, onTaxRateChange, documentType = "quote", storageKey = STORAGE_KEY }) {
   const { t, locale } = useTranslation();
-  const [design, setDesign] = useState(() => ({ ...DEFAULT_DESIGN, ...readSaved(), ...(savedDesign || {}) }));
+  const isInvoice = documentType === "invoice";
+  const [design, setDesign] = useState(() => ({ ...DEFAULT_DESIGN, ...readSaved(storageKey), ...(savedDesign || {}) }));
   const [loaded, setLoaded] = useState(true);
   const [workspaceMode, setWorkspaceMode] = useState("preview");
   const settingsPanelRef = useRef(null);
@@ -229,7 +229,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   useEffect(() => {
     if (!loaded) return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      window.localStorage.setItem(storageKey, JSON.stringify({
         selected: QUOTE_TEMPLATES.find((t) => t.name.toLowerCase() === design.template)?.name || design.selected || DEFAULT_DESIGN.template,
         customColor: design.accentColor || design.color,
         accentColor: design.accentColor || design.color,
@@ -260,7 +260,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         showSku: design.showSku,
       }));
     } catch { /* storage unavailable */ }
-  }, [loaded, design]);
+  }, [loaded, design, storageKey]);
 
   const theme = QUOTE_TEMPLATES.find(
     (t) => t.name.toLowerCase() === (design.template || design.selected?.toLowerCase())
@@ -281,7 +281,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const companyWebsite = store?.website || store?.website_url || store?.store_url || "";
   const countryNames = { PK: "Pakistan", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", IN: "India", CA: "Canada", AU: "Australia" };
   const addressLine = [store?.address, store?.city, store?.state, store?.zip_code, countryNames[String(store?.country || "").toUpperCase()] || store?.country].filter(Boolean).join(", ");
-  const quoteHeaderNumber = getQuoteHeaderData({
+  const quoteHeaderNumber = isInvoice ? quoteNumber || "Assigned when saved" : getQuoteHeaderData({
     quote_number: quoteNumber === "Draft quote" ? "" : quoteNumber,
     status: quoteStatus,
   }).quoteNumber;
@@ -289,14 +289,16 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     ? t("admin.quoteInvoice.pdf.assignedWhenSaved")
     : quoteHeaderNumber;
   const normalizedQuoteStatus = String(quoteStatus || "Draft").trim().toLowerCase();
-  const displayQuoteStatus = ["pending", "draft", "sent", "accepted", "rejected"].includes(normalizedQuoteStatus)
+  const displayQuoteStatus = isInvoice
+    ? String(quoteStatus || "Unpaid").trim()
+    : ["pending", "draft", "sent", "accepted", "rejected"].includes(normalizedQuoteStatus)
     ? t(`admin.quoteInvoice.status.${normalizedQuoteStatus}`)
     : String(quoteStatus || "Draft").trim().toUpperCase();
   const quoteHeaderLabels = {
-    quoteNumber: t("admin.quoteInvoice.pdf.quoteNumber"),
+    quoteNumber: isInvoice ? "Invoice Number" : t("admin.quoteInvoice.pdf.quoteNumber"),
     status: t("admin.quoteInvoice.pdf.status"),
-    quoteDate: t("admin.quoteInvoice.pdf.quoteDate"),
-    validUntil: t("admin.quoteInvoice.pdf.validUntil"),
+    quoteDate: isInvoice ? t("admin.invoiceDetail.field.invoiceDate") : t("admin.quoteInvoice.pdf.quoteDate"),
+    validUntil: isInvoice ? t("admin.invoiceDetail.field.dueDate") : t("admin.quoteInvoice.pdf.validUntil"),
   };
 
   const formatDate = (value) => {
@@ -304,8 +306,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     const parsed = new Date(`${String(value).length <= 10 ? `${value}T00:00:00` : value}`);
     return Number.isNaN(parsed.getTime()) ? "\u2014" : parsed.toLocaleDateString(locale || "en-GB", { year: "numeric", month: "short", day: "numeric" });
   };
-  const quoteDateLabel = formatDate(form?.quote_date);
-  const validUntilLabel = formatDate(form?.expiry_date);
+  const quoteDateLabel = formatDate(isInvoice ? form?.invoice_date : form?.quote_date);
+  const validUntilLabel = formatDate(isInvoice ? form?.due_date : form?.expiry_date);
 
   const currency = (value) => new Intl.NumberFormat(locale || "en-PK", { style: "currency", currency: design.currencySymbol || "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
   const labelClass = "block text-[10px] font-semibold text-[var(--text-secondary)]";
@@ -321,7 +323,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     const tax = (gross - discount) * Number(item.tax_rate || 0) / 100;
     return { ...item, gross, discount, tax, amount: gross - discount + tax, index: index + 1 };
   });
-  const previewTermsText = htmlToPlainText(form?.terms)
+  const previewTermsText = String(form?.terms || "")
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
@@ -497,16 +499,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 <section className="rounded-lg border border-[var(--border-color)] p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><h5 className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="text-[9px] text-[var(--text-muted)]">{form?.items?.length || 0} {t("admin.quoteInvoice.ui.items_7316c8b2")}</span></div><button type="button" onClick={onBrowseProducts} className="h-9 rounded-lg bg-blue-600 px-4 text-[10px] font-bold text-white shadow-sm transition hover:bg-blue-700">{t("admin.quoteDesigner.addProduct")}</button></div>
                   {form?.items?.length ? <div className="space-y-2">{form.items.map((item, index) => <div key={item.row_id || item._id || index} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]/40 p-2.5"><div className="mb-2 flex items-center gap-2"><div className="min-w-0 flex-1"><input value={item.name || ""} onChange={(event) => onUpdateItem(item.row_id, "name", event.target.value)} className={inputClass} aria-label={`${t("admin.quoteInvoice.ui.product_dd3b86d1")} ${index + 1}`} />{item.sku && <p className="mt-1 text-[9px] text-[var(--text-muted)]">SKU {item.sku}</p>}</div><button type="button" onClick={() => onRemoveItem(item.row_id)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-rose-600 hover:bg-rose-50">{t("admin.quoteDesigner.remove")}</button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <label key={key} className={labelClass}>{title}<input type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} className={inputClass} /></label>)}</div></div>)}</div> : <div className="rounded-lg border border-dashed border-[var(--border-color)] p-5 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.noProducts")}</div>}
                 </section>
-                <section className="grid gap-2 rounded-lg border border-[var(--border-color)] p-3 sm:grid-cols-2"><h5 className="sm:col-span-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.totals")}</h5><label className={labelClass}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className={selectClass}><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label><label className={labelClass}>{t("admin.quoteDesigner.discount")}<input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className={inputClass} /></label><label className={labelClass}>{t("admin.quoteDesigner.additionalTax")}<input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className={inputClass} /></label><div className="self-end space-y-1 text-right text-[10px] text-[var(--text-secondary)]"><p>{t("admin.quoteDesigner.subtotal")} {money(totals?.subtotal)} · {t("admin.quoteDesigner.discount")} {money(totals?.discount)} · {t("admin.quoteInvoice.ui.tax_9be70f66")} {money(totals?.tax)}</p><p className="text-xs font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.grandTotal")} {money(totals?.total)}</p></div></section>
+                <section className="grid gap-2 rounded-lg border border-[var(--border-color)] p-3 sm:grid-cols-2"><h5 className="sm:col-span-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.totals")}</h5><label className={labelClass}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className={selectClass}><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label><label className={labelClass}>{t("admin.quoteInvoice.ui.discount_b524936d")}<input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className={inputClass} /></label><label className={labelClass}>{t("admin.quoteDesigner.additionalTax")}<input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className={inputClass} /></label><div className="self-end space-y-1 text-right text-[10px] text-[var(--text-secondary)]"><p>{t("admin.quoteDesigner.subtotal")} {money(totals?.subtotal)} · {t("admin.quoteInvoice.ui.discount_b524936d")} {money(totals?.discount)} · {t("admin.quoteInvoice.ui.tax_9be70f66")} {money(totals?.tax)}</p><p className="text-xs font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.grandTotal")} {money(totals?.total)}</p></div></section>
                 <section className="grid gap-2 sm:grid-cols-2"><label className={labelClass}>{t("admin.quoteDesigner.notes")}<textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 text-xs" /></label></section>
-                <section>
-                  <div className={labelClass}>{t("admin.quoteDesigner.termsConditions")}</div>
-                  <RichTextEditor
-                    value={form?.terms || ""}
-                    onChange={(html) => onFieldChange("terms", html)}
-                    minHeight={160}
-                  />
-                </section>
               </div>            ) : (
             /* Preview container with safe zoom */
             <div style={{ overflow: "hidden", position: "relative" }}>
@@ -614,9 +608,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-[7.5px] font-extrabold uppercase tracking-[0.16em] text-slate-400">{t("admin.quoteDesigner.quoteDate")}</p>
-                      <p className="mt-1 text-[10px] font-bold text-slate-900">{formatDate(form?.quote_date)}</p>
-                      <p className="mt-1.5 text-[8px] text-slate-500">{t("admin.quoteDesigner.validUntil")} <span className="font-bold">{formatDate(form?.expiry_date)}</span></p>
+                      <p className="text-[7.5px] font-extrabold uppercase tracking-[0.16em] text-slate-400">{quoteHeaderLabels.quoteDate}</p>
+                      <p className="mt-1 text-[10px] font-bold text-slate-900">{quoteDateLabel}</p>
+                      <p className="mt-1.5 text-[8px] text-slate-500">{quoteHeaderLabels.validUntil} <span className="font-bold">{validUntilLabel}</span></p>
                     </div>
                   </div>
 
@@ -634,8 +628,12 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                     </thead>
                     <tbody className="text-slate-600">
                       {previewItems.map((item) => (
-                        <tr key={item.index} className="border-b border-slate-100">
-                          <td className="px-2.5 py-3 text-[8.5px]">{[item.name, item.variant_name].filter(Boolean).join(" / ") || `Item ${item.index}`}</td>
+                        <tr key={item.index} className={`border-b ${Number(item.returned_quantity) > 0 ? "border-rose-200 bg-rose-50/60" : "border-slate-100"}`}>
+                          <td className="px-2.5 py-3 text-[8.5px]">
+                            <span>{item.name || `Item ${item.index}`}</span>
+                            {item.variant_name && <span className={Number(item.returned_quantity) > 0 ? "font-bold text-rose-700" : ""}> / {item.variant_name}</span>}
+                            {Number(item.returned_quantity) > 0 && <span className="ml-1.5 inline-block rounded-full bg-rose-100 px-1.5 py-0.5 text-[7px] font-bold text-rose-700">{t(item.returned_quantity === 1 ? "admin.invoiceDetail.timeline.returnedOne" : "admin.invoiceDetail.timeline.returnedMany", { count: Number(item.returned_quantity) })}</span>}
+                          </td>
                           <td className="px-2 py-3 text-right text-[9px]">{item.quantity}</td>
                           <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.unit_price)}</td>
                           <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.discount)}</td>

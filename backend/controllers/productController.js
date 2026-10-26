@@ -11,6 +11,9 @@ const Attribute = require("../models/Attribute");
 const Deal = require("../models/Deal");
 const Discount = require("../models/Discount");
 const PurchaseOrder = require("../models/PurchaseOrder");
+const PosSale = require("../models/PosSale");
+const Quote = require("../models/Quote");
+const Invoice = require("../models/Invoice");
 // ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
 const loadBrandModel = () => {
   const paths = [
@@ -1467,6 +1470,82 @@ const getProductById = async (req, res) => {
   }
 };
 
+const getProductDocumentHistory = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: "Invalid product ID" });
+    }
+
+    const productId = new mongoose.Types.ObjectId(req.params.id);
+    const product = await Product.findOne({ _id: productId, is_deleted: { $ne: true } }).select("_id").lean();
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+    const [sales, quotes, invoices] = await Promise.all([
+      PosSale.find({ "items.product_id": productId, status: "completed" })
+        .select("sale_number customer_snapshot cashier_name total items.product_id items.variant_id items.product_name items.variant_title items.sku items.quantity items.line_total created_at")
+        .sort({ created_at: -1 })
+        .lean(),
+      Quote.find({ "items.product_id": productId, is_deleted: { $ne: true } })
+        .select("quote_number customer_name status total items.product_id items.variant_id items.name items.variant_name items.sku items.quantity items.total created_at createdby")
+        .populate("createdby", "name email")
+        .sort({ created_at: -1 })
+        .lean(),
+      Invoice.find({ "items.product_id": productId, is_deleted: { $ne: true } })
+        .select("invoice_number customer_name status total items.product_id items.variant_id items.name items.sku items.quantity items.total created_at createdby")
+        .populate("createdby", "name email")
+        .sort({ created_at: -1 })
+        .lean(),
+    ]);
+
+    const productItems = (items = []) => items.filter((item) => String(item.product_id) === String(productId));
+    const toHistoryItems = (items, nameKey, variantKey, totalKey) => productItems(items).map((item) => ({
+      variant_id: item.variant_id || null,
+      name: item[variantKey] || item[nameKey] || item.sku || "Variant",
+      sku: item.sku || "",
+      quantity: Number(item.quantity) || 0,
+      total: Number(item[totalKey]) || 0,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        posHistory: sales.map((sale) => ({
+          _id: sale._id,
+          sale_number: sale.sale_number,
+          customer_name: sale.customer_snapshot?.name || "",
+          cashier_name: sale.cashier_name || "",
+          total: Number(sale.total) || 0,
+          created_at: sale.created_at,
+          items: toHistoryItems(sale.items, "product_name", "variant_title", "line_total"),
+        })),
+        quoteHistory: quotes.map((quote) => ({
+          _id: quote._id,
+          quote_number: quote.quote_number,
+          customer_name: quote.customer_name || "",
+          status: quote.status,
+          total: Number(quote.total) || 0,
+          created_at: quote.created_at,
+          createdby: quote.createdby || null,
+          items: toHistoryItems(quote.items, "name", "variant_name", "total"),
+        })),
+        invoiceHistory: invoices.map((invoice) => ({
+          _id: invoice._id,
+          invoice_number: invoice.invoice_number,
+          customer_name: invoice.customer_name || "",
+          status: invoice.status,
+          total: Number(invoice.total) || 0,
+          created_at: invoice.created_at,
+          createdby: invoice.createdby || null,
+          items: toHistoryItems(invoice.items, "name", "name", "total"),
+        })),
+      },
+    });
+  } catch (error) {
+    log.error("[getProductDocumentHistory] Error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch product history" });
+  }
+};
+
 // ======================================================
 // CREATE PRODUCT
 // ======================================================
@@ -2553,6 +2632,7 @@ module.exports = {
   getProductFacets,
   getCategoryTiles,
   getProductById,
+  getProductDocumentHistory,
   updateProduct,
   deleteProduct,
   toggleProductStatus,

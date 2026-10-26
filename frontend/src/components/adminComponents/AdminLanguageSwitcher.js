@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, Languages } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import LanguageTransition from "@/components/common/LanguageTransition";
@@ -8,34 +9,70 @@ import LanguageTransition from "@/components/common/LanguageTransition";
 export default function AdminLanguageSwitcher() {
   const { locale, locales, changeLocale, t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   // Target locale while a switch is in flight — the curtain is mounted for it.
   const [switchingTo, setSwitchingTo] = useState(null);
   const ref = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const updateMenuPosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const width = 190;
+    const isRtl = trigger.closest("[dir='rtl']") || document.documentElement.dir === "rtl";
+    const alignedLeft = isRtl ? rect.left : rect.right - width;
+    const left = Math.max(8, Math.min(alignedLeft, window.innerWidth - width - 8));
+    setMenuPosition({ left, top: rect.bottom + 8 });
+  };
 
   useEffect(() => {
     if (!open) return undefined;
 
     const onPointerDown = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+      if (
+        ref.current?.contains(event.target) ||
+        menuRef.current?.contains(event.target)
+      ) return;
+      setOpen(false);
     };
     const onKeyDown = (event) => {
       if (event.key === "Escape") setOpen(false);
     };
 
-    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return undefined;
+    }
+
+    updateMenuPosition();
+    const handleViewportChange = () => updateMenuPosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
     };
   }, [open]);
 
   const currentLanguage = locales.find((item) => item.code === locale) || locales[0];
 
   return (
-    <div className="relative" ref={ref}>
+    <div ref={ref}>
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen((value) => !value)}
         title={t("admin.switcher.title")}
         aria-label={t("admin.switcher.label")}
@@ -56,14 +93,15 @@ export default function AdminLanguageSwitcher() {
         <span className="hidden sm:inline">{currentLanguage.nativeLabel}</span>
       </button>
 
-      {open && (
+      {open && menuPosition && typeof document !== "undefined" && createPortal(
         <div
+          ref={menuRef}
           role="listbox"
           aria-label={t("admin.switcher.current")}
-          className="absolute z-[70] mt-2 min-w-[190px] overflow-hidden rounded-lg border py-1 shadow-xl"
+          className="fixed z-[10000] min-w-[190px] overflow-hidden rounded-lg border py-1 shadow-xl"
           style={{
-            top: "100%",
-            insetInlineEnd: 0,
+            left: menuPosition.left,
+            top: menuPosition.top,
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-card)",
           }}
@@ -103,7 +141,8 @@ export default function AdminLanguageSwitcher() {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
 
       {switchingTo && (
