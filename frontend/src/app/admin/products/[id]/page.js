@@ -11,7 +11,7 @@ import {
   Package, Layers3, Box, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
   Sparkles, AlertTriangle, FolderOpen, Store, Hash, Tag as TagIcon,
-  Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText, Info,
+  Edit3, Save, Calendar, User, Activity, Eye, ArrowLeft, Image as ImageIcon, FileText, Info, Receipt, ShoppingCart,
   Ban, ChevronLeft, ZoomIn, Search // Added ZoomIn and ChevronLeft for gallery
 } from "lucide-react";
 import { toast } from "sonner";
@@ -420,6 +420,9 @@ const ACTIVITY_TYPES = {
   "variant-created": { group: "variant", groupLabelKey: "admin.productDetail.page.variants", labelKey: "admin.productDetail.page.activityVariantCreated", icon: Layers3, bg: "var(--purple-soft)", fg: "var(--purple)", avatar: "purple" },
   "variant-updated": { group: "variant", groupLabelKey: "admin.productDetail.page.variants", labelKey: "admin.productDetail.page.activityVariantUpdated", icon: Pencil, bg: "var(--warning-soft)", fg: "var(--warning)", avatar: "blue" },
   "purchase-order-received": { group: "purchase-order", groupLabelKey: "admin.productDetail.page.purchaseOrders", labelKey: "admin.productDetail.page.activityPurchaseOrderReceived", icon: Package, bg: "var(--info-soft)", fg: "var(--info)", avatar: "emerald" },
+  "pos-sale": { group: "pos", groupLabelKey: "admin.productDetail.page.posSales", labelKey: "admin.productDetail.page.activityPosSale", icon: ShoppingCart, bg: "var(--success-soft)", fg: "var(--success)", avatar: "emerald" },
+  "quote-created": { group: "quote", groupLabelKey: "admin.productDetail.page.quotes", labelKey: "admin.productDetail.page.activityQuote", icon: FileText, bg: "var(--purple-soft)", fg: "var(--purple)", avatar: "purple" },
+  "invoice-created": { group: "invoice", groupLabelKey: "admin.productDetail.page.invoices", labelKey: "admin.productDetail.page.activityInvoice", icon: Receipt, bg: "var(--info-soft)", fg: "var(--info)", avatar: "blue" },
 };
 
 const activityMetaOf = (type) => ACTIVITY_TYPES[type] || ACTIVITY_TYPES["product-updated"];
@@ -1137,6 +1140,11 @@ export default function ProductDetailPage() {
 
   const { data: product, isLoading, isError, refetch: refetchProduct } = useQuery({
     queryKey: ["product", id], queryFn: () => productApi.getById(id), enabled: !!id,
+  });
+  const { data: productDocumentHistory } = useQuery({
+    queryKey: ["product-document-history", id],
+    queryFn: () => productApi.getDocumentHistory(id),
+    enabled: Boolean(id && product),
   });
 
   const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
@@ -1913,6 +1921,51 @@ export default function ProductDetailPage() {
       });
     });
 
+    const documentSubjects = (referenceLabel, reference, items, total) => [
+      { label: referenceLabel, value: reference || "—", mono: true },
+      ...(items || []).map((item) => ({
+        label: t("admin.productDetail.page.variant"),
+        value: `${item.name || item.sku || t("admin.productDetail.page.variant")}${item.sku ? ` · SKU ${item.sku}` : ""} · ${t("admin.productDetail.page.quantity")}: ${Number(item.quantity || 0).toLocaleString(locale)}`,
+      })),
+      { label: "Total", value: formatMoney(total) },
+    ];
+
+    (productDocumentHistory?.posHistory || []).forEach((sale) => push({
+      key: `pos-sale-${sale._id}`,
+      type: "pos-sale",
+      actor: sale.cashier_name || null,
+      descriptionKey: "admin.productDetail.page.activityPosSaleDescription",
+      descriptionParams: { number: sale.sale_number, customer: sale.customer_name || "Walk-in customer" },
+      date: sale.created_at,
+      href: `/admin/pos/history/${sale._id}`,
+      recordNumber: sale.sale_number,
+      subject: documentSubjects("POS", sale.sale_number, sale.items, sale.total),
+    }));
+
+    (productDocumentHistory?.quoteHistory || []).forEach((quote) => push({
+      key: `quote-created-${quote._id}`,
+      type: "quote-created",
+      actor: quote.createdby || null,
+      descriptionKey: "admin.productDetail.page.activityQuoteDescription",
+      descriptionParams: { number: quote.quote_number, customer: quote.customer_name || "" },
+      date: quote.created_at,
+      href: `/admin/quotes/${quote._id}`,
+      recordNumber: quote.quote_number,
+      subject: documentSubjects("Quote", quote.quote_number, quote.items, quote.total),
+    }));
+
+    (productDocumentHistory?.invoiceHistory || []).forEach((invoice) => push({
+      key: `invoice-created-${invoice._id}`,
+      type: "invoice-created",
+      actor: invoice.createdby || null,
+      descriptionKey: "admin.productDetail.page.activityInvoiceDescription",
+      descriptionParams: { number: invoice.invoice_number, customer: invoice.customer_name || "" },
+      date: invoice.created_at,
+      href: `/admin/invoices/${invoice._id}`,
+      recordNumber: invoice.invoice_number,
+      subject: documentSubjects("Invoice", invoice.invoice_number, invoice.items, invoice.total),
+    }));
+
     /* ---------------- Live socket overlay (deduped against DB entries) ---------------- */
     // The refetched document and the socket broadcast describe the same save with
     // the same millisecond, so an exact stamp match drops only true duplicates.
@@ -1959,6 +2012,9 @@ export default function ProductDetailPage() {
   const variantCreateCount = activityTimeline.filter((e) => e.type === "variant-created").length;
   const variantUpdateCount = activityTimeline.filter((e) => e.type === "variant-updated").length;
   const purchaseOrderReceiveCount = activityTimeline.filter((e) => e.type === "purchase-order-received").length;
+  const posSaleCount = activityTimeline.filter((e) => e.group === "pos").length;
+  const quoteActivityCount = activityTimeline.filter((e) => e.group === "quote").length;
+  const invoiceActivityCount = activityTimeline.filter((e) => e.group === "invoice").length;
   // Entries the backend never attributed to a user. Surfaced so the empty actor
   // rows are explained instead of looking like a rendering fault.
   const unattributedCount = activityTimeline.filter((e) => !actorInfo(e.actor).known).length;
@@ -1984,6 +2040,9 @@ export default function ProductDetailPage() {
     { id: "product", labelKey: "admin.productDetail.page.product", count: productEventCount },
     { id: "variant", labelKey: "admin.productDetail.page.variants", count: variantCreateCount + variantUpdateCount },
     { id: "purchase-order", labelKey: "admin.productDetail.page.purchaseOrders", count: purchaseOrderReceiveCount },
+    { id: "pos", labelKey: "admin.productDetail.page.posSales", count: posSaleCount },
+    { id: "quote", labelKey: "admin.productDetail.page.quotes", count: quoteActivityCount },
+    { id: "invoice", labelKey: "admin.productDetail.page.invoices", count: invoiceActivityCount },
   ];
 
   // Helper to open gallery
@@ -2987,9 +3046,23 @@ export default function ProductDetailPage() {
                                           <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>{t(ev.descriptionKey, ev.descriptionParams)}</p>
                                         </div>
                                         {/* Day is in the group header, so only the time here */}
-                                        <div className="text-right shrink-0" title={fullStampOf(ev.date, locale)}>
-                                          <p className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{clockOf(ev.date, locale)}</p>
-                                          <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{tago(ev.date, t, locale)}</p>
+                                        <div className="flex shrink-0 items-start gap-2">
+                                          {ev.href && (
+                                            <button
+                                              type="button"
+                                              onClick={() => router.push(ev.href)}
+                                              aria-label={`${t("admin.productDetail.page.viewRelatedRecord")} ${ev.recordNumber || ""}`.trim()}
+                                              title={t("admin.productDetail.page.viewRelatedRecord")}
+                                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-secondary)" }}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                            </button>
+                                          )}
+                                          <div className="text-right" title={fullStampOf(ev.date, locale)}>
+                                            <p className="text-[11px] font-bold tabular-nums" style={{ color: "var(--text-primary)" }}>{clockOf(ev.date, locale)}</p>
+                                            <p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{tago(ev.date, t, locale)}</p>
+                                          </div>
                                         </div>
                                       </div>
 

@@ -81,6 +81,7 @@ const buildInvoice = (body = {}) => {
     payment_terms: String(body.payment_terms || "Due on receipt").trim(),
     items, subtotal, discount, tax, original_total: total, total,
     bank_details: String(body.bank_details || "").trim(), terms: String(body.terms || "").trim(),
+    pdf_design: body.pdf_design && typeof body.pdf_design === "object" && !Array.isArray(body.pdf_design) ? body.pdf_design : {},
   };
 };
 

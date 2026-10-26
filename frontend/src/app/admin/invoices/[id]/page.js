@@ -1,22 +1,20 @@
 "use client";import { useTranslation } from "@/i18n/LanguageProvider";
 
 import { use, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight,
-  Clock3, CreditCard, FileText, Mail, MapPin,
-  Package, Percent, Phone, Printer, Receipt, RotateCcw, Send, UserRound } from
+  CreditCard, FileText, Printer, RotateCcw, Send } from
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
 import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
+import QuoteTemplateDesigner, { INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
 
-const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const edge = { border: "1px solid #dce8f8" };
 const card = {
   ...edge,
@@ -41,10 +39,6 @@ const paymentDateTime = (payment, locale) => {
   if (!value || Number.isNaN(new Date(value).getTime())) return { date: "-", time: "-" };
   return { date: date(value, locale), time: payment.payment_time || new Date(value).toLocaleTimeString(locale || [], { hour: "2-digit", minute: "2-digit" }) };
 };
-const imageUrl = (url) => !url || /^(https?:|blob:|data:)/i.test(url) ?
-url || "" :
-API_ORIGIN ? `${API_ORIGIN}${url.startsWith("/") ? url : `/${url}`}` : url;
-
 const statusStyles = {
   Unpaid: { bg: "#fff5df", fg: "#b5760a" },
   "Partially Paid": { bg: "#fff5df", fg: "#b5760a" },
@@ -66,13 +60,6 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
     </div>
     {children}
   </section>;
-}
-
-function LabelValue({ label, value, icon: Icon }) {
-  return <div className="grid grid-cols-[minmax(84px,.8fr)_minmax(0,1.2fr)] items-center gap-2 text-[13px] leading-6">
-    <span className="inline-flex items-center gap-1.5" style={muted}>{Icon && <Icon size={13} />}{label}</span>
-    <span className="min-w-0 truncate font-medium" style={primary} title={value || "-"}>{value || "-"}</span>
-  </div>;
 }
 
 export default function InvoiceDetailsPage({ params }) {const { t, locale } = useTranslation();
@@ -150,7 +137,6 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const displayStatus = rawStatus === "Draft" ? "Unpaid" : rawStatus;
   const canReturn = Boolean(invoice.sent_at);
   const items = invoice.items || [];
-  const payments = invoice.payments || [];
   const returns = invoice.returns || [];
   const returnedQuantityByItem = new Map();
   returns.forEach((record) => {
@@ -159,16 +145,44 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       if (itemId) returnedQuantityByItem.set(itemId, (returnedQuantityByItem.get(itemId) || 0) + Number(returnedItem.qty || 0));
     });
   });
+  const previewItems = items.map((item, index) => {
+    const [productName, ...variantParts] = String(item.name || "").split(" / ");
+    return {
+      ...item,
+      row_id: item._id || `invoice-item-${index}`,
+      name: productName || item.name || "",
+      variant_name: item.variant_name || variantParts.join(" / "),
+      returned_quantity: returnedQuantityByItem.get(String(item._id || "")) || 0,
+    };
+  });
+  const payments = invoice.payments || [];
   const paidAmount = Number(invoice.amount_paid || 0);
   const total = Number(invoice.total || 0);
-  const balanceAdjustments = returns.reduce((sum, record) => sum + Number(record.total_adjustment ?? record.refund_amount ?? 0), 0);
-  const originalTotal = Number(invoice.original_total ?? (total + balanceAdjustments));
   const paymentProgress = total > 0 ? Math.min(100, Math.max(0, (paidAmount / total) * 100)) : 0;
   const lastPayment = payments[payments.length - 1];
+  const returnedItemCount = returns.reduce((count, record) => count + (record.items_returned || []).reduce((itemCount, item) => itemCount + Number(item.qty || 0), 0), 0);
+  const latestReturnDate = returns.reduce((latest, record) => {
+    const returnDate = new Date(record.date);
+    return !Number.isNaN(returnDate.getTime()) && (!latest || returnDate > latest) ? returnDate : latest;
+  }, null);
+  const returnedTimelineStep = returnedItemCount > 0
+    ? [
+      t(returnedItemCount === 1 ? "admin.invoiceDetail.timeline.returnedOne" : "admin.invoiceDetail.timeline.returnedMany", { count: returnedItemCount }),
+      date(latestReturnDate, locale),
+      true,
+    ]
+    : null;
+  const paymentTimelineStep = [
+    t("admin.invoiceDetail.timeline.paymentReceived"),
+    lastPayment ? date(lastPayment.payment_date, locale) : t("admin.invoiceDetail.timeline.awaitingPayment"),
+    Boolean(lastPayment),
+  ];
   const timeline = [
   [t("admin.invoiceDetail.timeline.invoiceCreated"), date(invoice.created_at || invoice.invoice_date, locale), true],
   [t("admin.invoiceDetail.timeline.sent"), date(invoice.sent_at, locale), Boolean(invoice.sent_at)],
-  [t("admin.invoiceDetail.timeline.paymentReceived"), lastPayment ? date(lastPayment.payment_date, locale) : t("admin.invoiceDetail.timeline.awaitingPayment"), Boolean(lastPayment)]];
+  ...(returnedTimelineStep && paidAmount === 0 ? [returnedTimelineStep] : []),
+  paymentTimelineStep,
+  ...(returnedTimelineStep && paidAmount > 0 ? [returnedTimelineStep] : [])];
 
   const smallAction = (label, onClick, Icon, primaryAction = false, disabled = false, title) => {
     const button = <button
@@ -180,7 +194,6 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       {Icon && <Icon size={16} />}{label}</button>;
     return disabled && title ? <span key={label} title={title} className="inline-flex">{button}</span> : <span key={label} title={title}>{button}</span>;
   };
-  const printInvoice = () => window.print();
   return <div id="invoice-print-area" className="space-y-4 pb-8">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="min-w-0">
@@ -214,109 +227,37 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     </div>
 
     <div className="grid items-start gap-4 lg:grid-cols-12">
-      <main className="space-y-3.5 lg:col-span-8">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Panel
-            title={t("admin.quoteInvoice.ui.customer_information_c996cd10")}
-            icon={UserRound}
-            trailing={invoice.customer_id && <Link href={`/admin/customers/${invoice.customer_id}`} className="rounded border px-2 py-1 text-xs font-semibold transition hover:bg-blue-50" style={{ borderColor: "#cfe0f8", color: "#2878f0" }}>{t("admin.quoteInvoice.ui.view_customer_26fa8d1d")}</Link>}>
-
-            <div className="p-4">
-              <div className="mb-2.5 flex items-center gap-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ background: "#f0f4fa", color: "#4c6688" }}>{String(invoice.customer_name || "C").slice(0, 2).toUpperCase()}</div>
-                <div className="min-w-0"><div className="truncate text-[11px] font-bold" style={primary}>{invoice.customer_name || t("admin.invoiceDetail.common.customer")}</div><div className="truncate text-xs" style={muted}>{t("admin.quoteInvoice.ui.invoice_customer_4cd77f44")}</div></div>
-              </div>
-              <div className="space-y-0.5">
-                <LabelValue icon={UserRound} label={t("admin.invoiceDetail.field.name")} value={invoice.customer_name} />
-                <LabelValue icon={Phone} label={t("admin.invoiceDetail.field.phone")} value={invoice.customer_phone} />
-                <LabelValue icon={Mail} label={t("admin.invoiceDetail.field.email")} value={invoice.customer_email} />
-                <LabelValue icon={MapPin} label={t("admin.invoiceDetail.field.address")} value={invoice.customer_address} />
-              </div>
-            </div>
-          </Panel>
-
-          <Panel title={t("admin.quoteInvoice.ui.invoice_details_397a6f30")} icon={FileText}>
-            <div className="space-y-1 p-4">
-              <LabelValue icon={CalendarDays} label={t("admin.invoiceDetail.field.invoiceDate")} value={date(invoice.invoice_date, locale)} />
-              <LabelValue icon={CalendarDays} label={t("admin.invoiceDetail.field.dueDate")} value={date(invoice.due_date, locale)} />
-              <LabelValue icon={Receipt} label={t("admin.invoiceDetail.field.paymentTerms")} value={invoice.payment_terms || t("admin.invoiceDetail.common.dueOnReceipt")} />
-              <LabelValue icon={CheckCircle2} label={t("admin.invoiceDetail.field.status")} value={displayStatus} />
-              <LabelValue icon={Clock3} label={t("admin.invoiceDetail.field.created")} value={date(invoice.created_at || invoice.invoice_date, locale)} />
-            </div>
-          </Panel>
-        </div>
-
-        <Panel
-          title={t("admin.quoteInvoice.ui.invoice_items_ec6e78b6")}
-          icon={Package}
-          trailing={<span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: "#2878f0", background: "#edf5ff" }}>{items.length} {t("admin.quoteInvoice.ui.items_44d25b5d")}</span>}>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-xs">
-              <thead style={{ background: "#f8fbff", color: "#627b9f" }}>
-                <tr>
-                  {["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.invoiceDetail.column.quantity"), t("admin.invoiceDetail.column.unitPrice"), t("admin.invoiceDetail.column.discountRate"), t("admin.invoiceDetail.column.discount"), t("admin.invoiceDetail.column.taxRate"), t("admin.invoiceDetail.column.tax"), t("admin.invoiceDetail.column.total")].map((heading, index) => <th key={heading} className={`whitespace-nowrap px-2.5 py-2 font-semibold ${index >= 3 ? "text-right" : ""}`}>{heading}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => {
-                  const nameParts = String(item.name || "").split(" / ");
-                  const purchasedQty = Number(item.quantity || 0);
-                  const returnedQty = Math.min(purchasedQty, returnedQuantityByItem.get(String(item._id || "")) || 0);
-                  const isReturned = returnedQty > 0;
-                  return <tr key={item._id || index} className={`border-t transition-colors ${isReturned ? "bg-rose-50/70 hover:bg-rose-100/70" : "hover:bg-blue-50/50"}`} style={{ borderColor: isReturned ? "#fecaca" : "#eaf0f8" }}>
-                    <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
-                    <td className="max-w-[220px] px-2.5 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        {imageUrl(item.image) ?
-                        <Image src={imageUrl(item.image)} alt={item.name || t("admin.invoiceDetail.common.product")} width={38} height={38} unoptimized className="h-9 w-9 shrink-0 rounded-md border bg-white object-cover" style={{ borderColor: "#dce8f8" }} /> :
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-white" style={{ borderColor: "#dce8f8", color: "#9bb0cc" }}><Package size={15} /></span>}
-                        <span className="min-w-0"><span className="flex items-center gap-1.5"><span className="truncate font-semibold" style={isReturned ? { color: "#b91c1c" } : primary}>{nameParts[0] || "-"}</span>{isReturned && <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">Returned</span>}</span><span className="mt-0.5 block truncate text-[10px]" style={isReturned ? { color: "#be123c" } : muted}>{nameParts.slice(1).join(" / ") || t("admin.invoiceDetail.common.product")}</span></span>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "-"}</td>
-                    <td className="px-2.5 py-2.5 text-right" style={primary}>{item.quantity}{isReturned && <span className="mt-0.5 block text-[10px] font-semibold text-rose-700">{returnedQty} returned</span>}</td>
-                    <td className="whitespace-nowrap px-2.5 py-2.5 text-right" style={primary}>{money(item.unit_price, locale)}</td>
-                    <td className="px-2.5 py-2.5 text-right" style={muted}>{Number(item.discount_rate || 0).toLocaleString(locale)}%</td>
-                    <td className="whitespace-nowrap px-2.5 py-2.5 text-right" style={primary}>{money(item.discount, locale)}</td>
-                    <td className="px-2.5 py-2.5 text-right" style={muted}>{Number(item.tax_rate || 0).toLocaleString(locale)}%</td>
-                    <td className="whitespace-nowrap px-2.5 py-2.5 text-right" style={primary}>{money(item.tax, locale)}</td>
-                    <td className="whitespace-nowrap px-2.5 py-2.5 text-right font-semibold" style={primary}>{money(item.total, locale)}</td>
-                  </tr>;
-                })}
-                {!items.length && <tr><td colSpan={10} className="p-8 text-center text-xs" style={muted}>{t("admin.quoteInvoice.ui.no_invoice_items_7a16164c")}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Panel title={t("admin.quoteInvoice.ui.additional_information_ecfe29ef")} icon={FileText}>
-            <div className="space-y-3 p-4 text-[13px]">
-              <div><p className="text-xs font-bold" style={primary}>{t("admin.quoteInvoice.ui.bank_details_7bc4a700")}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5" style={muted}>{invoice.bank_details || t("admin.invoiceDetail.empty.noBank")}</p></div>
-              <div className="border-t pt-3" style={{ borderColor: "#e5eef9" }}><p className="text-xs font-bold" style={primary}>{t("admin.quoteInvoice.ui.terms_conditions_d35f2b98")}</p><p className="mt-1 whitespace-pre-wrap rounded-lg p-2 text-xs leading-5" style={{ ...muted, background: "#f8fafc" }}>{invoice.terms || t("admin.invoiceDetail.empty.noTerms")}</p></div>
-            </div>
-          </Panel>
-          <Panel title={t("admin.quoteInvoice.ui.calculation_summary_fdc8fa6c")} icon={Percent}>
-            <div className="space-y-2 p-4 text-[13px]">
-              <div className="flex justify-between"><span style={muted}>Items subtotal</span><span style={primary}>{money(invoice.subtotal)}</span></div>
-              <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>- {money(invoice.discount)}</span></div>
-              <div className="flex justify-between"><span style={muted}>Tax</span><span style={primary}>+ {money(invoice.tax)}</span></div>
-              <div className="flex justify-between border-t pt-2" style={{ borderColor: "#e5eef9" }}><span style={muted}>Original invoice total</span><span style={primary}>{money(originalTotal, locale)}</span></div>
-              {balanceAdjustments > 0 && <div className="flex justify-between"><span style={muted}>Returned items</span><span style={{ color: "#dc2626" }}>- {money(balanceAdjustments, locale)}</span></div>}
-              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Adjusted invoice total</span><span style={{ color: "#06a981" }}>{money(invoice.total, locale)}</span></div>
-            </div>
-          </Panel>
-        </div>
+      <main className="min-w-0 lg:col-span-8">
+        <QuoteTemplateDesigner
+          previewOnly
+          documentType="invoice"
+          storageKey={INVOICE_TEMPLATE_STORAGE_KEY}
+          form={{
+            customer_name: invoice.customer_name || "",
+            customer_email: invoice.customer_email || "",
+            customer_phone: invoice.customer_phone || "",
+            customer_address: invoice.customer_address || "",
+            invoice_date: invoice.invoice_date || "",
+            due_date: invoice.due_date || "",
+            terms: invoice.terms || "",
+            notes: "",
+            items: previewItems,
+          }}
+          totals={{ subtotal: invoice.subtotal, discount: invoice.discount, tax: invoice.tax, total: invoice.total }}
+          quoteNumber={invoice.invoice_number}
+          quoteStatus={displayStatus}
+          savedDesign={invoice.pdf_design || {}}
+          money={(value) => money(value, locale)}
+        />
       </main>
 
       <aside className="space-y-3.5 lg:col-span-4">
         <Panel title={t("admin.quoteInvoice.ui.status_payment_cb7d8510")} icon={CheckCircle2}>
           <div className="p-4">
             <div className="flex items-center gap-2"><span className="text-sm font-semibold" style={primary}>{t("admin.quoteInvoice.ui.invoice_status_a5a0bffa")}</span><Badge value={displayStatus} status={rawStatus} /></div>
-            <div className="relative mt-5 grid grid-cols-3 gap-1">
-              <div className="absolute left-[16%] right-[16%] top-[5px] h-px" style={{ background: "#d9e7fa" }} />
-              {timeline.map(([label, value, complete], index) => <div key={label} className="relative flex flex-col items-center gap-1.5 text-center">
+            <div className="relative mt-5 grid gap-1" style={{ gridTemplateColumns: `repeat(${timeline.length}, minmax(0, 1fr))` }}>
+              <div className="absolute top-[5px] h-px" style={{ left: `${50 / timeline.length}%`, right: `${50 / timeline.length}%`, background: "#d9e7fa" }} />
+              {timeline.map(([label, value, complete]) => <div key={label} className="relative flex flex-col items-center gap-1.5 text-center">
                 <span className="z-[1] flex h-[11px] w-[11px] items-center justify-center rounded-full border-2 bg-white" style={{ borderColor: complete ? "#08b88e" : "#cbdaf0", background: complete ? "#08b88e" : "white" }}>{complete && <Check size={7} color="white" strokeWidth={3} />}</span>
                 <span className="text-[11px]" style={{ color: complete ? "#173d78" : "#7188a8", fontWeight: complete ? 700 : 400 }}>{label}</span>
                 <span className="text-[10px]" style={muted}>{value}</span>

@@ -52,6 +52,9 @@ export const adminProductApi = {
   getById: (id) =>
     adminHttp.get(`/products/${id}`).then((res) => res.data?.data || res.data),
 
+  getDocumentHistory: (id) =>
+    adminHttp.get(`/products/admin/${id}/history`).then((res) => res.data?.data || res.data || {}),
+
   create: (data) =>
     adminHttp.post("/products", data).then((res) => res.data),
 

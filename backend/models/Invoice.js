@@ -74,6 +74,7 @@ const invoiceSchema = new mongoose.Schema({
   
   bank_details: { type: String, trim: true, default: "" },
   terms: { type: String, trim: true, default: "" },
+  pdf_design: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   
   amount_paid: { type: Number, default: 0, min: 0 },
   remaining_balance: { type: Number, default: 0, min: 0 },
