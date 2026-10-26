@@ -60,7 +60,7 @@ export default function AdminLanguageSwitcher() {
         <div
           role="listbox"
           aria-label={t("admin.switcher.current")}
-          className="absolute z-50 mt-2 min-w-[190px] overflow-hidden rounded-lg border py-1 shadow-xl"
+          className="absolute z-[70] mt-2 min-w-[190px] overflow-hidden rounded-lg border py-1 shadow-xl"
           style={{
             top: "100%",
             insetInlineEnd: 0,

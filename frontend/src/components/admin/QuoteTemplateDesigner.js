@@ -5,7 +5,9 @@ import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
+import { htmlToPlainText } from "@/lib/termsContent";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import RichTextEditor from "@/components/admin/RichTextEditor";
 import { Check, ChevronDown, Palette } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -319,7 +321,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     const tax = (gross - discount) * Number(item.tax_rate || 0) / 100;
     return { ...item, gross, discount, tax, amount: gross - discount + tax, index: index + 1 };
   });
-  const previewTermsText = String(form?.terms || "")
+  const previewTermsText = htmlToPlainText(form?.terms)
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
@@ -497,6 +499,14 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 </section>
                 <section className="grid gap-2 rounded-lg border border-[var(--border-color)] p-3 sm:grid-cols-2"><h5 className="sm:col-span-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.totals")}</h5><label className={labelClass}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className={selectClass}><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label><label className={labelClass}>{t("admin.quoteDesigner.discount")}<input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className={inputClass} /></label><label className={labelClass}>{t("admin.quoteDesigner.additionalTax")}<input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className={inputClass} /></label><div className="self-end space-y-1 text-right text-[10px] text-[var(--text-secondary)]"><p>{t("admin.quoteDesigner.subtotal")} {money(totals?.subtotal)} · {t("admin.quoteDesigner.discount")} {money(totals?.discount)} · {t("admin.quoteInvoice.ui.tax_9be70f66")} {money(totals?.tax)}</p><p className="text-xs font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.grandTotal")} {money(totals?.total)}</p></div></section>
                 <section className="grid gap-2 sm:grid-cols-2"><label className={labelClass}>{t("admin.quoteDesigner.notes")}<textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 text-xs" /></label></section>
+                <section>
+                  <div className={labelClass}>{t("admin.quoteDesigner.termsConditions")}</div>
+                  <RichTextEditor
+                    value={form?.terms || ""}
+                    onChange={(html) => onFieldChange("terms", html)}
+                    minHeight={160}
+                  />
+                </section>
               </div>            ) : (
             /* Preview container with safe zoom */
             <div style={{ overflow: "hidden", position: "relative" }}>

@@ -15,6 +15,22 @@ import { invoiceApi } from "@/apis/admin/invoiceApi";
 import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
+import { renderRichHtml, htmlToPlainText } from "@/lib/termsContent";
+
+const renderTerms = (terms, fallback) => {
+  const raw = String(terms || "").trim();
+  if (!raw) return <p className="mt-1 whitespace-pre-wrap p-2 text-xs leading-5" style={muted}>{fallback}</p>;
+  if (/<[a-z][\s\S]*>/i.test(raw)) {
+    return (
+      <div
+        className="mt-1 rounded-lg p-2 text-xs leading-5 [&_a]:text-blue-600 [&_a]:underline [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-bold [&_h3]:text-xs [&_h3]:font-semibold [&_img]:my-1 [&_img]:max-w-full [&_li]:ml-4 [&_ol]:list-decimal [&_p]:my-1 [&_ul]:list-disc"
+        style={{ ...muted, background: "#f8fafc" }}
+        dangerouslySetInnerHTML={{ __html: renderRichHtml(raw) }}
+      />
+    );
+  }
+  return <p className="mt-1 whitespace-pre-wrap p-2 text-xs leading-5" style={muted}>{htmlToPlainText(raw) || raw}</p>;
+};
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const edge = { border: "1px solid #dce8f8" };
@@ -283,7 +299,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           <Panel title={t("admin.quoteInvoice.ui.additional_information_ecfe29ef")} icon={FileText}>
             <div className="space-y-3 p-4 text-[13px]">
               <div><p className="text-xs font-bold" style={primary}>{t("admin.quoteInvoice.ui.bank_details_7bc4a700")}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5" style={muted}>{invoice.bank_details || t("admin.invoiceDetail.empty.noBank")}</p></div>
-              <div className="border-t pt-3" style={{ borderColor: "#e5eef9" }}><p className="text-xs font-bold" style={primary}>{t("admin.quoteInvoice.ui.terms_conditions_d35f2b98")}</p><p className="mt-1 whitespace-pre-wrap rounded-lg p-2 text-xs leading-5" style={{ ...muted, background: "#f8fafc" }}>{invoice.terms || t("admin.invoiceDetail.empty.noTerms")}</p></div>
+              <div className="border-t pt-3" style={{ borderColor: "#e5eef9" }}><p className="text-xs font-bold" style={primary}>{t("admin.quoteInvoice.ui.terms_conditions_d35f2b98")}</p>{renderTerms(invoice.terms, t("admin.invoiceDetail.empty.noTerms"))}</div>
             </div>
           </Panel>
           <Panel title={t("admin.quoteInvoice.ui.calculation_summary_fdc8fa6c")} icon={Percent}>
@@ -354,5 +370,20 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
+
+    <style jsx global>{`
+      @media print {
+        html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+        body * { visibility: hidden !important; }
+        #invoice-print-area, #invoice-print-area * { visibility: visible !important; }
+        #invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
+        #invoice-print-area button, #invoice-print-area a, #invoice-print-area .print:hidden { display: none !important; }
+        #invoice-print-area section { box-shadow: none !important; border: 1px solid #d1d5db !important; break-inside: auto !important; }
+        #invoice-print-area table { width: 100% !important; border-collapse: collapse !important; }
+        #invoice-print-area th, #invoice-print-area td { border-color: #d1d5db !important; color: #111827 !important; }
+        #invoice-print-area .overflow-x-auto { overflow: visible !important; }
+        #invoice-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      }
+    `}</style>
   </div>;
 }

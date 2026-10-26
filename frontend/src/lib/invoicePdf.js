@@ -1,5 +1,6 @@
 import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
+import { htmlToPlainText } from "@/lib/termsContent";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const PAGE_MARGIN = 14;
@@ -582,7 +583,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const showBalanceRows = paidAmount > 0 || balanceDue > 0;
   const summaryRowHeight = 6.5 * spacingScale;
   const summaryHeight = summaryRows.length * summaryRowHeight + 22 * spacingScale + (showBalanceRows ? 15 * spacingScale : 0);
-  const termsText = String(invoice.terms || "")
+  const termsText = htmlToPlainText(invoice.terms)
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")

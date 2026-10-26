@@ -290,7 +290,7 @@ export default function PurchaseOrdersPage() {
               <option value="all">{t("admin.purchaseOrders.list.vendorAll")}</option>{vendorList.map((v) => <option key={v._id} value={v._id}>{v.name}</option>)}
             </select>
             <select value={draft.range} onChange={(e) => setDraft({ ...draft, range: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
-              {RANGES.map((v) => <option key={v} value={v}>{t(`admin.purchaseOrders.list.range.${v}`)}</option>)}
+              {RANGES.map(([value]) => <option key={value} value={value}>{t(`admin.purchaseOrders.list.range.${value}`)}</option>)}
             </select>
             <select value={draft.payment} onChange={(e) => setDraft({ ...draft, payment: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
               <option value="all">{t("admin.purchaseOrders.list.paymentAll")}</option>{PAY_STATUSES.map((s) => <option key={s} value={s}>{t(`admin.purchaseOrders.status.${s}`)}</option>)}
