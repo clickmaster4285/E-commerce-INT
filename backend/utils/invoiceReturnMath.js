@@ -81,4 +81,14 @@ function calculateReturnSettlement(invoiceTotal, amountPaid, returnDeduction) {
   return { adjusted_total: adjustedTotal, amount_paid: paidAfterRefund, remaining_balance: remainingBalance, cash_refund: cashRefund };
 }
 
-module.exports = { roundMoney, calculateReturnLine, capReturnLines, calculateReturnSettlement };
+function getOriginalInvoiceTotal(invoice = {}) {
+  const adjustments = (invoice.returns || []).reduce(
+    (sum, record) => sum + Number(record.total_adjustment ?? record.refund_amount ?? 0),
+    0,
+  );
+  const fallback = Number(invoice.total || 0) + adjustments;
+  const original = invoice.original_total == null ? fallback : Number(invoice.original_total);
+  return roundMoney(Math.max(0, Number.isFinite(original) ? original : 0));
+}
+
+module.exports = { roundMoney, calculateReturnLine, capReturnLines, calculateReturnSettlement, getOriginalInvoiceTotal };

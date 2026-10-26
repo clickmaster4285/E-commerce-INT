@@ -152,9 +152,17 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const items = invoice.items || [];
   const payments = invoice.payments || [];
   const returns = invoice.returns || [];
+  const returnedQuantityByItem = new Map();
+  returns.forEach((record) => {
+    (record.items_returned || []).forEach((returnedItem) => {
+      const itemId = String(returnedItem.item_id?._id || returnedItem.item_id || "");
+      if (itemId) returnedQuantityByItem.set(itemId, (returnedQuantityByItem.get(itemId) || 0) + Number(returnedItem.qty || 0));
+    });
+  });
   const paidAmount = Number(invoice.amount_paid || 0);
   const total = Number(invoice.total || 0);
-  const balanceAdjustments = returns.reduce((sum, record) => sum + Number(record.total_adjustment ?? (record.refund_method === "Balance Adjustment" ? record.refund_amount : 0) ?? 0), 0);
+  const balanceAdjustments = returns.reduce((sum, record) => sum + Number(record.total_adjustment ?? record.refund_amount ?? 0), 0);
+  const originalTotal = Number(invoice.original_total ?? (total + balanceAdjustments));
   const paymentProgress = total > 0 ? Math.min(100, Math.max(0, (paidAmount / total) * 100)) : 0;
   const lastPayment = payments[payments.length - 1];
   const timeline = [
@@ -253,18 +261,21 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
               <tbody>
                 {items.map((item, index) => {
                   const nameParts = String(item.name || "").split(" / ");
-                  return <tr key={item._id || index} className="border-t transition-colors hover:bg-blue-50/50" style={{ borderColor: "#eaf0f8" }}>
+                  const purchasedQty = Number(item.quantity || 0);
+                  const returnedQty = Math.min(purchasedQty, returnedQuantityByItem.get(String(item._id || "")) || 0);
+                  const isReturned = returnedQty > 0;
+                  return <tr key={item._id || index} className={`border-t transition-colors ${isReturned ? "bg-rose-50/70 hover:bg-rose-100/70" : "hover:bg-blue-50/50"}`} style={{ borderColor: isReturned ? "#fecaca" : "#eaf0f8" }}>
                     <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
                     <td className="max-w-[220px] px-2.5 py-2.5">
                       <div className="flex items-center gap-2.5">
                         {imageUrl(item.image) ?
                         <Image src={imageUrl(item.image)} alt={item.name || t("admin.invoiceDetail.common.product")} width={38} height={38} unoptimized className="h-9 w-9 shrink-0 rounded-md border bg-white object-cover" style={{ borderColor: "#dce8f8" }} /> :
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-white" style={{ borderColor: "#dce8f8", color: "#9bb0cc" }}><Package size={15} /></span>}
-                        <span className="min-w-0"><span className="block truncate font-semibold" style={primary}>{nameParts[0] || "-"}</span><span className="mt-0.5 block truncate text-[10px]" style={muted}>{nameParts.slice(1).join(" / ") || t("admin.invoiceDetail.common.product")}</span></span>
+                        <span className="min-w-0"><span className="flex items-center gap-1.5"><span className="truncate font-semibold" style={isReturned ? { color: "#b91c1c" } : primary}>{nameParts[0] || "-"}</span>{isReturned && <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700">Returned</span>}</span><span className="mt-0.5 block truncate text-[10px]" style={isReturned ? { color: "#be123c" } : muted}>{nameParts.slice(1).join(" / ") || t("admin.invoiceDetail.common.product")}</span></span>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "-"}</td>
-                    <td className="px-2.5 py-2.5 text-right" style={primary}>{item.quantity}</td>
+                    <td className="px-2.5 py-2.5 text-right" style={primary}>{item.quantity}{isReturned && <span className="mt-0.5 block text-[10px] font-semibold text-rose-700">{returnedQty} returned</span>}</td>
                     <td className="whitespace-nowrap px-2.5 py-2.5 text-right" style={primary}>{money(item.unit_price, locale)}</td>
                     <td className="px-2.5 py-2.5 text-right" style={muted}>{Number(item.discount_rate || 0).toLocaleString(locale)}%</td>
                     <td className="whitespace-nowrap px-2.5 py-2.5 text-right" style={primary}>{money(item.discount, locale)}</td>
@@ -291,8 +302,9 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
               <div className="flex justify-between"><span style={muted}>Items subtotal</span><span style={primary}>{money(invoice.subtotal)}</span></div>
               <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>- {money(invoice.discount)}</span></div>
               <div className="flex justify-between"><span style={muted}>Tax</span><span style={primary}>+ {money(invoice.tax)}</span></div>
-              {balanceAdjustments > 0 && <div className="flex justify-between"><span style={muted}>Returned items</span><span style={{ color: "#dc2626" }}>- {money(balanceAdjustments)}</span></div>}
-              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Grand Total</span><span style={{ color: "#06a981" }}>{money(invoice.total)}</span></div>
+              <div className="flex justify-between border-t pt-2" style={{ borderColor: "#e5eef9" }}><span style={muted}>Original invoice total</span><span style={primary}>{money(originalTotal, locale)}</span></div>
+              {balanceAdjustments > 0 && <div className="flex justify-between"><span style={muted}>Returned items</span><span style={{ color: "#dc2626" }}>- {money(balanceAdjustments, locale)}</span></div>}
+              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Adjusted invoice total</span><span style={{ color: "#06a981" }}>{money(invoice.total, locale)}</span></div>
             </div>
           </Panel>
         </div>
@@ -314,6 +326,11 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
             <div className="flex items-center justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.amount_paid_d39013c6")}</span><span className="font-semibold" style={{ color: "#079878" }}>{money(paidAmount, locale)}</span></div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "#edf3fb" }}><div className="h-full rounded-full" style={{ width: `${paymentProgress}%`, background: "#0bb98f" }} /></div>
             <div className="mt-2 flex justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.remaining_balance_939fea83")}</span><span className="font-semibold" style={remaining > 0 ? { color: "#b5760a" } : { color: "#079878" }}>{money(remaining, locale)}</span></div>
+            {canReturn && <button type="button" onClick={() => setReturnOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-left transition hover:border-rose-300 hover:bg-rose-100/80 print:hidden">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-rose-600 shadow-sm"><RotateCcw size={16} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-rose-800">Return &amp; Refund</span><span className="mt-0.5 block text-[10px] text-rose-700/80">Process returned items and adjust the bill</span></span>
+              <ChevronRight size={15} className="shrink-0 text-rose-500" />
+            </button>}
           </div>
         </Panel>
 

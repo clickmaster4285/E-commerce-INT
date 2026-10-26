@@ -67,6 +67,9 @@ const invoiceSchema = new mongoose.Schema({
   subtotal: { type: Number, required: true, min: 0 },
   discount: { type: Number, default: 0, min: 0 },
   tax: { type: Number, default: 0, min: 0 },
+  // Immutable total when this invoice was first saved; `total` is the current
+  // amount due after bill adjustments from returns.
+  original_total: { type: Number, min: 0 },
   total: { type: Number, required: true, min: 0 },
   
   bank_details: { type: String, trim: true, default: "" },

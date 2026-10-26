@@ -4,6 +4,7 @@ const {
   calculateReturnLine,
   capReturnLines,
   calculateReturnSettlement,
+  getOriginalInvoiceTotal,
 } = require("../utils/invoiceReturnMath");
 
 const closeTo = (actual, expected) => assert.equal(actual, expected);
@@ -52,4 +53,16 @@ test("partial payment offsets the balance before paying cash", () => {
   closeTo(settlement.cash_refund, 795.10);
   closeTo(settlement.amount_paid, 1204.90);
   closeTo(settlement.remaining_balance, 0);
+});
+
+test("original invoice total stays unchanged after returns, including legacy records", () => {
+  closeTo(getOriginalInvoiceTotal({
+    original_total: 1000,
+    total: 600,
+    returns: [{ total_adjustment: 400 }],
+  }), 1000);
+  closeTo(getOriginalInvoiceTotal({
+    total: 600,
+    returns: [{ refund_amount: 250 }, { total_adjustment: 150 }],
+  }), 1000);
 });
