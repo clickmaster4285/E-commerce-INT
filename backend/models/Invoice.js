@@ -16,7 +16,8 @@ const invoiceItemSchema = new mongoose.Schema({
 }, { _id: true });
 
 const invoicePaymentSchema = new mongoose.Schema({
-  amount: { type: Number, required: true, min: 0.01 },
+  // Negative entries record cash refunds in the same ledger as received payments.
+  amount: { type: Number, required: true, validate: { validator: (value) => Number.isFinite(value) && value !== 0, message: "Payment transaction amount cannot be zero" } },
   payment_date: { type: Date, required: true, default: Date.now },
   payment_time: { type: String, trim: true, default: "" },
   payment_method: { type: String, required: true, trim: true, enum: ["Cash", "Bank", "Card", "Other"] },
@@ -28,13 +29,16 @@ const invoiceReturnItemSchema = new mongoose.Schema({
   qty: { type: Number, required: true, min: 1 },
   name: { type: String, trim: true, default: "" },
   unit_price: { type: Number, required: true, min: 0 },
+  return_value: { type: Number, default: 0, min: 0 },
 }, { _id: false });
 
 const invoiceReturnSchema = new mongoose.Schema({
   return_id: { type: String, required: true, trim: true, default: () => new mongoose.Types.ObjectId().toString() },
   items_returned: { type: [invoiceReturnItemSchema], required: true, validate: (items) => Array.isArray(items) && items.length > 0 },
   refund_amount: { type: Number, required: true, min: 0 },
-  refund_method: { type: String, required: true, enum: ["Bank Transfer", "Cash", "Store Credit"] },
+  amount_to_refund: { type: Number, default: 0, min: 0 },
+  total_adjustment: { type: Number, default: 0, min: 0 },
+  refund_method: { type: String, required: true, enum: ["Cash Refund", "Balance Adjustment"] },
   reason: { type: String, required: true, trim: true, maxlength: 500 },
   notes: { type: String, trim: true, default: "", maxlength: 2000 },
   status: { type: String, enum: ["Pending", "Completed"], default: "Completed" },

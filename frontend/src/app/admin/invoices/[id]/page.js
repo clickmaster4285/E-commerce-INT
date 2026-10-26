@@ -90,9 +90,8 @@ export default function InvoiceDetailsPage({ params }) {
   const remaining = Math.max(0, Number(invoice?.remaining_balance ?? invoice?.total ?? 0));
 
   useEffect(() => {
-    if (!invoice || searchParams.get("returnRefund") !== "1") return;
-    if (["Paid", "Partially Paid"].includes(invoice.status) && Number(invoice.amount_paid) > 0) setReturnOpen(true);
-    else toast.error("Refund not possible. No payment received yet.");
+    if (!invoice?.sent_at || searchParams.get("returnRefund") !== "1") return;
+    setReturnOpen(true);
     router.replace(`/admin/invoices/${id}`, { scroll: false });
   }, [invoice, id, router, searchParams]);
 
@@ -137,12 +136,13 @@ export default function InvoiceDetailsPage({ params }) {
   </div>;
 
   const displayStatus = invoice.status === "Draft" || !invoice.status ? "Unpaid" : invoice.status;
-  const canRefund = ["Paid", "Partially Paid"].includes(invoice.status) && Number(invoice.amount_paid) > 0;
+  const canReturn = Boolean(invoice.sent_at);
   const items = invoice.items || [];
   const payments = invoice.payments || [];
   const returns = invoice.returns || [];
   const paidAmount = Number(invoice.amount_paid || 0);
   const total = Number(invoice.total || 0);
+  const balanceAdjustments = returns.reduce((sum, record) => sum + Number(record.total_adjustment ?? (record.refund_method === "Balance Adjustment" ? record.refund_amount : 0) ?? 0), 0);
   const paymentProgress = total > 0 ? Math.min(100, Math.max(0, (paidAmount / total) * 100)) : 0;
   const lastPayment = payments[payments.length - 1];
   const timeline = [
@@ -180,7 +180,7 @@ export default function InvoiceDetailsPage({ params }) {
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
-        {smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true, !canRefund, !canRefund ? "Refund not possible. No payment received yet." : undefined)}
+        {canReturn && smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true)}
         {smallAction("Download PDF", () => downloadInvoicePdf(invoice).catch(() => toast.error("Could not generate invoice PDF")), FileText)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? "Saving..." : "Send to Customer",
@@ -278,6 +278,7 @@ export default function InvoiceDetailsPage({ params }) {
               <div className="flex justify-between"><span style={muted}>Items subtotal</span><span style={primary}>{money(invoice.subtotal)}</span></div>
               <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>- {money(invoice.discount)}</span></div>
               <div className="flex justify-between"><span style={muted}>Tax</span><span style={primary}>+ {money(invoice.tax)}</span></div>
+              {balanceAdjustments > 0 && <div className="flex justify-between"><span style={muted}>Returned items</span><span style={{ color: "#dc2626" }}>- {money(balanceAdjustments)}</span></div>}
               <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Grand Total</span><span style={{ color: "#06a981" }}>{money(invoice.total)}</span></div>
             </div>
           </Panel>
@@ -310,7 +311,7 @@ export default function InvoiceDetailsPage({ params }) {
               <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t transition-colors hover:bg-blue-50/50" style={{ borderColor: "#eaf0f8" }}>
                 <td className="px-2 py-2.5" style={muted}>{index + 1}</td>
                 <td className="whitespace-nowrap px-2 py-2.5" style={primary}><span className="block">{paymentDateTime(payment).date}</span><span className="mt-0.5 block text-[10px]" style={muted}>{paymentDateTime(payment).time}</span></td>
-                <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={primary}>{money(payment.amount)}</td>
+                <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={{ color: Number(payment.amount) < 0 ? "#dc2626" : "#0f172a" }}>{money(payment.amount)}</td>
                 <td className="px-2 py-2.5" style={muted}>{payment.payment_method || "-"}</td>
                 <td className="max-w-24 truncate px-2 py-2.5" style={muted} title={payment.note || "-"}>{payment.note || "-"}</td>
               </tr>)}
@@ -328,7 +329,7 @@ export default function InvoiceDetailsPage({ params }) {
         <Panel title="Return & Refund History" icon={RotateCcw} trailing={<span className="text-xs font-semibold" style={accent}>{returns.length} Returns</span>}>
           <div className="space-y-2 p-3">
             {returns.length ? [...returns].reverse().map((record) => <article key={record.return_id || record._id} className="rounded-xl border p-3" style={{ borderColor: "#e2eaf5", background: "#fff" }}>
-              <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-bold" style={primary}>{money(record.refund_amount)}</p><p className="mt-0.5 text-[10px]" style={muted}>{record.refund_method} · {record.reason}</p></div><span className="rounded-full px-2 py-1 text-[9px] font-bold" style={{ color: record.status === "Completed" ? "#079878" : "#b5760a", background: record.status === "Completed" ? "#e1f8f0" : "#fff5df" }}>{record.status}</span></div>
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-medium" style={muted}>Item deduction: <span className="text-xs font-bold" style={primary}>{money(record.refund_amount)}</span></p>{record.refund_method === "Cash Refund" && <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">Cash paid back: {money(record.amount_to_refund ?? record.refund_amount)}</p>}<p className="mt-0.5 text-[10px]" style={muted}>{record.refund_method} · {record.reason}</p></div><span className="rounded-full px-2 py-1 text-[9px] font-bold" style={{ color: record.status === "Completed" ? "#079878" : "#b5760a", background: record.status === "Completed" ? "#e1f8f0" : "#fff5df" }}>{record.status}</span></div>
               <p className="mt-2 text-[10px]" style={muted}>{new Date(record.date).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
               <div className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: "#edf2f9" }}>{(record.items_returned || []).map((item, index) => <div key={`${item.item_id || index}`} className="flex justify-between gap-3 text-[10px]"><span className="truncate" style={muted}>{item.name || invoice.items?.find((invoiceItem) => String(invoiceItem._id) === String(item.item_id))?.name || "Invoice item"}</span><span className="shrink-0 font-semibold" style={primary}>× {item.qty}</span></div>)}</div>
               {record.notes && <p className="mt-2 whitespace-pre-wrap text-[10px]" style={muted}>{record.notes}</p>}
@@ -339,6 +340,6 @@ export default function InvoiceDetailsPage({ params }) {
     </div>
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
-    {returnOpen && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
+    {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
   </div>;
 }

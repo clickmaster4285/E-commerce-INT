@@ -20,8 +20,8 @@ const primary = { color: "#0f172a" };
 const accent = { color: "#2563eb" };
 const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
 const money = (n, locale = "en") => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
-const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
-const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "—";
+const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "â€”";
+const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "â€”";
 const imageUrl = (url) => !url ? "" : /^https?:\/\//i.test(url) ? url : `${API_ORIGIN || ""}${url.startsWith("/") ? url : `/${url}`}`;
 
 const statusStyles = {
@@ -55,7 +55,7 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
 function LabelValue({ label, value, icon: Icon }) {
   return <div className="grid grid-cols-[minmax(84px,.8fr)_minmax(0,1.2fr)] items-center gap-2 text-[13px] leading-6">
     <span className="inline-flex items-center gap-1.5" style={muted}>{Icon && <Icon size={13} />}{label}</span>
-    <span className="min-w-0 truncate font-medium" style={primary} title={value || "—"}>{value || "—"}</span>
+    <span className="min-w-0 truncate font-medium" style={primary} title={value || "â€”"}>{value || "â€”"}</span>
   </div>;
 }
 
@@ -168,7 +168,7 @@ export default function PODetailPage({ params }) {
               <div className="p-4">
                 <div className="mb-2.5 flex items-center gap-2.5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ background: "#f0f4fa", color: "#4c6688" }}>{String(vendor.name || po.vendor_id?.name || "V").slice(0, 2).toUpperCase()}</div>
-                  <div className="min-w-0"><div className="truncate text-[11px] font-bold" style={primary}>{vendor.name || po.vendor_id?.name || "Vendor"}</div><div className="truncate text-xs" style={muted}>{vendor.company_name || "—"}</div></div>
+                  <div className="min-w-0"><div className="truncate text-[11px] font-bold" style={primary}>{vendor.name || po.vendor_id?.name || "Vendor"}</div><div className="truncate text-xs" style={muted}>{vendor.company_name || "â€”"}</div></div>
                   {vendorActive !== undefined && <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: vendorActive ? "#079878" : "#cf3348", background: vendorActive ? "#e1f8f0" : "#ffebed" }}>{t(vendorActive ? "admin.purchaseOrders.view.active" : "admin.purchaseOrders.view.inactive")}</span>}
                 </div>
                 <div className="space-y-0.5">
@@ -183,20 +183,11 @@ export default function PODetailPage({ params }) {
 
             <Panel title={t("admin.purchaseOrders.view.summary")} icon={FileText}>
               <div className="space-y-2 p-4 text-[13px]">
-<<<<<<< HEAD
                 <div className="flex justify-between"><span style={muted}>Subtotal</span><span style={primary}>{money(po.subtotal)}</span></div>
                 <div className="flex justify-between"><span style={muted}>Tax (overall {new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 2 }).format(overallTaxPercent)}%)</span><span style={primary}>{money(Number(po.tax || 0) + Number(po.overall_tax || 0))}</span></div>
                 <div className="flex justify-between"><span style={muted}>Shipping</span><span style={primary}>{money(po.shipping)}</span></div>
                 <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>{money(po.discount)}</span></div>
                 <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Total</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
-=======
-                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.subtotal")}</span><span style={primary}>{money(po.subtotal)}</span></div>
-                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.tax")} ({new Intl.NumberFormat(intlLocale(locale)).format(taxPercent)}%)</span><span style={primary}>{money(po.tax)}</span></div>
-                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.overallTax")}</span><span style={primary}>{money(po.overall_tax)}</span></div>
-                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.shipping")}</span><span style={primary}>{money(po.shipping)}</span></div>
-                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.discount")}</span><span style={primary}>{money(po.discount)}</span></div>
-                <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>{t("admin.purchaseOrders.detail.total")}</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
->>>>>>> 2e3f0d01943d374997bd89fc3c0e0f7e0754f66e
               </div>
             </Panel>
           </div>
@@ -208,14 +199,14 @@ export default function PODetailPage({ params }) {
                 <tbody>{items.slice(0, showAllItems ? items.length : 10).map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
                   <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || ""} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
-                  <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{item.name || "—"}</div><div className="truncate" style={muted}>{item.variantTitle || "—"}</div></td>
-                  <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "—"}</td>
+                  <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{item.name || "â€”"}</div><div className="truncate" style={muted}>{item.variantTitle || "â€”"}</div></td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "â€”"}</td>
                   <td className="px-2.5 py-2.5 text-center" style={primary}>{item.qty_ordered}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.cost_price, locale)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.sell_price, locale)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-semibold" style={primary}>{money(item.line_total, locale)}</td>
                   <td className="px-2.5 py-2.5" style={muted}>{new Intl.NumberFormat(intlLocale(locale)).format(Number(item.tax_rate || 0))}%</td>
-                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${new Intl.NumberFormat(intlLocale(locale)).format(item.expiry_after_delivery)} ${t("admin.purchaseOrders.view.days")}` : item.expiry_date ? t("admin.purchaseOrders.view.until", { date: dateOnly(item.expiry_date, locale) }) : "—"}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${new Intl.NumberFormat(intlLocale(locale)).format(item.expiry_after_delivery)} ${t("admin.purchaseOrders.view.days")}` : item.expiry_date ? t("admin.purchaseOrders.view.until", { date: dateOnly(item.expiry_date, locale) }) : "â€”"}</td>
                 </tr>)}
                   {!items.length && <tr><td colSpan={10} className="p-8 text-center text-xs" style={muted}>{t("admin.purchaseOrders.view.noItems")}</td></tr>}</tbody>
               </table>

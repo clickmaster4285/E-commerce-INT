@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Invoice = require("../models/Invoice");
 const Customer = require("../models/Customer");
 const Variant = require("../models/Variant");
+const { calculateReturnLine, capReturnLines, calculateReturnSettlement } = require("../utils/invoiceReturnMath");
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 const nextInvoiceNumber = async () => {
@@ -182,15 +183,17 @@ exports.recordReturn = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false });
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
+    if (!invoice.sent_at) return res.status(400).json({ success: false, message: "Send the invoice to the customer before processing a return or refund" });
 
     const priorPaid = round(Number(invoice.amount_paid || 0));
-    if (!["Paid", "Partially Paid"].includes(invoice.status) || priorPaid <= 0) {
-      return res.status(400).json({ success: false, message: "Refund not possible. No payment received yet." });
-    }
-
+    const priorTotal = round(Number(invoice.total || 0));
     const refundMethod = String(req.body.refund_method || "").trim();
-    if (!["Bank Transfer", "Cash", "Store Credit"].includes(refundMethod)) {
+    if (!["Cash Refund", "Balance Adjustment"].includes(refundMethod)) {
       return res.status(400).json({ success: false, message: "Choose a valid refund method" });
+    }
+    const refundPaymentMethod = String(req.body.refund_payment_method || "Cash").trim();
+    if (refundMethod === "Cash Refund" && !["Cash", "Bank"].includes(refundPaymentMethod)) {
+      return res.status(400).json({ success: false, message: "Choose Cash or Bank for the cash refund" });
     }
     const reason = String(req.body.reason || "").trim();
     if (!reason) return res.status(400).json({ success: false, message: "Select or enter a reason for return" });
@@ -217,8 +220,7 @@ exports.recordReturn = async (req, res) => {
       requested.set(itemId, (requested.get(itemId) || 0) + qty);
     }
 
-    const itemsReturned = [];
-    let refundAmount = 0;
+    let itemsReturned = [];
     for (const [itemId, qty] of requested) {
       const item = invoice.items.id(itemId);
       if (!item) return res.status(400).json({ success: false, message: "A selected item does not belong to this invoice" });
@@ -226,22 +228,33 @@ exports.recordReturn = async (req, res) => {
       if (qty > availableQty) {
         return res.status(400).json({ success: false, message: `Return quantity for ${item.name} exceeds the unreturned quantity (${Math.max(0, availableQty)})` });
       }
-      const unitPrice = round(Number(item.unit_price) || 0);
-      refundAmount += unitPrice * qty;
-      itemsReturned.push({ item_id: item._id, qty, name: item.name, unit_price: unitPrice });
+      const lineValue = calculateReturnLine(item, qty, invoice.returns || []);
+      itemsReturned.push({ item_id: item._id, qty, name: item.name, unit_price: lineValue.unit_price, return_value: lineValue.return_value });
     }
-    refundAmount = round(refundAmount);
+    const cappedReturn = capReturnLines(itemsReturned, priorTotal);
+    itemsReturned = cappedReturn.lines;
+    const refundAmount = cappedReturn.total;
     if (refundAmount <= 0) return res.status(400).json({ success: false, message: "Refund amount must be greater than zero" });
-    if (refundAmount > priorPaid) {
-      return res.status(400).json({ success: false, message: "Refund amount cannot exceed the amount paid" });
+    const settlement = calculateReturnSettlement(priorTotal, priorPaid, refundAmount);
+    if (settlement.cash_refund > 0 && refundMethod !== "Cash Refund") {
+      return res.status(400).json({ success: false, message: "The customer has overpaid. Process the excess as a cash or bank refund." });
     }
-
-    const paid = round(priorPaid - refundAmount);
-    const remaining = round(Math.max(0, Number(invoice.total || 0) - paid));
+    if (refundMethod === "Cash Refund" && settlement.cash_refund <= 0) {
+      return res.status(400).json({ success: false, message: "Cash refund is only needed when the invoice is fully paid or the return creates an excess payment" });
+    }
+    const cashRefundAmount = refundMethod === "Cash Refund" ? settlement.cash_refund : 0;
+    // Cash paid back is only the amount that remains after the return offsets the invoice balance.
+    const amountToRefund = round(cashRefundAmount);
+    const adjustedTotal = settlement.adjusted_total;
+    const paid = settlement.amount_paid;
+    const remaining = settlement.remaining_balance;
+    const nextStatus = remaining <= 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid";
     const returnRecord = {
       return_id: new mongoose.Types.ObjectId().toString(),
       items_returned: itemsReturned,
       refund_amount: refundAmount,
+      amount_to_refund: amountToRefund,
+      total_adjustment: refundAmount,
       refund_method: refundMethod,
       reason: reason.slice(0, 500),
       notes: String(req.body.notes || "").trim().slice(0, 2000),
@@ -249,13 +262,23 @@ exports.recordReturn = async (req, res) => {
       date: new Date(),
       refunded_by: req.user?._id || null,
     };
+    const update = {
+      $push: { returns: returnRecord },
+      $set: { amount_paid: paid, total: adjustedTotal, remaining_balance: remaining, status: nextStatus, paid_at: nextStatus === "Paid" ? invoice.paid_at || new Date() : null, updatedby: req.user?._id || null },
+      $inc: { __v: 1 },
+    };
+    if (cashRefundAmount > 0) {
+      update.$push.payments = {
+        amount: -amountToRefund,
+        payment_date: new Date(),
+        payment_time: "",
+        payment_method: refundPaymentMethod,
+        note: `${refundPaymentMethod} refund for return ${returnRecord.return_id}`,
+      };
+    }
     const updatedInvoice = await Invoice.findOneAndUpdate(
-      { _id: invoice._id, is_deleted: false, status: { $in: ["Paid", "Partially Paid"] }, amount_paid: priorPaid, __v: invoice.__v },
-      {
-        $push: { returns: returnRecord },
-        $set: { amount_paid: paid, remaining_balance: remaining, status: paid > 0 ? "Partially Paid" : "Unpaid", paid_at: null, updatedby: req.user?._id || null },
-        $inc: { __v: 1 },
-      },
+      { _id: invoice._id, is_deleted: false, amount_paid: priorPaid, total: priorTotal, __v: invoice.__v },
+      update,
       { new: true, runValidators: true }
     );
     if (!updatedInvoice) return res.status(409).json({ success: false, message: "Invoice changed while processing. Refresh and try again." });
