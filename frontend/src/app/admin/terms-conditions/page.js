@@ -93,14 +93,10 @@ export default function TermsConditionsPage() {
             className="min-h-64 w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-60"
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">
-              {isLoading ? "Loading saved terms…" : isError ? "Could not load company settings." : "Leave blank if you do not want default terms on this document type."}
-            </p>
-            <span className="text-[11px] tabular-nums text-slate-500">{values[activeTab].length} / 5000</span>
+                        <span className="text-[11px] tabular-nums text-slate-500">{values[activeTab].length} / 5000</span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-            <p className="text-xs text-slate-500">Defaults are used for new documents. Existing documents stay unchanged.</p>
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
             <button
               type="button"
               onClick={() => saveMutation.mutate()}

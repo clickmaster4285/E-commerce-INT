@@ -30,7 +30,7 @@ new Date(value).toLocaleDateString([], { year: "numeric", month: "short", day: "
 "—";
 const money = (value) => new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 
-export default function QuotesPage() {const { t } = useTranslation();
+export default function QuotesPage() {const { t, dir, locale } = useTranslation();
   const router = useRouter();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -93,7 +93,7 @@ export default function QuotesPage() {const { t } = useTranslation();
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t("admin.quoteInvoice.ui.quotes_7b0257ce")}</h1>
         <p className="mt-1 text-xs font-medium text-slate-500">{t("admin.quoteInvoice.ui.create_track_and_manage_customer_quotations_2132eaca")}</p>
       </div>
-      <button type="button" onClick={() => router.push("/admin/quotes/new")} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"><Plus size={16} strokeWidth={2.5} /> {t("admin.quoteInvoice.ui.create_quote_b146a77e")}</button>
+      <button type="button" onClick={() => router.push("/admin/quotes/new")} style={{ marginInlineStart: "auto" }} className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"><Plus size={16} strokeWidth={2.5} /> {t("admin.quoteInvoice.ui.create_quote_b146a77e")}</button>
     </header>
 
     <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label={t("admin.quoteInvoice.ui.quote_status_summary_6f594d13")}>
