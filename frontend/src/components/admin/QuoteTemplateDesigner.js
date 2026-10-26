@@ -48,7 +48,7 @@ const DEFAULT_DESIGN = {
   lineSpacing: 1.15,
   decimalPrecision: 2,
   currencySymbol: "PKR",
-  customTypography: false,
+  customTypography: true,
 };
 
 const QUOTE_TEMPLATES = [
@@ -179,7 +179,7 @@ export function getSavedQuotePdfDesign() {
     decimalPrecision: 2,
     currencySymbol: saved.currencySymbol || "PKR",
     dateFormat: "locale",
-    customTypography: Boolean(saved.customTypography),
+    customTypography: true,
   };
 }
 
@@ -421,7 +421,6 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 [t("admin.quoteDesigner.boldBody"), "boldBody"],
                 [t("admin.quoteDesigner.italicBody"), "italicBody"],
                 [t("admin.quoteDesigner.italicNotes"), "italicNotes"],
-                [t("admin.quoteDesigner.customTypography"), "customTypography"],
               ].map(([label, key]) => (
                 <label key={key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-color)] px-2.5 py-2 text-[10px] font-medium text-[var(--text-secondary)] hover:border-blue-300 transition">
                   <input type="checkbox" checked={!!design[key]} onChange={(e) => setDesign((prev) => ({ ...prev, [key]: e.target.checked }))} className="h-3.5 w-3.5 rounded" />
@@ -493,9 +492,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
               <div className="mx-auto max-w-[760px] space-y-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 sm:p-4">
                 <div><h4 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.quoteDesigner.editDocument")}</h4><p className="text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.editHint")}</p></div>
 
-                <section className="rounded-lg border border-[var(--border-color)] p-3"><div className="mb-2 flex items-center justify-between"><h5 className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="text-[9px] text-[var(--text-muted)]">{form?.items?.length || 0} {t("admin.quoteInvoice.ui.items_7316c8b2")}</span></div>
+                <section className="rounded-lg border border-[var(--border-color)] p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><h5 className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="text-[9px] text-[var(--text-muted)]">{form?.items?.length || 0} {t("admin.quoteInvoice.ui.items_7316c8b2")}</span></div><button type="button" onClick={onBrowseProducts} className="h-9 rounded-lg bg-blue-600 px-4 text-[10px] font-bold text-white shadow-sm transition hover:bg-blue-700">{t("admin.quoteDesigner.addProduct")}</button></div>
                   {form?.items?.length ? <div className="space-y-2">{form.items.map((item, index) => <div key={item.row_id || item._id || index} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]/40 p-2.5"><div className="mb-2 flex items-center gap-2"><div className="min-w-0 flex-1"><input value={item.name || ""} onChange={(event) => onUpdateItem(item.row_id, "name", event.target.value)} className={inputClass} aria-label={`${t("admin.quoteInvoice.ui.product_dd3b86d1")} ${index + 1}`} />{item.sku && <p className="mt-1 text-[9px] text-[var(--text-muted)]">SKU {item.sku}</p>}</div><button type="button" onClick={() => onRemoveItem(item.row_id)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-rose-600 hover:bg-rose-50">{t("admin.quoteDesigner.remove")}</button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <label key={key} className={labelClass}>{title}<input type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} className={inputClass} /></label>)}</div></div>)}</div> : <div className="rounded-lg border border-dashed border-[var(--border-color)] p-5 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.noProducts")}</div>}
-                  <div className="flex justify-center pt-3"><button type="button" onClick={onBrowseProducts} className="h-9 rounded-lg bg-blue-600 px-4 text-[10px] font-bold text-white shadow-sm transition hover:bg-blue-700">{t("admin.quoteDesigner.addProduct")}</button></div>
                 </section>
                 <section className="grid gap-2 rounded-lg border border-[var(--border-color)] p-3 sm:grid-cols-2"><h5 className="sm:col-span-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.totals")}</h5><label className={labelClass}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className={selectClass}><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label><label className={labelClass}>{t("admin.quoteDesigner.discount")}<input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className={inputClass} /></label><label className={labelClass}>{t("admin.quoteDesigner.additionalTax")}<input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className={inputClass} /></label><div className="self-end space-y-1 text-right text-[10px] text-[var(--text-secondary)]"><p>{t("admin.quoteDesigner.subtotal")} {money(totals?.subtotal)} · {t("admin.quoteDesigner.discount")} {money(totals?.discount)} · {t("admin.quoteInvoice.ui.tax_9be70f66")} {money(totals?.tax)}</p><p className="text-xs font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.grandTotal")} {money(totals?.total)}</p></div></section>
                 <section className="grid gap-2 sm:grid-cols-2"><label className={labelClass}>{t("admin.quoteDesigner.notes")}<textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 text-xs" /></label></section>

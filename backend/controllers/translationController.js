@@ -13,9 +13,27 @@ const PurchaseOrder = require("../models/PurchaseOrder");
 const Vendor = require("../models/Vendor");
 const ShippingMethod = require("../models/ShippingMethod");
 const { TARGET_LOCALES } = require("../utils/libreTranslate");
+const { translateBatch } = require("../utils/libreTranslate");
 const { syncDocumentTranslations } = require("../utils/translationService");
 
 const MODELS = { Brand, Category, Product, Discount, Deal, Attribute, Review, Banner, Variant, StockHistory, Order, PurchaseOrder, Vendor, ShippingMethod };
+
+async function translateTerms(req, res) {
+  const { text, locale } = req.body || {};
+  if (req.user?.role?.toLowerCase() !== "admin" && !req.user?.permissions?.store) {
+    return res.status(403).json({ success: false, message: "Access denied: store" });
+  }
+  if (typeof text !== "string" || !text.trim() || text.length > 5000 || !TARGET_LOCALES.includes(locale)) {
+    return res.status(400).json({ success: false, message: "Invalid terms translation request" });
+  }
+  try {
+    const translated = await translateBatch([text], locale);
+    if (!translated?.[0]) return res.status(503).json({ success: false, message: "Translation service is unavailable" });
+    return res.json({ success: true, data: { text: translated[0] } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Could not translate terms" });
+  }
+}
 const PERMISSIONS = { Brand: "brands", Category: "categories", Product: "products", Discount: "discounts", Deal: "deals", Attribute: "attribute", Review: "reviews", Banner: "banners", Variant: "manageStock", StockHistory: "manageStock", Order: "order", PurchaseOrder: "purchaseOrders", Vendor: "vendors", ShippingMethod: "shipping" };
 
 async function translatePage(req, res) {
@@ -57,4 +75,4 @@ async function translatePage(req, res) {
   }
 }
 
-module.exports = { translatePage };
+module.exports = { translatePage, translateTerms };
