@@ -39,9 +39,9 @@ const REQUIRED_TARGET_LOCALES = ["ur", "ar", "es", "fr", "de", "hi", "zh", "pt",
 const TARGET_LOCALES = [...new Set([
   ...REQUIRED_TARGET_LOCALES,
   ...String(process.env.TRANSLATE_TARGET_LOCALES || "")
-  .split(",")
-  .map((l) => l.trim().toLowerCase())
-  .filter(Boolean),
+    .split(",")
+    .map((locale) => locale.trim().toLowerCase())
+    .filter(Boolean),
 ])];
 
 // ✅ Serial queue — ek waqt me sirf ek request jaari ho.

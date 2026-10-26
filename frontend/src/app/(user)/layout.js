@@ -101,6 +101,7 @@ function NavItem({ icon, label, active }) {
 
 export default function UserLayout({ children }) {
   useUserSocketSync();
+  const { dir, locale } = useTranslation();
   const pathname = usePathname();
   const queryClient = useQueryClient();
 
@@ -141,6 +142,8 @@ export default function UserLayout({ children }) {
         <QuickBuyProvider>
         <div
           id="user-theme"
+          dir={dir}
+          lang={locale}
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
         >
           <Header />

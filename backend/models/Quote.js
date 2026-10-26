@@ -4,6 +4,7 @@ const quoteItemSchema = new mongoose.Schema({
   product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: null },
   variant_id: { type: mongoose.Schema.Types.ObjectId, ref: "Variant", default: null },
   name: { type: String, required: true, trim: true, maxlength: 240 },
+  variant_name: { type: String, trim: true, default: "", maxlength: 240 },
   sku: { type: String, trim: true, default: "" },
   quantity: { type: Number, required: true, min: 1 },
   unit_price: { type: Number, required: true, min: 0 },
@@ -35,6 +36,7 @@ const quoteSchema = new mongoose.Schema({
   total: { type: Number, required: true, min: 0 },
   terms: { type: String, trim: true, default: "", maxlength: 5000 },
   notes: { type: String, trim: true, default: "", maxlength: 1000 },
+  pdf_design: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   status: { type: String, enum: ["Pending", "Draft", "Sent", "Accepted", "Rejected"], default: "Pending", index: true },
   createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
@@ -44,4 +46,15 @@ const quoteSchema = new mongoose.Schema({
 quoteSchema.index({ status: 1, created_at: -1 });
 quoteSchema.index({ customer_name: 1 });
 
-module.exports = mongoose.model("Quote", quoteSchema);
+const quoteNumberReservationSchema = new mongoose.Schema({
+  token: { type: String, required: true, unique: true, index: true },
+  quote_number: { type: String, required: true, unique: true, index: true },
+  createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+  expires_at: { type: Date, required: true, index: true },
+  consumed_at: { type: Date, default: null },
+}, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
+
+const Quote = mongoose.models.Quote || mongoose.model("Quote", quoteSchema);
+Quote.NumberReservation = mongoose.models.QuoteNumberReservation || mongoose.model("QuoteNumberReservation", quoteNumberReservationSchema);
+
+module.exports = Quote;

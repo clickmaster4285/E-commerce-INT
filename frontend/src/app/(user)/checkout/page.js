@@ -535,7 +535,7 @@ function CheckoutContent() {
     if (draftCreateInFlight.current) return;
     if (!selectedCartItems.length) return toast.error(t("checkout.items.selectAtLeastOne"));
     const dealIssue = getDealRequirementIssues(selectedCartItems)[0];
-    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
 
     draftCreateInFlight.current = true;
     const snap = selectedCartItems.map((i) => ({ ...i }));
@@ -618,7 +618,7 @@ function CheckoutContent() {
     if (!draftReady || placing || step !== 1 || activeItems.length === 0) return;
     const dealIssue = getDealRequirementIssues(activeItems)[0];
     if (dealIssue) {
-      toast.error(formatDealRequirementIssue(dealIssue));
+      toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
       router.replace("/cart");
     }
   }, [activeItems, draftReady, placing, router, step]);
@@ -855,7 +855,7 @@ function CheckoutContent() {
       setBankForm({ senderName: trimmedSenderName, transactionRef: trimmedTransactionRef });
     }
     const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
-    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue));
+    if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
     placingRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);
@@ -924,7 +924,7 @@ function CheckoutContent() {
       ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
       : "border-[var(--user-border)] focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
   }`;
-  const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
+  const labelCls = "block text-xs font-bold leading-snug text-start text-[var(--user-text-secondary)] mb-2";
   const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
   const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
   // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)
@@ -1061,7 +1061,7 @@ function CheckoutContent() {
 
       {needsPhone ? (
         <div className="max-w-[31.25rem] mx-auto mt-8 sm:mt-12">
-          <div className={`${cardCls} p-6 sm:p-8`}>
+          <div className={`${cardCls} checkout-phone-required p-6 sm:p-8`}>
             <div className="w-14 h-14 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-5">
               <Phone size={24} className="text-[var(--user-accent-text)]" />
             </div>
@@ -1072,6 +1072,7 @@ function CheckoutContent() {
             <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.phone.label")}</label>
             <input
               id="checkout-phone-desktop"
+              dir="auto"
               type="tel"
               inputMode="numeric"
               autoComplete="tel"
@@ -1617,7 +1618,7 @@ function CheckoutContent() {
               </div>
             </div>
             <div className="px-4 pt-6 pb-8 max-w-[30rem] mx-auto">
-              <div className="bg-[var(--user-bg-card)] rounded-2xl border-2 border-[var(--user-border)] p-6">
+              <div className="checkout-phone-required bg-[var(--user-bg-card)] rounded-2xl border-2 border-[var(--user-border)] p-6">
                 <div className="w-12 h-12 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-4">
                   <Phone size={22} className="text-[var(--user-accent-text)]" />
                 </div>
@@ -1628,6 +1629,7 @@ function CheckoutContent() {
                 <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.phone.label")}</label>
                 <input
                   id="checkout-phone-mobile"
+                  dir="auto"
                   type="tel"
                   inputMode="numeric"
                   autoComplete="tel"

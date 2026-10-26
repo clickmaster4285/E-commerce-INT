@@ -21,7 +21,6 @@ const attributeSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, lowercase: true },
-    description: { type: String, trim: true, default: "" },
 
     // Category field for filtering attributes by type
     category: { type: String, trim: true, lowercase: true, index: true },
@@ -49,19 +48,12 @@ const attributeSchema = new mongoose.Schema(
     // overwrite nahi hota — `translations` alag map hai.
     translations: {
       name: { type: Map, of: String, default: () => ({}) },
-      description: { type: Map, of: String, default: () => ({}) },
     },
     translation_source: {
       name: { type: String, default: "" },
-      description: { type: String, default: "" },
     },
     translation_status: {
       name: {
-        type: String,
-        enum: ["pending", "done", "failed", "skipped"],
-        default: "pending",
-      },
-      description: {
         type: String,
         enum: ["pending", "done", "failed", "skipped"],
         default: "pending",

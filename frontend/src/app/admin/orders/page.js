@@ -5,7 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
+import { shippingApi } from "@/apis/admin/shippingApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField, useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== ICONS ==================== */
 const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
@@ -43,14 +46,16 @@ const paymentMethodLabel = (method, t) => {
   const labels = { cod: "cashOnDelivery", bank: "bankTransfer", card: "cardPayment" };
   return labels[method] ? t(`admin.orders.detail.${labels[method]}`) : method || "—";
 };
-const shippingMethodLabel = (method, t) => {
+const shippingMethodLabel = (method, t, methods = [], locale = "en") => {
   const labels = { standard: "standardShipping", express: "expressShipping" };
-  return labels[method] ? t(`admin.orders.page.${labels[method]}`) : method ? String(method).replace(/_/g, " ") : t("common.notProvided");
+  if (labels[method]) return t(`admin.orders.page.${labels[method]}`);
+  const custom = methods.find((entry) => entry.code === method || String(entry._id) === String(method));
+  return custom ? localizedStrictField(custom.name, custom.translations?.name, locale) : method ? String(method).replace(/_/g, " ") : t("common.notProvided");
 };
 
 // ✅ Line item product se match karta hai? (String compare — ObjectId vs string safe)
 const isProductMatch = (item, productId) =>
-  Boolean(productId) && item?.product_id != null && String(item.product_id) === String(productId);
+  Boolean(productId) && item?.product_id != null && String(item.product_id?._id || item.product_id) === String(productId);
 
 // ✅ Order items ko aise order karo ki filtered product pehle dikhe
 const orderItemsForDisplay = (order, productId) => {
@@ -239,6 +244,7 @@ function OrdersFallback() {
 
 function OrdersView() {
   const { t, locale } = useTranslation();
+  const { productNameOf, contentOf } = useLocalized();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -266,8 +272,9 @@ function OrdersView() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
 
+  const ordersQueryKey = ["admin-orders", page, pageSize, statusFilter, search, paymentFilter, shippingFilter, dateRange, productId];
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["admin-orders", page, pageSize, statusFilter, search, paymentFilter, shippingFilter, dateRange, productId],
+    queryKey: ordersQueryKey,
     // ✅ Saare filters backend pe jaate hain — pagination aur counts sahi rehte hain
     queryFn: () => orderApi.getAll({
       page, limit: pageSize, status: statusFilter, search,
@@ -346,6 +353,13 @@ if (lastProductId !== productId) {
   });
 
   const orders = useMemo(() => data?.data || [], [data]);
+  const { data: shippingMethods = [], isLoading: shippingMethodsLoading } = useQuery({ queryKey: ["adminShippingMethods"], queryFn: shippingApi.getMethods, retry: false });
+  usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient });
+  usePageTranslations({ model: "Order", records: orders, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const orderProducts = useMemo(() => orders.flatMap((order) => (order.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id)), [orders]);
+  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const orderVariants = useMemo(() => orders.flatMap((order) => (order.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id)), [orders]);
+  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
   const pagination = data?.pagination || {};
   const total = pagination.total || 0;
   const totalPages = pagination.totalPages || 1;
@@ -720,7 +734,7 @@ if (lastProductId !== productId) {
                                     boxShadow: "inset 2px 0 0 var(--accent)",
                                   } : undefined}>
                                   <OrderItemImage item={item} size={22} />
-                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{item.name}</span>
+                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{productNameOf(item.product_id) || item.name}</span>
                                   <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: isMatch ? "var(--accent)" : "var(--text-secondary)" }}>
                                     ×{item.qty}
                                   </span>
@@ -846,9 +860,9 @@ if (lastProductId !== productId) {
                                     }}>
                                     <OrderItemImage item={item} size={36} />
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-xs font-medium truncate" title={item.name}>{item.name}</p>
+                                      <p className="text-xs font-medium truncate" title={item.name}>{productNameOf(item.product_id) || item.name}</p>
                                       <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{item.variantTitle ? ` · ${item.variantTitle}` : ""}
+                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{(item.variant_id?.title || item.variantTitle) ? ` · ${contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title)}` : ""}
                                       </p>
                                       {(dealLabel(item, t) || Number(item.free_items) > 0 || item.bundle_name) && (
                                         <p className="flex flex-wrap items-center gap-1 mt-1">
@@ -883,6 +897,7 @@ if (lastProductId !== productId) {
                   <OrderCard
                     key={order._id}
                     order={order}
+                    shippingMethods={shippingMethods}
                     isSelected={isSelected}
                     payStatus={payStatus}
                     menuOpen={actionMenuFor === order._id}
@@ -1134,7 +1149,7 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
 }
 
 // Mobile Order Card - Optimized for touch
-function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
+function OrderCard({ order, shippingMethods = [], isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
   const { t, locale } = useTranslation();
   return (
     <div className="rounded-xl p-4 space-y-3 cursor-pointer transition box-border max-w-full"
@@ -1203,7 +1218,7 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
         <PaymentBadge status={payStatus} />
         <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-          {paymentMethodLabel(order.payment?.method, t)} • {shippingMethodLabel(order.shipping_method || "standard", t)}
+          {paymentMethodLabel(order.payment?.method, t)} • {shippingMethodLabel(order.shipping_method || "standard", t, shippingMethods, locale)}
         </span>
       </div>
 

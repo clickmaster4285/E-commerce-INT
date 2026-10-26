@@ -68,6 +68,24 @@ const stockHistorySchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    translations: {
+      product_name: { type: Map, of: String, default: () => ({}) },
+      variant_title: { type: Map, of: String, default: () => ({}) },
+      reason: { type: Map, of: String, default: () => ({}) },
+      explanation: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      product_name: { type: String, default: "" },
+      variant_title: { type: String, default: "" },
+      reason: { type: String, default: "" },
+      explanation: { type: String, default: "" },
+    },
+    translation_status: {
+      product_name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      variant_title: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      reason: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      explanation: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
 
     performed_by: {
       type: mongoose.Schema.Types.ObjectId,

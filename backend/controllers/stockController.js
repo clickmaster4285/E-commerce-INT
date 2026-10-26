@@ -55,6 +55,7 @@ const toStockItem = (variant) => {
     max_qnt: variant.max_qnt ?? 0,
     image: variant.images?.[0]?.img_url || "",
     product_id: product?._id || variant.product_id || null,
+    translations: variant.translations || {},
     product_name: product?.name || "Unknown Product",
     product_translations: product?.translations || {},
     product_is_deleted: Boolean(product?.is_deleted),
@@ -171,7 +172,7 @@ const getStockOverview = async (req, res) => {
         { path: "brand_id", select: "name translations logo" },
       ],
     }];
-    const variantSelect = "sku title quantity min_qnt max_qnt product_id images";
+    const variantSelect = "sku title translations quantity min_qnt max_qnt product_id images";
 
     // ---- LEGACY MODE (no limit) ----
     if (!limit) {

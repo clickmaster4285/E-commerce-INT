@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { categoryApi } from "@/apis/admin/categoryApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
+import AttributeFormModal from "@/components/admin/AttributeFormModal";
 
 const ParentLockNotice = ({ title, children }) => (
   <div className="flex items-start gap-2.5 rounded-[10px] border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-3 py-2.5">
@@ -36,11 +37,6 @@ function CategoryFormModal({ open, onClose, onCreated }) {
   const [attrSearch, setAttrSearch] = useState("");
   const [tempSelectedAttrIds, setTempSelectedAttrIds] = useState([]);
   const [showCreateAttrModal, setShowCreateAttrModal] = useState(false);
-  const [newAttrName, setNewAttrName] = useState("");
-  const [newAttrType, setNewAttrType] = useState("multi_select");
-  const [newAttrValues, setNewAttrValues] = useState([]);
-  const [newAttrValueInput, setNewAttrValueInput] = useState("");
-  const [newAttrDefaultValue, setNewAttrDefaultValue] = useState("yes");
   const [creatingAttribute, setCreatingAttribute] = useState(false);
 
   const [showParentDropdown, setShowParentDropdown] = useState(false);
@@ -276,26 +272,30 @@ function CategoryFormModal({ open, onClose, onCreated }) {
     setFormData((p) => ({ ...p, attributes: p.attributes.filter((a) => String(getAttributeId(a)) !== String(attrId)) }));
   };
 
-  const handleCreateAttribute = async () => {
-    if (!newAttrName.trim() || creatingAttribute) return;
-    if (newAttrType === "multi_select" && newAttrValues.length === 0) {
-      toast.error("At least one option is required for Multi Options type");
-      return;
-    }
+  const handleCreateAttribute = async (attributeForm) => {
+    if (!attributeForm?.name?.trim() || creatingAttribute) return;
     setCreatingAttribute(true);
     try {
-      const code = newAttrName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      const name = attributeForm.name.trim();
+      const code = name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || `attribute_${Date.now()}`;
+      const values = (attributeForm.values || []).map((option) => {
+        const label = typeof option === "string" ? option.trim() : String(option?.label || option?.value || "").trim();
+        if (!label) return null;
+        return { label, value: typeof option?.value === "string" ? option.value : label.toLowerCase() };
+      }).filter(Boolean);
       const payload = {
-        name: newAttrName.trim(), code, data_type: newAttrType, description: "",
-        values: newAttrType === "multi_select"
-          ? newAttrValues.map((v) => ({ label: v, value: v }))
-          : [{ label: newAttrDefaultValue === "yes" ? "Yes" : "No", value: newAttrDefaultValue }],
+        name,
+        code,
+        data_type: attributeForm.data_type,
+        variant_allowed: true,
+        is_active: true,
+        values,
       };
       const created = await attributeApi.create(payload);
       queryClient.invalidateQueries({ queryKey: ["all-attributes"] });
       if (created && created._id) {
         const mappedType = created.data_type === "select" || created.data_type === "color" ? "multi_select" : created.data_type;
-        const options = (created.values || []).map(v => v.label || v.value || v);
+        const options = (created.values || values).map((v) => typeof v === "string" ? v : (v?.label || v?.value || "")).filter(Boolean);
         const newAttrEntry = {
           ui_key: `sel-${created._id}-${Date.now()}`,
           attribute_id: created._id,
@@ -306,17 +306,12 @@ function CategoryFormModal({ open, onClose, onCreated }) {
           is_visible: true,
           is_searchable: true,
           sort_order: formData.attributes.length,
-          value: mappedType === "multi_select" ? [] : (newAttrDefaultValue === "yes" ? true : false),
+          value: mappedType === "multi_select" ? [] : false,
         };
         setFormData((p) => ({ ...p, attributes: [...p.attributes, newAttrEntry] }));
         setTempSelectedAttrIds((prev) => [...prev, created._id]);
       }
       setShowCreateAttrModal(false);
-      setNewAttrName("");
-      setNewAttrType("multi_select");
-      setNewAttrValues([]);
-      setNewAttrValueInput("");
-      setNewAttrDefaultValue("yes");
       setAttrSearch("");
       toast.success(`Attribute "${created?.name}" created`);
     } catch (err) {
@@ -459,7 +454,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
             <div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">
               {attrSearch.trim() && filteredAllAttributes.length === 0 ? (
                 <div className="px-5 py-2.5">
-                  <button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(attrSearch.trim()); }}
+                  <button type="button" onClick={() => setShowCreateAttrModal(true)}
                     className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-[12px] font-medium">Create &quot;{attrSearch.trim()}&quot;</span>
@@ -467,7 +462,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
                 </div>
               ) : !attrSearch.trim() ? (
                 <div className="px-5 py-2.5">
-                  <button type="button" onClick={() => { setShowCreateAttrModal(true); setNewAttrName(""); }}
+                  <button type="button" onClick={() => setShowCreateAttrModal(true)}
                     className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-[12px] font-medium">Create new attribute</span>
@@ -484,75 +479,6 @@ function CategoryFormModal({ open, onClose, onCreated }) {
             <button type="button" onClick={applyAttributeSelection}
               className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">
               Apply{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}
-            </button>
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  };
-
-  const renderCreateAttrInline = () => {
-    if (!showCreateAttrModal) return null;
-    return createPortal(
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="w-full max-w-sm bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
-            <h3 className="text-[13px] font-bold text-[var(--text-primary)]">Create Attribute</h3>
-            <button type="button" onClick={() => setShowCreateAttrModal(false)} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-              <CloseIcon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Name <span className="text-red-500">*</span></label>
-              <input type="text" value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} autoFocus
-                className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                placeholder="e.g. Color" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Type</label>
-              <select value={newAttrType} onChange={(e) => setNewAttrType(e.target.value)}
-                className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]">
-                <option value="multi_select">Multi Select</option>
-                <option value="text">Text</option>
-                <option value="number">Number</option>
-                <option value="boolean">Boolean</option>
-              </select>
-            </div>
-            {newAttrType === "multi_select" && (
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Options</label>
-                <div className="flex gap-2">
-                  <input type="text" value={newAttrValueInput} onChange={(e) => setNewAttrValueInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (newAttrValueInput.trim()) { setNewAttrValues((p) => [...p, newAttrValueInput.trim()]); setNewAttrValueInput(""); } } }}
-                    className="flex-1 h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
-                    placeholder="Type and press Enter" />
-                  <button type="button" onClick={() => { if (newAttrValueInput.trim()) { setNewAttrValues((p) => [...p, newAttrValueInput.trim()]); setNewAttrValueInput(""); } }}
-                    className="h-[38px] px-3 text-[12px] font-medium rounded-lg bg-[var(--accent)] text-white hover:opacity-90">Add</button>
-                </div>
-                {newAttrValues.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {newAttrValues.map((v, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-secondary)]">
-                        {v}
-                        <button type="button" onClick={() => setNewAttrValues((p) => p.filter((_, idx) => idx !== i))} className="text-[var(--text-muted)] hover:text-red-500">&times;</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="px-5 py-3 border-t border-[var(--border-color)] flex items-center justify-end gap-2">
-            <button type="button" onClick={() => setShowCreateAttrModal(false)}
-              className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
-              Cancel
-            </button>
-            <button type="button" onClick={handleCreateAttribute} disabled={creatingAttribute || !newAttrName.trim()}
-              className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 disabled:opacity-50">
-              {creatingAttribute && <Spinner className="w-3 h-3" />}
-              Create
             </button>
           </div>
         </div>
@@ -716,7 +642,15 @@ function CategoryFormModal({ open, onClose, onCreated }) {
 
       {renderParentDropdown()}
       {renderAttributeSelectModal()}
-      {renderCreateAttrInline()}
+      <AttributeFormModal
+        open={showCreateAttrModal}
+        onClose={() => setShowCreateAttrModal(false)}
+        mode="create"
+        initialName={attrSearch.trim()}
+        isSaving={creatingAttribute}
+        zIndexClassName="z-[90]"
+        onSave={handleCreateAttribute}
+      />
     </div>,
     document.body
   );

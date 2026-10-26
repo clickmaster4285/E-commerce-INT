@@ -10,7 +10,7 @@
 //   npm run backfill:translations -- --force        # stale + done dono dobara
 //
 // Options:
-//   --model=all|brand|category|product|attribute|review   (default: all)
+//   --model=all|brand|category|product|attribute|review|vendor|shippingmethod|order|purchaseorder|stockhistory (default: all)
 //   --batch=N     har batch me kitne docs   (default: 25)
 //   --limit=N     sirf pehle N docs per model (default: 0 = all)
 //   --force       hash match hone par bhi dobara translate karo
@@ -34,6 +34,11 @@ const Review = require("../models/Review");
 const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
 const Banner = require("../models/Banner");
+const Vendor = require("../models/Vendor");
+const ShippingMethod = require("../models/ShippingMethod");
+const Order = require("../models/Order");
+const PurchaseOrder = require("../models/PurchaseOrder");
+const StockHistory = require("../models/StockHistory");
 const { checkAvailability } = require("../utils/libreTranslate");
 const { backfillTranslations } = require("../utils/translationService");
 
@@ -48,6 +53,11 @@ const MODELS = {
   discount: Discount,
   deal: Deal,
   banner: Banner,
+  vendor: Vendor,
+  shippingmethod: ShippingMethod,
+  order: Order,
+  purchaseorder: PurchaseOrder,
+  stockhistory: StockHistory,
 };
 
 function parseArgs() {

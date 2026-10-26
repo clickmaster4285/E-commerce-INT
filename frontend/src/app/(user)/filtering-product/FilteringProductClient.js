@@ -509,7 +509,7 @@ function FilteringContent() {
           </span>
         </SectionHeading>
 
-        <div dir="ltr" className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+        <div dir={dir} className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
           {/* LEFT SIDEBAR — home wala same component */}
           <div
             className={`filters-sidebar-hover sticky top-[7.25rem] hidden min-w-0 shrink-0 self-start overflow-hidden ${
@@ -522,7 +522,7 @@ function FilteringContent() {
             <HomeSidebar
               {...sidebarProps}
               scrollable
-              className="w-full rounded-l-none border-l-0"
+              className={`w-full ${dir === "rtl" ? "rounded-r-none border-r-0" : "rounded-l-none border-l-0"}`}
             />
           </div>
 

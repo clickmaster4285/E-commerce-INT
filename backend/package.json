@@ -9,7 +9,7 @@
     "dev": "nodemon server.js",
     "backfill:translations": "node scripts/backfillTranslations.js",
     "translation:check": "node scripts/backfillTranslations.js --check",
-    "argos:serve": "py scripts/argosTranslateServer.py"
+    "argos:serve": "uv run --python 3.13 --with ctranslate2 --with sentencepiece python scripts/argosTranslateServer.py"
   },
   "keywords": [],
   "author": "",

@@ -63,17 +63,10 @@ export default function LeadFormModal({ open, form, setForm, editing = false, is
         <section className="rounded-2xl border bg-white p-4 sm:p-5" style={{ borderColor: "#e5edf7" }}>
           {sectionHeading(ContactRound, t("admin.leads.ui.leadDetails"), t("admin.leads.ui.setSourceProgressOwnerAndFollowUp"))}
           <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
-<<<<<<< HEAD
-            <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">Source</span><LeadDropdown value={form.source || "Other"} onChange={(value) => update("source", value)} ariaLabel="Lead source" options={sources.map((source) => ({ value: source, label: source }))} /></div>
-            <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">Status</span><LeadDropdown value={form.status || "New"} onChange={(value) => update("status", value)} ariaLabel="Lead status" options={["New", "Contacted", "Qualified", ...(form.status === "Customer" || form.status === "Converted" ? ["Customer"] : []), "Lost"].map((status) => ({ value: status, label: status === "Converted" ? "Customer" : status }))} /></div>
-            <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">Assigned employee</span><LeadDropdown value={form.assigned_employee_id?._id || form.assigned_employee_id || ""} onChange={(value) => update("assigned_employee_id", value)} ariaLabel="Assigned employee" options={[{ value: "", label: "Unassigned" }, ...employees.filter((employee) => (employee.role !== "admin" && employee.status === "active" && !employee.is_deleted) || String(employee._id) === String(form.assigned_employee_id?._id || form.assigned_employee_id || "")).map((employee) => ({ value: employee._id, label: employee.name }))]} /></div>
-            {field("Next follow-up", "next_follow_up_date", "date", false, null)}
-=======
             <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.source")}</span><LeadDropdown value={form.source || "Other"} onChange={(value) => update("source", value)} ariaLabel={t("admin.leads.ui.leadSource")} options={sources.map((source) => ({ value: source, label: optionLabel(source, t) }))} /></div>
             <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.status")}</span><LeadDropdown value={form.status || "New"} onChange={(value) => update("status", value)} ariaLabel={t("admin.leads.ui.leadStatus")} options={["New", "Contacted", "Qualified", "Converted", "Lost"].map((status) => ({ value: status, label: optionLabel(status, t) }))} /></div>
             <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.assignedEmployee")}</span><LeadDropdown value={form.assigned_employee_id?._id || form.assigned_employee_id || ""} onChange={(value) => update("assigned_employee_id", value)} ariaLabel={t("admin.leads.ui.assignedEmployee")} options={[{ value: "", label: t("admin.leads.value.unassigned") }, ...employees.filter((employee) => (employee.role !== "admin" && employee.status === "active" && !employee.is_deleted) || String(employee._id) === String(form.assigned_employee_id?._id || form.assigned_employee_id || "")).map((employee) => ({ value: employee._id, label: employee.name }))]} /></div>
             {field(t("admin.leads.ui.nextFollowUp"), "next_follow_up_date", "date", false, null)}
->>>>>>> 2e3f0d01943d374997bd89fc3c0e0f7e0754f66e
           </div>
         </section>
 

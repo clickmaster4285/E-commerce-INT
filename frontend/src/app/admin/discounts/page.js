@@ -12,6 +12,7 @@ import { attributeApi } from "../../../apis/admin/attributeApi";
 import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { translate } from "@/i18n/translations";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
@@ -70,7 +71,10 @@ const getName = (item, type) => {
   return item?.name || "Unnamed";
 };
 
-const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+const formatCurrency = (amount, locale = "en") => new Intl.NumberFormat(
+  locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale,
+  { style: "currency", currency: "PKR" },
+).format(amount || 0);
 
 // Target/value summaries parte hain â†’ inhe `t` chahiye, isliye caller pass karta hai.
 const formatTarget = (target, t) => {
@@ -83,17 +87,19 @@ const formatTarget = (target, t) => {
     category: "admin.discounts.page.categories",
     specific_categories: "admin.discounts.page.categories",
     brand: "admin.discounts.page.brands",
+    specific_brands: "admin.discounts.page.brands",
+    specific_tags: "admin.discounts.page.specificTags",
   };
   return map[target] ? t(map[target]) : String(target).replaceAll("_", " ");
 };
 
-const formatValue = (discount, t) => {
+const formatValue = (discount, t, locale) => {
   const type = discount?.value_type || discount?.valueType || discount?.type || "percentage";
   const value = Number(discount?.value ?? 0);
   if (type === "percentage") return `${value}% ${t("admin.shipping.page.off")}`;
-  if (type === "fixed_amount" || type === "fixed") return `${formatCurrency(value)} ${t("admin.shipping.page.off")}`;
-  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${formatCurrency(value)}`;
-  return `${formatCurrency(value)} ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_amount" || type === "fixed") return `${formatCurrency(value, locale)} ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${formatCurrency(value, locale)}`;
+  return `${formatCurrency(value, locale)} ${t("admin.shipping.page.off")}`;
 };
 
 
@@ -516,6 +522,7 @@ export default function DiscountsPage() {
   const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [activeFormType, setActiveFormType] = useState(null);
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
+  const [typeMenuPosition, setTypeMenuPosition] = useState(null);
   const typeMenuRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -533,11 +540,12 @@ export default function DiscountsPage() {
   });
   const [formErrors, setFormErrors] = useState({});
 
-  const { data: paginatedDiscountsData, isLoading } = useQuery({
+  const { data: paginatedDiscountsData, isLoading, isFetching } = useQuery({
     queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
     queryFn: () => discountApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: search || "", status: statusFilter === "all" ? "" : statusFilter, applyTo: targetFilter === "all" ? "" : targetFilter }),
   });
   const discounts = paginatedDiscountsData?.items || paginatedDiscountsData || normalizeArrayResponse(paginatedDiscountsData);
+  usePageTranslations({ model: "Discount", records: discounts, locale, ready: !isFetching && paginatedDiscountsData?.pagination?.page === currentPage, queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter], queryClient });
   const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
   const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
@@ -553,6 +561,17 @@ export default function DiscountsPage() {
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    if (!isTypeMenuOpen) return undefined;
+    const closeOnViewportChange = () => setIsTypeMenuOpen(false);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    window.addEventListener("resize", closeOnViewportChange);
+    return () => {
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+      window.removeEventListener("resize", closeOnViewportChange);
+    };
+  }, [isTypeMenuOpen]);
 
   useEffect(() => {
     const timer = setTimeout(() => setCurrentPage(1), 0);
@@ -944,7 +963,30 @@ export default function DiscountsPage() {
               <div className="relative shrink-0" ref={typeMenuRef}>
                 <button 
                   type="button" 
-                  onClick={() => setIsTypeMenuOpen((open) => !open)} 
+                  onClick={(event) => {
+                    if (isTypeMenuOpen) {
+                      setIsTypeMenuOpen(false);
+                      return;
+                    }
+                    const buttonRect = event.currentTarget.getBoundingClientRect();
+                    const contentRect = typeMenuRef.current?.closest("main")?.getBoundingClientRect();
+                    const menuWidth = Math.min(224, Math.max(180, (contentRect?.width || window.innerWidth) - 16));
+                    const estimatedMenuHeight = Math.min(352, window.innerHeight - 16);
+                    const menuTop = buttonRect.bottom + estimatedMenuHeight + 8 <= window.innerHeight
+                      ? buttonRect.bottom + 8
+                      : Math.max(8, buttonRect.top - estimatedMenuHeight - 8);
+                    const minLeft = (contentRect?.left || 0) + 8;
+                    const maxLeft = Math.max(minLeft, Math.min(
+                      window.innerWidth - menuWidth - 8,
+                      (contentRect?.right || window.innerWidth) - menuWidth - 8
+                    ));
+                    setTypeMenuPosition({
+                      top: menuTop,
+                      left: Math.min(Math.max(buttonRect.left, minLeft), maxLeft),
+                      width: menuWidth,
+                    });
+                    setIsTypeMenuOpen(true);
+                  }}
                   aria-expanded={isTypeMenuOpen} 
                   className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition" 
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
@@ -952,13 +994,13 @@ export default function DiscountsPage() {
                   <PlusIcon /> {t("admin.discounts.page.new")} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isTypeMenuOpen && (
-                  <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
+                  <div className="fixed z-[100] max-h-[min(22rem,calc(100vh-1rem))] overflow-y-auto rounded-xl p-1.5" style={{ top: typeMenuPosition?.top, left: typeMenuPosition?.left, width: typeMenuPosition?.width, backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
                     {discountTypes.map((dt) => {
                       const Icon = dt.icon;
                       return (
-                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-[var(--bg-tertiary)]">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
-                          <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
+                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-[var(--bg-tertiary)]">
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
+                          <span className="min-w-0 flex-1"><span className="block break-words text-[12px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="mt-0.5 block whitespace-normal break-words text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
                         </button>
                       );
                     })}
@@ -1069,7 +1111,7 @@ export default function DiscountsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, t)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, t)}</span></td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, t, locale)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons discount={discount} /></td>
                       </tr>
@@ -1091,7 +1133,7 @@ export default function DiscountsPage() {
                   <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t, locale)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>

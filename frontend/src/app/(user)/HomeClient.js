@@ -286,14 +286,14 @@ function HomeContent({ initialBanners = null }) {
       {/* HEADER ROW 2 — nav */}
       <HomeNav />
 
-      <div className="w-full min-w-0 max-w-full pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-2 lg:pr-8 lg:pt-2 xl:pr-10 2xl:pr-12">
-        <div dir="ltr" className="flex w-full min-w-0 max-w-full items-start gap-4">
+      <div className={`w-full min-w-0 max-w-full pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pt-2 ${dir === "rtl" ? "lg:pr-2 lg:pl-8 xl:pl-10 2xl:pl-12" : "lg:pl-2 lg:pr-8 xl:pr-10 2xl:pr-12"}`}>
+        <div dir={dir} className="flex w-full min-w-0 max-w-full items-start gap-4">
           {/* LEFT SIDEBAR — same component, click → /filtering-product */}
           <HomeSidebar
             {...sidebarProps}
             scrollable
             dir={dir}
-            className="sticky top-[6.75rem] hidden w-[280px] shrink-0 rounded-l-none border-l-0 lg:block"
+            className={`sticky top-[6.75rem] hidden w-[280px] shrink-0 lg:block ${dir === "rtl" ? "rounded-r-none border-r-0" : "rounded-l-none border-l-0"}`}
           />
 
           {/* MAIN COLUMN — sirf showcase (koi filter grid nahi → fast) */}

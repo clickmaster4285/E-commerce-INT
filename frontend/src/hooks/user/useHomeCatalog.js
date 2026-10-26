@@ -10,11 +10,13 @@
    ========================================================== */
 
 import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { dealApi } from "@/apis/user/dealApi";
 import { productApi } from "@/apis/user/productApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import {
   EMPTY_HOME_FILTERS,
   hasActiveFilters,
@@ -54,6 +56,8 @@ export function filtersToFacetParams(filters, extra = {}) {
 }
 
 export function useHomeCatalog(initialFilters = {}, opts = {}) {
+  const { locale } = useTranslation();
+  const queryClient = useQueryClient();
   const search = String(opts?.search || "").trim();
   const { data: categories = [], isPending: categoriesPending } = useQuery({
     queryKey: ["categories"],
@@ -65,6 +69,14 @@ export function useHomeCatalog(initialFilters = {}, opts = {}) {
     queryKey: ["brands"],
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
+  });
+  usePageTranslations({
+    model: "Brand",
+    records: brands,
+    locale,
+    ready: !brandsPending,
+    queryKey: ["brands"],
+    queryClient,
   });
 
   // ✅ Active deals (sidebar "Deals" filter + counts merge).

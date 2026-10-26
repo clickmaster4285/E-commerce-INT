@@ -109,7 +109,7 @@ const getAllPOs = async (req, res) => {
     if (vendor !== "all" && mongoose.isValidObjectId(String(vendor))) q.vendor_id = vendor;
     if (String(search).trim()) { const rx = new RegExp(escapeRegex(String(search).trim()), "i"); q.$or = [{ po_number: rx }, { "vendor_snapshot.name": rx }]; }
     const [pos, total] = await Promise.all([
-      PurchaseOrder.find(q).populate("vendor_id", "name vendor_code").sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      PurchaseOrder.find(q).populate("vendor_id", "name vendor_code translations").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       PurchaseOrder.countDocuments(q),
     ]);
     res.status(200).json({ success: true, data: pos, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } });
@@ -118,7 +118,7 @@ const getAllPOs = async (req, res) => {
 
 const getPOByIdAdmin = async (req, res) => {
   try {
-    const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code phone email").lean();
+    const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code phone email company_name address city state country translations translation_source translation_status").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").lean();
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     const legacyVariantIds = (po.items || [])
       .filter((item) => item.sell_price == null)

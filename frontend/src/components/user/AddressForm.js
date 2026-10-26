@@ -275,7 +275,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
   const inputCls =
     "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] hover:border-[var(--user-accent)]/40";
   const labelCls =
-    "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
+    "block text-xs font-bold leading-snug text-start text-[var(--user-text-secondary)] mb-2";
   const textareaCls =
     "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
   const accentBtn =
@@ -377,11 +377,11 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                 </select>
                 <ChevronDown
                   size={16}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
+                  className="absolute end-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <label className={labelCls}>{t("checkout.address.state")}</label>
                 <div className="relative">
@@ -405,7 +405,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
+                    className="absolute end-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
                   />
                 </div>
               </div>
@@ -432,7 +432,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel }) {
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
+                    className="absolute end-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
                   />
                 </div>
               </div>

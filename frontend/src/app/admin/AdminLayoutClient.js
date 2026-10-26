@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
@@ -29,6 +29,7 @@ const ROUTE_PERMISSIONS = {
   // ✅ Reviews — alag permission (legacy: products se fallback, backend undefined = allow)
   '/admin/reviews': 'reviews',
   '/admin/store-info': 'store',
+  '/admin/terms-conditions': 'store',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',
@@ -41,6 +42,14 @@ const ROUTE_PERMISSIONS = {
   '/admin/quotes': 'quotes',
   '/admin/invoices': 'invoices',
 };
+
+const KNOWN_ADMIN_ROUTE_PREFIXES = [
+  ...Object.keys(ROUTE_PERMISSIONS),
+  '/admin/customers',
+  '/admin/leads',
+  '/admin/pos',
+  '/admin/access-denied',
+];
 
 // ==========================================
 // SINGLETON SOCKET
@@ -113,6 +122,7 @@ const getStoreData = async () => {
 export default function AdminLayout({ children }) {
   const { t: __t, locale, dir } = useTranslation();
   const t = (key, params) => __t(`admin.layout.${key}`, params);
+  const adminMainRef = useRef(null);
 
   const [theme, setTheme] = useState('light');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -120,6 +130,21 @@ export default function AdminLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  const isUnknownAdminPath =
+    pathname?.startsWith('/admin/') &&
+    !KNOWN_ADMIN_ROUTE_PREFIXES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+
+  // A direction change can leave the browser's previous horizontal scroll
+  // offset in place. Since every admin route shares this scrollport, reset it
+  // whenever the locale changes so page headers, toolbars, and buttons remain
+  // in the visible layout area in both LTR and RTL languages.
+  useEffect(() => {
+    const scrollport = adminMainRef.current;
+    if (!scrollport) return;
+    scrollport.scrollLeft = 0;
+  }, [locale]);
 
   // ==========================================
   // LOGIN PAGE
@@ -218,8 +243,8 @@ export default function AdminLayout({ children }) {
       return {
         isAuthenticated: true,
         checkComplete: true,
-        redirectTo: '/admin/access-denied',
-        redirectMode: 'replace',
+        redirectTo: isUnknownAdminPath ? '/admin/login' : '/admin/access-denied',
+        redirectMode: isUnknownAdminPath ? 'push' : 'replace',
       };
     }
 
@@ -260,7 +285,7 @@ export default function AdminLayout({ children }) {
       checkComplete: true,
       redirectTo: null,
     };
-  }, [isLoginPage, userLoading, userError, userQueryError, userData, pathname]);
+  }, [isLoginPage, userLoading, userError, userQueryError, userData, pathname, isUnknownAdminPath]);
 
   // ==========================================
   // STORE QUERY
@@ -607,7 +632,7 @@ export default function AdminLayout({ children }) {
   // MAIN LAYOUT
   // ==========================================
   return (
-    <div className="admin-panel flex h-screen overflow-hidden" dir="ltr">
+    <div className="admin-panel flex h-screen overflow-hidden" dir={dir} lang={locale}>
 
       {/* Mobile Overlay */}
       {sidebarOpen && (
@@ -628,7 +653,7 @@ export default function AdminLayout({ children }) {
           fixed
           md:relative
           top-0
-          left-0
+          ${dir === 'rtl' ? 'right-0 left-auto' : 'left-0 right-auto'}
           transition-transform
           duration-300
           ease-in-out
@@ -636,7 +661,7 @@ export default function AdminLayout({ children }) {
           ${
             sidebarOpen
               ? 'translate-x-0'
-              : '-translate-x-full'
+              : dir === 'rtl' ? 'translate-x-full' : '-translate-x-full'
           }
         `}
       >
@@ -659,8 +684,11 @@ export default function AdminLayout({ children }) {
         />
 
         {/* Page */}
-        <main dir={dir} lang={locale} className="flex-1 overflow-y-auto overflow-x-auto bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        {/* Keep the scrollport LTR so switching to an RTL locale does not move
+            its horizontal origin and crop the left side of admin pages. Apply
+            locale direction to the content wrapper instead. */}
+        <main ref={adminMainRef} dir="ltr" className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
+          <div dir={dir} lang={locale} className="mx-auto min-w-0 w-full max-w-[1600px]">{children}</div>
         </main>
 
       </div>
