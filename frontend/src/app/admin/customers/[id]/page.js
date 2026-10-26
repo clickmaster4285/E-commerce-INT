@@ -80,7 +80,7 @@ export default function CustomerDetailPage({ params }) {
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric icon={CreditCard} label={t("admin.customers.detail.totalPurchases")} value={String(customer.total_sales || 0)} />
       <Metric icon={Tag} label={t("admin.customers.detail.totalSpent")} value={money(customer.total_spent, locale)} />
-      <Metric icon={CalendarDays} label={t("admin.customers.detail.customerSince")} value={customer.created_at ? new Date(customer.created_at).toLocaleDateString(locale) : "—"} />
+      <Metric icon={CalendarDays} label={t("admin.customers.detail.customerSince")} value={customer.created_at ? new Date(customer.created_at).toLocaleDateString(locale) : "â€”"} />
       <Metric icon={UserRound} label={t("admin.customers.detail.customerType")} value={t(customer.total_sales > 0 ? "admin.customers.detail.returning" : "admin.customers.detail.new")} />
     </section>
 
@@ -129,9 +129,9 @@ function DocumentHistory({ records, numberKey, dateKey, hrefBase, emptyText }) {
   return <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left">
       <thead className="bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]"><tr><th className="px-4 py-3">Number</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Total</th><th className="w-14 px-4 py-3 text-right">View</th></tr></thead>
       <tbody>{records.map((record) => <tr key={record._id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]">
-        <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{record[numberKey] || "—"}</td>
+        <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{record[numberKey] || "â€”"}</td>
         <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-secondary)]">{dateTime(record[dateKey] || record.created_at)}</td>
-        <td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{record.status || "—"}</span></td>
+        <td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{record.status || "â€”"}</span></td>
         <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold">{money(record.total)}</td>
         <td className="px-4 py-3 text-right"><Link href={`${hrefBase}/${record._id}`} aria-label={`View ${record[numberKey] || "record"}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"><Eye size={15} /></Link></td>
       </tr>)}

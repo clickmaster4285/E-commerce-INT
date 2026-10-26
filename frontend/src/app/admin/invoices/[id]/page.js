@@ -91,9 +91,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const remaining = Math.max(0, Number(invoice?.remaining_balance ?? invoice?.total ?? 0));
 
   useEffect(() => {
-    if (!invoice || searchParams.get("returnRefund") !== "1") return;
-    if (["Paid", "Partially Paid"].includes(invoice.status) && Number(invoice.amount_paid) > 0) setReturnOpen(true);else
-    toast.error(t("admin.invoiceDetail.message.refundNoPayment"));
+    if (!invoice?.sent_at || searchParams.get("returnRefund") !== "1") return;
+    setReturnOpen(true);
     router.replace(`/admin/invoices/${id}`, { scroll: false });
   }, [invoice, id, router, searchParams, t]);
 
@@ -147,16 +146,16 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     <div><Link href="/admin/invoices" className="mt-3 inline-block text-sm underline" style={muted}>{t("admin.quoteInvoice.ui.back_to_invoices_8371e902")}</Link></div>
   </div>;
 
-  const rawStatus = invoice.status === "Draft" || !invoice.status ? "Unpaid" : invoice.status;
-  const statusKeys = { Unpaid: "unpaid", "Partially Paid": "partiallyPaid", Paid: "paid", Overdue: "overdue" };
-  const displayStatus = statusKeys[rawStatus] ? t(`admin.invoiceDetail.status.${statusKeys[rawStatus]}`) : rawStatus;
-  const canRefund = ["Paid", "Partially Paid"].includes(invoice.status) && Number(invoice.amount_paid) > 0;
+  const rawStatus = invoice.status || "Unpaid";
+  const displayStatus = rawStatus === "Draft" ? "Unpaid" : rawStatus;
+  const canReturn = Boolean(invoice.sent_at);
   const items = invoice.items || [];
   const payments = invoice.payments || [];
   const returns = invoice.returns || [];
   const paidAmount = Number(invoice.amount_paid || 0);
   const total = Number(invoice.total || 0);
-  const paymentProgress = total > 0 ? Math.min(100, Math.max(0, paidAmount / total * 100)) : 0;
+  const balanceAdjustments = returns.reduce((sum, record) => sum + Number(record.total_adjustment ?? (record.refund_method === "Balance Adjustment" ? record.refund_amount : 0) ?? 0), 0);
+  const paymentProgress = total > 0 ? Math.min(100, Math.max(0, (paidAmount / total) * 100)) : 0;
   const lastPayment = payments[payments.length - 1];
   const timeline = [
   [t("admin.invoiceDetail.timeline.invoiceCreated"), date(invoice.created_at || invoice.invoice_date, locale), true],
@@ -194,9 +193,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
-        {smallAction(t("admin.invoiceDetail.action.returnRefund"), () => setReturnOpen(true), RotateCcw, true, !canRefund, !canRefund ? t("admin.invoiceDetail.message.refundNoPayment") : undefined)}
-        {smallAction(t("admin.invoiceDetail.action.print"), printInvoice, Printer)}
-        {smallAction(t("admin.invoiceDetail.action.downloadPdf"), () => downloadInvoicePdf(invoice).catch(() => toast.error(t("admin.invoiceDetail.message.pdfFailed"))), FileText)}
+        {canReturn && smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true)}
+        {smallAction("Download PDF", () => downloadInvoicePdf(invoice).catch(() => toast.error("Could not generate invoice PDF")), FileText)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? t("admin.invoiceDetail.action.saving") : t("admin.invoiceDetail.action.sendCustomer"),
           () => sendMutation.mutate(),
@@ -290,10 +288,11 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           </Panel>
           <Panel title={t("admin.quoteInvoice.ui.calculation_summary_fdc8fa6c")} icon={Percent}>
             <div className="space-y-2 p-4 text-[13px]">
-              <div className="flex justify-between"><span style={muted}>{t("admin.quoteInvoice.ui.items_subtotal_71f05c3f")}</span><span style={primary}>{money(invoice.subtotal, locale)}</span></div>
-              <div className="flex justify-between"><span style={muted}>{t("admin.quoteInvoice.ui.discount_b524936d")}</span><span style={primary}>- {money(invoice.discount, locale)}</span></div>
-              <div className="flex justify-between"><span style={muted}>{t("admin.quoteInvoice.ui.tax_9be70f66")}</span><span style={primary}>+ {money(invoice.tax, locale)}</span></div>
-              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>{t("admin.quoteInvoice.ui.grand_total_91faafb1")}</span><span style={{ color: "#06a981" }}>{money(invoice.total, locale)}</span></div>
+              <div className="flex justify-between"><span style={muted}>Items subtotal</span><span style={primary}>{money(invoice.subtotal)}</span></div>
+              <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>- {money(invoice.discount)}</span></div>
+              <div className="flex justify-between"><span style={muted}>Tax</span><span style={primary}>+ {money(invoice.tax)}</span></div>
+              {balanceAdjustments > 0 && <div className="flex justify-between"><span style={muted}>Returned items</span><span style={{ color: "#dc2626" }}>- {money(balanceAdjustments)}</span></div>}
+              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Grand Total</span><span style={{ color: "#06a981" }}>{money(invoice.total)}</span></div>
             </div>
           </Panel>
         </div>
@@ -324,8 +323,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
               <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", t("admin.invoiceDetail.field.dateTime"), t("admin.invoiceDetail.field.amount"), t("admin.invoiceDetail.field.method"), t("admin.invoiceDetail.field.note")].map((heading) => <th key={heading} className="whitespace-nowrap px-2 py-2 font-semibold">{heading}</th>)}</tr></thead>
               <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t transition-colors hover:bg-blue-50/50" style={{ borderColor: "#eaf0f8" }}>
                 <td className="px-2 py-2.5" style={muted}>{index + 1}</td>
-                <td className="whitespace-nowrap px-2 py-2.5" style={primary}><span className="block">{paymentDateTime(payment, locale).date}</span><span className="mt-0.5 block text-[10px]" style={muted}>{paymentDateTime(payment, locale).time}</span></td>
-                <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={primary}>{money(payment.amount, locale)}</td>
+                <td className="whitespace-nowrap px-2 py-2.5" style={primary}><span className="block">{paymentDateTime(payment).date}</span><span className="mt-0.5 block text-[10px]" style={muted}>{paymentDateTime(payment).time}</span></td>
+                <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={{ color: Number(payment.amount) < 0 ? "#dc2626" : "#0f172a" }}>{money(payment.amount)}</td>
                 <td className="px-2 py-2.5" style={muted}>{payment.payment_method || "-"}</td>
                 <td className="max-w-24 truncate px-2 py-2.5" style={muted} title={payment.note || "-"}>{payment.note || "-"}</td>
               </tr>)}
@@ -343,9 +342,9 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         <Panel title={t("admin.quoteInvoice.ui.return_refund_history_e7a94538")} icon={RotateCcw} trailing={<span className="text-xs font-semibold" style={accent}>{returns.length} {t("admin.quoteInvoice.ui.returns_9582a02f")}</span>}>
           <div className="space-y-2 p-3">
             {returns.length ? [...returns].reverse().map((record) => <article key={record.return_id || record._id} className="rounded-xl border p-3" style={{ borderColor: "#e2eaf5", background: "#fff" }}>
-              <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-bold" style={primary}>{money(record.refund_amount, locale)}</p><p className="mt-0.5 text-[10px]" style={muted}>{record.refund_method} · {record.reason}</p></div><span className="rounded-full px-2 py-1 text-[9px] font-bold" style={{ color: record.status === "Completed" ? "#079878" : "#b5760a", background: record.status === "Completed" ? "#e1f8f0" : "#fff5df" }}>{record.status === "Completed" ? t("admin.invoiceDetail.common.completed") : record.status}</span></div>
-              <p className="mt-2 text-[10px]" style={muted}>{new Date(record.date).toLocaleString(locale || [], { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-              <div className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: "#edf2f9" }}>{(record.items_returned || []).map((item, index) => <div key={`${item.item_id || index}`} className="flex justify-between gap-3 text-[10px]"><span className="truncate" style={muted}>{item.name || invoice.items?.find((invoiceItem) => String(invoiceItem._id) === String(item.item_id))?.name || t("admin.invoiceDetail.empty.invoiceItem")}</span><span className="shrink-0 font-semibold" style={primary}>× {item.qty}</span></div>)}</div>
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-medium" style={muted}>Item deduction: <span className="text-xs font-bold" style={primary}>{money(record.refund_amount)}</span></p>{record.refund_method === "Cash Refund" && <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">Cash paid back: {money(record.amount_to_refund ?? record.refund_amount)}</p>}<p className="mt-0.5 text-[10px]" style={muted}>{record.refund_method} · {record.reason}</p></div><span className="rounded-full px-2 py-1 text-[9px] font-bold" style={{ color: record.status === "Completed" ? "#079878" : "#b5760a", background: record.status === "Completed" ? "#e1f8f0" : "#fff5df" }}>{record.status}</span></div>
+              <p className="mt-2 text-[10px]" style={muted}>{new Date(record.date).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+              <div className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: "#edf2f9" }}>{(record.items_returned || []).map((item, index) => <div key={`${item.item_id || index}`} className="flex justify-between gap-3 text-[10px]"><span className="truncate" style={muted}>{item.name || invoice.items?.find((invoiceItem) => String(invoiceItem._id) === String(item.item_id))?.name || "Invoice item"}</span><span className="shrink-0 font-semibold" style={primary}>× {item.qty}</span></div>)}</div>
               {record.notes && <p className="mt-2 whitespace-pre-wrap text-[10px]" style={muted}>{record.notes}</p>}
             </article>) : <p className="py-6 text-center text-xs" style={muted}>{t("admin.quoteInvoice.ui.no_returns_or_refunds_recorded_yet_18614002")}</p>}
           </div>
@@ -354,25 +353,6 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     </div>
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
-    {returnOpen && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
-    <style jsx global>{`
-      @page { size: A4 portrait; margin: 14mm; }
-      @media print {
-        html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
-        body * { visibility: hidden !important; }
-        #invoice-print-area, #invoice-print-area * { visibility: visible !important; }
-        #invoice-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
-        #invoice-print-area button, #invoice-print-area a, #invoice-print-area [role="dialog"] { display: none !important; }
-        #invoice-print-area > .grid { display: block !important; }
-        #invoice-print-area main, #invoice-print-area aside { display: block !important; break-inside: auto !important; }
-        #invoice-print-area section { break-inside: auto !important; box-shadow: none !important; }
-        #invoice-print-area section > div:first-child { break-after: avoid; }
-        #invoice-print-area tr { break-inside: avoid; }
-        #invoice-print-area .overflow-x-auto { overflow: visible !important; }
-        #invoice-print-area table { width: 100% !important; border-collapse: collapse !important; }
-        #invoice-print-area th, #invoice-print-area td { color: #111827 !important; border-color: #d1d5db !important; }
-        #invoice-print-area img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      }
-    `}</style>
+    {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
   </div>;
 }

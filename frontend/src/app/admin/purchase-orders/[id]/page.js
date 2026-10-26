@@ -23,8 +23,8 @@ const primary = { color: "#0f172a" };
 const accent = { color: "#2563eb" };
 const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
 const money = (n, locale = "en") => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
-const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
-const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "—";
+const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "â€”";
+const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "â€”";
 const imageUrl = (url) => !url ? "" : /^https?:\/\//i.test(url) ? url : `${API_ORIGIN || ""}${url.startsWith("/") ? url : `/${url}`}`;
 
 const statusStyles = {
@@ -58,7 +58,7 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
 function LabelValue({ label, value, icon: Icon }) {
   return <div className="grid grid-cols-[minmax(84px,.8fr)_minmax(0,1.2fr)] items-center gap-2 text-[13px] leading-6">
     <span className="inline-flex items-center gap-1.5" style={muted}>{Icon && <Icon size={13} />}{label}</span>
-    <span className="min-w-0 truncate font-medium" style={primary} title={value || "—"}>{value || "—"}</span>
+    <span className="min-w-0 truncate font-medium" style={primary} title={value || "â€”"}>{value || "â€”"}</span>
   </div>;
 }
 
@@ -225,7 +225,7 @@ export default function PODetailPage({ params }) {
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.sell_price, locale)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-semibold" style={primary}>{money(item.line_total, locale)}</td>
                   <td className="px-2.5 py-2.5" style={muted}>{new Intl.NumberFormat(intlLocale(locale)).format(Number(item.tax_rate || 0))}%</td>
-                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${new Intl.NumberFormat(intlLocale(locale)).format(item.expiry_after_delivery)} ${t("admin.purchaseOrders.view.days")}` : item.expiry_date ? t("admin.purchaseOrders.view.until", { date: dateOnly(item.expiry_date, locale) }) : "—"}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${new Intl.NumberFormat(intlLocale(locale)).format(item.expiry_after_delivery)} ${t("admin.purchaseOrders.view.days")}` : item.expiry_date ? t("admin.purchaseOrders.view.until", { date: dateOnly(item.expiry_date, locale) }) : "â€”"}</td>
                 </tr>)}
                   {!items.length && <tr><td colSpan={10} className="p-8 text-center text-xs" style={muted}>{t("admin.purchaseOrders.view.noItems")}</td></tr>}</tbody>
               </table>

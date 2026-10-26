@@ -27,7 +27,7 @@ export default function LeadsPage() {
   const [search, setSearch] = useState(""); const [filters, setFilters] = useState({ status: "", lead_type: "", source: "", assigned_employee_id: "" }); const [page, setPage] = useState(1);
   const [form, setForm] = useState(emptyForm); const [editingId, setEditingId] = useState(null); const [formOpen, setFormOpen] = useState(false);
   const [lostReasonLead, setLostReasonLead] = useState(null); const [lostReason, setLostReason] = useState("");
-  const { data, isLoading, isError, error } = useQuery({ queryKey: ["leads-admin", search, filters, page], queryFn: () => leadApi.list({ search, ...filters, page, limit: PAGE_SIZE }), keepPreviousData: true });
+  const { data, isLoading, isError, error } = useQuery({ queryKey: ["leads-admin", search, filters, page], queryFn: () => leadApi.list({ search, ...filters, page, limit: 10 }), keepPreviousData: true });
   const { data: employeeData } = useQuery({ queryKey: ["lead-list-employees"], queryFn: () => employeeApi.getAll() });
   const employees = Array.isArray(employeeData) ? employeeData : employeeData?.data || employeeData?.items || [];
   const leads = data?.data || []; const stats = data?.stats || {}; const pagination = data?.pagination || { total: 0, pages: 1, page: 1 };
@@ -35,7 +35,7 @@ export default function LeadsPage() {
   const statusMutation = useMutation({ mutationFn: ({ id, payload }) => leadApi.updateStatus(id, payload), onSuccess: () => { toast.success(t("admin.leads.toast.statusUpdated")); setLostReasonLead(null); setLostReason(""); qc.invalidateQueries({ queryKey: ["leads-admin"] }); }, onError: (e) => toast.error(e?.response?.data?.message || t("admin.leads.toast.statusFailed")) });
   const convertCustomerMutation = useMutation({ mutationFn: addLeadAsCustomer, onSuccess: ({ alreadyExists }) => { toast.success(t(alreadyExists ? "admin.leads.toast.customerUpdated" : "admin.leads.toast.addedToCustomers")); qc.invalidateQueries({ queryKey: ["leads-admin"] }); qc.invalidateQueries({ queryKey: ["customers-admin"] }); }, onError: (e) => toast.error(e?.response?.data?.message || t("admin.leads.toast.addCustomerFailed")) });
   const openCreate = () => { setEditingId(null); setForm(emptyForm); setFormOpen(true); };
-  const openEdit = (lead) => { setEditingId(lead._id); setForm({ ...emptyForm, ...lead, status: lead.status === "Converted" ? "Customer" : lead.status, phone: String(lead.phone || "").replace(/\D/g, "").slice(0, 15), category_id: lead.category_id?._id || lead.category_id || "", assigned_employee_id: lead.assigned_employee_id?._id || lead.assigned_employee_id || "", expected_purchase_date: lead.expected_purchase_date?.slice(0, 10) || "", next_follow_up_date: lead.next_follow_up_date?.slice(0, 10) || "", products: (lead.products || []).map((p) => ({ product_id: p.product_id?._id || p.product_id, variant_id: p.variant_id?._id || p.variant_id || "", quantity: p.quantity })) }); setFormOpen(true); };
+  const openEdit = (lead) => { setEditingId(lead._id); setForm({ ...emptyForm, ...lead, phone: String(lead.phone || "").replace(/\D/g, "").slice(0, 15), category_id: lead.category_id?._id || lead.category_id || "", assigned_employee_id: lead.assigned_employee_id?._id || lead.assigned_employee_id || "", expected_purchase_date: lead.expected_purchase_date?.slice(0, 10) || "", next_follow_up_date: lead.next_follow_up_date?.slice(0, 10) || "", products: (lead.products || []).map((p) => ({ product_id: p.product_id?._id || p.product_id, variant_id: p.variant_id?._id || p.variant_id || "", quantity: p.quantity })) }); setFormOpen(true); };
   const save = (event) => { event.preventDefault(); const payload = { ...form, category_id: form.category_id || null, estimated_deal_value: form.estimated_deal_value === "" ? null : Number(form.estimated_deal_value), assigned_employee_id: form.assigned_employee_id || null, next_follow_up_date: form.next_follow_up_date || null, products: form.products.filter((p) => p.product_id).map((p) => ({ ...p, variant_id: p.variant_id || null })) }; if (payload.lead_type === "Individual") { payload.company_name = ""; payload.business_type = ""; payload.business_address = ""; payload.city = ""; } saveMutation.mutate(payload); };
   const clearFilters = () => { setSearch(""); setFilters({ status: "", lead_type: "", source: "", assigned_employee_id: "" }); setPage(1); };
   const setFilter = (key, value) => { setPage(1); setFilters((current) => ({ ...current, [key]: value })); };
@@ -93,7 +93,7 @@ function RowActions({ lead, onView, onEdit, onStatusChange, onAddCustomer, onOpe
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
     const menuWidth = 176;
-    const menuHeight = 240;
+    const menuHeight = 180;
     const top = window.innerHeight - rect.bottom < menuHeight + 8
       ? Math.max(8, rect.top - menuHeight - 4)
       : Math.min(rect.bottom + 4, window.innerHeight - menuHeight - 8);

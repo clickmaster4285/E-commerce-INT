@@ -2,7 +2,6 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { leadApi } from "@/apis/admin/leadApi";
 import { addLeadAsCustomer } from "@/lib/addLeadAsCustomer";
@@ -31,14 +30,11 @@ export default function LeadDetailPage({ params }) {
   const { t, locale, dir } = useTranslation();
   const { productNameOf } = useLocalized();
   const { id } = use(params);
-  const router = useRouter();
   const qc = useQueryClient();
-  const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState(null);
+  const [activity, setActivity] = useState({ type: "Call", notes: "", follow_up_date: "" });
   const [lostReasonOpen, setLostReasonOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const [historyTab, setHistoryTab] = useState("overview");
-  const [activity, setActivity] = useState({ type: "Call", notes: "", follow_up_date: "" });
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey: ["lead-detail", id],
     queryFn: () => leadApi.getById(id),
@@ -84,59 +80,15 @@ export default function LeadDetailPage({ params }) {
     activityMutation.mutate({ ...activity, notes: activity.notes.trim(), follow_up_date: activity.follow_up_date || null });
   };
   const changeStatus = (status) => {
-    if (status === "Lost") {
-      setLostReason(lead.lost_reason || "");
-      setLostReasonOpen(true);
-      return;
-    }
+    if (status === "Lost") { setLostReason(lead.lost_reason || ""); setLostReasonOpen(true); return; }
     statusMutation.mutate({ status });
   };
   const submitLostReason = (event) => {
     event.preventDefault();
-    if (!lostReason.trim()) return;
-    statusMutation.mutate({ status: "Lost", lost_reason: lostReason.trim() });
+    const reason = lostReason.trim();
+    if (!reason) return;
+    statusMutation.mutate({ status: "Lost", lost_reason: reason });
   };
-  const openEdit = () => {
-    setEditForm({
-      ...lead,
-      status: lead.status === "Converted" ? "Customer" : lead.status,
-      phone: String(lead.phone || "").replace(/\D/g, "").slice(0, 15),
-      category_id: lead.category_id?._id || lead.category_id || "",
-      assigned_employee_id: lead.assigned_employee_id?._id || lead.assigned_employee_id || "",
-      expected_purchase_date: lead.expected_purchase_date?.slice(0, 10) || "",
-      next_follow_up_date: lead.next_follow_up_date?.slice(0, 10) || "",
-      products: (lead.products || []).map((item) => ({
-        product_id: item.product_id?._id || item.product_id,
-        variant_id: item.variant_id?._id || item.variant_id || "",
-        quantity: item.quantity,
-      })),
-    });
-    setEditOpen(true);
-  };
-  const saveEdit = (event) => {
-    event.preventDefault();
-    const payload = {
-      ...editForm,
-      category_id: editForm.category_id || null,
-      estimated_deal_value: editForm.estimated_deal_value === "" ? null : Number(editForm.estimated_deal_value),
-      assigned_employee_id: editForm.assigned_employee_id || null,
-      next_follow_up_date: editForm.next_follow_up_date || null,
-      expected_purchase_date: editForm.expected_purchase_date || null,
-      products: (editForm.products || []).filter((item) => item.product_id).map((item) => ({ ...item, variant_id: item.variant_id || null })),
-    };
-    if (payload.lead_type === "Individual") {
-      payload.company_name = "";
-      payload.business_type = "";
-      payload.business_address = "";
-      payload.city = "";
-    }
-    editMutation.mutate(payload);
-  };
-
-  const status = lead.status === "Converted" ? "Customer" : lead.status;
-  const isCustomer = status === "Customer" && Boolean(lead.customer_id);
-  const journeyStages = ["New", "Contacted", "Qualified", "Customer"];
-  const journeyIndex = status === "Lost" ? 1 : Math.max(0, journeyStages.indexOf(status));
   const next = nextStatuses[lead.status] || [];
   const previous = previousStatus[lead.status];
   const displayName = lead.lead_type === "Business" && lead.company_name ? lead.company_name : lead.name;
