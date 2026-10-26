@@ -106,7 +106,7 @@ function StoreLogo({
 }
 
 export default function AdminLoginPage() {
-  const { t } = useTranslation();
+  const { t, dir, locale } = useTranslation();
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
 
@@ -236,7 +236,7 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div dir={dir} lang={locale} className="flex min-h-screen w-full">
       {/* ============ LEFT - BRAND PANEL WITH FULL BG IMAGE ============ */}
       <aside
         className="relative z-20 hidden shrink-0 flex-col overflow-hidden px-8 py-7 text-white lg:flex lg:w-[48%] xl:w-[52%] xl:px-14 xl:py-10"
@@ -391,22 +391,29 @@ export default function AdminLoginPage() {
                 </span>
                 <span className="min-w-0 flex-1">
                   <label htmlFor="admin-password" className="block cursor-text text-[12px] font-medium text-[var(--text-secondary)]">{t('admin.login.password')}</label>
-                  <input
-                    id="admin-password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={handlePasswordChange}
-                    onKeyUp={(e) => setCapsLockOn(e.getModifierState?.('CapsLock') || false)}
-                    onBlur={() => setCapsLockOn(false)}
-                    placeholder={t('admin.login.passwordPlaceholder')}
-                    autoComplete="current-password"
-                    aria-invalid={Boolean(fieldErrors.password)}
-                    className="w-full bg-transparent pt-0.5 pr-7 text-[13px] font-normal text-[var(--text-secondary)] placeholder:font-normal placeholder:text-[var(--text-muted)] focus:outline-none"
-                  />
+                  <span className="relative block">
+                    <input
+                      id="admin-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={handlePasswordChange}
+                      onKeyUp={(e) => setCapsLockOn(e.getModifierState?.('CapsLock') || false)}
+                      onBlur={() => setCapsLockOn(false)}
+                      placeholder={t('admin.login.passwordPlaceholder')}
+                      autoComplete="current-password"
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      className="w-full bg-transparent pt-0.5 pe-8 text-[13px] font-normal text-[var(--text-secondary)] placeholder:font-normal placeholder:text-[var(--text-muted)] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? t('admin.login.hidePassword') : t('admin.login.showPassword')}
+                      className="absolute end-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center text-[var(--text-muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none"
+                    >
+                      {showPassword ? <EyeOff size={15} aria-hidden="true" /> : <Eye size={15} aria-hidden="true" />}
+                    </button>
+                  </span>
                 </span>
-                <button type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? t('admin.login.hidePassword') : t('admin.login.showPassword')} className="-ml-7 mt-4 h-6 w-6 shrink-0 text-[var(--text-muted)] transition-colors hover:text-[var(--accent)] focus-visible:outline-none">
-                  {showPassword ? <EyeOff size={15} className="mx-auto" aria-hidden="true" /> : <Eye size={15} className="mx-auto" aria-hidden="true" />}
-                </button>
               </div>
               {fieldErrors.password && <p role="alert" className="mt-1.5 text-xs font-medium text-[var(--danger-text)]">{fieldErrors.password}</p>}
               {capsLockOn && !fieldErrors.password && (
@@ -418,13 +425,13 @@ export default function AdminLoginPage() {
             </div>
 
             {/* Remember Me / Forgot Password */}
-            <div className="flex items-center justify-between pt-0.5 text-[12.5px]">
-              <label className="flex cursor-pointer select-none items-center gap-2 font-medium text-[var(--text-secondary)]">
+            <div dir={dir} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-0.5 text-[12.5px]">
+              <label className="flex min-w-0 cursor-pointer select-none items-center gap-2 text-start font-medium text-[var(--text-secondary)]">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 cursor-pointer rounded border-[var(--border-card)] accent-[var(--accent)]"
+                  className="h-4 w-4 shrink-0 cursor-pointer rounded border-[var(--border-card)] accent-[var(--accent)]"
                 />
                 {t('admin.login.rememberMe')}
               </label>

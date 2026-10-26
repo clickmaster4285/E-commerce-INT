@@ -384,7 +384,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
       // ✅ Validate deal requirements BEFORE navigation
       if (dealRequirementIssues.length) {
         const firstIssue = dealRequirementIssues[0];
-        toast.error(formatDealRequirementIssue(firstIssue));
+        toast.error(formatDealRequirementIssue(firstIssue, { t, localizedName: text(firstIssue.item?.name, firstIssue.item?.translations?.name) }));
         // ❌ BLOCK navigation - user stays in drawer
         return;
       }
@@ -622,7 +622,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
                 </button>
                 {dealRequirementIssues.length > 0 && (
                   <p role="alert" className="text-center text-xs text-amber-700 dark:text-amber-300">
-                    {formatDealRequirementIssue(dealRequirementIssues[0])}
+                    {formatDealRequirementIssue(dealRequirementIssues[0], { t, localizedName: text(dealRequirementIssues[0].item?.name, dealRequirementIssues[0].item?.translations?.name) })}
                   </p>
                 )}
               </div>

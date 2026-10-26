@@ -10,6 +10,7 @@ import { attributeApi } from "../../../apis/admin/attributeApi";
 import { useCategorySocketSync } from "../../../hooks/admin/useCategorySocketSync";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 // ================= ICONS =================
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -265,7 +266,7 @@ const getParentAssignmentError = ({ categories = [], editingCategory = null, nex
 export default function CategoriesPage() {
   useCategorySocketSync();
   // Admin-panel i18n. English is the fallback for any missing key.
-  const { t: __t } = useTranslation();
+  const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.categories.${k}`, p);
   // Database-sourced content (category / attribute names + descriptions) —
   // active locale me render hota hai, English fallback helper ke andar hai.
@@ -748,6 +749,7 @@ const [viewMode, setViewMode] = useState(() => {
   /* ---------- Derived data (server side paginated) ---------- */
   // ✅ Backend se sirf current page ki categories aati hain
   const categories = Array.isArray(paginatedCategoriesData?.items) ? paginatedCategoriesData.items : [];
+  usePageTranslations({ model: "Category", records: categories, locale, ready: !categoriesFetching && paginatedCategoriesData?.pagination?.page === currentPage, queryKey: ["admin-categories", "paginated", currentPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction], queryClient });
   // ✅ Poori list (lightweight) — parent dropdown + parent name ke liye
   const categoryOptions = Array.isArray(paginatedCategoriesData?.options) ? paginatedCategoriesData.options : [];
   const categoryCounts = paginatedCategoriesData?.counts || { total: 0, root: 0, child: 0, withAttributes: 0 };

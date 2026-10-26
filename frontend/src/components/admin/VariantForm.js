@@ -914,11 +914,8 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                 </div>
                 <div>
                   <h2 className="text-base font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
-                    {isEditMode ? t("admin.productForm.editVariant") : t("admin.productForm.addVariant")}
+                    {isEditMode ? t("admin.productDetail.page.editVariant") : t("admin.productDetail.page.addVariant")}
                   </h2>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {isEditMode ? t("admin.productForm.updateVariant") : t("admin.productForm.configureVariant")}
-                  </p>
                 </div>
               </div>
             </div>
@@ -1066,13 +1063,13 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                   className="text-[10px] font-bold uppercase tracking-wider mb-3"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  {t("admin.productForm.pricingStock")}
+                  {t("admin.productDetail.page.pricingAndStock")}
                 </h3>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { l: t("admin.productForm.sellingPrice"), f: "selling_price", p: "0.00", req: true },
-                    { l: t("admin.productForm.quantity"), f: "quantity", p: "0", req: false },
+                    { l: t("admin.productDetail.page.sellingPrice"), f: "selling_price", p: "0.00", req: true },
+                    { l: t("admin.productDetail.page.quantity"), f: "quantity", p: "0", req: false },
                   ].map(({ l, f, p: placeholder, req }) => (
                     <div key={f}>
                       <label className="block text-[11px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>

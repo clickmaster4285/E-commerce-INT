@@ -27,6 +27,7 @@ import {
 import bannerAPI from "@/apis/admin/bannerApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -50,11 +51,13 @@ function formatDate(value, withTime = false, locale = "en") {
 
 function relativeDate(value) {
   if (!value) return "\u2014";
+  const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
   const minutes = Math.floor((Date.now() - new Date(value).getTime()) / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
-  return `${Math.floor(minutes / 1440)}d ago`;
+  const relative = new Intl.RelativeTimeFormat(locale === "ur" ? "ur-PK" : locale, { numeric: "auto" });
+  if (minutes < 1) return relative.format(0, "second");
+  if (minutes < 60) return relative.format(-minutes, "minute");
+  if (minutes < 1440) return relative.format(-Math.floor(minutes / 60), "hour");
+  return relative.format(-Math.floor(minutes / 1440), "day");
 }
 
 function imageUrl(image) {
@@ -337,6 +340,7 @@ export default function BannerDetailPage() {
     enabled: !!bannerId,
     retry: false,
   });
+  usePageTranslations({ model: "Banner", records: banner ? [banner] : [], locale, ready: !!banner && !isLoading, queryKey: ["banner", bannerId], queryClient });
 
   const deleteMutation = useMutation({
     mutationFn: () => bannerAPI.delete(bannerId),

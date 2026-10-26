@@ -41,6 +41,8 @@ const updateStoreInfo = async (req, res) => {
       store_status, maintenance_message,
       meta_title, meta_description, meta_keywords,
       return_policy, privacy_policy, terms_conditions,
+      quote_terms_conditions, invoice_terms_conditions,
+      quote_terms_translations, invoice_terms_translations,
       social_links,
     } = req.body;
 
@@ -81,6 +83,10 @@ const updateStoreInfo = async (req, res) => {
     if (return_policy !== undefined) store.return_policy = return_policy;
     if (privacy_policy !== undefined) store.privacy_policy = privacy_policy;
     if (terms_conditions !== undefined) store.terms_conditions = terms_conditions;
+    if (quote_terms_conditions !== undefined) store.quote_terms_conditions = quote_terms_conditions;
+    if (invoice_terms_conditions !== undefined) store.invoice_terms_conditions = invoice_terms_conditions;
+    if (quote_terms_translations !== undefined) store.quote_terms_translations = quote_terms_translations;
+    if (invoice_terms_translations !== undefined) store.invoice_terms_translations = invoice_terms_translations;
 
     if (social_links) {
       store.social_links = typeof social_links === "string" ? JSON.parse(social_links) : social_links;

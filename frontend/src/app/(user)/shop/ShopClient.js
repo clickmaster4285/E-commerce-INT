@@ -476,12 +476,12 @@ function ShopContent() {
           </span>
         </SectionHeading>
 
-        <div dir="ltr" className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+        <div dir={dir} className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
           {/* LEFT SIDEBAR — ghar wali look/data/options (same component) */}
           <HomeSidebar
             {...sidebarProps}
             scrollable
-            className="sticky top-[7.25rem] hidden w-56 shrink-0 rounded-l-none border-l-0 lg:block xl:w-60 2xl:w-64"
+            className={`sticky top-[7.25rem] hidden w-56 shrink-0 lg:block xl:w-60 2xl:w-64 ${dir === "rtl" ? "rounded-r-none border-r-0" : "rounded-l-none border-l-0"}`}
           />
 
           {/* MAIN COLUMN */}

@@ -1,10 +1,46 @@
 const mongoose = require("mongoose");
+const { randomUUID } = require("crypto");
 const Quote = require("../models/Quote");
+const QuoteNumberReservation = Quote.NumberReservation;
 
 const nextQuoteNumber = async () => {
-  const existing = await Quote.find({ quote_number: /^QT-(?:\d{4}-)?\d+$/ }).select("quote_number").lean();
-  const max = existing.reduce((highest, quote) => Math.max(highest, Number(String(quote.quote_number).split("-").at(-1)) || 0), 0);
-  return `QT-${String(max + 1).padStart(4, "0")}`;
+  const pattern = /^(?:QT|QUO)-(?:\d{4}-)?\d+$/;
+  const [existing, reserved] = await Promise.all([
+    Quote.find({ quote_number: pattern }).select("quote_number").lean(),
+    QuoteNumberReservation.find({ quote_number: pattern }).select("quote_number").lean(),
+  ]);
+  const max = [...existing, ...reserved].reduce((highest, quote) => Math.max(highest, Number(String(quote.quote_number).split("-").at(-1)) || 0), 0);
+  return `QUO-${String(max + 1).padStart(4, "0")}`;
+};
+
+exports.reserveQuoteNumber = async (req, res) => {
+  try {
+    const createdby = req.user?._id || null;
+    const suppliedToken = String(req.body?.token || "");
+    const validReservation = suppliedToken ? await QuoteNumberReservation.findOne({
+      token: suppliedToken,
+      createdby,
+      consumed_at: null,
+      expires_at: { $gt: new Date() },
+    }).lean() : null;
+    if (validReservation) {
+      return res.json({ success: true, data: { quote_number: validReservation.quote_number, reservation_token: validReservation.token } });
+    }
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        const reservation = await QuoteNumberReservation.create({
+          token: randomUUID(),
+          quote_number: await nextQuoteNumber(),
+          createdby,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+        return res.json({ success: true, data: { quote_number: reservation.quote_number, reservation_token: reservation.token } });
+      } catch (error) {
+        if (error.code !== 11000 || attempt === 9) throw error;
+      }
+    }
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
 const buildQuote = (body = {}) => {
@@ -32,7 +68,7 @@ const buildQuote = (body = {}) => {
     return {
       product_id: mongoose.isValidObjectId(item.product_id) ? item.product_id : null,
       variant_id: mongoose.isValidObjectId(item.variant_id) ? item.variant_id : null,
-      name: String(item.name).trim(), sku: String(item.sku || "").trim(),
+      name: String(item.name).trim(), variant_name: String(item.variant_name || "").trim(), sku: String(item.sku || "").trim(),
       quantity, unit_price: unitPrice, discount_rate: discountRate, discount, tax_rate: taxRate, tax,
       total: round(gross - discount + tax),
     };
@@ -61,6 +97,7 @@ const buildQuote = (body = {}) => {
     tax_rate: taxRate, tax, discount, total,
     terms: String(body.terms || "").trim(),
     notes: String(body.notes || "").trim(),
+    pdf_design: body.pdf_design && typeof body.pdf_design === "object" ? body.pdf_design : {},
   };
 };
 
@@ -83,12 +120,28 @@ exports.createQuote = async (req, res) => {
   try {
     const data = buildQuote(req.body);
     const status = ["Pending", "Draft", "Sent"].includes(req.body.status) ? req.body.status : "Pending";
+    const reservationToken = String(req.body.quote_number_reservation || "");
+    let reservation = null;
+    if (reservationToken) {
+      reservation = await QuoteNumberReservation.findOneAndUpdate({
+        token: reservationToken,
+        createdby: req.user?._id || null,
+        consumed_at: null,
+        expires_at: { $gt: new Date() },
+      }, { $set: { consumed_at: new Date() } }, { new: true });
+      if (!reservation) return res.status(409).json({ success: false, message: "Quote number reservation expired. Please refresh the editor." });
+    }
     let quote;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
-        quote = await Quote.create({ ...data, quote_number: await nextQuoteNumber(), status, createdby: req.user?._id || null });
+        quote = await Quote.create({ ...data, quote_number: reservation?.quote_number || await nextQuoteNumber(), status, createdby: req.user?._id || null });
         break;
-      } catch (error) { if (error.code !== 11000 || attempt === 4) throw error; }
+      } catch (error) {
+        if (reservation || error.code !== 11000 || attempt === 4) {
+          if (reservation && error.code !== 11000) await QuoteNumberReservation.updateOne({ _id: reservation._id, consumed_at: { $ne: null } }, { $set: { consumed_at: null } });
+          throw error;
+        }
+      }
     }
     res.status(201).json({ success: true, data: quote });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
@@ -97,13 +150,19 @@ exports.createQuote = async (req, res) => {
 exports.updateQuote = async (req, res) => {
   try {
     const data = buildQuote(req.body);
-    const status = ["Draft", "Sent"].includes(req.body.status) ? req.body.status : "Pending";
-    const quote = await Quote.findOneAndUpdate(
-      { _id: req.params.id, is_deleted: false, status: { $in: ["Pending", "Draft"] } },
-      { ...data, status, updatedby: req.user?._id || null },
-      { new: true, runValidators: true },
-    );
-    if (!quote) return res.status(404).json({ success: false, message: "Pending quote not found" });
+    const quote = await Quote.findOne({ _id: req.params.id, is_deleted: false });
+    if (!quote) return res.status(404).json({ success: false, message: "Quote not found" });
+
+    const currentStatus = String(quote.status || "Pending").trim().toLowerCase();
+    if (!["pending", "draft"].includes(currentStatus)) {
+      return res.status(409).json({ success: false, message: "Only pending or draft quotes can be edited" });
+    }
+
+    const requestedStatus = ["Pending", "Draft", "Sent"].includes(req.body.status)
+      ? req.body.status
+      : (currentStatus === "draft" ? "Draft" : "Pending");
+    quote.set({ ...data, status: requestedStatus, updatedby: req.user?._id || null });
+    await quote.save();
     res.json({ success: true, data: quote });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };

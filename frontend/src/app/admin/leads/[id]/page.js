@@ -9,9 +9,9 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 import { toast } from "sonner";
 import {
-  Activity, ArrowLeft, ArrowRight, BadgeDollarSign, Building2, CalendarDays,
-  CheckCircle2, ChevronRight, Clock3, ContactRound, Mail, MapPin,
-  Package, Phone, Plus, RotateCcw, Tag, UserRound, Users, X,
+  Activity, ArrowLeft, ArrowRight, BadgeDollarSign, Building2, CalendarDays, CheckCircle2, FilePlus2,
+  ChevronRight, Clock3, ContactRound, Eye, History, Mail, MapPin, Pencil, Phone,
+  Package, Plus, RotateCcw, StickyNote, Tag, UserRound, Users,
 } from "lucide-react";
 
 const activityTypes = ["Call", "WhatsApp", "Email", "Meeting", "Other"];
@@ -34,7 +34,12 @@ export default function LeadDetailPage({ params }) {
   const [activity, setActivity] = useState({ type: "Call", notes: "", follow_up_date: "" });
   const [lostReasonOpen, setLostReasonOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
-  const { data: lead, isLoading, isError, error } = useQuery({ queryKey: ["lead-detail", id], queryFn: () => leadApi.getById(id) });
+  const [historyTab, setHistoryTab] = useState("overview");
+  const { data: lead, isLoading, isError, error } = useQuery({
+    queryKey: ["lead-detail", id],
+    queryFn: () => leadApi.getById(id),
+  });
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["lead-detail", id] });
     qc.invalidateQueries({ queryKey: ["leads-admin"] });
@@ -55,10 +60,25 @@ export default function LeadDetailPage({ params }) {
     onSuccess: ({ alreadyExists }) => { toast.success(t(alreadyExists ? "admin.leads.toast.customerUpdated" : "admin.leads.toast.addedToCustomers")); refresh(); },
     onError: (e) => toast.error(e?.response?.data?.message || t("admin.leads.toast.addCustomerFailed")),
   });
+  const editMutation = useMutation({
+    mutationFn: (payload) => leadApi.update(id, payload),
+    onSuccess: () => {
+      toast.success("Lead updated");
+      setEditOpen(false);
+      refresh();
+    },
+    onError: (e) => toast.error(e?.response?.data?.message || "Lead could not be updated"),
+  });
 
   if (isLoading) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center text-sm text-[var(--text-muted)]">{t("admin.leads.ui.loadingLeadDetails")}</div>;
   if (isError || !lead) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center"><p className="text-sm font-semibold">{error?.response?.data?.message || t("admin.leads.ui.leadNotFound")}</p><Link href="/admin/leads" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"><ArrowLeft size={14} /> {t("admin.leads.ui.backToLeads")}</Link></div>;
 
+  const products = Array.isArray(lead.products) ? lead.products : [];
+  const recordActivity = (event) => {
+    event.preventDefault();
+    if (!activity.notes.trim()) return;
+    activityMutation.mutate({ ...activity, notes: activity.notes.trim(), follow_up_date: activity.follow_up_date || null });
+  };
   const changeStatus = (status) => {
     if (status === "Lost") { setLostReason(lead.lost_reason || ""); setLostReasonOpen(true); return; }
     statusMutation.mutate({ status });
@@ -69,13 +89,33 @@ export default function LeadDetailPage({ params }) {
     if (!reason) return;
     statusMutation.mutate({ status: "Lost", lost_reason: reason });
   };
-  const recordActivity = (event) => {
-    event.preventDefault();
-    activityMutation.mutate({ ...activity, follow_up_date: activity.follow_up_date || null });
-  };
   const next = nextStatuses[lead.status] || [];
   const previous = previousStatus[lead.status];
-  const products = lead.products || [];
+  const displayName = lead.lead_type === "Business" && lead.company_name ? lead.company_name : lead.name;
+  const historyItems = [
+    ...(lead.history || []).map((entry) => ({ ...entry, key: `history-${entry._id}`, details: "" })),
+    ...(lead.activities || []).map((entry) => ({
+      key: `activity-${entry._id}`,
+      action: "activity",
+      summary: `${entry.type} activity recorded`,
+      details: entry.notes,
+      employee_id: entry.employee_id,
+      employee_name: entry.employee_name,
+      created_at: entry.created_at,
+      changes: entry.follow_up_date ? [{ field: "Follow-up date", from: "—", to: dateOnly(entry.follow_up_date) }] : [],
+    })),
+  ];
+  if (!historyItems.some((entry) => entry.action === "created")) {
+    historyItems.push({
+      key: "history-created-fallback",
+      action: "created",
+      summary: "Lead created",
+      employee_name: "System record",
+      created_at: lead.created_at,
+      changes: [],
+    });
+  }
+  historyItems.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
   return <div dir={dir} className="space-y-4 text-[var(--text-primary)] sm:space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3">
@@ -168,10 +208,25 @@ export default function LeadDetailPage({ params }) {
 function PanelHeader({ icon: Icon, title, trailing }) {
   return <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm"><Icon size={15} /></span><h2 className="text-sm font-bold">{title}</h2><div className="ms-auto">{trailing}</div></div>;
 }
+function Metric({ icon: Icon, label, value }) {
+  return <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={17} /></span>
+    <div className="min-w-0"><p className="truncate text-[11px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm font-semibold text-[var(--text-primary)]">{value}</p></div>
+  </div>;
+}
 function Fact({ icon: Icon, label, value }) {
   const { t } = useTranslation();
   return <div className="group flex min-w-0 items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-row-hover)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-colors group-hover:text-[var(--accent)]"><Icon size={15} /></span><div className="min-w-0"><p className="text-[10px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-xs font-semibold">{value || t("common.notProvided")}</p></div></div>;
 }
-function Metric({ icon: Icon, label, value, tone }) {
-  return <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={17} /></span><div className="min-w-0"><p className="text-[10px] font-semibold text-[var(--text-muted)]">{label}</p><p className="mt-1 truncate text-sm font-bold text-[var(--text-primary)]">{tone ? <span className={`rounded-full px-2 py-1 text-[10px] ${tone}`}>{value}</span> : value}</p></div></div>;
+
+function JourneyFact({ label, value }) {
+  return <div className="min-w-0 rounded-xl border border-blue-100/80 bg-white/75 px-3 py-2.5"><p className="text-[10px] font-medium text-slate-500">{label}</p><p className="mt-1 truncate text-xs font-bold text-slate-800">{value}</p></div>;
+}
+
+function SectionHeader({ icon: Icon, title }) {
+  return <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={15} /></span><h2 className="text-sm font-bold">{title}</h2></div>;
+}
+
+function DetailField({ icon: Icon, label, value }) {
+  return <div className="flex min-w-0 items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-row-hover)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"><Icon size={15} /></span><div className="min-w-0"><p className="text-[10px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm font-semibold">{value || "—"}</p></div></div>;
 }

@@ -94,12 +94,15 @@ export function getDealRequirementIssues(items) {
   });
 }
 
-export function formatDealRequirementIssue(issue) {
+export function formatDealRequirementIssue(issue, { t, localizedName } = {}) {
   if (!issue) return "";
-  const name = issue.item?.name || "This item";
+  const name = localizedName || issue.item?.name || "This item";
   const required = issue.requiredQuantity;
   const current = issue.quantity;
   const remaining = issue.remainingQuantity;
+  if (typeof t === "function") {
+    return t("cart.dealRequirementIssue", { name, required, current, remaining });
+  }
   return `"${name}" requires at least ${required} items for this deal. You have selected only ${current}. Please add ${remaining} more item${remaining === 1 ? '' : 's'}.`;
 }
 

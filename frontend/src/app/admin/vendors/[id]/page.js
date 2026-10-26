@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { vendorApi } from "@/apis/admin/vendorApi";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { localizedStrictField } from "@/i18n/localize";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
 import { toast } from "sonner";
 import VendorFormModal, { emptyVendorForm, toVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
@@ -87,6 +89,8 @@ export default function VendorDetailPage({ params }) {
   const [form, setForm] = useState(emptyVendorForm);
 
   const { data: detail, isLoading } = useQuery({ queryKey: ["vendor", id], queryFn: () => vendorApi.getWithPOs(id) });
+  usePageTranslations({ model: "Vendor", records: detail ? [detail] : [], locale, ready: !!detail && !isLoading, queryKey: ["vendor", id], queryClient: qc });
+  const vendorText = (field) => localizedStrictField(detail?.[field], detail?.translations?.[field], locale);
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["vendor", id] }); qc.invalidateQueries({ queryKey: ["vendors"] }); };
 
   const saveMutation = useMutation({
@@ -135,16 +139,16 @@ export default function VendorDetailPage({ params }) {
           <div className="mb-1.5 flex items-center gap-1.5 text-sm" style={muted}>
             <Link href="/admin/vendors" className="inline-flex items-center gap-1 hover:text-blue-700"><ArrowLeft size={14} />{tShared("nav.item.vendors")}</Link>
             <ChevronRight size={13} />
-            <span className="truncate" style={primary}>{detail.name}</span>
+            <span className="truncate" style={primary}>{vendorText("name")}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white" style={{ borderColor: "#cfe0f8", color: "#2878f0" }}><Building2 size={18} /></div>
-            <h1 className="text-xl font-bold" style={primary}>{detail.name}</h1>
+            <h1 className="text-xl font-bold" style={primary}>{vendorText("name")}</h1>
             <Pill tone={detail.is_active ? "green" : "red"}>{detail.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 pl-11 text-xs" style={muted}>
             <span className="font-mono">{tDetail("vendorCode")} {detail.vendor_code || "—"}</span>
-            {detail.company_name && <span>{detail.company_name}</span>}
+            {vendorText("company_name") && <span>{vendorText("company_name")}</span>}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -158,8 +162,8 @@ export default function VendorDetailPage({ params }) {
           <Panel title={tDetail("vendorInformation")} icon={Building2} trailing={<div className="flex items-center gap-1.5"><Stars value={detail.rating} /><span className="text-xs font-bold" style={primary}>{(Number(detail.rating) || 0).toFixed(1)} / 5</span></div>}>
             <div className="grid gap-4 p-4 md:grid-cols-2">
               <div className="space-y-0.5">
-                <Dl label={tDetail("labels.vendorName")} value={detail.name} />
-                <Dl label={tDetail("labels.company")} value={detail.company_name} />
+                <Dl label={tDetail("labels.vendorName")} value={vendorText("name")} />
+                <Dl label={tDetail("labels.company")} value={vendorText("company_name")} />
                 <Dl label={tDetail("labels.contactPerson")} value={detail.contact_person} />
                 <Dl label={tDetail("vendorCode")} value={detail.vendor_code} mono />
                 <Dl label={tDetail("labels.taxId")} value={detail.tax_id} />
@@ -169,9 +173,9 @@ export default function VendorDetailPage({ params }) {
                 <Dl label={tDetail("labels.email")} value={detail.email} icon={Mail} />
                 <Dl label={tDetail("labels.phone")} value={detail.phone} icon={Phone} />
                 <Dl label={tDetail("labels.whatsapp")} value={detail.whatsapp} icon={MessageCircle} />
-                <Dl label={tDetail("labels.address")} value={detail.address} icon={MapPin} />
-                <Dl label={tDetail("labels.cityState")} value={[detail.city, detail.state].filter(Boolean).join(", ")} />
-                <Dl label={tDetail("labels.countryZIP")} value={[detail.country, detail.zip_code].filter(Boolean).join(" · ")} />
+                <Dl label={tDetail("labels.address")} value={vendorText("address")} icon={MapPin} />
+                <Dl label={tDetail("labels.cityState")} value={[vendorText("city"), vendorText("state")].filter(Boolean).join(", ")} />
+                <Dl label={tDetail("labels.countryZIP")} value={[vendorText("country"), detail.zip_code].filter(Boolean).join(" · ")} />
               </div>
             </div>
             {(detail.bank_details?.bank || detail.bank_details?.account_title || detail.bank_details?.account_no) && (

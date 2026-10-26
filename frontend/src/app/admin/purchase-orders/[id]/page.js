@@ -1,11 +1,14 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
+import { localizedStrictField } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import {
   ArrowLeft, BriefcaseBusiness, CalendarDays, Check, CheckCircle2,
   ChevronRight, Circle, CreditCard, FileText, MapPin, Mail, Package, PackageCheck,
@@ -73,6 +76,7 @@ function Modal({ title, onClose, icon: Icon, children }) {
 
 export default function PODetailPage({ params }) {
   const { t, locale } = useTranslation();
+  const { contentOf, productNameOf } = useLocalized();
   const { id } = use(params);
   const qc = useQueryClient();
   const [deliverOpen, setDeliverOpen] = useState(false);
@@ -83,18 +87,26 @@ export default function PODetailPage({ params }) {
   const [showAllItems, setShowAllItems] = useState(false);
   const { data: res, isLoading, isError, refetch } = useQuery({ queryKey: ["po", id], queryFn: () => purchaseOrderApi.getById(id) });
   const po = res?.data || null;
+  usePageTranslations({ model: "PurchaseOrder", records: po ? [po] : [], locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  const poVendor = po?.vendor_id && typeof po.vendor_id === "object" ? po.vendor_id : null;
+  usePageTranslations({ model: "Vendor", records: poVendor?._id ? [poVendor] : [], locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  const vendorText = (field) => localizedStrictField(poVendor?.[field] || po?.vendor_snapshot?.[field], poVendor?.translations?.[field], locale);
+  const poProducts = useMemo(() => (po?.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id), [po]);
+  usePageTranslations({ model: "Product", records: poProducts, locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  const poVariants = useMemo(() => (po?.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id), [po]);
+  usePageTranslations({ model: "Variant", records: poVariants, locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
   const taxBase = po ? Math.max(0, Number(po.subtotal || 0) - Number(po.discount || 0)) : 0;
   const overallTaxPercent = po?.overall_tax_rate != null
     ? Number(po.overall_tax_rate)
     : taxBase > 0 ? Number(po?.overall_tax || 0) / taxBase * 100 : 0;
   const refresh = () => qc.invalidateQueries({ queryKey: ["po", id] });
-  const act = (fn, ok) => useMutation({ mutationFn: fn, onSuccess: () => { toast.success(ok); refresh(); }, onError: () => toast.error(t("admin.purchaseOrders.toast.updateFailed")) });
-  const confirmM = act(() => purchaseOrderApi.confirm(id), t("admin.purchaseOrders.toast.confirmed"));
-  const cancelM = act(() => purchaseOrderApi.cancel(id, cancelReason), t("admin.purchaseOrders.toast.cancelled"));
+  const useActionMutation = (fn, ok) => useMutation({ mutationFn: fn, onSuccess: () => { toast.success(ok); refresh(); }, onError: () => toast.error(t("admin.purchaseOrders.toast.updateFailed")) });
+  const confirmM = useActionMutation(() => purchaseOrderApi.confirm(id), t("admin.purchaseOrders.toast.confirmed"));
+  const cancelM = useActionMutation(() => purchaseOrderApi.cancel(id, cancelReason), t("admin.purchaseOrders.toast.cancelled"));
   const deliverM = useMutation({
     mutationFn: (invoiceNumber) => purchaseOrderApi.deliver(id, {
       items: (po?.items || [])
-        .map((item) => ({ variant_id: item.variant_id, qty: Math.max(0, Number(item.qty_ordered) - Number(item.received_qty)) }))
+        .map((item) => ({ variant_id: item.variant_id?._id || item.variant_id, qty: Math.max(0, Number(item.qty_ordered) - Number(item.received_qty)) }))
         .filter((item) => item.qty > 0),
       invoice_no: invoiceNumber,
     }),
@@ -122,6 +134,10 @@ export default function PODetailPage({ params }) {
   if (isError || !po) return <div className="rounded-xl border bg-white p-8 text-center" style={edge}><p className="text-sm" style={primary}>{t("admin.purchaseOrders.toast.loadFailed")}</p><button onClick={() => refetch()} className="mt-2 text-sm font-semibold" style={accent}>{t("admin.purchaseOrders.toast.tryAgain")}</button><div><Link href="/admin/purchase-orders" className="mt-3 inline-block text-sm underline" style={muted}>{t("admin.purchaseOrders.detail.poDetails")}</Link></div></div>;
 
   const items = po.items || [];
+  const itemTaxBase = items.reduce((sum, item) => sum + (Number(item.line_total) || 0), 0);
+  const itemTaxPercent = itemTaxBase > 0
+    ? Number(po.tax || 0) / itemTaxBase * 100
+    : 0;
   const vendor = po.vendor_snapshot || {};
   const payments = po.payments || [];
   const status = String(po.status || "pending").toLowerCase();
@@ -167,27 +183,30 @@ export default function PODetailPage({ params }) {
             <Panel title={t("admin.purchaseOrders.detail.vendorInfo")} icon={BriefcaseBusiness} trailing={vendorId && <Link href={`/admin/vendors/${vendorId}`} className="rounded border px-2 py-1 text-xs font-semibold hover:bg-blue-50" style={{ borderColor: "#cfe0f8", color: "#2878f0" }}>{t("admin.purchaseOrders.view.viewVendor")}</Link>}>
               <div className="p-4">
                 <div className="mb-2.5 flex items-center gap-2.5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ background: "#f0f4fa", color: "#4c6688" }}>{String(vendor.name || po.vendor_id?.name || "V").slice(0, 2).toUpperCase()}</div>
-                  <div className="min-w-0"><div className="truncate text-[11px] font-bold" style={primary}>{vendor.name || po.vendor_id?.name || "Vendor"}</div><div className="truncate text-xs" style={muted}>{vendor.company_name || "â€”"}</div></div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ background: "#f0f4fa", color: "#4c6688" }}>{String(vendorText("name") || "V").slice(0, 2).toUpperCase()}</div>
+                  <div className="min-w-0"><div className="truncate text-[11px] font-bold" style={primary}>{vendorText("name") || "Vendor"}</div><div className="truncate text-xs" style={muted}>{vendorText("company_name") || "—"}</div></div>
                   {vendorActive !== undefined && <span className="rounded-full px-2.5 py-1 text-xs font-semibold" style={{ color: vendorActive ? "#079878" : "#cf3348", background: vendorActive ? "#e1f8f0" : "#ffebed" }}>{t(vendorActive ? "admin.purchaseOrders.view.active" : "admin.purchaseOrders.view.inactive")}</span>}
                 </div>
                 <div className="space-y-0.5">
-                  <LabelValue icon={BriefcaseBusiness} label={t("admin.purchaseOrders.view.company")} value={vendor.company_name || vendor.name || po.vendor_id?.name} />
+                  <LabelValue icon={BriefcaseBusiness} label={t("admin.purchaseOrders.view.company")} value={vendorText("company_name") || vendorText("name")} />
                   <LabelValue icon={Phone} label={t("admin.purchaseOrders.detail.phone")} value={vendor.phone} />
                   <LabelValue icon={Mail} label={t("admin.purchaseOrders.detail.email")} value={vendor.email} />
-                  <LabelValue icon={MapPin} label={t("admin.purchaseOrders.detail.address")} value={vendor.address} />
-                  <LabelValue icon={MapPin} label={t("admin.purchaseOrders.view.city")} value={vendor.city} />
+                  <LabelValue icon={MapPin} label={t("admin.purchaseOrders.detail.address")} value={vendorText("address")} />
+                  <LabelValue icon={MapPin} label={t("admin.purchaseOrders.view.city")} value={vendorText("city")} />
                 </div>
               </div>
             </Panel>
 
             <Panel title={t("admin.purchaseOrders.view.summary")} icon={FileText}>
               <div className="space-y-2 p-4 text-[13px]">
-                <div className="flex justify-between"><span style={muted}>Subtotal</span><span style={primary}>{money(po.subtotal)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Tax (overall {new Intl.NumberFormat(intlLocale(locale), { maximumFractionDigits: 2 }).format(overallTaxPercent)}%)</span><span style={primary}>{money(Number(po.tax || 0) + Number(po.overall_tax || 0))}</span></div>
-                <div className="flex justify-between"><span style={muted}>Shipping</span><span style={primary}>{money(po.shipping)}</span></div>
-                <div className="flex justify-between"><span style={muted}>Discount</span><span style={primary}>{money(po.discount)}</span></div>
-                <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>Total</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.subtotal")}</span><span style={primary}>{money(po.subtotal)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.tax")} ({new Intl.NumberFormat(intlLocale(locale)).format(itemTaxPercent)}%)</span><span style={primary}>{money(po.tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.detail.overallTax")}</span><span style={primary}>{money(po.overall_tax)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.shipping")}</span><span style={primary}>{money(po.shipping)}</span></div>
+                <div className="flex justify-between"><span style={muted}>{t("admin.purchaseOrders.view.discount")}</span><span style={primary}>{money(po.discount)}</span></div>
+                <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "#e5eef9" }}><span style={primary}>{t("admin.purchaseOrders.detail.total")}</span><span style={{ color: "#06a981" }}>{money(po.total)}</span></div>
+                {po.notes && <LabelValue icon={FileText} label={t("admin.purchaseOrders.create.notes")} value={contentOf(po.notes, po.translations?.notes)} />}
+                {po.cancel_reason && <LabelValue icon={FileText} label={t("admin.purchaseOrders.view.cancelReason")} value={contentOf(po.cancel_reason, po.translations?.cancel_reason)} />}
               </div>
             </Panel>
           </div>
@@ -196,11 +215,11 @@ export default function PODetailPage({ params }) {
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-xs">
                 <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "admin.purchaseOrders.view.image", "admin.purchaseOrders.view.productVariant", "SKU", "admin.purchaseOrders.view.qtyOrdered", "admin.purchaseOrders.view.costPrice", "admin.purchaseOrders.view.sellPrice", "admin.purchaseOrders.view.lineTotal", "admin.purchaseOrders.view.taxRate", "admin.purchaseOrders.view.expiryAfterDelivery"].map((key) => <th key={key} className="whitespace-nowrap px-2.5 py-2 font-semibold">{key === "#" || key === "SKU" ? key : t(key)}</th>)}</tr></thead>
-                <tbody>{items.slice(0, showAllItems ? items.length : 10).map((item, index) => <tr key={`${item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
+                <tbody>{items.slice(0, showAllItems ? items.length : 10).map((item, index) => <tr key={`${item.variant_id?._id || item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
                   <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || ""} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
-                  <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{item.name || "â€”"}</div><div className="truncate" style={muted}>{item.variantTitle || "â€”"}</div></td>
-                  <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "â€”"}</td>
+                  <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{productNameOf(item.product_id) || item.name || "—"}</div><div className="truncate" style={muted}>{contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title) || "—"}</div></td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "—"}</td>
                   <td className="px-2.5 py-2.5 text-center" style={primary}>{item.qty_ordered}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.cost_price, locale)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.sell_price, locale)}</td>
@@ -246,12 +265,12 @@ export default function PODetailPage({ params }) {
 
           <Panel title={t("admin.purchaseOrders.view.vendorSnapshot")} icon={UserRound}>
             <div className="space-y-1 px-4 py-3 text-sm">
-              <LabelValue label={t("admin.purchaseOrders.detail.name")} value={vendor.name || po.vendor_id?.name} />
-              <LabelValue label={t("admin.purchaseOrders.view.companyName")} value={vendor.company_name} />
+              <LabelValue label={t("admin.purchaseOrders.detail.name")} value={vendorText("name")} />
+              <LabelValue label={t("admin.purchaseOrders.view.companyName")} value={vendorText("company_name")} />
               <LabelValue label={t("admin.purchaseOrders.detail.phone")} value={vendor.phone} />
               <LabelValue label={t("admin.purchaseOrders.detail.email")} value={vendor.email} />
-              <LabelValue label={t("admin.purchaseOrders.detail.address")} value={vendor.address} />
-              <LabelValue label={t("admin.purchaseOrders.view.city")} value={vendor.city} />
+              <LabelValue label={t("admin.purchaseOrders.detail.address")} value={vendorText("address")} />
+              <LabelValue label={t("admin.purchaseOrders.view.city")} value={vendorText("city")} />
             </div>
           </Panel>
 

@@ -80,7 +80,7 @@ const LEGACY_DATA_TYPE_MAP = {
 
 const sanitizePayload = (body, existingValues = []) => {
   const allowed = [
-    "name", "code", "data_type", "unit", "description", "values", "category",
+    "name", "code", "data_type", "unit", "values", "category",
     "variant_allowed", "filterable", "searchable", "visible", "is_active",
   ];
   const out = {};
@@ -100,7 +100,6 @@ const sanitizePayload = (body, existingValues = []) => {
     }
   }
   if (out.unit !== undefined) out.unit = String(out.unit || "").trim();
-  if (out.description !== undefined) out.description = String(out.description || "").trim();
   if (out.values !== undefined) out.values = normalizeValues(out.values, existingValues);
   if (out.variant_allowed !== undefined) out.variant_allowed = Boolean(out.variant_allowed);
   if (out.filterable !== undefined) out.filterable = Boolean(out.filterable);

@@ -75,6 +75,18 @@ const purchaseOrderSchema = new mongoose.Schema(
     due_date: { type: Date, default: null },
     notes: { type: String, default: "", trim: true },
     cancel_reason: { type: String, default: "", trim: true },
+    translations: {
+      notes: { type: Map, of: String, default: () => ({}) },
+      cancel_reason: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      notes: { type: String, default: "" },
+      cancel_reason: { type: String, default: "" },
+    },
+    translation_status: {
+      notes: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      cancel_reason: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
     receivings: { type: [receivingSchema], default: [] },
     is_deleted: { type: Boolean, default: false, index: true },
     deleted_at: { type: Date, default: null },

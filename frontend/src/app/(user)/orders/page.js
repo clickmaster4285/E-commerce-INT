@@ -776,7 +776,7 @@ function OrdersContent({ compact = false }) {
     <>
     {/* ============= DESKTOP ============= */}
     <div className="hidden lg:block">
-    <main className={compact ? "" : "max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-24 md:pb-10"}>
+    <main className={`user-orders-page ${compact ? "" : "max-w-[75rem] mx-auto px-4 lg:px-6 py-6 lg:py-8 pb-24 md:pb-10"}`}>
       {/* HEADER — account tab (compact) me account ka apna header hota hai */}
       {!compact && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -967,7 +967,7 @@ function OrdersContent({ compact = false }) {
     </div>
 
     {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
-    <div className="lg:hidden bg-[var(--user-bg)]">
+    <div className="user-orders-page lg:hidden bg-[var(--user-bg)]">
       {/* Sticky top app bar — account tab (compact) me account ka apna top bar hota hai */}
       {!compact && (
       <div

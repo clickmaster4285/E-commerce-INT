@@ -55,7 +55,7 @@ const getName = (item, type, locale = "en", t = null) => {
 
 const formatCurrency = (amount) => {
   const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
-  const intlLocale = locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : "en-PK";
+  const intlLocale = locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale;
   return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'PKR' }).format(amount || 0);
 };
 
@@ -465,7 +465,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
               <section>
                 <SectionHeader
                   icon={TargetIconFor(formType)}
-                  title={`Target Selection â€” ${sel.label}`}
+                  title={t("admin.discounts.form.targetSelectionFor", { type: sel.label })}
                   subtitle={sel.sub}
                   right={
                     formType === 'product' && ids.length > 0 ? (
@@ -851,7 +851,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               <TypeIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <h3 className="text-[15px] font-bold truncate">{t(editingDiscount ? "admin.discounts.form.update" : "admin.discounts.form.create")}{sel ? " â€” " + sel.label : ""}</h3>
+              <h3 className="text-[15px] font-bold truncate">{title}</h3>
               <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.563bf1031bfb")}{" "}{title.toLowerCase()}{" "}{t("admin.promotions.ui.generated.f936d324fc3a")}</p>
             </div>
           </div>

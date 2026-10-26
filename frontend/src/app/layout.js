@@ -2,6 +2,7 @@ import "./globals.css";
 import "./user.css";
 import Providers from "./providers";
 import { LanguageProvider } from "@/i18n/LanguageProvider";
+import Script from "next/script";
 
 export const metadata = {
   title: "Store",
@@ -25,14 +26,22 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* Arabic -> Cairo/Tajawal, Urdu -> Noto Nastaliq Urdu. Loaded on demand
+        {/* Arabic -> Noto Naskh Arabic, Urdu -> Noto Nastaliq Urdu. Loaded on demand
             via the media trick so English (LTR) never blocks on them. */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
         />
-        <script dangerouslySetInnerHTML={{ __html: adminThemeScript }} />
-        <script dangerouslySetInnerHTML={{ __html: userThemeScript }} />
+        <Script
+          id="admin-theme-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: adminThemeScript }}
+        />
+        <Script
+          id="user-theme-script"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: userThemeScript }}
+        />
       </head>
       <body>
         <Providers>

@@ -11,8 +11,10 @@ import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
 import OtpVerifyCard from "./OtpVerifyCard";
 import ResetPasswordCard from "./ResetPasswordCard";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 export default function LoginModal({ isOpen, onClose }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
@@ -335,13 +337,13 @@ export default function LoginModal({ isOpen, onClose }) {
               <OtpVerifyCard
                 email={otpEmail}
                 icon={MailCheck}
-                title="Verify your email"
-                subtitle="Enter the 6-digit code we sent to"
-                submitLabel="Verify & Continue"
+                title={t("auth.login.verifyEmail")}
+                subtitle={t("auth.login.otpSentSubtitle")}
+                submitLabel={t("auth.login.verifyContinue")}
                 onVerify={handleVerifyEmailOtp}
                 onResend={handleResendEmailOtp}
                 onBack={() => setStep("auth")}
-                backLabel="Use a different email"
+                backLabel={t("auth.login.useDifferentEmail")}
                 expiresInMinutes={5}
               />
             )}
@@ -353,12 +355,12 @@ export default function LoginModal({ isOpen, onClose }) {
                   <div className="flex items-center gap-2 mb-3">
                     <KeyRound size={16} className="text-[var(--user-accent)]" />
                     <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
-                      Forgot Password
+                      {t("auth.login.forgotPassword")}
                     </span>
                   </div>
-                  <h2 className="text-xl font-black text-[var(--user-text)] mb-1">Reset your password</h2>
+                  <h2 className="text-xl font-black text-[var(--user-text)] mb-1">{t("auth.login.resetPassword")}</h2>
                   <p className="text-[var(--user-text-muted)] text-sm">
-                    Enter your registered email and we&apos;ll send you a 6-digit code.
+                    {t("auth.login.resetEmailHelp")}
                   </p>
                 </div>
 
@@ -371,7 +373,7 @@ export default function LoginModal({ isOpen, onClose }) {
                       setEmail(e.target.value);
                       setForgotError("");
                     }}
-                    placeholder="Email address"
+                    placeholder={t("auth.login.emailAddress")}
                     className={inputCls}
                   />
                 </div>
@@ -389,7 +391,7 @@ export default function LoginModal({ isOpen, onClose }) {
                   className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-4"
                 >
                   {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
-                  {forgotLoading ? "Sending code..." : "Send reset code"}
+                  {forgotLoading ? t("auth.login.sendingCode") : t("auth.login.sendResetCode")}
                 </button>
 
                 <button
@@ -400,7 +402,7 @@ export default function LoginModal({ isOpen, onClose }) {
                   }}
                   className="flex items-center gap-1.5 mt-4 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition"
                 >
-                  <ArrowLeft size={13} /> Back to login
+                  <ArrowLeft size={13} /> {t("auth.login.backToLogin")}
                 </button>
               </form>
             )}
@@ -410,13 +412,13 @@ export default function LoginModal({ isOpen, onClose }) {
               <OtpVerifyCard
                 email={otpEmail}
                 icon={KeyRound}
-                title="Enter reset code"
-                subtitle="Enter the 6-digit code we sent to"
-                submitLabel="Verify code"
+                title={t("auth.login.enterResetCode")}
+                subtitle={t("auth.login.otpSentSubtitle")}
+                submitLabel={t("auth.login.verifyCode")}
                 onVerify={handleVerifyResetOtp}
                 onResend={handleResendResetOtp}
                 onBack={() => setStep("forgot")}
-                backLabel="Change email"
+                backLabel={t("auth.login.changeEmail")}
                 expiresInMinutes={5}
               />
             )}
@@ -427,6 +429,7 @@ export default function LoginModal({ isOpen, onClose }) {
                 email={otpEmail}
                 onSubmit={handleResetPassword}
                 onBack={() => setStep("auth")}
+                backLabel={t("auth.login.backToLogin")}
               />
             )}
 
@@ -437,14 +440,14 @@ export default function LoginModal({ isOpen, onClose }) {
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={16} className="text-[var(--user-accent)]" />
                 <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
-                  {isLogin ? "User Sign-In" : "Create Account"}
+                  {isLogin ? t("auth.login.userSignIn") : t("auth.login.createAccount")}
                 </span>
               </div>
               <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">
-                {isLogin ? "Welcome Back" : "Create Account"}
+                {isLogin ? t("auth.login.welcomeBack") : t("auth.login.createAccount")}
               </h2>
               <p className="text-[var(--user-text-muted)] text-sm">
-                {isLogin ? "Continue shopping with your account." : "Create your account in 30 seconds."}
+                {isLogin ? t("auth.login.continueShoppingSubtitle") : t("auth.login.createAccountSubtitle")}
               </p>
             </div>
 
@@ -462,7 +465,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     <LazyGoogleLogin
                       clientId={googleClientId}
                       onSuccess={(res) => handleGoogleLogin(res.credential)}
-                      onError={() => setGeneralError("Google login failed.")}
+                      onError={() => setGeneralError(t("auth.login.googleFailed"))}
                       theme="filled_black"
                       shape="pill"
                       size="large"
@@ -471,13 +474,13 @@ export default function LoginModal({ isOpen, onClose }) {
                     />
                   ) : (
                     <div className="w-full py-3 rounded-full border border-[var(--user-border)] text-center text-[var(--user-text-muted)] text-sm">
-                      Google login unavailable
+                      {t("auth.login.googleUnavailable")}
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-3 mb-6">
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
-                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">or with email</span>
+                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">{t("auth.login.orWithEmail")}</span>
                   <div className="flex-1 h-px bg-[var(--user-border)]" />
                 </div>
               </>
@@ -493,7 +496,7 @@ export default function LoginModal({ isOpen, onClose }) {
                         type="text"
                         value={name}
                         onChange={(e) => { setName(e.target.value); setErrors((prev) => ({ ...prev, name: "" })); }}
-                        placeholder="Full name"
+                        placeholder={t("auth.login.fullName")}
                         className={getInputCls("name")}
                       />
                     </div>
@@ -507,7 +510,7 @@ export default function LoginModal({ isOpen, onClose }) {
                         type="text"
                         value={username}
                         onChange={(e) => { setUsername(e.target.value); setErrors((prev) => ({ ...prev, username: "" })); }}
-                        placeholder="Username"
+                        placeholder={t("auth.login.username")}
                         className={getInputCls("username")}
                       />
                     </div>
@@ -523,7 +526,7 @@ export default function LoginModal({ isOpen, onClose }) {
                         value={phone}
                         onChange={(e) => { setPhone(normalizePhone(e.target.value)); setErrors((prev) => ({ ...prev, phone: "" })); }}
                         maxLength={PHONE_MAX}
-                        placeholder="Phone number"
+                        placeholder={t("auth.login.phoneNumber")}
                         className={getInputCls("phone")}
                       />
                     </div>
@@ -539,7 +542,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     type="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setErrors((prev) => ({ ...prev, email: "" })); }}
-                    placeholder="Email address"
+                    placeholder={t("auth.login.emailAddress")}
                     className={getInputCls("email")}
                   />
                 </div>
@@ -553,7 +556,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     type="password"
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setErrors((prev) => ({ ...prev, password: "" })); }}
-                    placeholder="Password"
+                    placeholder={t("auth.login.password")}
                     className={getInputCls("password")}
                   />
                 </div>
@@ -571,7 +574,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     }}
                     className="text-[0.75rem] font-semibold text-[var(--user-accent)] hover:underline"
                   >
-                    Forgot password?
+                    {t("auth.login.forgotPassword")}
                   </button>
                 </div>
               )}
@@ -582,14 +585,14 @@ export default function LoginModal({ isOpen, onClose }) {
                 className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-1"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-                {loading ? (isLogin ? "Logging in..." : "Creating account...") : isLogin ? "Login" : "Create Account"}
+                {loading ? (isLogin ? t("auth.login.loggingIn") : t("auth.login.creatingAccount")) : isLogin ? t("auth.login.login") : t("auth.login.createAccount")}
               </button>
             </form>
 
             <p className="text-center py-2 mt-5 text-[var(--user-text-muted)] text-sm">
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              {isLogin ? t("auth.login.noAccount") : t("auth.login.haveAccount")}{" "}
               <button onClick={switchMode} className="text-[var(--user-accent)] hover:underline font-semibold">
-                {isLogin ? "Register" : "Login"}
+                {isLogin ? t("auth.login.register") : t("auth.login.login")}
               </button>
             </p>
               </>

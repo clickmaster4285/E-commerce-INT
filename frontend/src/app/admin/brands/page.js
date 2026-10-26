@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ================= Icons ================= */
 const PlusIcon = ({ className = "w-4 h-4" }) => (
@@ -423,6 +424,7 @@ export default function BrandsPage() {
   /* ---------- Derived data (server side paginated) ---------- */
   // ✅ Sirf current page ke brands aate hain backend se
   const brands = Array.isArray(paginatedBrandsData?.items) ? paginatedBrandsData.items : [];
+  usePageTranslations({ model: "Brand", records: brands, locale, ready: !isFetching && paginatedBrandsData?.pagination?.page === currentPage, queryKey: ["adminBrands", "paginated", currentPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction], queryClient });
   const brandCounts = paginatedBrandsData?.counts || { total: 0, active: 0, inactive: 0, withLogo: 0 };
   const countries = Array.isArray(paginatedBrandsData?.countries) ? paginatedBrandsData.countries : [];
   const countryLabel = (name) => {

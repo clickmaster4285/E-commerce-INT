@@ -225,7 +225,7 @@ function ReviewComment({ comment }) {
   );
 }
 
-const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom }) => {
+const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, onZoom, dir }) => {
   const { t } = useTranslation();
   const stripRef = useRef(null);
   const imageFrameRef = useRef(null);
@@ -374,7 +374,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
   );
 
   return (
-    <div className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
+    <div dir={dir} className="product-gallery-zoom relative z-0 min-w-0 lg:hover:z-30">
       <div className="product-gallery-main relative">
       <div
         ref={imageFrameRef}
@@ -421,7 +421,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         <div
           ref={zoomPanelRef}
           aria-hidden="true"
-          className={`product-image-zoom-panel pointer-events-none absolute left-full top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          className={`product-image-zoom-panel pointer-events-none absolute ${dir === "rtl" ? "right-full left-auto" : "left-full right-auto"} top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
           style={{ backgroundImage: `url("${mainImage}")`, backgroundRepeat: "no-repeat" }}
         >
           {!zoomLoaded ? (
@@ -655,8 +655,8 @@ export default function ProductDetailPage(props) {
 
 function ProductDetailContent({ params }) {
   const { id } = use(params);
-  const { locale, t } = useTranslation();
-  const { productNameOf, fieldOf, reviewTextOf } = useLocalized();
+  const { locale, dir, t } = useTranslation();
+  const { productNameOf, productDescriptionOf, fieldOf, reviewTextOf } = useLocalized();
   const searchParams = useSearchParams();
   const { product, isLoading, isError } = useProductDetail(id);
   const productName = productNameOf(product) || product?.name || "";
@@ -666,8 +666,8 @@ function ProductDetailContent({ params }) {
   const brandName = product?.brand_id && typeof product.brand_id === "object"
     ? fieldOf(product.brand_id, "name")
     : extractName(product?.brand_id);
-  const fullDescription = fieldOf(product, "description") || "";
-  const shortDescription = fieldOf(product, "short_description") || "";
+  const fullDescription = productDescriptionOf(product) || "";
+  const shortDescription = productDescriptionOf(product, "short_description") || "";
 
   // ✅ User ki apni ratings — product page par sirf apni di hui rating dikhani hai.
   const { data: user = null } = useQuery({
@@ -842,7 +842,7 @@ function ProductDetailContent({ params }) {
   if (isError || !product) return <ErrorState isError={isError} />;
 
   return (
-    <main className="min-h-screen bg-[var(--user-bg-hover)] pb-16 md:pb-8">
+    <main dir={dir} lang={locale} className="min-h-screen bg-[var(--user-bg-hover)] pb-16 md:pb-8">
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
@@ -851,7 +851,7 @@ function ProductDetailContent({ params }) {
         <Breadcrumb categoryId={categoryId} categoryName={categoryName} productName={productName} />
 
         {/* ===== Top card: gallery + info + sold-by (Daraz 3-col) ===== */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <div dir={dir} className="grid grid-cols-1 gap-3 lg:grid-cols-12">
           <section className="bg-[var(--user-bg-card)] p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
               <Gallery
@@ -861,6 +861,7 @@ function ProductDetailContent({ params }) {
                 onImageSelect={selectImageByUrl}
                 stock={stock}
                 onZoom={openLightbox}
+                dir={dir}
               />
 
               <div className="min-w-0" ref={sentinelRef}>
@@ -1175,7 +1176,7 @@ function ProductDetailContent({ params }) {
         </div>
 
         {/* ===== Product details — real description ===== */}
-        {(shortDescription || fullDescription || fieldOf(currentVariant, "description")) && (
+        {(shortDescription || fullDescription || productDescriptionOf(currentVariant)) && (
           <section className="mt-3 bg-[var(--user-bg-card)]">
             <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
               {t("admin.productDetail.page.productDetails")}: {shortDescription || productName}
@@ -1183,10 +1184,10 @@ function ProductDetailContent({ params }) {
             <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-[var(--user-text)]">
               {shortDescription && <p className="font-medium">{shortDescription}</p>}
               {fullDescription && <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">{fullDescription}</p>}
-              {fieldOf(currentVariant, "description") && (
+              {productDescriptionOf(currentVariant) && (
                 <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">
                   <span className="font-semibold text-[var(--user-text)]">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
-                  {fieldOf(currentVariant, "description")}
+                  {productDescriptionOf(currentVariant)}
                 </p>
               )}
             </div>
@@ -1319,17 +1320,18 @@ function ProductDetailContent({ params }) {
               {related.slice(0, 10).map((p) => {
                 const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
                 const price = p?.variants?.[0]?.selling_price ?? p?.selling_price ?? p?.price;
+                const relatedName = productNameOf(p) || p?.name || "";
                 return (
                   <Link key={p._id} href={`/product/${p._id}`} className="group bg-[var(--user-bg-card)] hover:shadow-lg transition-shadow">
                     <div className="relative aspect-square overflow-hidden bg-white">
                       {image ? (
-                        <img src={image} alt={p.name || ""} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
+                        <img src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center"><Package size={28} className="text-gray-300" /></div>
                       )}
                     </div>
                     <div className="p-2.5">
-                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{productNameOf(p)}</p>
+                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{relatedName}</p>
                       {price != null && <p className="mt-1.5 text-sm font-medium text-[var(--user-accent)]">Rs. {toNum(price).toLocaleString()}</p>}
                       <div className="mt-1"><Stars value={0} size={10} /></div>
                     </div>
