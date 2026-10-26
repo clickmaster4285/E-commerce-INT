@@ -7,11 +7,12 @@ import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import {
   CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign,
-  Download, Eye, FileText, MoreHorizontal, Plus, Receipt, RotateCcw, Search, Send, X } from
+  Download, Eye, FileText, MoreVertical, Plus, Receipt, RotateCcw, Search, Send, X } from
 "lucide-react";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
 import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
+import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
 
 const PAGE_SIZE = 20;
 const currentTime = () => new Date().toTimeString().slice(0, 5);
@@ -38,6 +39,23 @@ const originalTotal = (invoice) => Number(invoice.original_total ?? (
     0,
   )
 ));
+const areAllInvoiceItemsReturned = (invoice) => {
+  const items = invoice.items || [];
+  const returns = invoice.returns || [];
+  if (!items.length || !returns.length) return false;
+
+  const returnedQuantities = new Map();
+  returns.forEach((record) => (record.items_returned || []).forEach((returned) => {
+    const itemId = String(returned.item_id?._id || returned.item_id || "");
+    returnedQuantities.set(itemId, (returnedQuantities.get(itemId) || 0) + Number(returned.qty || 0));
+  }));
+
+  return items.every((item) => {
+    const itemId = String(item._id || "");
+    if (!itemId) return false;
+    return (returnedQuantities.get(itemId) || 0) >= Number(item.quantity || 0);
+  });
+};
 const today = () => {const d = new Date();return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;};
 
 function InvoiceRowMenu({ invoice, onView, onPayment, onReturnRefund, onDownload, onSend, isSending }) {const { t } = useTranslation();
@@ -61,8 +79,8 @@ function InvoiceRowMenu({ invoice, onView, onPayment, onReturnRefund, onDownload
     setOpen(true);
   };
   const action = (fn) => (event) => {event.stopPropagation();setOpen(false);fn();};
-  const item = "flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700";
-  return <><button ref={buttonRef} type="button" onClick={(event) => { event.stopPropagation(); open ? setOpen(false) : showMenu(); }} aria-label={`Actions for ${invoice.invoice_number}`} aria-expanded={open} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"><MoreHorizontal size={17}/></button>{open && createPortal(<div ref={menuRef} style={{ top: position.top, left: position.left }} className="fixed z-[12000] w-[205px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"><button className={item} onClick={action(onView)}><Eye size={14}/> View Details</button>{!invoice.sent_at && <button className={item} onClick={action(onSend)} disabled={isSending}><Send size={14}/>{isSending ? "Sending..." : "Send to Customer"}</button>}{Number(invoice.remaining_balance ?? invoice.total) > 0 && <button className={item} onClick={action(onPayment)}><CircleDollarSign size={14}/> Add Payment</button>}{invoice.sent_at && <button className={item} onClick={action(onReturnRefund)}><RotateCcw size={14}/> Return &amp; Refund</button>}<button className={item} onClick={action(onDownload)}><Download size={14}/> Download PDF</button></div>, document.body)}</>;
+  const item = "flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)]";
+  return <div className="flex items-center justify-end"><button ref={buttonRef} type="button" onClick={(event) => { event.stopPropagation(); open ? setOpen(false) : showMenu(); }} aria-label={`More actions for ${invoice.invoice_number}`} aria-haspopup="menu" aria-expanded={open} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-secondary)] transition hover:bg-[var(--bg-row-hover)] hover:text-[var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"><MoreVertical size={18} /></button>{open && createPortal(<div ref={menuRef} role="menu" style={{ top: position.top, left: position.left }} className="fixed z-[12000] w-[205px] overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1.5 shadow-xl shadow-slate-900/15"><button type="button" role="menuitem" className={item} onClick={action(onView)}><Eye size={13}/> View Details</button>{!invoice.sent_at && <button type="button" role="menuitem" className={item} onClick={action(onSend)} disabled={isSending}><Send size={13}/>{isSending ? "Sending..." : "Send to Customer"}</button>}{Number(invoice.remaining_balance ?? invoice.total) > 0 && <button type="button" role="menuitem" className={item} onClick={action(onPayment)}><CircleDollarSign size={13}/> Add Payment</button>}{invoice.sent_at && <button type="button" role="menuitem" className={item} onClick={action(onReturnRefund)}><RotateCcw size={13}/> Return &amp; Refund</button>}<button type="button" role="menuitem" className={item} onClick={action(onDownload)}><Download size={13}/> Download PDF</button></div>, document.body)}</div>;
 }
 
 export default function InvoicesPage() {const { t } = useTranslation();
@@ -74,9 +92,15 @@ export default function InvoicesPage() {const { t } = useTranslation();
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [returnInvoiceId, setReturnInvoiceId] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });
   const { data: rawInvoices, isLoading, isError, refetch } = useQuery({ queryKey: ["invoices-admin"], queryFn: invoiceApi.list });
+  const { data: returnInvoice, isLoading: isReturnInvoiceLoading, isError: isReturnInvoiceError } = useQuery({
+    queryKey: ["invoice-admin", returnInvoiceId],
+    queryFn: () => invoiceApi.getById(returnInvoiceId),
+    enabled: Boolean(returnInvoiceId),
+  });
   const invoices = useMemo(() => Array.isArray(rawInvoices) ? rawInvoices : rawInvoices?.invoices || [], [rawInvoices]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -111,6 +135,16 @@ export default function InvoicesPage() {const { t } = useTranslation();
       queryClient.invalidateQueries({ queryKey: ["invoices-admin"] });
     },
     onError: (error) => toast.error(error?.response?.data?.message || "Could not record payment")
+  });
+  const returnMutation = useMutation({
+    mutationFn: ({ id, payload }) => invoiceApi.recordReturn(id, payload),
+    onSuccess: (updated, { id }) => {
+      queryClient.setQueryData(["invoice-admin", id], updated);
+      queryClient.invalidateQueries({ queryKey: ["invoices-admin"] });
+      setReturnInvoiceId("");
+      toast.success("Return and refund recorded");
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || "Could not record return and refund"),
   });
   const sendMutation = useMutation({
     mutationFn: (id) => invoiceApi.send(id),
@@ -163,7 +197,7 @@ export default function InvoicesPage() {const { t } = useTranslation();
             {isLoading ? <tr><td colSpan={7} className="px-3 py-10 text-center text-xs text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.loading_invoices_de149b79")}</td></tr> :
             isError ? <tr><td colSpan={7} className="px-3 py-10 text-center text-xs text-[var(--danger-text)]">{t("admin.quoteInvoice.ui.could_not_load_invoices_2b4083bc")} <button type="button" onClick={() => refetch()} className="font-semibold underline">{t("admin.quoteInvoice.ui.retry_9f5cd8a2")}</button></td></tr> :
             !rows.length ? <tr><td colSpan={7} className="px-3 py-12 text-center"><span className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Receipt size={17} /></span><p className="text-xs font-semibold">{search || status !== "all" || dateFrom || dateTo ? "No matching invoices" : "No invoices yet"}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search || status !== "all" || dateFrom || dateTo ? "Try changing your search or filters." : "Create your first invoice to track customer payments."}</p>{!search && status === "all" && !dateFrom && !dateTo && <button type="button" onClick={() => router.push("/admin/invoices/new")} className="mt-3 inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-semibold text-[var(--accent)]"><Plus size={12} /> {t("admin.quoteInvoice.ui.create_invoice_32815b0b")}</button>}</td></tr> :
-            rows.map((invoice) => {const displayStatus = getStatus(invoice);return <tr key={invoice._id} onClick={() => router.push(`/admin/invoices/${invoice._id}`)} className="cursor-pointer border-b border-slate-200 transition-colors duration-150 hover:bg-blue-50/60"><td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-semibold text-blue-600">{invoice.invoice_number}</td><td className="max-w-56 px-4 py-2.5"><p className="truncate text-[13px] font-semibold text-slate-900">{invoice.customer_name}</p>{invoice.customer_phone && <p className="mt-0.5 truncate text-[11px] text-slate-500">{invoice.customer_phone}</p>}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-600">{date(invoice.invoice_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-600">{date(invoice.due_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-[13px] font-bold text-slate-900">{money(originalTotal(invoice))}</td><td className="px-4 py-2.5"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${statusStyle[displayStatus] || statusStyle.Unpaid}`}>{displayStatus}</span></td><td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-end"><InvoiceRowMenu invoice={invoice} onView={() => router.push(`/admin/invoices/${invoice._id}`)} onPayment={() => {setSelectedInvoice(invoice);setPaymentForm({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });setPaymentOpen(true);}} onReturnRefund={() => router.push(`/admin/invoices/${invoice._id}?returnRefund=1`)} onDownload={() => download(invoice)} onSend={() => sendMutation.mutate(invoice._id)} isSending={sendMutation.isPending && sendMutation.variables === invoice._id} /></div></td></tr>;})}
+            rows.map((invoice) => {const displayStatus = getStatus(invoice);const hasReturns = Boolean(invoice.returns?.length);const returnedOnly = hasReturns && (displayStatus === "Paid" || areAllInvoiceItemsReturned(invoice));return <tr key={invoice._id} onClick={() => router.push(`/admin/invoices/${invoice._id}`)} className="cursor-pointer border-b border-slate-200 transition-colors duration-150 hover:bg-blue-50/60"><td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-semibold text-blue-600">{invoice.invoice_number}</td><td className="max-w-56 px-4 py-2.5"><p className="truncate text-[13px] font-semibold text-slate-900">{invoice.customer_name}</p>{invoice.customer_phone && <p className="mt-0.5 truncate text-[11px] text-slate-500">{invoice.customer_phone}</p>}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-600">{date(invoice.invoice_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-600">{date(invoice.due_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-[13px] font-bold text-slate-900">{money(originalTotal(invoice))}</td><td className="px-4 py-2.5"><div className="flex flex-wrap items-center gap-1.5">{returnedOnly ? <span className="rounded-lg bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">Returned</span> : <><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${statusStyle[displayStatus] || statusStyle.Unpaid}`}>{displayStatus}</span>{hasReturns && <span className="rounded-lg bg-rose-100 px-2.5 py-1 text-[11px] font-semibold text-rose-700">Returned</span>}</>}</div></td><td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-end"><InvoiceRowMenu invoice={invoice} onView={() => router.push(`/admin/invoices/${invoice._id}`)} onPayment={() => {setSelectedInvoice(invoice);setPaymentForm({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });setPaymentOpen(true);}} onReturnRefund={() => setReturnInvoiceId(invoice._id)} onDownload={() => download(invoice)} onSend={() => sendMutation.mutate(invoice._id)} isSending={sendMutation.isPending && sendMutation.variables === invoice._id} /></div></td></tr>;})}
           </tbody>
         </table>
       </div>
@@ -183,5 +217,6 @@ export default function InvoicesPage() {const { t } = useTranslation();
       </section>
     </div>}
     {paymentOpen && selectedInvoice && <InvoicePaymentModal invoice={selectedInvoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => {setPaymentOpen(false);setSelectedInvoice(null);}} onSubmit={() => paymentMutation.mutate({ id: selectedInvoice._id, payment: paymentForm })} />}
+    {returnInvoiceId && (isReturnInvoiceLoading || !returnInvoice ? <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-slate-950/55 p-4" role="status"><div className="rounded-xl bg-white px-5 py-4 text-sm text-slate-700 shadow-xl">{isReturnInvoiceError ? <><p>Could not load this invoice.</p><button type="button" onClick={() => setReturnInvoiceId("")} className="mt-3 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Close</button></> : "Loading invoice…"}</div></div> : <InvoiceReturnModal invoice={returnInvoice} isPending={returnMutation.isPending} onClose={() => setReturnInvoiceId("")} onSubmit={(payload) => returnMutation.mutate({ id: returnInvoiceId, payload })} />)}
   </div>;
 }
