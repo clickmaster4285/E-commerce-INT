@@ -9,7 +9,7 @@ const path = require("path");
 const fs = require("fs");
 const cookieParser = require("cookie-parser");
 
-const net = require('net');
+const spawn = require("child_process").spawn;
 
 const connectDB = require("./config/db");
 const log = require("./utils/logger");
@@ -161,6 +161,16 @@ const startupLog = {
   error: (msg) => console.error(`❌ ${msg}`),
 };
 
+function checkPortAvailable(port) {
+  return new Promise((resolve) => {
+    const net = require("net");
+    const probe = net.createServer();
+    probe.once("error", (error) => resolve(error.code !== "EADDRINUSE"));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port);
+  });
+}
+
 // ==========================================
 // SOCKET.IO — init + status (startup console ke liye)
 // ==========================================
@@ -301,20 +311,142 @@ const seedDefaultData = async () => {
   }
 };
 
-function checkPortAvailable(port) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once('error', (err) => {
-      if (err.code === 'EADDRINUSE') resolve(false);
-      else resolve(true);
+// ==========================================
+// 🔤 ARGOS / LOCAL TRANSLATION SERVER (dev companion)
+// Backend start hote hi local translation bridge (scripts/argosTranslateServer.py —
+// LibreTranslate-compatible; utils/libreTranslate.js aur routes/translationRoutes
+// isi ko call karte hain) saath chalu ho jaye. Design:
+//   • Sirf dev mode me (NODE_ENV !== "production") — production ka startup
+//     pehle jaisa hi rehta hai.
+//   • agar configured URL par bridge pehle se zinda hai to REUSE hota hai —
+//     duplicate process start nahi hota (server restart par bhi; loading bridge
+//     ke bind hone tak chhota sa grace wait bhi hota hai).
+//   • Start command backend/package.json ke existing script se aati hai
+//     (hardcode nahi) aur port LIBRETRANSLATE_URL se derive hota hai —
+//     libreTranslate.js ka client isi URL par call karta hai.
+//   • Ye background me hota hai — Express server kabhi block nahi hota
+//     (pehli baar model download/load me minutes lag sakte hain).
+// ==========================================
+const TRANSLATION_API_URL = (process.env.LIBRETRANSLATE_URL || "http://localhost:5055").replace(/\/+$/, "");
+const TRANSLATION_READY_TIMEOUT_MS = Number(process.env.TRANSLATE_READY_TIMEOUT_MS) || 15 * 60 * 1000;
+const TRANSLATION_REUSE_GRACE_MS = Number(process.env.TRANSLATE_REUSE_GRACE_MS) || 75 * 1000;
+const ARGOS_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let argosProcess = null;
+const isTranslationServiceUp = async () => {
+  try {
+    const response = await fetch(`${TRANSLATION_API_URL}/healthz`, { signal: AbortSignal.timeout(3000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+const waitTranslationServiceReady = async () => {
+  const deadline = Date.now() + TRANSLATION_READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (await isTranslationServiceUp()) return true;
+    await ARGOS_SLEEP(2500);
+  }
+  return false;
+};
+
+/** package.json me se wahi script dhoondo jo argosTranslateServer.py chalati hai. */
+const findArgosScript = () => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
+    for (const [name, command] of Object.entries(pkg.scripts || {})) {
+      if (String(command).includes("argosTranslateServer.py")) return { name, command };
+    }
+  } catch { /* package.json na mile to niche clear error dikhega */ }
+  return null;
+};
+
+const startArgosServer = async () => {
+  // Duplicate guard: python bridge apna port model load/prewarm ke BAAD bind
+  // karta hai. Restart par purana bridge abhi "loading" me ho sakta hai —
+  // spawn ke faislay se pehle thodi der tak reuse ka wait karo, warna do
+  // processes aa jate hain (doosra baad me port bind karne par crash hota hai).
+  let serviceUp = await isTranslationServiceUp();
+  if (!serviceUp) {
+    const graceDeadline = Date.now() + TRANSLATION_REUSE_GRACE_MS;
+    while (!serviceUp && Date.now() < graceDeadline) {
+      await ARGOS_SLEEP(2000);
+      serviceUp = await isTranslationServiceUp();
+    }
+  }
+  if (serviceUp) {
+    console.log(`🔤 Translation bridge ${TRANSLATION_API_URL} par pehle se chal raha hai — reuse (duplicate start nahi hua)`);
+    console.log(`✅ Argos Translate is running at ${TRANSLATION_API_URL}`);
+    return;
+  }
+
+  const script = findArgosScript();
+  if (!script) {
+    startupLog.error(`Argos translation bridge nahi start hua — package.json me "argosTranslateServer.py" wala script nahi mila`);
+    return;
+  }
+
+  // Node client jis port par call karega, python bridge usi par sunna chahiye.
+  // ARGOS_PORT pehle se set hai to user ki ki hui value jeetegi.
+  const targetPort = (() => {
+    try { return Number(new URL(TRANSLATION_API_URL).port) || 80; } catch { return null; }
+  })();
+  const childEnv = { ...process.env };
+  if (childEnv.ARGOS_PORT) {
+    console.log(`🔤 ARGOS_PORT=${childEnv.ARGOS_PORT} (env se) — LIBRETRANSLATE_URL=${TRANSLATION_API_URL} ka port alag hai to .env theek karein`);
+  } else if (targetPort) {
+    childEnv.ARGOS_PORT = String(targetPort);
+  }
+
+  console.log(`🔤 Translation bridge start ho raha hai (${script.name}) — pehli baar model download/load me time lag sakta hai`);
+  let output = [];
+  const recordOutput = (chunk) => {
+    output.push(...String(chunk).split(/\r?\n/).filter(Boolean));
+    while (output.length > 40) output.shift(); // crash diagnose ke liye last 40 lines
+  };
+
+  try {
+    argosProcess = spawn(script.command, {
+      shell: true,
+      cwd: __dirname, // script ka "scripts/argosTranslateServer.py" relative path isi se resolve hota hai
+      env: childEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
     });
-    server.once('listening', () => {
-      server.close();
-      resolve(true);
-    });
-    server.listen(port);
+  } catch (error) {
+    argosProcess = null;
+    startupLog.error(`Argos translation bridge spawn failed: ${error.message}`);
+    return;
+  }
+  argosProcess.stdout?.on("data", recordOutput);
+  argosProcess.stderr?.on("data", recordOutput);
+
+  argosProcess.once("error", (error) => {
+    const message = error.code === "ENOENT"
+      ? `"uv" executable is process ke PATH me nahi mila (uv installed hai to PATH check karein)`
+      : error.message;
+    startupLog.error(`Argos translation bridge start nahi ho saka: ${message}`);
   });
-}
+
+  argosProcess.once("exit", (code, signal) => {
+    if (signal === "SIGTERM") return; // graceful shutdown — error nahi
+    startupLog.error(`Argos translation bridge exit ho gaya (code: ${code ?? signal ?? "unknown"})`);
+    console.error(`   Last output:\n   ${output.join("\n   ")}`);
+    console.error(`   💡 Manual check: cd backend && npm run ${script.name}`);
+  });
+
+  // Blocking nahi — sirf status report.
+  waitTranslationServiceReady()
+    .then((ready) => {
+      if (ready) {
+        console.log(`🔤 Translation bridge ready at ${TRANSLATION_API_URL}`);
+        console.log(`✅ Argos Translate is running at ${TRANSLATION_API_URL}`);
+      }
+      else startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
+    })
+    .catch(() => {});
+};
 
 // ==========================================
 // SERVER STARTUP
@@ -342,17 +474,16 @@ const startServer = async () => {
     
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
-      // ✅ Pehle ye block poora silent tha — process bina kuch bataye exit ho jata tha
       startupLog.error(`Port ${PORT} already in use (EADDRINUSE) — doosra backend chal raha hai.`);
       console.error(`💡 Fix: taskkill /PID <pid> /F   |   ya .env me PORT badal do`);
       process.exit(1);
     }
 
     server.listen(PORT, HOST, () => {
-      // ✅ Sirf 2 lines — server start + socket status. Extra info nahi.
       console.log(`✅ ${STARTUP_MESSAGE}`);
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
+    if (NODE_ENV !== "production") startArgosServer();
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi
     startupLog.error(`Server start failed: ${error.message}`);

@@ -1,5 +1,6 @@
 import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
+import { htmlToPlainText } from "@/lib/termsContent";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const PAGE_MARGIN = 14;
@@ -692,10 +693,48 @@ export async function createInvoicePdf(invoice, suppliedStore = null) {
   });
 }
 
-export async function downloadInvoicePdf(invoice, suppliedStore = null) {
-  const pdf = await createInvoicePdf(invoice, suppliedStore);
+export async function downloadInvoicePdf(invoice, suppliedStore = null, previewRoot = null) {
+  const pdf = await createInvoicePdfDocument(invoice, suppliedStore, previewRoot);
   const fileName = String(invoice.invoice_number || "invoice-draft").replace(/[^a-z0-9_-]/gi, "_");
   pdf.save(`${fileName}.pdf`);
+}
+
+export async function printInvoicePdf(invoice, suppliedStore = null, previewRoot = null) {
+  if (typeof window === "undefined") throw new Error("Invoice printing is only available in a browser.");
+  const pdf = await createInvoicePdfDocument(invoice, suppliedStore, previewRoot);
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.tabIndex = -1;
+  Object.assign(frame.style, {
+    position: "fixed",
+    insetInlineEnd: "0",
+    bottom: "0",
+    width: "1px",
+    height: "1px",
+    border: "0",
+    opacity: "0",
+    pointerEvents: "none",
+  });
+  document.body.appendChild(frame);
+
+  const pdfUrl = URL.createObjectURL(pdf.output("blob"));
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    frame.remove();
+    URL.revokeObjectURL(pdfUrl);
+  };
+
+  frame.onload = () => {
+    window.setTimeout(() => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+    }, 250);
+  };
+  frame.src = pdfUrl;
+  window.addEventListener("afterprint", cleanup, { once: true });
+  window.setTimeout(cleanup, 5 * 60 * 1000);
 }
 
 async function createQuoteBusinessPdf(quote, suppliedStore = null) {
@@ -720,7 +759,7 @@ async function createQuoteBusinessPdf(quote, suppliedStore = null) {
   return createBusinessDocumentPdf(normalizedQuote, suppliedStore, { documentType: "quote", design: quote.pdf_design || {} });
 }
 
-async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot = null) {
+async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot, fallbackPdf) {
   let pdf;
   const pages = previewRoot?.querySelectorAll?.("[data-quote-document-page='true']");
   if (pages?.length) {
@@ -729,7 +768,7 @@ async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot =
       import("html2canvas"),
     ]);
     const html2canvas = html2canvasModule.default;
-    const design = quote.pdf_design || {};
+    const design = documentData.pdf_design || {};
     const format = design.pageSize === "letter" ? "letter" : "a4";
     const orientation = design.orientation === "landscape" ? "landscape" : "portrait";
     pdf = new jsPDF({ orientation, unit: "mm", format, compress: true });
@@ -784,13 +823,21 @@ async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot =
         pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, margin, width, height, undefined, "FAST");
       }
     } catch (captureError) {
-      console.error("Quote preview capture failed; using the PDF renderer instead:", captureError);
-      return createQuoteBusinessPdf(quote, suppliedStore);
+      console.error("Document preview capture failed; using the PDF renderer instead:", captureError);
+      return fallbackPdf(documentData, suppliedStore);
     }
   } else {
-    pdf = await createQuoteBusinessPdf(quote, suppliedStore);
+    pdf = await fallbackPdf(documentData, suppliedStore);
   }
   return pdf;
+}
+
+async function createInvoicePdfDocument(invoice, suppliedStore = null, previewRoot = null) {
+  return createPreviewDocumentPdf(invoice, suppliedStore, previewRoot, createInvoicePdf);
+}
+
+async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot = null) {
+  return createPreviewDocumentPdf(quote, suppliedStore, previewRoot, createQuoteBusinessPdf);
 }
 
 export async function downloadQuotePdf(quote, suppliedStore = null, previewRoot = null) {

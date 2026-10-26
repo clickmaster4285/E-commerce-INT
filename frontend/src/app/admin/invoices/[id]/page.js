@@ -6,11 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight,
-  CreditCard, FileText, Printer, RotateCcw, Send } from
+  CreditCard, FileText, MoreHorizontal, Printer, RotateCcw, Send } from
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
-import { downloadInvoicePdf } from "@/lib/invoicePdf";
+import { downloadInvoicePdf, printInvoicePdf } from "@/lib/invoicePdf";
+import { storeApi } from "@/apis/admin/storeApi";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
 import QuoteTemplateDesigner, { INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
@@ -69,13 +70,38 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const queryClient = useQueryClient();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const printHandled = useRef(false);
+  const invoicePreviewRef = useRef(null);
+  const actionsRef = useRef(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_time: new Date().toTimeString().slice(0, 5), payment_method: "Cash", note: "" });
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ["invoice-admin", id],
     queryFn: () => invoiceApi.getById(id)
   });
+  const { data: store = null, isLoading: isStoreLoading } = useQuery({
+    queryKey: ["store-public"],
+    queryFn: () => storeApi.getPublic(),
+    staleTime: 5 * 60 * 1000
+  });
   const remaining = Math.max(0, Number(invoice?.remaining_balance ?? invoice?.total ?? 0));
+
+  useEffect(() => {
+    if (!actionsOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!actionsRef.current?.contains(event.target)) setActionsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [actionsOpen]);
 
   useEffect(() => {
     if (!invoice?.sent_at || searchParams.get("returnRefund") !== "1") return;
@@ -84,14 +110,20 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   }, [invoice, id, router, searchParams, t]);
 
   useEffect(() => {
-    if (searchParams.get("print") !== "1" || !invoice || isLoading || printHandled.current) return undefined;
-    printHandled.current = true;
+    if (searchParams.get("print") !== "1" || !invoice || isLoading || isStoreLoading || printHandled.current) return undefined;
     const timer = window.setTimeout(() => {
-      window.print();
-      router.replace(`/admin/invoices/${id}`, { scroll: false });
+      if (printHandled.current) return;
+      printHandled.current = true;
+      printInvoicePdf(invoice, store, invoicePreviewRef.current)
+        .catch((printError) => { console.error("Could not print invoice PDF:", printError); toast.error("Could not print invoice"); })
+        .finally(() => {
+          printHandled.current = false;
+          setIsGeneratingPdf(false);
+          router.replace(`/admin/invoices/${id}`, { scroll: false });
+        });
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [id, invoice, isLoading, router, searchParams]);
+  }, [id, invoice, isLoading, isStoreLoading, router, searchParams, store]);
 
   const paymentMutation = useMutation({
     mutationFn: (payment) => invoiceApi.recordPayment(id, payment),
@@ -125,6 +157,33 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     },
     onError: (error) => toast.error(error?.response?.data?.message || t("admin.invoiceDetail.message.sendFailed"))
   });
+
+  const downloadPdf = async () => {
+    if (isGeneratingPdf || isStoreLoading) return;
+    setIsGeneratingPdf(true);
+    try {
+      await downloadInvoicePdf(invoice, store, invoicePreviewRef.current);
+      toast.success("Invoice PDF downloaded");
+    } catch (downloadError) {
+      console.error("Could not generate invoice PDF:", downloadError);
+      toast.error("Could not generate invoice PDF");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const printInvoice = async () => {
+    if (isGeneratingPdf || isStoreLoading) return;
+    setIsGeneratingPdf(true);
+    try {
+      await printInvoicePdf(invoice, store, invoicePreviewRef.current);
+    } catch (printError) {
+      console.error("Could not print invoice PDF:", printError);
+      toast.error("Could not print invoice");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   if (isLoading) return <div className="space-y-3"><div className="skeleton h-8 w-1/3" /><div className="skeleton h-28 w-full" /><div className="skeleton h-52 w-full" /></div>;
   if (isError || !invoice) return <div className="rounded-xl border bg-white p-8 text-center" style={edge}>
@@ -214,8 +273,20 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
+        <div ref={actionsRef} className="relative">
+          <button type="button" aria-label="Invoice actions" aria-expanded={actionsOpen} disabled={isGeneratingPdf} onClick={() => setActionsOpen((open) => !open)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-45">
+            <MoreHorizontal size={17} />
+          </button>
+          {actionsOpen && <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+            <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { setActionsOpen(false); printInvoice(); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-slate-700 transition hover:bg-blue-50 disabled:opacity-50">
+              <Printer size={14} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}
+            </button>
+            <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { setActionsOpen(false); downloadPdf(); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-slate-700 transition hover:bg-blue-50 disabled:opacity-50">
+              <FileText size={14} />Download PDF
+            </button>
+          </div>}
+        </div>
         {canReturn && smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true)}
-        {smallAction("Download PDF", () => downloadInvoicePdf(invoice).catch(() => toast.error("Could not generate invoice PDF")), FileText)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? t("admin.invoiceDetail.action.saving") : t("admin.invoiceDetail.action.sendCustomer"),
           () => sendMutation.mutate(),
@@ -228,6 +299,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
     <div className="grid items-start gap-4 lg:grid-cols-12">
       <main className="min-w-0 lg:col-span-8">
+        <div ref={invoicePreviewRef}>
         <QuoteTemplateDesigner
           previewOnly
           documentType="invoice"
@@ -249,6 +321,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           savedDesign={invoice.pdf_design || {}}
           money={(value) => money(value, locale)}
         />
+        </div>
       </main>
 
       <aside className="space-y-3.5 lg:col-span-4">
@@ -312,5 +385,28 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
+
+    <style jsx global>{`
+      @page { size: ${invoice.pdf_design?.pageSize === "letter" ? "letter" : "A4"} ${invoice.pdf_design?.orientation === "landscape" ? "landscape" : "portrait"}; margin: 10mm; }
+      @media print {
+        html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+        body * { visibility: hidden !important; }
+        #invoice-document-preview [data-quote-document-page="true"],
+        #invoice-document-preview [data-quote-document-page="true"] * { visibility: visible !important; }
+        #invoice-print-area > .grid { display: block !important; }
+        #invoice-print-area > .grid > main { display: block !important; width: 100% !important; max-width: none !important; }
+        #invoice-print-area > .grid > aside,
+        #invoice-print-area > :not(.grid) { display: none !important; }
+        #invoice-document-preview { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        #invoice-document-preview .quote-saved-preview { margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; }
+        #invoice-document-preview .quote-saved-preview > div { padding: 0 !important; background: #fff !important; }
+        #invoice-document-preview .quote-no-print,
+        #invoice-document-preview button,
+        #invoice-document-preview a { display: none !important; }
+        #invoice-document-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; overflow: hidden !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
+        #invoice-document-preview [data-quote-document-page="true"]:last-child { break-after: auto; page-break-after: auto; }
+        #invoice-document-preview img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      }
+    `}</style>
   </div>;
 }
