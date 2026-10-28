@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -41,6 +42,7 @@ import {
   ContactRound,
   FileText,
   Receipt,
+  DollarSign,
 } from "lucide-react";
 
 // ============================================================
@@ -56,42 +58,14 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 function StoreMark({
   logoUrl,
   name,
-  letter,
-  color,
   sizeClass = "h-8 w-8",
-  letterClass = "text-sm",
   roundedClass = "rounded-lg",
 }) {
-  const [logoFailed, setLogoFailed] = useState(false);
-
-  if (logoUrl && !logoFailed) {
-    return (
-      <span
-        className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden bg-white shadow-sm ring-1 ring-black/10`}
-      >
-        <img
-          src={logoUrl}
-          alt={name}
-          onError={() => setLogoFailed(true)}
-          className="h-full w-full object-contain p-[3px]"
-        />
-      </span>
-    );
-  }
-
   return (
     <span
-      aria-hidden="true"
-      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center shadow-sm ring-1 ring-white/15`}
-      style={{
-        backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${color} 82%, #ffffff), color-mix(in srgb, ${color} 72%, #000000))`,
-      }}
+      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden bg-white shadow-sm ring-1 ring-black/10`}
     >
-      <span
-        className={`font-semibold uppercase tracking-tight text-white ${letterClass}`}
-      >
-        {letter}
-      </span>
+      <FallbackImage src={logoUrl} alt={name} className="h-full w-full object-contain p-[3px]" />
     </span>
   );
 }
@@ -126,6 +100,10 @@ const sidebarSections = [
     items: ["POS", "Customers", "Leads", "Quotes", "Invoices"],
   },
   {
+    title: "FINANCE",
+    items: ["Finance"],
+  },
+  {
     title: "STORE",
     items: ["Store Info", "Terms & Conditions"],
   },
@@ -141,6 +119,7 @@ const sidebarSections = [
 
 const allMenuItems = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: "dashboard" },
+  { name: "Finance", icon: DollarSign, path: "/admin/finance", permissionKey: "finance" },
   { name: "Brands", icon: Tag, path: "/admin/brands", permissionKey: "brands" },
   { name: "Categories", icon: FolderOpen, path: "/admin/categories", permissionKey: "categories" },
   { 

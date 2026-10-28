@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -32,7 +33,7 @@ function ReviewMedia({ images = [], videos = [] }) {
     <div className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label={t("admin.reviews.ui.media")}>
       {media.map((item, index) => (
         <a key={`${item.type}-${index}`} href={item.url} target="_blank" rel="noreferrer" className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]">
-          {item.type === "video" ? <><video src={item.url} muted preload="metadata" className="h-full w-full object-cover" /><span className="absolute inset-0 grid place-items-center bg-black/25"><Play size={17} className="fill-white text-white" /></span></> : <img src={item.url} alt={`Review media ${index + 1}`} className="h-full w-full object-cover" />}
+          {item.type === "video" ? <><video src={item.url} muted preload="metadata" className="h-full w-full object-cover" /><span className="absolute inset-0 grid place-items-center bg-black/25"><Play size={17} className="fill-white text-white" /></span></> : <FallbackImage src={item.url} alt={`Review media ${index + 1}`} className="h-full w-full object-cover" />}
         </a>
       ))}
     </div>
@@ -81,7 +82,7 @@ export default function MyReviews() {
                 <div className="grid gap-4 p-4 sm:p-5 md:grid-cols-[150px_minmax(0,1fr)_148px] md:gap-5">
                   <div className="flex gap-3 md:block">
                     <Link href={pid ? `/product/${pid}` : "/orders"} className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] sm:h-24 sm:w-24 md:h-[150px] md:w-[150px]">
-                      {productImage ? <img src={productImage} alt={productName} className="h-full w-full object-cover" /> : <span className="grid h-full w-full place-items-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></span>}
+                      <FallbackImage src={productImage} alt={productName} className="h-full w-full object-cover" />
                     </Link>
                     <div className="min-w-0 self-center md:mt-2"><Link href={pid ? `/product/${pid}` : "/orders"} className="break-words text-sm font-bold text-[var(--user-text)] hover:text-[var(--user-accent)]">{productName}</Link><p className="mt-1 flex flex-wrap gap-1 text-xs text-[var(--user-text-muted)]">{t("admin.shared.label.createdAt")} <span className="text-[var(--user-text-secondary)]">{dateLabel(match?.order?.created_at || match?.order?.order_date, locale)}</span></p></div>
                   </div>

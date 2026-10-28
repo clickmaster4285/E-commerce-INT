@@ -1,12 +1,12 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Plus,
   Check,
-  Package,
   Layers,
   ChevronDown,
   Loader2,
@@ -127,18 +127,12 @@ export default function BundleCard({ bundle, className = "" }) {
     >
       {/* ✅ SIRF bundle ki manual cover image — individual product images nahi */}
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
-        {image ? (
-          <img
-            src={image}
-            alt={name}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package size={44} className="text-[var(--user-text-subtle)]" />
-          </div>
-        )}
+        <FallbackImage
+          src={image}
+          alt={name}
+          loading="lazy"
+          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+        />
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           <span className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg">

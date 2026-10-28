@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { categoryApi } from "@/apis/user/categoryApi";
@@ -37,7 +38,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
   }
 
   return (
-    <img
+    <FallbackImage
       src={logoUrl}
       alt={store?.store_name || "Store"}
       className={`${sizeClass} rounded-lg object-cover shrink-0 bg-[var(--user-bg-card)]`}

@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -116,7 +117,7 @@ function OrderItemImage({ item, size = 60 }) {
     );
   }
   return (
-    <img src={src} alt={item?.name || "Product"} loading="lazy" onError={() => setFailed(true)}
+    <FallbackImage src={src} alt={item?.name || "Product"} loading="lazy" onError={() => setFailed(true)}
       className="shrink-0 object-cover rounded-lg"
       style={{ width: `${size}px`, height: `${size}px`, border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }} />
   );

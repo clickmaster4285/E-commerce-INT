@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -755,7 +756,7 @@ function PodiumStage({ images, name, hex }) {
 
   const card = (src, size, key, delay) =>
     src ? (
-      <img
+      <FallbackImage
         key={`${key}-${src}`}
         src={src}
         alt={key === "c" ? name || "Deal product" : ""}

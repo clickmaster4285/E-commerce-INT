@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -357,17 +358,11 @@ export default function CartPage() {
       <div className="flex gap-4 flex-1 min-w-0">
         <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0 group/img">
           <div className="relative">
-            {getImgUrl(row.image) ? (
-              <img
-                src={getImgUrl(row.image)}
-                alt={displayName}
-                className="w-24 h-24 rounded-xl object-cover border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] group-hover/img:scale-105 transition-transform duration-300"
-              />
-            ) : (
-              <div className="w-24 h-24 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center">
-                <Package size={28} className="text-[var(--user-text-subtle)]" />
-              </div>
-            )}
+            <FallbackImage
+              src={getImgUrl(row.image)}
+              alt={displayName}
+              className="w-24 h-24 rounded-xl object-cover border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] group-hover/img:scale-105 transition-transform duration-300"
+            />
             <div className="absolute -top-1.5 -right-1.5 min-w-[1.5rem] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)] shadow-sm">
               ×{row.qty}
             </div>
@@ -943,13 +938,7 @@ function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge
 
       {/* Image (unchanged) */}
       <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0">
-        {img ? (
-          <img src={img} alt={text(row.name, row.raw?.translations?.name)} className="w-20 h-20 rounded-lg object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
-        ) : (
-          <div className="w-20 h-20 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
-            <Package size={26} className="text-[var(--user-text-muted)]" />
-          </div>
-        )}
+        <FallbackImage src={img} alt={text(row.name, row.raw?.translations?.name)} className="w-20 h-20 rounded-lg object-cover border border-[var(--user-border)] bg-[var(--user-bg-hover)]" />
       </Link>
 
       <div className="flex-1 min-w-0 flex flex-col">

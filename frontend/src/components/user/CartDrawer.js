@@ -1,5 +1,6 @@
   "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
@@ -665,7 +666,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
         </button>
 
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--user-bg-hover)]">
-          {imgUrl ? (<img src={imgUrl} alt={rowName} loading="lazy" decoding="async" className="h-full w-full object-cover" />) : (<Package size={24} aria-hidden="true" className="text-[var(--user-text-subtle)]" />)}
+          <FallbackImage src={imgUrl} alt={rowName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
         </div>
 
         <div className="flex min-w-0 flex-col">

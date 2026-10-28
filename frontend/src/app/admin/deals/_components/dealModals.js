@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* Shared deal modals — moved out of page.js (App Router pages cannot have named exports). */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -950,7 +951,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                       <>
                         {/* Product image / fallback */}
                         {image ? (
-                          <img
+                          <FallbackImage
                             src={image}
                             alt={getName(item, type, locale)}
                             className="w-9 h-9 rounded-md object-cover shrink-0"
@@ -1188,7 +1189,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
     >
       {/* Image / fallback */}
       {image ? (
-        <img
+        <FallbackImage
           src={image}
           alt={name}
           className="w-11 h-11 rounded-md object-cover shrink-0"
@@ -1325,7 +1326,7 @@ function ProductDetailsModal({ product, onClose }) {
           {/* Product Hero */}
           <div className="flex items-center gap-4 mb-5">
             {image ? (
-              <img
+              <FallbackImage
                 src={image}
                 alt={name}
                 className="w-16 h-16 rounded-lg object-cover shrink-0"

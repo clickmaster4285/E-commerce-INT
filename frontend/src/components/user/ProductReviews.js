@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 // ==========================================
 // ⭐ PRODUCT RATING WIDGET (order-based ratings + photos/video)
 // ==========================================
@@ -93,7 +94,7 @@ function SavedMedia({ images = [], videos = [], onPreview }) {
             </>
           ) : (
             <>
-              <img src={item.url} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
+              <FallbackImage src={item.url} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
               <span className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-200 group-hover:bg-black/10" />
             </>
           )}
@@ -255,7 +256,7 @@ function RatingModal({
                   const url = mediaUrl(item.img_url);
                   return url ? (
                     <span key={`saved-i-${item.img_url}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]">
-                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <FallbackImage src={url} alt="" className="h-full w-full object-cover" />
                       <button type="button" onClick={() => onRemoveExistingImage(item.img_url)} aria-label={t("admin.productDetail.page.remove")} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
                     </span>
                   ) : null;
@@ -269,7 +270,7 @@ function RatingModal({
                 ) : null}
                 {previews.map((src, i) => (
                   <span key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-[var(--user-border)] shrink-0 bg-[var(--user-bg-hover)]">
-                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    <FallbackImage src={src} alt="" className="w-full h-full object-cover" />
                     <button type="button" onClick={() => onRemoveImage(i)} aria-label={t("admin.productDetail.page.remove")}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition"><X size={12} /></button>
                   </span>
@@ -336,7 +337,7 @@ function MediaLightbox({ preview, onClose }) {
       {preview.type === "video" ? (
         <video src={preview.url} controls autoPlay playsInline className="max-w-[92vw] max-h-[82vh] rounded-lg" onClick={(e) => e.stopPropagation()} />
       ) : (
-        <img src={preview.url} alt="" className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        <FallbackImage src={preview.url} alt="" className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
       )}
     </div>,
     document.body

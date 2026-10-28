@@ -52,6 +52,7 @@ const leadRoutes = require("./routes/leadRoutes");
 const quoteRoutes = require("./routes/quoteRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const posRoutes = require("./routes/posRoutes");
+const financeRoutes = require("./routes/financeRoutes");
 const translationRoutes = require("./routes/translationRoutes");
 
 // ==========================================
@@ -225,6 +226,7 @@ app.use(`${API_PREFIX}/leads`, leadRoutes);
 app.use(`${API_PREFIX}/quotes`, quoteRoutes);
 app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
 app.use(`${API_PREFIX}/pos`, posRoutes);
+app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));

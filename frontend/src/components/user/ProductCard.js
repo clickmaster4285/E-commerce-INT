@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { memo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { smartImageLoader } from "@/utils/smartImageLoader";
@@ -104,7 +105,6 @@ function ProductCardInner({
   const { productNameOf, fieldOf } = useLocalized();
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [failedImage, setFailedImage] = useState("");
   const router = useRouter();
   const { addToCart, cart = [] } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
@@ -288,23 +288,17 @@ function ProductCardInner({
       <div
         className={`relative w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)] ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-48 @min-[220px]:h-56 @min-[260px]:h-64"}`}
       >
-        {image && failedImage !== image ? (
-          <Image
-            src={getImageUrl(image)}
-            alt={displayName}
-            fill
-            loader={smartImageLoader}
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-            priority={priority}
-            fetchPriority={priority ? "high" : "auto"}
-            className="object-cover object-center p-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
-            onError={() => setFailedImage(image)}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package size={36} className="text-[var(--user-text-subtle)]" />
-          </div>
-        )}
+        <FallbackImage
+          nextImage
+          src={getImageUrl(image)}
+          alt={displayName}
+          fill
+          loader={smartImageLoader}
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+          priority={priority}
+          fetchPriority={priority ? "high" : "auto"}
+          className="object-cover object-center p-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
+        />
 
         <div className={`absolute top-2 left-2 z-20 flex flex-col items-start gap-1.5 ${dealCarousel ? "right-14 max-w-[calc(100%_-_56px)]" : showDealPricing ? "right-11" : ""}`}>
           {displayBadgeText && !hideDiscountBadge && (

@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* Shared discount modals — moved out of page.js (App Router pages cannot have named exports). */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -927,7 +928,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                     {type === "product" ? (
                       <>
                         {image ? (
-                          <img
+                          <FallbackImage
                             src={image}
                             alt={getName(item, type, locale, t)}
                             className="w-9 h-9 rounded-md object-cover shrink-0"
@@ -1036,7 +1037,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
     >
       {image ? (
-        <img
+        <FallbackImage
           src={image}
           alt={name}
           className="w-11 h-11 rounded-md object-cover shrink-0"
@@ -1170,7 +1171,7 @@ function ProductDetailsModal({ product, onClose }) {
         <div className="flex-1 overflow-y-auto p-5">
           <div className="flex items-center gap-4 mb-5">
             {image ? (
-              <img
+              <FallbackImage
                 src={image}
                 alt={name}
                 className="w-16 h-16 rounded-lg object-cover shrink-0"

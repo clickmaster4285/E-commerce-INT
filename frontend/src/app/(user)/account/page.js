@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* ==========================================================
    ACCOUNT PAGE — "profile workspace" layout
    ----------------------------------------------------------
@@ -193,7 +194,7 @@ function navBadgeCls(active) {
   }`;
 }
 
-function SidebarNav({ user, avatarLetter, status, tab, counts, onNavigate, onLogout }) {
+function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
   return (
     <div className="space-y-4">
     <Card className="overflow-hidden rounded-l-none border-l-0">
@@ -202,17 +203,7 @@ function SidebarNav({ user, avatarLetter, status, tab, counts, onNavigate, onLog
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/12 via-transparent to-transparent pointer-events-none" />
         <div className="relative flex items-center gap-3">
           <div className="relative shrink-0">
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name || user.username}
-                className="w-11 h-11 rounded-full object-cover border border-[var(--user-border)]"
-              />
-            ) : (
-              <div className="w-11 h-11 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-base font-black flex items-center justify-center">
-                {avatarLetter}
-              </div>
-            )}
+            <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-11 h-11 rounded-full object-cover border border-[var(--user-border)]" />
             <span
               className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[var(--user-bg-card)] ${
                 status === "Active" ? "bg-[var(--user-success)]" : "bg-[var(--user-danger)]"
@@ -296,7 +287,6 @@ function SidebarNav({ user, avatarLetter, status, tab, counts, onNavigate, onLog
 /* ============ MOBILE MENU ============ */
 function MobileMenu({
   user,
-  avatarLetter,
   status,
   memberSince,
   stats,
@@ -314,17 +304,7 @@ function MobileMenu({
         </div>
         <div className="relative p-4 sm:p-5">
           <div className="flex items-center gap-4">
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name || user.username}
-                className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-2xl font-black flex items-center justify-center shadow-lg shrink-0">
-                {avatarLetter}
-              </div>
-            )}
+            <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0" />
             <div className="min-w-0 flex-1">
               <h1 className="text-base font-black text-[var(--user-text)] capitalize truncate">
                 {user.name || user.username}
@@ -566,7 +546,6 @@ export default function AccountPage() {
 
 
   /* ---------- derived ---------- */
-  const avatarLetter = (user.name || user.email || "U").charAt(0).toUpperCase();
   const memberSince = fmtDate(user.created_at);
   const accountStatus =
     user.is_deleted || String(user.status || "").toLowerCase() === "inactive"
@@ -714,7 +693,6 @@ export default function AccountPage() {
   /* ---------- shared sidebar props ---------- */
   const sidebarProps = {
     user,
-    avatarLetter,
     status: accountStatus,
     tab,
     counts,
@@ -757,17 +735,7 @@ export default function AccountPage() {
                         <ShoppingBag size={160} className="text-[var(--user-accent)]" />
                       </div>
                       <div className="relative p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                        {user.avatar ? (
-                          <img
-                            src={user.avatar}
-                            alt={user.name || user.username}
-                            className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-2xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-2xl font-black flex items-center justify-center shadow-lg shrink-0">
-                            {avatarLetter}
-                          </div>
-                        )}
+                        <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h1 className="text-lg font-black text-[var(--user-text)] capitalize truncate">

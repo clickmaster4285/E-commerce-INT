@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useState, useCallback } from "react";
 import {
   User,
@@ -524,7 +525,7 @@ export default function ProfilePage() {
                 }}
               >
                 {profile.avatar ? (
-                  <img src={profile.avatar} alt={t("admin.profile.title")} className="h-full w-full object-cover" />
+                  <FallbackImage src={profile.avatar} alt={t("admin.profile.title")} className="h-full w-full object-cover" />
                 ) : (
                   <span
                     className="text-3xl sm:text-4xl font-bold select-none"

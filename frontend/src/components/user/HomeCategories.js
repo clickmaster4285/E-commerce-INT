@@ -1,9 +1,10 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Image from "next/image";
+
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
 import useScrollFade from "../../hooks/user/useScrollFade";
@@ -19,7 +20,6 @@ function CategoryCard({ category, tabIndex }) {
   const { fieldOf } = useLocalized();
   const categoryName = fieldOf(category, "name");
   const image = getCategoryImage(category);
-  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <Link
@@ -30,22 +30,16 @@ function CategoryCard({ category, tabIndex }) {
       className="group flex h-auto w-[180px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-0 text-left shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-200 ease-out hover:-translate-y-[3px] hover:border-[var(--user-accent)]/35 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:-translate-y-[3px] focus-visible:border-[var(--user-accent)]/40 focus-visible:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] active:scale-[0.98]"
     >
       <span className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-t-xl bg-[var(--user-bg-hover)]">
-        {image && !imageFailed ? (
-          <Image
-            src={image}
-            alt={categoryName}
-            fill
-            loader={smartImageLoader}
-            sizes="(max-width: 639px) 140px, 168px"
-            className="object-cover object-center transition-transform duration-200 ease-out group-hover:scale-105 group-focus-visible:scale-105"
-            onError={() => setImageFailed(true)}
-            draggable={false}
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center text-[var(--user-text-subtle)]">
-            <ImageOff size={24} strokeWidth={1.5} aria-hidden="true" />
-          </span>
-        )}
+        <FallbackImage
+          nextImage
+          src={image}
+          alt={categoryName}
+          fill
+          loader={smartImageLoader}
+          sizes="(max-width: 639px) 140px, 168px"
+          className="object-cover object-center transition-transform duration-200 ease-out group-hover:scale-105 group-focus-visible:scale-105"
+          draggable={false}
+        />
       </span>
 
       <span className="flex min-h-0 flex-col gap-1 px-3.5 py-3">

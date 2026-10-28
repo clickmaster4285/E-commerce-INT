@@ -1,7 +1,8 @@
-"use client";import { useTranslation } from "@/i18n/LanguageProvider";
+"use client";import FallbackImage from "@/components/common/FallbackImage";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -287,7 +288,7 @@ export default function NewInvoicePage() {const { t } = useTranslation();
               const checked = pickedVariants.includes(variant.id);
               return <label key={variant.id} className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition sm:px-4 ${alreadyAdded ? "cursor-not-allowed border-emerald-200 bg-emerald-50/60 opacity-75" : checked ? "border-blue-300 bg-blue-50/80 shadow-sm" : "border-[var(--border-color)] bg-[var(--bg-card)] hover:border-blue-200 hover:bg-blue-50/40"}`}>
               <input type="checkbox" checked={alreadyAdded || checked} disabled={alreadyAdded} onChange={(event) => setPickedVariants((current) => event.target.checked ? [...current, variant.id] : current.filter((id) => id !== variant.id))} className="h-4 w-4 shrink-0 rounded border-[var(--border-color)] accent-blue-600" aria-label={`Select ${variant.productName} ${variant.variantName}`} />
-              {variant.image ? <Image src={getImageUrl(variant.image)} alt="" width={44} height={44} unoptimized className="h-11 w-11 shrink-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] object-cover" /> : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-muted)]"><Package size={18} /></span>}
+              <FallbackImage nextImage src={getImageUrl(variant.image)} alt="" width={44} height={44} unoptimized className="h-11 w-11 shrink-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] object-cover" />
               <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-[var(--text-primary)]">{variant.productName} <span className="font-medium text-[var(--text-secondary)]">/ {variant.variantName}</span></span><span className="mt-1 block truncate text-[10px] font-medium text-[var(--text-muted)]">{[variant.sku && `SKU ${variant.sku}`, `Stock ${variant.stock}`, variant.categoryName, variant.brandName].filter(Boolean).join(" · ")}</span></span>
               <span className="hidden shrink-0 text-right sm:block"><span className="block text-xs font-bold text-[var(--text-primary)]">{money(variant.price)}</span><span className="text-[9px] text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.unit_price_3c6c777f")}</span></span>{alreadyAdded && <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-bold text-emerald-700">{t("admin.quoteInvoice.ui.added_b68734c2")}</span>}
             </label>;

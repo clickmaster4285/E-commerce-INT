@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockApi } from "../../../apis/admin/stockApi";
@@ -164,7 +165,7 @@ const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
   const { t, locale } = useTranslation();
   const image = getImageUrl(item?.image);
   return image ? (
-    <img
+    <FallbackImage
       src={image}
       alt={stockProductNameOf(item, locale) || t("admin.manageStock.page.product")}
       className={`${size} shrink-0 rounded-lg object-cover`}

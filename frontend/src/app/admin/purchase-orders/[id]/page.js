@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -218,7 +219,7 @@ export default function PODetailPage({ params }) {
                 <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", "admin.purchaseOrders.view.image", "admin.purchaseOrders.view.productVariant", "SKU", "admin.purchaseOrders.view.qtyOrdered", "admin.purchaseOrders.view.costPrice", "admin.purchaseOrders.view.sellPrice", "admin.purchaseOrders.view.lineTotal", "admin.purchaseOrders.view.taxRate", "admin.purchaseOrders.view.expiryAfterDelivery"].map((key) => <th key={key} className="whitespace-nowrap px-2.5 py-2 font-semibold">{key === "#" || key === "SKU" ? key : t(key)}</th>)}</tr></thead>
                 <tbody>{items.slice(0, showAllItems ? items.length : 10).map((item, index) => <tr key={`${item.variant_id?._id || item.variant_id}-${index}`} className="border-t" style={{ borderColor: "#eaf0f8" }}>
                   <td className="px-2.5 py-2.5" style={muted}>{index + 1}</td>
-                  <td className="px-2.5 py-2"><div className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white" style={{ borderColor: "#dce8f8" }}>{imageUrl(item.image) ? <img src={imageUrl(item.image)} alt={item.name || ""} className="h-full w-full object-cover" /> : <Package size={15} style={{ color: "#9bb0cc" }} />}</div></td>
+                  <td className="px-2.5 py-2"><FallbackImage src={imageUrl(item.image)} alt={item.name || ""} className="flex h-9 w-10 items-center justify-center overflow-hidden rounded-md border bg-white object-cover" style={{ borderColor: "#dce8f8" }} /></td>
                   <td className="max-w-[150px] px-2.5 py-2.5"><div className="truncate font-semibold" style={primary}>{productNameOf(item.product_id) || item.name || "—"}</div><div className="truncate" style={muted}>{contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title) || "—"}</div></td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-mono" style={muted}>{item.sku || "—"}</td>
                   <td className="px-2.5 py-2.5 text-center" style={primary}>{item.qty_ordered}</td>

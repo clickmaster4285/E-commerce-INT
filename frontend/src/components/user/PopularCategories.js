@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* ==========================================================
    POPULAR CATEGORIES — real category cards
    Har card me:
@@ -7,9 +8,9 @@
    ========================================================== */
 
 import Link from "next/link";
-import Image from "next/image";
+
 import { smartImageLoader } from "@/utils/smartImageLoader";
-import { ArrowRight, ImageOff } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import SectionHeading from "./SectionHeading";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
@@ -56,18 +57,14 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
             className="group flex flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
           >
             <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
-              {category.image ? (
-                <Image
-                  src={category.image}
-                  alt={fieldOf(category, "name")}
-                  fill
-                  loader={smartImageLoader}
-                  sizes="(max-width: 640px) 50vw, 33vw"
-                  className="object-cover transition duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <ImageOff size={26} className="text-[var(--user-text-subtle)]" />
-              )}
+              <FallbackImage nextImage
+                src={category.image}
+                alt={fieldOf(category, "name")}
+                fill
+                loader={smartImageLoader}
+                sizes="(max-width: 640px) 50vw, 33vw"
+                className="object-cover transition duration-500 group-hover:scale-105"
+              />
             </span>
 
             <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">

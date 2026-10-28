@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -153,23 +154,14 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                   onClick={() => pick(p)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--user-bg-hover)] transition text-left"
                 >
-                  {img ? (
-                    <Image
-                      src={getImageUrl(img)}
-                      alt={productNameOf(p)}
-                      width={40}
-                      height={40}
-                      loader={smartImageLoader}
-                      className="rounded-lg object-cover border border-[var(--user-border)] shrink-0"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-lg bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center shrink-0">
-                      <Package
-                        size={16}
-                        className="text-[var(--user-text-subtle)]"
-                      />
-                    </div>
-                  )}
+                  <FallbackImage nextImage
+                    src={getImageUrl(img)}
+                    alt={productNameOf(p)}
+                    width={40}
+                    height={40}
+                    loader={smartImageLoader}
+                    className="rounded-lg object-cover border border-[var(--user-border)] shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-medium text-[var(--user-text)]">
                       {productNameOf(p)}
@@ -207,7 +199,7 @@ function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
   }
 
   return (
-    <img
+    <FallbackImage
       src={url}
       alt={user?.name || "User"}
       referrerPolicy="no-referrer"
@@ -237,7 +229,7 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
   }
 
   return (
-    <img
+    <FallbackImage
       src={logoUrl}
       alt={store?.store_name || "Store"}
       onError={() => setFailed(true)}
@@ -823,7 +815,7 @@ export default function Header() {
                   >
                     {logoUrl ? (
                       <span className="relative w-10 h-10 rounded-full bg-white p-2 shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
-                        <Image
+                        <FallbackImage nextImage
                           src={logoUrl}
                           alt={fieldOf(brand, "name")}
                           fill

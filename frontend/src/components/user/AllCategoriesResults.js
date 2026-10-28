@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* ==========================================================
    ALL CATEGORIES RESULTS — nav ke "More → All Categories" par
    main column ke TOP par aane wala categories panel.
@@ -90,17 +91,12 @@ export default function AllCategoriesResults({
                 className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)] hover:shadow-[var(--user-shadow-md)]"
               >
                 <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
-                  {category.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={category.image}
-                      alt={category.name}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <ImageOff size={26} className="text-[var(--user-text-subtle)]" />
-                  )}
+                  <FallbackImage
+                    src={category.image}
+                    alt={category.name}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
                 </span>
                 <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
                   <span className="w-full line-clamp-2 break-words text-[0.78125rem] font-bold capitalize text-[var(--user-text)]">

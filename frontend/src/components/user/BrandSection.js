@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { brandApi } from "@/apis/user/brandApi";
@@ -81,21 +82,9 @@ export default function BrandSection() {
                       className="mr-3 w-[8.75rem] sm:w-[10rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[8.125rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
                     >
                       {/* ✅ Logo (white circle) */}
-                      {logoUrl ? (
-                        <div className="w-14 h-14 rounded-full bg-[var(--user-text)] flex items-center justify-center p-2">
-                          <img
-                            src={logoUrl}
-                            alt={brandName}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-14 h-14 rounded-full bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
-                          <span className="text-2xl font-black text-[var(--user-accent)]">
-                            {brandName?.charAt(0)}
-                          </span>
-                        </div>
-                      )}
+                      <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-2">
+                        <FallbackImage src={logoUrl} alt={brandName} className="max-h-full max-w-full object-contain" />
+                      </span>
 
                       {/* ✅ Brand name */}
                       <p className="text-xs text-[var(--user-text-muted)] text-center capitalize line-clamp-1 w-full">

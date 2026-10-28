@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -201,11 +202,7 @@ function QuickBuyBody({ product, dealInfo }) {
       <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] px-5 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--user-bg-hover)]">
-            {headerImage ? (
-              <img src={headerImage} alt={productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
-            ) : (
-              <Package size={18} aria-hidden="true" className="text-[var(--user-text-muted)]" />
-            )}
+            <FallbackImage src={headerImage} alt={productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
           </span>
           <span className="min-w-0">
             <h2 className="line-clamp-1 text-base font-semibold text-[var(--user-text)]">{productName}</h2>
@@ -258,11 +255,7 @@ function QuickBuyBody({ product, dealInfo }) {
                     } ${variantOut ? "cursor-not-allowed opacity-50" : ""}`}
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--user-bg-hover)]">
-                      {image ? (
-                        <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                      ) : (
-                        <Package size={17} aria-hidden="true" className="text-[var(--user-text-muted)]" />
-                      )}
+                      <FallbackImage src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     </span>
                     <span className="min-w-0 flex-1 break-words text-sm font-medium text-[var(--user-text)]">
                       {fieldOf(variant, "title") || variant.sku || `${t("admin.shared.label.selectOption")} ${index + 1}`}

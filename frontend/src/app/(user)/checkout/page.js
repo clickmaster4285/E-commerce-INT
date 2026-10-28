@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useMemo, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -95,7 +96,7 @@ const DEFAULT_SHIP_CONFIG = {
 const ItemThumb = ({ item, size = "w-14 h-14" }) =>
   getImgUrl(item.image) ? (
     <div className={`${size} rounded-xl overflow-hidden border-2 border-[var(--user-border)] shrink-0 shadow-sm bg-[var(--user-bg-hover)]`}>
-      <img src={getImgUrl(item.image)} alt="" className="w-full h-full object-cover" />
+      <FallbackImage src={getImgUrl(item.image)} alt="" className="w-full h-full object-cover" />
     </div>
   ) : (
     <div className={`${size} rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center shrink-0`}>

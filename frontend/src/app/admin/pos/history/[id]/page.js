@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -258,7 +259,7 @@ export default function PosSaleDetailPage() {
                       <td className="px-4 py-3">
                         <div className="flex min-w-0 items-center gap-3">
                           {productImage ? (
-                            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border bg-white" style={edge}><Image src={productImage} alt={productNameOf(item) || t("admin.pos.ui.product")} fill unoptimized className="object-contain p-1" /></span>
+                            <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border bg-white" style={edge}><FallbackImage nextImage src={productImage} alt={productNameOf(item) || t("admin.pos.ui.product")} fill unoptimized className="object-contain p-1" /></span>
                           ) : <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Package size={18} /></span>}
                           <span className="min-w-0"><span className="block truncate text-xs font-bold" style={primary}>{productNameOf(item) || t("admin.pos.ui.product")}</span><span className="mt-0.5 block truncate text-[10px]" style={muted}>{item.variant_title || t("admin.pos.ui.defaultVariant")}{item.sku ? ` · ${item.sku}` : ""}</span></span>
                         </div>

@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -777,7 +778,7 @@ export default function DealDetailPage() {
                         return (
                           <div key={p._id || p.id} className="w-[68px]">
                             <div className="w-[68px] h-[68px] rounded-lg overflow-hidden flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                              {img ? <img src={img} alt=                              {productNameOf(p) || t("common.product")} className="w-full h-full object-cover" /> : <Box className="w-5 h-5" style={{ color: "var(--text-muted)" }} />}
+                              <FallbackImage src={img} alt={productNameOf(p) || t("common.product")} className="w-full h-full object-cover" />
                             </div>
                             <p className="text-[9px] font-semibold mt-1 truncate text-center" style={{ color: "var(--text-primary)" }}>{productNameOf(p) || t("common.product")}</p>
                           </div>
@@ -836,7 +837,7 @@ export default function DealDetailPage() {
                       const logo = getBrandLogo(b);
                       return (
                         <div key={b._id || b.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
-                          {logo ? <img src={logo} alt={b.name || "Brand"} className="w-6 h-6 rounded object-contain shrink-0" /> : <Award className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />}
+                          <FallbackImage src={logo} alt={b.name || "Brand"} className="w-6 h-6 rounded object-contain shrink-0" />
                           <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{nameOf(b) || t("common.brand")}</span>
                         </div>
                       );

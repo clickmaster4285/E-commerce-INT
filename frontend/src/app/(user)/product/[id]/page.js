@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { use, useState, useMemo, useCallback, useEffect, useRef, memo, Suspense } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
@@ -384,20 +385,16 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         onMouseLeave={handleMouseLeave}
         onMouseMove={handleMouseMove}
       >
-        {mainImage ? (
-          <Image
-            key={mainImage}
-            src={mainImage}
-            alt={productName}
-            fill
-            loader={smartImageLoader}
-            sizes="(max-width: 1024px) 100vw, 40vw"
-            priority
-            className="object-contain"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-white"><Package size={64} strokeWidth={1.25} className="text-gray-300" /></div>
-        )}
+        <FallbackImage nextImage
+          key={mainImage || "missing-product-image"}
+          src={mainImage}
+          alt={productName}
+          fill
+          loader={smartImageLoader}
+          sizes="(max-width: 1024px) 100vw, 40vw"
+          priority
+          className="object-contain"
+        />
         {stock === 0 && (
           <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">{t("admin.productDetail.page.outOfStock")}</span>
         )}
@@ -451,7 +448,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
                 aria-current={url === mainImage}
                 className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-80 hover:opacity-100"}`}
               >
-                <img src={url} alt={`${productName}, image ${i + 1}`} loading="lazy" className="h-full w-full object-contain" />
+                <FallbackImage src={url} alt={`${productName}, image ${i + 1}`} loading="lazy" className="h-full w-full object-contain" />
               </button>
             ))}
           </div>
@@ -487,7 +484,7 @@ const DetailImages = memo(({ productName, images, onZoom }) => {
       >
         <div className="flex flex-col items-center gap-2">
           {visible.map((url, i) => (
-            <img
+            <FallbackImage
               key={url}
               src={url}
               alt={`${productName}, image ${i + 1}`}
@@ -597,7 +594,7 @@ const Lightbox = memo(({ images, index, onClose, onStep }) => {
     <div role="dialog" aria-modal="true" aria-label={t("admin.productDetail.page.openImagePreview")} className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center" onClick={onClose}>
       <button type="button" onClick={(event) => { event.stopPropagation(); onClose(); }} className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label={t("common.close")}><X size={20} /></button>
       <button type="button" onClick={(e) => { e.stopPropagation(); onStep(-1); }} className="absolute left-3 lg:left-6 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors" aria-label={t("admin.productDetail.page.previousImage")}><ChevronLeft size={20} /></button>
-      <img
+      <FallbackImage
         src={images[index]}
         alt=""
         className="max-w-[92vw] max-h-[82vh] object-contain rounded-lg"
@@ -1048,11 +1045,7 @@ function ProductDetailContent({ params }) {
                             title={fieldOf(variant, "title") || variant.sku || `${t("admin.productDetail.page.selectOption")} ${index + 1}`}
                             className={`flex h-11 min-w-11 items-center justify-center gap-2 border px-1.5 text-xs ${selected ? "border-[var(--user-accent)] ring-1 ring-[var(--user-accent)]" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/60"} ${unavailable ? "cursor-not-allowed opacity-40" : ""}`}
                           >
-                            {image ? (
-                              <img src={image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
-                            ) : (
-                              <span className="px-2 font-medium text-[var(--user-text)]">{fieldOf(variant, "title") || variant.sku || index + 1}</span>
-                            )}
+                            <FallbackImage src={image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
                           </button>
                         );
                       })}
@@ -1324,11 +1317,7 @@ function ProductDetailContent({ params }) {
                 return (
                   <Link key={p._id} href={`/product/${p._id}`} className="group bg-[var(--user-bg-card)] hover:shadow-lg transition-shadow">
                     <div className="relative aspect-square overflow-hidden bg-white">
-                      {image ? (
-                        <img src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center"><Package size={28} className="text-gray-300" /></div>
-                      )}
+                      <FallbackImage src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
                     </div>
                     <div className="p-2.5">
                       <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{relatedName}</p>

@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { Suspense, useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -245,11 +246,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
               <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-border-hover)] transition-all">
                 <div className="flex gap-2 sm:gap-3 mb-1.5 sm:mb-2">
                   <div className="shrink-0">
-                    {getImgUrl(item.image) ? (
-                      <img src={getImgUrl(item.image)} alt={text(item.name, item.translations?.name)} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
-                    ) : (
-                      <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center"><Package size={18} className="text-[var(--user-text-subtle)]" /></div>
-                    )}
+                    <FallbackImage src={getImgUrl(item.image)} alt={text(item.name, item.translations?.name)} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-end items-end text-right">
                     {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
@@ -740,7 +737,7 @@ function OrdersContent({ compact = false }) {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {getImgUrl(firstItem?.image) ? (
-              <Image src={getImgUrl(firstItem.image)} alt={text(firstItem.name, firstItem.translations?.name) || t("user.orders.draft.product")} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-[var(--user-border)] object-cover" />
+              <FallbackImage nextImage src={getImgUrl(firstItem.image)} alt={text(firstItem.name, firstItem.translations?.name) || t("user.orders.draft.product")} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-[var(--user-border)] object-cover" />
             ) : (
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
             )}

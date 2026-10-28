@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
@@ -75,6 +76,7 @@ const ALLOWED_PERMISSIONS = {
   purchaseOrders: { label: "Purchase Orders", default: true },
   quotes: { label: "Quotes", default: true },
   leads: { label: "Leads", default: false },
+  finance: { label: "Finance", default: false },
 };
 
 // ==========================================
@@ -438,28 +440,12 @@ function EmployeeOverview({
             {/* Identity */}
             <div className="flex min-w-0 flex-1 items-start gap-4">
               <div className="relative shrink-0">
-                {avatar ? (
-                  <img
-                    src={avatar}
-                    alt={name}
-                    className="h-20 w-20 rounded-2xl border object-cover"
-                    style={{
-                      borderColor: "var(--border-color)",
-                      boxShadow: "var(--shadow-sm)",
-                    }}
-                  />
-                ) : (
-                  <div
-                    className="flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold"
-                    style={{
-                      backgroundColor: "var(--accent-soft)",
-                      color: "var(--accent)",
-                      border: "1px solid color-mix(in srgb, var(--accent) 22%, transparent)",
-                    }}
-                  >
-                    {name.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <FallbackImage
+                  src={avatar}
+                  alt={name}
+                  className="h-20 w-20 rounded-2xl border object-cover"
+                  style={{ borderColor: "var(--border-color)", boxShadow: "var(--shadow-sm)" }}
+                />
 
                 <span
                   title={status === "active" ? t("admin.employees.detail.onlineAccountActive") : t("admin.employees.detail.accountInactive")}
