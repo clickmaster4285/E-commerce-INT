@@ -327,7 +327,7 @@ const seedDefaultData = async () => {
 //   • Ye background me hota hai — Express server kabhi block nahi hota
 //     (pehli baar model download/load me minutes lag sakte hain).
 // ==========================================
-const TRANSLATION_API_URL = (process.env.LIBRETRANSLATE_URL || "http://localhost:5055").replace(/\/+$/, "");
+const TRANSLATION_API_URL = String(process.env.LIBRETRANSLATE_URL || "").replace(/\/+$/, "");
 const TRANSLATION_READY_TIMEOUT_MS = Number(process.env.TRANSLATE_READY_TIMEOUT_MS) || 15 * 60 * 1000;
 const TRANSLATION_REUSE_GRACE_MS = Number(process.env.TRANSLATE_REUSE_GRACE_MS) || 75 * 1000;
 const ARGOS_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -363,6 +363,11 @@ const findArgosScript = () => {
 };
 
 const startArgosServer = async () => {
+  if (!TRANSLATION_API_URL) {
+    startupLog.error("Argos translation bridge configure nahi hai — backend/.env me LIBRETRANSLATE_URL set karein");
+    return;
+  }
+
   // Duplicate guard: python bridge apna port model load/prewarm ke BAAD bind
   // karta hai. Restart par purana bridge abhi "loading" me ho sakta hai —
   // spawn ke faislay se pehle thodi der tak reuse ka wait karo, warna do

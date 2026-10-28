@@ -341,3 +341,4 @@ export default function NewInvoicePage() {const { t } = useTranslation();
     `}</style>
   </div>;
 }
+
