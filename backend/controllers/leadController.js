@@ -38,7 +38,7 @@ const buildHistoryChanges = async (before, after) => {
   const employeeIds = [before?.assigned_employee_id, after?.assigned_employee_id].filter(Boolean).map((value) => value?._id || value);
   const employees = employeeIds.length ? await Employee.find({ _id: { $in: employeeIds } }).select("name").lean() : [];
   const employeeNames = new Map(employees.map((employee) => [String(employee._id), employee.name]));
-  return Object.keys(historyLabels).flatMap((key) => {
+  const fieldChanges = Object.keys(historyLabels).filter((key) => key !== "products").flatMap((key) => {
     const from = before?.[key];
     const to = after?.[key];
     const normalize = (value) => ["next_follow_up_date", "expected_purchase_date"].includes(key) && value
@@ -50,6 +50,28 @@ const buildHistoryChanges = async (before, after) => {
       : historyValue(value);
     return [{ field: historyLabels[key], from: displayValue(from), to: displayValue(to) }];
   });
+  const oldProducts = before?.products || [];
+  const newProducts = after?.products || [];
+  const productIds = [...new Set([...oldProducts, ...newProducts].map((item) => String(item.product_id?._id || item.product_id || "")).filter(validId))];
+  const variantIds = [...new Set([...oldProducts, ...newProducts].map((item) => String(item.variant_id?._id || item.variant_id || "")).filter(validId))];
+  const [products, variants] = await Promise.all([
+    productIds.length ? Product.find({ _id: { $in: productIds } }).select("name").lean() : [],
+    variantIds.length ? Variant.find({ _id: { $in: variantIds } }).select("title sku").lean() : [],
+  ]);
+  const productNames = new Map(products.map((item) => [String(item._id), item.name]));
+  const variantNames = new Map(variants.map((item) => [String(item._id), item.title || item.sku]));
+  const rowKey = (item) => String(item.variant_id?._id || item.variant_id || item.product_id?._id || item.product_id || "");
+  const oldByKey = new Map(oldProducts.map((item) => [rowKey(item), item]));
+  const newByKey = new Map(newProducts.map((item) => [rowKey(item), item]));
+  const describe = (item) => `${productNames.get(String(item.product_id?._id || item.product_id || "")) || "Product"}${item.variant_id ? ` · ${variantNames.get(String(item.variant_id?._id || item.variant_id)) || "Variant"}` : ""} × ${Number(item.quantity) || 0}`;
+  const productChanges = [];
+  for (const [key, item] of newByKey) {
+    const old = oldByKey.get(key);
+    if (!old) productChanges.push({ field: "Product added", from: "—", to: describe(item) });
+    else if (Number(old.quantity) !== Number(item.quantity)) productChanges.push({ field: "Product quantity", from: describe(old), to: describe(item) });
+  }
+  for (const [key, item] of oldByKey) if (!newByKey.has(key)) productChanges.push({ field: "Product removed", from: describe(item), to: "—" });
+  return [...fieldChanges, ...productChanges];
 };
 const historyEntry = async (req, action, summary, changes = []) => ({ action, summary, changes, employee_id: actorId(req), employee_name: await actorName(req), created_at: new Date() });
 const leadFields = ["lead_type", "name", "phone", "email", "company_name", "business_type", "business_address", "city", "source", "status", "product_interest", "category_id", "assigned_employee_id", "estimated_deal_value", "expected_purchase_date", "next_follow_up_date", "products", "custom_requirements", "notes"];
@@ -174,8 +196,8 @@ exports.getLead = async (req, res) => {
     if ((lead.status === "Customer" || lead.status === "Converted") && lead.customer_id) {
       const [pos, quotes, invoices] = await Promise.all([
         PosSale.find({ customer_id: lead.customer_id }).sort({ created_at: -1 }).lean(),
-        Quote.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
-        Invoice.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
+        Quote.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
+        Invoice.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
       ]);
       customerHistory = { pos, quotes, invoices };
     }
@@ -189,7 +211,8 @@ exports.createLead = async (req, res) => {
     if (typeof payload === "string") return validationError(res, payload);
     if (!(await validateReferences(payload, res))) return;
     const initialStatus = payload.status || "New";
-    const createdEvent = await historyEntry(req, "created", `Lead created with status ${initialStatus}`, [{ field: "Status", from: "—", to: initialStatus }]);
+    const createdChanges = await buildHistoryChanges({}, { ...payload, status: initialStatus });
+    const createdEvent = await historyEntry(req, "created", `Lead created with status ${initialStatus}`, createdChanges);
     let lead;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
@@ -214,7 +237,7 @@ exports.updateLead = async (req, res) => {
     const current = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
     if (!current) return res.status(404).json({ success: false, message: "Lead not found" });
     if (current.status === "Customer" || current.status === "Converted") await syncLeadCustomer(current, actorId(req));
-    if (payload.status === "Lost" && current.status !== "Contacted" && current.status !== "Lost") return validationError(res, "Only contacted leads can be marked as lost");
+    if (payload.status === "Lost" && !["Contacted", "Qualified", "Lost"].includes(current.status)) return validationError(res, "Only contacted or qualified leads can be marked as lost");
     if (payload.status === "Customer" && !current.customer_added) return validationError(res, "Add the lead to Customers before setting this status");
     const mergedValidation = validatePayload({ ...current.toObject(), ...payload });
     if (typeof mergedValidation === "string") return validationError(res, mergedValidation);
@@ -243,7 +266,7 @@ exports.updateStatus = async (req, res) => {
     if (req.body.status === "Customer" && req.body.customer_added !== true) return validationError(res, "Convert the lead to a customer before setting this status");
     const current = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } }).select("status lost_reason").lean();
     if (!current) return res.status(404).json({ success: false, message: "Lead not found" });
-    if (req.body.status === "Lost" && current.status !== "Contacted") return validationError(res, "Only contacted leads can be marked as lost");
+    if (req.body.status === "Lost" && !["Contacted", "Qualified", "Lost"].includes(current.status)) return validationError(res, "Only contacted or qualified leads can be marked as lost");
     const updates = { status: req.body.status, updatedby: actorId(req) };
     if (req.body.status === "Lost") updates.lost_reason = String(req.body.lost_reason || "").trim().slice(0, 1000);
     if (req.body.customer_added !== undefined) {

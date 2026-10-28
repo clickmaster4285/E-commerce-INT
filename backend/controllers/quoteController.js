@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { randomUUID } = require("crypto");
 const Quote = require("../models/Quote");
 const QuoteNumberReservation = Quote.NumberReservation;
+const { auditEvent, diffFields, diffItems, valueText } = require("../utils/auditHistory");
 
 const nextQuoteNumber = async () => {
   const pattern = /^(?:QT|QUO)-(?:\d{4}-)?\d+$/;
@@ -103,7 +104,7 @@ const buildQuote = (body = {}) => {
 
 exports.listQuotes = async (req, res) => {
   try {
-    const quotes = await Quote.find({ is_deleted: false }).sort({ created_at: -1 }).lean();
+    const quotes = await Quote.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean();
     res.json({ success: true, data: quotes });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
@@ -134,7 +135,11 @@ exports.createQuote = async (req, res) => {
     let quote;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
-        quote = await Quote.create({ ...data, quote_number: reservation?.quote_number || await nextQuoteNumber(), status, createdby: req.user?._id || null });
+        quote = await Quote.create({ ...data, quote_number: reservation?.quote_number || await nextQuoteNumber(), status, createdby: req.user?._id || null, activity: [auditEvent(req, "created", [
+          { field: "Quote", before: "—", after: data.customer_name },
+          ...diffItems([], data.items, { itemFields: { unit_price: "Unit price", discount_rate: "Discount", tax_rate: "Tax" } }),
+          { field: "Total", before: "—", after: String(data.total) },
+        ])] });
         break;
       } catch (error) {
         if (reservation || error.code !== 11000 || attempt === 4) {
@@ -161,7 +166,15 @@ exports.updateQuote = async (req, res) => {
     const requestedStatus = ["Pending", "Draft", "Sent"].includes(req.body.status)
       ? req.body.status
       : (currentStatus === "draft" ? "Draft" : "Pending");
+    const before = quote.toObject();
+    const changes = [
+      ...diffFields(before, data, [["customer_type", "Customer type"], ["customer_name", "Customer"], ["customer_email", "Customer email"], ["customer_phone", "Customer phone"], ["customer_address", "Address"], ["quote_date", "Quote date"], ["expiry_date", "Expiry date"], ["subtotal", "Subtotal"], ["overall_discount_rate", "Overall discount rate"], ["overall_discount", "Overall discount"], ["discount", "Discount"], ["tax_rate", "Tax rate"], ["tax", "Tax"], ["total", "Total"], ["terms", "Terms & conditions"], ["notes", "Notes"]]),
+      ...(valueText(before.pdf_design) !== valueText(data.pdf_design) ? [{ field: "PDF design", before: "Previous settings", after: "Updated settings" }] : []),
+      ...diffItems(before.items, data.items, { itemFields: { unit_price: "Unit price", discount_rate: "Discount rate", discount: "Discount", tax_rate: "Tax rate", tax: "Tax" } }),
+      ...(before.status !== requestedStatus ? [{ field: "Status", before: before.status || "Pending", after: requestedStatus }] : []),
+    ];
     quote.set({ ...data, status: requestedStatus, updatedby: req.user?._id || null });
+    if (changes.length) quote.activity.push(auditEvent(req, "updated", changes));
     await quote.save();
     res.json({ success: true, data: quote });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
@@ -170,8 +183,14 @@ exports.updateQuote = async (req, res) => {
 exports.updateQuoteStatus = async (req, res) => {
   try {
     if (!["Accepted", "Rejected"].includes(req.body.status)) return res.status(400).json({ success: false, message: "Quote status can only be accepted or rejected here" });
-    const quote = await Quote.findOneAndUpdate({ _id: req.params.id, is_deleted: false }, { status: req.body.status, updatedby: req.user?._id || null }, { new: true, runValidators: true });
+    const quote = await Quote.findOne({ _id: req.params.id, is_deleted: false });
     if (!quote) return res.status(404).json({ success: false, message: "Quote not found" });
+    const previousStatus = quote.status;
+    if (previousStatus === req.body.status) return res.json({ success: true, data: quote });
+    quote.status = req.body.status;
+    quote.updatedby = req.user?._id || null;
+    quote.activity.push(auditEvent(req, "status", [{ field: "Status", before: previousStatus || "Pending", after: req.body.status }]));
+    await quote.save();
     res.json({ success: true, data: quote });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };

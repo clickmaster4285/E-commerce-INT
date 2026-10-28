@@ -9,13 +9,16 @@ import {
   CalendarDays,
   CheckCircle2,
   CreditCard,
+  Clock3,
   FileText,
+  Pencil,
   Mail,
   MapPin,
   Package,
   Phone,
   Printer,
   ReceiptText,
+  RotateCcw,
   ShoppingBag,
   UserRound,
   Wallet,
@@ -132,6 +135,36 @@ export default function PosSaleDetailPage() {
   const quantity = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const method = paymentName(sale.payment?.method, t);
   const isCompleted = (sale.status || "completed") === "completed";
+  const activity = [
+    {
+      id: "created",
+      type: "created",
+      at: sale.created_at,
+      actor: sale.created_by_name || sale.cashier_name || cashier.name || t("admin.pos.ui.unknownStaff"),
+      changes: items.map((item) => ({ action: "added", product_name: productNameOf(item) || item.product_name, variant_title: item.variant_title, sku: item.sku, to_quantity: item.quantity })),
+    },
+    ...(sale.edit_history || []).map((entry, index) => ({ ...entry, id: `edit-${index}`, type: "edited", at: entry.edited_at, actor: entry.edited_by_name || t("admin.pos.ui.unknownStaff") })),
+    ...(sale.returns || []).map((entry, index) => ({ ...entry, id: `return-${index}`, type: "returned", at: entry.returned_at, actor: entry.returned_by_name || t("admin.pos.ui.unknownStaff") })),
+  ].sort((a, b) => new Date(a.at || 0).getTime() - new Date(b.at || 0).getTime());
+  const activityChangeLabel = (change) => {
+    const name = productNameOf(change) || change.product_name || t("admin.pos.ui.product");
+    const variant = change.variant_title || change.sku;
+    const product = variant ? `${name} · ${variant}` : name;
+    if (change.action === "added") return t("admin.pos.ui.activityProductAdded", { product, quantity: change.to_quantity || 0 });
+    if (change.action === "removed") return t("admin.pos.ui.activityProductRemoved", { product, quantity: change.from_quantity || 0 });
+    if (change.action === "quantity") return t("admin.pos.ui.activityQuantityChanged", { product, from: change.from_quantity || 0, to: change.to_quantity || 0 });
+    if (change.action === "price") return t("admin.pos.ui.activityItemPriceChanged", { product, from: formatMoney(change.from_value), to: formatMoney(change.to_value) });
+    if (change.action === "discount") return t("admin.pos.ui.activityItemDiscountChanged", { product, from: change.from_value, to: change.to_value });
+    if (change.action === "tax") return change.product_name
+      ? t("admin.pos.ui.activityItemTaxChanged", { product, from: change.from_value, to: change.to_value })
+      : t("admin.pos.ui.activityTaxChanged", { from: formatMoney(change.from_value), to: formatMoney(change.to_value) });
+    if (change.action === "sale_discount") return t("admin.pos.ui.activitySaleDiscountChanged", { from: formatMoney(change.from_value), to: formatMoney(change.to_value) });
+    if (change.action === "sale_total") return t("admin.pos.ui.activitySaleTotalChanged", { from: formatMoney(change.from_value), to: formatMoney(change.to_value) });
+    if (change.action === "customer") return t("admin.pos.ui.activityCustomerChanged", { from: change.from_value, to: change.to_value });
+    if (change.action === "payment") return t("admin.pos.ui.activityPaymentChanged", { from: change.from_value, to: change.to_value });
+    if (change.action === "notes") return t("admin.pos.ui.activityNotesChanged", { from: change.from_value, to: change.to_value });
+    return product;
+  };
   const printReceipt = () => {
     const printWindow = window.open("", "_blank", "width=460,height=760");
     if (!printWindow) return;
@@ -274,6 +307,40 @@ export default function PosSaleDetailPage() {
             </div>
           </Panel>
 
+          <Panel title={t("admin.pos.ui.activityTimeline")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">{activity.length}</span>}>
+            <div className="max-h-[360px] overflow-y-auto px-3 py-3">
+              <ol className="space-y-0">
+                {[...activity].reverse().map((event, index, events) => {
+                  const created = event.type === "created";
+                  const returned = event.type === "returned";
+                  const Icon = created ? ShoppingBag : returned ? RotateCcw : Pencil;
+                  const eventTitle = created
+                    ? t("admin.pos.ui.saleCreated")
+                    : returned
+                      ? t("admin.pos.ui.saleReturned")
+                      : t("admin.pos.ui.saleUpdated");
+                  const changes = event.type === "returned"
+                    ? (event.items || []).map((item) => ({ action: "removed", product_name: item.product_name, variant_title: item.variant_title, sku: item.sku, from_quantity: item.quantity }))
+                    : event.changes || [];
+                  const eventDate = event.at && !Number.isNaN(new Date(event.at).getTime())
+                    ? new Date(event.at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
+                    : t("common.notProvided");
+                  return (
+                    <li key={event.id} className="relative flex gap-2.5 pb-3 last:pb-0">
+                      {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-slate-200" />}
+                      <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-white ${created ? "bg-emerald-100 text-emerald-700" : returned ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}><Icon size={11} /></span>
+                      <div className="min-w-0 flex-1 border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
+                        <div className="flex items-start justify-between gap-2"><p className="min-w-0 text-[11px] font-bold leading-4 text-slate-800">{eventTitle}</p><time className="shrink-0 text-[9px] leading-4 text-slate-400">{eventDate}</time></div>
+                        <p className="mt-0.5 truncate text-[10px] text-slate-500">{t("admin.pos.ui.activityBy", { name: event.actor || t("admin.pos.ui.unknownStaff") })}</p>
+                        {changes.length > 0 ? <ul className="mt-1.5 space-y-1">{changes.map((change, changeIndex) => <li key={`${event.id}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-slate-600"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "quantity" ? "bg-amber-400" : "bg-emerald-500"}`} /><span className="min-w-0 break-words">{activityChangeLabel(change)}</span></li>)}</ul> : !created && !returned ? <p className="mt-1 text-[10px] text-slate-500">{t("admin.pos.ui.saleDetailsUpdated")}</p> : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          </Panel>
+
           {sale.notes && (
             <Panel title={t("admin.pos.ui.saleNotes")} icon={FileText}>
               <p className="whitespace-pre-wrap break-words px-4 py-3 text-[13px] leading-6 text-slate-700">{sale.notes}</p>
@@ -281,6 +348,7 @@ export default function PosSaleDetailPage() {
           )}
         </aside>
       </div>
+
     </div>
   );
 }

@@ -66,7 +66,7 @@ function useRowMenuClose(open, menuRef, btnRef, onClose) {
 // live inside the menu itself, so parent re-renders never wipe the
 // coordinates (that bug put the menu at the top-left). Rendered in a
 // portal so the table scroll container can never clip it.
-function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete }) {
+function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete, onCreatePurchaseOrder }) {
   const btnRef = useRef(null);
   const menuRef = useRef(null);
   const { t: __t } = useTranslation();
@@ -75,7 +75,7 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete }) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const openMenu = () => {
     const rect = btnRef.current.getBoundingClientRect();
-    const menuW = 170, menuH = 180;
+    const menuW = 170, menuH = v.is_active ? 220 : 180;
     const flipUp = window.innerHeight - rect.bottom < menuH;
     const left = Math.min(Math.max(8, rect.right - menuW), window.innerWidth - menuW - 8);
     setPos({ top: flipUp ? rect.top - menuH - 4 : rect.bottom + 4, left });
@@ -87,6 +87,7 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete }) {
   const menuItems = [
     [t("viewDetails"), () => onView(v), "var(--text-primary)"],
     [t("edit"), () => onEdit(v), "var(--text-primary)"],
+    ...(v.is_active ? [[t("createPO"), () => onCreatePurchaseOrder(v), "var(--accent)"]] : []),
     [v.is_active ? t("deactivate") : t("activate"), () => onToggle(v), "var(--text-primary)"],
     [t("delete"), () => onDelete(v), "var(--danger-text)"],
   ];
@@ -253,6 +254,7 @@ export default function VendorsPage() {
                           onView={(row) => router.push(`/admin/vendors/${row._id}`)}
                           onEdit={(row) => openEdit(row)}
                           onToggle={(row) => toggleMutation.mutate(row)}
+                          onCreatePurchaseOrder={(row) => router.push(`/admin/purchase-orders/new?vendor=${encodeURIComponent(row._id)}`)}
                           onDelete={(row) => { if (confirm(t("deleteTitle"))) deleteMutation.mutate([row._id]); }}
                         />
                       </td>

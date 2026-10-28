@@ -46,6 +46,24 @@ const invoiceReturnSchema = new mongoose.Schema({
   refunded_by: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
 }, { _id: true });
 
+const invoiceActivitySchema = new mongoose.Schema({
+  type: { type: String, enum: ["created", "updated", "payment", "return", "sent"], required: true },
+  at: { type: Date, default: Date.now },
+  actor_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+  actor_name: { type: String, trim: true, default: "" },
+  changes: [{
+    action: { type: String, trim: true, default: "changed" },
+    field: { type: String, trim: true, default: "" },
+    product_name: { type: String, trim: true, default: "" },
+    variant_title: { type: String, trim: true, default: "" },
+    sku: { type: String, trim: true, default: "" },
+    from_quantity: { type: Number, default: 0 },
+    to_quantity: { type: Number, default: 0 },
+    before: { type: String, default: "" },
+    after: { type: String, default: "" },
+  }],
+}, { _id: true });
+
 const invoiceSchema = new mongoose.Schema({
   invoice_number: { type: String, unique: true, required: true, trim: true, index: true },
   
@@ -80,6 +98,7 @@ const invoiceSchema = new mongoose.Schema({
   remaining_balance: { type: Number, default: 0, min: 0 },
   payments: { type: [invoicePaymentSchema], default: [] },
   returns: { type: [invoiceReturnSchema], default: [] },
+  activity: { type: [invoiceActivitySchema], default: [] },
   status: { type: String, enum: ["Unpaid", "Partially Paid", "Paid", "Overdue"], default: "Unpaid", index: true },
   
   sent_at: { type: Date, default: null },

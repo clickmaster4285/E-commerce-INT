@@ -1,19 +1,66 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
+import { variantApi } from "@/apis/admin/variantApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { Check, ChevronDown, Palette } from "lucide-react";
+import { htmlToPlainText, renderRichHtml } from "@/lib/termsContent";
+import { Calculator, Check, ChevronDown, ChevronLeft, Eye, FileText, Package, Palette, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Design constants that match the user's reference screenshot      */
 /* ------------------------------------------------------------------ */
 
 const STORAGE_KEY = "quote-template-settings-v1";
+export const QUOTE_TEMPLATE_STORAGE_KEY = STORAGE_KEY;
 export const INVOICE_TEMPLATE_STORAGE_KEY = "invoice-template-settings-v1";
+
+/* ------------------------------------------------------------------ */
+/*  Reusable document configuration — the designer component itself    */
+/*  never hardcodes document-specific text or field names.             */
+/*  Each entry describes one document type (quote, invoice, …).        */
+/* ------------------------------------------------------------------ */
+
+const lblPair = (key, fallback) => ({ key, fallback });
+
+export const DOCUMENT_CONFIG = {
+  quote: {
+    storageKey: QUOTE_TEMPLATE_STORAGE_KEY,
+    dateField: "quote_date",
+    dueField: "expiry_date",
+    draftNumberPlaceholder: "Draft quote",
+    statuses: ["pending", "draft", "sent", "accepted", "rejected"],
+    fallbackStatus: "Draft",
+    labels: {
+      number: lblPair("admin.quoteInvoice.pdf.quoteNumber", "Quote Number"),
+      status: lblPair("admin.quoteInvoice.pdf.status", "Status"),
+      date: lblPair("admin.quoteInvoice.pdf.quoteDate", "Quote Date"),
+      due: lblPair("admin.quoteInvoice.pdf.validUntil", "Valid Until"),
+    },
+    termsLabel: lblPair("admin.quoteDesigner.termsConditions", "Terms & conditions"),
+    /* Formats the document number for the preview header. */
+    formatNumber: (number, status) => getQuoteHeaderData({ quote_number: number === DOCUMENT_CONFIG.quote.draftNumberPlaceholder ? "" : number, status }).quoteNumber,
+  },
+  invoice: {
+    storageKey: INVOICE_TEMPLATE_STORAGE_KEY,
+    dateField: "invoice_date",
+    dueField: "due_date",
+    fallbackStatus: "Unpaid",
+    labels: {
+      number: lblPair("admin.quoteInvoice.pdf.invoiceNumber", "Invoice Number"),
+      status: lblPair("admin.quoteInvoice.pdf.status", "Status"),
+      date: lblPair("admin.invoiceDetail.field.invoiceDate", "Invoice Date"),
+      due: lblPair("admin.invoiceDetail.field.dueDate", "Due Date"),
+    },
+    termsLabel: lblPair("admin.quoteDesigner.invoiceTerms", "Invoice Terms & Conditions"),
+    /* Invoices show the raw number as-is. */
+    formatNumber: (number) => number || "",
+  },
+};
 const DEFAULT_DESIGN = {
   template: "Bold",
   headerLayout: "band",
@@ -102,6 +149,33 @@ const TITLE_OPTIONS = [
 
 function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
 
+function getVariantDropdownPosition(anchor) {
+  if (!anchor || typeof window === "undefined") return null;
+  const rect = anchor.getBoundingClientRect();
+  const maxHeight = Math.max(120, Math.min(224, window.innerHeight - 16));
+  const width = Math.min(Math.max(rect.width, 280), Math.min(340, window.innerWidth - 16));
+  const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
+  const openAbove = window.innerHeight - rect.bottom < maxHeight + 12;
+  const top = openAbove
+    ? Math.max(8, rect.top - maxHeight - 4)
+    : Math.min(rect.bottom + 4, window.innerHeight - maxHeight - 8);
+  return { top, left, width, maxHeight };
+}
+
+const EMPTY_ITEM_ROW = {
+  row_id: "__empty-item-placeholder__",
+  product_id: null,
+  variant_id: null,
+  name: "",
+  variant_name: "",
+  sku: "",
+  image: "",
+  quantity: 1,
+  unit_price: 0,
+  discount_rate: 0,
+  tax_rate: 0,
+};
+
 function hexToRgb(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ""));
   return m ? [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)] : [20, 20, 20];
@@ -126,6 +200,7 @@ function readSaved(storageKey = STORAGE_KEY) {
       ...DEFAULT_DESIGN,
       ...saved,
       watermark: saved.watermark ?? saved.showWatermark ?? DEFAULT_DESIGN.watermark,
+      ...(saved.watermarkRotation == null ? {} : { watermarkRotation: clamp(Number(saved.watermarkRotation) || 0, -180, 180) }),
       selected: selectedName,
       template: theme.name.toLowerCase(),
       accentColor: /^#[0-9a-f]{6}$/i.test(saved.accentColor || saved.customColor || "") ? (saved.accentColor || saved.customColor) : theme.color,
@@ -168,6 +243,7 @@ export function getSavedQuotePdfDesign(storageKey = STORAGE_KEY) {
     watermarkUseLogo: Boolean(saved.watermarkUseLogo),
     watermarkText: String(saved.watermarkText || "PAID").slice(0, 40),
     watermarkPosition: saved.watermarkPosition || "center",
+    watermarkRotation: saved.watermarkRotation == null ? (saved.watermarkPosition === "diagonal" ? 35 : 0) : clamp(Number(saved.watermarkRotation) || 0, -180, 180),
     watermarkOpacity: clamp(Number(saved.watermarkOpacity) || 14, 5, 40),
     watermarkSize: clamp(Number(saved.watermarkSize) || 50, 20, 100),
     showTerms: saved.showTerms !== false,
@@ -199,10 +275,10 @@ function renderBoldText(text) {
 
 function QuoteHeaderDetails({ number, status, date, validUntil, labels, className = "", color = "#475569", emphasis = "#0f172a" }) {
   return <div className={`space-y-0.5 text-[8px] leading-snug ${className}`} style={{ color }}>
-    <p>{labels.quoteNumber}: <span className="font-semibold" style={{ color: emphasis }}>{number}</span></p>
+    <p>{labels.number}: <span className="font-semibold" style={{ color: emphasis }}>{number}</span></p>
     <p>{labels.status}: <span className="font-semibold" style={{ color: emphasis }}>{status}</span></p>
-    <p>{labels.quoteDate}: <span className="font-semibold" style={{ color: emphasis }}>{date}</span></p>
-    <p>{labels.validUntil}: <span className="font-semibold" style={{ color: emphasis }}>{validUntil}</span></p>
+    <p>{labels.date}: <span className="font-semibold" style={{ color: emphasis }}>{date}</span></p>
+    <p>{labels.due}: <span className="font-semibold" style={{ color: emphasis }}>{validUntil}</span></p>
   </div>;
 }
 
@@ -210,14 +286,111 @@ function QuoteHeaderDetails({ number, status, date, validUntil, labels, classNam
 /*  Component                                                            */
 /* ------------------------------------------------------------------ */
 
-export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quoteStatus, savedDesign, money, previewOnly = false, onBrowseProducts, onFieldChange, onUpdateItem, onRemoveItem, discountType, discountValue, onDiscountTypeChange, onDiscountValueChange, taxRate, onTaxRateChange, documentType = "quote", storageKey = STORAGE_KEY }) {
+export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quoteStatus, savedDesign, money, previewOnly = false, onBrowseProducts, onFieldChange, onUpdateItem, onRemoveItem, discountType, discountValue, onDiscountTypeChange, onDiscountValueChange, taxRate, onTaxRateChange, documentType = "quote", storageKey: storageKeyProp }) {
   const { t, locale } = useTranslation();
   const isInvoice = documentType === "invoice";
+  const doc = DOCUMENT_CONFIG[documentType] || DOCUMENT_CONFIG.quote;
+  const storageKey = storageKeyProp || doc.storageKey;
+  const lbl = (pair) => { const value = t(pair.key); return value === pair.key ? pair.fallback : value; };
   const [design, setDesign] = useState(() => ({ ...DEFAULT_DESIGN, ...readSaved(storageKey), ...(savedDesign || {}) }));
   const [loaded, setLoaded] = useState(true);
   const [workspaceMode, setWorkspaceMode] = useState("preview");
+  const [variantSearch, setVariantSearch] = useState("");
+  const [variantSearchOpen, setVariantSearchOpen] = useState(false);
+  const [activeVariantItemId, setActiveVariantItemId] = useState(null);
+  const [variantDropdownPosition, setVariantDropdownPosition] = useState(null);
+  const variantInputRefs = useRef(new Map());
   const settingsPanelRef = useRef(null);
   const watermarkSettingsRef = useRef(null);
+
+  const { data: rawVariants = [] } = useQuery({
+    queryKey: ["variant-search-options"],
+    queryFn: () => variantApi.getAll(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const variantOptions = useMemo(() => {
+    const listOf = (value) => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : Array.isArray(value?.items) ? value.items : [];
+    return listOf(rawVariants).filter((variant) => !variant.is_deleted).map((variant) => {
+      const product = variant.product_id && typeof variant.product_id === "object" ? variant.product_id : {};
+      return {
+        id: String(variant._id || ""),
+        product_id: String(product._id || variant.product_id || ""),
+        name: product.name || variant.name || "",
+        variant: variant.title || "",
+        sku: variant.sku || "",
+        price: Number(variant.selling_price ?? 0),
+        image: variant.images?.[0]?.img_url || variant.images?.[0]?.url || variant.images?.[0] || "",
+      };
+    }).filter((option) => option.id && option.product_id);
+  }, [rawVariants]);
+  const matchedVariants = useMemo(() => {
+    const term = variantSearch.trim().toLowerCase();
+    return variantOptions.filter((option) => !term || `${option.name} ${option.variant} ${option.sku}`.toLowerCase().includes(term)).slice(0, 8);
+  }, [variantOptions, variantSearch]);
+
+  const selectVariantForItem = (option, item) => {
+    if (!option) return;
+    onUpdateItem?.(item.row_id, "product_id", option.product_id);
+    onUpdateItem?.(item.row_id, "variant_id", option.id);
+    onUpdateItem?.(item.row_id, "name", option.name);
+    onUpdateItem?.(item.row_id, "variant_name", option.variant);
+    onUpdateItem?.(item.row_id, "sku", option.sku);
+    onUpdateItem?.(item.row_id, "image", option.image);
+    onUpdateItem?.(item.row_id, "unit_price", option.price);
+    setActiveVariantItemId(null);
+    setVariantSearchOpen(false);
+    setVariantDropdownPosition(null);
+    setVariantSearch("");
+  };
+
+  const ensureEditorItem = (item) => {
+    if (!form?.items?.length) onFieldChange?.("items", [item]);
+  };
+
+  const activateVariantSearch = (item, input) => {
+    ensureEditorItem(item);
+    setActiveVariantItemId(item.row_id);
+    setVariantSearch(input.value || "");
+    setVariantDropdownPosition(getVariantDropdownPosition(input));
+    setVariantSearchOpen(true);
+  };
+
+  useEffect(() => {
+    if (!variantSearchOpen || !activeVariantItemId) return undefined;
+    const reposition = () => {
+      const input = variantInputRefs.current.get(activeVariantItemId);
+      if (input) setVariantDropdownPosition(getVariantDropdownPosition(input));
+    };
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [variantSearchOpen, activeVariantItemId]);
+
+  const addManualItem = () => {
+    const currentItems = Array.isArray(form?.items) ? form.items : [];
+    const rowId = globalThis.crypto?.randomUUID?.() || `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setActiveVariantItemId(null);
+    setVariantSearchOpen(false);
+    setVariantDropdownPosition(null);
+    setVariantSearch("");
+    const rows = currentItems.length ? currentItems : [EMPTY_ITEM_ROW];
+    onFieldChange?.("items", [...rows, {
+      row_id: rowId,
+      product_id: null,
+      variant_id: null,
+      name: "",
+      variant_name: "",
+      sku: "",
+      image: "",
+      quantity: 1,
+      unit_price: 0,
+      discount_rate: 0,
+      tax_rate: 0,
+    }]);
+  };
 
   const { data: store = null } = useQuery({
     queryKey: ["store-public"],
@@ -249,6 +422,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         watermarkOpacity: design.watermarkOpacity,
         watermarkSize: design.watermarkSize,
         watermarkPosition: design.watermarkPosition,
+        watermarkRotation: design.watermarkRotation ?? (design.watermarkPosition === "diagonal" ? 35 : 0),
         headerLayout: design.headerLayout,
         orientation: design.orientation,
         pageSize: design.pageSize,
@@ -281,24 +455,22 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const companyWebsite = store?.website || store?.website_url || store?.store_url || "";
   const countryNames = { PK: "Pakistan", US: "United States", GB: "United Kingdom", AE: "United Arab Emirates", IN: "India", CA: "Canada", AU: "Australia" };
   const addressLine = [store?.address, store?.city, store?.state, store?.zip_code, countryNames[String(store?.country || "").toUpperCase()] || store?.country].filter(Boolean).join(", ");
-  const quoteHeaderNumber = isInvoice ? quoteNumber || "Assigned when saved" : getQuoteHeaderData({
-    quote_number: quoteNumber === "Draft quote" ? "" : quoteNumber,
-    status: quoteStatus,
-  }).quoteNumber;
-  const displayQuoteNumber = quoteHeaderNumber === "Assigned when saved"
-    ? t("admin.quoteInvoice.pdf.assignedWhenSaved")
-    : quoteHeaderNumber;
-  const normalizedQuoteStatus = String(quoteStatus || "Draft").trim().toLowerCase();
-  const displayQuoteStatus = isInvoice
-    ? String(quoteStatus || "Unpaid").trim()
-    : ["pending", "draft", "sent", "accepted", "rejected"].includes(normalizedQuoteStatus)
-    ? t(`admin.quoteInvoice.status.${normalizedQuoteStatus}`)
-    : String(quoteStatus || "Draft").trim().toUpperCase();
+  const displayQuoteNumber = (() => {
+    const headerNumber = doc.formatNumber(quoteNumber === doc.draftNumberPlaceholder ? "" : quoteNumber, quoteStatus);
+    return !headerNumber
+      ? t("admin.quoteInvoice.pdf.assignedWhenSaved")
+      : headerNumber;
+  })();
+  const displayQuoteStatus = (() => {
+    const raw = String(quoteStatus || doc.fallbackStatus).trim();
+    const key = raw.toLowerCase();
+    return doc.statuses?.includes(key) ? t(`admin.quoteInvoice.status.${key}`) : raw;
+  })();
   const quoteHeaderLabels = {
-    quoteNumber: isInvoice ? "Invoice Number" : t("admin.quoteInvoice.pdf.quoteNumber"),
-    status: t("admin.quoteInvoice.pdf.status"),
-    quoteDate: isInvoice ? t("admin.invoiceDetail.field.invoiceDate") : t("admin.quoteInvoice.pdf.quoteDate"),
-    validUntil: isInvoice ? t("admin.invoiceDetail.field.dueDate") : t("admin.quoteInvoice.pdf.validUntil"),
+    number: lbl(doc.labels.number),
+    status: lbl(doc.labels.status),
+    date: lbl(doc.labels.date),
+    due: lbl(doc.labels.due),
   };
 
   const formatDate = (value) => {
@@ -306,8 +478,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     const parsed = new Date(`${String(value).length <= 10 ? `${value}T00:00:00` : value}`);
     return Number.isNaN(parsed.getTime()) ? "\u2014" : parsed.toLocaleDateString(locale || "en-GB", { year: "numeric", month: "short", day: "numeric" });
   };
-  const quoteDateLabel = formatDate(isInvoice ? form?.invoice_date : form?.quote_date);
-  const validUntilLabel = formatDate(isInvoice ? form?.due_date : form?.expiry_date);
+  const quoteDateLabel = formatDate(form?.[doc.dateField]);
+  const validUntilLabel = formatDate(form?.[doc.dueField]);
 
   const currency = (value) => new Intl.NumberFormat(locale || "en-PK", { style: "currency", currency: design.currencySymbol || "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
   const labelClass = "block text-[10px] font-semibold text-[var(--text-secondary)]";
@@ -316,6 +488,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const buttonClass = (active) => `group flex flex-col gap-0.5 rounded-lg border p-1.5 text-left transition ${active ? "border-slate-900 bg-[var(--bg-card)] ring-2 ring-slate-900/10" : "border-[var(--border-color)] bg-[var(--bg-card)] hover:-translate-y-px hover:border-slate-400 hover:shadow-sm"}`;
 
   /* ------------------- Live preview article ---------------------- */
+  const editorItems = form?.items?.length ? form.items : [EMPTY_ITEM_ROW];
+  const activeVariantItem = editorItems.find((item) => item.row_id === activeVariantItemId);
   const items = (form?.items || []).filter((it) => it.name || it.variant_name);
   const previewItems = items.map((item, index) => {
     const gross = Number(item.quantity || 0) * Number(item.unit_price || 0);
@@ -323,7 +497,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     const tax = (gross - discount) * Number(item.tax_rate || 0) / 100;
     return { ...item, gross, discount, tax, amount: gross - discount + tax, index: index + 1 };
   });
-  const previewTermsText = String(form?.terms || "")
+  const rawTerms = String(form?.terms || "");
+  const hasRichTerms = /<[a-z][\s\S]*>/i.test(rawTerms);
+  const previewTermsText = (hasRichTerms ? htmlToPlainText(rawTerms) : rawTerms)
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
@@ -343,6 +519,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
 
   const previewScale = clamp((design.baseFontSize || 13) / 13, 0.75, 1.4);
   const watermarkPosition = design.watermarkPosition || "center";
+  const watermarkRotation = design.watermarkRotation == null
+    ? (watermarkPosition === "diagonal" ? 35 : 0)
+    : clamp(Number(design.watermarkRotation) || 0, -180, 180);
   const watermarkPlacement = {
     center: { left: "50%", top: "48%", transform: "translate(-50%, -50%)" },
     diagonal: { left: "50%", top: "48%", transform: "translate(-50%, -50%) rotate(35deg)" },
@@ -464,6 +643,10 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                     <input type="range" min="20" max="100" value={design.watermarkSize || 50} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkSize: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
                   <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
+                    {t("admin.quoteDesigner.watermarkRotation")} ({watermarkRotation}°)
+                    <input type="range" min="-180" max="180" step="1" value={watermarkRotation} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkRotation: Number(e.target.value) }))} className="mt-1.5 block w-full" />
+                  </label>
+                  <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
                     {t("admin.quoteDesigner.watermarkPosition")}
                     <select value={watermarkPosition} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkPosition: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 text-[11px] text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10">
                       <option value="center">{t("admin.quoteDesigner.center")}</option>
@@ -484,23 +667,79 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         </div>}
 
         {/* ---- Right panel preview ---- */}
-        <div className="min-w-0 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-          <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-2 border-b border-[var(--border-color)] px-3.5 py-2.5 bg-[var(--bg-tertiary)]/40`}>
-            <h3 className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{t("admin.quoteDesigner.livePreview")} - {theme.name}</h3>
-            {!previewOnly && <div className="flex items-center gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-0.5" role="tablist" aria-label={t("admin.quoteDesigner.editDocument")}>
-              {["edit", "preview"].map((mode) => <button key={mode} type="button" role="tab" aria-selected={workspaceMode === mode} onClick={() => setWorkspaceMode(mode)} className={`rounded-md px-2.5 py-1.5 text-[9px] font-bold capitalize transition ${workspaceMode === mode ? "bg-blue-600 text-white shadow-sm" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{t(`admin.quoteDesigner.${mode}`)}</button>)}
+        <div className="min-w-0 self-start overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+          <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3`}>
+            <div className="flex min-w-0 items-center gap-2">
+              {!previewOnly && workspaceMode === "edit" && <button type="button" onClick={() => setWorkspaceMode("preview")} aria-label={t("admin.quoteDesigner.preview")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] transition hover:border-slate-300 hover:text-[var(--text-primary)]"><ChevronLeft size={14} /></button>}
+              <h3 className="truncate text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.livePreview")} · {theme.name}</h3>
+              {!previewOnly && <span className="hidden shrink-0 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[9px] font-bold text-[var(--accent)] sm:inline">{workspaceMode === "edit" ? t("admin.quoteDesigner.editMode") : t("admin.quoteDesigner.previewMode")}</span>}
+            </div>
+            {!previewOnly && <div className="flex shrink-0 items-center gap-2" role="tablist" aria-label={t("admin.quoteDesigner.editDocument")}>
+              <button type="button" role="tab" aria-selected={workspaceMode === "edit"} onClick={() => setWorkspaceMode("edit")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "edit" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-slate-300 hover:text-[var(--text-primary)]"}`}><Pencil size={13} />{t("admin.quoteDesigner.edit")}</button>
+              <button type="button" role="tab" aria-selected={workspaceMode === "preview"} onClick={() => setWorkspaceMode("preview")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "preview" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-slate-300 hover:text-[var(--text-primary)]"}`}><Eye size={13} />{t("admin.quoteDesigner.preview")}</button>
             </div>}
           </div>
-          <div className={`${previewOnly ? "bg-[var(--bg-tertiary)] p-3 sm:p-4" : "max-h-[720px] overflow-y-auto bg-[var(--bg-tertiary)] p-3 sm:p-4"}`}>
+          <div className={`${previewOnly ? "bg-[var(--bg-tertiary)] p-3 sm:p-4" : "max-h-[720px] overflow-y-auto bg-[var(--bg-tertiary)] p-0"}`}>
             {!previewOnly && workspaceMode === "edit" ? (
-              <div className="mx-auto max-w-[760px] space-y-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 sm:p-4">
-                <div><h4 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.quoteDesigner.editDocument")}</h4><p className="text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.editHint")}</p></div>
+              <div className="space-y-3 rounded-none border-0 bg-[var(--bg-card)] p-3.5 sm:p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] ring-1 ring-[var(--accent)]/10"><FileText size={18} /></span>
+                  <div className="min-w-0"><h4 className="text-[15px] font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.editDocument")}</h4><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{t("admin.quoteDesigner.editHint")}</p></div>
+                </div>
 
-                <section className="rounded-lg border border-[var(--border-color)] p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><h5 className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="text-[9px] text-[var(--text-muted)]">{form?.items?.length || 0} {t("admin.quoteInvoice.ui.items_7316c8b2")}</span></div><button type="button" onClick={onBrowseProducts} className="h-9 rounded-lg bg-blue-600 px-4 text-[10px] font-bold text-white shadow-sm transition hover:bg-blue-700">{t("admin.quoteDesigner.addProduct")}</button></div>
-                  {form?.items?.length ? <div className="space-y-2">{form.items.map((item, index) => <div key={item.row_id || item._id || index} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]/40 p-2.5"><div className="mb-2 flex items-center gap-2"><div className="min-w-0 flex-1"><input value={item.name || ""} onChange={(event) => onUpdateItem(item.row_id, "name", event.target.value)} className={inputClass} aria-label={`${t("admin.quoteInvoice.ui.product_dd3b86d1")} ${index + 1}`} />{item.sku && <p className="mt-1 text-[9px] text-[var(--text-muted)]">SKU {item.sku}</p>}</div><button type="button" onClick={() => onRemoveItem(item.row_id)} className="rounded-md px-2 py-1 text-[10px] font-semibold text-rose-600 hover:bg-rose-50">{t("admin.quoteDesigner.remove")}</button></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <label key={key} className={labelClass}>{title}<input type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} className={inputClass} /></label>)}</div></div>)}</div> : <div className="rounded-lg border border-dashed border-[var(--border-color)] p-5 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.noProducts")}</div>}
+                <section className="rounded-xl border border-[var(--border-color)] p-3.5"><div className="mb-2.5 flex flex-wrap items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Package size={16} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{Math.max(1, form?.items?.length || 0)} {t("admin.quoteInvoice.ui.items_7316c8b2")}</span></div>
+                  <div className="overflow-x-auto pb-1">
+                    <div className="min-w-[710px] space-y-2">
+                    {(() => {
+                      const itemGrid = "grid grid-cols-[1.5rem_3rem_minmax(110px,1.4fr)_minmax(74px,.85fr)_4.5rem_6.25rem_5rem_5rem_2.25rem] items-center gap-1.5";
+                      const headers = ["#", "", t("admin.quoteInvoice.ui.product_dd3b86d1"), "SKU", t("admin.quoteInvoice.ui.quantity_44f6af69"), t("admin.quoteInvoice.ui.unit_price_3c6c777f"), t("admin.quoteInvoice.ui.discount_b524936d"), t("admin.quoteInvoice.ui.tax_9be70f66"), ""];
+                      return <>
+                        <div className={`${itemGrid} rounded-lg bg-[var(--bg-tertiary)]/70 px-2.5 py-2`}>
+                          {headers.map((header, i) => <span key={i} className={`truncate text-[8px] font-bold uppercase tracking-wide text-[var(--text-muted)] ${i >= 3 && i <= 7 ? "text-center" : ""}`}>{header}</span>)}
+                        </div>
+                        {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 shadow-sm transition hover:border-slate-300`}>
+                          <span className="flex h-9 w-9 items-center justify-center justify-self-center rounded-lg bg-[var(--accent-soft)] text-[11px] font-extrabold text-[var(--accent)]">{index + 1}</span>
+                          <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]">
+                            {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <Package size={16} className="text-slate-300" />}
+                          </span>
+                          <div className="relative flex min-w-0 flex-col justify-center">
+                            <div className="relative">
+                              <Search size={12} className="pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <input ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} value={item.name || ""} onFocus={(event) => activateVariantSearch(item, event.currentTarget)} onChange={(event) => { onUpdateItem(item.row_id, "name", event.target.value); activateVariantSearch(item, event.currentTarget); }} onBlur={() => { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); event.currentTarget.blur(); } }} className="h-8 w-full min-w-0 rounded-lg border border-transparent bg-transparent ps-7 pe-2 text-[13px] font-bold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-[var(--border-color)] focus:border-blue-500 focus:bg-[var(--bg-card)] focus:ring-4 focus:ring-blue-500/10" aria-label={`${t("admin.quoteInvoice.ui.product_dd3b86d1")} ${index + 1}`} aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id} placeholder={t("admin.quoteDesigner.selectOrTypeProduct")} />
+                            </div>
+                          </div>
+                          <span className="min-w-0 truncate px-1 py-2 text-center font-mono text-[9px] text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
+                          {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-1.5 text-center text-[11px] font-semibold text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />)}
+                          <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-9 w-9 items-center justify-center justify-self-center rounded-lg bg-[var(--danger-soft)] text-[var(--danger-text)] transition hover:brightness-95"><Trash2 size={14} /></button>
+                        </div>)}
+                      </>;
+                    })()}
+                    </div>
+                  </div>
+                  <button type="button" onClick={addManualItem} className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-color)] px-3 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
                 </section>
-                <section className="grid gap-2 rounded-lg border border-[var(--border-color)] p-3 sm:grid-cols-2"><h5 className="sm:col-span-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{t("admin.quoteDesigner.totals")}</h5><label className={labelClass}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className={selectClass}><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label><label className={labelClass}>{t("admin.quoteInvoice.ui.discount_b524936d")}<input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className={inputClass} /></label><label className={labelClass}>{t("admin.quoteDesigner.additionalTax")}<input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className={inputClass} /></label><div className="self-end space-y-1 text-right text-[10px] text-[var(--text-secondary)]"><p>{t("admin.quoteDesigner.subtotal")} {money(totals?.subtotal)} · {t("admin.quoteInvoice.ui.discount_b524936d")} {money(totals?.discount)} · {t("admin.quoteInvoice.ui.tax_9be70f66")} {money(totals?.tax)}</p><p className="text-xs font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.grandTotal")} {money(totals?.total)}</p></div></section>
-                <section className="grid gap-2 sm:grid-cols-2"><label className={labelClass}>{t("admin.quoteDesigner.notes")}<textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} className="mt-1.5 w-full resize-y rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 text-xs" /></label></section>
+                <section className="rounded-xl border border-[var(--border-color)] p-3.5">
+                  <div className="mb-3 flex flex-wrap items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Calculator size={16} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.totals")}</h5></div>
+                  <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,300px)]">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <label className={labelClass}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className={`${selectClass} mt-1`}><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label>
+                      <label className={labelClass}>{t("admin.quoteInvoice.ui.discount_b524936d")}<span className="relative mt-1 block"><input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className={inputClass} aria-label={t("admin.quoteInvoice.ui.discount_b524936d")} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-[10px] font-bold text-[var(--text-muted)]">%</span></span></label>
+                      <label className={labelClass}>{t("admin.quoteDesigner.additionalTax")}<span className="relative mt-1 block"><input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className={inputClass} aria-label={t("admin.quoteDesigner.additionalTax")} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-[10px] font-bold text-[var(--text-muted)]">%</span></span></label>
+                      <div className="mt-3 border-t border-[var(--border-color)] pt-3 sm:col-span-3">
+                        <label className={`${labelClass} text-[10px]`}>{t("admin.quoteDesigner.notes")}</label>
+                        <textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} placeholder={t("admin.quoteDesigner.notesPlaceholder")} aria-label={t("admin.quoteDesigner.notes")} className="mt-1 w-full resize-y rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-[var(--bg-tertiary)]/60 p-3 lg:border-s lg:border-[var(--border-color)] lg:rounded-none lg:bg-transparent lg:ps-5">
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex items-center justify-between gap-3"><span className="text-[var(--text-muted)]">{t("admin.quoteDesigner.subtotal")}:</span><span className="font-bold text-[var(--text-primary)]">{currency(totals?.subtotal)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span className="text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.discount_b524936d")}:</span><span className="font-bold text-[var(--text-primary)]">{currency(totals?.discount)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span className="text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.tax_9be70f66")}:</span><span className="font-bold text-[var(--text-primary)]">{currency(totals?.tax)}</span></div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-[var(--accent-soft)] px-3 py-2.5"><span className="text-xs font-extrabold text-[var(--accent)]">{t("admin.quoteDesigner.grandTotal")}</span><span className="font-mono text-sm font-extrabold text-[var(--accent)]">{currency(totals?.total)}</span></div>
+                    </div>
+                  </div>
+                </section>
               </div>            ) : (
             /* Preview container with safe zoom */
             <div style={{ overflow: "hidden", position: "relative" }}>
@@ -528,8 +767,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 {isAgencyLayout && <header className="absolute right-6 top-5 z-20 text-right"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#475569" emphasis={accent} /></header>}
                 {!isAgencyLayout && (design.template === "bold" ? (
                   <header className="relative min-h-[112px] overflow-hidden border-b-2 border-slate-100 bg-white px-5 py-5 sm:px-7">
-                    <div className="pointer-events-none absolute right-0 top-0 h-full w-[42%]" style={{ background: accent, clipPath: "polygon(42% 0, 100% 0, 100% 100%, 72% 100%)" }} />
-                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2">{companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="mt-1 h-8 w-auto max-w-[90px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}<p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 shrink-0 pt-1 text-right text-white"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
+                    <div className="pointer-events-none absolute right-0 top-0 h-full w-[42%]" style={{ background: accent, clipPath: "polygon(10% 0, 100% 0, 100% 100%, 30% 100%)" }} />
+                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2">{companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="mt-1 h-8 w-auto max-w-[90px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}<p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
                     <div className="absolute bottom-0 left-6 right-6 h-[2px]" style={{ background: accent }} />
                   </header>
                 ) : isMinimalLayout ? (
@@ -581,7 +820,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 {/* Meta row */}
                 <div className="px-6 py-4 sm:px-9" style={isAgencyLayout ? { marginLeft: "30%", paddingLeft: "16px", paddingRight: "16px", paddingTop: "96px" } : undefined}>
                   {design.watermark && (
-                    <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 10 }}>
+                    <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, transform: `${watermarkPlacement.transform || ""} rotate(${watermarkRotation}deg)`, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 10 }}>
                       {design.watermarkUseLogo && companyLogoUrl ? <Image src={companyLogoUrl} alt="" width={220} height={100} unoptimized className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
                     </div>
                   )}
@@ -608,9 +847,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                       )}
                     </div>
                     <div className="text-right">
-                      <p className="text-[7.5px] font-extrabold uppercase tracking-[0.16em] text-slate-400">{quoteHeaderLabels.quoteDate}</p>
+                      <p className="text-[7.5px] font-extrabold uppercase tracking-[0.16em] text-slate-400">{quoteHeaderLabels.date}</p>
                       <p className="mt-1 text-[10px] font-bold text-slate-900">{quoteDateLabel}</p>
-                      <p className="mt-1.5 text-[8px] text-slate-500">{quoteHeaderLabels.validUntil} <span className="font-bold">{validUntilLabel}</span></p>
+                      <p className="mt-1.5 text-[8px] text-slate-500">{quoteHeaderLabels.due} <span className="font-bold">{validUntilLabel}</span></p>
                     </div>
                   </div>
 
@@ -661,9 +900,11 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
 
                   {/* Terms */}
                   {design.showTerms !== false && !termsOnSecondPage && (form?.terms || form?.notes) && <div className="mt-5 border-t border-slate-100 pt-3" style={{ fontStyle: design.italicNotes ? "italic" : "normal" }}>
-                    <p className="text-[7.5px] font-extrabold uppercase tracking-[0.14em] text-slate-400">{t("admin.quoteDesigner.termsConditions")}</p>
-                    <div className="mt-1.5 text-[8px] leading-5 text-slate-500 space-y-1 whitespace-pre-line">
-                      {form.terms && design.showTerms !== false && !termsOnSecondPage && <p>{renderBoldText(previewTermsText)}</p>}
+                    <p className="text-[7.5px] font-extrabold uppercase tracking-[0.14em] text-slate-400">{lbl(doc.termsLabel)}</p>
+                    <div className="mt-1.5 text-[8px] leading-5 text-slate-500 space-y-1 whitespace-pre-line [&_.terms-rich-content_p]:mb-1 [&_.terms-rich-content_p:last-child]:mb-0 [&_.terms-rich-content_h1]:mb-1 [&_.terms-rich-content_h1]:font-bold [&_.terms-rich-content_h2]:mb-1 [&_.terms-rich-content_h2]:font-bold [&_.terms-rich-content_h3]:mb-1 [&_.terms-rich-content_h3]:font-bold [&_.terms-rich-content_ul]:list-disc [&_.terms-rich-content_ul]:pl-4 [&_.terms-rich-content_ol]:list-decimal [&_.terms-rich-content_ol]:pl-4 [&_.terms-rich-content_a]:text-blue-700 [&_.terms-rich-content_a]:underline">
+                      {form.terms && design.showTerms !== false && !termsOnSecondPage && (hasRichTerms
+                        ? <div className="terms-rich-content" dangerouslySetInnerHTML={{ __html: renderRichHtml(rawTerms) }} />
+                        : <p>{renderBoldText(previewTermsText)}</p>)}
                       {form.notes && <p>{form.notes}</p>}
                     </div>
                   </div>}
@@ -682,14 +923,16 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   minHeight: `${960 / previewScale}px`,
                 }}
               >
-                {design.watermark && <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 1 }}>
+                {design.watermark && <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, transform: `${watermarkPlacement.transform || ""} rotate(${watermarkRotation}deg)`, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 1 }}>
                   {design.watermarkUseLogo && companyLogoUrl ? <Image src={companyLogoUrl} alt="" width={220} height={100} unoptimized className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
                 </div>}
 
                 <section className="pt-7" style={{ lineHeight: design.lineSpacing || 1.5 }}>
-                  <h3 className="mb-5 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{t("admin.quoteDesigner.termsConditions")}</h3>
-                  <div className="space-y-4 whitespace-pre-line text-slate-600">
-                    {previewTermParagraphs.map((paragraph, index) => <p key={index}>{renderBoldText(paragraph)}</p>)}
+                  <h3 className="mb-5 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{lbl(doc.termsLabel)}</h3>
+                  <div className="space-y-4 whitespace-pre-line text-slate-600 [&_.terms-rich-content_p]:mb-3 [&_.terms-rich-content_h1]:mb-2 [&_.terms-rich-content_h1]:font-bold [&_.terms-rich-content_h2]:mb-2 [&_.terms-rich-content_h2]:font-bold [&_.terms-rich-content_h3]:mb-2 [&_.terms-rich-content_h3]:font-bold [&_.terms-rich-content_ul]:list-disc [&_.terms-rich-content_ul]:pl-5 [&_.terms-rich-content_ol]:list-decimal [&_.terms-rich-content_ol]:pl-5 [&_.terms-rich-content_a]:text-blue-700 [&_.terms-rich-content_a]:underline">
+                    {hasRichTerms
+                      ? <div className="terms-rich-content" dangerouslySetInnerHTML={{ __html: renderRichHtml(rawTerms) }} />
+                      : previewTermParagraphs.map((paragraph, index) => <p key={index}>{renderBoldText(paragraph)}</p>)}
                     {form?.notes && <p><strong>{t("admin.quoteInvoice.ui.additional_notes_41b5f2e6")}:</strong> {form.notes}</p>}
                   </div>
                 </section>
@@ -700,6 +943,28 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
           </div>
         </div>
       </div>
+      {variantSearchOpen && activeVariantItem && variantDropdownPosition && createPortal(
+        <div
+          role="listbox"
+          aria-label={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")}
+          className="overflow-y-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-xl shadow-slate-900/15"
+          style={{ position: "fixed", top: variantDropdownPosition.top, left: variantDropdownPosition.left, width: variantDropdownPosition.width, maxHeight: variantDropdownPosition.maxHeight, zIndex: 10050 }}
+        >
+          {variantOptions.length === 0 ? <p className="px-3 py-3 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.searchVariantsUnavailable")}</p>
+            : matchedVariants.length === 0 ? <p className="px-3 py-3 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.noVariantsFound")}</p>
+            : matchedVariants.map((option) => (
+              <button key={option.id} type="button" role="option" aria-selected={false} onMouseDown={(event) => event.preventDefault()} onClick={() => selectVariantForItem(option, activeVariantItem)} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start transition hover:bg-[var(--accent-soft)]">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)]">{option.image ? <img src={option.image} alt="" className="h-full w-full object-cover" /> : <Package size={14} className="text-slate-400" />}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[11px] font-semibold text-[var(--text-primary)]">{option.name}</span>
+                  <span className="block truncate text-[9px] text-[var(--text-muted)]">{option.variant || option.sku || "—"}{option.sku && option.variant ? ` · ${option.sku}` : ""}</span>
+                </span>
+                <span className="shrink-0 text-[10px] font-bold text-[var(--text-secondary)]">{money(option.price)}</span>
+              </button>
+            ))}
+        </div>,
+        document.body,
+      )}
     </section>
   );
 }

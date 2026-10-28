@@ -4,8 +4,92 @@ const Customer = require("../models/Customer");
 const Variant = require("../models/Variant");
 const { calculateReturnLine, capReturnLines, calculateReturnSettlement, getOriginalInvoiceTotal } = require("../utils/invoiceReturnMath");
 const StockHistory = require("../models/StockHistory");
+const { getInvoiceStockAdjustments } = require("../utils/invoiceStockAdjustments");
 
 const round = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+const actorName = (req) => String(req.user?.name || req.user?.username || req.user?.email || "Administrator").trim();
+const auditValue = (value) => String(value ?? "")
+  .replace(/<br\s*\/?>/gi, "\n")
+  .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+  .replace(/<[^>]*>/g, "")
+  .replace(/&nbsp;/gi, " ")
+  .replace(/&amp;/gi, "&")
+  .replace(/&lt;/gi, "<")
+  .replace(/&gt;/gi, ">")
+  .replace(/\s+/g, " ")
+  .trim();
+const invoiceActivity = (req, type, changes = []) => ({
+  type,
+  at: new Date(),
+  actor_id: req.user?._id || null,
+  actor_name: actorName(req),
+  changes,
+});
+const compareInvoice = (current, next) => {
+  const changes = [];
+  const add = (action, field, before, after, item = {}) => {
+    const oldValue = String(before ?? "");
+    const newValue = String(after ?? "");
+    if (oldValue === newValue) return;
+    changes.push({ action, field, ...item, before: oldValue || "—", after: newValue || "—" });
+  };
+  const previousItems = current.items || [];
+  const nextItems = next.items || [];
+  const matchedPreviousIndexes = new Set();
+  const sameId = (left, right) => String(left?._id || left || "") === String(right?._id || right || "");
+  const findPreviousMatch = (item) => {
+    const available = previousItems.map((previous, index) => ({ previous, index })).filter(({ index }) => !matchedPreviousIndexes.has(index));
+    const variantId = item.variant_id?._id || item.variant_id;
+    const sku = String(item.sku || "").trim().toLowerCase();
+    const productId = item.product_id?._id || item.product_id;
+    const normalizedName = String(item.name || "").trim().toLowerCase();
+    const byVariant = variantId && available.filter(({ previous }) => sameId(previous.variant_id, variantId));
+    if (byVariant?.length === 1) return byVariant[0];
+    const byProductAndName = productId && available.filter(({ previous }) => sameId(previous.product_id, productId) && String(previous.name || "").trim().toLowerCase() === normalizedName);
+    if (byProductAndName?.length === 1) return byProductAndName[0];
+    const bySku = sku && available.filter(({ previous }) => String(previous.sku || "").trim().toLowerCase() === sku);
+    if (bySku?.length === 1) return bySku[0];
+    const byProduct = productId && available.filter(({ previous }) => sameId(previous.product_id, productId));
+    return byProduct?.length === 1 ? byProduct[0] : null;
+  };
+  for (const item of nextItems) {
+    const match = findPreviousMatch(item);
+    const previous = match?.previous;
+    const product = { product_name: item.name || "Invoice item", variant_title: item.variant_title || "", sku: item.sku || "" };
+    if (!previous) {
+      changes.push({ action: "added", field: "item", ...product, from_quantity: 0, to_quantity: Number(item.quantity) || 0 });
+      changes.push({ action: "item_field", field: "Unit price", ...product, before: "—", after: String(Number(item.unit_price) || 0) });
+      changes.push({ action: "item_field", field: "Discount", ...product, before: "—", after: `${Number(item.discount_rate) || 0}% · ${Number(item.discount) || 0}` });
+      changes.push({ action: "item_field", field: "Tax", ...product, before: "—", after: `${Number(item.tax_rate) || 0}% · ${Number(item.tax) || 0}` });
+      continue;
+    }
+    matchedPreviousIndexes.add(match.index);
+    add("item_field", "Product / variant", previous.name, item.name, product);
+    if (Number(previous.quantity) !== Number(item.quantity)) changes.push({ action: "quantity", field: "quantity", ...product, from_quantity: Number(previous.quantity) || 0, to_quantity: Number(item.quantity) || 0 });
+    add("item_field", "Unit price", previous.unit_price, item.unit_price, product);
+    add("item_field", "Discount", `${Number(previous.discount_rate) || 0}% · ${Number(previous.discount) || 0}`, `${Number(item.discount_rate) || 0}% · ${Number(item.discount) || 0}`, product);
+    add("item_field", "Tax", `${Number(previous.tax_rate) || 0}% · ${Number(previous.tax) || 0}`, `${Number(item.tax_rate) || 0}% · ${Number(item.tax) || 0}`, product);
+  }
+  previousItems.forEach((item, index) => {
+    if (!matchedPreviousIndexes.has(index)) changes.push({ action: "removed", field: "item", product_name: item.name || "Invoice item", variant_title: item.variant_title || "", sku: item.sku || "", from_quantity: Number(item.quantity) || 0, to_quantity: 0 });
+  });
+  [
+    ["Customer", current.customer_name, next.customer_name],
+    ["Customer email", current.customer_email, next.customer_email],
+    ["Customer phone", current.customer_phone, next.customer_phone],
+    ["Billing address", current.customer_address, next.customer_address],
+    ["Invoice date", current.invoice_date && new Date(current.invoice_date).toISOString().slice(0, 10), next.invoice_date && new Date(next.invoice_date).toISOString().slice(0, 10)],
+    ["Due date", current.due_date && new Date(current.due_date).toISOString().slice(0, 10), next.due_date && new Date(next.due_date).toISOString().slice(0, 10)],
+    ["Payment terms", current.payment_terms, next.payment_terms],
+    ["Subtotal", current.subtotal, next.subtotal],
+    ["Total discount", current.discount, next.discount],
+    ["Total tax", current.tax, next.tax],
+    ["Invoice total", current.total, next.total],
+    ["Bank details", current.bank_details, next.bank_details],
+    ["Terms & conditions", auditValue(current.terms), auditValue(next.terms)],
+  ].forEach(([field, before, after]) => add("field", field, before, after));
+  return changes;
+};
 const nextInvoiceNumber = async () => {
   const existing = await Invoice.find({ invoice_number: /^INV-(?:\d{4}-)?\d+$/ }).select("invoice_number").lean();
   const max = existing.reduce((highest, item) => Math.max(highest, Number(item.invoice_number.split("-").at(-1)) || 0), 0);
@@ -87,15 +171,24 @@ const buildInvoice = (body = {}) => {
 
 exports.listInvoices = async (_req, res) => {
   try {
-    const invoices = (await Invoice.find({ is_deleted: false }).sort({ created_at: -1 }).lean())
+    const invoices = (await Invoice.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean())
       .map((invoice) => ({ ...invoice, original_total: getOriginalInvoiceTotal(invoice) }));
     res.json({ success: true, data: invoices });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
+exports.getNextInvoiceNumber = async (_req, res) => {
+  try {
+    res.json({ success: true, data: { invoice_number: await nextInvoiceNumber() } });
+  } catch (error) { res.status(500).json({ success: false, message: error.message }); }
+};
+
 exports.getInvoice = async (req, res) => {
   try {
-    const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false }).lean();
+    const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false })
+      .populate("createdby", "name")
+      .populate("updatedby", "name")
+      .lean();
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
     res.json({ success: true, data: { ...invoice, original_total: getOriginalInvoiceTotal(invoice) } });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
@@ -137,7 +230,30 @@ exports.createInvoice = async (req, res) => {
     let invoice;
     for (let attempt = 0; attempt < 5; attempt += 1) {
       try {
-        invoice = await Invoice.create({ ...data, invoice_number: await nextInvoiceNumber(), status: "Unpaid", amount_paid: 0, remaining_balance: total, createdby: req.user?._id || null });
+        invoice = await Invoice.create({
+          ...data,
+          invoice_number: await nextInvoiceNumber(),
+          status: "Unpaid",
+          amount_paid: 0,
+          remaining_balance: total,
+          createdby: req.user?._id || null,
+          activity: [invoiceActivity(req, "created", [
+            ...data.items.flatMap((item) => {
+              const product = { product_name: item.name, sku: item.sku || "" };
+              return [
+                { action: "added", field: "item", ...product, from_quantity: 0, to_quantity: item.quantity },
+                { action: "item_field", field: "Unit price", ...product, before: "—", after: String(Number(item.unit_price) || 0) },
+                { action: "item_field", field: "Discount", ...product, before: "—", after: `${Number(item.discount_rate) || 0}% · ${Number(item.discount) || 0}` },
+                { action: "item_field", field: "Tax", ...product, before: "—", after: `${Number(item.tax_rate) || 0}% · ${Number(item.tax) || 0}` },
+              ];
+            }),
+            { action: "field", field: "Customer", before: "—", after: data.customer_name },
+            { action: "field", field: "Invoice total", before: "—", after: data.total },
+            { action: "field", field: "Total discount", before: "—", after: data.discount },
+            { action: "field", field: "Total tax", before: "—", after: data.tax },
+            { action: "field", field: "Due date", before: "—", after: new Date(data.due_date).toISOString().slice(0, 10) },
+          ])],
+        });
         break;
       } catch (error) { if (error.code !== 11000 || attempt === 4) throw error; }
     }
@@ -149,6 +265,99 @@ exports.createInvoice = async (req, res) => {
   } catch (error) {
     await Promise.all(deductedStock.map(({ variant_id, quantity }) => Variant.updateOne({ _id: variant_id }, { $inc: { quantity } }).catch(() => null)));
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateInvoice = async (req, res) => {
+  const stockChanges = [];
+  const rollbackStock = async () => {
+    let failed = false;
+    for (const change of [...stockChanges].reverse()) {
+      await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.stockChange } }).catch(() => { failed = true; });
+    }
+    stockChanges.length = 0;
+    return failed;
+  };
+  try {
+    const current = await Invoice.findOne({ _id: req.params.id, is_deleted: false });
+    if (!current) return res.status(404).json({ success: false, message: "Invoice not found" });
+    if (current.sent_at) return res.status(409).json({ success: false, message: "A sent invoice can no longer be edited" });
+
+    const data = buildInvoice(req.body);
+    if (!data.customer_id) return res.status(400).json({ success: false, message: "Select a valid customer" });
+    const customer = await Customer.findOne({ _id: data.customer_id, is_deleted: { $ne: true } }).select("_id").lean();
+    if (!customer) return res.status(400).json({ success: false, message: "Selected customer was not found" });
+
+    const productByVariant = new Map();
+    for (const item of [...(current.items || []), ...data.items]) {
+      if (!item.variant_id) throw new Error(`Select a valid variant for "${item.name}" to update its stock`);
+      const key = String(item.variant_id);
+      const productId = String(item.product_id);
+      if (productByVariant.has(key) && productByVariant.get(key) !== productId) throw new Error("Invoice variant does not match its product");
+      productByVariant.set(key, productId);
+    }
+
+    const adjustments = getInvoiceStockAdjustments(current.items, data.items);
+    for (const adjustment of adjustments) {
+      const product_id = productByVariant.get(adjustment.variant_id);
+      let updatedVariant;
+      if (adjustment.quantity > 0) {
+        updatedVariant = await Variant.findOneAndUpdate(
+          { _id: adjustment.variant_id, product_id, quantity: { $gte: adjustment.quantity }, status: "active" },
+          { $inc: { quantity: -adjustment.quantity } },
+          { new: true, select: "_id quantity product_id" },
+        );
+        if (!updatedVariant) {
+          const existing = await Variant.findOne({ _id: adjustment.variant_id, product_id }).select("quantity").lean();
+          if (!existing) throw new Error("An invoice variant was not found");
+          throw new Error(`Insufficient stock for the updated invoice (available: ${existing.quantity || 0})`);
+        }
+        stockChanges.push({ variant_id: adjustment.variant_id, stockChange: -adjustment.quantity });
+      } else {
+        updatedVariant = await Variant.findOneAndUpdate(
+          { _id: adjustment.variant_id, product_id },
+          { $inc: { quantity: -adjustment.quantity } },
+          { new: true, select: "_id quantity product_id" },
+        );
+        if (!updatedVariant) throw new Error("An invoice variant was not found");
+        stockChanges.push({ variant_id: adjustment.variant_id, stockChange: -adjustment.quantity });
+      }
+    }
+
+    const amountPaid = round(Number(current.amount_paid || 0));
+    if (data.total < amountPaid) throw new Error("Invoice total cannot be lower than the amount already paid");
+    const remaining = round(data.total - amountPaid);
+    const dueDateDay = new Date(data.due_date).toISOString().slice(0, 10);
+    const todayDay = new Date().toISOString().slice(0, 10);
+    const status = remaining <= 0 ? "Paid" : amountPaid > 0 ? "Partially Paid" : dueDateDay < todayDay ? "Overdue" : "Unpaid";
+    const changes = [
+      ...compareInvoice(current, data),
+      ...(round(Number(current.remaining_balance || 0)) !== remaining ? [{ action: "balance", field: "Remaining balance", before: round(Number(current.remaining_balance || 0)), after: remaining }] : []),
+      ...(current.status !== status ? [{ action: "field", field: "Status", before: current.status || "Unpaid", after: status }] : []),
+    ];
+    const update = {
+      $set: { ...data, original_total: data.total, total: data.total, amount_paid: amountPaid, remaining_balance: remaining, status, paid_at: status === "Paid" ? current.paid_at || new Date() : null, updatedby: req.user?._id || null },
+      $inc: { __v: 1 },
+    };
+    // A save with no meaningful differences should not create an empty timeline entry.
+    if (changes.length) update.$push = { activity: invoiceActivity(req, "updated", changes) };
+    const updatedInvoice = await Invoice.findOneAndUpdate(
+      { _id: current._id, is_deleted: false, sent_at: null, __v: current.__v ?? 0 },
+      update,
+      { new: true, runValidators: true },
+    );
+    if (!updatedInvoice) {
+      const rollbackFailed = await rollbackStock();
+      return res.status(409).json({ success: false, message: rollbackFailed ? "Invoice changed and stock rollback needs review" : "Invoice was sent or changed while editing. Refresh and try again." });
+    }
+    try {
+      const io = require("../utils/socket").getIO();
+      if (io && stockChanges.length) io.emit("stockUpdated", { variants: stockChanges.map(({ variant_id, stockChange }) => ({ variant_id, change: stockChange })), source: "invoice_updated" });
+    } catch (socketError) {}
+    return res.json({ success: true, data: updatedInvoice });
+  } catch (error) {
+    const rollbackFailed = await rollbackStock();
+    return res.status(400).json({ success: false, message: rollbackFailed ? `${error.message}. Stock rollback needs review.` : error.message });
   }
 };
 
@@ -178,6 +387,12 @@ exports.recordPayment = async (req, res) => {
     invoice.status = remaining <= 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid";
     invoice.paid_at = remaining <= 0 ? paymentDate : null;
     invoice.updatedby = req.user?._id || null;
+    invoice.activity.push(invoiceActivity(req, "payment", [{
+      action: "payment_recorded",
+      field: "Payment",
+      before: "—",
+      after: `${method} · ${amount} · ${paymentDate.toISOString().slice(0, 10)}${paymentTime ? ` ${paymentTime}` : ""}${String(req.body.note || "").trim() ? ` · ${String(req.body.note).trim()}` : ""}`,
+    }, { action: "balance", field: "Remaining balance", before: priorRemaining, after: remaining }]));
     await invoice.save();
     res.json({ success: true, data: invoice });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
@@ -328,7 +543,14 @@ exports.recordReturn = async (req, res) => {
     if (stockHistoryRows.length) await StockHistory.insertMany(stockHistoryRows);
 
     const update = {
-      $push: { returns: returnRecord },
+      $push: {
+        returns: returnRecord,
+        activity: invoiceActivity(req, "return", [
+          ...itemsReturned.map((item) => ({ action: "returned", field: "item", product_name: item.name, from_quantity: 0, to_quantity: item.qty, before: "—", after: `${item.qty} returned · ${item.return_value}` })),
+          { action: "refund", field: "Return", before: "—", after: `${refundMethod} · ${reason} · refund ${refundAmount} · cash paid ${amountToRefund}` },
+          { action: "balance", field: "Invoice total", before: priorTotal, after: adjustedTotal },
+        ]),
+      },
       $set: { original_total: originalTotal, amount_paid: paid, total: adjustedTotal, remaining_balance: remaining, status: nextStatus, paid_at: nextStatus === "Paid" ? invoice.paid_at || new Date() : null, updatedby: req.user?._id || null },
       $inc: { __v: 1 },
     };
@@ -369,6 +591,7 @@ exports.sendInvoice = async (req, res) => {
     if (!invoice.sent_at) {
       invoice.sent_at = new Date();
       invoice.updatedby = req.user?._id || null;
+      invoice.activity.push(invoiceActivity(req, "sent", [{ action: "sent", field: "Invoice sent to customer", before: "Not sent", after: invoice.sent_at.toISOString() }]));
       await invoice.save();
     }
     res.json({ success: true, data: invoice });

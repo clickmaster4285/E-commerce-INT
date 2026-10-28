@@ -1,6 +1,6 @@
 "use client";
 
-/* Shared discount modals â€” moved out of page.js (App Router pages cannot have named exports). */
+/* Shared discount modals — moved out of page.js (App Router pages cannot have named exports). */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { attributeApi } from "../../../../apis/admin/attributeApi";
@@ -35,7 +35,7 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
-// âœ… Rupee icon â€” "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
+// âœ… Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
 const RupeeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12M6 8h12M6 13h3m-3 0 8.5 8M9 13c6.667 0 6.667-10 0-10" /></svg>);
 
 const getId = (item) => {
@@ -114,7 +114,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               const active = value === opt.value;
               const OptionIcon = opt.icon;
 
-              // âœ… Plain option (icon/description na ho) â€” purana simple row
+              // âœ… Plain option (icon/description na ho) — purana simple row
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
@@ -125,7 +125,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
                 );
               }
 
-              // âœ… Rich row â€” icon badge + title + example description + selected tick
+              // âœ… Rich row — icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
                   className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -201,7 +201,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // âœ… Upper bound (e.g. percentage max 100) â€” typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}
@@ -282,7 +282,7 @@ const attrValueText = (value) => {
     if ("value" in value) return attrValueText(value.value);
     if ("label" in value) return attrValueText(value.label);
     if ("name" in value) return attrValueText(value.name);
-    // Nested objects like { "Exterior Color": "BLACK" } â€” join their values
+    // Nested objects like { "Exterior Color": "BLACK" } — join their values
     return Object.values(value).map(attrValueText).filter(Boolean).join(", ");
   }
   return "";
@@ -303,7 +303,7 @@ const getProductAttributes = (product) => {
     });
   }
 
-  // Variant attributes â€” supports object form { Color: "Red" } and array form [{ name, value }]
+  // Variant attributes — supports object form { Color: "Red" } and array form [{ name, value }]
   (product.variants || []).forEach((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return;
@@ -1111,7 +1111,7 @@ function ProductDetailsModal({ product, onClose }) {
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
-  // Category-assigned attributes (Attribute manager) â€” shown even when no variant value exists
+  // Category-assigned attributes (Attribute manager) — shown even when no variant value exists
   const categoryId = product?.category_id?._id || product?.category_id;
   const { data: categoryAttributes = [] } = useQuery({
     queryKey: ["category-attributes", categoryId],

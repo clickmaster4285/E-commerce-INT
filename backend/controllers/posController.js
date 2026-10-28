@@ -372,12 +372,62 @@ const savePosSale = async (req, res, existingSale = null) => {
     };
 
     const saleNumber = originalSale?.sale_number || await generateNextSaleNumber();
+    const editorName = String(req.user?.name || req.user?.username || req.user?.email || "Administrator").trim();
+    const editChanges = [];
+    if (originalSale) {
+      const addValueChange = (action, fromValue, toValue, product = {}) => {
+        const before = String(fromValue ?? "");
+        const after = String(toValue ?? "");
+        if (before === after) return;
+        editChanges.push({ action, ...product, from_value: before || "—", to_value: after || "—" });
+      };
+      const previousItems = new Map((originalSale.items || []).map((item) => [String(item.variant_id?._id || item.variant_id), item]));
+      const nextItems = new Map(normalizedItems.map((item) => [String(item.variant_id), item]));
+      for (const [variantId, item] of nextItems) {
+        const previous = previousItems.get(variantId);
+        const details = { product_name: item.product_name, variant_title: item.variant_title || "", sku: item.sku || "" };
+        if (!previous) editChanges.push({ action: "added", ...details, from_quantity: 0, to_quantity: item.quantity });
+        else if (Number(previous.quantity) !== Number(item.quantity)) editChanges.push({ action: "quantity", ...details, from_quantity: Number(previous.quantity) || 0, to_quantity: item.quantity });
+        if (previous) {
+          addValueChange("price", Number(previous.unit_price) || 0, item.unit_price, details);
+          const previousDiscount = `${Number(previous.discount_amount) || 0} (${Number(previous.discount_rate) || 0}% + flat ${Number(previous.flat_discount) || 0}/unit)`;
+          const nextDiscount = `${Number(item.discount_amount) || 0} (${Number(item.discount_rate) || 0}% + flat ${Number(item.flat_discount) || 0}/unit)`;
+          addValueChange("discount", previousDiscount, nextDiscount, details);
+          addValueChange("tax", Number(previous.tax_rate) || 0, item.tax_rate, details);
+        }
+      }
+      for (const [variantId, item] of previousItems) {
+        if (!nextItems.has(variantId)) editChanges.push({ action: "removed", product_name: item.product_name, variant_title: item.variant_title || "", sku: item.sku || "", from_quantity: Number(item.quantity) || 0, to_quantity: 0 });
+      }
+      addValueChange("sale_discount", Number(originalSale.discount_amount) || 0, finalDiscount);
+      addValueChange("tax", Number(originalSale.tax_amount) || 0, finalTax);
+      addValueChange("sale_total", Number(originalSale.total) || 0, total);
+      const previousCustomer = originalSale.customer_snapshot || {};
+      if ((previousCustomer.name || "") !== customerSnapshot.name || (previousCustomer.phone || "") !== customerSnapshot.phone) {
+        addValueChange("customer", `${previousCustomer.name || "Walk-in Customer"}${previousCustomer.phone ? ` · ${previousCustomer.phone}` : ""}`, `${customerSnapshot.name}${customerSnapshot.phone ? ` · ${customerSnapshot.phone}` : ""}`);
+      }
+      const previousPayment = originalSale.payment || {};
+      const paymentBefore = `${previousPayment.method || "cash"}, received ${Number(previousPayment.amount_received) || 0}${previousPayment.reference ? `, ref ${previousPayment.reference}` : ""}`;
+      const paymentAfter = `${paymentMethod}, received ${amountReceived}${String(reference || "").trim() ? `, ref ${String(reference).trim()}` : ""}`;
+      addValueChange("payment", paymentBefore, paymentAfter);
+      addValueChange("notes", originalSale.notes || "", String(notes || "").trim());
+    }
     const saleData = {
       sale_number: saleNumber,
       customer_id: customer?._id || null,
       customer_snapshot: customerSnapshot,
       cashier_id: originalSale?.cashier_id || req.user?._id || null,
       cashier_name: originalSale?.cashier_name || req.user?.name || "Administrator",
+      created_by_id: originalSale?.created_by_id || (!originalSale ? req.user?._id || null : null),
+      created_by_name: originalSale?.created_by_name || (!originalSale ? editorName : ""),
+      edit_history: originalSale
+        ? [...(Array.isArray(originalSale.edit_history) ? originalSale.edit_history : []), {
+          edited_at: new Date(),
+          edited_by_id: req.user?._id || null,
+          edited_by_name: editorName,
+          changes: editChanges,
+        }]
+        : [],
       items: normalizedItems,
       subtotal: finalSubtotal,
       discount_amount: finalDiscount,

@@ -1,5 +1,8 @@
 const mongoose = require("mongoose");
 
+const auditChangeSchema = new mongoose.Schema({ field: String, before: String, after: String, action: String, product_name: String, variant_title: String, sku: String, from_quantity: Number, to_quantity: Number }, { _id: false });
+const activitySchema = new mongoose.Schema({ type: { type: String, required: true }, at: { type: Date, default: Date.now }, actor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null }, actor_name: { type: String, default: "Administrator" }, changes: { type: [auditChangeSchema], default: [] } }, { _id: false });
+
 const poItemSchema = new mongoose.Schema(
   {
     product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
@@ -92,6 +95,7 @@ const purchaseOrderSchema = new mongoose.Schema(
     deleted_at: { type: Date, default: null },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
     updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+    activity: { type: [activitySchema], default: [] },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
