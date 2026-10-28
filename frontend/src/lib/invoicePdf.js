@@ -6,6 +6,29 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const PAGE_MARGIN = 14;
 const PAGE_FORMATS_MM = {
   a4: [210, 297],
+  a3: [297, 420],
+  a5: [148, 210],
+  a6: [105, 148],
+  b5jis: [182, 257],
+  b4jis: [257, 364],
+  letter: [215.9, 279.4],
+  legal: [215.9, 355.6],
+  executive: [184.15, 266.7],
+  statement: [139.7, 215.9],
+  tabloid: [279.4, 431.8],
+  "thermal-58": [58, 200],
+  "thermal-80": [80, 200],
+};
+const getDocumentPageSpec = (design = {}) => {
+  const value = String(design.pageSize || "a4-portrait").toLowerCase();
+  const isThermal = value.startsWith("thermal-");
+  const [formatKey, requestedOrientation] = isThermal ? [value, "portrait"] : value.split("-");
+  const pageFormat = PAGE_FORMATS_MM[formatKey] ? formatKey : "a4";
+  const orientation = requestedOrientation === "landscape" ? "landscape" : "portrait";
+  const [shortSide, longSide] = PAGE_FORMATS_MM[pageFormat];
+  const width = orientation === "landscape" ? longSide : shortSide;
+  const height = orientation === "landscape" ? shortSide : longSide;
+  return { pageFormat, orientation, width, height };
 };
 const COLORS = {
   ink: [20, 20, 20],
@@ -112,15 +135,11 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const numberLabel = isQuote ? "Quote Number" : "Invoice Number";
   const dateLabelText = isQuote ? "Quote Date" : "Invoice Date";
   const dueLabelText = isQuote ? "Valid Until" : "Due Date";
-  const pageFormat = "a4";
-  const pageOrientation = "portrait";
+  const { pageFormat, orientation: pageOrientation, width: requestedPageWidth, height: requestedPageHeight } = getDocumentPageSpec(design);
   const documentTitleSize = isDesigned
     ? Math.min(22.5, Math.max(13.5, (Number(design.titleSize) || 26) * 0.75))
     : 17;
-  const [shortPageSide, longPageSide] = PAGE_FORMATS_MM[pageFormat];
-  const requestedPageWidth = isDesigned && pageOrientation === "landscape" ? longPageSide : shortPageSide;
-  const requestedPageHeight = isDesigned && pageOrientation === "landscape" ? shortPageSide : longPageSide;
-  const baseMargin = PAGE_MARGIN;
+  const baseMargin = pageFormat.startsWith("thermal-") ? Math.min(PAGE_MARGIN, requestedPageWidth * 0.07) : PAGE_MARGIN;
   const agencySidebar = isDesigned && template === "agency";
   const sidebarWidth = agencySidebar ? Math.min(66, requestedPageWidth * 0.3) : 0;
   const margin = baseMargin + sidebarWidth;
@@ -777,8 +796,8 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
       import("html2canvas"),
     ]);
     const html2canvas = html2canvasModule.default;
-    const orientation = "portrait";
-    const pageFormat = PAGE_FORMATS_MM.a4;
+    const { orientation, width, height } = getDocumentPageSpec(documentData?.pdf_design || {});
+    const pageFormat = [width, height];
     pdf = new jsPDF({ orientation, unit: "mm", format: pageFormat, compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
