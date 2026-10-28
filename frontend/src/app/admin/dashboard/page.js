@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -758,16 +759,11 @@ function RecentOrders({ data }) {
                 className="group flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-tertiary)]"
               >
                 <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-tertiary)]">
-                  {o.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={imageUrl(o.image)}
-                      alt={o.order_number}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                  ) : (
-                    <Package size={16} className="text-[var(--text-muted)]" />
-                  )}
+                  <FallbackImage
+                    src={imageUrl(o.image)}
+                    alt={o.order_number}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  />
                 </span>
 
                 <span className="min-w-0 flex-1">
@@ -893,12 +889,7 @@ function TopProducts({ data }) {
                     <td className="py-2.5">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-tertiary)]">
-                          {p.image ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={imageUrl(p.image)} alt={productName} className="h-full w-full object-cover" />
-                          ) : (
-                            <Package size={15} className="text-[var(--text-muted)]" />
-                          )}
+                          <FallbackImage src={imageUrl(p.image)} alt={productName} className="h-full w-full object-cover" />
                         </span>
 
                         <span

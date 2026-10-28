@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
@@ -1190,7 +1191,7 @@ function BundleImageUploader({ value, onChange }) {
         }}
       >
         {preview ? (
-          <img
+          <FallbackImage
             src={preview}
             alt={t("admin.promotions.ui.generated.d59795de8a4d")}
             className="w-full h-40 object-cover rounded-md"

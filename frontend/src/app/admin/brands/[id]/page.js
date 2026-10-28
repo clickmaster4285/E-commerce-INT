@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -596,7 +597,7 @@ export default function BrandDetailPage() {
           <div className="flex min-w-0 items-start gap-3.5 xl:pr-5">
             {hasLogo ? (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <img src={logoSrc} alt={nameOf(brand)} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
+                <FallbackImage src={logoSrc} alt={nameOf(brand)} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
               </div>
             ) : (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
@@ -1030,7 +1031,7 @@ export default function BrandDetailPage() {
                           maxHeight: "200px"
                         }}
                       >
-                        <img
+                        <FallbackImage
                           src={logoSrc}
                           alt={nameOf(brand)}
                           onError={() => setLogoFailed(true)}
@@ -1483,7 +1484,7 @@ export default function BrandDetailPage() {
                 >
                   {logoPreview ? (
                     <div className="relative w-full h-full flex items-center justify-center p-2">
-                       <img src={logoPreview} alt={t("detail.brandLogo")} className="max-h-full max-w-full object-contain rounded-md" />
+                       <FallbackImage src={logoPreview} alt={t("detail.brandLogo")} className="max-h-full max-w-full object-contain rounded-md" />
                        {/* Remove Button Overlay */}
                        <button 
                         type="button"

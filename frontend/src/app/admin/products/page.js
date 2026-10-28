@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -1014,7 +1015,7 @@ const [viewMode, setViewMode] = useState(() => {
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          {img ? <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-8 w-8 shrink-0 rounded-full object-cover" /> : <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{productNameOf(p)?.charAt(0).toUpperCase() || "P"}</div>}
+                          <FallbackImage src={getImageUrl(img)} alt={productNameOf(p)} className="h-8 w-8 shrink-0 rounded-full object-cover" />
                           <div className="min-w-0">
                             <p className="max-w-[160px] truncate text-[13px] font-medium">{productNameOf(p)}</p>
                             {firstVariantSku && <p className="max-w-[160px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstVariantSku}</p>}
@@ -1062,7 +1063,7 @@ const [viewMode, setViewMode] = useState(() => {
             return (
               <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
-                  {img ? <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{productNameOf(p)?.charAt(0).toUpperCase() || "P"}</div>}
+                  <FallbackImage src={getImageUrl(img)} alt={productNameOf(p)} className="h-10 w-10 shrink-0 rounded-full object-cover" />
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="min-w-0">

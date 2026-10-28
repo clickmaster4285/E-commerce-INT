@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
@@ -1112,7 +1113,7 @@ export default function StoreInfoPage() {
                       <div className="w-28 h-28 rounded-xl flex items-center justify-center overflow-hidden"
                         style={{ backgroundColor: logoPreview && !logoError ? "#ffffff" : "var(--bg-tertiary)", border: "1px dashed var(--border-color)", boxShadow: logoPreview && !logoError ? "var(--shadow-sm)" : "none" }}>
                         {logoPreview && !logoError ? (
-                          <img 
+                          <FallbackImage 
                             src={logoPreview} 
                             alt={t("admin.storeInfo.page.storeLogo")}
                             className="w-full h-full object-contain p-1.5"
@@ -1477,7 +1478,7 @@ export default function StoreInfoPage() {
               <div className="w-16 h-16 rounded-xl flex items-center justify-center overflow-hidden shrink-0"
                 style={{ backgroundColor: logoPreview && !logoError ? "#ffffff" : "var(--bg-tertiary)", border: "1px solid var(--border-color)", boxShadow: logoPreview && !logoError ? "var(--shadow-sm)" : "none" }}>
                 {logoPreview && !logoError ? (
-                  <img 
+                  <FallbackImage 
                     src={logoPreview} 
                     alt={t("admin.storeInfo.page.storeLogo")}
                     className="w-full h-full object-contain p-1.5"

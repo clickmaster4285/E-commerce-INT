@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Country } from "country-state-city";
@@ -545,7 +546,7 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
                 <div onClick={() => !createBrandMutation.isPending && brandFileInputRef.current?.click()} onDrop={handleBrandFileDrop} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setBrandIsDragging(true); }} onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setBrandIsDragging(false); }} className={`relative w-full h-32 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-2 cursor-pointer transition-all duration-200 ${brandIsDragging ? "border-emerald-500 bg-emerald-500/10" : "border-gray-600 hover:border-emerald-500/50 hover:bg-white/5"}`} style={{ borderColor: brandIsDragging ? undefined : "var(--border-color)" }}>
                   {brandLogoPreview ? (
                     <div className="relative w-full h-full flex items-center justify-center p-2">
-                      <img src={brandLogoPreview} alt={t("brand.logoPreviewAlt")} className="max-h-full max-w-full object-contain rounded-md" />
+                      <FallbackImage src={brandLogoPreview} alt={t("brand.logoPreviewAlt")} className="max-h-full max-w-full object-contain rounded-md" />
                       <button type="button" onClick={(e) => { e.stopPropagation(); handleBrandRemoveLogo(); }} aria-label={ts("media.remove")} title={ts("media.remove")} className="absolute top-2 end-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600 transition shadow-md"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (

@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { bannerApi } from "@/apis/user/bannerApi";
@@ -333,7 +334,7 @@ function PromoSlide({ banner, imgUrl, mountImage, isActive, palette, priority, d
     <div className="bn-anim absolute inset-0 overflow-hidden">
       {/* Banner ka main image — ab alag card/fan nahi, poori slide ka background hai */}
       {imgUrl && mountImage ? (
-        <Image
+        <FallbackImage nextImage
           src={imgUrl}
           alt={alt}
           fill
@@ -425,7 +426,7 @@ function ImageSlide({ banner, imgUrl, mountImage, isActive, priority, fallbackAl
   return (
     <>
       {imgUrl && mountImage ? (
-        <Image
+        <FallbackImage nextImage
           src={imgUrl}
           alt={banner.altText || fallbackAlt}
           fill

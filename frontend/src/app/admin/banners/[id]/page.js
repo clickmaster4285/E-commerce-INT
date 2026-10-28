@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -487,7 +488,7 @@ export default function BannerDetailPage() {
                   className="overflow-hidden rounded-lg"
                   style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-secondary)" }}
                 >
-                  <img
+                  <FallbackImage
                     src={desktopImage}
                     alt={contentOf(banner.altText, banner.translations?.altText) || contentOf(banner.title, banner.translations?.title) || t("admin.banners.detail.banner")}
                     className="block h-auto max-h-[420px] w-full object-contain"

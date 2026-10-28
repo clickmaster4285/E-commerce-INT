@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 // ==========================================
 // LANGUAGE TRANSITION CURTAIN
 // ==========================================
@@ -36,7 +37,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
+
 import { usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 import { DEFAULT_LOCALE, isRtl } from "@/i18n/config";
@@ -164,7 +165,7 @@ export default function LanguageTransition({
         <span className="language-curtain__brandmark">
           <span className="language-curtain__logo">
             {logoUrl && !logoFailed ? (
-              <Image
+              <FallbackImage nextImage
                 src={logoUrl}
                 alt=""
                 fill

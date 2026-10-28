@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -37,7 +38,6 @@ const resolveAvatarUrl = (value) => {
   return `${serverUrl}/${value.replace(/^\//, "")}`;
 };
 
-const avatarInitial = (name) => (name || "?").trim().charAt(0).toUpperCase() || "?";
 
 const normalizeArrayResponse = (response) => {
   if (Array.isArray(response)) return response;
@@ -915,21 +915,12 @@ export default function EmployeesPage() {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          {empAvatar ? (
-                            <img
-                              src={empAvatar}
-                              alt={empName}
-                              className="h-8 w-8 rounded-full object-cover shrink-0 border"
-                              style={{ borderColor: "var(--border-color)" }}
-                            />
-                          ) : (
-                            <div
-                              className="h-8 w-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-                              style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
-                            >
-                              {empName?.charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <FallbackImage
+                            src={empAvatar}
+                            alt={empName}
+                            className="h-8 w-8 rounded-full object-cover shrink-0 border"
+                            style={{ borderColor: "var(--border-color)" }}
+                          />
                           <span className="font-medium text-[13px] truncate max-w-[140px]">
                             {empName}
                           </span>
@@ -1068,7 +1059,7 @@ export default function EmployeesPage() {
                       }}
                     >
                       {avatarPreview ? (
-                        <img
+                        <FallbackImage
                           src={avatarPreview}
                           alt={t("admin.employees.form.profilePicturePreview")}
                           className="h-full w-full object-cover"
@@ -1078,11 +1069,7 @@ export default function EmployeesPage() {
                             setAvatarError("That image could not be previewed, please try another one");
                           }}
                         />
-                      ) : (
-                        <span className="text-[24px] font-bold" style={{ color: "var(--text-muted)" }}>
-                          {avatarInitial(formData.name)}
-                        </span>
-                      )}
+                      ) : <FallbackImage src="" alt={t("admin.employees.form.profilePicturePreview")} className="h-full w-full object-cover" />}
                     </div>
                     {avatarPreview && (
                       <button

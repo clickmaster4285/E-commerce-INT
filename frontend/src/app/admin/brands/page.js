@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
@@ -73,11 +74,6 @@ const GlobeIcon = ({ className = "w-3.5 h-3.5" }) => (
 );
 
 /* ================= Helpers ================= */
-const getInitials = (name) => {
-  if (!name) return "??";
-  return name.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
-};
-
 const getLogoUrl = (brand) => {
   if (brand.logo?.img_url) {
     if (brand.logo.img_url.startsWith("http")) return brand.logo.img_url;
@@ -91,14 +87,7 @@ const Avatar = ({ brand, size = "w-8 h-8" }) => {
   const { nameOf } = useLocalized();
   const brandName = nameOf(brand);
   const logoUrl = getLogoUrl(brand);
-  if (logoUrl) {
-    return <img src={logoUrl} alt={brandName} className={`${size} rounded-full object-cover shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
-  }
-  return (
-    <div className={`${size} rounded-full flex items-center justify-center text-[11px] font-bold shrink-0`} style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
-      {getInitials(brandName)}
-    </div>
-  );
+  return <FallbackImage src={logoUrl} alt={brandName} className={`${size} rounded-full object-contain shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
 };
 
 const StatusBadge = ({ active }) => {
@@ -1048,7 +1037,7 @@ export default function BrandsPage() {
                 >
                   {logoPreview ? (
                     <div className="relative w-full h-full flex items-center justify-center p-2">
-                       <img src={logoPreview} alt={t("admin.brands.ui.logoPreview")} className="max-h-full max-w-full object-contain rounded-md" />
+                       <FallbackImage src={logoPreview} alt={t("admin.brands.ui.logoPreview")} className="max-h-full max-w-full object-contain rounded-md" />
                        {/* Remove Button Overlay */}
                        <button 
                         type="button"

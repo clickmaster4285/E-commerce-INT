@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* ==========================================================
    BRAND STRIP — real brand logos + product counts
    (brand logo API se, count real products se, kuch hardcoded nahi)
@@ -7,7 +8,7 @@
 
 import { useMemo, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
 import useScrollFade from "../../hooks/user/useScrollFade";
@@ -63,13 +64,7 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
               className="group flex w-[8.75rem] shrink-0 flex-col items-center gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
             >
               <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
-                {logo ? (
-                  <Image src={logo} alt={brandName} fill loader={smartImageLoader} sizes="48px" className="object-contain" />
-                ) : (
-                  <span className="text-lg font-black text-[var(--user-accent)]">
-                    {String(brandName || "?").charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <FallbackImage nextImage src={logo} alt={brandName} fill loader={smartImageLoader} sizes="48px" className="object-contain" />
               </span>
               <span className="w-full truncate text-center text-sm font-medium capitalize text-[var(--user-text)]">
                 {brandName}

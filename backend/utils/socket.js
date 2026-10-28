@@ -133,7 +133,7 @@ const getDefaultPermissions = () => {
     employees: true, products: true, featuredProducts: true, reviews: true, brands: true, categories: true,
     profile: true, store: true, discounts: true, deals: true, bundles: true, banners: true,
     manageStock: true, shipping: true, order: true, attribute: true, vendors: true, purchaseOrders: true, quotes: true,
-    customers: true, pos: true, invoices: true
+    customers: true, pos: true, invoices: true, finance: false
   };
 };
 
@@ -161,6 +161,7 @@ const fixPermissions = (oldPerms) => {
     customers: oldPerms?.customers ?? defaults.customers,
     quotes: oldPerms?.quotes ?? defaults.quotes,
     invoices: oldPerms?.invoices ?? defaults.invoices,
+    finance: oldPerms?.finance ?? defaults.finance,
     pos: oldPerms?.pos ?? defaults.pos,
   };
 };

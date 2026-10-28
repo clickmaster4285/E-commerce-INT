@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { Suspense, use, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -194,7 +195,7 @@ function DealDetailContent({ params }) {
         <div className="grid md:grid-cols-2 gap-0">
           <div className="relative aspect-[4/3] md:aspect-auto block overflow-hidden">
             {imgUrl ? (
-              <img src={imgUrl} alt={dealName} className="w-full h-full object-cover" />
+              <FallbackImage src={imgUrl} alt={dealName} className="w-full h-full object-cover" />
             ) : (
               <div className={`w-full h-full bg-gradient-to-br ${visual.color} flex flex-col items-center justify-center p-6`}>
                 <div className="relative z-10 w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-4 border-2 border-white/30">

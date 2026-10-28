@@ -1,8 +1,9 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
+
 import { useQuery } from "@tanstack/react-query";
 import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
@@ -700,7 +701,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                         {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 shadow-sm transition hover:border-slate-300`}>
                           <span className="flex h-9 w-9 items-center justify-center justify-self-center rounded-lg bg-[var(--accent-soft)] text-[11px] font-extrabold text-[var(--accent)]">{index + 1}</span>
                           <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]">
-                            {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <Package size={16} className="text-slate-300" />}
+                            <FallbackImage src={item.image} alt="" className="h-full w-full object-cover" />
                           </span>
                           <div className="relative flex min-w-0 flex-col justify-center">
                             <div className="relative">
@@ -759,7 +760,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 }}
               >
                 {isAgencyLayout && <aside className="absolute inset-y-0 left-0 z-10 flex w-[30%] flex-col px-4 py-6 text-white sm:px-5" style={{ background: accent }}>
-                  {companyLogoUrl && <Image src={companyLogoUrl} alt="Company logo" width={120} height={48} unoptimized className="mb-4 h-8 w-auto max-w-24 object-contain" />}
+                  {companyLogoUrl && <FallbackImage nextImage src={companyLogoUrl} alt="Company logo" width={120} height={48} unoptimized className="mb-4 h-8 w-auto max-w-24 object-contain" />}
                   <p className="text-[10px] font-bold">{companyName}</p>
                   <div className="mt-auto pt-6 text-[9px]"><p className="font-semibold text-white/70">{t("admin.quoteInvoice.ui.total_b25928c6").toUpperCase()}</p><p className="mt-0.5 text-sm font-extrabold">{money(totals?.total)}</p></div>
                 </aside>}
@@ -768,7 +769,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 {!isAgencyLayout && (design.template === "bold" ? (
                   <header className="relative min-h-[112px] overflow-hidden border-b-2 border-slate-100 bg-white px-5 py-5 sm:px-7">
                     <div className="pointer-events-none absolute right-0 top-0 h-full w-[42%]" style={{ background: accent, clipPath: "polygon(10% 0, 100% 0, 100% 100%, 30% 100%)" }} />
-                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2">{companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="mt-1 h-8 w-auto max-w-[90px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}<p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
+                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2">{companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="mt-1 h-8 w-auto max-w-[90px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}<p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
                     <div className="absolute bottom-0 left-6 right-6 h-[2px]" style={{ background: accent }} />
                   </header>
                 ) : isMinimalLayout ? (
@@ -776,7 +777,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                     {isMonoLayout && <span className="absolute inset-x-0 top-0 h-[7px] bg-zinc-900" />}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-2">
-                        {companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={100} height={32} unoptimized className="h-7 w-auto max-w-[70px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}
+                        {companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="Logo" width={100} height={32} unoptimized className="h-7 w-auto max-w-[70px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}
                         <div>
                           <p className="truncate text-[11px] font-extrabold">{companyName}</p>
 
@@ -790,14 +791,14 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 ) : isCenteredLayout ? (
                   <header className="text-center px-5 pt-5 pb-4 sm:px-7" style={{ background: theme.tone || "#f8fafc" }}>
                     <div className="flex justify-center">
-                      {companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="h-8 w-auto max-w-[86px] object-contain" /> : <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}
+                      {companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="h-8 w-auto max-w-[86px] object-contain" /> : <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}
                     </div>
                     <div className="mt-2 flex items-start justify-between gap-3 text-left"><p className="pt-1 text-[9px] font-bold text-slate-700">{companyName}</p><div className="text-right"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} /></div></div>
                   </header>
                 ) : isSplitLayout ? (
                   <header className="flex items-center justify-between gap-4 px-5 pt-5 px-3 pb-3">
                     <div className="flex min-w-0 items-center gap-2">
-                      {companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={96} height={36} unoptimized className="h-7 w-auto max-w-[70px] object-contain" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-900 text-[10px] font-black text-white">{initials}</span>}
+                      {companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="Logo" width={96} height={36} unoptimized className="h-7 w-auto max-w-[70px] object-contain" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-slate-900 text-[10px] font-black text-white">{initials}</span>}
                       <div className="min-w-0">
                         <p className="truncate text-[10.5px] font-extrabold">{companyName}</p>
 
@@ -808,7 +809,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 ) : (
                   <header className="flex items-start justify-between gap-4 px-6 py-5 sm:px-9" style={{ background: accent, color: "#fff" }}>
                     <div className="flex min-w-0 items-start gap-3">
-                      {companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="h-9 w-auto max-w-[86px] object-contain" /> : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-white/20 text-[11px] font-black text-white">{initials}</span>}
+                      {companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="h-9 w-auto max-w-[86px] object-contain" /> : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-white/20 text-[11px] font-black text-white">{initials}</span>}
                       <div className="min-w-0">
                         <p className="truncate text-[10.5px] font-extrabold leading-tight">{companyName}</p>
                       </div>
@@ -821,7 +822,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 <div className="px-6 py-4 sm:px-9" style={isAgencyLayout ? { marginLeft: "30%", paddingLeft: "16px", paddingRight: "16px", paddingTop: "96px" } : undefined}>
                   {design.watermark && (
                     <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, transform: `${watermarkPlacement.transform || ""} rotate(${watermarkRotation}deg)`, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 10 }}>
-                      {design.watermarkUseLogo && companyLogoUrl ? <Image src={companyLogoUrl} alt="" width={220} height={100} unoptimized className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
+                      {design.watermarkUseLogo && companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="" width={220} height={100} unoptimized className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
                     </div>
                   )}
                   <div className="relative z-0 grid grid-cols-3 gap-3 border-b border-slate-200 pb-4 text-[10px]">
@@ -924,7 +925,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 }}
               >
                 {design.watermark && <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, transform: `${watermarkPlacement.transform || ""} rotate(${watermarkRotation}deg)`, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 1 }}>
-                  {design.watermarkUseLogo && companyLogoUrl ? <Image src={companyLogoUrl} alt="" width={220} height={100} unoptimized className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
+                  {design.watermarkUseLogo && companyLogoUrl ? <FallbackImage nextImage src={companyLogoUrl} alt="" width={220} height={100} unoptimized className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
                 </div>}
 
                 <section className="pt-7" style={{ lineHeight: design.lineSpacing || 1.5 }}>
@@ -954,7 +955,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
             : matchedVariants.length === 0 ? <p className="px-3 py-3 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.noVariantsFound")}</p>
             : matchedVariants.map((option) => (
               <button key={option.id} type="button" role="option" aria-selected={false} onMouseDown={(event) => event.preventDefault()} onClick={() => selectVariantForItem(option, activeVariantItem)} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start transition hover:bg-[var(--accent-soft)]">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)]">{option.image ? <img src={option.image} alt="" className="h-full w-full object-cover" /> : <Package size={14} className="text-slate-400" />}</span>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)]"><FallbackImage src={option.image} alt="" className="h-full w-full object-cover" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[11px] font-semibold text-[var(--text-primary)]">{option.name}</span>
                   <span className="block truncate text-[9px] text-[var(--text-muted)]">{option.variant || option.sku || "—"}{option.sku && option.variant ? ` · ${option.sku}` : ""}</span>

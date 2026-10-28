@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -754,7 +755,7 @@ function VariantDetailsDrawer({ variant, productName, attributeLabelOf, onClose,
               {primaryImage ? (
                 <button type="button" onClick={() => setPreviewImage(0)} aria-label={t("admin.productDetail.page.openImagePreview")} className="group relative w-[84px] h-[84px] rounded-xl overflow-hidden shrink-0 transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={getImageUrl(primaryImage.img_url)} alt={variantLabelOf(variant, t)} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.08]" />
+                  <FallbackImage src={getImageUrl(primaryImage.img_url)} alt={variantLabelOf(variant, t)} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.08]" />
                   <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100" style={{ backgroundColor: "rgba(2,6,23,0.45)" }}>
                     <ZoomIn className="w-4 h-4 text-white" />
                   </span>
@@ -875,7 +876,7 @@ function VariantDetailsDrawer({ variant, productName, attributeLabelOf, onClose,
                 {images.map((image, index) => (
                   <button key={`${image.img_url}-${index}`} type="button" onClick={() => setPreviewImage(index)} aria-label={t("admin.productDetail.page.openImage", { number: index + 1 })} className="group relative aspect-square rounded-xl overflow-hidden transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={getImageUrl(image.img_url)} alt={`${variantLabelOf(variant, t)} ${index + 1}`} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.06]" />
+                    <FallbackImage src={getImageUrl(image.img_url)} alt={`${variantLabelOf(variant, t)} ${index + 1}`} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.06]" />
                     <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100" style={{ backgroundColor: "rgba(2,6,23,0.5)" }}>
                       <ZoomIn className="w-4 h-4 text-white" />
                     </span>
@@ -989,7 +990,7 @@ function ImageGalleryModal({ images, initialIndex, onClose }) {
 
         {/* Image Display */}
         <div className="relative w-full h-full flex items-center justify-center p-8">
-           <img 
+           <FallbackImage 
             src={getImageUrl(images[currentIndex].img_url)} 
             alt={t("admin.productDetail.page.productImageNumber", { number: currentIndex + 1 })}
             className="max-w-full max-h-full object-contain rounded-lg shadow-2xl select-none"
@@ -1028,7 +1029,7 @@ function ImageGalleryModal({ images, initialIndex, onClose }) {
                   : "opacity-50 hover:opacity-80 grayscale hover:grayscale-0"
               }`}
             >
-              <img 
+              <FallbackImage 
                 src={getImageUrl(img.img_url)} 
                 alt="" 
                 className="w-full h-full object-cover" 
@@ -2098,7 +2099,7 @@ export default function ProductDetailPage() {
                   <td className="px-4 py-2.5">
                     {variant.images?.length > 0 ? (
                       <button onClick={(e) => { e.stopPropagation(); openGallery(0); }} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
-                        <img src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
+                        <FallbackImage src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
                       </button>
                     ) : (
                       <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
@@ -2278,7 +2279,7 @@ export default function ProductDetailPage() {
                   onClick={() => openGallery(0)}
                   className="block w-full relative overflow-hidden rounded-xl shadow-lg group-hover:shadow-2xl transition-all duration-300"
                 >
-                  <img
+                  <FallbackImage
                     src={getImageUrl(firstVariant.images[0].img_url)}
                     alt={productNameOf(product)}
                     className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
@@ -2306,7 +2307,7 @@ export default function ProductDetailPage() {
                             : "border-[var(--border-color)] hover:border-[var(--text-muted)] opacity-70 hover:opacity-100"
                         }`}
                       >
-                        <img
+                        <FallbackImage
                           src={getImageUrl(img.img_url)}
                           alt=""
                           className="w-full h-full object-cover"
@@ -2595,7 +2596,7 @@ export default function ProductDetailPage() {
                               onClick={() => openGallery(0)}
                               className="group/img relative block w-full overflow-hidden rounded-lg border border-[var(--border-color)]"
                             >
-                              <img src={getImageUrl(firstVariant.images[0].img_url)} alt={product.name} className="w-full h-36 object-cover" />
+                              <FallbackImage src={getImageUrl(firstVariant.images[0].img_url)} alt={product.name} className="w-full h-36 object-cover" />
                               <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
                                 <span className="flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover/img:opacity-100">
                                   <ZoomIn className="w-3 h-3" /> {t("admin.productDetail.page.viewFullSize")}
@@ -2611,7 +2612,7 @@ export default function ProductDetailPage() {
                                     onClick={() => openGallery(i + 1)}
                                     className="h-14 w-full overflow-hidden rounded-md border border-[var(--border-color)] transition-all hover:ring-2 hover:ring-[var(--accent)]"
                                   >
-                                    <img src={getImageUrl(img.img_url)} alt="" className="h-full w-full object-cover" />
+                                    <FallbackImage src={getImageUrl(img.img_url)} alt="" className="h-full w-full object-cover" />
                                   </button>
                                 ))}
                                 {firstVariant.images.length > 4 && (
@@ -3445,7 +3446,7 @@ export default function ProductDetailPage() {
                                   <div className="mt-2 flex flex-wrap gap-2">
                                     {variant.images.map((img, ii) => (
                                       <div key={ii} className="relative group">
-                                        <img src={img.preview} alt="" className="h-14 w-14 rounded-lg object-cover" style={{ border: "1px solid var(--border-color)" }} />
+                                        <FallbackImage src={img.preview} alt="" className="h-14 w-14 rounded-lg object-cover" style={{ border: "1px solid var(--border-color)" }} />
                                         <button type="button" onClick={() => removeImage(index, ii)}
                                           className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600">
                                           <X className="w-3.5 h-3.5" />

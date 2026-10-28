@@ -1,5 +1,6 @@
 'use client';
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useState, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/apis/axiosInstance';
@@ -78,7 +79,7 @@ function StoreLogo({
       <span
         className={`${sizeClass} flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-black/10 ${shadowClass} ${extraClass}`}
       >
-        <img
+        <FallbackImage
           src={logoUrl}
           alt={alt || 'Store'}
           onError={() => setLogoFailed(true)}

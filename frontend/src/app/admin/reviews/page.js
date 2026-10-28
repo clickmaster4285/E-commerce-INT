@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -405,7 +406,7 @@ export default function AdminReviewsPage() {
                             >
                               {user?.avatar ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={mediaUrl(user.avatar) || user.avatar} alt={user?.name || t("admin.reviews.ui.customer")} className="h-full w-full object-cover" />
+                                <FallbackImage src={mediaUrl(user.avatar) || user.avatar} alt={user?.name || t("admin.reviews.ui.customer")} className="h-full w-full object-cover" />
                               ) : (
                                 String(user?.name || "U").charAt(0).toUpperCase()
                               )}

@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +42,7 @@ function FieldLabel({ children, required }) {
 function Thumb({ src, alt, size = "w-9 h-9", circle = false }) {
   const round = circle ? "rounded-full" : "rounded-lg";
   const url = getImageUrl(src);
-  if (url) return <img src={url} alt={alt} className={`${size} shrink-0 ${round} object-cover`} style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }} />;
+  if (url) return <FallbackImage src={url} alt={alt} className={`${size} shrink-0 ${round} object-cover`} style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }} />;
   return <div className={`${size} shrink-0 ${round} flex items-center justify-center`} style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}><Package size={16} aria-hidden="true" /></div>;
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { use, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -524,11 +525,7 @@ export default function OrderDetailPage({ params }) {
                 return (
                   <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors group">
                     <div className="shrink-0 relative">
-                      {getImgUrl(i.image) ? (
-                        <img src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
-                      ) : (
-                        <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center"><Package size={26} className="text-[var(--user-text-subtle)]" /></div>
-                      )}
+                      <FallbackImage src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
                       <div className="absolute -top-2 -right-2 min-w-[1.375rem] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -779,13 +776,7 @@ export default function OrderDetailPage({ params }) {
               return (
                 <div key={idx} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                   <div className="shrink-0 relative">
-                    {getImgUrl(i.image) ? (
-                      <img src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
-                    ) : (
-                      <div className="w-14 h-14 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
-                        <Package size={20} className="text-[var(--user-text-muted)]" />
-                      </div>
-                    )}
+                    <FallbackImage src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
                     <div className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-black flex items-center justify-center border border-[var(--user-bg-card)]">×{qty}</div>
                   </div>
                   <div className="flex-1 min-w-0">

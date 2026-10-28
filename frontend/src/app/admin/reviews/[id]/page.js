@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -335,7 +336,7 @@ export default function AdminReviewDetailPage() {
                   className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold"
                   style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                 >
-                  {user.avatar ? <img src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : reviewerName.charAt(0).toUpperCase()}
+                  {user.avatar ? <FallbackImage src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : reviewerName.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -377,7 +378,7 @@ export default function AdminReviewDetailPage() {
                           onClick={() => setLightboxMedia({ type: "image", url: item.url })}
                           className="block h-full w-full"
                         >
-                          <img
+                          <FallbackImage
                             src={item.url}
                             alt={`Review photo ${item.index + 1}`}
                             className="h-full w-full object-cover transition-transform group-hover:scale-105"
@@ -602,7 +603,7 @@ export default function AdminReviewDetailPage() {
                   className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-base font-bold"
                   style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                 >
-                  {user.avatar ? <img src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : reviewerName.charAt(0).toUpperCase()}
+                  {user.avatar ? <FallbackImage src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : reviewerName.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-center">
                   <p className="text-[12px] font-bold text-[var(--text-primary)]">{reviewerName}</p>
@@ -642,13 +643,7 @@ export default function AdminReviewDetailPage() {
             </div>
             <div className="p-3.5">
               <div className="flex items-center gap-2.5">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
-                  {product.image ? (
-                    <img src={mediaUrl(product.image)} alt="" className="h-full w-full rounded-md object-cover" />
-                  ) : (
-                    <Package size={18} />
-                  )}
-                </span>
+                <FallbackImage src={mediaUrl(product.image)} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(product) || t("admin.reviews.detail.productUnavailable")}</p>
                   <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">ID: {productId || "—"}</p>
@@ -794,7 +789,7 @@ export default function AdminReviewDetailPage() {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <img
+            <FallbackImage
               src={lightboxMedia.url}
               alt=""
               className="max-w-[92vw] max-h-[85vh] object-contain rounded-md"

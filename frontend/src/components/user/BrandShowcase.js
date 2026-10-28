@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* ==========================================================
    BRAND SHOWCASE — "Shop by Brand" ke neeche, home page ka
    aakhri section. Top brands ki apni sliding product rows:
@@ -15,7 +16,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
@@ -71,13 +72,7 @@ function BrandRow({ brand, items }) {
       {/* Brand header */}
       <div className="mb-3 flex items-center gap-3">
         <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
-          {logo ? (
-            <Image src={logo} alt={brandDisplayName} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
-          ) : (
-            <span className="text-base font-black text-[var(--user-accent)]">
-              {String(brandDisplayName || "?").charAt(0).toUpperCase()}
-            </span>
-          )}
+          <FallbackImage nextImage src={logo} alt={brandDisplayName} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
         </span>
         <div className="min-w-0 flex-1">
           <p title={brandDisplayName} className="truncate text-sm font-medium capitalize text-[var(--user-text)]">

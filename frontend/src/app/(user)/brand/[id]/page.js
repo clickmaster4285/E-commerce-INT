@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { Suspense, useRef } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -147,7 +148,7 @@ function BrandContent({ brandId }) {
         <div className="flex items-center gap-3 lg:gap-4 mb-3">
           {logoUrl ? (
             <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-xl bg-[var(--user-text)] border border-[var(--user-border)] flex items-center justify-center p-2 lg:p-2.5 shrink-0">
-              <img
+              <FallbackImage
                 src={logoUrl}
                 alt={brandDisplayName}
                 className="max-h-full max-w-full object-contain"

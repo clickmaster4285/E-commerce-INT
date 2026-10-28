@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useRouter } from "next/navigation";
 import {
   useQuery,
@@ -1155,7 +1156,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                   <div className="flex flex-wrap gap-3 mt-4">
                     {variant.images.map((image, imageIndex) => (
                       <div key={imageIndex} className="relative group rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: "var(--border-color)" }}>
-                        <img
+                        <FallbackImage
                           src={image.preview}
                           alt={image.file?.name || t("admin.shared.label.image")}
                           className="h-20 w-20 object-cover"

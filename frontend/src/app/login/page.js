@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -37,7 +38,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
       </div>
     );
   }
-  return <img src={logoUrl} alt={store?.store_name || "Store"} className={`${sizeClass} rounded-lg object-cover shrink-0`} />;
+  return <FallbackImage src={logoUrl} alt={store?.store_name || "Store"} className={`${sizeClass} rounded-lg object-cover shrink-0`} />;
 }
 
 export default function UserLoginPage() {

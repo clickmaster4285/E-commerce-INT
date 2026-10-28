@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* ==========================================================
    FEATURED PRODUCTS — Admin
    Sirf wahi products jo admin ne "featured" mark kiye hain.
@@ -159,17 +160,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
     >
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          {img ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={getImageUrl(img)} alt={productName} className="h-8 w-8 shrink-0 rounded object-cover" />
-          ) : (
-            <div
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded"
-              style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}
-            >
-              <Package className="h-4 w-4" />
-            </div>
-          )}
+          <FallbackImage src={getImageUrl(img)} alt={productName} className="h-8 w-8 shrink-0 rounded object-cover" />
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold">{productName}</p>
             <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{variant?.sku || "—"}</p>
@@ -245,17 +236,7 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
       style={cardStyle}
     >
       <div className="flex items-start justify-between">
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={getImageUrl(img)} alt={productName} className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-            style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}
-          >
-            <Package className="h-4 w-4" />
-          </div>
-        )}
+        <FallbackImage src={getImageUrl(img)} alt={productName} className="h-10 w-10 shrink-0 rounded-full object-cover" />
         <div className="flex items-center gap-1.5">
           <span
             className="inline-flex items-center rounded-md px-1.5 py-1"
@@ -616,14 +597,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
                       {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                     </span>
 
-                    {img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={getImageUrl(img)} alt={productNameOf(p)} className="h-9 w-9 shrink-0 rounded object-cover" />
-                    ) : (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>
-                        <Package className="h-4 w-4" />
-                      </div>
-                    )}
+                    <FallbackImage src={getImageUrl(img)} alt={productNameOf(p)} className="h-9 w-9 shrink-0 rounded object-cover" />
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p>

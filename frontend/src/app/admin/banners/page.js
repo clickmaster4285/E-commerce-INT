@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
@@ -401,7 +402,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
       >
         {currentPreview ? (
           <div className="relative w-full group">
-            <img src={currentPreview} alt={label} className="w-full h-32 object-cover rounded-md border border-white/10" />
+            <FallbackImage src={currentPreview} alt={label} className="w-full h-32 object-cover rounded-md border border-white/10" />
             <button
               type="button"
               onClick={handleRemove}
@@ -1292,7 +1293,7 @@ export default function BannersPage() {
                           <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(banner._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} />
                         </td>
                         <td className="px-4 py-2.5">
-                          <img src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
+                          <FallbackImage src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
                         </td>
                         <td className="px-4 py-2.5 font-medium text-[13px]">{contentOf(banner.title, banner.translations?.title)}</td>
                         <td className="px-4 py-2.5 capitalize text-[13px]" style={{ color: "var(--text-secondary)" }}>{banner.bannerType.replace("_", " ")}</td>
@@ -1315,7 +1316,7 @@ export default function BannersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {paginatedBanners.map((banner) => (
               <div key={banner._id} onClick={() => router.push(`${pathname}/${banner._id}`)} className="rounded-lg p-4 flex flex-col gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
-                <img src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
+                <FallbackImage src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
                 <div className="flex items-start justify-between">
                   <div className="min-w-0">
                     <p className="font-semibold text-[13px] truncate">{contentOf(banner.title, banner.translations?.title)}</p>
