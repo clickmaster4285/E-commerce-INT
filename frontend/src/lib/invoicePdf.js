@@ -4,6 +4,20 @@ import { htmlToPlainText } from "@/lib/termsContent";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const PAGE_MARGIN = 14;
+const PAGE_FORMATS_MM = {
+  tabloid: [279.4, 431.8],
+  legal: [215.9, 355.6],
+  letter: [215.9, 279.4],
+  a0: [841, 1189],
+  a1: [594, 841],
+  a2: [420, 594],
+  a3: [297, 420],
+  a4: [210, 297],
+  a5: [148, 210],
+};
+const normalizePageFormat = (value) => Object.hasOwn(PAGE_FORMATS_MM, String(value || "").toLowerCase())
+  ? String(value).toLowerCase()
+  : "a4";
 const COLORS = {
   ink: [20, 20, 20],
   muted: [85, 85, 85],
@@ -109,14 +123,14 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const numberLabel = isQuote ? "Quote Number" : "Invoice Number";
   const dateLabelText = isQuote ? "Quote Date" : "Invoice Date";
   const dueLabelText = isQuote ? "Valid Until" : "Due Date";
-  const pageFormat = isDesigned && design.pageSize === "letter" ? "letter" : "a4";
+  const pageFormat = isDesigned ? normalizePageFormat(design.pageSize) : "a4";
   const pageOrientation = isDesigned && design.orientation === "landscape" ? "landscape" : "portrait";
-  const [shortPageSide, longPageSide] = pageFormat === "letter" ? [215.9, 279.4] : [210, 297];
+  const documentTitleSize = isDesigned
+    ? Math.min(22.5, Math.max(13.5, (Number(design.titleSize) || 26) * 0.75))
+    : 17;
+  const [shortPageSide, longPageSide] = PAGE_FORMATS_MM[pageFormat];
   const requestedPageWidth = isDesigned && pageOrientation === "landscape" ? longPageSide : shortPageSide;
-  const defaultPageHeight = isDesigned && pageOrientation === "landscape" ? shortPageSide : longPageSide;
-  const requestedPageHeight = isDesigned && Number(design.pageHeight) > 0
-    ? Math.max(180, Math.min(420, Number(design.pageHeight)))
-    : defaultPageHeight;
+  const requestedPageHeight = isDesigned && pageOrientation === "landscape" ? shortPageSide : longPageSide;
   const baseMargin = PAGE_MARGIN;
   const agencySidebar = isDesigned && template === "agency";
   const sidebarWidth = agencySidebar ? Math.min(66, requestedPageWidth * 0.3) : 0;
@@ -219,7 +233,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       setText(11, [255, 255, 255], "bold");
       pdf.text(pdf.splitTextToSize(companyName, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 37);
       setText(6.5, [235, 238, 255]);
-      setText(22, accent, "bold");
+      setText(documentTitleSize, accent, "bold");
       pdf.text(documentTitle, pageWidth - baseMargin, 18, { align: "right" });
       setText(6.5, COLORS.muted, "bold");
       pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - baseMargin, 25, { align: "right" });
@@ -244,7 +258,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
       setText(12, COLORS.ink, "bold");
       pdf.text(companyName, textX, 17);
-      setText(23, [255, 255, 255], "bold");
+      setText(documentTitleSize, [255, 255, 255], "bold");
       pdf.text(documentTitle, pageWidth - baseMargin, 18, { align: "right" });
       setText(6.2, [255, 255, 255], "bold");
       pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - baseMargin, 27, { align: "right" });
@@ -279,7 +293,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       if (elegant) {
         setText(9, COLORS.ink, "bold");
         pdf.text(companyName, pageWidth / 2, logo ? 25 : 14, { align: "center" });
-        setText(26, accent, "bold");
+        setText(documentTitleSize, accent, "bold");
         pdf.text(documentTitle, pageWidth - margin, logo ? 23 : 18, { align: "right" });
         setText(6.5, COLORS.muted, "bold");
         pdf.text(`${numberLabel}: ${documentNumber}`, pageWidth - margin, logo ? 30 : 25, { align: "right" });
@@ -290,7 +304,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
         const titleY = logo ? 30 : 17;
         setText(isDesigned ? 20 : 14, accent, "bold");
         pdf.text(companyName, pageWidth / 2, titleY, { align: "center" });
-        setText(isDesigned ? 18 : 8, accent, "bold");
+        setText(isDesigned ? documentTitleSize : 8, accent, "bold");
         if (isDesigned) {
           pdf.text(documentTitle, pageWidth - margin, titleY, { align: "right" });
           setText(6.5, COLORS.muted, "bold");
@@ -332,7 +346,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
 
     const rightX = pageWidth - margin;
     if (isDesigned) {
-      setText(17, headerColor, "bold");
+      setText(documentTitleSize, headerColor, "bold");
       pdf.text(documentTitle, rightX, 13, { align: "right" });
       setText(6.5, headerColor, "bold");
       pdf.text(`${numberLabel}: ${documentNumber}`, rightX, 21, { align: "right" });
@@ -775,7 +789,7 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
     ]);
     const html2canvas = html2canvasModule.default;
     const design = documentData.pdf_design || {};
-    const format = design.pageSize === "letter" ? "letter" : "a4";
+    const format = normalizePageFormat(design.pageSize);
     const orientation = design.orientation === "landscape" ? "landscape" : "portrait";
     pdf = new jsPDF({ orientation, unit: "mm", format, compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
