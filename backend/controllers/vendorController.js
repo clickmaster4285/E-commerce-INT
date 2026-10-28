@@ -3,6 +3,7 @@ const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const { auditEvent, diffFields } = require("../utils/auditHistory");
 
 const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -29,7 +30,7 @@ const createVendor = async (req, res) => {
       const dup = await Vendor.findOne({ vendor_code: code, is_deleted: false });
       if (dup) return res.status(400).json({ success: false, message: "Active vendor with this code already exists" });
     }
-    const vendor = await Vendor.create({ ...req.body, vendor_code: code, createdby: req.user?._id || null });
+    const vendor = await Vendor.create({ ...req.body, vendor_code: code, createdby: req.user?._id || null, activity: [auditEvent(req, "created", [{ field: "Vendor", before: "—", after: String(req.body?.name || "").trim() }])] });
     const io = req.io || getIO();
     await pushGlobalActivity(io, { action: `${req.user?.name || "Admin"} created vendor "${vendor.name}"`, category: "Vendor Management", performedBy: req.user?._id || null, performedByName: req.user?.name || "Admin", details: { vendorId: vendor._id, vendor_code: code } }, req.user?._id || null).catch(() => {});
     try { io.emit("vendorCreated", vendor.toObject()); } catch {}
@@ -43,7 +44,7 @@ const createVendor = async (req, res) => {
 const getVendorsAdmin = async (req, res) => {
   try {
     if (req.query.page === undefined && req.query.limit === undefined) {
-      const vendors = await Vendor.find({ is_deleted: false }).sort({ created_at: -1 }).lean();
+      const vendors = await Vendor.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean();
       return res.status(200).json({ success: true, data: vendors });
     }
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -57,7 +58,7 @@ const getVendorsAdmin = async (req, res) => {
     if (city && city.toLowerCase() !== "all") filter.city = city;
     const [total, vendors, totalAll, activeCount, cities] = await Promise.all([
       Vendor.countDocuments(filter),
-      Vendor.find(filter).sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Vendor.find(filter).select("-activity").sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Vendor.countDocuments({ is_deleted: false }),
       Vendor.countDocuments({ is_deleted: false, is_active: true }),
       Vendor.distinct("city", { is_deleted: false }),
@@ -94,6 +95,9 @@ const updateVendor = async (req, res) => {
     if (!existing) return res.status(404).json({ success: false, message: "Vendor not found" });
     const update = { ...req.body, updatedby: req.user?._id || null };
     if (!String(req.body?.vendor_code || "").trim()) update.vendor_code = existing.vendor_code;
+    const fields = ["vendor_code", "name", "company_name", "contact_person", "email", "phone", "whatsapp", "address", "city", "state", "country", "zip_code", "tax_id", "bank_details", "lead_time_days", "rating", "is_active"];
+    const changes = diffFields(existing.toObject(), { ...existing.toObject(), ...update }, fields.map((key) => [key, key.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())]));
+    if (changes.length) update.activity = [...(existing.activity || []), auditEvent(req, "updated", changes)];
     const vendor = await Vendor.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     try { (req.io || getIO()).emit("vendorUpdated", vendor.toObject()); } catch {}
     res.status(200).json({ success: true, message: "Vendor updated", data: vendor });
@@ -107,6 +111,7 @@ const deleteVendor = async (req, res) => {
   try {
     const vendor = await Vendor.findOne({ _id: req.params.id, is_deleted: false });
     if (!vendor) return res.status(404).json({ success: false, message: "Vendor not found or already deleted" });
+    vendor.activity.push(auditEvent(req, "deleted", [{ field: "Vendor", before: vendor.name, after: "Deleted" }]));
     await vendor.softDelete(req.user?._id);
     try { (req.io || getIO()).emit("vendorDeleted", { _id: String(vendor._id) }); } catch {}
     res.status(200).json({ success: true, message: "Vendor soft deleted", data: { _id: vendor._id } });

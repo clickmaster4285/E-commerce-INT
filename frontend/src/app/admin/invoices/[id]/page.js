@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight,
-  CreditCard, FileText, MoreHorizontal, Printer, RotateCcw, Send } from
+  ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3,
+  CreditCard, FileText, Printer, RotateCcw, Send, Pencil, ShoppingBag } from
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
@@ -70,11 +70,9 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const queryClient = useQueryClient();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const [actionsOpen, setActionsOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const printHandled = useRef(false);
   const invoicePreviewRef = useRef(null);
-  const actionsRef = useRef(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_time: new Date().toTimeString().slice(0, 5), payment_method: "Cash", note: "" });
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ["invoice-admin", id],
@@ -86,22 +84,6 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     staleTime: 5 * 60 * 1000
   });
   const remaining = Math.max(0, Number(invoice?.remaining_balance ?? invoice?.total ?? 0));
-
-  useEffect(() => {
-    if (!actionsOpen) return undefined;
-    const closeOnOutsideClick = (event) => {
-      if (!actionsRef.current?.contains(event.target)) setActionsOpen(false);
-    };
-    const closeOnEscape = (event) => {
-      if (event.key === "Escape") setActionsOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [actionsOpen]);
 
   useEffect(() => {
     if (!invoice?.sent_at || searchParams.get("returnRefund") !== "1") return;
@@ -242,6 +224,36 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   ...(returnedTimelineStep && paidAmount === 0 ? [returnedTimelineStep] : []),
   paymentTimelineStep,
   ...(returnedTimelineStep && paidAmount > 0 ? [returnedTimelineStep] : [])];
+  const storedActivity = Array.isArray(invoice.activity) ? invoice.activity : [];
+  const invoiceActivity = storedActivity.length ? storedActivity : [
+    { _id: "legacy-created", type: "created", at: invoice.created_at || invoice.invoice_date, actor_name: invoice.createdby?.name || invoice.updatedby?.name || "", changes: items.map((item) => ({ action: "added", field: "item", product_name: item.name, sku: item.sku, from_quantity: 0, to_quantity: item.quantity })) },
+    ...(invoice.sent_at ? [{ _id: "legacy-sent", type: "sent", at: invoice.sent_at, actor_name: invoice.updatedby?.name || "" }] : []),
+    ...payments.map((payment, index) => ({ _id: `legacy-payment-${index}`, type: "payment", at: payment.payment_date, actor_name: "", changes: [{ action: "payment_recorded", field: "Payment", before: "—", after: `${payment.payment_method} · ${money(payment.amount, locale)}${payment.note ? ` · ${payment.note}` : ""}` }] })),
+    ...returns.map((record, index) => ({ _id: `legacy-return-${index}`, type: "return", at: record.date, actor_name: "", changes: (record.items_returned || []).map((item) => ({ action: "returned", field: "item", product_name: item.name, from_quantity: 0, to_quantity: item.qty, before: "—", after: `${item.qty} returned · ${money(item.return_value, locale)}` })) })),
+  ].sort((a, b) => new Date(a.at || 0).getTime() - new Date(b.at || 0).getTime());
+  const invoiceActivityLabel = (change) => {
+    const product = [change.product_name, change.variant_title || change.sku].filter(Boolean).join(" · ") || t("admin.pos.ui.product");
+    if (change.action === "added") return t("admin.invoiceDetail.activity.productAdded", { product, quantity: change.to_quantity || 0 });
+    if (change.action === "removed") return t("admin.invoiceDetail.activity.productRemoved", { product, quantity: change.from_quantity || 0 });
+    if (change.action === "quantity") return t("admin.invoiceDetail.activity.quantityChanged", { product, from: change.from_quantity || 0, to: change.to_quantity || 0 });
+    if (change.action === "returned") return t("admin.invoiceDetail.activity.productReturned", { product, quantity: change.to_quantity || 0 });
+    if (change.action === "item_field") {
+      const before = change.field === "Unit price" && change.before !== "—" ? money(change.before, locale) : change.before;
+      const after = change.field === "Unit price" && change.after !== "—" ? money(change.after, locale) : change.after;
+      return t("admin.invoiceDetail.activity.itemFieldChanged", { field: change.field, product, before, after });
+    }
+    if (change.action === "field") {
+      const moneyFields = ["Subtotal", "Total discount", "Total tax", "Invoice total"];
+      const before = moneyFields.includes(change.field) && change.before !== "—" ? money(change.before, locale) : change.before;
+      const after = moneyFields.includes(change.field) && change.after !== "—" ? money(change.after, locale) : change.after;
+      return t("admin.invoiceDetail.activity.fieldChanged", { field: change.field, before, after });
+    }
+    if (change.action === "payment_recorded") return t("admin.invoiceDetail.activity.paymentRecorded", { detail: change.after });
+    if (change.action === "balance") return t("admin.invoiceDetail.activity.balanceChanged", { before: money(change.before, locale), after: money(change.after, locale) });
+    if (change.action === "refund") return t("admin.invoiceDetail.activity.refundProcessed", { detail: change.after });
+    if (change.action === "sent") return t("admin.invoiceDetail.activity.sentToCustomer");
+    return change.after ? `${change.field}: ${change.after}` : change.field;
+  };
 
   const smallAction = (label, onClick, Icon, primaryAction = false, disabled = false, title) => {
     const button = <button
@@ -273,19 +285,9 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
-        <div ref={actionsRef} className="relative">
-          <button type="button" aria-label="Invoice actions" aria-expanded={actionsOpen} disabled={isGeneratingPdf} onClick={() => setActionsOpen((open) => !open)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-45">
-            <MoreHorizontal size={17} />
-          </button>
-          {actionsOpen && <div className="absolute right-0 top-11 z-30 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-            <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { setActionsOpen(false); printInvoice(); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-slate-700 transition hover:bg-blue-50 disabled:opacity-50">
-              <Printer size={14} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}
-            </button>
-            <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { setActionsOpen(false); downloadPdf(); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs font-medium text-slate-700 transition hover:bg-blue-50 disabled:opacity-50">
-              <FileText size={14} />Download PDF
-            </button>
-          </div>}
-        </div>
+        {!invoice.sent_at && smallAction("Edit", () => router.push(`/admin/invoices/new?invoice=${encodeURIComponent(id)}`), Pencil)}
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 disabled:opacity-45" style={{ borderColor: "#dce8f8", color: "#36567f", background: "white" }}><Printer size={16} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 disabled:opacity-45" style={{ borderColor: "#dce8f8", color: "#36567f", background: "white" }}><FileText size={16} />Download PDF</button>
         {canReturn && smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? t("admin.invoiceDetail.action.saving") : t("admin.invoiceDetail.action.sendCustomer"),
@@ -345,6 +347,33 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
               <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-rose-800">Return &amp; Refund</span><span className="mt-0.5 block text-[10px] text-rose-700/80">Process returned items and adjust the bill</span></span>
               <ChevronRight size={15} className="shrink-0 text-rose-500" />
             </button>}
+          </div>
+        </Panel>
+
+        <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">{invoiceActivity.length}</span>} className="print:hidden">
+          <div className="max-h-[360px] overflow-y-auto px-3 py-3">
+            <ol className="space-y-0">
+              {[...invoiceActivity].reverse().map((event, index, events) => {
+                const created = event.type === "created";
+                const sent = event.type === "sent";
+                const payment = event.type === "payment";
+                const returned = event.type === "return";
+                const Icon = created ? ShoppingBag : sent ? Send : payment ? CreditCard : returned ? RotateCcw : Pencil;
+                const title = t(`admin.invoiceDetail.activity.type.${event.type}`);
+                const eventDate = event.at && !Number.isNaN(new Date(event.at).getTime())
+                  ? new Date(event.at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
+                  : t("common.notProvided");
+                return <li key={event._id || `${event.type}-${index}`} className="relative flex gap-2.5 pb-3 last:pb-0">
+                  {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-slate-200" />}
+                  <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-white ${created ? "bg-emerald-100 text-emerald-700" : returned ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}><Icon size={11} /></span>
+                  <div className="min-w-0 flex-1 border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-2"><p className="min-w-0 text-[11px] font-bold leading-4 text-slate-800">{title}</p><time className="shrink-0 text-[9px] leading-4 text-slate-400">{eventDate}</time></div>
+                    <p className="mt-0.5 truncate text-[10px] text-slate-500">{t("admin.invoiceDetail.activity.by", { name: event.actor_name || t("admin.pos.ui.unknownStaff") })}</p>
+                    {event.changes?.length > 0 && <ul className="mt-1.5 space-y-1">{event.changes.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-slate-600"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
+                  </div>
+                </li>;
+              })}
+            </ol>
           </div>
         </Panel>
 

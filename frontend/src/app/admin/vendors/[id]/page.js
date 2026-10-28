@@ -8,6 +8,7 @@ import { vendorApi } from "@/apis/admin/vendorApi";
 import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { localizedStrictField } from "@/i18n/localize";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
+import ActivityTimeline from "@/components/admin/ActivityTimeline";
 import { toast } from "sonner";
 import VendorFormModal, { emptyVendorForm, toVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
 import {
@@ -116,15 +117,25 @@ export default function VendorDetailPage({ params }) {
     if (!detail) return [];
     const ev = [];
     for (const p of detail.purchaseOrders || []) {
-      ev.push({ t: p.created_at, label: tDetail("events.poCreated", { number: p.po_number }), sub: tDetail("events.poSummary", { count: new Intl.NumberFormat(intlLocale(locale)).format((p.items || []).length), amount: money(p.total, locale) }) });
-      for (const r of p.receivings || []) {
-        const invoice = r.invoice_no ? tDetail("events.invoice", { invoice: r.invoice_no }) : "";
-        const receiver = r.received_by_name ? tDetail("events.receivedBy", { name: r.received_by_name }) : "";
-        ev.push({ t: r.received_at, label: tDetail("events.poReceived", { number: p.po_number }), sub: tDetail("events.receivingSummary", { count: new Intl.NumberFormat(intlLocale(locale)).format((r.items || []).reduce((s, x) => s + (x.qty || 0), 0)), units: tShared("label.units"), invoice: invoice ? ` · ${invoice}` : "", receiver: receiver ? ` · ${receiver}` : "" }) });
+      if (p.activity?.length) {
+        ev.push(...p.activity.map((event) => ({ ...event, at: event.at || p.created_at, summary: `PO ${p.po_number} · ${String(event.type || "activity").replaceAll("_", " ")}` })));
+      } else {
+        ev.push({ type: "created", at: p.created_at, actor_name: p.createdby?.name || "Staff", summary: tDetail("events.poCreated", { number: p.po_number }), changes: [{ field: "Total", before: "—", after: money(p.total, locale) }] });
+        for (const r of p.receivings || []) {
+          const invoice = r.invoice_no ? tDetail("events.invoice", { invoice: r.invoice_no }) : "";
+          const receiver = r.received_by_name ? tDetail("events.receivedBy", { name: r.received_by_name }) : "";
+          ev.push({ type: "received", at: r.received_at, actor_name: r.received_by_name || "Staff", summary: tDetail("events.poReceived", { number: p.po_number }), changes: [{ field: "Receiving", before: "—", after: tDetail("events.receivingSummary", { count: new Intl.NumberFormat(intlLocale(locale)).format((r.items || []).reduce((s, x) => s + (x.qty || 0), 0)), units: tShared("label.units"), invoice: invoice ? ` · ${invoice}` : "", receiver: receiver ? ` · ${receiver}` : "" }) }] });
+        }
       }
     }
-    for (const pay of paymentsByPo || []) ev.push({ t: pay.paid_at || pay.created_at, label: tDetail("events.paymentReceived", { amount: money(pay.amount, locale) }), sub: pay.po_number || "" });
-    return ev.sort((a, b) => new Date(b.t) - new Date(a.t));
+    for (const pay of paymentsByPo || []) {
+      const po = (detail.purchaseOrders || []).find((item) => String(item._id) === String(pay.po_id));
+      const alreadyRecorded = po?.activity?.some((event) => event.type === "payment" && event.changes?.some((change) => Number(String(change.after || "").split(" · ")[1]) === Number(pay.amount)));
+      if (!alreadyRecorded) ev.push({ type: "payment", at: pay.paid_at || pay.created_at, actor_name: "Staff", summary: tDetail("events.paymentReceived", { amount: money(pay.amount, locale) }), changes: [{ field: "Payment", before: "—", after: `${money(pay.amount, locale)} · ${pay.po_number || ""}` }] });
+    }
+    ev.push(...(detail.activity || []));
+    if (!detail.activity?.length) ev.push({ type: "created", at: detail.created_at, actor_name: detail.createdby?.name || "Staff", summary: "Vendor created", changes: [{ field: "Vendor", before: "—", after: detail.name || "Vendor" }] });
+    return ev;
   }, [detail, paymentsByPo, locale, tDetail, tShared]);
 
   if (isLoading) return <p className="text-sm p-6 text-center" style={{ color: "var(--text-muted)" }}>{tDetail("states.loading")}</p>;
@@ -239,19 +250,7 @@ export default function VendorDetailPage({ params }) {
                     </table>
                   </div>
               )}
-              {tab === "activity" && (
-                <div className="space-y-1">
-                  {events.map((e, i) => (
-                    <div key={i} className="flex gap-3 py-2" style={{ borderBottom: "1px solid var(--border-color)" }}>
-                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: "var(--accent)" }} />
-                      <div className="text-[13px]"><div className="font-semibold">{e.label}</div>
-                        <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{e.sub}{e.sub ? " · " : ""}{e.t ? new Date(e.t).toLocaleString() : ""}</div>
-                      </div>
-                    </div>
-                  ))}
-                  {!events.length && <p className="text-sm text-center py-6" style={{ color: "var(--text-muted)" }}>{tDetail("states.noActivity")}</p>}
-                </div>
-              )}
+              {tab === "activity" && <ActivityTimeline events={events} title="Vendor activity" emptyText={tDetail("states.noActivity")} />}
             </div>
           </div>
         </main>

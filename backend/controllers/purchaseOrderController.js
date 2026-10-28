@@ -8,6 +8,7 @@ const StockHistory = require("../models/StockHistory");
 const log = require("../utils/logger");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
+const { auditEvent, diffFields, diffItems } = require("../utils/auditHistory");
 
 const emitPO = (event, data) => { try { const io = getIO(); if (io) io.emit(event, data); } catch {} };
 const emitStock = (data) => emitPO("stockUpdated", data);
@@ -89,6 +90,11 @@ const createPO = async (req, res) => {
           status: "pending", payment_status: "unpaid", paid_amount: 0, due_amount: total,
           expected_date: expected_date || null, due_date: due_date || null, notes: notes || "",
           createdby: req.user?._id || null,
+          activity: [auditEvent(req, "created", [
+            { field: "Purchase order", before: "—", after: String(vendor.name || "Vendor") },
+            ...diffItems([], items, { itemFields: { cost_price: "Cost price" } }),
+            { field: "Total", before: "—", after: String(total) },
+          ])],
         });
         break;
       } catch (e) { if (e.code === 11000 && i < 4) continue; throw e; }
@@ -109,7 +115,7 @@ const getAllPOs = async (req, res) => {
     if (vendor !== "all" && mongoose.isValidObjectId(String(vendor))) q.vendor_id = vendor;
     if (String(search).trim()) { const rx = new RegExp(escapeRegex(String(search).trim()), "i"); q.$or = [{ po_number: rx }, { "vendor_snapshot.name": rx }]; }
     const [pos, total] = await Promise.all([
-      PurchaseOrder.find(q).populate("vendor_id", "name vendor_code translations").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      PurchaseOrder.find(q).select("-activity").populate("vendor_id", "name vendor_code translations").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       PurchaseOrder.countDocuments(q),
     ]);
     res.status(200).json({ success: true, data: pos, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } });
@@ -118,7 +124,7 @@ const getAllPOs = async (req, res) => {
 
 const getPOByIdAdmin = async (req, res) => {
   try {
-    const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code phone email company_name address city state country translations translation_source translation_status").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").lean();
+    const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code phone email company_name address city state country translations translation_source translation_status").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").populate("createdby", "name").populate("updatedby", "name").lean();
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     const legacyVariantIds = (po.items || [])
       .filter((item) => item.sell_price == null)
@@ -143,6 +149,7 @@ const updatePO = async (req, res) => {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     if (po.status !== "pending") return res.status(400).json({ success: false, message: "Only pending POs can be edited" });
+    const before = po.toObject();
     const { items: rawItems, shipping, discount, overall_tax, overall_tax_rate, expected_date, due_date, notes } = req.body;
     if (rawItems) {
       const { items, subtotal, tax } = await buildItems(rawItems);
@@ -158,6 +165,11 @@ const updatePO = async (req, res) => {
     if (due_date !== undefined) po.due_date = due_date || null;
     if (notes !== undefined) po.notes = notes || "";
     po.updatedby = req.user?._id || null;
+    const changes = [
+      ...diffFields(before, po.toObject(), [["shipping", "Shipping"], ["discount", "Discount"], ["overall_tax", "Additional tax"], ["overall_tax_rate", "Additional tax rate"], ["expected_date", "Expected delivery"], ["due_date", "Due date"], ["notes", "Notes"], ["subtotal", "Subtotal"], ["tax", "Tax"], ["total", "Total"]]),
+      ...(rawItems ? diffItems(before.items, po.items, { itemFields: { cost_price: "Cost price", sell_price: "Selling price", tax_rate: "Tax rate", expiry_after_delivery: "Expiry period", expiry_after_delivery_unit: "Expiry unit" } }) : []),
+    ];
+    if (changes.length) po.activity.push(auditEvent(req, "updated", changes));
     await po.save();
     emitPO("po:updated", { success: true, data: po });
     res.status(200).json({ success: true, data: po });
@@ -173,8 +185,13 @@ const transition = (from, to) => async (req, res) => {
       if (!String(req.body?.cancel_reason || "").trim()) return res.status(400).json({ success: false, message: "cancel_reason is required" });
       po.cancel_reason = String(req.body.cancel_reason).trim();
     }
+    const beforeStatus = po.status;
     po.status = to;
     po.updatedby = req.user?._id || null;
+    po.activity.push(auditEvent(req, "status", [
+      { field: "Status", before: beforeStatus, after: to },
+      ...(to === "cancelled" && po.cancel_reason ? [{ field: "Cancellation reason", before: "—", after: po.cancel_reason }] : []),
+    ]));
     await po.save();
     emitPO("po:updated", { success: true, data: po });
     res.status(200).json({ success: true, message: `PO ${to}`, data: po });
@@ -188,6 +205,7 @@ const closePO = async (req, res) => {
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     if (po.status !== "delivered") return res.status(400).json({ success: false, message: "Only delivered POs can be closed" });
     po.status = "closed"; po.updatedby = req.user?._id || null;
+    po.activity.push(auditEvent(req, "status", [{ field: "Status", before: "delivered", after: "closed" }]));
     await po.save();
     emitPO("po:updated", { success: true, data: po });
     res.status(200).json({ success: true, message: "PO closed", data: po });
@@ -225,7 +243,7 @@ const deliverPO = async (req, res) => {
       if (!item) return res.status(400).json({ success: false, message: "Variant not in PO" });
       const remaining = item.qty_ordered - item.received_qty;
       if (qty > remaining) return res.status(400).json({ success: false, message: `Over-receive: only ${remaining} remaining for ${item.sku || item.name}` });
-      norm.push({ variant_id: item.variant_id, product_id: item.product_id, qty, item });
+      norm.push({ variant_id: item.variant_id, product_id: item.product_id, qty, item, priorReceived: Number(item.received_qty) || 0 });
     }
     // Delivered means the complete ordered quantity arrived — no partial state.
     const notFull = po.items.some((i) => {
@@ -266,6 +284,12 @@ const deliverPO = async (req, res) => {
       touched.push({ variant_id: variant._id, change: n.qty });
     }
     po.receivings.push({ received_at: receivedAt, invoice_no, explanation, items: norm.map((n) => ({ variant_id: n.variant_id, product_id: n.product_id, qty: n.qty })), received_by: req.user?._id || null, received_by_name: req.user?.name || "Admin" });
+    po.activity.push(auditEvent(req, "received", [
+      { field: "Status", before: "confirmed", after: "delivered" },
+      ...(invoice_no ? [{ field: "Supplier invoice", before: "—", after: invoice_no }] : []),
+      { field: "Receiving note", before: "—", after: explanation },
+      ...norm.map(({ item, qty, priorReceived }) => ({ action: "received", field: "Received quantity", product_name: item.name, variant_title: item.variantTitle || "", sku: item.sku || "", before: String(priorReceived), after: String(priorReceived + qty), from_quantity: priorReceived, to_quantity: priorReceived + qty })),
+    ]));
     po.status = "delivered";
     po.updatedby = req.user?._id || null;
     await po.save({ session });
@@ -298,10 +322,20 @@ const recordPOPayment = async (req, res) => {
       po_id: po._id, vendor_id: po.vendor_id, amount, method,
       paid_at: req.body?.paid_at || new Date(), createdby: req.user?._id || null,
     });
+    const oldPaidAmount = po.paid_amount;
+    const oldDueAmount = po.due_amount;
+    const oldStatus = po.status;
     po.paid_amount = Math.round((po.paid_amount + amount) * 100) / 100;
     po.due_amount = Math.max(0, Math.round((po.total - po.paid_amount) * 100) / 100);
     po.payment_status = po.paid_amount <= 0 ? "unpaid" : po.paid_amount >= po.total ? "paid" : "partial";
     if (po.payment_status === "paid") po.status = "closed";
+    po.activity.push(auditEvent(req, "payment", [
+      { field: "Payment", before: "—", after: `${method} · ${amount} · ${new Date(req.body?.paid_at || Date.now()).toISOString().slice(0, 10)}` },
+      ...(oldPaidAmount !== po.paid_amount ? [{ field: "Paid amount", before: String(oldPaidAmount), after: String(po.paid_amount) }] : []),
+      ...(oldDueAmount !== po.due_amount ? [{ field: "Due amount", before: String(oldDueAmount), after: String(po.due_amount) }] : []),
+      ...(oldStatus !== po.status ? [{ field: "Status", before: oldStatus, after: po.status }] : []),
+    ]));
+    po.updatedby = req.user?._id || null;
     await po.save();
     await Vendor.updateOne({ _id: po.vendor_id }, { $inc: { total_paid: amount }, $set: { balance_payable: Math.max(0, po.total - po.paid_amount) } }).catch(() => {});
     const sums = await PurchasePayment.aggregate([{ $match: { vendor_id: po.vendor_id } }, { $group: { _id: null, paid: { $sum: "$amount" } } }]);

@@ -17,7 +17,7 @@ import { useLocalized } from "@/i18n/localize";
 import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== CONSTANTS ==================== */
-// âœ… Server-side pagination â€” ek request par yehi deals aati hain
+// âœ… Server-side pagination — ek request par yehi deals aati hain
 const DEALS_PER_PAGE = 20;
 
 /* ==================== ICONS ==================== */
@@ -68,7 +68,7 @@ const getId = (item) => {
 };
 
 const getDealStatus = (deal) => {
-  // âœ… Sirf Active/Inactive model â€” off (isActive false) ya expired sab "inactive"
+  // âœ… Sirf Active/Inactive model — off (isActive false) ya expired sab "inactive"
   if (!deal?.isActive) return "inactive";
   const end = deal?.endDate ? new Date(deal.endDate) : null;
   if (end && end < new Date()) return "inactive";
@@ -112,7 +112,7 @@ const formatDealValue = (deal, t, productNameOf = null) => {
           ? productNameOf(rule.freeProduct)
           : rule.freeProductName || t("admin.deals.detail.freeGift");
         const qty = rule.freeQuantity || rule.free_quantity || 1;
-        return `Buy ${buy} â†’ ${qty > 1 ? qty + "Ã— " : ""}${gift} ${off}`;
+        return `Buy ${buy} → ${qty > 1 ? qty + "× " : ""}${gift} ${off}`;
       }
       if (rule.rewardType === "percentage" || rule.reward_type === "percentage") {
         return `Buy ${buy} â†’ ${rule.value || 0}% ${off}`;
@@ -148,7 +148,7 @@ const dateToISO = (value) => {
 
 const StatusBadge = ({ status }) => {
   const { t } = useTranslation();
-  // âœ… Sirf Active/Inactive â€” purani values (scheduled/expired/disabled) bhi inactive
+  // âœ… Sirf Active/Inactive — purani values (scheduled/expired/disabled) bhi inactive
   const config = {
     active: { text: t("admin.banners.page.active"), bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
     inactive: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
@@ -246,14 +246,14 @@ export default function DealsPage() {
   const router = useRouter();
   const pathname = usePathname();
   
-  // âœ… SERVER-SIDE PAGINATION â€” search / status / target / page sab backend par (DB-level).
+  // âœ… SERVER-SIDE PAGINATION — search / status / target / page sab backend par (DB-level).
   const [searchInput, setSearchInput] = useState(""); // input box (turant update)
   const [search, setSearch] = useState("");          // debounced value â†’ API query
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Typing ke dauran har keystroke par API hit na ho â€” 400ms debounce
+  // Typing ke dauran har keystroke par API hit na ho — 400ms debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
@@ -412,7 +412,7 @@ export default function DealsPage() {
     onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.deals.toast.statusFailed")),
   });
 
-  // âœ… Search / status / target filtering ab backend par ho chuki hai â€” is liye yahan
+  // âœ… Search / status / target filtering ab backend par ho chuki hai — is liye yahan
   //    koi client-side filter/slice nahi. Jo data aaya wohi current page hai.
   const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -513,7 +513,7 @@ export default function DealsPage() {
     e.preventDefault();
     if (!String(formData.name || "").trim()) return toast.error(t("admin.deals.validation.nameRequired"));
 
-    // âœ… Negative values block â€” Deal Offer, quantities, limits (input level pe bhi blocked)
+    // âœ… Negative values block — Deal Offer, quantities, limits (input level pe bhi blocked)
     const nonNegativeError = validateNonNegative([
       [t("admin.deals.form.dealValue"), formData.value],
       [t("admin.promotions.ui.generated.4ee9bbdde227"), formData.buy_quantity],
@@ -543,7 +543,7 @@ export default function DealsPage() {
       if (formData.get_discount_value !== "" && Number(formData.get_discount_value) > 100) return toast.error(t("admin.deals.validation.getDiscountPercent"));
     }
 
-    // âœ… Bundle deal â€” single offer condition validation
+    // âœ… Bundle deal — single offer condition validation
     if (formData.value_type === "bundle") {
       const rule = formData.bundle_rule || {};
 
@@ -812,7 +812,7 @@ export default function DealsPage() {
 
         {/* TABLE / GRID DISPLAY */}
         {isLoading ? (
-          /* âœ… SKELETON â€” spinner ki jagah real layout ka skeleton:
+          /* âœ… SKELETON — spinner ki jagah real layout ka skeleton:
              list view me wahi table shell + shimmer rows, grid view me shimmer cards */
           viewMode === "list" ? (
             <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -865,7 +865,7 @@ export default function DealsPage() {
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
                               <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
-                              <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "â€”"}</p>
+                              <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                             </div>
                           </div>
                         </td>
@@ -890,7 +890,7 @@ export default function DealsPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-semibold text-[13px] truncate">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
-                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "â€”"}</p>
+                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                   <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatDealValue(deal, t, productNameOf)}</span>
@@ -910,7 +910,7 @@ export default function DealsPage() {
               <button type="button" disabled={currentPage === 1 || isFetching} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label={t("admin.reviews.ui.previousPage")}><ChevronLeftIcon className="h-4 w-4" /></button>
               {renderPageNumbers().map((pg, i) =>
                 pg === "..." ? (
-                  <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>â€¦</span>
+                  <span key={`ellipsis-${i}`} className="px-1 text-[13px]" style={{ color: "var(--text-muted)" }}>…</span>
                 ) : (
                   <button key={pg} type="button" disabled={isFetching} onClick={() => setCurrentPage(pg)} className="flex h-8 min-w-[2rem] items-center justify-center rounded-md px-2 text-[13px] font-medium transition" style={pg === currentPage ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}>{pg}</button>
                 )
@@ -953,11 +953,11 @@ export default function DealsPage() {
 
 /* ==================== SUB-COMPONENTS ==================== */
 /* =========================================================
-   SKELETON LOADING UI â€” existing `.skeleton` shimmer utility (globals.css) reuse
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
    âœ… Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
       widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
       par layout shift nahi hota (pehle yahan sirf spinner tha).
-   âœ… Sirf loading state ke liye â€” real table/grid design me koi change nahi.
+   âœ… Sirf loading state ke liye — real table/grid design me koi change nahi.
 ========================================================= */
 // `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
 const SKELETON_ROUND = { borderRadius: "9999px" };
@@ -968,7 +968,7 @@ function DealRowsSkeleton({ rows = DEALS_PER_PAGE }) {
     <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1b44fba50568")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`deal-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
-          {/* deal â€” icon + name + code */}
+          {/* deal — icon + name + code */}
           <td className="px-4 py-3">
             <div className="flex items-center gap-3">
               <span className="skeleton h-9 w-9 shrink-0 rounded-lg" />
@@ -1073,7 +1073,7 @@ const FormField = ({ label, required, children, hint, fullWidth }) => (
   </div>
 );
 
-// âœ… Deal form ke number inputs kabhi negative nahi ho sakte (nonNegative default) â€”
+// âœ… Deal form ke number inputs kabhi negative nahi ho sakte (nonNegative default) —
 // "-"/"+"/"e"/"E" type nahi hota, paste par sign hat jata hai, min=0 aur spinner bhi 0 se neeche nahi jata.
 const TextInput = ({ value, onChange, placeholder, type = "text", style, disabled, min, max, nonNegative = type === "number", integer = false }) => (
   <input
@@ -1085,7 +1085,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // âœ… Upper bound (e.g. discount percentage max 100) â€” typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. discount percentage max 100) — typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}

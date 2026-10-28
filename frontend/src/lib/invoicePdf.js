@@ -588,12 +588,14 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const showBalanceRows = paidAmount > 0 || balanceDue > 0;
   const summaryRowHeight = 6.5 * spacingScale;
   const summaryHeight = summaryRows.length * summaryRowHeight + 22 * spacingScale + (showBalanceRows ? 15 * spacingScale : 0);
-  const termsText = String(isDesigned && design.showTerms === false ? "" : invoice.terms || "")
+  // Terms may be stored as rich-text HTML by the editor. The PDF renderer uses
+  // jsPDF text APIs, so convert that markup to readable text before wrapping it.
+  const termsText = htmlToPlainText(isDesigned && design.showTerms === false ? "" : invoice.terms || "")
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .split("\n")
-    .filter((line) => !/^\s*terms\s*&\s*conditions\s*:?\s*$/i.test(line))
+    .filter((line) => !/^\s*terms\s*&\s*conditions(?:\s*[:—-].*)?\s*$/i.test(line))
     .join("\n")
     .trim();
   const termsLines = termsText ? split(termsText, contentWidth, 7) : [];
@@ -657,24 +659,28 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   for (let page = 1; page <= pageCount; page += 1) {
     pdf.setPage(page);
     if (isDesigned && design.watermark && (watermarkLogo || String(design.watermarkText || "").trim())) {
+      const watermarkPosition = design.watermarkPosition || "center";
+      const watermarkRotation = design.watermarkRotation == null
+        ? (watermarkPosition === "diagonal" ? 35 : 0)
+        : Math.max(-180, Math.min(180, Number(design.watermarkRotation) || 0));
       if (watermarkLogo) {
         const requestedWidth = contentWidth * Math.max(0.2, Math.min(0.85, (Number(design.watermarkSize) || 50) / 100));
         const requestedHeight = pageHeight * 0.38;
         const scale = Math.min(requestedWidth / Math.max(1, watermarkLogo.width), requestedHeight / Math.max(1, watermarkLogo.height));
         const width = watermarkLogo.width * scale;
         const height = watermarkLogo.height * scale;
-        const position = design.watermarkPosition || "center";
+        const position = watermarkPosition;
         const x = position.endsWith("right") ? pageWidth - margin - width : position === "center" || position === "diagonal" ? (pageWidth - width) / 2 : margin;
         const yPosition = position.startsWith("top") ? pageHeight * 0.25 - height / 2 : position.startsWith("bottom") ? pageHeight * 0.72 - height / 2 : (pageHeight - height) / 2;
-        pdf.addImage(watermarkLogo.data, "PNG", x, yPosition, width, height, undefined, "FAST", position === "diagonal" ? 35 : 0);
+        pdf.addImage(watermarkLogo.data, "PNG", x, yPosition, width, height, undefined, "FAST", watermarkRotation);
       } else {
         const opacity = Math.max(0.03, Math.min(0.4, (Number(design.watermarkOpacity) || 8) / 100));
         const paleAccent = accent.map((channel) => Math.round(255 - (255 - channel) * opacity));
         setText(28 * Math.max(0.5, Math.min(1.3, (Number(design.watermarkSize) || 50) / 50)), paleAccent, "bold");
-        const position = design.watermarkPosition || "center";
+        const position = watermarkPosition;
         const watermarkX = position.endsWith("right") || position === "right" ? pageWidth - margin - 10 : position === "left" || position.endsWith("left") ? margin + 10 : pageWidth / 2;
         const watermarkY = position.startsWith("top") ? pageHeight * 0.25 : position.startsWith("bottom") ? pageHeight * 0.72 : pageHeight / 2;
-        pdf.text(String(design.watermarkText || companyName).toUpperCase(), watermarkX, watermarkY, { align: "center", angle: position === "diagonal" ? 35 : 0 });
+        pdf.text(String(design.watermarkText || companyName).toUpperCase(), watermarkX, watermarkY, { align: "center", angle: watermarkRotation });
       }
     }
     setText(7, COLORS.ink, "bold");
@@ -809,7 +815,8 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
                 if (value) clonedNode.style.setProperty(property, value, "important");
               });
               const image = computed.getPropertyValue("background-image");
-              if (/oklch|oklab|color\(/i.test(image)) clonedNode.style.setProperty("background-image", "none", "important");
+              // html2canvas cannot parse newer CSS Color 4 functions in gradients.
+              if (/\b(?:oklch|oklab|lab|lch|color)\(/i.test(image)) clonedNode.style.setProperty("background-image", "none", "important");
               clonedNode.style.setProperty("box-shadow", "none", "important");
               clonedNode.style.setProperty("text-shadow", "none", "important");
             });
@@ -823,7 +830,7 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
         pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, margin, width, height, undefined, "FAST");
       }
     } catch (captureError) {
-      console.error("Document preview capture failed; using the PDF renderer instead:", captureError);
+      console.warn("Document preview capture failed; using the PDF renderer instead:", captureError);
       return fallbackPdf(documentData, suppliedStore);
     }
   } else {

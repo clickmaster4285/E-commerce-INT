@@ -7,6 +7,7 @@ import { quoteApi } from "@/apis/admin/quoteApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import QuoteTemplateDesigner from "@/components/admin/QuoteTemplateDesigner";
+import ActivityTimeline from "@/components/admin/ActivityTimeline";
 import { downloadQuotePdf, printQuotePdf } from "@/lib/invoicePdf";
 import { toast } from "sonner";
 import {
@@ -124,6 +125,9 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
         savedDesign={quote.pdf_design || {}}
         money={money}
       />
+      </div>
+      <div className="quote-no-print ml-auto w-full max-w-md">
+        <ActivityTimeline events={quote.activity?.length ? quote.activity : [{ type: "created", at: quote.created_at, actor_name: quote.createdby?.name || "Staff", changes: [] }]} title="Quote activity" />
       </div>
       <style jsx global>{`
         @page { size: ${quote.pdf_design?.pageSize === "letter" ? "letter" : "A4"} ${quote.pdf_design?.orientation === "landscape" ? "landscape" : "portrait"}; margin: 10mm; }

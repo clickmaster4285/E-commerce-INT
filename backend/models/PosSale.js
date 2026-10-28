@@ -110,6 +110,28 @@ const posSaleSchema = new mongoose.Schema(
       trim: true,
     },
 
+    created_by_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+    created_by_name: { type: String, default: "", trim: true },
+
+    edit_history: {
+      type: [{
+        edited_at: { type: Date, default: Date.now },
+        edited_by_id: { type: mongoose.Schema.Types.ObjectId, default: null },
+        edited_by_name: { type: String, default: "", trim: true },
+        changes: [{
+          action: { type: String, enum: ["added", "removed", "quantity", "price", "discount", "tax", "sale_discount", "customer", "payment", "notes", "sale_total"], required: true },
+          product_name: { type: String, default: "", trim: true },
+          variant_title: { type: String, default: "", trim: true },
+          sku: { type: String, default: "", trim: true },
+          from_quantity: { type: Number, default: 0 },
+          to_quantity: { type: Number, default: 0 },
+          from_value: { type: String, default: "" },
+          to_value: { type: String, default: "" },
+        }],
+      }],
+      default: [],
+    },
+
     items: {
       type: [posSaleItemSchema],
       required: true,

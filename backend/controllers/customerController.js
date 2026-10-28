@@ -5,6 +5,7 @@ const PosSale = require("../models/PosSale");
 const Quote = require("../models/Quote");
 const Invoice = require("../models/Invoice");
 const syncLeadCustomer = require("../utils/syncLeadCustomer");
+const { auditEvent, diffFields } = require("../utils/auditHistory");
 
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -28,7 +29,7 @@ const getCustomersAdmin = async (req, res) => {
       ];
     }
 
-    const customers = await Customer.find(q).sort({ created_at: -1 }).lean();
+    const customers = await Customer.find(q).select("-activity").sort({ created_at: -1 }).lean();
     res.status(200).json({ success: true, data: customers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -39,7 +40,7 @@ const searchCustomers = async (req, res) => {
   try {
     const search = String(req.query.search || "").trim();
     if (!search) {
-      const customers = await Customer.find({ is_deleted: { $ne: true } }).sort({ created_at: -1 }).limit(10).lean();
+      const customers = await Customer.find({ is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).limit(10).lean();
       return res.status(200).json({ success: true, data: customers });
     }
 
@@ -47,7 +48,7 @@ const searchCustomers = async (req, res) => {
     const customers = await Customer.find({
       is_deleted: { $ne: true },
       $or: [{ name: regex }, { phone: regex }, { email: regex }],
-    }).sort({ created_at: -1 }).limit(20).lean();
+    }).select("-activity").sort({ created_at: -1 }).limit(20).lean();
 
     res.status(200).json({ success: true, data: customers });
   } catch (error) {
@@ -62,8 +63,8 @@ const getCustomerById = async (req, res) => {
 
     const [sales, quotes, invoices] = await Promise.all([
       PosSale.find({ customer_id: customer._id }).sort({ created_at: -1 }).lean(),
-      Quote.find({ customer_id: customer._id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
-      Invoice.find({ customer_id: customer._id, is_deleted: { $ne: true } }).sort({ created_at: -1 }).lean(),
+      Quote.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
+      Invoice.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
     ]);
     const totalSpent = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
 
@@ -99,6 +100,7 @@ const createCustomer = async (req, res) => {
       address: String(address || "").trim(),
       notes: String(notes || "").trim(),
       createdby: req.user?._id || null,
+      activity: [auditEvent(req, "created", [{ field: "Customer", before: "—", after: String(name).trim() }])],
     });
 
     res.status(201).json({ success: true, data: customer });
@@ -118,7 +120,9 @@ const updateCustomer = async (req, res) => {
       if (req.body[key] !== undefined) customer[key] = req.body[key];
     }
 
+    const auditChanges = diffFields(before, customer.toObject(), allowed.map((key) => [key, key[0].toUpperCase() + key.slice(1)]));
     customer.updatedby = req.user?._id || null;
+    if (auditChanges.length) customer.activity.push(auditEvent(req, "updated", auditChanges));
     await customer.save();
     const changes = allowed.filter((key) => String(before[key]) !== String(customer[key] || "")).map((key) => ({ field: key[0].toUpperCase() + key.slice(1), from: before[key] || "—", to: customer[key] || "—" }));
     if (changes.length) {
@@ -147,6 +151,7 @@ const deleteCustomer = async (req, res) => {
     if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
     customer.is_deleted = true;
     customer.deletedby = req.user?._id || null;
+    customer.activity.push(auditEvent(req, "deleted", [{ field: "Customer", before: customer.name, after: "Deleted" }]));
     await customer.save();
     res.status(200).json({ success: true, message: "Customer deleted" });
   } catch (error) {

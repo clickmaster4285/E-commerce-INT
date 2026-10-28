@@ -4,6 +4,7 @@ import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
+import ActivityTimeline from "@/components/admin/ActivityTimeline";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
@@ -23,8 +24,8 @@ const primary = { color: "#0f172a" };
 const accent = { color: "#2563eb" };
 const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
 const money = (n, locale = "en") => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
-const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "â€”";
-const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "â€”";
+const dateTime = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
+const dateOnly = (value, locale = "en") => value ? new Intl.DateTimeFormat(intlLocale(locale), { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)) : "—";
 const imageUrl = (url) => !url ? "" : /^https?:\/\//i.test(url) ? url : `${API_ORIGIN || ""}${url.startsWith("/") ? url : `/${url}`}`;
 
 const statusStyles = {
@@ -58,7 +59,7 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
 function LabelValue({ label, value, icon: Icon }) {
   return <div className="grid grid-cols-[minmax(84px,.8fr)_minmax(0,1.2fr)] items-center gap-2 text-[13px] leading-6">
     <span className="inline-flex items-center gap-1.5" style={muted}>{Icon && <Icon size={13} />}{label}</span>
-    <span className="min-w-0 truncate font-medium" style={primary} title={value || "â€”"}>{value || "â€”"}</span>
+    <span className="min-w-0 truncate font-medium" style={primary} title={value || "—"}>{value || "—"}</span>
   </div>;
 }
 
@@ -225,7 +226,7 @@ export default function PODetailPage({ params }) {
                   <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{money(item.sell_price, locale)}</td>
                   <td className="whitespace-nowrap px-2.5 py-2.5 font-semibold" style={primary}>{money(item.line_total, locale)}</td>
                   <td className="px-2.5 py-2.5" style={muted}>{new Intl.NumberFormat(intlLocale(locale)).format(Number(item.tax_rate || 0))}%</td>
-                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${new Intl.NumberFormat(intlLocale(locale)).format(item.expiry_after_delivery)} ${t("admin.purchaseOrders.view.days")}` : item.expiry_date ? t("admin.purchaseOrders.view.until", { date: dateOnly(item.expiry_date, locale) }) : "â€”"}</td>
+                  <td className="whitespace-nowrap px-2.5 py-2.5" style={primary}>{Number(item.expiry_after_delivery) > 0 ? `${new Intl.NumberFormat(intlLocale(locale)).format(item.expiry_after_delivery)} ${t("admin.purchaseOrders.view.days")}` : item.expiry_date ? t("admin.purchaseOrders.view.until", { date: dateOnly(item.expiry_date, locale) }) : "—"}</td>
                 </tr>)}
                   {!items.length && <tr><td colSpan={10} className="p-8 text-center text-xs" style={muted}>{t("admin.purchaseOrders.view.noItems")}</td></tr>}</tbody>
               </table>
@@ -287,6 +288,7 @@ export default function PODetailPage({ params }) {
               {["pending", "confirmed"].includes(status) && <div className="flex gap-1.5 print:hidden"><input value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder={t("admin.purchaseOrders.view.cancelReason")} className="h-8 min-w-0 flex-1 rounded-md border px-2 text-xs outline-none" style={{ borderColor: "#dce8f8", color: "#173d78" }} /><button disabled={cancelM.isPending || !cancelReason.trim()} onClick={() => cancelM.mutate()} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border px-2 text-xs font-semibold disabled:opacity-40" style={{ borderColor: "#ffc9d0", color: "#cf3348" }}><XCircle size={13} />{t("admin.purchaseOrders.view.cancelPO")}</button></div>}
             </div>
           </Panel>
+          <ActivityTimeline events={po.activity?.length ? po.activity : [{ type: "created", at: po.created_at, actor_name: po.createdby?.name || t("admin.purchaseOrders.view.admin"), changes: [] }]} title="Purchase order activity" />
         </aside>
       </div>
     {deliverOpen && <Modal title={t("admin.purchaseOrders.view.receiveTitle")} icon={Truck} onClose={() => setDeliverOpen(false)}><div className="space-y-5 p-5 sm:p-6">

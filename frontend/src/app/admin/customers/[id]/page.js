@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customerApi } from "@/apis/admin/customerApi";
+import ActivityTimeline from "@/components/admin/ActivityTimeline";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
@@ -80,7 +81,7 @@ export default function CustomerDetailPage({ params }) {
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric icon={CreditCard} label={t("admin.customers.detail.totalPurchases")} value={String(customer.total_sales || 0)} />
       <Metric icon={Tag} label={t("admin.customers.detail.totalSpent")} value={money(customer.total_spent, locale)} />
-      <Metric icon={CalendarDays} label={t("admin.customers.detail.customerSince")} value={customer.created_at ? new Date(customer.created_at).toLocaleDateString(locale) : "â€”"} />
+      <Metric icon={CalendarDays} label={t("admin.customers.detail.customerSince")} value={customer.created_at ? new Date(customer.created_at).toLocaleDateString(locale) : "—"} />
       <Metric icon={UserRound} label={t("admin.customers.detail.customerType")} value={t(customer.total_sales > 0 ? "admin.customers.detail.returning" : "admin.customers.detail.new")} />
     </section>
 
@@ -93,10 +94,13 @@ export default function CustomerDetailPage({ params }) {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-        <PanelHeader icon={Tag} title={t("admin.customers.detail.notes")} />
-        <div className="min-h-36 p-4 sm:p-5"><p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{customer.notes || t("admin.customers.detail.noNotes")}</p></div>
-      </section>
+      <div className="space-y-4">
+        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+          <PanelHeader icon={Tag} title={t("admin.customers.detail.notes")} />
+          <div className="min-h-36 p-4 sm:p-5"><p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{customer.notes || t("admin.customers.detail.noNotes")}</p></div>
+        </section>
+        <ActivityTimeline events={customer.activity?.length ? customer.activity : [{ type: "created", at: customer.created_at, actor_name: customer.createdby?.name || "Staff", changes: [] }]} title="Customer activity" />
+      </div>
     </div>
 
     <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
@@ -129,9 +133,9 @@ function DocumentHistory({ records, numberKey, dateKey, hrefBase, emptyText }) {
   return <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left">
       <thead className="bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]"><tr><th className="px-4 py-3">Number</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Total</th><th className="w-14 px-4 py-3 text-right">View</th></tr></thead>
       <tbody>{records.map((record) => <tr key={record._id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]">
-        <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{record[numberKey] || "â€”"}</td>
+        <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{record[numberKey] || "—"}</td>
         <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-secondary)]">{dateTime(record[dateKey] || record.created_at)}</td>
-        <td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{record.status || "â€”"}</span></td>
+        <td className="px-4 py-3"><span className="inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{record.status || "—"}</span></td>
         <td className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold">{money(record.total)}</td>
         <td className="px-4 py-3 text-right"><Link href={`${hrefBase}/${record._id}`} aria-label={`View ${record[numberKey] || "record"}`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"><Eye size={15} /></Link></td>
       </tr>)}

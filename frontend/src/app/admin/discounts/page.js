@@ -44,7 +44,7 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
-// âœ… Rupee icon â€” "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
+// âœ… Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
 const RupeeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12M6 8h12M6 13h3m-3 0 8.5 8M9 13c6.667 0 6.667-10 0-10" /></svg>);
 
 /* ==================== HELPERS ==================== */
@@ -104,7 +104,7 @@ const formatValue = (discount, t, locale) => {
 
 
 const getDiscountStatus = (discount) => {
-  // âœ… Sirf Active/Inactive model â€” scheduled/expired/disabled/draft sab "inactive"
+  // âœ… Sirf Active/Inactive model — scheduled/expired/disabled/draft sab "inactive"
   const end = discount?.end_at || discount?.endDate;
   const isExpired = end && new Date(end) < new Date();
   if (discount?.isActive === false) return "inactive";
@@ -201,7 +201,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               const active = value === opt.value;
               const OptionIcon = opt.icon;
 
-              // âœ… Plain option (icon/description na ho) â€” purana simple row
+              // âœ… Plain option (icon/description na ho) — purana simple row
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
@@ -212,7 +212,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
                 );
               }
 
-              // âœ… Rich row â€” icon badge + title + example description + selected tick
+              // âœ… Rich row — icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
                   className="flex w-full items-start gap-2.5 px-3 py-2.5 text-start transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -289,7 +289,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // âœ… Upper bound (e.g. percentage max 100) â€” typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}
@@ -317,11 +317,11 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 );
 
 /* =========================================================
-   SKELETON LOADING UI â€” existing `.skeleton` shimmer utility (globals.css) reuse
+   SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
    âœ… Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
       widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
       par layout shift nahi hota (pehle yahan sirf spinner tha).
-   âœ… Sirf loading state ke liye â€” real table/grid design me koi change nahi.
+   âœ… Sirf loading state ke liye — real table/grid design me koi change nahi.
 ========================================================= */
 // `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
 const SKELETON_ROUND = { borderRadius: "9999px" };
@@ -334,7 +334,7 @@ function DiscountRowsSkeleton({ rows = 10 }) {
         <tr key={`discount-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
           {/* checkbox */}
           <td className="px-4 py-3"><span className="skeleton block h-4 w-4 rounded" /></td>
-          {/* discount â€” icon + name */}
+          {/* discount — icon + name */}
           <td className="px-4 py-3">
             <div className="flex items-center gap-3">
               <span className="skeleton h-9 w-9 shrink-0 rounded-lg" />
@@ -439,7 +439,7 @@ const attrValueText = (value) => {
     if ("value" in value) return attrValueText(value.value);
     if ("label" in value) return attrValueText(value.label);
     if ("name" in value) return attrValueText(value.name);
-    // Nested objects like { "Exterior Color": "BLACK" } â€” join their values
+    // Nested objects like { "Exterior Color": "BLACK" } — join their values
     return Object.values(value).map(attrValueText).filter(Boolean).join(", ");
   }
   return "";
@@ -462,7 +462,7 @@ const getProductAttributes = (product) => {
     });
   }
 
-  // Variant attributes â€” supports object form { Color: "Red" } and array form [{ name, value }]
+  // Variant attributes — supports object form { Color: "Red" } and array form [{ name, value }]
   (product.variants || []).forEach((variant) => {
     const attrs = variant?.attributes;
     if (!attrs) return;
@@ -670,7 +670,7 @@ export default function DiscountsPage() {
   const totalPages = pagination.pages || 1;
   const totalDiscounts = pagination.total || discounts.length;
 
-  // âœ… Stats server se aate hain (poora dataset â€” search respect, status se independent).
+  // âœ… Stats server se aate hain (poora dataset — search respect, status se independent).
   //    Purana response (stats missing) ho to current page se fallback.
   const serverStats = paginatedDiscountsData?.stats || null;
   const stats = useMemo(() => {
@@ -717,7 +717,7 @@ export default function DiscountsPage() {
       usage_per_customer: discount?.usage_per_customer ?? discount?.perUserLimit ?? "",
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
-      // âœ… Form options "active"/"disabled" hain â€” prefill usi value me karo
+      // âœ… Form options "active"/"disabled" hain — prefill usi value me karo
       // warna select khaali (placeholder) dikhta hai
       status: discount?.status === "active" ? "active" : "disabled",
     });
@@ -1052,7 +1052,7 @@ export default function DiscountsPage() {
 
         {/* TABLE / GRID */}
         {isLoading ? (
-          /* âœ… SKELETON â€” spinner ki jagah real layout ka skeleton:
+          /* âœ… SKELETON — spinner ki jagah real layout ka skeleton:
              list view me wahi table shell + shimmer rows, grid view me shimmer cards */
           viewMode === "list" ? (
             <div className="rounded-lg overflow-hidden" style={cardStyle}>

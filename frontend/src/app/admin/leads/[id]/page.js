@@ -6,12 +6,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { leadApi } from "@/apis/admin/leadApi";
 import { addLeadAsCustomer } from "@/lib/addLeadAsCustomer";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { useLocalized } from "@/i18n/localize";
 import { toast } from "sonner";
 import {
-  Activity, ArrowLeft, ArrowRight, BadgeDollarSign, Building2, CalendarDays, CheckCircle2, FilePlus2,
-  ChevronRight, Clock3, ContactRound, Eye, History, Mail, MapPin, Pencil, Phone,
-  Package, Plus, RotateCcw, StickyNote, Tag, UserRound, Users,
+  Activity, ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2, ChevronRight,
+  Clock3, ContactRound, Mail, MapPin, Phone, Plus, RotateCcw, UserRound, Users,
 } from "lucide-react";
 
 const activityTypes = ["Call", "WhatsApp", "Email", "Meeting", "Other"];
@@ -24,17 +22,13 @@ const activityValueKey = (value) => `admin.leads.activity.${String(value || "").
 const activityLabel = (value, t) => { const key = activityValueKey(value); const label = t(key); return label === key ? (String(value || "").replaceAll("_", " ") || t("common.notProvided")) : label; };
 const dateOnly = (value, locale, t) => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" }) : t("common.notProvided");
 const dateTime = (value, locale, t) => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toLocaleString(locale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : t("common.notProvided");
-const currency = (value, locale, t) => value == null ? t("admin.leads.ui.notEstimated") : `Rs. ${Number(value).toLocaleString(locale)}`;
-
 export default function LeadDetailPage({ params }) {
   const { t, locale, dir } = useTranslation();
-  const { productNameOf } = useLocalized();
   const { id } = use(params);
   const qc = useQueryClient();
   const [activity, setActivity] = useState({ type: "Call", notes: "", follow_up_date: "" });
   const [lostReasonOpen, setLostReasonOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
-  const [historyTab, setHistoryTab] = useState("overview");
   const { data: lead, isLoading, isError, error } = useQuery({
     queryKey: ["lead-detail", id],
     queryFn: () => leadApi.getById(id),
@@ -60,20 +54,9 @@ export default function LeadDetailPage({ params }) {
     onSuccess: ({ alreadyExists }) => { toast.success(t(alreadyExists ? "admin.leads.toast.customerUpdated" : "admin.leads.toast.addedToCustomers")); refresh(); },
     onError: (e) => toast.error(e?.response?.data?.message || t("admin.leads.toast.addCustomerFailed")),
   });
-  const editMutation = useMutation({
-    mutationFn: (payload) => leadApi.update(id, payload),
-    onSuccess: () => {
-      toast.success("Lead updated");
-      setEditOpen(false);
-      refresh();
-    },
-    onError: (e) => toast.error(e?.response?.data?.message || "Lead could not be updated"),
-  });
-
   if (isLoading) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center text-sm text-[var(--text-muted)]">{t("admin.leads.ui.loadingLeadDetails")}</div>;
   if (isError || !lead) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center"><p className="text-sm font-semibold">{error?.response?.data?.message || t("admin.leads.ui.leadNotFound")}</p><Link href="/admin/leads" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"><ArrowLeft size={14} /> {t("admin.leads.ui.backToLeads")}</Link></div>;
 
-  const products = Array.isArray(lead.products) ? lead.products : [];
   const recordActivity = (event) => {
     event.preventDefault();
     if (!activity.notes.trim()) return;
@@ -91,31 +74,10 @@ export default function LeadDetailPage({ params }) {
   };
   const next = nextStatuses[lead.status] || [];
   const previous = previousStatus[lead.status];
-  const displayName = lead.lead_type === "Business" && lead.company_name ? lead.company_name : lead.name;
-  const historyItems = [
-    ...(lead.history || []).map((entry) => ({ ...entry, key: `history-${entry._id}`, details: "" })),
-    ...(lead.activities || []).map((entry) => ({
-      key: `activity-${entry._id}`,
-      action: "activity",
-      summary: `${entry.type} activity recorded`,
-      details: entry.notes,
-      employee_id: entry.employee_id,
-      employee_name: entry.employee_name,
-      created_at: entry.created_at,
-      changes: entry.follow_up_date ? [{ field: "Follow-up date", from: "—", to: dateOnly(entry.follow_up_date) }] : [],
-    })),
-  ];
-  if (!historyItems.some((entry) => entry.action === "created")) {
-    historyItems.push({
-      key: "history-created-fallback",
-      action: "created",
-      summary: "Lead created",
-      employee_name: "System record",
-      created_at: lead.created_at,
-      changes: [],
-    });
-  }
-  historyItems.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  const timeline = [
+    ...(lead.history || []).map((entry) => ({ ...entry, key: `history-${entry._id}`, kind: "change" })),
+    ...(lead.activities || []).map((entry) => ({ ...entry, key: `activity-${entry._id}`, kind: "activity" })),
+  ].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
   return <div dir={dir} className="space-y-4 text-[var(--text-primary)] sm:space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3">
@@ -132,11 +94,10 @@ export default function LeadDetailPage({ params }) {
       </div>
     </header>
 
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-3 sm:grid-cols-3">
       <Metric icon={Users} label={t("admin.leads.ui.assignedEmployee")} value={lead.assigned_employee_id?.name || t("admin.leads.value.unassigned")} />
-      <Metric icon={BadgeDollarSign} label={t("admin.leads.ui.estimatedValue")} value={currency(lead.estimated_deal_value, locale, t)} />
+      <Metric icon={Activity} label={t("admin.leads.ui.leadSource")} value={lead.source ? leadValueLabel(lead.source, t) : t("common.notProvided")} />
       <Metric icon={CalendarDays} label={t("admin.leads.ui.nextFollowUp")} value={dateOnly(lead.next_follow_up_date, locale, t)} />
-      <Metric icon={Tag} label={t("admin.leads.ui.leadSource")} value={lead.source ? leadValueLabel(lead.source, t) : t("common.notProvided")} />
     </section>
 
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,.8fr)]">
@@ -147,9 +108,7 @@ export default function LeadDetailPage({ params }) {
             <Fact icon={UserRound} label={t("admin.leads.ui.contactPerson")} value={lead.name} />
             <Fact icon={Phone} label={t("common.phone")} value={lead.phone} />
             <Fact icon={Mail} label={t("common.email")} value={lead.email || t("common.notProvided")} />
-            <Fact icon={Tag} label={t("admin.leads.ui.leadSource")} value={lead.source ? leadValueLabel(lead.source, t) : t("common.notProvided")} />
             <Fact icon={CalendarDays} label={t("admin.leads.ui.created")} value={dateTime(lead.created_at, locale, t)} />
-            <Fact icon={Clock3} label={t("admin.leads.ui.lastUpdated")} value={dateTime(lead.updated_at, locale, t)} />
           </div>
         </section>
 
@@ -159,44 +118,37 @@ export default function LeadDetailPage({ params }) {
             <Fact icon={Building2} label={t("admin.leads.ui.company")} value={lead.company_name} />
             <Fact icon={Tag} label={t("admin.leads.ui.businessType")} value={lead.business_type} />
             <Fact icon={MapPin} label={t("admin.leads.ui.businessAddress")} value={lead.business_address} />
-            <Fact icon={MapPin} label={t("admin.leads.ui.city")} value={lead.city} />
           </div>
         </section>}
 
         <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-          <PanelHeader icon={CalendarDays} title={t("admin.leads.ui.leadTimeline")} />
-          <div className="grid gap-x-8 gap-y-1 p-4 sm:grid-cols-2 sm:p-5">
-            <Fact icon={CalendarDays} label={t("admin.leads.ui.expectedPurchase")} value={dateOnly(lead.expected_purchase_date, locale, t)} />
-            <Fact icon={CalendarDays} label={t("admin.leads.ui.nextFollowUp")} value={dateOnly(lead.next_follow_up_date, locale, t)} />
-            <Fact icon={BadgeDollarSign} label={t("admin.leads.ui.estimatedDealValue")} value={currency(lead.estimated_deal_value, locale, t)} />
-            {lead.lost_reason && <Fact icon={X} label={t("admin.leads.ui.lostReason")} value={lead.lost_reason} />}
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-          <PanelHeader icon={Package} title={t("admin.leads.ui.productInterest")} trailing={<span className="rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--accent)]">{products.length} {t("admin.leads.ui.items")}</span>} />
-          <div className="space-y-3 p-4 sm:p-5">
-            {lead.product_interest && <p className="rounded-xl bg-[var(--bg-card-alt)] p-3 text-sm text-[var(--text-secondary)]">{lead.product_interest}</p>}
-            {products.length ? <div className="space-y-2">{products.map((item, index) => <div key={item._id || index} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] p-3"><div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Package size={16} /></span><div className="min-w-0"><p className="truncate text-sm font-semibold">{productNameOf(item.product_id) || t("admin.leads.ui.productUnavailable")}</p><p className="mt-0.5 text-xs text-[var(--text-muted)]">{item.variant_id?.title || t("admin.leads.ui.noVariant")}{item.variant_id?.sku ? ` · SKU ${item.variant_id.sku}` : ""}</p></div></div><span className="rounded-lg bg-[var(--bg-tertiary)] px-2.5 py-1 text-xs font-semibold">{t("admin.leads.ui.qty")} {item.quantity}</span></div>)}</div> : !lead.product_interest && <p className="text-sm text-[var(--text-muted)]">{t("admin.leads.ui.noProductInterestRecorded")}</p>}
-            <div className="border-t border-[var(--border-color)] pt-3"><p className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.leads.ui.customRequirements")}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{lead.custom_requirements || t("admin.leads.ui.noCustomRequirementsRecorded")}</p></div>
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-          <PanelHeader icon={Activity} title={t("admin.leads.ui.customerNotes")} />
+          <PanelHeader icon={Clock3} title={t("admin.leads.ui.notes")} />
           <p className="min-h-20 whitespace-pre-wrap p-4 text-sm leading-6 text-[var(--text-secondary)] sm:p-5">{lead.notes || t("admin.leads.ui.noNotesHaveBeenAdded")}</p>
         </section>
+        {lead.lost_reason && <section className="overflow-hidden rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger-soft)] shadow-sm">
+          <PanelHeader icon={Activity} title={t("admin.leads.ui.lostReason")} />
+          <p className="whitespace-pre-wrap p-4 text-sm leading-6 text-[var(--danger-text)] sm:p-5">{lead.lost_reason}</p>
+        </section>}
       </div>
 
       <div className="space-y-4">
         <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-          <PanelHeader icon={Activity} title={t("admin.leads.ui.followUpHistory")} trailing={<span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{lead.activities?.length || 0}</span>} />
-          <form onSubmit={recordActivity} className="space-y-2 border-b border-[var(--border-color)] p-4">
+          <PanelHeader icon={Activity} title={t("admin.leads.ui.activityHistory")} trailing={<span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{timeline.length}</span>} />
+          <form onSubmit={recordActivity} className="space-y-3 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] p-4">
+            <p className="text-xs font-semibold text-[var(--text-secondary)]">{t("admin.leads.ui.recordActivity")}</p>
             <div className="grid grid-cols-2 gap-2"><label className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.leads.ui.type")}<select value={activity.type} onChange={(event) => setActivity({ ...activity, type: event.target.value })} className="mt-1 h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2 text-xs">{activityTypes.map((type) => <option key={type} value={type}>{activityLabel(type, t)}</option>)}</select></label><label className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.leads.ui.followUpDate")}<input type="date" value={activity.follow_up_date} onChange={(event) => setActivity({ ...activity, follow_up_date: event.target.value })} className="mt-1 h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2 text-xs" /></label></div>
-            <label className="block text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.leads.ui.notesOrOutcome")}<textarea required rows={3} value={activity.notes} onChange={(event) => setActivity({ ...activity, notes: event.target.value })} className="mt-1 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] p-2 text-xs" /></label>
-            <button type="submit" disabled={activityMutation.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--accent-text)] disabled:opacity-50"><Plus size={13} />{activityMutation.isPending ? t("admin.leads.ui.saving") : t("admin.leads.ui.recordActivity")}</button>
+            <label className="block text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.leads.ui.notesOrOutcome")}<textarea required maxLength={3000} rows={3} value={activity.notes} onChange={(event) => setActivity({ ...activity, notes: event.target.value })} className="mt-1 w-full resize-y rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] p-2.5 text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" /></label>
+            <button type="submit" disabled={activityMutation.isPending || !activity.notes.trim()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--accent-text)] transition hover:brightness-95 disabled:opacity-50"><Plus size={13} />{activityMutation.isPending ? t("admin.leads.ui.saving") : t("admin.leads.ui.recordActivity")}</button>
           </form>
-          <div className="max-h-[440px] space-y-0 overflow-y-auto p-4">{lead.activities?.length ? [...lead.activities].reverse().map((entry, index) => <div key={entry._id || index} className="relative border-s border-[var(--border-color)] pb-5 ps-4 last:border-0 last:pb-0"><span className="absolute -start-[5px] top-1 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" /><p className="text-xs font-semibold">{activityLabel(entry.type, t)} · {entry.employee_id?.name || entry.employee_name || t("admin.leads.ui.staff")}</p><p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--text-secondary)]">{entry.notes}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{dateTime(entry.created_at, locale, t)}{entry.follow_up_date ? ` · ${t("admin.leads.ui.followUpDateValue", { date: dateOnly(entry.follow_up_date, locale, t) })}` : ""}</p></div>) : <p className="py-4 text-center text-xs text-[var(--text-muted)]">{t("admin.leads.ui.noInteractionsRecordedYet")}</p>}</div>
+          <div className="max-h-[680px] space-y-0 overflow-y-auto p-4">
+            {timeline.length ? timeline.map((entry, index) => <div key={entry.key} className="relative border-s border-[var(--border-color)] pb-5 ps-5 last:border-0 last:pb-0">
+              <span className={`absolute -start-[6px] top-1 flex h-3 w-3 items-center justify-center rounded-full ring-4 ring-[var(--bg-card)] ${entry.kind === "activity" ? "bg-[var(--accent)]" : "bg-[var(--text-muted)]"}`} />
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-semibold">{entry.kind === "activity" ? `${activityLabel(entry.type, t)} · ${entry.employee_id?.name || entry.employee_name || t("admin.leads.ui.staff")}` : entry.summary}</p><p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{entry.employee_id?.name || entry.employee_name || t("admin.leads.ui.staff")}</p></div><time className="shrink-0 text-[10px] text-[var(--text-muted)]">{dateTime(entry.created_at, locale, t)}</time></div>
+              {entry.kind === "activity" && entry.notes && <p className="mt-2 whitespace-pre-wrap rounded-lg bg-[var(--bg-card-alt)] px-3 py-2 text-xs leading-5 text-[var(--text-secondary)]">{entry.notes}</p>}
+              {entry.kind === "activity" && entry.follow_up_date && <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-medium text-[var(--accent)]"><CalendarDays size={12} />{t("admin.leads.ui.followUpDateValue", { date: dateOnly(entry.follow_up_date, locale, t) })}</p>}
+              {entry.kind === "change" && entry.changes?.length > 0 && <div className="mt-2 space-y-1 rounded-lg bg-[var(--bg-card-alt)] px-3 py-2">{entry.changes.map((change, changeIndex) => <p key={`${entry.key}-${changeIndex}`} className="text-[10px] leading-4 text-[var(--text-secondary)]"><span className="font-semibold">{change.field}:</span> {change.from || "—"} <span aria-hidden="true">→</span> {change.to || "—"}</p>)}</div>}
+            </div>) : <div className="flex flex-col items-center px-4 py-8 text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-muted)]"><Activity size={18} /></span><p className="text-xs font-semibold">{t("admin.leads.ui.noInteractionsRecordedYet")}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{t("admin.leads.ui.activityHistoryHint")}</p></div>}
+          </div>
         </section>
       </div>
     </div>
@@ -217,16 +169,4 @@ function Metric({ icon: Icon, label, value }) {
 function Fact({ icon: Icon, label, value }) {
   const { t } = useTranslation();
   return <div className="group flex min-w-0 items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-row-hover)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-colors group-hover:text-[var(--accent)]"><Icon size={15} /></span><div className="min-w-0"><p className="text-[10px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-xs font-semibold">{value || t("common.notProvided")}</p></div></div>;
-}
-
-function JourneyFact({ label, value }) {
-  return <div className="min-w-0 rounded-xl border border-blue-100/80 bg-white/75 px-3 py-2.5"><p className="text-[10px] font-medium text-slate-500">{label}</p><p className="mt-1 truncate text-xs font-bold text-slate-800">{value}</p></div>;
-}
-
-function SectionHeader({ icon: Icon, title }) {
-  return <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={15} /></span><h2 className="text-sm font-bold">{title}</h2></div>;
-}
-
-function DetailField({ icon: Icon, label, value }) {
-  return <div className="flex min-w-0 items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-row-hover)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"><Icon size={15} /></span><div className="min-w-0"><p className="text-[10px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm font-semibold">{value || "—"}</p></div></div>;
 }

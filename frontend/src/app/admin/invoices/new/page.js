@@ -35,13 +35,16 @@ const card = "rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)
 const input = "h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-slate-300 focus:border-blue-500 focus:bg-[var(--bg-card)] focus:ring-4 focus:ring-blue-500/10";
 const label = "mb-1.5 block text-[11px] font-semibold text-[var(--text-secondary)]";
 const rowId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const dateInput = (value) => value ? new Date(value).toISOString().slice(0, 10) : "";
 
 const emptyInvoice = () => ({ customer_id: "", customer_name: "", customer_email: "", customer_phone: "", customer_address: "", invoice_date: today(), due_date: today(), payment_terms: "Due on receipt", overall_discount_rate: "0", overall_discount_type: "percent", tax_rate: "0", bank_details: "", terms: "", items: [] });
 
-export default function NewInvoicePage() {const { t, locale } = useTranslation();
+export default function NewInvoicePage() {const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyInvoice);
+  const [editInvoiceId, setEditInvoiceId] = useState("");
+  const [editInvoiceLoaded, setEditInvoiceLoaded] = useState(false);
   const [prefillCustomerId, setPrefillCustomerId] = useState("");
   const [prefillQuoteId, setPrefillQuoteId] = useState("");
   const appliedQuoteId = useRef("");
@@ -55,15 +58,18 @@ export default function NewInvoicePage() {const { t, locale } = useTranslation()
   const [pickedVariants, setPickedVariants] = useState([]);
 
   const { data: rawCustomers = [] } = useQuery({ queryKey: ["invoice-customers"], queryFn: () => customerApi.getAll({ limit: 500 }) });
+  const { data: nextInvoiceNumber } = useQuery({ queryKey: ["invoice-next-number"], queryFn: invoiceApi.getNextNumber, enabled: !editInvoiceId });
+  const { data: editingInvoice, isLoading: isLoadingInvoice } = useQuery({ queryKey: ["invoice-admin", editInvoiceId], queryFn: () => invoiceApi.getById(editInvoiceId), enabled: Boolean(editInvoiceId) });
   const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });
   const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });const { data: companySettings } = useQuery({ queryKey: ["admin-store-info"], queryFn: storeApi.get });
   const { data: rawStock = [] } = useQuery({ queryKey: ["invoice-product-stock"], queryFn: stockApi.getAll, staleTime: 2 * 60 * 1000 });
   const { data: rawVariants = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variants"], queryFn: variantApi.getAll, staleTime: 2 * 60 * 1000 });
-  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_translations?.[locale] || (locale === "en" ? companySettings?.invoice_terms_conditions : ""); if (!prefillQuoteId && defaultTerms) setForm((current) => current.terms ? current : { ...current, terms: defaultTerms }); }, [prefillQuoteId, locale, companySettings?.invoice_terms_conditions, companySettings?.invoice_terms_translations]);
+  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_conditions ?? ""; if (!editInvoiceId && !prefillQuoteId && defaultTerms !== undefined && defaultTerms !== null) setForm((current) => ({ ...current, terms: defaultTerms })); }, [editInvoiceId, prefillQuoteId, companySettings?.invoice_terms_conditions]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setPrefillCustomerId(params.get("customer") || "");
     setPrefillQuoteId(params.get("quote") || "");
+    setEditInvoiceId(params.get("invoice") || "");
   }, []);
   useEffect(() => {
     if (!prefillCustomerId || prefillQuoteId) return;
@@ -85,6 +91,22 @@ export default function NewInvoicePage() {const { t, locale } = useTranslation()
       return { id: String(variant._id || ""), product_id: String(productId), productName: stock.product_name || product.name || variant.name || "Product", variantName: variant.title || variant.sku || "Variant", sku: variant.sku || "", price: Number(variant.selling_price ?? stock.selling_price ?? stock.sell_price ?? 0), image: variant.images?.[0]?.img_url || stock.image || "", stock: Number(variant.quantity ?? stock.quantity ?? stock.stock ?? 0), categoryId: String(stock.category_id?._id || stock.category_id || ""), categoryName: stock.category_name || stock.category_id?.name || "", brandId: String(stock.brand_id?._id || stock.brand_id || ""), brandName: stock.brand_name || stock.brand_id?.name || "" };
     }).filter((variant) => variant.id && variant.product_id);
   }, [rawVariants, rawStock]);
+  useEffect(() => {
+    if (!editInvoiceId || !editingInvoice || editInvoiceLoaded || productsLoading) return;
+    if (editingInvoice.sent_at) {
+      toast.error("Sent invoices can no longer be edited");
+      router.replace(`/admin/invoices/${editInvoiceId}`);
+      return;
+    }
+    const items = (editingInvoice.items || []).map((item) => {
+      const selectedVariant = variants.find((variant) => variant.id === String(item.variant_id?._id || item.variant_id || ""));
+      const [name, ...parts] = String(item.name || "").split(" / ");
+      return { row_id: rowId(), product_id: String(item.product_id?._id || item.product_id || selectedVariant?.product_id || ""), variant_id: String(item.variant_id?._id || item.variant_id || ""), name: selectedVariant?.productName || name || item.name || "", variant_name: selectedVariant?.variantName || parts.join(" / "), sku: item.sku || selectedVariant?.sku || "", image: item.image || selectedVariant?.image || "", quantity: Number(item.quantity) || 1, unit_price: Number(item.unit_price) || 0, discount_rate: Number(item.discount_rate) || 0, tax_rate: Number(item.tax_rate) || 0 };
+    });
+    const paymentTerms = ["Due on receipt", "Net 7", "Net 14", "Net 30"].includes(editingInvoice.payment_terms) ? editingInvoice.payment_terms : "Custom";
+    setForm({ customer_id: String(editingInvoice.customer_id?._id || editingInvoice.customer_id || ""), customer_name: editingInvoice.customer_name || "", customer_email: editingInvoice.customer_email || "", customer_phone: editingInvoice.customer_phone || "", customer_address: editingInvoice.customer_address || "", invoice_date: dateInput(editingInvoice.invoice_date), due_date: dateInput(editingInvoice.due_date), payment_terms: paymentTerms, custom_payment_terms: paymentTerms === "Custom" ? editingInvoice.payment_terms || "" : "", overall_discount_rate: String(editingInvoice.overall_discount_rate ?? 0), overall_discount_type: editingInvoice.overall_discount_type || "percent", tax_rate: String(editingInvoice.tax_rate ?? 0), bank_details: editingInvoice.bank_details || "", terms: editingInvoice.terms || "", items });
+    setEditInvoiceLoaded(true);
+  }, [editInvoiceId, editingInvoice, editInvoiceLoaded, variants, productsLoading, router]);
   useEffect(() => {
     if (!prefillQuoteId || !prefilledQuote || productsLoading || appliedQuoteId.current === prefillQuoteId) return;
     const quoteItems = (prefilledQuote.items || []).map((item) => {
@@ -172,20 +194,23 @@ export default function NewInvoicePage() {const { t, locale } = useTranslation()
     bank_details: form.bank_details,
     terms: form.terms,
     pdf_design: getSavedQuotePdfDesign(INVOICE_TEMPLATE_STORAGE_KEY),
-    items: form.items.map(({ row_id, variant_name, ...item }) => ({ ...item, name: variant_name ? `${item.name} / ${variant_name}` : item.name }))
+    items: form.items.filter((item) => String(item.name || "").trim()).map(({ row_id, variant_name, ...item }) => ({ ...item, name: variant_name ? `${item.name} / ${variant_name}` : item.name }))
   });
   const canSubmit = Boolean(form.customer_id && form.customer_name.trim() && form.invoice_date && form.due_date && form.items.length);
   const setField = (name, value) => setForm((current) => ({ ...current, [name]: value }));
 
   const draftMutation = useMutation({
-    mutationFn: () => invoiceApi.create(payload()),
+    mutationFn: () => editInvoiceId ? invoiceApi.update(editInvoiceId, payload()) : invoiceApi.create(payload()),
     onSuccess: async (invoice) => {
-      toast.success(`${invoice.invoice_number} saved successfully`);
-      await queryClient.invalidateQueries({ queryKey: ["stock"] });
-      await queryClient.invalidateQueries({ queryKey: ["invoice-product-stock"] });
-      await queryClient.invalidateQueries({ queryKey: ["invoice-variants"] });
-      await queryClient.invalidateQueries({ queryKey: ["invoices-admin"] });
-      router.push("/admin/invoices");
+      toast.success(`${invoice.invoice_number} ${editInvoiceId ? "updated" : "saved"} successfully`);
+      queryClient.setQueryData(["invoice-admin", invoice._id], invoice);
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["invoice-product-stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["invoice-variants"] }),
+        queryClient.invalidateQueries({ queryKey: ["invoices-admin"] }),
+      ]).catch((error) => console.error("Could not refresh invoice-related data:", error));
+      router.push(editInvoiceId ? `/admin/invoices/${invoice._id}` : "/admin/invoices");
     },
     onError: (error) => toast.error(error?.response?.data?.message || "Could not save invoice")
   });
@@ -207,8 +232,8 @@ export default function NewInvoicePage() {const { t, locale } = useTranslation()
   const removeItem = (id) => setForm((current) => ({ ...current, items: current.items.filter((item) => item.row_id !== id) }));
   return <div className="invoice-create-page w-full space-y-2.5 pb-5 text-[var(--text-primary)]">
     <header className="flex flex-wrap items-center justify-between gap-2">
-      <div className="min-w-0"><div className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-[var(--text-muted)]"><button onClick={() => router.push("/admin/invoices")} className="transition hover:text-blue-600">{t("admin.quoteInvoice.ui.invoices_35f8f37b")}</button><ChevronRight size={11} /><span>{t("admin.quoteInvoice.ui.create_new_invoice_1804881a")}</span></div><h1 className="text-xl font-extrabold leading-tight tracking-tight sm:text-2xl">{t("admin.quoteInvoice.ui.create_new_invoice_1804881a")}</h1><p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">{t("admin.quoteInvoice.ui.fill_in_the_details_below_to_create_a_new_invoice_for_yo_fdcff0fd")}</p></div>
-      <div className="flex flex-wrap gap-1.5"><button type="button" disabled={!canSubmit || draftMutation.isPending} onClick={() => draftMutation.mutate()} className="invoice-primary-btn"><Save size={12} /> {draftMutation.isPending ? "Saving..." : "Save Invoice"}</button></div>
+      <div className="min-w-0"><div className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-[var(--text-muted)]"><button onClick={() => router.push("/admin/invoices")} className="transition hover:text-blue-600">{t("admin.quoteInvoice.ui.invoices_35f8f37b")}</button><ChevronRight size={11} /><span>{editInvoiceId ? "Edit Invoice" : t("admin.quoteInvoice.ui.create_new_invoice_1804881a")}</span></div><h1 className="text-xl font-extrabold leading-tight tracking-tight sm:text-2xl">{editInvoiceId ? "Edit Invoice" : t("admin.quoteInvoice.ui.create_new_invoice_1804881a")}</h1><p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">{editInvoiceId ? `Update ${editingInvoice?.invoice_number || "invoice"} details before sending it to the customer.` : t("admin.quoteInvoice.ui.fill_in_the_details_below_to_create_a_new_invoice_for_yo_fdcff0fd")}</p></div>
+      <div className="flex flex-wrap gap-1.5"><button type="button" disabled={!canSubmit || draftMutation.isPending || isLoadingInvoice || Boolean(editInvoiceId && !editInvoiceLoaded)} onClick={() => draftMutation.mutate()} className="invoice-primary-btn"><Save size={12} /> {draftMutation.isPending ? "Saving..." : editInvoiceId ? "Update Invoice" : "Save Invoice"}</button></div>
     </header>
 
     <div className="grid items-start gap-3 md:grid-cols-2">
@@ -231,7 +256,7 @@ export default function NewInvoicePage() {const { t, locale } = useTranslation()
       storageKey={INVOICE_TEMPLATE_STORAGE_KEY}
       form={{ ...form, quote_date: form.invoice_date, expiry_date: form.due_date }}
       totals={totals}
-      quoteNumber=""
+      quoteNumber={editingInvoice?.invoice_number || nextInvoiceNumber?.invoice_number || ""}
       quoteStatus="Unpaid"
       money={money}
       onBrowseProducts={openProductPicker}
