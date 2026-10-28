@@ -63,7 +63,7 @@ const server = http.createServer(app);
 
 const PORT = Number(process.env.PORT);
 // TRUST_PROXY sirf env se — blank/off ho to proxy trust nahi hota
-if (String(process.env.TRUST_PROXY).trim()) {
+if (String(process.env.TRUST_PROXY || "").trim()) {
   app.set("trust proxy", String(process.env.TRUST_PROXY).trim());
 }
 const HOST = process.env.HOST;
@@ -75,6 +75,8 @@ const REQUEST_SIZE_LIMIT = process.env.REQUEST_SIZE_LIMIT;
 const UPLOAD_CACHE_MAX_AGE = process.env.UPLOAD_CACHE_MAX_AGE;
 const UPLOAD_DIR = process.env.UPLOAD_DIR;
 const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR;
+const BUNDLE_UPLOAD_SUBDIR = process.env.BUNDLE_UPLOAD_SUBDIR;
+const REVIEW_UPLOAD_SUBDIR = process.env.REVIEW_UPLOAD_SUBDIR;
 const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE;
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 
@@ -97,14 +99,14 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (buildAllowedOrigins().includes(origin)) return callback(null, true);
     
-    if (NODE_ENV !== "production") {
+    if (NODE_ENV === "development") {
       try {
         const url = new URL(origin);
         if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return callback(null, true);
       } catch (error) { return callback(new Error("Invalid request origin")); }
     }
 
-    if (process.env.ALLOW_LOCAL_NETWORK === "true") {
+    if (NODE_ENV === "development" && process.env.ALLOW_LOCAL_NETWORK === "true") {
       try {
         const url = new URL(origin);
         const isPrivate = /^192\.168\.\d+\.\d+$/.test(url.hostname) || 
@@ -142,7 +144,7 @@ const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
 app.use(
   "/uploads",
   express.static(uploadDir, {
-    maxAge: "1y",
+    maxAge: UPLOAD_CACHE_MAX_AGE,
     immutable: true,
     etag: true,
   }),
@@ -240,10 +242,10 @@ const createUploadDirectories = () => {
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   if (!fs.existsSync(storeUploadDir)) fs.mkdirSync(storeUploadDir, { recursive: true });
   // ✅ Bundle cover images
-  const bundleUploadDir = path.join(uploadDir, "bundles");
+  const bundleUploadDir = path.join(uploadDir, BUNDLE_UPLOAD_SUBDIR);
   if (!fs.existsSync(bundleUploadDir)) fs.mkdirSync(bundleUploadDir, { recursive: true });
   // ✅ Review media (images + video)
-  const reviewUploadDir = path.join(uploadDir, "reviews");
+  const reviewUploadDir = path.join(uploadDir, REVIEW_UPLOAD_SUBDIR);
   if (!fs.existsSync(reviewUploadDir)) fs.mkdirSync(reviewUploadDir, { recursive: true });
 };
 
@@ -328,14 +330,19 @@ const seedDefaultData = async () => {
 //     (pehli baar model download/load me minutes lag sakte hain).
 // ==========================================
 const TRANSLATION_API_URL = String(process.env.LIBRETRANSLATE_URL || "").replace(/\/+$/, "");
-const TRANSLATION_READY_TIMEOUT_MS = Number(process.env.TRANSLATE_READY_TIMEOUT_MS) || 15 * 60 * 1000;
-const TRANSLATION_REUSE_GRACE_MS = Number(process.env.TRANSLATE_REUSE_GRACE_MS) || 75 * 1000;
+const TRANSLATION_READY_TIMEOUT_MS = Number(process.env.TRANSLATE_READY_TIMEOUT_MS);
+const TRANSLATION_REUSE_GRACE_MS = Number(process.env.TRANSLATE_REUSE_GRACE_MS);
+const TRANSLATION_HEALTHCHECK_TIMEOUT_MS = Number(process.env.TRANSLATE_HEALTHCHECK_TIMEOUT_MS);
+const TRANSLATION_READY_POLL_INTERVAL_MS = Number(process.env.TRANSLATE_READY_POLL_INTERVAL_MS);
+const TRANSLATION_REUSE_POLL_INTERVAL_MS = Number(process.env.TRANSLATE_REUSE_POLL_INTERVAL_MS);
 const ARGOS_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let argosProcess = null;
 const isTranslationServiceUp = async () => {
   try {
-    const response = await fetch(`${TRANSLATION_API_URL}/healthz`, { signal: AbortSignal.timeout(3000) });
+    const response = await fetch(`${TRANSLATION_API_URL}/healthz`, {
+      signal: AbortSignal.timeout(TRANSLATION_HEALTHCHECK_TIMEOUT_MS),
+    });
     return response.ok;
   } catch {
     return false;
@@ -346,7 +353,7 @@ const waitTranslationServiceReady = async () => {
   const deadline = Date.now() + TRANSLATION_READY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (await isTranslationServiceUp()) return true;
-    await ARGOS_SLEEP(2500);
+    await ARGOS_SLEEP(TRANSLATION_READY_POLL_INTERVAL_MS);
   }
   return false;
 };
@@ -376,7 +383,7 @@ const startArgosServer = async () => {
   if (!serviceUp) {
     const graceDeadline = Date.now() + TRANSLATION_REUSE_GRACE_MS;
     while (!serviceUp && Date.now() < graceDeadline) {
-      await ARGOS_SLEEP(2000);
+      await ARGOS_SLEEP(TRANSLATION_REUSE_POLL_INTERVAL_MS);
       serviceUp = await isTranslationServiceUp();
     }
   }
@@ -479,8 +486,7 @@ const startServer = async () => {
     
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
-      startupLog.error(`Port ${PORT} already in use (EADDRINUSE) — doosra backend chal raha hai.`);
-      console.error(`💡 Fix: taskkill /PID <pid> /F   |   ya .env me PORT badal do`);
+      startupLog.error(`Port ${PORT} already in use — stop the existing service or configure a different PORT.`);
       process.exit(1);
     }
 
@@ -488,7 +494,7 @@ const startServer = async () => {
       console.log(`✅ ${STARTUP_MESSAGE}`);
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
-    if (NODE_ENV !== "production") startArgosServer();
+    if (NODE_ENV === "development") startArgosServer();
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi
     startupLog.error(`Server start failed: ${error.message}`);

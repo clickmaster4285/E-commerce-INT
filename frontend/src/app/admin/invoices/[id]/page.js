@@ -16,15 +16,15 @@ import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
 import QuoteTemplateDesigner, { INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
 
-const edge = { border: "1px solid #dce8f8" };
+const edge = { border: "1px solid var(--border-color)" };
 const card = {
   ...edge,
-  background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
+  background: "var(--bg-card)",
   borderRadius: 14,
   boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)"
 };
-const muted = { color: "#64748b" };
-const primary = { color: "#0f172a" };
+const muted = { color: "var(--text-muted)" };
+const primary = { color: "var(--text-primary)" };
 const accent = { color: "#2563eb" };
 const money = (value, locale) => new Intl.NumberFormat(locale || "en-PK", {
   style: "currency",
@@ -41,20 +41,20 @@ const paymentDateTime = (payment, locale) => {
   return { date: date(value, locale), time: payment.payment_time || new Date(value).toLocaleTimeString(locale || [], { hour: "2-digit", minute: "2-digit" }) };
 };
 const statusStyles = {
-  Unpaid: { bg: "#fff5df", fg: "#b5760a" },
-  "Partially Paid": { bg: "#fff5df", fg: "#b5760a" },
-  Paid: { bg: "#e1f8f0", fg: "#079878" },
-  Overdue: { bg: "#ffebed", fg: "#cf3348" }
+  Unpaid: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+  "Partially Paid": "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
+  Paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
+  Overdue: "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
 };
 
 function Badge({ value, status = value }) {
   const style = statusStyles[status] || statusStyles.Unpaid;
-  return <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold shadow-sm" style={{ backgroundColor: style.bg, color: style.fg }}>{value}</span>;
+  return <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold shadow-sm ${style}`}>{value}</span>;
 }
 
 function Panel({ title, icon: Icon, trailing, className = "", children }) {
   return <section className={`min-w-0 overflow-hidden rounded-2xl shadow-lg transition hover:shadow-xl ${className}`} style={card}>
-    <div className="flex min-h-10 items-center gap-2.5 border-b px-5 py-3" style={{ borderColor: "#e2e8f0", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)" }}>
+    <div className="flex min-h-10 items-center gap-2.5 border-b px-5 py-3" style={{ borderColor: "var(--border-color)", background: "var(--bg-card-alt)" }}>
       {Icon && <div className="flex h-8 w-8 items-center justify-center rounded-lg shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}><Icon size={15} strokeWidth={2.5} style={{ color: "#fff" }} /></div>}
       <h2 className="text-sm font-extrabold tracking-tight" style={primary}>{title}</h2>
       <div className="ml-auto">{trailing}</div>
@@ -168,7 +168,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   };
 
   if (isLoading) return <div className="space-y-3"><div className="skeleton h-8 w-1/3" /><div className="skeleton h-28 w-full" /><div className="skeleton h-52 w-full" /></div>;
-  if (isError || !invoice) return <div className="rounded-xl border bg-white p-8 text-center" style={edge}>
+  if (isError || !invoice) return <div className="rounded-xl border bg-[var(--bg-card)] p-8 text-center" style={edge}>
     <p className="text-sm" style={primary}>{t("admin.quoteInvoice.ui.could_not_load_this_invoice_b761111d")}</p>
     <button type="button" onClick={() => refetch()} className="mt-2 text-sm font-semibold" style={accent}>{t("admin.quoteInvoice.ui.try_again_042c862e")}</button>
     <div><Link href="/admin/invoices" className="mt-3 inline-block text-sm underline" style={muted}>{t("admin.quoteInvoice.ui.back_to_invoices_8371e902")}</Link></div>
@@ -260,8 +260,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 disabled:opacity-45"
-      style={{ borderColor: primaryAction ? "#c8dcff" : "#dce8f8", color: primaryAction ? "#2878f0" : "#36567f", background: "white" }}>
+      className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45"
+      style={{ borderColor: primaryAction ? "color-mix(in srgb, var(--accent) 30%, var(--border-color))" : "var(--border-color)", color: primaryAction ? "var(--accent)" : "var(--text-secondary)", background: primaryAction ? "var(--accent-soft)" : "var(--bg-card)" }}>
       {Icon && <Icon size={16} />}{label}</button>;
     return disabled && title ? <span key={label} title={title} className="inline-flex">{button}</span> : <span key={label} title={title}>{button}</span>;
   };
@@ -273,7 +273,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           <ChevronRight size={13} /> <span style={primary}>{invoice.invoice_number}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-white" style={{ borderColor: "#cfe0f8", color: "#2878f0" }}><FileText size={18} /></div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-[var(--bg-tertiary)]" style={{ borderColor: "var(--border-color)", color: "#2878f0" }}><FileText size={18} /></div>
           <h1 className="font-mono text-xl font-bold" style={primary}>{t("admin.quoteInvoice.ui.invoice_51d86044")}{invoice.invoice_number}</h1>
           <Badge value={displayStatus} status={rawStatus} />
         </div>
@@ -286,8 +286,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
         {!invoice.sent_at && smallAction("Edit", () => router.push(`/admin/invoices/new?invoice=${encodeURIComponent(id)}`), Pencil)}
-        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 disabled:opacity-45" style={{ borderColor: "#dce8f8", color: "#36567f", background: "white" }}><Printer size={16} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
-        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 disabled:opacity-45" style={{ borderColor: "#dce8f8", color: "#36567f", background: "white" }}><FileText size={16} />Download PDF</button>
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><Printer size={16} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><FileText size={16} />Download PDF</button>
         {canReturn && smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? t("admin.invoiceDetail.action.saving") : t("admin.invoiceDetail.action.sendCustomer"),
@@ -331,26 +331,26 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           <div className="p-4">
             <div className="flex items-center gap-2"><span className="text-sm font-semibold" style={primary}>{t("admin.quoteInvoice.ui.invoice_status_a5a0bffa")}</span><Badge value={displayStatus} status={rawStatus} /></div>
             <div className="relative mt-5 grid gap-1" style={{ gridTemplateColumns: `repeat(${timeline.length}, minmax(0, 1fr))` }}>
-              <div className="absolute top-[5px] h-px" style={{ left: `${50 / timeline.length}%`, right: `${50 / timeline.length}%`, background: "#d9e7fa" }} />
+              <div className="absolute top-[5px] h-px" style={{ left: `${50 / timeline.length}%`, right: `${50 / timeline.length}%`, background: "var(--border-color)" }} />
               {timeline.map(([label, value, complete]) => <div key={label} className="relative flex flex-col items-center gap-1.5 text-center">
-                <span className="z-[1] flex h-[11px] w-[11px] items-center justify-center rounded-full border-2 bg-white" style={{ borderColor: complete ? "#08b88e" : "#cbdaf0", background: complete ? "#08b88e" : "white" }}>{complete && <Check size={7} color="white" strokeWidth={3} />}</span>
-                <span className="text-[11px]" style={{ color: complete ? "#173d78" : "#7188a8", fontWeight: complete ? 700 : 400 }}>{label}</span>
+                <span className="z-[1] flex h-[11px] w-[11px] items-center justify-center rounded-full border-2" style={{ borderColor: complete ? "#08b88e" : "var(--border-color)", background: complete ? "#08b88e" : "var(--bg-card)" }}>{complete && <Check size={7} color="white" strokeWidth={3} />}</span>
+                <span className="text-[11px]" style={{ color: complete ? "var(--accent)" : "var(--text-muted)", fontWeight: complete ? 700 : 400 }}>{label}</span>
                 <span className="text-[10px]" style={muted}>{value}</span>
               </div>)}
             </div>
-            <div className="my-3 border-t" style={{ borderColor: "#edf2f9" }} />
+            <div className="my-3 border-t" style={{ borderColor: "var(--border-color)" }} />
             <div className="flex items-center justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.amount_paid_d39013c6")}</span><span className="font-semibold" style={{ color: "#079878" }}>{money(paidAmount, locale)}</span></div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "#edf3fb" }}><div className="h-full rounded-full" style={{ width: `${paymentProgress}%`, background: "#0bb98f" }} /></div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg-tertiary)" }}><div className="h-full rounded-full" style={{ width: `${paymentProgress}%`, background: "#0bb98f" }} /></div>
             <div className="mt-2 flex justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.remaining_balance_939fea83")}</span><span className="font-semibold" style={remaining > 0 ? { color: "#b5760a" } : { color: "#079878" }}>{money(remaining, locale)}</span></div>
-            {canReturn && <button type="button" onClick={() => setReturnOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-left transition hover:border-rose-300 hover:bg-rose-100/80 print:hidden">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-rose-600 shadow-sm"><RotateCcw size={16} /></span>
+            {canReturn && <button type="button" onClick={() => setReturnOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-left text-rose-800 transition hover:border-rose-300 hover:bg-rose-100/80 print:hidden dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-card)] text-rose-600 shadow-sm"><RotateCcw size={16} /></span>
               <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-rose-800">Return &amp; Refund</span><span className="mt-0.5 block text-[10px] text-rose-700/80">Process returned items and adjust the bill</span></span>
               <ChevronRight size={15} className="shrink-0 text-rose-500" />
             </button>}
           </div>
         </Panel>
 
-        <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700">{invoiceActivity.length}</span>} className="print:hidden">
+        <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">{invoiceActivity.length}</span>} className="print:hidden">
           <div className="max-h-[360px] overflow-y-auto px-3 py-3">
             <ol className="space-y-0">
               {[...invoiceActivity].reverse().map((event, index, events) => {
@@ -364,12 +364,12 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
                   ? new Date(event.at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
                   : t("common.notProvided");
                 return <li key={event._id || `${event.type}-${index}`} className="relative flex gap-2.5 pb-3 last:pb-0">
-                  {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-slate-200" />}
-                  <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-white ${created ? "bg-emerald-100 text-emerald-700" : returned ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}><Icon size={11} /></span>
-                  <div className="min-w-0 flex-1 border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-2"><p className="min-w-0 text-[11px] font-bold leading-4 text-slate-800">{title}</p><time className="shrink-0 text-[9px] leading-4 text-slate-400">{eventDate}</time></div>
-                    <p className="mt-0.5 truncate text-[10px] text-slate-500">{t("admin.invoiceDetail.activity.by", { name: event.actor_name || t("admin.pos.ui.unknownStaff") })}</p>
-                    {event.changes?.length > 0 && <ul className="mt-1.5 space-y-1">{event.changes.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-slate-600"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
+                  {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-slate-200 dark:bg-slate-700" />}
+                  <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-[var(--bg-card)] ${created ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : returned ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"}`}><Icon size={11} /></span>
+                  <div className="min-w-0 flex-1 border-b border-[var(--border-color)] pb-2.5 last:border-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-2"><p className="min-w-0 text-[11px] font-bold leading-4 text-[var(--text-primary)]">{title}</p><time className="shrink-0 text-[9px] leading-4 text-[var(--text-muted)]">{eventDate}</time></div>
+                    <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">{t("admin.invoiceDetail.activity.by", { name: event.actor_name || t("admin.pos.ui.unknownStaff") })}</p>
+                    {event.changes?.length > 0 && <ul className="mt-1.5 space-y-1">{event.changes.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-[var(--text-secondary)]"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
                   </div>
                 </li>;
               })}
@@ -380,11 +380,11 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         <Panel title={t("admin.quoteInvoice.ui.payment_history_cfeba031")} icon={CreditCard} trailing={<span className="text-xs font-semibold" style={accent}>{payments.length} {t("admin.quoteInvoice.ui.payments_44357ae5")}</span>}>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-xs">
-              <thead style={{ background: "#f8fbff", color: "#627b9f" }}><tr>{["#", t("admin.invoiceDetail.field.dateTime"), t("admin.invoiceDetail.field.amount"), t("admin.invoiceDetail.field.method"), t("admin.invoiceDetail.field.note")].map((heading) => <th key={heading} className="whitespace-nowrap px-2 py-2 font-semibold">{heading}</th>)}</tr></thead>
-              <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t transition-colors hover:bg-blue-50/50" style={{ borderColor: "#eaf0f8" }}>
+            <thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.field.dateTime"), t("admin.invoiceDetail.field.amount"), t("admin.invoiceDetail.field.method"), t("admin.invoiceDetail.field.note")].map((heading) => <th key={heading} className="whitespace-nowrap px-2 py-2 font-semibold">{heading}</th>)}</tr></thead>
+              <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/30" style={{ borderColor: "var(--border-color)" }}>
                 <td className="px-2 py-2.5" style={muted}>{index + 1}</td>
                 <td className="whitespace-nowrap px-2 py-2.5" style={primary}><span className="block">{paymentDateTime(payment).date}</span><span className="mt-0.5 block text-[10px]" style={muted}>{paymentDateTime(payment).time}</span></td>
-                <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={{ color: Number(payment.amount) < 0 ? "#dc2626" : "#0f172a" }}>{money(payment.amount)}</td>
+                <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={{ color: Number(payment.amount) < 0 ? "#dc2626" : "var(--text-primary)" }}>{money(payment.amount)}</td>
                 <td className="px-2 py-2.5" style={muted}>{payment.payment_method || "-"}</td>
                 <td className="max-w-24 truncate px-2 py-2.5" style={muted} title={payment.note || "-"}>{payment.note || "-"}</td>
               </tr>)}
@@ -392,7 +392,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
               </tbody>
             </table>
           </div>
-          <div className="space-y-2 border-t p-3" style={{ borderColor: "#e5eef9" }}>
+          <div className="space-y-2 border-t p-3" style={{ borderColor: "var(--border-color)" }}>
             <div className="flex justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.total_paid_3c6c32fd")}</span><span className="font-semibold" style={{ color: "#079878" }}>{money(paidAmount, locale)}</span></div>
             <div className="flex justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.remaining_balance_939fea83")}</span><span className="font-semibold" style={primary}>{money(remaining, locale)}</span></div>
             {remaining > 0 && <button type="button" onClick={() => setPaymentOpen(true)} className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md text-sm font-semibold text-white transition hover:opacity-90 print:hidden" style={{ background: "#2878f0" }}><CreditCard size={14} />{t("admin.quoteInvoice.ui.add_payment_b5118402")}</button>}
@@ -401,10 +401,10 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
         <Panel title={t("admin.quoteInvoice.ui.return_refund_history_e7a94538")} icon={RotateCcw} trailing={<span className="text-xs font-semibold" style={accent}>{returns.length} {t("admin.quoteInvoice.ui.returns_9582a02f")}</span>}>
           <div className="space-y-2 p-3">
-            {returns.length ? [...returns].reverse().map((record) => <article key={record.return_id || record._id} className="rounded-xl border p-3" style={{ borderColor: "#e2eaf5", background: "#fff" }}>
+            {returns.length ? [...returns].reverse().map((record) => <article key={record.return_id || record._id} className="rounded-xl border p-3" style={{ borderColor: "var(--border-color)", background: "var(--bg-tertiary)" }}>
               <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-[10px] font-medium" style={muted}>Item deduction: <span className="text-xs font-bold" style={primary}>{money(record.refund_amount)}</span></p>{record.refund_method === "Cash Refund" && <p className="mt-0.5 text-[10px] font-semibold text-emerald-700">Cash paid back: {money(record.amount_to_refund ?? record.refund_amount)}</p>}<p className="mt-0.5 text-[10px]" style={muted}>{record.refund_method} · {record.reason}</p></div><span className="rounded-full px-2 py-1 text-[9px] font-bold" style={{ color: record.status === "Completed" ? "#079878" : "#b5760a", background: record.status === "Completed" ? "#e1f8f0" : "#fff5df" }}>{record.status}</span></div>
               <p className="mt-2 text-[10px]" style={muted}>{new Date(record.date).toLocaleString([], { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
-              <div className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: "#edf2f9" }}>{(record.items_returned || []).map((item, index) => <div key={`${item.item_id || index}`} className="flex justify-between gap-3 text-[10px]"><span className="truncate" style={muted}>{item.name || invoice.items?.find((invoiceItem) => String(invoiceItem._id) === String(item.item_id))?.name || "Invoice item"}</span><span className="shrink-0 font-semibold" style={primary}>× {item.qty}</span></div>)}</div>
+              <div className="mt-2 space-y-1 border-t pt-2" style={{ borderColor: "var(--border-color)" }}>{(record.items_returned || []).map((item, index) => <div key={`${item.item_id || index}`} className="flex justify-between gap-3 text-[10px]"><span className="truncate" style={muted}>{item.name || invoice.items?.find((invoiceItem) => String(invoiceItem._id) === String(item.item_id))?.name || "Invoice item"}</span><span className="shrink-0 font-semibold" style={primary}>Ã— {item.qty}</span></div>)}</div>
               {record.notes && <p className="mt-2 whitespace-pre-wrap text-[10px]" style={muted}>{record.notes}</p>}
             </article>) : <p className="py-6 text-center text-xs" style={muted}>{t("admin.quoteInvoice.ui.no_returns_or_refunds_recorded_yet_18614002")}</p>}
           </div>
@@ -416,7 +416,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
 
     <style jsx global>{`
-      @page { size: ${invoice.pdf_design?.pageSize === "letter" ? "letter" : "A4"} ${invoice.pdf_design?.orientation === "landscape" ? "landscape" : "portrait"}; margin: 10mm; }
+      @page { size: ${["tabloid", "legal", "letter", "a0", "a1", "a2", "a3", "a4", "a5"].includes(String(invoice.pdf_design?.pageSize || "a4").toLowerCase()) ? String(invoice.pdf_design?.pageSize || "a4").toLowerCase() : "a4"} ${invoice.pdf_design?.orientation === "landscape" ? "landscape" : "portrait"}; margin: 10mm; }
       @media print {
         html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
         body * { visibility: hidden !important; }
@@ -434,7 +434,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         #invoice-document-preview a { display: none !important; }
         #invoice-document-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; overflow: hidden !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
         #invoice-document-preview [data-quote-document-page="true"]:last-child { break-after: auto; page-break-after: auto; }
-        #invoice-document-preview img { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        #invoice-document-preview, #invoice-document-preview * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       }
     `}</style>
   </div>;

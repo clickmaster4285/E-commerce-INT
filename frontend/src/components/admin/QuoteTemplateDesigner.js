@@ -27,6 +27,25 @@ export const INVOICE_TEMPLATE_STORAGE_KEY = "invoice-template-settings-v1";
 
 const lblPair = (key, fallback) => ({ key, fallback });
 
+const resolveProductImage = (value) => {
+  const raw = typeof value === "string"
+    ? value
+    : value?.img_url || value?.image_url || value?.url || value?.path || "";
+  if (!raw) return "";
+  if (/^(https?:|blob:|data:)/i.test(raw)) return raw;
+  const origin = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+  return origin ? `${origin}${raw.startsWith("/") ? raw : `/${raw}`}` : raw;
+};
+
+const firstProductImage = (...sources) => {
+  for (const source of sources) {
+    const candidate = Array.isArray(source) ? source[0] : source;
+    const url = resolveProductImage(candidate);
+    if (url) return url;
+  }
+  return "";
+};
+
 export const DOCUMENT_CONFIG = {
   quote: {
     storageKey: QUOTE_TEMPLATE_STORAGE_KEY,
@@ -118,6 +137,18 @@ const QUOTE_TEMPLATES = [
   { name: "Lavender", subtitle: "Beauty", color: "#7b3fe4", tone: "#f8f5ff", layout: "center" },
   { name: "Ocean", subtitle: "Consulting", color: "#287d91", tone: "#f1f8fa", layout: "split" },
   { name: "Mono", subtitle: "Software", color: "#18181b", tone: "#f4f4f5", layout: "minimal" },
+];
+
+const PAGE_SIZE_OPTIONS = [
+  { value: "tabloid", label: "Tabloid (11 x 17 in)", dimensions: [279.4, 431.8] },
+  { value: "legal", label: "Legal (8.5 x 14 in)", dimensions: [215.9, 355.6] },
+  { value: "letter", label: "Letter (8.5 x 11 in)", dimensions: [215.9, 279.4] },
+  { value: "a0", label: "A0", dimensions: [841, 1189] },
+  { value: "a1", label: "A1", dimensions: [594, 841] },
+  { value: "a2", label: "A2", dimensions: [420, 594] },
+  { value: "a3", label: "A3", dimensions: [297, 420] },
+  { value: "a4", label: "A4", dimensions: [210, 297] },
+  { value: "a5", label: "A5", dimensions: [148, 210] },
 ];
 
 const FONT_OPTIONS = [
@@ -236,9 +267,8 @@ export function getSavedQuotePdfDesign(storageKey = STORAGE_KEY) {
     logoWidth: Math.max(12, Math.min(50, Number(saved.logoWidth) || 24)),
     logoAlignment: saved.logoAlignment || "left",
     logoOffset: Number(saved.logoOffset) || 0,
-    pageSize: saved.pageSize || "a4",
+    pageSize: PAGE_SIZE_OPTIONS.some((option) => option.value === String(saved.pageSize || "").toLowerCase()) ? String(saved.pageSize).toLowerCase() : "a4",
     orientation: saved.orientation || "portrait",
-    pageHeight: 297,
     watermark: Boolean(saved.watermark),
     watermarkUseLogo: Boolean(saved.watermarkUseLogo),
     watermarkText: String(saved.watermarkText || "PAID").slice(0, 40),
@@ -273,8 +303,9 @@ function renderBoldText(text) {
   });
 }
 
-function QuoteHeaderDetails({ number, status, date, validUntil, labels, className = "", color = "#475569", emphasis = "#0f172a" }) {
+function QuoteHeaderDetails({ number, status, date, validUntil, labels, title, titleSize, className = "", color = "#475569", emphasis = "#0f172a" }) {
   return <div className={`space-y-0.5 text-[8px] leading-snug ${className}`} style={{ color }}>
+    <p className="mb-1 font-extrabold leading-none" style={{ color: emphasis, fontSize: `${titleSize}px` }}>{title}</p>
     <p>{labels.number}: <span className="font-semibold" style={{ color: emphasis }}>{number}</span></p>
     <p>{labels.status}: <span className="font-semibold" style={{ color: emphasis }}>{status}</span></p>
     <p>{labels.date}: <span className="font-semibold" style={{ color: emphasis }}>{date}</span></p>
@@ -319,7 +350,14 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         variant: variant.title || "",
         sku: variant.sku || "",
         price: Number(variant.selling_price ?? 0),
-        image: variant.images?.[0]?.img_url || variant.images?.[0]?.url || variant.images?.[0] || "",
+        image: firstProductImage(
+          product.images,
+          product.image,
+          product.image_url,
+          variant.images,
+          variant.image,
+          variant.image_url,
+        ),
       };
     }).filter((option) => option.id && option.product_id);
   }, [rawVariants]);
@@ -472,6 +510,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     date: lbl(doc.labels.date),
     due: lbl(doc.labels.due),
   };
+  const documentHeading = isInvoice ? "INVOICE" : "QUOTE";
+  const documentHeadingSize = clamp(Number(design.titleSize) || DEFAULT_DESIGN.titleSize, 18, 30);
 
   const formatDate = (value) => {
     if (!value) return "\u2014";
@@ -518,6 +558,12 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const headerText = isBoldLayout ? "#fff" : isCenteredLayout ? design.accentColor || theme.color : design.accentColor || theme.color;
 
   const previewScale = clamp((design.baseFontSize || 13) / 13, 0.75, 1.4);
+  const selectedPageSize = PAGE_SIZE_OPTIONS.find((option) => option.value === design.pageSize) || PAGE_SIZE_OPTIONS.find((option) => option.value === "a4");
+  const pageDimensions = design.orientation === "landscape"
+    ? [selectedPageSize.dimensions[1], selectedPageSize.dimensions[0]]
+    : selectedPageSize.dimensions;
+  const previewPageWidth = 680;
+  const previewPageHeight = previewPageWidth * pageDimensions[1] / pageDimensions[0];
   const watermarkPosition = design.watermarkPosition || "center";
   const watermarkRotation = design.watermarkRotation == null
     ? (watermarkPosition === "diagonal" ? 35 : 0)
@@ -613,40 +659,63 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
             </div>
           </div>
 
+          <div className="mt-3 border-t border-[var(--border-color)] px-3.5 pt-3">
+            <h3 className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{t("admin.quoteDesigner.pageSetup")}</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={labelClass}>{t("admin.quoteDesigner.paperSize")}
+                <select className={selectClass} value={design.pageSize || "a4"} onChange={(e) => setDesign((prev) => ({ ...prev, pageSize: e.target.value }))}>
+                  {PAGE_SIZE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className={labelClass}>{t("admin.quoteDesigner.orientation")}
+                <select className={selectClass} value={design.orientation || "portrait"} onChange={(e) => setDesign((prev) => ({ ...prev, orientation: e.target.value }))}>
+                  <option value="portrait">{t("admin.quoteDesigner.portrait")}</option>
+                  <option value="landscape">{t("admin.quoteDesigner.landscape")}</option>
+                </select>
+              </label>
+              <p className="sm:col-span-2 rounded-lg bg-[var(--bg-tertiary)] px-2.5 py-2 text-[10px] text-[var(--text-secondary)]">
+                {t("admin.quoteDesigner.pdfPageSize")}: <span className="font-bold text-[var(--text-primary)]">{selectedPageSize.value.toUpperCase()} · {pageDimensions[0]} × {pageDimensions[1]} mm · {t(`admin.quoteDesigner.${design.orientation === "landscape" ? "landscape" : "portrait"}`)}</span>
+              </p>
+            </div>
+          </div>
+
           <details className="group mt-3 border-t border-[var(--border-color)] pt-2.5" open>
             <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
               {t("admin.quoteDesigner.branding")}
               <ChevronDown size={13} className="text-[var(--text-muted)] transition-transform group-open:rotate-180" />
             </summary>
             <div className="mt-2 space-y-2 px-0.5">
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-color)] px-3 py-2.5 text-[10px] font-medium text-[var(--text-secondary)] transition hover:border-slate-300">
-                    <input type="checkbox" checked={design.watermark} onChange={(e) => { const enabled = e.target.checked; setDesign((prev) => ({ ...prev, watermark: enabled })); if (enabled) requestAnimationFrame(() => { const panel = settingsPanelRef.current; const controls = watermarkSettingsRef.current; if (panel && controls) panel.scrollTo({ top: controls.offsetTop - panel.offsetTop + panel.scrollTop, behavior: "smooth" }); }); }} className="h-3.5 w-3.5 rounded" /> {t("admin.quoteDesigner.showWatermark")}
+              <label className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-3 text-[11px] font-semibold transition ${design.watermark ? "border-blue-300 bg-blue-50 text-blue-900 shadow-sm dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200" : "border-[var(--border-color)] text-[var(--text-secondary)] hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/30"}`}>
+                    <input type="checkbox" checked={design.watermark} onChange={(e) => { const enabled = e.target.checked; setDesign((prev) => ({ ...prev, watermark: enabled })); if (enabled) requestAnimationFrame(() => watermarkSettingsRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} className="h-4 w-4 shrink-0 rounded accent-blue-600" /> {t("admin.quoteDesigner.showWatermark")}
               </label>
               {design.watermark && (
-                <div ref={watermarkSettingsRef} className="space-y-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3 shadow-sm">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-blue-800">{t("admin.quoteDesigner.watermarkSettings")}</p>
-                  <label className="flex cursor-pointer items-center gap-2 text-[10px] font-medium text-[var(--text-secondary)]">
-                    <input type="checkbox" checked={design.watermarkUseLogo} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkUseLogo: e.target.checked }))} className="h-3.5 w-3.5 rounded" /> {t("admin.quoteDesigner.logoWatermark")}
+                <div ref={watermarkSettingsRef} className="space-y-3 rounded-xl border-2 border-blue-200 bg-blue-50/80 p-3.5 shadow-sm ring-1 ring-blue-100 dark:border-blue-800 dark:bg-slate-900 dark:ring-blue-950">
+                  <div className="flex items-center gap-2 border-b border-blue-200 pb-2">
+                    <span aria-hidden="true" className="h-2 w-2 rounded-full bg-blue-600" />
+                    <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-blue-900 dark:text-blue-200">{t("admin.quoteDesigner.watermarkSettings")}</p>
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-blue-200 bg-white/80 px-2.5 py-2 text-[11px] font-semibold text-[var(--text-primary)] dark:border-[var(--border-color)] dark:bg-[var(--bg-card)]">
+                    <input type="checkbox" checked={design.watermarkUseLogo} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkUseLogo: e.target.checked }))} className="h-4 w-4 shrink-0 rounded accent-blue-600" /> {t("admin.quoteDesigner.logoWatermark")}
                   </label>
                   {!design.watermarkUseLogo && (
-                    <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
+                    <label className="block text-[11px] font-medium text-[var(--text-secondary)]">
                       {t("admin.quoteDesigner.watermarkText")}
                       <input value={design.watermarkText || ""} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkText: e.target.value.slice(0, 40) }))} maxLength={40} className="mt-1 h-8 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[11px] outline-none focus:border-blue-500" placeholder="PAID" />
                     </label>
                   )}
-                  <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
                     {t("admin.quoteDesigner.watermarkOpacity")} ({design.watermarkOpacity || 14}%)
                     <input type="range" min="5" max="40" value={design.watermarkOpacity || 14} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkOpacity: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
-                  <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
                     {t("admin.quoteDesigner.watermarkSize")} ({design.watermarkSize || 50}%)
                     <input type="range" min="20" max="100" value={design.watermarkSize || 50} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkSize: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
-                  <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
                     {t("admin.quoteDesigner.watermarkRotation")} ({watermarkRotation}°)
                     <input type="range" min="-180" max="180" step="1" value={watermarkRotation} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkRotation: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
-                  <label className="block text-[10px] font-medium text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
                     {t("admin.quoteDesigner.watermarkPosition")}
                     <select value={watermarkPosition} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkPosition: e.target.value }))} className="mt-1 h-9 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 text-[11px] text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10">
                       <option value="center">{t("admin.quoteDesigner.center")}</option>
@@ -691,21 +760,22 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   <div className="overflow-x-auto pb-1">
                     <div className="min-w-[710px] space-y-2">
                     {(() => {
-                      const itemGrid = "grid grid-cols-[1.5rem_3rem_minmax(110px,1.4fr)_minmax(74px,.85fr)_4.5rem_6.25rem_5rem_5rem_2.25rem] items-center gap-1.5";
+                      const itemGrid = "grid grid-cols-[1.25rem_2.5rem_minmax(140px,1.5fr)_minmax(58px,.6fr)_3.5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-1.5";
                       const headers = ["#", "", t("admin.quoteInvoice.ui.product_dd3b86d1"), "SKU", t("admin.quoteInvoice.ui.quantity_44f6af69"), t("admin.quoteInvoice.ui.unit_price_3c6c777f"), t("admin.quoteInvoice.ui.discount_b524936d"), t("admin.quoteInvoice.ui.tax_9be70f66"), ""];
                       return <>
                         <div className={`${itemGrid} rounded-lg bg-[var(--bg-tertiary)]/70 px-2.5 py-2`}>
                           {headers.map((header, i) => <span key={i} className={`truncate text-[8px] font-bold uppercase tracking-wide text-[var(--text-muted)] ${i >= 3 && i <= 7 ? "text-center" : ""}`}>{header}</span>)}
                         </div>
-                        {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 shadow-sm transition hover:border-slate-300`}>
-                          <span className="flex h-9 w-9 items-center justify-center justify-self-center rounded-lg bg-[var(--accent-soft)] text-[11px] font-extrabold text-[var(--accent)]">{index + 1}</span>
-                          <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]">
-                            {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <Package size={16} className="text-slate-300" />}
+                        {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 transition hover:border-blue-200`}>
+                          <span className="text-center text-[9px] font-semibold tabular-nums text-[var(--text-muted)]">{index + 1}</span>
+                          <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)]">
+                            <Package size={14} className="absolute text-slate-400" />
+                            {item.image && <img src={resolveProductImage(item.image)} alt={item.name || ""} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} className="relative h-full w-full object-cover" />}
                           </span>
                           <div className="relative flex min-w-0 flex-col justify-center">
                             <div className="relative">
                               <Search size={12} className="pointer-events-none absolute start-2 top-1/2 -translate-y-1/2 text-slate-400" />
-                              <input ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} value={item.name || ""} onFocus={(event) => activateVariantSearch(item, event.currentTarget)} onChange={(event) => { onUpdateItem(item.row_id, "name", event.target.value); activateVariantSearch(item, event.currentTarget); }} onBlur={() => { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); event.currentTarget.blur(); } }} className="h-8 w-full min-w-0 rounded-lg border border-transparent bg-transparent ps-7 pe-2 text-[13px] font-bold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-[var(--border-color)] focus:border-blue-500 focus:bg-[var(--bg-card)] focus:ring-4 focus:ring-blue-500/10" aria-label={`${t("admin.quoteInvoice.ui.product_dd3b86d1")} ${index + 1}`} aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id} placeholder={t("admin.quoteDesigner.selectOrTypeProduct")} />
+                              <input ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} value={item.name || ""} onFocus={(event) => activateVariantSearch(item, event.currentTarget)} onChange={(event) => { onUpdateItem(item.row_id, "name", event.target.value); if (item.variant_id) { onUpdateItem(item.row_id, "product_id", null); onUpdateItem(item.row_id, "variant_id", ""); onUpdateItem(item.row_id, "variant_name", ""); onUpdateItem(item.row_id, "sku", ""); onUpdateItem(item.row_id, "image", ""); onUpdateItem(item.row_id, "unit_price", 0); } activateVariantSearch(item, event.currentTarget); }} onBlur={() => { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (variantSearchOpen && activeVariantItemId === item.row_id && matchedVariants[0]) selectVariantForItem(matchedVariants[0], item); return; } if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); event.currentTarget.blur(); } }} className="h-8 w-full min-w-0 rounded-lg border border-transparent bg-transparent ps-7 pe-2 text-[13px] font-bold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-[var(--border-color)] focus:border-blue-500 focus:bg-[var(--bg-card)] focus:ring-4 focus:ring-blue-500/10" aria-label={`${t("admin.quoteInvoice.ui.product_dd3b86d1")} ${index + 1}`} aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id} placeholder={t("admin.quoteDesigner.selectOrTypeProduct")} />
                             </div>
                           </div>
                           <span className="min-w-0 truncate px-1 py-2 text-center font-mono text-[9px] text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
@@ -716,7 +786,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                     })()}
                     </div>
                   </div>
-                  <button type="button" onClick={addManualItem} className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-color)] px-3 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
+                  <div className="mt-2 flex justify-center">
+                    <button type="button" onClick={addManualItem} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-color)] px-3 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
+                  </div>
                 </section>
                 <section className="rounded-xl border border-[var(--border-color)] p-3.5">
                   <div className="mb-3 flex flex-wrap items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Calculator size={16} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.totals")}</h5></div>
@@ -753,9 +825,10 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   fontStyle: design.italicBody ? "italic" : "normal",
                   zoom: previewScale,
                   width: `${100 / previewScale}%`,
-                  maxWidth: `${680 / previewScale}px`,
+                  maxWidth: `${previewPageWidth / previewScale}px`,
+                  aspectRatio: `${pageDimensions[0]} / ${pageDimensions[1]}`,
                   margin: "0 auto",
-                  minHeight: termsOnSecondPage ? `${960 / previewScale}px` : isAgencyLayout ? "790px" : undefined,
+                  minHeight: `${previewPageHeight / previewScale}px`,
                 }}
               >
                 {isAgencyLayout && <aside className="absolute inset-y-0 left-0 z-10 flex w-[30%] flex-col px-4 py-6 text-white sm:px-5" style={{ background: accent }}>
@@ -764,11 +837,11 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   <div className="mt-auto pt-6 text-[9px]"><p className="font-semibold text-white/70">{t("admin.quoteInvoice.ui.total_b25928c6").toUpperCase()}</p><p className="mt-0.5 text-sm font-extrabold">{money(totals?.total)}</p></div>
                 </aside>}
                 {/* Header */}
-                {isAgencyLayout && <header className="absolute right-6 top-5 z-20 text-right"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#475569" emphasis={accent} /></header>}
+                {isAgencyLayout && <header className="absolute right-6 top-5 z-20 text-right"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#475569" emphasis={accent} /></header>}
                 {!isAgencyLayout && (design.template === "bold" ? (
                   <header className="relative min-h-[112px] overflow-hidden border-b-2 border-slate-100 bg-white px-5 py-5 sm:px-7">
                     <div className="pointer-events-none absolute right-0 top-0 h-full w-[42%]" style={{ background: accent, clipPath: "polygon(10% 0, 100% 0, 100% 100%, 30% 100%)" }} />
-                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2">{companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="mt-1 h-8 w-auto max-w-[90px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}<p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
+                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2">{companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="mt-1 h-8 w-auto max-w-[90px] object-contain" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}<p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
                     <div className="absolute bottom-0 left-6 right-6 h-[2px]" style={{ background: accent }} />
                   </header>
                 ) : isMinimalLayout ? (
@@ -783,7 +856,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                         </div>
                       </div>
                       <div className="text-right">
-                        <QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} />
+                        <QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} />
                       </div>
                     </div>
                   </header>
@@ -792,7 +865,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                     <div className="flex justify-center">
                       {companyLogoUrl ? <Image src={companyLogoUrl} alt="Logo" width={120} height={48} unoptimized className="h-8 w-auto max-w-[86px] object-contain" /> : <span className="flex h-8 w-8 items-center justify-center rounded bg-slate-900 text-[11px] font-black text-white">{initials}</span>}
                     </div>
-                    <div className="mt-2 flex items-start justify-between gap-3 text-left"><p className="pt-1 text-[9px] font-bold text-slate-700">{companyName}</p><div className="text-right"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} /></div></div>
+                    <div className="mt-2 flex items-start justify-between gap-3 text-left"><p className="pt-1 text-[9px] font-bold text-slate-700">{companyName}</p><div className="text-right"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} /></div></div>
                   </header>
                 ) : isSplitLayout ? (
                   <header className="flex items-center justify-between gap-4 px-5 pt-5 px-3 pb-3">
@@ -803,7 +876,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
 
                       </div>
                     </div>
-                    <div className="rounded-bl-xl px-3 py-1.5 text-right" style={{ background: tintRgb(accent, 0.92) }}><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#475569" emphasis={accent} /></div>
+                    <div className="rounded-bl-xl px-3 py-1.5 text-right" style={{ background: tintRgb(accent, 0.92) }}><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#475569" emphasis={accent} /></div>
                   </header>
                 ) : (
                   <header className="flex items-start justify-between gap-4 px-6 py-5 sm:px-9" style={{ background: accent, color: "#fff" }}>
@@ -813,7 +886,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                         <p className="truncate text-[10.5px] font-extrabold leading-tight">{companyName}</p>
                       </div>
                     </div>
-                    <div className="text-right shrink-0"><QuoteHeaderDetails number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div>
+                    <div className="text-right shrink-0"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div>
                   </header>
                 ))}
 
@@ -919,8 +992,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   fontStyle: design.italicNotes ? "italic" : "normal",
                   zoom: previewScale,
                   width: `${100 / previewScale}%`,
-                  maxWidth: `${680 / previewScale}px`,
-                  minHeight: `${960 / previewScale}px`,
+                  maxWidth: `${previewPageWidth / previewScale}px`,
+                  aspectRatio: `${pageDimensions[0]} / ${pageDimensions[1]}`,
+                  minHeight: `${previewPageHeight / previewScale}px`,
                 }}
               >
                 {design.watermark && <div aria-hidden="true" className="pointer-events-none absolute whitespace-nowrap font-black tracking-[0.2em]" style={{ ...watermarkPlacement, transform: `${watermarkPlacement.transform || ""} rotate(${watermarkRotation}deg)`, color: accent, opacity: design.watermarkOpacity / 100, fontSize: 32 * watermarkScale, zIndex: 1 }}>
@@ -954,7 +1028,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
             : matchedVariants.length === 0 ? <p className="px-3 py-3 text-center text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.noVariantsFound")}</p>
             : matchedVariants.map((option) => (
               <button key={option.id} type="button" role="option" aria-selected={false} onMouseDown={(event) => event.preventDefault()} onClick={() => selectVariantForItem(option, activeVariantItem)} className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start transition hover:bg-[var(--accent-soft)]">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)]">{option.image ? <img src={option.image} alt="" className="h-full w-full object-cover" /> : <Package size={14} className="text-slate-400" />}</span>
+                <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)]"><Package size={14} className="absolute text-slate-400" />{option.image && <img src={option.image} alt={option.name || ""} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} className="relative h-full w-full object-cover" />}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[11px] font-semibold text-[var(--text-primary)]">{option.name}</span>
                   <span className="block truncate text-[9px] text-[var(--text-muted)]">{option.variant || option.sku || "—"}{option.sku && option.variant ? ` · ${option.sku}` : ""}</span>
