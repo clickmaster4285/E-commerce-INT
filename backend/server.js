@@ -390,8 +390,6 @@ const startArgosServer = async () => {
     }
   }
   if (serviceUp) {
-    console.log(`🔤 Translation bridge ${TRANSLATION_API_URL} par pehle se chal raha hai — reuse (duplicate start nahi hua)`);
-    console.log(`✅ Argos Translate is running at ${TRANSLATION_API_URL}`);
     return;
   }
 
@@ -407,25 +405,16 @@ const startArgosServer = async () => {
     try { return Number(new URL(TRANSLATION_API_URL).port) || 80; } catch { return null; }
   })();
   const childEnv = { ...process.env };
-  if (childEnv.ARGOS_PORT) {
-    console.log(`🔤 ARGOS_PORT=${childEnv.ARGOS_PORT} (env se) — LIBRETRANSLATE_URL=${TRANSLATION_API_URL} ka port alag hai to .env theek karein`);
-  } else if (targetPort) {
+  if (!childEnv.ARGOS_PORT && targetPort) {
     childEnv.ARGOS_PORT = String(targetPort);
   }
-
-  console.log(`🔤 Translation bridge start ho raha hai (${script.name}) — pehli baar model download/load me time lag sakta hai`);
-  let output = [];
-  const recordOutput = (chunk) => {
-    output.push(...String(chunk).split(/\r?\n/).filter(Boolean));
-    while (output.length > 40) output.shift(); // crash diagnose ke liye last 40 lines
-  };
 
   try {
     argosProcess = spawn(script.command, {
       shell: true,
       cwd: __dirname, // script ka "scripts/argosTranslateServer.py" relative path isi se resolve hota hai
       env: childEnv,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: "ignore",
       windowsHide: true,
     });
   } catch (error) {
@@ -433,8 +422,6 @@ const startArgosServer = async () => {
     startupLog.error(`Argos translation bridge spawn failed: ${error.message}`);
     return;
   }
-  argosProcess.stdout?.on("data", recordOutput);
-  argosProcess.stderr?.on("data", recordOutput);
 
   argosProcess.once("error", (error) => {
     const message = error.code === "ENOENT"
@@ -446,18 +433,12 @@ const startArgosServer = async () => {
   argosProcess.once("exit", (code, signal) => {
     if (signal === "SIGTERM") return; // graceful shutdown — error nahi
     startupLog.error(`Argos translation bridge exit ho gaya (code: ${code ?? signal ?? "unknown"})`);
-    console.error(`   Last output:\n   ${output.join("\n   ")}`);
-    console.error(`   💡 Manual check: cd backend && npm run ${script.name}`);
   });
 
   // Blocking nahi — sirf status report.
   waitTranslationServiceReady()
     .then((ready) => {
-      if (ready) {
-        console.log(`🔤 Translation bridge ready at ${TRANSLATION_API_URL}`);
-        console.log(`✅ Argos Translate is running at ${TRANSLATION_API_URL}`);
-      }
-      else startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
+      if (!ready) startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
     })
     .catch(() => {});
 };
