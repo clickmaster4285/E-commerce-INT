@@ -5,19 +5,8 @@ import { htmlToPlainText } from "@/lib/termsContent";
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const PAGE_MARGIN = 14;
 const PAGE_FORMATS_MM = {
-  tabloid: [279.4, 431.8],
-  legal: [215.9, 355.6],
-  letter: [215.9, 279.4],
-  a0: [841, 1189],
-  a1: [594, 841],
-  a2: [420, 594],
-  a3: [297, 420],
   a4: [210, 297],
-  a5: [148, 210],
 };
-const normalizePageFormat = (value) => Object.hasOwn(PAGE_FORMATS_MM, String(value || "").toLowerCase())
-  ? String(value).toLowerCase()
-  : "a4";
 const COLORS = {
   ink: [20, 20, 20],
   muted: [85, 85, 85],
@@ -123,8 +112,8 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const numberLabel = isQuote ? "Quote Number" : "Invoice Number";
   const dateLabelText = isQuote ? "Quote Date" : "Invoice Date";
   const dueLabelText = isQuote ? "Valid Until" : "Due Date";
-  const pageFormat = isDesigned ? normalizePageFormat(design.pageSize) : "a4";
-  const pageOrientation = isDesigned && design.orientation === "landscape" ? "landscape" : "portrait";
+  const pageFormat = "a4";
+  const pageOrientation = "portrait";
   const documentTitleSize = isDesigned
     ? Math.min(22.5, Math.max(13.5, (Number(design.titleSize) || 26) * 0.75))
     : 17;
@@ -788,10 +777,9 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
       import("html2canvas"),
     ]);
     const html2canvas = html2canvasModule.default;
-    const design = documentData.pdf_design || {};
-    const format = normalizePageFormat(design.pageSize);
-    const orientation = design.orientation === "landscape" ? "landscape" : "portrait";
-    pdf = new jsPDF({ orientation, unit: "mm", format, compress: true });
+    const orientation = "portrait";
+    const pageFormat = PAGE_FORMATS_MM.a4;
+    pdf = new jsPDF({ orientation, unit: "mm", format: pageFormat, compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const margin = 10;
@@ -812,6 +800,21 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
             const colorContext = clonedDocument.createElement("canvas").getContext("2d");
             const clonedPage = clonedDocument.querySelectorAll("[data-quote-document-page='true']")[index];
             if (!clonedPage) return;
+            const visiblePageWidth = clonedPage.getBoundingClientRect().width;
+            const pageZoom = Number.parseFloat(clonedDocument.defaultView.getComputedStyle(clonedPage).zoom) || 1;
+            const printPageHeight = visiblePageWidth * (pageHeight / pageWidth) / pageZoom;
+            clonedPage.style.setProperty("height", `${printPageHeight}px`, "important");
+            clonedPage.style.setProperty("min-height", `${printPageHeight}px`, "important");
+            clonedPage.style.setProperty("aspect-ratio", `${pageWidth} / ${pageHeight}`, "important");
+            const pageNumber = clonedPage.querySelector(".quote-preview-page-number");
+            if (pageNumber) {
+              pageNumber.style.setProperty("display", "block", "important");
+              pageNumber.style.setProperty("position", "absolute", "important");
+              pageNumber.style.setProperty("right", "32px", "important");
+              pageNumber.style.setProperty("bottom", "20px", "important");
+              pageNumber.style.setProperty("margin", "0", "important");
+              pageNumber.style.setProperty("padding", "0", "important");
+            }
             const sourceNodes = [page, ...page.querySelectorAll("*")];
             const clonedNodes = [clonedPage, ...clonedPage.querySelectorAll("*")];
             const colorProperties = ["color", "background-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "outline-color", "text-decoration-color", "fill", "stroke"];
@@ -836,7 +839,7 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
             });
           },
         });
-        if (index > 0) pdf.addPage(format, orientation);
+        if (index > 0) pdf.addPage(pageFormat, orientation);
         const scale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
         const width = canvas.width * scale;
         const height = canvas.height * scale;
