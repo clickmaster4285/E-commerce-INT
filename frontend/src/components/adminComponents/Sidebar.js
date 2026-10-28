@@ -58,14 +58,36 @@ const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 function StoreMark({
   logoUrl,
   name,
+  letter,
+  color = "var(--accent)",
   sizeClass = "h-8 w-8",
   roundedClass = "rounded-lg",
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [logoUrl]);
+  const showLogo = Boolean(logoUrl && !imageFailed);
+
   return (
     <span
-      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden bg-white shadow-sm ring-1 ring-black/10`}
+      aria-label={name}
+      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden shadow-sm ${
+        showLogo ? "bg-white ring-1 ring-black/10" : "text-white ring-1 ring-white/20"
+      }`}
+      style={showLogo ? undefined : { background: `linear-gradient(135deg, ${color}, #4338ca)` }}
     >
-      <FallbackImage src={logoUrl} alt={name} className="h-full w-full object-contain p-[3px]" />
+      {showLogo ? (
+        <FallbackImage
+          key={logoUrl}
+          src={logoUrl}
+          alt={name}
+          onError={() => setImageFailed(true)}
+          className="h-full w-full object-contain p-[3px]"
+        />
+      ) : (
+        <span aria-hidden="true" className="text-sm font-extrabold tracking-wide">
+          {letter || "S"}
+        </span>
+      )}
     </span>
   );
 }
