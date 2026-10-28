@@ -612,7 +612,7 @@ function SalesDistribution({ data }) {
               const percent = total ? Math.round((d.value / total) * 100) : 0;
 
               return (
-                <li key={d.name} className="group">
+                <li key={`${d.name}-${i}`} className="group">
                   <div className="flex items-center justify-between gap-2 text-[12.5px]">
                     <span className="flex min-w-0 items-center gap-2">
                       <span

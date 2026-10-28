@@ -83,6 +83,7 @@ export const DOCUMENT_CONFIG = {
 };
 const DEFAULT_DESIGN = {
   template: "Bold",
+  pageSize: "a4-portrait",
   headerLayout: "band",
   accentColor: "#dc2626",
   fontFamily: "helvetica",
@@ -165,6 +166,29 @@ const TITLE_OPTIONS = [
   { value: 30, level: "Display", size: "extraLarge" },
 ];
 
+const PAPER_SIZE_OPTIONS = [
+  { value: "a4-portrait", label: "A4 · Portrait", size: [210, 297] },
+  { value: "a4-landscape", label: "A4 · Landscape", size: [297, 210] },
+  { value: "a5-portrait", label: "A5 · Portrait", size: [148, 210] },
+  { value: "a5-landscape", label: "A5 · Landscape", size: [210, 148] },
+  { value: "a3-portrait", label: "A3 · Portrait", size: [297, 420] },
+  { value: "a3-landscape", label: "A3 · Landscape", size: [420, 297] },
+  { value: "a6-portrait", label: "A6 · Portrait", size: [105, 148] },
+  { value: "a6-landscape", label: "A6 · Landscape", size: [148, 105] },
+  { value: "b5jis-portrait", label: "B5 (JIS) · Portrait", size: [182, 257] },
+  { value: "b5jis-landscape", label: "B5 (JIS) · Landscape", size: [257, 182] },
+  { value: "b4jis-portrait", label: "B4 (JIS) · Portrait", size: [257, 364] },
+  { value: "b4jis-landscape", label: "B4 (JIS) · Landscape", size: [364, 257] },
+  { value: "letter-portrait", label: "Letter", size: [215.9, 279.4] },
+  { value: "legal-portrait", label: "Legal", size: [215.9, 355.6] },
+  { value: "executive-portrait", label: "Executive", size: [184.15, 266.7] },
+  { value: "statement-portrait", label: "Statement", size: [139.7, 215.9] },
+  { value: "tabloid-portrait", label: "Tabloid · Portrait", size: [279.4, 431.8] },
+  { value: "tabloid-landscape", label: "Tabloid / Ledger · Landscape", size: [431.8, 279.4] },
+  { value: "thermal-58", label: "Thermal Receipt · 58 mm", size: [58, 200] },
+  { value: "thermal-80", label: "Thermal Receipt · 80 mm", size: [80, 200] },
+];
+
 function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
 
 function getVariantDropdownPosition(anchor) {
@@ -222,8 +246,7 @@ function readSaved(storageKey = STORAGE_KEY) {
     return {
       ...DEFAULT_DESIGN,
       ...saved,
-      pageSize: "a4",
-      orientation: "portrait",
+      pageSize: PAPER_SIZE_OPTIONS.some((option) => option.value === saved.pageSize) ? saved.pageSize : "a4-portrait",
       watermark: saved.watermark ?? saved.showWatermark ?? DEFAULT_DESIGN.watermark,
       ...(saved.watermarkRotation == null ? {} : { watermarkRotation: clamp(Number(saved.watermarkRotation) || 0, -180, 180) }),
       selected: selectedName,
@@ -261,8 +284,7 @@ export function getSavedQuotePdfDesign(storageKey = STORAGE_KEY) {
     logoWidth: Math.max(12, Math.min(50, Number(saved.logoWidth) || 24)),
     logoAlignment: saved.logoAlignment || "left",
     logoOffset: Number(saved.logoOffset) || 0,
-    pageSize: "a4",
-    orientation: "portrait",
+    pageSize: PAPER_SIZE_OPTIONS.some((option) => option.value === saved.pageSize) ? saved.pageSize : "a4-portrait",
     watermark: Boolean(saved.watermark),
     watermarkUseLogo: Boolean(saved.watermarkUseLogo),
     watermarkText: String(saved.watermarkText || "PAID").slice(0, 40),
@@ -323,7 +345,14 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const doc = DOCUMENT_CONFIG[documentType] || DOCUMENT_CONFIG.quote;
   const storageKey = storageKeyProp || doc.storageKey;
   const lbl = (pair) => { const value = t(pair.key); return value === pair.key ? pair.fallback : value; };
-  const [design, setDesign] = useState(() => ({ ...DEFAULT_DESIGN, ...readSaved(storageKey), ...(savedDesign || {}) }));
+  const [design, setDesign] = useState(() => {
+    const storedDesign = readSaved(storageKey);
+    const mergedDesign = { ...DEFAULT_DESIGN, ...storedDesign, ...(savedDesign || {}) };
+    return {
+      ...mergedDesign,
+      pageSize: PAPER_SIZE_OPTIONS.some((option) => option.value === mergedDesign.pageSize) ? mergedDesign.pageSize : "a4-portrait",
+    };
+  });
   const [loaded, setLoaded] = useState(true);
   const [workspaceMode, setWorkspaceMode] = useState("preview");
   const [variantSearch, setVariantSearch] = useState("");
@@ -488,6 +517,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         boldBody: design.boldBody,
         italicBody: design.italicBody,
         italicNotes: design.italicNotes,
+        pageSize: design.pageSize || "a4-portrait",
 
         showWatermark: design.watermark,
         watermarkUseLogo: design.watermarkUseLogo,
@@ -592,7 +622,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const headerText = isBoldLayout ? "#fff" : isCenteredLayout ? design.accentColor || theme.color : design.accentColor || theme.color;
 
   const previewScale = clamp((design.baseFontSize || 13) / 13, 0.75, 1.4);
-  const pageDimensions = [210, 297];
+  const pageDimensions = PAPER_SIZE_OPTIONS.find((option) => option.value === design.pageSize)?.size || [210, 297];
   const watermarkPosition = design.watermarkPosition || "center";
   const watermarkRotation = design.watermarkRotation == null
     ? (watermarkPosition === "diagonal" ? 35 : 0)
@@ -623,7 +653,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         </div>
       </div>
 
-      <div className={`grid ${cleanPreview ? "m-0 w-full gap-0 p-0" : "gap-3 p-3.5 lg:p-4"} ${previewOnly ? "grid-cols-1" : "lg:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.35fr)]"}`}>
+      <div className={`grid ${previewOnly ? "m-0 w-full gap-0 p-0" : "gap-3 p-3.5 lg:p-4"} ${previewOnly ? "grid-cols-1" : "lg:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.35fr)]"}`}>
         {/* ---- Left panel ---- */}
         {!previewOnly && <div ref={settingsPanelRef} className="max-h-[min(82vh,900px)] overflow-y-auto rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
           <h3 className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--text-secondary)] px-3.5 pt-3">{t("admin.quoteDesigner.templatesTypography")}</h3>
@@ -669,6 +699,15 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 <input type="range" min="9" max="18" step="1" value={design.baseFontSize || 13} onChange={(e) => setDesign((prev) => ({ ...prev, baseFontSize: Number(e.target.value) }))} className="mt-3 block w-full" style={{ accentColor: "#16a34a" }} />
               </label>
             </div>
+          </div>
+
+          <div className="mt-3 border-t border-[var(--border-color)] px-3.5 pt-3">
+            <label className={labelClass}>{t("admin.quoteDesigner.paperSize")}
+              <select className={selectClass} value={PAPER_SIZE_OPTIONS.some((option) => option.value === design.pageSize) ? design.pageSize : "a4-portrait"} onChange={(event) => setDesign((prev) => ({ ...prev, pageSize: event.target.value }))}>
+                {PAPER_SIZE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <p className="mt-1 text-[9px] text-[var(--text-muted)]">{t("admin.quoteDesigner.pdfPageSize")}</p>
           </div>
 
           <div className="mt-3 border-t border-[var(--border-color)] px-3.5 pt-3">
@@ -745,7 +784,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         </div>}
 
         {/* ---- Right panel preview ---- */}
-        <div className="m-0 w-full min-w-0 overflow-hidden p-0">
+        <div className={`m-0 w-full min-w-0 overflow-hidden p-0 ${!previewOnly && workspaceMode === "preview" ? "rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm" : ""}`}>
           <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3`}>
             <div className="flex min-w-0 items-center gap-2">
               {!previewOnly && workspaceMode === "edit" && <button type="button" onClick={() => setWorkspaceMode("preview")} aria-label={t("admin.quoteDesigner.preview")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] transition hover:border-slate-300 hover:text-[var(--text-primary)]"><ChevronLeft size={14} /></button>}
@@ -757,7 +796,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
               <button type="button" role="tab" aria-selected={workspaceMode === "preview"} onClick={() => setWorkspaceMode("preview")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "preview" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-slate-300 hover:text-[var(--text-primary)]"}`}><Eye size={13} />{t("admin.quoteDesigner.preview")}</button>
             </div>}
           </div>
-          <div ref={previewCanvasRef} className={`no-scrollbar m-0 w-full min-w-0 overflow-x-hidden ${previewOnly ? "bg-white p-0" : "max-h-[720px] overflow-y-auto bg-white p-0"}`}>
+          <div ref={previewCanvasRef} className={`no-scrollbar m-0 w-full min-w-0 overflow-x-hidden ${previewOnly ? "bg-white p-0" : workspaceMode === "preview" ? "max-h-[720px] overflow-y-auto bg-[var(--bg-secondary)] p-2" : "max-h-[720px] overflow-y-auto bg-white p-0"}`}>
             {!previewOnly && workspaceMode === "edit" ? (
               <div className="space-y-3 rounded-none border-0 bg-[var(--bg-card)] p-3.5 sm:p-4">
                 <div className="flex items-start gap-3">
@@ -838,6 +877,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   minHeight: 0,
                   maxWidth: "none",
                   boxSizing: "border-box",
+                  aspectRatio: `${pageDimensions[0]} / ${pageDimensions[1]}`,
                   "--quote-page-ratio": `${pageDimensions[0]} / ${pageDimensions[1]}`,
                   margin: 0,
                 }}
@@ -999,6 +1039,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   height: "auto",
                   minHeight: 0,
                   maxWidth: "none",
+                  aspectRatio: `${pageDimensions[0]} / ${pageDimensions[1]}`,
                   "--quote-page-ratio": `${pageDimensions[0]} / ${pageDimensions[1]}`,
                 }}
               >
