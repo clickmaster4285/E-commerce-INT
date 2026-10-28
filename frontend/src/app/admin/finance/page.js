@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { financeApi } from "@/apis/admin/financeApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 
 const periods = [
   { value: "today", key: "admin.finance.today" },
@@ -104,6 +105,29 @@ const formatDateTime = (value, locale = "en", t = (key) => key) => {
   }).format(date);
 };
 
+const collapseRepeatedLabel = (value) => {
+  const text = String(value || "").trim();
+  for (let length = Math.floor(text.length / 2); length > 0; length -= 1) {
+    if (text.length % length !== 0) continue;
+    const part = text.slice(0, length);
+    if (part.repeat(text.length / length) === text) return part.trim();
+  }
+  return text;
+};
+
+const financeItemLabel = (item, t) => {
+  const rawName = String(item.name || item.product_name || item.title || t("admin.finance.item")).trim();
+  const [rawProductName, ...inlineVariantParts] = rawName.split(/\s+\/\s+/);
+  const productName = collapseRepeatedLabel(rawProductName);
+  const inlineVariant = inlineVariantParts.join(" / ").trim();
+  const explicitVariant = String(item.variant_name || item.variant_title || item.variantTitle || "").trim();
+  const variant = explicitVariant || inlineVariant;
+  return {
+    title: [productName, variant].filter(Boolean).join(" / "),
+    metadata: [item.sku, explicitVariant && !inlineVariant ? explicitVariant : ""].filter(Boolean),
+  };
+};
+
 const todayAsInputDate = () => {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -118,11 +142,11 @@ function SummaryCard({ title, value, note, icon: Icon, tone = "blue" }) {
     violet: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
   };
   return (
-    <article className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
+    <article className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">{title}</p>
-          <p className="mt-2 truncate text-xl font-bold text-[var(--text-primary)] sm:text-2xl">{value}</p>
+          <p className="mt-2 truncate text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{value}</p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">{note}</p>
         </div>
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}><Icon className="h-5 w-5" /></span>
@@ -143,6 +167,8 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
   const isIncome = transaction.amount >= 0;
   const source = transaction.source || {};
   const history = transaction.history || [];
+  const description = String(transaction.description || "").trim();
+  const showDescription = description && !/^\d+$/.test(description);
   return (
     <div className="fixed inset-0 z-[70] flex justify-end bg-slate-950/45 backdrop-blur-[1px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside role="dialog" aria-modal="true" aria-labelledby="finance-drawer-title" className="flex h-full w-full max-w-xl flex-col border-s border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
@@ -151,7 +177,7 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isIncome ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}><Icon className="h-5 w-5" /></span>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[var(--text-muted)]">{translated(t, categoryKeys, transaction.category)}</p>
-              <h2 id="finance-drawer-title" className="mt-1 truncate text-lg font-bold text-[var(--text-primary)]">{transaction.reference}</h2>
+              <h2 id="finance-drawer-title" className="mt-1 truncate text-lg font-semibold text-[var(--text-primary)]">{transaction.reference}</h2>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label={t("admin.finance.closeDetails")} className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"><X className="h-5 w-5" /></button>
@@ -162,14 +188,14 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm text-[var(--text-muted)]">{translated(t, titleKeys, transaction.title)}</p>
-                <p className={`mt-1 text-3xl font-bold ${isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{isIncome ? "+" : "−"}{formatCurrency(Math.abs(transaction.amount), locale)}</p>
+                <p className={`mt-1 text-3xl font-semibold ${isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{isIncome ? "+" : "−"}{formatCurrency(Math.abs(transaction.amount), locale)}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isIncome ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}>{statusKeys[String(transaction.status || "").toLowerCase()] ? t(statusKeys[String(transaction.status).toLowerCase()]) : transaction.status}</span>
             </div>
           </section>
 
           <section>
-            <h3 className="mb-3 text-sm font-bold text-[var(--text-primary)]">{t("admin.finance.transactionDetails")}</h3>
+            <h3 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">{t("admin.finance.transactionDetails")}</h3>
             <div className="grid grid-cols-2 gap-3 text-start">
               {[
                 [t("admin.finance.customerVendor"), transaction.counterparty],
@@ -183,31 +209,31 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
                 ...(source.balance != null ? [[t("admin.finance.invoiceBalance"), formatCurrency(source.balance, locale)]] : []),
                 ...(source.dueAmount != null ? [[t("admin.finance.vendorBalance"), formatCurrency(source.dueAmount, locale)]] : []),
                 ...(source.historicalRecord ? [[t("admin.finance.historyNote"), t("admin.finance.historicalRecordText")]] : []),
-              ].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3"><p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm font-medium text-[var(--text-primary)]">{value || t("admin.finance.notRecorded")}</p></div>)}
+              ].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3"><p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm leading-5 text-[var(--text-primary)]">{value || t("admin.finance.notRecorded")}</p></div>)}
             </div>
-            {transaction.description && <p className="mt-3 rounded-xl bg-[var(--bg-secondary)] px-3.5 py-3 text-start text-sm leading-6 text-[var(--text-secondary)]">{transaction.description}</p>}
+            {showDescription && <p className="mt-3 text-start text-sm leading-6 text-[var(--text-secondary)]">{description}</p>}
           </section>
 
           {!!transaction.items?.length && <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]"><ShoppingBag className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.itemsOnRecord")}</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><ShoppingBag className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.itemsOnRecord")}</h3>
             <div className="overflow-hidden rounded-xl border border-[var(--border-color)]">
-              {transaction.items.map((item, index) => <div key={`${item._id || item.product_id || item.name || item.product_name || index}-${index}`} className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-3.5 py-3 last:border-0">
-                <div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--text-primary)]">{item.name || item.product_name || item.title || t("admin.finance.item")}</p><p className="mt-0.5 text-xs text-[var(--text-muted)]">{item.sku || t("admin.finance.noSku")}{item.variant_title || item.variantTitle ? ` · ${item.variant_title || item.variantTitle}` : ""}</p></div>
-                <p className="shrink-0 text-sm font-semibold text-[var(--text-primary)]">×{item.quantity || item.qty || item.qty_ordered || 1}</p>
-              </div>)}
+              {transaction.items.map((item, index) => { const label = financeItemLabel(item, t); return <div key={`${item._id || item.product_id || item.name || item.product_name || index}-${index}`} className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-3.5 py-3 last:border-0">
+                <div className="min-w-0 flex-1"><p className="break-words text-sm leading-5 text-[var(--text-primary)]">{label.title}</p><p className="mt-1 flex flex-wrap gap-x-1.5 text-xs leading-4 text-[var(--text-muted)]">{label.metadata.length ? label.metadata.map((value, metadataIndex) => <span key={`${value}-${metadataIndex}`}>{metadataIndex > 0 && <span className="me-1.5">·</span>}{value}</span>) : t("admin.finance.noSku")}</p></div>
+                <p className="shrink-0 text-sm text-[var(--text-secondary)]">×{item.quantity || item.qty || item.qty_ordered || 1}</p>
+              </div>; })}
             </div>
           </section>}
 
           <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]"><History className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.history")}</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><History className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.history")}</h3>
             {history.length ? <ol className="space-y-0">
               {history.map((event, index) => <li key={`${event.type}-${event.at}-${index}`} className="relative flex gap-3 pb-4 last:pb-0">
                 {index < history.length - 1 && <span className="absolute start-[9px] top-5 h-[calc(100%-8px)] w-px bg-[var(--border-color)]" />}
                 <span className={`relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${event.type === "payment" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : event.type === "return" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}><CheckCircle2 className="h-3 w-3" /></span>
-                <div className="min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3 text-start">
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-sm font-semibold text-[var(--text-primary)]">{translated(t, historyTitleKeys, event.title)}</p><time className="text-[11px] text-[var(--text-muted)]">{formatDateTime(event.at, locale, t)}</time></div>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">{t("admin.finance.by", { actor: event.actor || t("admin.finance.notRecorded") })}</p>
-                  {event.description && <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-[var(--text-secondary)]">{event.description}</p>}
+                <div className="min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3.5 text-start">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-sm font-medium leading-5 text-[var(--text-primary)]">{translated(t, historyTitleKeys, event.title)}</p><time className="text-xs leading-5 text-[var(--text-muted)]">{formatDateTime(event.at, locale, t)}</time></div>
+                  <p className="mt-1.5 text-xs leading-5 text-[var(--text-muted)]">{t("admin.finance.by", { actor: event.actor || t("admin.finance.notRecorded") })}</p>
+                  {event.description && <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--text-secondary)]">{event.description}</p>}
                 </div>
               </li>)}
             </ol> : <div className="rounded-xl border border-dashed border-[var(--border-color)] px-4 py-5 text-center text-sm text-[var(--text-muted)]"><Clock3 className="mx-auto mb-2 h-5 w-5" />{t("admin.finance.noDetailedActivity")}</div>}
@@ -246,14 +272,11 @@ export default function FinancePage() {
   };
 
   return (
-    <div className="min-h-full space-y-5 pb-8">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div><p className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--accent)]">{t("admin.finance.overview")}</p><h1 className="mt-1 text-2xl font-bold text-[var(--text-primary)] sm:text-3xl">{t("admin.finance.title")}</h1><p className="mt-1 text-sm text-[var(--text-muted)]">{t("admin.finance.intro")}</p></div>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+    <div className="min-h-full w-full min-w-0 space-y-5 pb-8">
+      <AdminPageHeader className="min-w-0" title={t("admin.finance.title")} subtitle={t("admin.finance.intro")} actions={<div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           <label className="flex min-w-[180px] items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 text-sm text-[var(--text-muted)]"><CalendarDays className="h-4 w-4 shrink-0" /><select aria-label={t("admin.finance.date")} value={period} onChange={(event) => changePeriod(event.target.value)} className="w-full bg-transparent font-semibold text-[var(--text-primary)] outline-none">{periods.map((option) => <option key={option.value} value={option.value} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">{t(option.key)}</option>)}</select></label>
           {period === "custom" && <div className="flex flex-wrap justify-end gap-2"><label className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-muted)]"><span>{t("admin.finance.from")}</span><input aria-label={t("admin.finance.from")} type="date" value={startDate} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPage(1); }} className="bg-transparent text-sm text-[var(--text-primary)] outline-none" /></label><label className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-muted)]"><span>{t("admin.finance.to")}</span><input aria-label={t("admin.finance.to")} type="date" value={endDate} min={startDate || undefined} onChange={(event) => { setEndDate(event.target.value); setPage(1); }} className="bg-transparent text-sm text-[var(--text-primary)] outline-none" /></label></div>}
-        </div>
-      </header>
+        </div>} />
 
       {isError ? <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"><p className="font-semibold">{t("admin.finance.loadError")}</p><p className="mt-1">{t("admin.finance.accessError")}</p><button type="button" onClick={() => refetch()} className="mt-3 rounded-lg bg-rose-600 px-3 py-2 font-semibold text-white">{t("admin.finance.tryAgain")}</button></section> : <>
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -266,7 +289,7 @@ export default function FinancePage() {
 
         <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
           <div className="flex flex-col gap-3 border-b border-[var(--border-color)] p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><h2 className="text-base font-bold text-[var(--text-primary)]">{t("admin.finance.cashFlowHistory")}</h2><p className="mt-0.5 text-xs text-[var(--text-muted)]">{t("admin.finance.entryHint")}</p></div>
+            <div><h2 className="text-base font-semibold text-[var(--text-primary)]">{t("admin.finance.cashFlowHistory")}</h2><p className="mt-0.5 text-xs text-[var(--text-muted)]">{t("admin.finance.entryHint")}</p></div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <label className="relative min-w-0 sm:w-64"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={t("admin.finance.searchPlaceholder")} className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] ps-9 pe-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]" /></label>
               <select aria-label={t("admin.finance.transaction")} value={kind} onChange={(event) => { setKind(event.target.value); setPage(1); }} className="h-10 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"><option value="all">{t("admin.finance.allActivity")}</option><option value="income">{t("admin.finance.moneyIn")}</option><option value="expense">{t("admin.finance.moneyOut")}</option></select>
@@ -274,16 +297,16 @@ export default function FinancePage() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[780px] text-start">
-              <thead className="bg-[var(--bg-secondary)]"><tr className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-muted)]"><th className="px-4 py-3">{t("admin.finance.transaction")}</th><th className="px-4 py-3">{t("admin.finance.customerVendor")}</th><th className="px-4 py-3">{t("admin.finance.date")}</th><th className="px-4 py-3">{t("admin.finance.method")}</th><th className="px-4 py-3 text-end">{t("admin.finance.amount")}</th><th className="px-4 py-3 text-end">{t("admin.finance.history")}</th></tr></thead>
+              <thead className="bg-[var(--bg-secondary)]"><tr className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]"><th className="px-4 py-3">{t("admin.finance.transaction")}</th><th className="px-4 py-3">{t("admin.finance.customerVendor")}</th><th className="px-4 py-3">{t("admin.finance.date")}</th><th className="px-4 py-3">{t("admin.finance.method")}</th><th className="px-4 py-3 text-end">{t("admin.finance.amount")}</th><th className="px-4 py-3 text-end">{t("admin.finance.history")}</th></tr></thead>
               <tbody className="divide-y divide-[var(--border-color)]">
                 {isLoading ? <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-[var(--text-muted)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />{t("admin.finance.loadingRecords")}</td></tr> : transactions.length ? transactions.map((entry) => {
                   const Icon = categoryIcons[entry.category] || Banknote;
                   return <tr key={entry.id} onClick={() => setSelected(entry)} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(entry); } }} className="cursor-pointer transition hover:bg-[var(--bg-secondary)] focus:bg-[var(--bg-secondary)] focus:outline-none">
-                    <td className="px-4 py-3.5"><div className="flex items-center gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${entry.kind === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}><Icon className="h-4 w-4" /></span><div><p className="text-sm font-semibold text-[var(--text-primary)]">{translated(t, titleKeys, entry.title)}</p><p className="mt-0.5 text-xs text-[var(--text-muted)]">{entry.reference} · {translated(t, categoryKeys, entry.category)}</p></div></div></td>
+                    <td className="px-4 py-3.5"><div className="flex items-center gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${entry.kind === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}><Icon className="h-4 w-4" /></span><div><p className="text-sm font-medium text-[var(--text-primary)]">{translated(t, titleKeys, entry.title)}</p><p className="mt-0.5 text-xs text-[var(--text-muted)]">{entry.reference} · {translated(t, categoryKeys, entry.category)}</p></div></div></td>
                     <td className="px-4 py-3.5 text-start text-sm text-[var(--text-primary)]">{entry.counterparty}</td>
                     <td className="px-4 py-3.5 text-start text-sm text-[var(--text-secondary)]">{formatDateTime(entry.date, locale, t)}</td>
                     <td className="px-4 py-3.5 text-start"><span className="rounded-full bg-[var(--bg-secondary)] px-2.5 py-1 text-xs font-medium capitalize text-[var(--text-secondary)]">{translatedMethod(t, entry.method)}</span></td>
-                    <td className={`px-4 py-3.5 text-end text-sm font-bold ${entry.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{entry.amount >= 0 ? "+" : "−"}{formatCurrency(Math.abs(entry.amount), locale)}</td>
+                    <td className={`px-4 py-3.5 text-end text-sm font-semibold ${entry.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{entry.amount >= 0 ? "+" : "−"}{formatCurrency(Math.abs(entry.amount), locale)}</td>
                     <td className="px-4 py-3.5 text-end"><span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)]"><History className="h-3.5 w-3.5" />{entry.history?.length || 0}</span></td>
                   </tr>;
                 }) : <tr><td colSpan={6} className="px-4 py-16 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--bg-secondary)] text-[var(--text-muted)]"><Banknote className="h-5 w-5" /></div><p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{t("admin.finance.noActivityFound")}</p><p className="mt-1 text-xs text-[var(--text-muted)]">{t("admin.finance.noActivityHint")}</p></td></tr>}

@@ -324,12 +324,12 @@ function HomeContent({ initialBanners = null }) {
             </div>
 
             {/* CATEGORY TILES */}
-            <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full px-4 sm:px-6">
+            <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full">
               <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} />
             </ViewportSection>
 
             {/* TODAY'S DEALS */}
-            <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full px-4 sm:px-6">
+            <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full">
               <DealsSection embedded />
             </ViewportSection>
 
