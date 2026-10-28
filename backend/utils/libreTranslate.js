@@ -13,7 +13,7 @@
 //     hai — is liye hard failure nahi, balki `null` return hota hai.
 //
 // Env (backend/.env):
-//   LIBRETRANSLATE_URL=http://localhost:5000
+//   LIBRETRANSLATE_URL=http://localhost:<ARGOS_PORT>
 //   LIBRETRANSLATE_API_KEY=            (optional — sirf agar instance par
 //                                       `--api-keys` enable kiya ho)
 //   TRANSLATE_TARGET_LOCALES=ur,ar,es,fr,de,hi,zh,pt,tr (comma separated)
@@ -23,12 +23,7 @@
 
 const log = require("./logger");
 
-// ⚠️ Default port 5055 — ye jaan-boojh kar teenon busy/alag ports se door hai:
-//   5000 = is project ka apna Express server
-//   5005 = LibreTranslate ka default (aapki existing instance yahi par hai)
-// Agar same port par do services aa jayein to connections galat server par
-// jaakar "ur is not supported" jaisi errors milti hain.
-const API_URL = (process.env.LIBRETRANSLATE_URL || "http://localhost:5055").replace(/\/+$/, "");
+const API_URL = String(process.env.LIBRETRANSLATE_URL || "").replace(/\/+$/, "");
 const API_KEY = process.env.LIBRETRANSLATE_API_KEY || "";
 const TIMEOUT_MS = Number(process.env.TRANSLATE_TIMEOUT_MS) || 30000;
 const MAX_RETRIES = Number(process.env.TRANSLATE_MAX_RETRIES) || 3;
@@ -79,7 +74,7 @@ function warnUnreachableOnce(reason) {
     `\n\x1b[33m⚠️  [translation] LibreTranslate reachable nahi hai (${reason})\x1b[0m\n` +
       `    URL: ${API_URL || "(set nahi hai)"}\n` +
       `    Urdu abhi English fallback dikha raha hoga. Fix:\n` +
-      `      1. LibreTranslate chalao (self-hosted, Argos se) — e.g. docker run -p 5005:5000 libretranslate/libretranslate\n` +
+      `      1. Local translation bridge chalao: npm run argos:serve\n` +
       `      2. Urdu model install karo (translate-ur)\n` +
       `      3. backend/.env me LIBRETRANSLATE_URL sahi port ke saath set karo\n` +
       `      4. ` + "`npm run backfill:translations`" + ` chalao\n` +

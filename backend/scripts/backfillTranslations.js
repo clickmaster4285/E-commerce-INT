@@ -42,8 +42,6 @@ const StockHistory = require("../models/StockHistory");
 const { checkAvailability } = require("../utils/libreTranslate");
 const { backfillTranslations } = require("../utils/translationService");
 
-const DEFAULT_URL = "http://localhost:5055"; // 5000 = Express, 5005 = LibreTranslate
-
 const MODELS = {
   brand: Brand,
   category: Category,
@@ -84,7 +82,7 @@ async function runPreflight() {
   console.log("\n══════════════════════════════════════════════════════════");
   console.log("  Translation engine check (Argos bridge)");
   console.log("══════════════════════════════════════════════════════════");
-  console.log("  URL          :", process.env.LIBRETRANSLATE_URL || `(not set — default ${DEFAULT_URL})`);
+  console.log("  URL          :", process.env.LIBRETRANSLATE_URL || "(not configured)");
   console.log("  API key      :", process.env.LIBRETRANSLATE_API_KEY ? "set" : "not set (keyless instance)");
   console.log("  Targets      :", process.env.TRANSLATE_TARGET_LOCALES || "ur");
 
@@ -105,7 +103,6 @@ async function runPreflight() {
     console.log("         argospm install translate-ur     # Urdu");
     console.log("         argospm install translate-ar     # Arabic");
     console.log("    3. backend/.env me LIBRETRANSLATE_URL sahi port ke saath set karo");
-    console.log("         (5055 — 5000 Express ke liye, 5005 LibreTranslate ke liye reserved)");
     console.log("    4. npm run backfill:translations\n");
     console.log("══════════════════════════════════════════════════════════\n");
   }

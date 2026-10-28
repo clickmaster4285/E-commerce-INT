@@ -49,6 +49,7 @@ import {
 import { dashboardApi } from "../../../apis/admin/dashboardApi";
 import { useStoreSocketSync } from "../../../hooks/admin/useStoreSocketSync";
 import { useAdminSocket } from "../../../hooks/admin/useAdminSocket";
+import { useLocalized } from "@/i18n/localize";
 
 /* ==================== HELPERS ==================== */
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -817,6 +818,7 @@ const RANK_STYLES = [
 
 function TopProducts({ data }) {
   const { t: __t } = useTranslation();
+  const { productNameOf } = useLocalized();
   const t = (k, p) => __t("admin.dashboard." + k, p);
   const router = useRouter();
   const products = data?.topProducts || [];
@@ -825,9 +827,10 @@ function TopProducts({ data }) {
   //    productId (id) bhejte hain — name sirf chip display ke liye.
   const openProductOrders = (p) => {
     if (!p?.id) return;
+    const productName = productNameOf(p);
     router.push(
       `/admin/orders?productId=${encodeURIComponent(String(p.id))}` +
-        `&productName=${encodeURIComponent(p.name || "Product")}`
+        `&productName=${encodeURIComponent(productName || "Product")}`
     );
   };
 
@@ -865,13 +868,14 @@ function TopProducts({ data }) {
             <tbody className="divide-y divide-[var(--border-card)]">
               {products.map((p, i) => {
                 const TrendIcon = p.trend > 0 ? ArrowUp : p.trend < 0 ? ArrowDown : Minus;
+                const productName = productNameOf(p);
 
                 return (
                   <tr
                     key={String(p.id) || i}
                     onClick={() => openProductOrders(p)}
-                    title={p.id ? t("topProducts.viewOrdersTitle", { name: p.name }) : t("topProducts.idMissing")}
-                    aria-label={p.id ? t("topProducts.viewOrdersAria", { name: p.name }) : undefined}
+                    title={p.id ? t("topProducts.viewOrdersTitle", { name: productName }) : t("topProducts.idMissing")}
+                    aria-label={p.id ? t("topProducts.viewOrdersAria", { name: productName }) : undefined}
                     className={`group transition-colors hover:bg-[var(--bg-tertiary)]/70 ${
                       p.id ? "cursor-pointer" : "cursor-default"
                     }`}
@@ -891,7 +895,7 @@ function TopProducts({ data }) {
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-tertiary)]">
                           {p.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={imageUrl(p.image)} alt={p.name} className="h-full w-full object-cover" />
+                            <img src={imageUrl(p.image)} alt={productName} className="h-full w-full object-cover" />
                           ) : (
                             <Package size={15} className="text-[var(--text-muted)]" />
                           )}
@@ -899,9 +903,9 @@ function TopProducts({ data }) {
 
                         <span
                           className="max-w-[220px] truncate font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors"
-                          title={p.name}
+                          title={productName}
                         >
-                          {p.name}
+                          {productName}
                         </span>
                       </div>
                     </td>

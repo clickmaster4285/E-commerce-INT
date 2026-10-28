@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Languages } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
@@ -16,7 +16,7 @@ export default function AdminLanguageSwitcher() {
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
 
-  const updateMenuPosition = () => {
+  const updateMenuPosition = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
 
@@ -26,7 +26,7 @@ export default function AdminLanguageSwitcher() {
     const alignedLeft = isRtl ? rect.left : rect.right - width;
     const left = Math.max(8, Math.min(alignedLeft, window.innerWidth - width - 8));
     setMenuPosition({ left, top: rect.bottom + 8 });
-  };
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -50,13 +50,9 @@ export default function AdminLanguageSwitcher() {
     };
   }, [open]);
 
-  useLayoutEffect(() => {
-    if (!open) {
-      setMenuPosition(null);
-      return undefined;
-    }
+  useEffect(() => {
+    if (!open) return undefined;
 
-    updateMenuPosition();
     const handleViewportChange = () => updateMenuPosition();
     window.addEventListener("resize", handleViewportChange);
     window.addEventListener("scroll", handleViewportChange, true);
@@ -64,7 +60,7 @@ export default function AdminLanguageSwitcher() {
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
     };
-  }, [open]);
+  }, [open, updateMenuPosition]);
 
   const currentLanguage = locales.find((item) => item.code === locale) || locales[0];
 
@@ -73,7 +69,11 @@ export default function AdminLanguageSwitcher() {
       <button
         type="button"
         ref={triggerRef}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          const nextOpen = !open;
+          if (nextOpen) updateMenuPosition();
+          setOpen(nextOpen);
+        }}
         title={t("admin.switcher.title")}
         aria-label={t("admin.switcher.label")}
         aria-haspopup="listbox"
@@ -102,6 +102,7 @@ export default function AdminLanguageSwitcher() {
           style={{
             left: menuPosition.left,
             top: menuPosition.top,
+            maxHeight: `calc(100vh - ${menuPosition.top}px - 8px)`,
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-card)",
           }}
