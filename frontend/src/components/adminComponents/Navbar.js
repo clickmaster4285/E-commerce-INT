@@ -37,6 +37,39 @@ const profileOptions = [
   { name: "admin.navbar.profile", icon: User, path: "/admin/profile?tab=general" },
 ];
 
+function UserAvatar({ src, name, className = "", style }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [src]);
+
+  const showAvatar = Boolean(src && !imageFailed);
+  const initial = name?.trim()?.charAt(0)?.toUpperCase() || "U";
+
+  return (
+    <span
+      aria-label={name}
+      className={`${className} inline-flex items-center justify-center overflow-hidden rounded-full ${
+        showAvatar ? "" : "font-bold text-white"
+      }`}
+      style={showAvatar ? style : {
+        ...style,
+        background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 58%, var(--bg-sidebar)))",
+      }}
+    >
+      {showAvatar ? (
+        <FallbackImage
+          key={src}
+          src={src}
+          alt={name}
+          onError={() => setImageFailed(true)}
+          className="h-full w-full rounded-full object-cover"
+        />
+      ) : (
+        <span aria-hidden="true">{initial}</span>
+      )}
+    </span>
+  );
+}
+
 export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
   const { t, dir, locale } = useTranslation();
   const router = useRouter();
@@ -235,9 +268,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                 e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            <FallbackImage
+            <UserAvatar
               src={currentUser.avatar}
-              alt={displayName}
+              name={displayName}
               className="h-7 w-7 shrink-0 rounded-full object-cover transition-shadow duration-200"
               style={{
                 boxShadow: isOpen || isProfileActive
@@ -289,9 +322,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                   style={{ borderBottom: '1px solid var(--border-color)' }}
                 >
                   <div className="flex items-center gap-3">
-                    <FallbackImage
+                    <UserAvatar
                       src={currentUser.avatar}
-                      alt={displayName}
+                      name={displayName}
                       className="h-10 w-10 shrink-0 rounded-full object-cover"
                       style={{
                         boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
