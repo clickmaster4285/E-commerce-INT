@@ -416,7 +416,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
 
     <style jsx global>{`
-      @page { size: ${["tabloid", "legal", "letter", "a0", "a1", "a2", "a3", "a4", "a5"].includes(String(invoice.pdf_design?.pageSize || "a4").toLowerCase()) ? String(invoice.pdf_design?.pageSize || "a4").toLowerCase() : "a4"} ${invoice.pdf_design?.orientation === "landscape" ? "landscape" : "portrait"}; margin: 10mm; }
+      @page { size: A4 portrait; margin: 10mm; }
       @media print {
         html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
         body * { visibility: hidden !important; }
@@ -432,7 +432,9 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         #invoice-document-preview .quote-no-print,
         #invoice-document-preview button,
         #invoice-document-preview a { display: none !important; }
-        #invoice-document-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; overflow: hidden !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
+        #invoice-document-preview .quote-preview-page-break { display: none !important; }
+        #invoice-document-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; height: auto !important; min-height: 0 !important; aspect-ratio: var(--quote-page-ratio) !important; margin: 0 !important; overflow: hidden !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
+        #invoice-document-preview .quote-preview-page-number { display: block !important; position: absolute !important; right: 8mm !important; bottom: 6mm !important; margin: 0 !important; padding: 0 !important; }
         #invoice-document-preview [data-quote-document-page="true"]:last-child { break-after: auto; page-break-after: auto; }
         #invoice-document-preview, #invoice-document-preview * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       }

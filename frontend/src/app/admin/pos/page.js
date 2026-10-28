@@ -2,6 +2,7 @@
 
 import FallbackImage from "@/components/common/FallbackImage";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -152,6 +153,74 @@ function PosDropdown({
         </div>
       )}
     </div>
+  );
+}
+
+function SaleActionsMenu({ sale, direction = "ltr", onEdit, onPrint }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = 184;
+      const menuHeight = 132;
+      const placeAbove = window.innerHeight - rect.bottom < menuHeight + 12 && rect.top > window.innerHeight - rect.bottom;
+      const preferredLeft = direction === "rtl" ? rect.left : rect.right - menuWidth;
+      setPosition({
+        left: Math.max(8, Math.min(preferredLeft, window.innerWidth - menuWidth - 8)),
+        top: placeAbove ? Math.max(8, rect.top - menuHeight - 8) : Math.min(rect.bottom + 8, window.innerHeight - menuHeight - 8),
+      });
+    };
+    const closeOutside = (event) => {
+      if (triggerRef.current?.contains(event.target) || menuRef.current?.contains(event.target)) return;
+      setOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    updatePosition();
+    document.addEventListener("mousedown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      document.removeEventListener("mousedown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, direction]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={t("admin.orders.page.actionsFor", { number: sale.sale_number || t("common.notProvided") })}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => { setPosition(null); setOpen((current) => !current); }}
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${open ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`}
+      ><MoreVertical size={18}/></button>
+      {open && position && typeof document !== "undefined" && createPortal(
+        <div ref={menuRef} role="menu" className="fixed z-[1000] min-w-[184px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-900/15 ring-1 ring-black/5" style={position}>
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onEdit(sale); }} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none"><Pencil size={14}/>{t("admin.pos.ui.editSaleInPOSCart")}</button>
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onPrint(sale); }} className="flex w-full items-center gap-2.5 px-3 py-2.5 text-start text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none"><Printer size={14}/>{t("admin.pos.ui.printReceipt")}</button>
+          <Link role="menuitem" href={`/admin/pos/history/${sale._id}`} onClick={() => setOpen(false)} className="flex w-full items-center justify-between gap-2.5 px-3 py-2.5 text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none">{t("admin.pos.ui.details")}<ArrowUpRight size={13}/></Link>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 
@@ -839,7 +908,7 @@ export default function PosPage() {
                           <td className="px-4 py-3"><span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold capitalize text-slate-600">{payment}</span></td>
                           <td className="px-4 py-3"><span className="inline-flex min-w-8 justify-center rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold tabular-nums text-slate-700">{quantity}</span></td>
                           <td className="whitespace-nowrap px-4 py-3 text-start font-extrabold tabular-nums text-slate-900">{formatMoney(sale.total)}</td>
-                          <td className="px-4 py-3 text-start"><details className="group relative inline-block text-start"><summary aria-label={t("admin.orders.page.actionsFor", { number: sale.sale_number || t("common.notProvided") })} className="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 [&::-webkit-details-marker]:hidden"><MoreVertical size={18}/></summary><div className="absolute end-0 top-full z-[70] mt-1 min-w-40 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl"><button type="button" onClick={() => editHistorySale(sale)} className="flex w-full items-center gap-2 px-3 py-2 text-start text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"><Pencil size={14}/>{t("admin.pos.ui.editSaleInPOSCart")}</button><button type="button" onClick={() => printHistoryReceipt(sale)} className="flex w-full items-center gap-2 px-3 py-2 text-start text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"><Printer size={14}/>{t("admin.pos.ui.printReceipt")}</button><Link href={`/admin/pos/history/${sale._id}`} className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700">{t("admin.pos.ui.details")}<ArrowUpRight size={13}/></Link></div></details></td>
+                          <td className="px-4 py-3 text-start"><SaleActionsMenu sale={sale} direction={dir} onEdit={editHistorySale} onPrint={printHistoryReceipt} /></td>
                         </tr>{isExpanded && <tr className="border-b border-slate-100 bg-slate-50/70"><td colSpan={7} className="px-4 py-3 sm:px-12"><div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(220px,1fr)]"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("admin.pos.ui.itemsInSaleCount", { count: quantity })}</p><div className="space-y-1.5">{previewItems.map((item, index) => { const image = getProductImage({ variants: [{ images: item.product_image ? [{ img_url: item.product_image }] : [] }] }); return <div key={`${item.variant_id || item.sku || item.product_name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5"><div className="flex min-w-0 items-center gap-2.5"><span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">{image ? <FallbackImage nextImage src={image} alt={productNameOf(item) || t("admin.pos.ui.product")} fill unoptimized sizes="36px" className="object-cover"/> : <ShoppingCart size={14} className="absolute inset-0 m-auto text-slate-400"/>}</span><span className="min-w-0 truncate text-xs font-medium text-slate-700">{productNameOf(item) || t("admin.pos.ui.product")}{item.variant_title ? <span className="font-normal text-slate-400"> · {item.variant_title}</span> : null}</span></div><span className="shrink-0 text-[11px] text-slate-500">× {item.quantity}</span></div>; })}{!saleItems.length && <p className="text-xs text-slate-500">{t("admin.pos.ui.noItemDetailsRecorded")}</p>}{saleItems.length > 4 && <Link href={`/admin/pos/history/${sale._id}`} className="inline-flex items-center gap-1 pt-1 text-xs font-bold text-blue-700 hover:text-blue-800">{t("admin.pos.ui.showMoreItems", { count: saleItems.length - 4 })}<ArrowUpRight size={13}/></Link>}</div></div><div><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("admin.pos.ui.paymentSummary")}</p><div className="space-y-1.5 rounded-xl border border-slate-200/80 bg-white p-3 text-xs"><div className="flex justify-between gap-3 text-slate-500"><span>{t("admin.pos.ui.subtotal")}</span><span className="font-medium text-slate-700">{formatMoney(sale.subtotal)}</span></div>{Number(sale.discount_amount) > 0 && <div className="flex justify-between gap-3 text-slate-500"><span>{t("admin.pos.ui.discount")}</span><span className="font-medium text-emerald-700">− {formatMoney(sale.discount_amount)}</span></div>}<div className="flex justify-between gap-3 text-slate-500"><span>{t("admin.pos.ui.tax")}</span><span className="font-medium text-slate-700">{formatMoney(sale.tax_amount)}</span></div><div className="flex justify-between gap-3 border-t border-slate-100 pt-2 font-bold text-slate-900"><span>{t("admin.pos.ui.total")}</span><span>{formatMoney(sale.total)}</span></div>{sale.payment?.reference && <div className="flex justify-between gap-3 pt-1 text-slate-500"><span>{t("admin.pos.ui.reference")}</span><span className="max-w-[180px] truncate text-slate-700">{sale.payment.reference}</span></div>}</div>{sale.customer_snapshot?.phone && <p className="mt-2 text-[11px] text-slate-500">{t("admin.pos.ui.customerPhone")} <span className="font-medium text-slate-700">{sale.customer_snapshot.phone}</span></p>}</div></div></td></tr>}</Fragment>;
                       }) : <tr><td colSpan={7} className="px-4 py-14 text-center"><span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400"><History size={18}/></span><span className="block text-sm font-semibold text-slate-700">{t(historySearch || historyPayment !== "all" || historyRange !== "all" ? "admin.pos.ui.noSalesMatchFilters" : "admin.pos.ui.noSalesYet")}</span><span className="mt-1 block text-xs text-slate-500">{t(historySearch || historyPayment !== "all" || historyRange !== "all" ? "admin.pos.ui.tryAdjustingSearchOrFilters" : "admin.pos.ui.completedSalesWillAppearHere")}</span></td></tr>}
                 </tbody>

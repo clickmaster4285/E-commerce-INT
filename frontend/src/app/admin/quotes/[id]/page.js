@@ -130,16 +130,18 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
         <ActivityTimeline events={quote.activity?.length ? quote.activity : [{ type: "created", at: quote.created_at, actor_name: quote.createdby?.name || "Staff", changes: [] }]} title="Quote activity" />
       </div>
       <style jsx global>{`
-        @page { size: ${["tabloid", "legal", "letter", "a0", "a1", "a2", "a3", "a4", "a5"].includes(String(quote.pdf_design?.pageSize || "a4").toLowerCase()) ? String(quote.pdf_design?.pageSize || "a4").toLowerCase() : "a4"} ${quote.pdf_design?.orientation === "landscape" ? "landscape" : "portrait"}; margin: 10mm; }
+        @page { size: A4 portrait; margin: 10mm; }
         @media print {
           html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
           body * { visibility: hidden !important; }
           #quote-print-area, #quote-print-area * { visibility: visible !important; }
           #quote-print-area { position: absolute !important; inset: 0 auto auto 0 !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; color: #111827 !important; background: #fff !important; }
           #quote-print-area .quote-no-print, #quote-print-area button, #quote-print-area a { display: none !important; }
+          #quote-print-area .quote-preview-page-break { display: none !important; }
           #quote-print-area .quote-saved-preview { margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; }
           #quote-print-area .quote-saved-preview > div { padding: 0 !important; background: #fff !important; }
-          #quote-print-area .quote-saved-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; min-height: 0 !important; margin: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
+          #quote-print-area .quote-saved-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; height: auto !important; min-height: 0 !important; aspect-ratio: var(--quote-page-ratio) !important; margin: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
+          #quote-print-area .quote-preview-page-number { display: block !important; position: absolute !important; right: 8mm !important; bottom: 6mm !important; margin: 0 !important; padding: 0 !important; }
           #quote-print-area .quote-saved-preview [data-quote-document-page="true"]:last-child { break-after: auto; page-break-after: auto; }
           #quote-print-area > div.grid { display: block !important; }
           #quote-print-area > div.grid > div, #quote-print-area aside { display: block !important; break-inside: auto !important; }
