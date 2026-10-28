@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { useQuery } from "@tanstack/react-query";
@@ -362,7 +362,11 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const variantInputRefs = useRef(new Map());
   const variantDropdownRef = useRef(null);
   const previewCanvasRef = useRef(null);
+  const previewPageOneRef = useRef(null);
+  const previewSummaryRef = useRef(null);
+  const termsSectionRef = useRef(null);
   const [previewCanvasWidth, setPreviewCanvasWidth] = useState(0);
+  const [termsFitOnFirstPage, setTermsFitOnFirstPage] = useState(false);
   const settingsPanelRef = useRef(null);
   const watermarkSettingsRef = useRef(null);
 
@@ -638,7 +642,55 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     "bottom-left": { left: "5%", top: "72%" },
   }[watermarkPosition] || { left: "50%", top: "48%", transform: "translate(-50%, -50%)" };
   const watermarkScale = clamp(Number(design.watermarkSize) || 50, 20, 100) / 50;
-  const previewPageCount = 1 + Number(hasTermsPage);
+  useLayoutEffect(() => {
+    if (!hasTermsPage) return;
+    const page = previewPageOneRef.current;
+    const summary = previewSummaryRef.current;
+    const terms = termsSectionRef.current;
+    if (!page || !summary || !terms) return;
+
+    const scale = previewScale;
+    const pageBottom = page.getBoundingClientRect().bottom;
+    const summaryBottom = summary.getBoundingClientRect().bottom;
+    const termsHeight = terms.getBoundingClientRect().height;
+    // Reserve the document's bottom padding and printed page number area.
+    const reservedBottom = 38 * scale;
+    const gap = 20 * scale;
+    const fits = summaryBottom + gap + termsHeight <= pageBottom - reservedBottom;
+    const frame = window.requestAnimationFrame(() => {
+      setTermsFitOnFirstPage((current) => current === fits ? current : fits);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    hasTermsPage,
+    previewCanvasWidth,
+    previewScale,
+    previewTermsText,
+    form?.notes,
+    form?.customer_name,
+    form?.customer_email,
+    form?.customer_phone,
+    form?.customer_address,
+    previewItems.length,
+    totals?.total,
+    design.pageSize,
+    design.lineSpacing,
+    design.baseFontSize,
+    design.template,
+    design.showTerms,
+  ]);
+  const previewPageCount = 1 + Number(hasTermsPage && !termsFitOnFirstPage);
+  const termsSection = (
+    <section ref={termsSectionRef} className="mt-5 pt-0" style={{ lineHeight: design.lineSpacing || 1.5 }}>
+      <h3 className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{lbl(doc.termsLabel)}</h3>
+      <div className="min-w-0 space-y-4 break-words whitespace-pre-line text-slate-600 [&_.terms-rich-content_p]:mb-3 [&_.terms-rich-content_h1]:mb-2 [&_.terms-rich-content_h1]:font-bold [&_.terms-rich-content_h2]:mb-2 [&_.terms-rich-content_h2]:font-bold [&_.terms-rich-content_h3]:mb-2 [&_.terms-rich-content_h3]:font-bold [&_.terms-rich-content_ul]:list-disc [&_.terms-rich-content_ul]:pl-5 [&_.terms-rich-content_ol]:list-decimal [&_.terms-rich-content_ol]:pl-5 [&_.terms-rich-content_a]:text-blue-700 [&_.terms-rich-content_a]:underline" style={{ overflowWrap: "anywhere" }}>
+        {hasRichTerms
+          ? <div className="terms-rich-content" dangerouslySetInnerHTML={{ __html: renderRichHtml(rawTerms) }} />
+          : previewTermParagraphs.map((paragraph, index) => <p key={index}>{renderBoldText(paragraph)}</p>)}
+        {form?.notes && <p><strong>{t("admin.quoteInvoice.ui.additional_notes_41b5f2e6")}:</strong> {form.notes}</p>}
+      </div>
+    </section>
+  );
 
   /* ------------------- Component return ------------------------- */
   return (
@@ -864,6 +916,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
             /* Preview container with safe zoom */
             <div className="m-0 block w-full min-w-0 overflow-hidden bg-white p-0" style={{ position: "relative" }}>
               <article
+                ref={previewPageOneRef}
                 data-quote-document-page="true"
                 className="relative m-0 block w-full min-w-0 max-w-none box-border overflow-hidden rounded-none bg-white text-slate-800 shadow-none ring-0"
                 style={{
@@ -1013,7 +1066,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   </table>
 
                   {/* Subtotals */}
-                  <div className="ml-auto mt-4 max-w-[230px] space-y-1.5 text-[9px]">
+                  <div ref={previewSummaryRef} className="ml-auto mt-4 max-w-[230px] space-y-1.5 text-[9px]">
                     <div className="flex justify-between text-slate-500"><span>{t("admin.quoteDesigner.subtotal")}</span><span>{currency(totals?.subtotal)}</span></div>
                     {Number(totals?.discount || 0) > 0 && <div className="flex justify-between text-slate-500"><span>{t("admin.quoteInvoice.ui.discount_b524936d")}</span><span>- {currency(totals?.discount || 0)}</span></div>}
                     {Number(totals?.tax || 0) > 0 && <div className="flex justify-between text-slate-500"><span>{t("admin.quoteInvoice.ui.tax_9be70f66")}</span><span>+ {currency(totals?.tax || 0)}</span></div>}
@@ -1021,11 +1074,12 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                       <span>{t("admin.quoteInvoice.ui.total_b25928c6")}</span><span>{currency(totals?.total)}</span>
                     </div>
                   </div>
+                  {hasTermsPage && termsFitOnFirstPage && termsSection}
 
                 </div>
                 {design.showPageNumbers !== false && <p className="quote-preview-page-number hidden mt-2 px-6 pb-1 text-right text-[8px] text-slate-400 sm:px-9">1 / {previewPageCount}</p>}
               </article>
-              {hasTermsPage && <>
+              {hasTermsPage && !termsFitOnFirstPage && <>
                 <div className="quote-preview-page-break my-3 h-5 border-y border-slate-200 bg-slate-100" aria-hidden="true" />
                 <article
                 data-quote-document-page="true"
@@ -1047,7 +1101,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   {design.watermarkUseLogo && companyLogoUrl ? <OptionalDocumentLogo src={companyLogoUrl} alt="" className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
                 </div>}
 
-                <section className="pt-0" style={{ lineHeight: design.lineSpacing || 1.5 }}>
+                <section ref={termsSectionRef} className="pt-0" style={{ lineHeight: design.lineSpacing || 1.5 }}>
                   <h3 className="mb-5 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{lbl(doc.termsLabel)}</h3>
                   <div className="min-w-0 space-y-4 break-words whitespace-pre-line text-slate-600 [&_.terms-rich-content_p]:mb-3 [&_.terms-rich-content_h1]:mb-2 [&_.terms-rich-content_h1]:font-bold [&_.terms-rich-content_h2]:mb-2 [&_.terms-rich-content_h2]:font-bold [&_.terms-rich-content_h3]:mb-2 [&_.terms-rich-content_h3]:font-bold [&_.terms-rich-content_ul]:list-disc [&_.terms-rich-content_ul]:pl-5 [&_.terms-rich-content_ol]:list-decimal [&_.terms-rich-content_ol]:pl-5 [&_.terms-rich-content_a]:text-blue-700 [&_.terms-rich-content_a]:underline" style={{ overflowWrap: "anywhere" }}>
                     {hasRichTerms

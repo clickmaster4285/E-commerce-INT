@@ -651,21 +651,16 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     setText(7, COLORS.ink, "bold");
     pdf.text(money(balanceDue), summaryX + summaryWidth - 3, paidY + 6 * spacingScale, { align: "right" });
   }
-  y += summaryHeight + 5 * spacingScale;
+  y += summaryHeight + 8 * spacingScale;
 
   if (termsLines.length) {
     const termsLineHeight = 3.7 * spacingScale * (Number(design.lineSpacing) || 1.15);
-    const termsBlockHeight = (14 + termsLines.length * 3.7) * spacingScale * (Number(design.lineSpacing) || 1.15);
-    const fitsOnOnePage = termsBlockHeight <= bottomLimit - 25;
-    const termsParagraphCount = termsText.split(/\n\s*\n/).filter((paragraph) => paragraph.trim()).length;
-    const termsNeedOwnPage = isDesigned && (termsText.length > 650 || termsParagraphCount > 8);
-    if ((termsNeedOwnPage && y > 35) || (fitsOnOnePage && y + termsBlockHeight > bottomLimit)) addPage();
+    // Use the remaining space on the current page first. If the terms do not
+    // fit, continue the remaining lines on the next page.
     let offset = 0;
     while (offset < termsLines.length) {
       if (y + 14 > bottomLimit) addPage();
-      const availableLines = fitsOnOnePage
-        ? termsLines.length
-        : Math.max(1, Math.floor((bottomLimit - y - 12) / termsLineHeight));
+      const availableLines = Math.max(1, Math.floor((bottomLimit - y - 12) / termsLineHeight));
       const chunk = termsLines.slice(offset, offset + availableLines);
       setText(8, COLORS.ink, "bold");
       pdf.text(offset ? "Terms & Conditions (continued)" : "Terms & Conditions", margin, y + 5);
