@@ -172,17 +172,39 @@ const getDashboardStats = async (req, res) => {
     const [curItems, prevItems] = await Promise.all([itemAgg(baseMatch), itemAgg(prevMatch)]);
 
     const prevSoldMap = new Map(prevItems.map((r) => [String(r._id), r.sold]));
-    const topProducts = curItems
+    const topProductRows = curItems
       .sort((a, b) => b.sold - a.sold)
-      .slice(0, 5)
-      .map((r) => ({
+      .slice(0, 5);
+    const topProductCatalog = topProductRows.length
+      ? await Product.find({ _id: { $in: topProductRows.map((row) => row._id).filter(Boolean) } })
+          .select("name translations.name")
+          .exec()
+      : [];
+    const topProductCatalogById = new Map(
+      topProductCatalog.map((product) => {
+        const nameTranslations = product.translations?.name;
+        return [String(product._id), {
+          name: product.name,
+          translations: {
+            name: nameTranslations instanceof Map
+              ? Object.fromEntries(nameTranslations)
+              : nameTranslations?.toObject?.() || nameTranslations || {},
+          },
+        }];
+      })
+    );
+    const topProducts = topProductRows.map((r) => {
+      const catalogProduct = topProductCatalogById.get(String(r._id));
+      return ({
         id: r._id,
-        name: r.name || "Unknown product",
+        name: catalogProduct?.name || r.name || "Unknown product",
+        translations: catalogProduct?.translations || {},
         image: r.image || "",
         sold: r.sold,
         revenue: Math.round(r.revenue),
         trend: pctChange(r.sold, prevSoldMap.get(String(r._id)) || 0),
-      }));
+      });
+    });
 
     // ---- Sales distribution by category (revenue share) ----
     const categoryRows = await Order.aggregate([

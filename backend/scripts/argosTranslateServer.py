@@ -9,7 +9,7 @@ Endpoints:
   GET  /healthz
   POST /translate
 
-Default port: 5055
+Configure ARGOS_HOST and ARGOS_PORT in backend/.env or the process environment.
 The pinned, MIT-licensed M2M100 model is downloaded once to the user cache.
 """
 
@@ -22,6 +22,25 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+
+def _load_bridge_env():
+    """Load bridge bind settings for direct Python starts; preserve process env."""
+    env_file = Path(__file__).resolve().parents[1] / ".env"
+    if not env_file.is_file():
+        return
+    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if key not in {"ARGOS_HOST", "ARGOS_PORT"} or key in os.environ:
+            continue
+        os.environ[key] = value.strip().strip("\"'")
+
+
+_load_bridge_env()
+
 # Windows console par Urdu/Arabic output ko safely print karne ke liye.gbhghg
 for _stream in ("stdout", "stderr"):
     try:
@@ -29,8 +48,8 @@ for _stream in ("stdout", "stderr"):
     except Exception:
         pass
 
-PORT = int(os.environ.get("ARGOS_PORT", "5055"))
-HOST = os.environ.get("ARGOS_HOST", "127.0.0.1")
+PORT = int(os.environ["ARGOS_PORT"])
+HOST = os.environ["ARGOS_HOST"]
 MAX_BODY_BYTES = 4 * 1024 * 1024
 SOURCE_LANG = os.environ.get("TRANSLATE_SOURCE_LANG", "en")
 

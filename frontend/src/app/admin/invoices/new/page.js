@@ -59,7 +59,7 @@ export default function NewInvoicePage() {const { t, locale } = useTranslation()
   const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });const { data: companySettings } = useQuery({ queryKey: ["admin-store-info"], queryFn: storeApi.get });
   const { data: rawStock = [] } = useQuery({ queryKey: ["invoice-product-stock"], queryFn: stockApi.getAll, staleTime: 2 * 60 * 1000 });
   const { data: rawVariants = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variants"], queryFn: variantApi.getAll, staleTime: 2 * 60 * 1000 });
-  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_translations?.[locale] || (locale === "en" ? companySettings?.invoice_terms_conditions : ""); if (!prefillQuoteId && defaultTerms) setForm((current) => current.terms ? current : { ...current, terms: defaultTerms }); }, [prefillQuoteId, locale, companySettings?.invoice_terms_conditions, companySettings?.invoice_terms_translations]);
+  const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_conditions || ""; if (!prefillQuoteId && defaultTerms) setForm((current) => current.terms ? current : { ...current, terms: defaultTerms }); }, [prefillQuoteId, locale, companySettings?.invoice_terms_conditions, companySettings?.invoice_terms_translations]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setPrefillCustomerId(params.get("customer") || "");
