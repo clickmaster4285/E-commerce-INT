@@ -231,6 +231,7 @@ export default function PosPage() {
   const searchInputRef = useRef(null);
   const saleFormRef = useRef(null);
   const customerBoxRef = useRef(null);
+  const filtersPanelRef = useRef(null);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
@@ -252,7 +253,7 @@ export default function PosPage() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [rateEditorVariantId, setRateEditorVariantId] = useState(null);
   const [activeView, setActiveView] = useState("pos");
-  const [viewMode, setViewMode] = useState("grid");
+  const [viewMode, setViewMode] = useState("list");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [heldCarts, setHeldCarts] = useState([]);
   const heldCartsLoaded = useRef(false);
@@ -267,6 +268,22 @@ export default function PosPage() {
   const [returnSaleId, setReturnSaleId] = useState("");
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnNote, setReturnNote] = useState("");
+
+  useEffect(() => {
+    if (!filtersOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!filtersPanelRef.current?.contains(event.target)) setFiltersOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setFiltersOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [filtersOpen]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -722,8 +739,8 @@ export default function PosPage() {
 
   return (
     <div dir={dir} className="admin-pos-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-[var(--bg-secondary)] px-0 py-0 text-[var(--text-primary)]">
-      <header className="flex min-h-12 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-color)] px-1">
-        <nav className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto whitespace-nowrap" aria-label={t("admin.pos.ui.posSections")}>
+      <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] bg-[var(--bg-card)] px-3 sm:px-4">
+        <nav className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap py-2" aria-label={t("admin.pos.ui.posSections")}>
           {[["pos", ShoppingCart, t("admin.pos.ui.pos")], ["history", History, t("admin.pos.ui.saleHistoryTab")], ["returns", RotateCcw, t("admin.pos.ui.returnTab")], ["hold", Bookmark, `${t("admin.pos.ui.holdTab")}${heldCarts.length ? ` (${heldCarts.length})` : ""}`]].map(([key, Icon, label]) => (
             <button key={key} type="button" onClick={() => {
     if (editingSaleId && key !== "pos") {
@@ -731,12 +748,12 @@ export default function PosPage() {
                 return;
               }
               setActiveView(key);
-            }} className={`inline-flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${activeView === key ? "border-blue-600 text-blue-600" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>
-              <Icon size={14} />{key === "hold" ? <>{t("admin.pos.ui.holdTab")}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeView === key ? "bg-blue-100 text-blue-700" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"}`}>{heldCarts.length}</span></> : label}
+            }} className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${activeView === key ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
+              <Icon size={15} />{key === "hold" ? <>{t("admin.pos.ui.holdTab")}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeView === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>{heldCarts.length}</span></> : label}
             </button>
           ))}
         </nav>
-        <div className="hidden shrink-0 items-center gap-2 text-xs text-[var(--text-muted)] sm:flex">
+        <div className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-[11px] text-[var(--text-muted)] sm:flex">
           <span className="font-medium text-[var(--text-secondary)]">{t("admin.pos.ui.today")}</span>
           <span className="font-semibold text-[var(--text-primary)]">{salesOverviewQuery.isLoading ? "…" : formatMoney(salesOverviewQuery.data?.todayRevenue)}</span>
           <span aria-hidden="true">·</span>
@@ -787,7 +804,7 @@ export default function PosPage() {
               buttonClassName="h-9 justify-between rounded-lg border-0 bg-transparent px-2 text-[11px] font-medium shadow-none hover:bg-[var(--bg-tertiary)]"
               menuClassName="w-48"
             />
-            <div className="relative flex shrink-0 items-center gap-1">
+            <div ref={filtersPanelRef} className="relative flex shrink-0 items-center gap-1">
               <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedCategory || selectedBrand || selectedStock ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
               <button type="button" onClick={() => setViewMode("grid")} aria-label={t("admin.pos.ui.gridView")} aria-pressed={viewMode === "grid"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "grid" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><LayoutGrid size={14}/></button>
               <button type="button" onClick={() => setViewMode("list")} aria-label={t("admin.pos.ui.listView")} aria-pressed={viewMode === "list"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "list" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><List size={14}/></button>
@@ -808,7 +825,7 @@ export default function PosPage() {
           ) : productsLoading && products.length === 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
               {Array.from({ length: 8 }, (_, index) => (
-                <div key={index} className="animate-pulse rounded-lg bg-[var(--bg-card)] p-2"><div className="aspect-square rounded-md bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-3/4 rounded bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-1/2 rounded bg-[var(--bg-tertiary)]"/></div>
+                <div key={index} className="animate-pulse rounded-xl border border-slate-200/80 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]"><div className="aspect-square rounded-lg bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-3/4 rounded bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-1/2 rounded bg-[var(--bg-tertiary)]"/></div>
               ))}
             </div>
           ) : variantCards.length === 0 ? (
@@ -828,8 +845,8 @@ export default function PosPage() {
                 ), 0);
 
                 return (
-                  <article key={variant._id} role={inStock ? "button" : undefined} tabIndex={inStock ? 0 : undefined} aria-disabled={!inStock} aria-label={t("admin.pos.ui.addProductToCart", { product: productNameOf(product), variant: variantName })} onClick={() => { if (inStock) addToCart(product, variant); }} onKeyDown={(event) => { if (inStock && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); addToCart(product, variant); } }} className={`${viewMode === "list" ? "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 p-2 sm:p-2.5" : "flex flex-col overflow-hidden"} group min-w-0 rounded-lg bg-[var(--bg-card)] shadow-none transition ${inStock ? "cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" : "cursor-not-allowed opacity-60"}`}>
-                  <div className={`relative ${viewMode === "list" ? "aspect-square rounded-xl" : "aspect-square rounded-t-2xl rounded-b-none"} w-full shrink-0 overflow-hidden bg-slate-100`}>
+                  <article key={variant._id} role={inStock ? "button" : undefined} tabIndex={inStock ? 0 : undefined} aria-disabled={!inStock} aria-label={t("admin.pos.ui.addProductToCart", { product: productNameOf(product), variant: variantName })} onClick={() => { if (inStock) addToCart(product, variant); }} onKeyDown={(event) => { if (inStock && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); addToCart(product, variant); } }} className={`${viewMode === "list" ? "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 p-2 sm:p-2.5" : "flex flex-col overflow-hidden"} group min-w-0 rounded-xl border border-slate-200/80 bg-white shadow-sm transition dark:border-slate-700 dark:bg-[var(--bg-card)] ${inStock ? "cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" : "cursor-not-allowed opacity-60"}`}>
+                  <div className={`relative ${viewMode === "list" ? "aspect-square rounded-lg" : "aspect-square rounded-t-xl rounded-b-none"} w-full shrink-0 overflow-hidden bg-slate-100`}>
                       <FallbackImage nextImage src={image} alt={`${productNameOf(product)} ${variantName}`} fill unoptimized sizes="(max-width: 640px) 44vw, (max-width: 1280px) 22vw, 16vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.025]" />
                       <span className={`absolute start-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${!inStock ? "bg-rose-50/95 text-rose-700" : stockQuantity < 10 ? "bg-amber-50/95 text-amber-700" : "bg-emerald-50/95 text-emerald-700"}`}>
                         {inStock && <Check size={11} strokeWidth={3} />}{!inStock ? t("admin.pos.ui.outOfStock") : stockQuantity < 10 ? t("admin.pos.ui.lowStock") : t("admin.pos.ui.inStock")}
@@ -874,10 +891,9 @@ export default function PosPage() {
           </> : activeView === "history" ? <div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><ClipboardList size={18}/></span>
-                <div><h2 className="text-lg font-extrabold tracking-tight text-slate-900">{t("admin.pos.ui.salesHistory")}</h2><p className="mt-0.5 text-xs text-slate-500">{t("admin.pos.ui.reviewCompletedPOSTransactionsAndPaymentDetails")}</p></div>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-600 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]"><ClipboardList size={18}/></span>
+                <div><h2 className="text-base font-bold leading-5 text-slate-900 dark:text-slate-100">{t("admin.pos.ui.salesHistory")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.reviewCompletedPOSTransactionsAndPaymentDetails")}</p></div>
               </div>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"><History size={13}/>{historySales.length.toLocaleString(locale)} {t("admin.pos.ui.saleCount", { count: historySales.length })}</span>
             </div>
 
             <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(220px,1fr)_155px_155px_auto]">
@@ -889,7 +905,7 @@ export default function PosPage() {
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-start">
-                <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.08em] text-slate-500">
+                <thead className="border-b border-slate-200 bg-white text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:bg-[var(--bg-card)]">
                   <tr>{["sale", "customer", "date", "payment", "items", "total", ""].map((label) => <th key={label} className={`px-4 py-3.5 text-start font-semibold ${label === "sale" ? "ps-12" : ""}`}>{label ? t(`admin.pos.ui.historyTable.${label}`) : ""}</th>)}</tr>
                 </thead>
                 <tbody>
@@ -905,7 +921,7 @@ export default function PosPage() {
                         const latestEdit = editHistory[editHistory.length - 1] || null;
                         const latestEditDate = latestEdit?.edited_at ? new Date(latestEdit.edited_at) : null;
                         const isExpanded = expandedSaleId === sale._id;
-                        return <Fragment key={sale._id}><tr className={`border-b border-slate-200 text-xs transition-colors ${isExpanded ? "bg-blue-50/40" : "hover:bg-white/70"}`}>
+                        return <Fragment key={sale._id}><tr className={`border-b border-slate-200 bg-white text-xs transition-colors dark:bg-[var(--bg-card)] ${isExpanded ? "!bg-blue-50/40 dark:!bg-blue-950/30" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}>
                           <td className="px-4 py-4"><div className="flex items-center gap-2"><button type="button" aria-label={t(`admin.pos.ui.${isExpanded ? "hide" : "show"}SaleDetails`, { sale: sale.sale_number || t("common.notProvided") })} aria-expanded={isExpanded} onClick={() => setExpandedSaleId(isExpanded ? null : sale._id)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${isExpanded ? "border-blue-200 bg-blue-100 text-blue-700" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-700"}`}><ChevronRight size={14} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}/></button><div className="min-w-0"><Link href={`/admin/pos/history/${sale._id}`} className="font-mono text-xs font-semibold text-blue-700 hover:text-blue-800">{sale.sale_number || t("common.notProvided")}</Link>{latestEdit ? <><span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{t("admin.pos.ui.saleEdited")}</span><span className="mt-1 block max-w-48 truncate text-[10px] text-slate-500" title={t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}>{t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}</span></> : <span className="mt-1 block text-[10px] text-slate-500">{t("admin.pos.ui.posTransaction")}</span>}</div></div></td>
                           <td className="px-4 py-4"><span className="block max-w-[180px] truncate text-[13px] font-medium text-slate-800">{sale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}</span>{sale.customer_snapshot?.phone && <span className="mt-1 block text-[11px] text-slate-500">{sale.customer_snapshot.phone}</span>}</td>
                           <td className="whitespace-nowrap px-4 py-4"><span className="block font-medium text-slate-700">{saleDate ? saleDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span className="mt-1 block text-[11px] text-slate-500">{saleDate ? saleDate.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" }) : ""}</span></td>
@@ -935,7 +951,7 @@ export default function PosPage() {
           </div>}
         </section>
 
-        <form ref={saleFormRef} dir={dir} onSubmit={submitSale} className={`${cartDrawerOpen ? "fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden sm:start-auto sm:w-[420px] lg:static lg:h-full lg:w-full" : "hidden lg:flex lg:h-full lg:w-full"} min-h-0 min-w-0 self-stretch overflow-hidden border-s border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-[var(--text-primary)] lg:flex-col lg:p-3`}>
+        <form ref={saleFormRef} dir={dir} onSubmit={submitSale} className={`${cartDrawerOpen ? "fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden sm:start-auto sm:w-[420px] lg:static lg:h-full lg:w-full" : "hidden lg:flex lg:h-full lg:w-full"} min-h-0 min-w-0 self-stretch overflow-hidden border-s border-[var(--border-color)] bg-white p-3 text-[var(--text-primary)] dark:bg-[var(--bg-card)] lg:flex-col lg:p-3`}>
           <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
             <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
               <ShoppingCart size={17} className="shrink-0 text-[var(--text-secondary)]" />

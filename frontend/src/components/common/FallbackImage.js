@@ -63,6 +63,7 @@ export default function FallbackImage({
         style={style}
         fill={fill}
         priority={priority}
+        loading={priority ? "eager" : props.loading}
         unoptimized={unoptimized}
         loader={loader}
         onError={handleError}

@@ -7,6 +7,7 @@ const compression = require("compression");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const cookieParser = require("cookie-parser");
 
 const spawn = require("child_process").spawn;
@@ -475,6 +476,19 @@ const startServer = async () => {
 
     server.listen(PORT, HOST, () => {
       console.log(`✅ ${STARTUP_MESSAGE}`);
+      const address = server.address();
+      const boundHost = typeof address === "object" && address ? address.address : HOST;
+      const isWildcardHost = !boundHost || ["0.0.0.0", "::", "::ffff:0.0.0.0"].includes(boundHost);
+      const apiPath = API_PREFIX ? `/${String(API_PREFIX).replace(/^\/+|\/+$/g, "")}` : "";
+      console.log(`🔗 Local: http://localhost:${PORT}${apiPath}`);
+      if (isWildcardHost) {
+        const localIPv4s = [...new Set(Object.values(os.networkInterfaces()).flatMap((interfaces) =>
+          (interfaces || [])
+            .filter((network) => !network.internal && (network.family === "IPv4" || network.family === 4))
+            .map((network) => network.address),
+        ))];
+        for (const ip of localIPv4s) console.log(`📡 Network: http://${ip}:${PORT}${apiPath}`);
+      }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
     if (NODE_ENV === "development") startArgosServer();

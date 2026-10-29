@@ -206,9 +206,9 @@ function ProductRow({ title, subtitle, href, products }) {
           ref={scrollRef}
           className="scrollbar-hide flex gap-3 lg:gap-4 overflow-x-auto scroll-smooth pb-1"
         >
-          {products.map((p) => (
+          {products.map((p, index) => (
             <div key={p._id} className="w-[9.375rem] sm:w-[12.5rem] lg:w-[14.375rem] shrink-0">
-              <ProductCard product={p} />
+              <ProductCard product={p} priority={index === 0} />
             </div>
           ))}
         </div>

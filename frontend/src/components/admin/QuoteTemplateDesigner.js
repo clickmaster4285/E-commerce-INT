@@ -10,7 +10,7 @@ import { variantApi } from "@/apis/admin/variantApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { htmlToPlainText, renderRichHtml } from "@/lib/termsContent";
 import { toast } from "sonner";
-import { Calculator, Check, ChevronDown, ChevronLeft, Eye, FileText, Package, Palette, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Calculator, Check, ChevronDown, Eye, Package, Palette, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Design constants that match the user's reference screenshot      */
@@ -171,22 +171,8 @@ const PAPER_SIZE_OPTIONS = [
   { value: "a4-landscape", label: "A4 · Landscape", size: [297, 210] },
   { value: "a5-portrait", label: "A5 · Portrait", size: [148, 210] },
   { value: "a5-landscape", label: "A5 · Landscape", size: [210, 148] },
-  { value: "a3-portrait", label: "A3 · Portrait", size: [297, 420] },
-  { value: "a3-landscape", label: "A3 · Landscape", size: [420, 297] },
-  { value: "a6-portrait", label: "A6 · Portrait", size: [105, 148] },
-  { value: "a6-landscape", label: "A6 · Landscape", size: [148, 105] },
-  { value: "b5jis-portrait", label: "B5 (JIS) · Portrait", size: [182, 257] },
-  { value: "b5jis-landscape", label: "B5 (JIS) · Landscape", size: [257, 182] },
-  { value: "b4jis-portrait", label: "B4 (JIS) · Portrait", size: [257, 364] },
-  { value: "b4jis-landscape", label: "B4 (JIS) · Landscape", size: [364, 257] },
   { value: "letter-portrait", label: "Letter", size: [215.9, 279.4] },
   { value: "legal-portrait", label: "Legal", size: [215.9, 355.6] },
-  { value: "executive-portrait", label: "Executive", size: [184.15, 266.7] },
-  { value: "statement-portrait", label: "Statement", size: [139.7, 215.9] },
-  { value: "tabloid-portrait", label: "Tabloid · Portrait", size: [279.4, 431.8] },
-  { value: "tabloid-landscape", label: "Tabloid / Ledger · Landscape", size: [431.8, 279.4] },
-  { value: "thermal-58", label: "Thermal Receipt · 58 mm", size: [58, 200] },
-  { value: "thermal-80", label: "Thermal Receipt · 80 mm", size: [80, 200] },
 ];
 
 function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
@@ -600,12 +586,13 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
 
   const currency = (value) => new Intl.NumberFormat(locale || "en-PK", { style: "currency", currency: design.currencySymbol || "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
   const labelClass = "block text-[10px] font-semibold text-[var(--text-secondary)]";
-  const inputClass = "h-9 w-full bg-transparent px-2.5 text-xs text-[var(--text-primary)] outline-none transition focus:ring-2 focus:ring-blue-500/20";
+  const inputClass = "h-9 w-full rounded-md border border-[var(--border-color)] bg-transparent px-2.5 text-xs text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20";
   const selectClass = inputClass + " cursor-pointer";
   const buttonClass = (active) => `group flex flex-col gap-0.5 p-1.5 text-left transition ${active ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`;
 
   /* ------------------- Live preview article ---------------------- */
   const editorItems = form?.items?.length ? form.items : [EMPTY_ITEM_ROW];
+  const editorItemCount = Math.max(1, form?.items?.length || 0);
   const activeVariantItem = editorItems.find((item) => item.row_id === activeVariantItemId);
   const items = (form?.items || []).filter((it) => it.name || it.variant_name);
   const previewItems = items.map((item, index) => {
@@ -852,9 +839,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         <div className={`m-0 w-full min-w-0 overflow-hidden p-0 ${!previewOnly && workspaceMode === "preview" ? "rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm" : ""}`}>
           <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3`}>
             <div className="flex min-w-0 items-center gap-2">
-              {!previewOnly && workspaceMode === "edit" && <button type="button" onClick={() => setWorkspaceMode("preview")} aria-label={t("admin.quoteDesigner.preview")} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] transition hover:border-slate-300 hover:text-[var(--text-primary)]"><ChevronLeft size={14} /></button>}
               <h3 className="truncate text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.livePreview")} · {theme.name}</h3>
-              {!previewOnly && <span className="hidden shrink-0 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[9px] font-bold text-[var(--accent)] sm:inline">{workspaceMode === "edit" ? t("admin.quoteDesigner.editMode") : t("admin.quoteDesigner.previewMode")}</span>}
+              {!previewOnly && workspaceMode === "preview" && <span className="hidden h-6 shrink-0 items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[10px] font-medium text-[var(--text-secondary)] sm:inline-flex">{t("admin.quoteDesigner.previewMode")}</span>}
             </div>
             {!previewOnly && <div className="flex shrink-0 items-center gap-2" role="tablist" aria-label={t("admin.quoteDesigner.editDocument")}>
               <button type="button" role="tab" aria-selected={workspaceMode === "edit"} onClick={() => setWorkspaceMode("edit")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "edit" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-slate-300 hover:text-[var(--text-primary)]"}`}><Pencil size={13} />{t("admin.quoteDesigner.edit")}</button>
@@ -863,48 +849,41 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
           </div>
           <div ref={previewCanvasRef} className={`no-scrollbar m-0 w-full min-w-0 overflow-x-hidden ${previewOnly ? "bg-white p-0" : workspaceMode === "preview" ? "max-h-[720px] overflow-y-auto bg-[var(--bg-secondary)] p-2" : "max-h-[720px] overflow-y-auto bg-[var(--bg-card)] p-0"}`}>
             {!previewOnly && workspaceMode === "edit" ? (
-              <div className="space-y-3 rounded-none border-0 bg-transparent p-3.5 sm:p-4">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center text-[var(--accent)]"><FileText size={18} /></span>
-                  <div className="min-w-0"><h4 className="text-[15px] font-extrabold text-[var(--text-primary)]">{t("admin.quoteDesigner.editDocument")}</h4><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{t("admin.quoteDesigner.editHint")}</p></div>
-                </div>
-
-                <section className="bg-transparent p-3.5"><div className="mb-2.5 flex flex-wrap items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center text-[var(--accent)]"><Package size={16} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--accent)]">{Math.max(1, form?.items?.length || 0)} {t("admin.quoteInvoice.ui.items_7316c8b2")}</span></div>
+              <div className="space-y-2.5 rounded-none border-0 bg-transparent p-2 sm:p-3">
+                <section className="bg-transparent p-2"><div className="mb-2 flex flex-wrap items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--accent)]"><Package size={15} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[10px] font-semibold text-[var(--text-secondary)]">{editorItemCount} {t(editorItemCount === 1 ? "admin.finance.item" : "admin.quoteInvoice.ui.items_7316c8b2")}</span></div>
                   <div ref={itemsTableScrollRef} className="overflow-x-auto pb-1">
-                    <div className="min-w-[710px] space-y-2">
+                    <div className="min-w-[710px] overflow-hidden rounded-md border border-[var(--border-color)]">
                     {(() => {
-                      const itemGrid = "grid grid-cols-[1.25rem_minmax(140px,1.5fr)_minmax(58px,.6fr)_3.5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-1.5";
+                      const itemGrid = "grid grid-cols-[1.25rem_minmax(140px,1.5fr)_minmax(58px,.6fr)_3.5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-0";
                       const headers = ["#", t("admin.quoteInvoice.ui.product_dd3b86d1"), "SKU", t("admin.quoteInvoice.ui.quantity_44f6af69"), t("admin.quoteInvoice.ui.unit_price_3c6c777f"), t("admin.quoteInvoice.ui.discount_b524936d"), t("admin.quoteInvoice.ui.tax_9be70f66"), ""];
                       return <>
-                        <div className={`${itemGrid} border-b border-[var(--border-color)] bg-transparent px-2.5 pt-2 pb-[7px]`}>
-                          {headers.map((header, i) => <span key={i} className={`truncate text-[8px] font-bold uppercase tracking-wide text-[var(--text-muted)] ${i >= 2 && i <= 6 ? "text-center" : ""}`}>{header}</span>)}
+                        <div className={`${itemGrid} border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 py-2`}>
+                          {headers.map((header, i) => <span key={i} className={`truncate border-e border-[var(--border-color)] px-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] last:border-e-0 ${i >= 2 && i <= 6 ? "text-center" : ""}`}>{header}</span>)}
                         </div>
-                        {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} ${index < editorItems.length - 1 ? "border-b border-[var(--border-color)] pt-[7px] pb-1.5" : "pt-[7px] pb-[7px]"} bg-transparent px-2`}>
-                          <span className="text-center text-[9px] font-semibold tabular-nums text-[var(--text-muted)]">{index + 1}</span>
+                        {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} border-b border-[var(--border-color)] last:border-b-0 bg-[var(--bg-card)] px-2 py-0`}>
+                          <span className="h-full border-e border-[var(--border-color)] py-2.5 text-center text-[9px] font-semibold tabular-nums text-[var(--text-muted)]">{index + 1}</span>
                           <div className="relative flex min-w-0 flex-col justify-center">
                             <div className="relative">
-                              <button ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} type="button" onClick={(event) => { if (variantSearchOpen && activeVariantItemId === item.row_id) { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } else activateVariantSearch(item, event.currentTarget); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} className={`group flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border px-3 text-left transition-colors duration-150 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/20 ${variantSearchOpen && activeVariantItemId === item.row_id ? "border-blue-500 bg-white ring-2 ring-blue-500/20 dark:bg-slate-900" : "border-slate-300 bg-white hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"}`} aria-label={t("admin.quoteInvoice.ui.product_dd3b86d1") + " " + (index + 1)} aria-haspopup="dialog" aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id}>
-                                <Search size={16} className={`shrink-0 transition-colors duration-150 ${variantSearchOpen && activeVariantItemId === item.row_id ? "text-blue-500" : "text-slate-400 group-focus:text-blue-500"}`} />
-                                {item.image && <img src={resolveProductImage(item.image)} alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-cover" />}
-                                <span className={`min-w-0 flex-1 truncate text-sm ${item.name ? "font-semibold text-slate-900 dark:text-slate-100" : "font-normal text-slate-500"}`}>{item.name || t("admin.quoteDesigner.selectOrTypeProduct")}</span>
+                              <button ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} type="button" onClick={(event) => { if (variantSearchOpen && activeVariantItemId === item.row_id) { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } else activateVariantSearch(item, event.currentTarget); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} className={`group flex h-9 w-full min-w-0 items-center gap-2 rounded-none border-e border-[var(--border-color)] px-2 text-left transition-colors duration-150 focus-visible:z-10 focus-visible:border-blue-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-500 focus-visible:outline-offset-[-1px] ${variantSearchOpen && activeVariantItemId === item.row_id ? "bg-white outline outline-1 outline-blue-500 outline-offset-[-1px] dark:bg-slate-900" : "bg-white hover:border-slate-400 dark:bg-slate-900 dark:hover:border-slate-600"}`} aria-label={t("admin.quoteInvoice.ui.product_dd3b86d1") + " " + (index + 1)} aria-haspopup="dialog" aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id}>
+                                <span title={item.name || t("admin.quoteDesigner.selectOrTypeProduct")} className={`min-w-0 flex-1 truncate text-sm ${item.name ? "font-semibold text-slate-900 dark:text-slate-100" : "font-normal text-slate-500"}`}>{item.name || t("admin.quoteDesigner.selectOrTypeProduct")}</span>
                                 <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform duration-150 ${variantSearchOpen && activeVariantItemId === item.row_id ? "rotate-180" : ""}`} />
                               </button>
                             </div>
                           </div>
-                          <span className="min-w-0 truncate px-1 py-2 text-center font-mono text-[9px] text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
-                          {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full appearance-none rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-1.5 text-center text-[11px] font-semibold text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10" />)}
-                          <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-9 w-9 items-center justify-center justify-self-center text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={14} /></button>
+                          <span className="h-full min-w-0 truncate border-e border-[var(--border-color)] px-1 py-2.5 text-center font-mono text-[9px] text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
+                          {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full appearance-none rounded-none border-e border-[var(--border-color)] bg-[var(--bg-card)] px-1 text-center text-[11px] font-medium text-[var(--text-primary)] outline-none transition focus:z-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />)}
+                          <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-full w-full items-center justify-center justify-self-center border-s border-[var(--border-color)] text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13} /></button>
                         </div>)}
                       </>;
                     })()}
                     </div>
                   </div>
-                  <div className="mt-2">
-                    <button type="button" onClick={addManualItem} className="inline-flex h-9 w-full items-center justify-center gap-1.5 px-3 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:text-[var(--accent)]"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
+                  <div className="mt-1.5">
+                    <button type="button" onClick={addManualItem} className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--border-color)] px-3 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
                   </div>
                 </section>
-                <section className="bg-transparent p-3.5">
-                  <div className="mb-3 flex flex-wrap items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center text-[var(--accent)]"><Calculator size={16} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.totals")}</h5></div>
+                <section className="bg-transparent p-2">
+                  <div className="mb-2 flex flex-wrap items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--accent)]"><Calculator size={15} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.totals")}</h5></div>
                   <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,300px)]">
                     <div className="grid gap-3 sm:grid-cols-3">
                       <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className="mt-1 h-9 w-full rounded-md border border-[var(--border-color)] bg-transparent px-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label>
