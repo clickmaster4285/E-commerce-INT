@@ -150,7 +150,13 @@ const updatePO = async (req, res) => {
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     if (po.status !== "pending") return res.status(400).json({ success: false, message: "Only pending POs can be edited" });
     const before = po.toObject();
-    const { items: rawItems, shipping, discount, overall_tax, overall_tax_rate, expected_date, due_date, notes } = req.body;
+    const { vendor_id, items: rawItems, shipping, discount, overall_tax, overall_tax_rate, expected_date, due_date, notes } = req.body;
+    if (vendor_id && String(vendor_id) !== String(po.vendor_id)) {
+      const vendor = await Vendor.findOne({ _id: vendor_id, is_deleted: false, is_active: true });
+      if (!vendor) return res.status(400).json({ success: false, message: "Vendor not found or inactive" });
+      po.vendor_id = vendor._id;
+      po.vendor_snapshot = { name: vendor.name, company_name: vendor.company_name, phone: vendor.phone, email: vendor.email, address: vendor.address, city: vendor.city };
+    }
     if (rawItems) {
       const { items, subtotal, tax } = await buildItems(rawItems);
       po.items = items; po.subtotal = subtotal; po.tax = tax;

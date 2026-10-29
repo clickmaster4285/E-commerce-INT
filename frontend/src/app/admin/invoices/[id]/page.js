@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3,
-  CreditCard, FileText, Printer, RotateCcw, Send, Pencil, ShoppingBag } from
+  CreditCard, FileText, Printer, RotateCcw, Send, Pencil, ShoppingBag, Eye, X,
+  UserRound, PackageCheck } from
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
@@ -15,6 +16,7 @@ import { storeApi } from "@/apis/admin/storeApi";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
 import QuoteTemplateDesigner, { INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
+import { renderRichHtml } from "@/lib/termsContent";
 
 const edge = { border: "1px solid var(--border-color)" };
 const card = {
@@ -63,6 +65,15 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
   </section>;
 }
 
+function PreviewModal({ onClose, children }) {
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section role="dialog" aria-modal="true" aria-label="Invoice preview" className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Eye size={17} /></span><div><h2 className="text-sm font-extrabold text-[var(--text-primary)]">Invoice preview</h2><p className="text-[10px] text-[var(--text-muted)]">Review the customer-facing invoice</p></div></div><button type="button" onClick={onClose} aria-label="Close preview" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"><X size={17} /></button></header>
+      <div className="min-h-0 overflow-auto bg-[var(--bg-secondary)] p-3 sm:p-5">{children}</div>
+    </section>
+  </div>;
+}
+
 export default function InvoiceDetailsPage({ params }) {const { t, locale } = useTranslation();
   const { id } = use(params);
   const router = useRouter();
@@ -71,6 +82,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const printHandled = useRef(false);
   const invoicePreviewRef = useRef(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_time: new Date().toTimeString().slice(0, 5), payment_method: "Cash", note: "" });
@@ -285,6 +297,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
+        <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 text-[13px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"><Eye size={15} />Preview</button>
         {!invoice.sent_at && smallAction("Edit", () => router.push(`/admin/invoices/new?invoice=${encodeURIComponent(id)}`), Pencil)}
         <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><Printer size={16} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
         <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><FileText size={16} />Download PDF</button>
@@ -301,29 +314,29 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
     <div className="grid items-start gap-4 lg:grid-cols-12">
       <main className="min-w-0 lg:col-span-8">
-        <div ref={invoicePreviewRef}>
-        <QuoteTemplateDesigner
-          previewOnly
-          documentType="invoice"
-          storageKey={INVOICE_TEMPLATE_STORAGE_KEY}
-          form={{
-            customer_name: invoice.customer_name || "",
-            customer_email: invoice.customer_email || "",
-            customer_phone: invoice.customer_phone || "",
-            customer_address: invoice.customer_address || "",
-            invoice_date: invoice.invoice_date || "",
-            due_date: invoice.due_date || "",
-            terms: invoice.terms || "",
-            notes: "",
-            items: previewItems,
-          }}
-          totals={{ subtotal: invoice.subtotal, discount: invoice.discount, tax: invoice.tax, total: invoice.total }}
-          quoteNumber={invoice.invoice_number}
-          quoteStatus={displayStatus}
-          savedDesign={invoice.pdf_design || {}}
-          money={(value) => money(value, locale)}
-        />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Panel title="Customer information" icon={UserRound}>
+            <div className="space-y-1 px-4 py-3 text-[13px]">
+              <div className="mb-2.5 flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">{String(invoice.customer_name || "C").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><div className="truncate text-[13px] font-bold text-[var(--text-primary)]">{invoice.customer_name || "—"}</div><div className="truncate text-xs text-[var(--text-muted)]">{invoice.customer_email || "Customer"}</div></div></div>
+              {invoice.customer_phone && <p className="text-xs text-[var(--text-secondary)]">{invoice.customer_phone}</p>}
+              {invoice.customer_address && <p className="whitespace-pre-wrap text-xs text-[var(--text-secondary)]">{invoice.customer_address}</p>}
+            </div>
+          </Panel>
+          <Panel title="Invoice summary" icon={FileText}>
+            <div className="space-y-2 p-4 text-[13px]">
+              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.created")}</span><span>{date(invoice.invoice_date, locale)}</span></div>
+              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.dueDate")}</span><span>{date(invoice.due_date, locale)}</span></div>
+              <div className="flex justify-between gap-3"><span style={muted}>Items</span><span>{items.length}</span></div>
+              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "var(--border-color)" }}><span>Total</span><span style={{ color: "#079878" }}>{money(total, locale)}</span></div>
+            </div>
+          </Panel>
         </div>
+        <div className="mt-4">
+          <Panel title="Products & items" icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{items.length} items</span>}>
+            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", "Product / variant", "SKU", "Quantity", "Unit price", "Discount", "Tax", "Amount"].map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}>{index + 1}</td><td className="max-w-[200px] px-3 py-3"><span className="block truncate font-semibold" style={primary}>{item.name || "—"}</span><span className="block truncate text-[10px]" style={muted}>{item.variant_name || ""}</span></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}>{item.sku || "—"}</td><td className="px-3 py-3">{item.quantity ?? item.qty ?? 0}</td><td className="whitespace-nowrap px-3 py-3">{money(item.unit_price, locale)}</td><td className="whitespace-nowrap px-3 py-3">{money(item.discount, locale)}</td><td className="whitespace-nowrap px-3 py-3">{money(item.tax, locale)}</td><td className="whitespace-nowrap px-3 py-3 font-semibold">{money(item.total ?? item.line_total, locale)}</td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-xs" style={muted}>No items added to this invoice.</td></tr>}</tbody></table></div>
+          </Panel>
+        </div>
+        {invoice.terms && <div className="mt-4"><Panel title="Terms & conditions" icon={FileText}><div className="p-4 text-xs leading-5" style={muted}>{/<[a-z][\s\S]*>/i.test(invoice.terms) ? <div className="invoice-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(invoice.terms) }} /> : <p className="whitespace-pre-wrap">{invoice.terms}</p>}</div></Panel></div>}
       </main>
 
       <aside className="space-y-3.5 lg:col-span-4">
@@ -411,6 +424,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </Panel>
       </aside>
     </div>
+
+    {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)}><div ref={invoicePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly documentType="invoice" storageKey={INVOICE_TEMPLATE_STORAGE_KEY} form={{ customer_name: invoice.customer_name || "", customer_email: invoice.customer_email || "", customer_phone: invoice.customer_phone || "", customer_address: invoice.customer_address || "", invoice_date: invoice.invoice_date || "", due_date: invoice.due_date || "", terms: invoice.terms || "", notes: "", items: previewItems }} totals={{ subtotal: invoice.subtotal, discount: invoice.discount, tax: invoice.tax, total: invoice.total }} quoteNumber={invoice.invoice_number} quoteStatus={displayStatus} savedDesign={invoice.pdf_design || {}} money={(value) => money(value, locale)} /></div></PreviewModal>}
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}

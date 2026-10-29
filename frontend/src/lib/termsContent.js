@@ -19,6 +19,38 @@ const ALLOWED_ATTR = [
 
 const BLOCK_TAGS = new Set(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr"]);
 
+function normalizeRichDocument(container) {
+  container.querySelectorAll("p, h1, h2, h3, h4, h5, h6").forEach((node) => {
+    if (!node.textContent.trim() && !node.querySelector("img, input, br")) node.remove();
+  });
+
+  const children = Array.from(container.childNodes);
+  const signatures = children.map((node) => (node.nodeType === 1 ? node.outerHTML : node.textContent).replace(/\s+/g, " ").trim());
+  const normalized = [];
+  for (let index = 0; index < children.length;) {
+    let repeatedBlockSize = 0;
+    for (let size = 1; index + size * 2 <= children.length; size += 1) {
+      if (signatures.slice(index, index + size).every((value, offset) => value === signatures[index + size + offset])) {
+        repeatedBlockSize = size;
+        break;
+      }
+    }
+
+    if (!repeatedBlockSize) {
+      normalized.push(children[index]);
+      index += 1;
+      continue;
+    }
+
+    normalized.push(...children.slice(index, index + repeatedBlockSize));
+    index += repeatedBlockSize;
+    while (index + repeatedBlockSize <= children.length && signatures.slice(index, index + repeatedBlockSize).every((value, offset) => value === signatures[index - repeatedBlockSize + offset])) {
+      index += repeatedBlockSize;
+    }
+  }
+  container.replaceChildren(...normalized);
+}
+
 /** Sanitize rich-text HTML from the editor before rendering inline or persisting. */
 export function sanitizeHtml(html) {
   const raw = String(html || "");
@@ -47,6 +79,7 @@ export function htmlToPlainText(html) {
       .trim();
   }
   const doc = new window.DOMParser().parseFromString(raw, "text/html");
+  normalizeRichDocument(doc.body);
   // Prefix list items with bullets/numbers so plain text keeps structure.
   doc.querySelectorAll("ol > li").forEach((li, index) => {
     li.textContent = `${index + 1}. ${li.textContent.replace(/^\s*[•\d.]+\s*/, "")}`;
@@ -88,5 +121,9 @@ export function htmlToPlainText(html) {
 
 /** Render-ready sanitized HTML for dangerouslySetInnerHTML display spots. */
 export function renderRichHtml(html) {
-  return sanitizeHtml(html);
+  const sanitized = sanitizeHtml(html);
+  if (typeof window === "undefined" || !/<[a-z][\s\S]*>/i.test(sanitized)) return sanitized;
+  const doc = new window.DOMParser().parseFromString(sanitized, "text/html");
+  normalizeRichDocument(doc.body);
+  return doc.body.innerHTML;
 }
