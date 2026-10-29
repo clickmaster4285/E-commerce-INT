@@ -636,15 +636,15 @@ export default function ShippingManagementPage() {
         {/* ===== Shipping Methods — Desktop Table ===== */}
         <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-start text-[13px]">
               <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                 <tr>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.method")}</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.shippingFee")}</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.minDays")}</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.maxDays")}</th>
-                  <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryWindow")}</th>
-                  <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.shared.label.actions")}</th>
+                  <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.method")}</th>
+                  <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.shippingFee")}</th>
+                  <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.minDays")}</th>
+                  <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.maxDays")}</th>
+                  <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.shipping.page.deliveryWindow")}</th>
+                  <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.shared.label.actions")}</th>
                 </tr>
               </thead>
               <tbody>
