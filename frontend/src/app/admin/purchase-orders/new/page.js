@@ -53,10 +53,14 @@ function NewPOPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
   const qc = useQueryClient();
+  const { data: editRes, isLoading: editLoading } = useQuery({ queryKey: ["po", editId], queryFn: () => purchaseOrderApi.getById(editId), enabled: !!editId });
+  const editPO = editRes?.data || null;
 
   const [vendorId, setVendorId] = useState("");
   const [prefilled, setPrefilled] = useState(false);
+  const [editPrefilledId, setEditPrefilledId] = useState("");
   const [vendorOpen, setVendorOpen] = useState(false);
   const [vendorSearch, setVendorSearch] = useState("");
   const [vendorFormOpen, setVendorFormOpen] = useState(false);
@@ -112,7 +116,7 @@ function NewPOPage() {
     if (!q) return vendorList;
     return vendorList.filter((v) => [v.name, v.vendor_code, v.company_name, v.phone].filter(Boolean).join(" ").toLowerCase().includes(q));
   }, [vendorList, vendorSearch]);
-  const selectedVendor = vendorList.find((v) => v._id === vendorId);
+  const selectedVendor = vendorList.find((v) => v._id === vendorId) || (editPO?.vendor_id?._id === vendorId ? editPO.vendor_id : null);
 
   const createVendorMutation = useMutation({
     mutationFn: async () => {
@@ -154,6 +158,36 @@ function NewPOPage() {
 
   // Full variant list once (cached) — grouped into products for the picker.
   const { data: stockAll, isLoading: stockLoading } = useQuery({ queryKey: ["stock-all"], queryFn: () => stockApi.getAll(), staleTime: 2 * 60 * 1000 });
+
+  useEffect(() => {
+    if (!editId || !editPO || !vendorsRaw || !stockAll || editPrefilledId === editId) return;
+    const stockByVariant = new Map(stockAll.map((variant) => [String(variant._id), variant]));
+    setVendorId(String(editPO.vendor_id?._id || editPO.vendor_id || ""));
+    setExpectedDate(editPO.expected_date ? String(editPO.expected_date).slice(0, 10) : "");
+    setShipping(Number(editPO.shipping) || 0);
+    setDiscount(Number(editPO.discount) || 0);
+    const taxBase = Number(editPO.subtotal || 0) - Number(editPO.discount || 0);
+    setOverallTaxRate(editPO.overall_tax_rate != null ? Number(editPO.overall_tax_rate) : taxBase > 0 ? Number(editPO.overall_tax || 0) / taxBase * 100 : 0);
+    setNotes(editPO.notes || "");
+    setLines((editPO.items || []).map((item) => {
+      const variantId = String(item.variant_id?._id || item.variant_id || "");
+      const variant = stockByVariant.get(variantId);
+      return {
+        variant_id: variantId, product_id: String(item.product_id?._id || item.product_id || variant?.product_id || ""),
+        product_name: item.name || item.product_id?.name || variant?.product_name || "Unknown Product",
+        sku: item.sku || variant?.sku || "", title: item.variantTitle || item.variant_id?.title || variant?.title || "",
+        image: item.image || variant?.image || "", in_stock: Number(variant?.quantity) || 0,
+        qty_ordered: Math.max(1, Math.floor(Number(item.qty_ordered) || 1)),
+        cost_price: Number(item.cost_price) || 0, sell_price: Number(item.sell_price) || 0,
+        topup: Number(item.topup) || 0, tax_rate: Number(item.tax_rate) || 0,
+        mfg_date: item.mfg_date ? String(item.mfg_date).slice(0, 10) : "",
+        expiry_date: item.expiry_date ? String(item.expiry_date).slice(0, 10) : "",
+        expiry_after_delivery: Number(item.expiry_after_delivery) || 0,
+        expiry_after_delivery_unit: item.expiry_after_delivery_unit || "days", included: true,
+      };
+    }));
+    setEditPrefilledId(editId);
+  }, [editId, editPO, vendorsRaw, stockAll, editPrefilledId]);
   const categories = useMemo(() => {
     const m = new Map();
     for (const v of stockAll || []) {
@@ -359,6 +393,9 @@ function NewPOPage() {
       tax_rate: Math.min(100, Math.max(0, Number(l.tax_rate) || 0)),
       topup: Number(l.topup) || 0,
       mfg_date: l.mfg_date || undefined,
+      expiry_date: l.expiry_date || undefined,
+      expiry_after_delivery: Math.max(0, Math.floor(Number(l.expiry_after_delivery) || 0)),
+      expiry_after_delivery_unit: l.expiry_after_delivery_unit || "days",
     })),
     shipping: Math.max(0, Number(shipping) || 0),
     discount: Math.max(0, Number(discount) || 0),
@@ -370,19 +407,20 @@ function NewPOPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const created = await purchaseOrderApi.create(buildPayload());
-      return created?.data?._id;
+      const saved = editId ? await purchaseOrderApi.update(editId, buildPayload()) : await purchaseOrderApi.create(buildPayload());
+      return saved?.data?._id || editId;
     },
     onSuccess: (id) => {
-      toast.success(t("admin.purchaseOrders.create.toast.created"));
+      toast.success(t(editId ? "admin.purchaseOrders.create.toast.updated" : "admin.purchaseOrders.create.toast.created"));
       qc.invalidateQueries({ queryKey: ["pos"] });
       qc.invalidateQueries({ queryKey: ["pos-all"] });
+      if (editId) qc.invalidateQueries({ queryKey: ["po", editId] });
       router.push(`/admin/purchase-orders/${id}`);
     },
     onError: () => { toast.error(t("admin.purchaseOrders.create.toast.saveFailed")); },
   });
 
-  const saveDisabled = createMutation.isPending || !vendorId || !includedLines.length || invalidPriceLines.length > 0;
+  const saveDisabled = createMutation.isPending || editLoading || (editId && editPrefilledId !== editId) || !vendorId || !includedLines.length || invalidPriceLines.length > 0;
   const tickedProducts = pickerFiltered.filter((g) => checkedProducts[String(g.product_id)] === true).length;
 
   // Group order lines by product for display.
@@ -454,8 +492,8 @@ function NewPOPage() {
         {/* LEFT */}
         <div className="space-y-4 min-w-0">
           <div>
-            <h1 className="text-xl font-bold">{t("admin.purchaseOrders.create.heading")}</h1>
-            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.create.subtitle")}</p>
+            <h1 className="text-xl font-bold">{t(editId ? "admin.purchaseOrders.create.editHeading" : "admin.purchaseOrders.create.heading")}</h1>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{t(editId ? "admin.purchaseOrders.create.editSubtitle" : "admin.purchaseOrders.create.subtitle")}</p>
           </div>
 
           {/* 1. Vendor Information */}
@@ -581,7 +619,7 @@ function NewPOPage() {
                       {expanded[group.id] !== false && (
                         <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
                           <div className="hidden xl:grid xl:grid-cols-[24px_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.5fr)_minmax(0,0.5fr)_minmax(0,0.8fr)_minmax(0,1fr)] items-center gap-2 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-widest" style={{ color: "#64748b", background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", borderBottom: "1px solid #e2e8f0" }}>
-                            <span>✓</span><span>{t("admin.purchaseOrders.create.productVariant")}</span><span className="text-center">{t("admin.purchaseOrders.create.inStock")}</span><span className="text-right">{t("admin.purchaseOrders.create.costPrice")}</span><span className="text-right">{t("admin.purchaseOrders.create.sellPrice")}</span><span className="text-right">{t("admin.purchaseOrders.create.qty")}</span><span className="text-right">{t("admin.purchaseOrders.create.tax")} %</span><span className="text-right">{t("admin.purchaseOrders.create.lineTotal")}</span><span>{t("admin.purchaseOrders.create.mfgDate")}</span>
+                            <span>✓</span><span>{t("admin.purchaseOrders.create.productVariant")}</span><span className="text-center">{t("admin.purchaseOrders.create.inStock")}</span><span className="text-left">{t("admin.purchaseOrders.create.costPrice")}</span><span className="text-left">{t("admin.purchaseOrders.create.sellPrice")}</span><span className="text-left">{t("admin.purchaseOrders.create.qty")}</span><span className="text-left">{t("admin.purchaseOrders.create.tax")} %</span><span className="text-left">{t("admin.purchaseOrders.create.lineTotal")}</span><span>{t("admin.purchaseOrders.create.mfgDate")}</span>
                           </div>
                             {group.lines.map((line) => {
                               const lineTotal = Math.round(Math.max(0, Number(line.cost_price) || 0) * Math.max(1, Math.floor(Number(line.qty_ordered) || 1)));
@@ -590,11 +628,11 @@ function NewPOPage() {
                                   <div className="flex items-center"><input type="checkbox" checked={line.included !== false} onChange={(event) => updateLine(line.variant_id, { included: event.target.checked })} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} aria-label={t("admin.purchaseOrders.create.includeVariant", { variant: line.title || line.sku })} /></div>
                                   <div className="min-w-0 flex items-center gap-2"><Thumb src={line.image} alt={line.title || line.product_name} size="w-10 h-10" /><div className="min-w-0"><div className="font-semibold text-xs truncate" title={line.title || t("admin.purchaseOrders.create.defaultVariant")}>{line.title || t("admin.purchaseOrders.create.defaultVariant")}</div><div className="font-mono text-[10px] truncate" style={{ color: "var(--text-secondary)" }}>{line.sku || "—"}</div></div></div>
                                   <div className="min-w-0 xl:flex xl:justify-center"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.inStock")}</div>{stockPill(line)}</div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.costPrice")}</div><input type="number" min={0} step="0.01" value={line.cost_price} onChange={(event) => updateLine(line.variant_id, { cost_price: Math.max(0, Number(event.target.value) || 0) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.sellPrice")}</div><input type="number" min={0} step="0.01" value={line.sell_price ?? ""} onChange={(event) => updateLine(line.variant_id, { sell_price: Math.max(0, Number(event.target.value) || 0) })} className={`w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 ${Number(line.cost_price || 0) > Number(line.sell_price || 0) ? "border-red-400 focus:ring-red-100" : "focus:ring-blue-200"}`} style={{ backgroundColor: "#fff", border: Number(line.cost_price || 0) > Number(line.sell_price || 0) ? "1.5px solid #ef4444" : "1.5px solid #e2e8f0", color: "#0f172a" }} />{Number(line.cost_price || 0) > Number(line.sell_price || 0) && <p className="mt-1 max-w-full break-words text-[9px] font-semibold leading-3 text-red-600">{t("admin.purchaseOrders.create.costExceedsSell")}</p>}</div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.qty")}</div><input type="number" min={1} step={1} value={line.qty_ordered} onChange={(event) => updateLine(line.variant_id, { qty_ordered: Math.max(1, Math.floor(Number(event.target.value) || 1)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.tax")} %</div><input type="number" min={0} max={100} value={line.tax_rate} onChange={(event) => updateLine(line.variant_id, { tax_rate: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-right text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
-                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.lineTotal")}</div><div className="h-9 px-2 rounded-lg flex items-center justify-end font-extrabold text-[11px] tabular-nums whitespace-nowrap overflow-hidden shadow-inner" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>{money(lineTotal, 0)}</div></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.costPrice")}</div><input type="number" min={0} step="0.01" value={line.cost_price} onChange={(event) => updateLine(line.variant_id, { cost_price: Math.max(0, Number(event.target.value) || 0) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-left text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.sellPrice")}</div><input type="number" min={0} step="0.01" value={line.sell_price ?? ""} onChange={(event) => updateLine(line.variant_id, { sell_price: Math.max(0, Number(event.target.value) || 0) })} className={`w-full min-w-0 h-9 px-2 rounded-lg text-left text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 ${Number(line.cost_price || 0) > Number(line.sell_price || 0) ? "border-red-400 focus:ring-red-100" : "focus:ring-blue-200"}`} style={{ backgroundColor: "#fff", border: Number(line.cost_price || 0) > Number(line.sell_price || 0) ? "1.5px solid #ef4444" : "1.5px solid #e2e8f0", color: "#0f172a" }} />{Number(line.cost_price || 0) > Number(line.sell_price || 0) && <p className="mt-1 max-w-full break-words text-[9px] font-semibold leading-3 text-red-600">{t("admin.purchaseOrders.create.costExceedsSell")}</p>}</div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.qty")}</div><input type="number" min={1} step={1} value={line.qty_ordered} onChange={(event) => updateLine(line.variant_id, { qty_ordered: Math.max(1, Math.floor(Number(event.target.value) || 1)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-left text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.tax")} %</div><input type="number" min={0} max={100} value={line.tax_rate} onChange={(event) => updateLine(line.variant_id, { tax_rate: Math.min(100, Math.max(0, Number(event.target.value) || 0)) })} className="w-full min-w-0 h-9 px-2 rounded-lg text-left text-[11px] tabular-nums outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
+                                  <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.lineTotal")}</div><div className="h-9 px-2 rounded-lg flex items-center justify-start font-extrabold text-[11px] tabular-nums whitespace-nowrap overflow-hidden shadow-inner" style={{ background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>{money(lineTotal, 0)}</div></div>
                                   <div className="min-w-0"><div className="mb-1 text-[9px] font-bold xl:hidden tracking-wide" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.mfgDate")}</div><input type="date" value={line.mfg_date || ""} onChange={(event) => updateLine(line.variant_id, { mfg_date: event.target.value })} className="w-full min-w-0 h-9 px-2 rounded-lg text-[10px] outline-none font-medium shadow-sm transition focus:shadow-md focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} /></div>
                                 </div>
                               </div>;
@@ -669,17 +707,17 @@ function NewPOPage() {
             </div>
             <div className="text-center">
               <span className="inline-block px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide uppercase mb-2" style={{ background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" }}>{t("admin.purchaseOrders.status.pending")}</span>
-              <div className="font-mono font-extrabold text-xl tracking-tight" style={{ color: "#0f172a" }}>{nextCode?.nextCode || "PO-..."}</div>
+              <div className="font-mono font-extrabold text-xl tracking-tight" style={{ color: "#0f172a" }}>{editPO?.po_number || nextCode?.nextCode || "PO-..."}</div>
               <div className="text-[11px] font-medium mt-1" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.create.autoGenerated")}</div>
             </div>
             <div className="flex gap-2 mt-4">
               <button disabled={saveDisabled} onClick={() => createMutation.mutate()} className="h-11 px-5 rounded-2xl text-[13px] font-extrabold transition-all duration-200 hover:scale-[1.03] hover:shadow-xl active:scale-[0.98] shadow-lg flex-1" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff", boxShadow: "0 4px 14px rgba(37,99,235,0.35)" }}>
-                {createMutation.isPending ? t("admin.purchaseOrders.create.creating") : t("admin.purchaseOrders.create.createPO")}
+                {createMutation.isPending ? t(editId ? "admin.purchaseOrders.create.updating" : "admin.purchaseOrders.create.creating") : t(editId ? "admin.purchaseOrders.create.updatePO" : "admin.purchaseOrders.create.createPO")}
               </button>
             </div>
-            {(lines.length > 0 || vendorId) && (
+            {!editId && (lines.length > 0 || vendorId) && (
               <button
-                onClick={() => { if (confirm("Clear this order?")) { setLines([]); setVendorId(""); setExpectedDate(""); setShipping(0); setDiscount(0); setOverallTax(0); setNotes(""); } }}
+                onClick={() => { if (confirm("Clear this order?")) { setLines([]); setVendorId(""); setExpectedDate(""); setShipping(0); setDiscount(0); setOverallTaxRate(0); setNotes(""); } }}
                 className="mt-3 w-full text-[12px] font-bold transition-all duration-200 hover:scale-[1.02] py-2 rounded-xl" style={{ color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0" }}
               >
                 {t("admin.purchaseOrders.create.clearOrder")}

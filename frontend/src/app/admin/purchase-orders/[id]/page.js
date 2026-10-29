@@ -2,6 +2,7 @@
 
 import FallbackImage from "@/components/common/FallbackImage";
 import { use, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
@@ -14,7 +15,7 @@ import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import {
   ArrowLeft, BriefcaseBusiness, CalendarDays, Check, CheckCircle2,
   ChevronRight, Circle, CreditCard, FileText, MapPin, Mail, Package, PackageCheck,
-  Phone, Truck, UserRound, Wallet, XCircle,
+  Phone, Truck, UserRound, Wallet, XCircle, Pencil,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -80,6 +81,7 @@ export default function PODetailPage({ params }) {
   const { t, locale } = useTranslation();
   const { contentOf, productNameOf } = useLocalized();
   const { id } = use(params);
+  const router = useRouter();
   const qc = useQueryClient();
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -172,6 +174,7 @@ export default function PODetailPage({ params }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
+          {status === "pending" && smallAction(t("admin.purchaseOrders.list.edit"), () => router.push("/admin/purchase-orders/new?edit=" + id), Pencil)}
           {status === "pending" && smallAction(confirmM.isPending ? t("admin.purchaseOrders.view.confirming") : t("admin.purchaseOrders.view.confirm"), () => confirmM.mutate(), Check, true, confirmM.isPending)}
           {status === "confirmed" && smallAction(t("admin.purchaseOrders.view.receiveItems"), openDeliver, Truck, true, !canDeliver)}
           {canPay && smallAction(t("admin.purchaseOrders.view.addPayment"), () => setPayOpen(true), CreditCard, true)}

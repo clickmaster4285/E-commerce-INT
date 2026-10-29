@@ -336,7 +336,7 @@ export default function PurchaseOrdersPage() {
                           <PORowMenu
                             p={p}
                             onView={() => router.push(`/admin/purchase-orders/${p._id}`)}
-                            onOpen={() => router.push(`/admin/purchase-orders/${p._id}`)}
+                            onOpen={() => router.push("/admin/purchase-orders/new?edit=" + p._id)}
                             onConfirm={() => confirmM.mutate(p._id)}
                             onDeliver={() => router.push(`/admin/purchase-orders/${p._id}`)}
                             onPay={() => router.push(`/admin/purchase-orders/${p._id}`)}

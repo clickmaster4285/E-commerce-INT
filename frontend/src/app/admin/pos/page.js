@@ -44,7 +44,6 @@ import { storeApi } from "@/apis/admin/storeApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
 import { posApi } from "@/apis/admin/posApi";
 import PosReturnPanel from "./PosReturnPanel";
-import PosReturnHistoryPanel from "./PosReturnHistoryPanel";
 import { getProductImage } from "@/utils/homeCatalog";
 
 const PAGE_SIZE = 30;
@@ -293,7 +292,7 @@ export default function PosPage() {
       }
       return allSales;
     },
-    enabled: activeView === "history" || activeView === "returns" || activeView === "return-history",
+    enabled: activeView === "history" || activeView === "returns",
   });
   const salesOverviewQuery = useQuery({
     queryKey: ["pos-sales-overview"],
@@ -725,7 +724,7 @@ export default function PosPage() {
     <div dir={dir} className="admin-pos-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-[var(--bg-secondary)] px-0 py-0 text-[var(--text-primary)]">
       <header className="flex min-h-12 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-color)] px-1">
         <nav className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto whitespace-nowrap" aria-label={t("admin.pos.ui.posSections")}>
-          {[["pos", ShoppingCart, t("admin.pos.ui.pos")], ["history", History, t("admin.pos.ui.saleHistoryTab")], ["returns", RotateCcw, t("admin.pos.ui.returnTab")], ["return-history", History, t("admin.pos.ui.returnHistory")], ["hold", Bookmark, `${t("admin.pos.ui.holdTab")}${heldCarts.length ? ` (${heldCarts.length})` : ""}`]].map(([key, Icon, label]) => (
+          {[["pos", ShoppingCart, t("admin.pos.ui.pos")], ["history", History, t("admin.pos.ui.saleHistoryTab")], ["returns", RotateCcw, t("admin.pos.ui.returnTab")], ["hold", Bookmark, `${t("admin.pos.ui.holdTab")}${heldCarts.length ? ` (${heldCarts.length})` : ""}`]].map(([key, Icon, label]) => (
             <button key={key} type="button" onClick={() => {
     if (editingSaleId && key !== "pos") {
                 toast.error(t("admin.pos.toast.saveOrCancelEditBeforeLeaving"));
@@ -929,8 +928,7 @@ export default function PosPage() {
               </div>
             </div>}
           </div> : activeView === "returns" ?
-            <PosReturnPanel sales={(historyQuery.data || []).filter((sale) => sale.status === "completed")} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={setReturnSaleId} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
-          : activeView === "return-history" ? <PosReturnHistoryPanel sales={historyQuery.data || []} isLoading={historyQuery.isLoading} isError={historyQuery.isError} />
+            <PosReturnPanel sales={(historyQuery.data || []).filter((sale) => sale.status === "completed")} historySales={historyQuery.data || []} historyLoading={historyQuery.isLoading} historyError={historyQuery.isError} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={(id) => { setReturnSaleId(id); if (!id) setReturnQuantities({}); }} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
           : <div>
             <div className="mb-4"><h2 className="text-lg font-extrabold text-slate-900">{t("admin.pos.ui.heldSales")}</h2><p className="mt-1 text-xs text-slate-500">{t("admin.pos.ui.savedCartsStayAvailableInThisBrowserUntilResumedOrRemoved")}</p></div>
             {heldCarts.length ? <div className="space-y-2">{heldCarts.map((held) => <article key={held.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Bookmark size={17}/></span><div className="min-w-0"><div className="truncate text-sm font-bold text-slate-900">{held.customer?.name || t("admin.pos.ui.walkInCustomer")} · {held.cart.length} {t("admin.pos.ui.items")}</div>{held.editingSaleNumber && <div className="mt-0.5 text-[10px] font-semibold text-blue-700">{t("admin.pos.ui.editDraftFor")} {held.editingSaleNumber} {t("admin.pos.ui.originalSaleUnchanged")}</div>}<div className="mt-1 text-xs text-slate-500">{new Date(held.createdAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })} · {formatMoney(held.cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0))}</div></div></div><div className="flex gap-2"><button type="button" onClick={() => resumeHeldCart(held, new Date().toISOString())} className="h-9 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">{t("admin.pos.ui.resumeSale")}</button><button type="button" onClick={() => setHeldCarts((current) => current.filter((item) => item.id !== held.id))} aria-label={t("admin.pos.ui.deleteHeldSale")} className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50"><Trash2 size={15}/></button></div></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center text-sm text-slate-500">{t("admin.pos.ui.noHeldSalesYetUseHoldInTheCartToSaveASaleForLater")}</div>}
@@ -972,7 +970,6 @@ export default function PosPage() {
                 {!customerResults.isFetching && !customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.noSavedCustomersYet")}</p>}
                 {!customerResults.isFetching && customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-5 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.noCustomersFound")}</p>}
               </div>
-              <button type="button" onClick={() => { setShowCustomerForm(true); setCustomerOpen(false); }} className="flex h-10 w-full items-center justify-center gap-2 border-t border-[var(--border-color)] px-3 text-xs font-semibold text-blue-600 transition hover:bg-[var(--bg-tertiary)]"><Plus size={15} /> {t("admin.pos.ui.addNewCustomer")}</button>
             </div>}
           </div>
 

@@ -143,12 +143,25 @@ const getPosSales = async (req, res) => {
       .populate("customer_id", "name phone email")
       .populate("cashier_id", "name email")
       .populate("items.product_id", "name translations")
+      .populate("items.variant_id", "images")
       .sort({ created_at: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
 
-    res.status(200).json({ success: true, data: sales, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 } });
+    const data = sales.map((sale) => ({
+      ...sale,
+      items: (sale.items || []).map((item) => {
+        const variant = item.variant_id && typeof item.variant_id === "object" ? item.variant_id : null;
+        return {
+          ...item,
+          product_image: item.product_image || variant?.images?.[0]?.img_url || "",
+          variant_id: variant?._id || item.variant_id,
+        };
+      }),
+    }));
+
+    res.status(200).json({ success: true, data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
