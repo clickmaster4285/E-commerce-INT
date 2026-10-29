@@ -168,9 +168,7 @@ const TITLE_OPTIONS = [
 
 const PAPER_SIZE_OPTIONS = [
   { value: "a4-portrait", label: "A4 · Portrait", size: [210, 297] },
-  { value: "a4-landscape", label: "A4 · Landscape", size: [297, 210] },
   { value: "a5-portrait", label: "A5 · Portrait", size: [148, 210] },
-  { value: "a5-landscape", label: "A5 · Landscape", size: [210, 148] },
   { value: "letter-portrait", label: "Letter", size: [215.9, 279.4] },
   { value: "legal-portrait", label: "Legal", size: [215.9, 355.6] },
 ];
@@ -854,7 +852,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   <div ref={itemsTableScrollRef} className="overflow-x-auto pb-1">
                     <div className="min-w-[710px] overflow-hidden rounded-md border border-[var(--border-color)]">
                     {(() => {
-                      const itemGrid = "grid grid-cols-[1.25rem_minmax(140px,1.5fr)_minmax(58px,.6fr)_3.5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-0";
+                      const itemGrid = "grid grid-cols-[1.25rem_minmax(180px,1.8fr)_4.25rem_5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-0";
                       const headers = ["#", t("admin.quoteInvoice.ui.product_dd3b86d1"), "SKU", t("admin.quoteInvoice.ui.quantity_44f6af69"), t("admin.quoteInvoice.ui.unit_price_3c6c777f"), t("admin.quoteInvoice.ui.discount_b524936d"), t("admin.quoteInvoice.ui.tax_9be70f66"), ""];
                       return <>
                         <div className={`${itemGrid} border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 py-2`}>
@@ -870,7 +868,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                               </button>
                             </div>
                           </div>
-                          <span className="h-full min-w-0 truncate border-e border-[var(--border-color)] px-1 py-2.5 text-center font-mono text-[9px] text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
+                          <span className="h-full min-w-0 truncate border-e border-[var(--border-color)] px-1 py-2.5 text-center font-mono text-[11px] font-medium text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
                           {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full appearance-none rounded-none border-e border-[var(--border-color)] bg-[var(--bg-card)] px-1 text-center text-[11px] font-medium text-[var(--text-primary)] outline-none transition focus:z-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />)}
                           <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-full w-full items-center justify-center justify-self-center border-s border-[var(--border-color)] text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13} /></button>
                         </div>)}

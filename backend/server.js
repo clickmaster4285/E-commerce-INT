@@ -162,6 +162,7 @@ app.use(
 //    hi silent chhodi gayi hai.
 // ==========================================
 const startupLog = {
+  info: (msg) => console.log(`ℹ️ ${msg}`),
   error: (msg) => console.error(`❌ ${msg}`),
 };
 
@@ -391,6 +392,7 @@ const startArgosServer = async () => {
     }
   }
   if (serviceUp) {
+    startupLog.info(`Argos Translator running at ${TRANSLATION_API_URL} (existing service)`);
     return;
   }
 
@@ -439,7 +441,11 @@ const startArgosServer = async () => {
   // Blocking nahi — sirf status report.
   waitTranslationServiceReady()
     .then((ready) => {
-      if (!ready) startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
+      if (ready) {
+        startupLog.info(`Argos Translator running at ${TRANSLATION_API_URL}`);
+      } else {
+        startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
+      }
     })
     .catch(() => {});
 };
