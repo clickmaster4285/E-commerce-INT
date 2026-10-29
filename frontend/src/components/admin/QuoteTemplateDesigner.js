@@ -8,6 +8,7 @@ import { storeApi } from "@/apis/admin/storeApi";
 import { getQuoteHeaderData } from "@/lib/quoteHeaderData";
 import { variantApi } from "@/apis/admin/variantApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
 import { htmlToPlainText, renderRichHtml } from "@/lib/termsContent";
 import { toast } from "sonner";
 import { Calculator, Check, ChevronDown, Eye, Package, Palette, Pencil, Plus, Search, Trash2 } from "lucide-react";
@@ -168,9 +169,7 @@ const TITLE_OPTIONS = [
 
 const PAPER_SIZE_OPTIONS = [
   { value: "a4-portrait", label: "A4 · Portrait", size: [210, 297] },
-  { value: "a4-landscape", label: "A4 · Landscape", size: [297, 210] },
   { value: "a5-portrait", label: "A5 · Portrait", size: [148, 210] },
-  { value: "a5-landscape", label: "A5 · Landscape", size: [210, 148] },
   { value: "letter-portrait", label: "Letter", size: [215.9, 279.4] },
   { value: "legal-portrait", label: "Legal", size: [215.9, 355.6] },
 ];
@@ -327,6 +326,7 @@ function QuoteHeaderDetails({ number, status, date, validUntil, labels, title, t
 
 export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quoteStatus, savedDesign, money, previewOnly = false, onBrowseProducts, onFieldChange, onUpdateItem, onRemoveItem, discountType, discountValue, onDiscountTypeChange, onDiscountValueChange, taxRate, onTaxRateChange, documentType = "quote", storageKey: storageKeyProp }) {
   const { t, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const isInvoice = documentType === "invoice";
   const doc = DOCUMENT_CONFIG[documentType] || DOCUMENT_CONFIG.quote;
   const storageKey = storageKeyProp || doc.storageKey;
@@ -377,11 +377,15 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     const listOf = (value) => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : Array.isArray(value?.items) ? value.items : [];
     return listOf(rawVariants).filter((variant) => !variant.is_deleted).map((variant) => {
       const product = variant.product_id && typeof variant.product_id === "object" ? variant.product_id : {};
+      const sourceName = product.name || variant.name || "";
+      const sourceVariant = variant.title || "";
       return {
         id: String(variant._id || ""),
         product_id: String(product._id || variant.product_id || ""),
-        name: product.name || variant.name || "",
-        variant: variant.title || "",
+        sourceName,
+        sourceVariant,
+        name: productNameOf(product) || sourceName,
+        variant: localizedVariantTitleOf(variant, locale) || sourceVariant,
         sku: variant.sku || "",
         price: Number(variant.selling_price ?? 0),
         image: firstProductImage(
@@ -394,7 +398,11 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         ),
       };
     }).filter((option) => option.id && option.product_id);
-  }, [rawVariants]);
+  }, [rawVariants, productNameOf, locale]);
+  const variantOptionsById = useMemo(
+    () => new Map(variantOptions.map((option) => [option.id, option])),
+    [variantOptions],
+  );
   const matchedVariants = useMemo(() => {
     const term = variantSearch.trim().toLowerCase();
     const selectedElsewhere = new Set((form?.items || [])
@@ -403,7 +411,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
       .filter(Boolean));
     return variantOptions
       .filter((option) => !selectedElsewhere.has(option.id))
-      .filter((option) => !term || `${option.name} ${option.variant} ${option.sku}`.toLowerCase().includes(term))
+      .filter((option) => !term || `${option.name} ${option.sourceName} ${option.variant} ${option.sourceVariant} ${option.sku}`.toLowerCase().includes(term))
       .slice(0, 8);
   }, [variantOptions, variantSearch, form?.items, activeVariantItemId]);
 
@@ -419,8 +427,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     }
     onUpdateItem?.(item.row_id, "product_id", option.product_id);
     onUpdateItem?.(item.row_id, "variant_id", option.id);
-    onUpdateItem?.(item.row_id, "name", option.name);
-    onUpdateItem?.(item.row_id, "variant_name", option.variant);
+    onUpdateItem?.(item.row_id, "name", option.sourceName || option.name);
+    onUpdateItem?.(item.row_id, "variant_name", option.sourceVariant || option.variant);
     onUpdateItem?.(item.row_id, "sku", option.sku);
     onUpdateItem?.(item.row_id, "image", option.image);
     onUpdateItem?.(item.row_id, "unit_price", option.price);
@@ -596,10 +604,20 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const activeVariantItem = editorItems.find((item) => item.row_id === activeVariantItemId);
   const items = (form?.items || []).filter((it) => it.name || it.variant_name);
   const previewItems = items.map((item, index) => {
+    const selectedOption = variantOptionsById.get(String(item.variant_id || ""));
     const gross = Number(item.quantity || 0) * Number(item.unit_price || 0);
     const discount = gross * Number(item.discount_rate || 0) / 100;
     const tax = (gross - discount) * Number(item.tax_rate || 0) / 100;
-    return { ...item, gross, discount, tax, amount: gross - discount + tax, index: index + 1 };
+    return {
+      ...item,
+      name: selectedOption?.name || item.name,
+      variant_name: selectedOption?.variant || item.variant_name,
+      gross,
+      discount,
+      tax,
+      amount: gross - discount + tax,
+      index: index + 1,
+    };
   });
   const rawTerms = String(form?.terms || "");
   const hasTermsPage = design.showTerms !== false && Boolean(form?.terms || form?.notes);
@@ -854,26 +872,30 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   <div ref={itemsTableScrollRef} className="overflow-x-auto pb-1">
                     <div className="min-w-[710px] overflow-hidden rounded-md border border-[var(--border-color)]">
                     {(() => {
-                      const itemGrid = "grid grid-cols-[1.25rem_minmax(140px,1.5fr)_minmax(58px,.6fr)_3.5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-0";
+                      const itemGrid = "grid grid-cols-[1.25rem_minmax(180px,1.8fr)_4.25rem_5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-0";
                       const headers = ["#", t("admin.quoteInvoice.ui.product_dd3b86d1"), "SKU", t("admin.quoteInvoice.ui.quantity_44f6af69"), t("admin.quoteInvoice.ui.unit_price_3c6c777f"), t("admin.quoteInvoice.ui.discount_b524936d"), t("admin.quoteInvoice.ui.tax_9be70f66"), ""];
                       return <>
                         <div className={`${itemGrid} border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 py-2`}>
                           {headers.map((header, i) => <span key={i} className={`truncate border-e border-[var(--border-color)] px-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] last:border-e-0 ${i >= 2 && i <= 6 ? "text-center" : ""}`}>{header}</span>)}
                         </div>
-                        {editorItems.map((item, index) => <div key={item.row_id || item._id || index} className={`${itemGrid} border-b border-[var(--border-color)] last:border-b-0 bg-[var(--bg-card)] px-2 py-0`}>
+                        {editorItems.map((item, index) => {
+                          const selectedOption = variantOptionsById.get(String(item.variant_id || ""));
+                          const displayedName = selectedOption?.name || item.name;
+                          return <div key={item.row_id || item._id || index} className={`${itemGrid} border-b border-[var(--border-color)] last:border-b-0 bg-[var(--bg-card)] px-2 py-0`}>
                           <span className="h-full border-e border-[var(--border-color)] py-2.5 text-center text-[9px] font-semibold tabular-nums text-[var(--text-muted)]">{index + 1}</span>
                           <div className="relative flex min-w-0 flex-col justify-center">
                             <div className="relative">
                               <button ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} type="button" onClick={(event) => { if (variantSearchOpen && activeVariantItemId === item.row_id) { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } else activateVariantSearch(item, event.currentTarget); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} className={`group flex h-9 w-full min-w-0 items-center gap-2 rounded-none border-e border-[var(--border-color)] px-2 text-left transition-colors duration-150 focus-visible:z-10 focus-visible:border-blue-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-500 focus-visible:outline-offset-[-1px] ${variantSearchOpen && activeVariantItemId === item.row_id ? "bg-white outline outline-1 outline-blue-500 outline-offset-[-1px] dark:bg-slate-900" : "bg-white hover:border-slate-400 dark:bg-slate-900 dark:hover:border-slate-600"}`} aria-label={t("admin.quoteInvoice.ui.product_dd3b86d1") + " " + (index + 1)} aria-haspopup="dialog" aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id}>
-                                <span title={item.name || t("admin.quoteDesigner.selectOrTypeProduct")} className={`min-w-0 flex-1 truncate text-sm ${item.name ? "font-semibold text-slate-900 dark:text-slate-100" : "font-normal text-slate-500"}`}>{item.name || t("admin.quoteDesigner.selectOrTypeProduct")}</span>
+                                <span title={displayedName || t("admin.quoteDesigner.selectOrTypeProduct")} className={`min-w-0 flex-1 truncate text-sm ${displayedName ? "font-semibold text-slate-900 dark:text-slate-100" : "font-normal text-slate-500"}`}>{displayedName || t("admin.quoteDesigner.selectOrTypeProduct")}</span>
                                 <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform duration-150 ${variantSearchOpen && activeVariantItemId === item.row_id ? "rotate-180" : ""}`} />
                               </button>
                             </div>
                           </div>
-                          <span className="h-full min-w-0 truncate border-e border-[var(--border-color)] px-1 py-2.5 text-center font-mono text-[9px] text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
+                          <span className="h-full min-w-0 truncate border-e border-[var(--border-color)] px-1 py-2.5 text-center font-mono text-[11px] font-medium text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
                           {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full appearance-none rounded-none border-e border-[var(--border-color)] bg-[var(--bg-card)] px-1 text-center text-[11px] font-medium text-[var(--text-primary)] outline-none transition focus:z-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />)}
                           <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-full w-full items-center justify-center justify-self-center border-s border-[var(--border-color)] text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13} /></button>
-                        </div>)}
+                        </div>;
+                        })}
                       </>;
                     })()}
                     </div>

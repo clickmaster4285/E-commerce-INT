@@ -200,6 +200,9 @@ exports.getInvoice = async (req, res) => {
     const invoice = await Invoice.findOne({ _id: req.params.id, is_deleted: false })
       .populate("createdby", "name")
       .populate("updatedby", "name")
+      .populate("customer_id", "name email phone address notes")
+      .populate("items.product_id", "name translations.name")
+      .populate("items.variant_id", "title translations.title")
       .lean();
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
     res.json({ success: true, data: { ...invoice, original_total: getOriginalInvoiceTotal(invoice) } });

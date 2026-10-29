@@ -681,6 +681,27 @@ main {
   text-align: end !important;
 }
 
+/* Keep admin actions aligned in Urdu/Arabic. The script-specific rules above
+   allow text to wrap and let fixed-height text controls grow so glyphs are not
+   clipped. Wrapping button labels makes neighboring actions land on different
+   baselines/heights after a locale switch. Keep each action on one line and
+   center its contents; responsive button groups can wrap as a group. */
+html:has([lang="ur"]) .admin-panel :is(button, [role="button"]),
+html:has([lang="ar"]) .admin-panel :is(button, [role="button"]) {
+  white-space: nowrap !important;
+  align-items: center;
+  vertical-align: middle;
+}
+
+html:has([lang="ur"]) .admin-panel :is(button, [role="button"]).truncate,
+html:has([lang="ar"]) .admin-panel :is(button, [role="button"]).truncate,
+html:has([lang="ur"]) .admin-panel :is(button, [role="button"]) .truncate,
+html:has([lang="ar"]) .admin-panel :is(button, [role="button"]) .truncate {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
 .sidebar-wrapper {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;

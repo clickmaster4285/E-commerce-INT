@@ -11,6 +11,7 @@ import {
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
+import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
 import { downloadInvoicePdf, printInvoicePdf } from "@/lib/invoicePdf";
 import { storeApi } from "@/apis/admin/storeApi";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
@@ -34,6 +35,7 @@ const money = (value, locale) => new Intl.NumberFormat(locale || "en-PK", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2
 }).format(Number(value) || 0);
+const bidiIsolate = (value) => `\u2068${String(value ?? "")}\u2069`;
 const date = (value, locale) => value && !Number.isNaN(new Date(value).getTime()) ?
 new Date(value).toLocaleDateString(locale || [], { year: "numeric", month: "2-digit", day: "2-digit" }) :
 "-";
@@ -75,6 +77,7 @@ function PreviewModal({ onClose, children }) {
 }
 
 export default function InvoiceDetailsPage({ params }) {const { t, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,6 +191,12 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
   const rawStatus = invoice.status || "Unpaid";
   const displayStatus = rawStatus === "Draft" ? "Unpaid" : rawStatus;
+  const normalizedStatus = displayStatus.toLowerCase();
+  const displayStatusLabel = t(`admin.invoiceDetail.status.${normalizedStatus === "partially paid" ? "partiallyPaid" : normalizedStatus}`);
+  const paymentTermsText = String(invoice.payment_terms || "").trim();
+  const paymentTermsLabel = /^due on receipt$/i.test(paymentTermsText)
+    ? t("admin.invoiceDetail.common.dueOnReceipt")
+    : paymentTermsText || t("admin.invoiceDetail.common.dueOnReceipt");
   const canReturn = Boolean(invoice.sent_at);
   const items = invoice.items || [];
   const returns = invoice.returns || [];
@@ -200,17 +209,24 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   });
   const previewItems = items.map((item, index) => {
     const [productName, ...variantParts] = String(item.name || "").split(" / ");
+    const localizedProductName = productNameOf(item.product_id || item.variant_id?.product_id) || productName || item.name || "";
+    const localizedVariantName = localizedVariantTitleOf(item.variant_id, locale);
     return {
       ...item,
       row_id: item._id || `invoice-item-${index}`,
-      name: productName || item.name || "",
-      variant_name: item.variant_name || variantParts.join(" / "),
+      name: localizedProductName,
+      variant_name: localizedVariantName || item.variant_name || variantParts.join(" / "),
       returned_quantity: returnedQuantityByItem.get(String(item._id || "")) || 0,
     };
   });
   const payments = invoice.payments || [];
   const paidAmount = Number(invoice.amount_paid || 0);
   const total = Number(invoice.total || 0);
+  const subtotal = Number(invoice.subtotal || 0);
+  const discountTotal = Number(invoice.discount || 0);
+  const taxTotal = Number(invoice.tax || 0);
+  const originalTotal = Number(invoice.original_total ?? (subtotal - discountTotal + taxTotal));
+  const returnAdjustment = Math.max(0, originalTotal - total);
   const paymentProgress = total > 0 ? Math.min(100, Math.max(0, (paidAmount / total) * 100)) : 0;
   const lastPayment = payments[payments.length - 1];
   const returnedItemCount = returns.reduce((count, record) => count + (record.items_returned || []).reduce((itemCount, item) => itemCount + Number(item.qty || 0), 0), 0);
@@ -244,25 +260,53 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     ...returns.map((record, index) => ({ _id: `legacy-return-${index}`, type: "return", at: record.date, actor_name: "", changes: (record.items_returned || []).map((item) => ({ action: "returned", field: "item", product_name: item.name, from_quantity: 0, to_quantity: item.qty, before: "—", after: `${item.qty} returned · ${money(item.return_value, locale)}` })) })),
   ].sort((a, b) => new Date(a.at || 0).getTime() - new Date(b.at || 0).getTime());
   const invoiceActivityLabel = (change) => {
-    const product = [change.product_name, change.variant_title || change.sku].filter(Boolean).join(" · ") || t("admin.pos.ui.product");
-    if (change.action === "added") return t("admin.invoiceDetail.activity.productAdded", { product, quantity: change.to_quantity || 0 });
-    if (change.action === "removed") return t("admin.invoiceDetail.activity.productRemoved", { product, quantity: change.from_quantity || 0 });
-    if (change.action === "quantity") return t("admin.invoiceDetail.activity.quantityChanged", { product, from: change.from_quantity || 0, to: change.to_quantity || 0 });
-    if (change.action === "returned") return t("admin.invoiceDetail.activity.productReturned", { product, quantity: change.to_quantity || 0 });
+    const normalizedActivityName = String(change.product_name || "").trim().toLowerCase();
+    const matchingItem = items.find((item) => item.sku && String(item.sku) === String(change.sku)) ||
+      items.find((item) => String(item.name || "").trim().toLowerCase() === normalizedActivityName);
+    const [, ...snapshotVariantParts] = String(change.product_name || "").split(" / ");
+    const productName = matchingItem
+      ? productNameOf(matchingItem.product_id) || change.product_name
+      : change.product_name;
+    const variantTitle = matchingItem
+      ? localizedVariantTitleOf(matchingItem.variant_id, locale) || change.variant_title || snapshotVariantParts.join(" / ")
+      : change.variant_title || snapshotVariantParts.join(" / ");
+    const product = [productName, variantTitle].filter(Boolean).join(" · ") || change.sku || t("admin.pos.ui.product");
+    if (change.action === "added") return t("admin.invoiceDetail.activity.productAdded", { product: bidiIsolate(product), quantity: bidiIsolate(change.to_quantity || 0) });
+    if (change.action === "removed") return t("admin.invoiceDetail.activity.productRemoved", { product: bidiIsolate(product), quantity: bidiIsolate(change.from_quantity || 0) });
+    if (change.action === "quantity") return t("admin.invoiceDetail.activity.quantityChanged", { product: bidiIsolate(product), from: bidiIsolate(change.from_quantity || 0), to: bidiIsolate(change.to_quantity || 0) });
+    if (change.action === "returned") return t("admin.invoiceDetail.activity.productReturned", { product: bidiIsolate(product), quantity: bidiIsolate(change.to_quantity || 0) });
     if (change.action === "item_field") {
-      const before = change.field === "Unit price" && change.before !== "—" ? money(change.before, locale) : change.before;
-      const after = change.field === "Unit price" && change.after !== "—" ? money(change.after, locale) : change.after;
-      return t("admin.invoiceDetail.activity.itemFieldChanged", { field: change.field, product, before, after });
+      const formatValue = (value) => {
+        if (value === "—") return value;
+        if (change.field === "Unit price") return money(value, locale);
+        if (["Discount", "Tax"].includes(change.field)) {
+          const match = String(value).match(/^([\d.]+)%\s*·\s*([\d.]+)$/);
+          if (match) return `${match[1]}% · ${money(match[2], locale)}`;
+        }
+        return value;
+      };
+      const before = formatValue(change.before);
+      const after = formatValue(change.after);
+      const fieldLabels = { "Unit price": t("admin.documentDetail.field.unitPrice"), Discount: t("admin.documentDetail.field.discount"), Tax: t("admin.documentDetail.field.tax"), Quantity: t("admin.documentDetail.field.quantity") };
+      return t("admin.invoiceDetail.activity.itemFieldChanged", { field: bidiIsolate(fieldLabels[change.field] || change.field), product: bidiIsolate(product), before: bidiIsolate(before), after: bidiIsolate(after) });
     }
     if (change.action === "field") {
       const moneyFields = ["Subtotal", "Total discount", "Total tax", "Invoice total"];
       const before = moneyFields.includes(change.field) && change.before !== "—" ? money(change.before, locale) : change.before;
       const after = moneyFields.includes(change.field) && change.after !== "—" ? money(change.after, locale) : change.after;
-      return t("admin.invoiceDetail.activity.fieldChanged", { field: change.field, before, after });
+      const fieldLabels = { Subtotal: t("admin.documentDetail.field.subtotal"), "Total discount": t("admin.documentDetail.field.totalDiscount"), "Total tax": t("admin.documentDetail.field.tax"), "Invoice total": t("admin.documentDetail.field.invoiceTotal"), Status: t("admin.documentDetail.field.currentStatus") };
+      const localizeStatus = (value) => {
+        const normalized = String(value ?? "").trim().toLowerCase();
+        const statusKey = normalized === "partially paid" ? "partiallyPaid" : normalized;
+        if (["pending", "draft", "sent", "accepted", "rejected"].includes(statusKey)) return t(`admin.quoteInvoice.status.${statusKey}`);
+        if (["unpaid", "partiallyPaid", "paid", "overdue"].includes(statusKey)) return t(`admin.invoiceDetail.status.${statusKey}`);
+        return value;
+      };
+      return t("admin.invoiceDetail.activity.fieldChanged", { field: bidiIsolate(fieldLabels[change.field] || change.field), before: bidiIsolate(change.field === "Status" ? localizeStatus(before) : before), after: bidiIsolate(change.field === "Status" ? localizeStatus(after) : after) });
     }
-    if (change.action === "payment_recorded") return t("admin.invoiceDetail.activity.paymentRecorded", { detail: change.after });
-    if (change.action === "balance") return t("admin.invoiceDetail.activity.balanceChanged", { before: money(change.before, locale), after: money(change.after, locale) });
-    if (change.action === "refund") return t("admin.invoiceDetail.activity.refundProcessed", { detail: change.after });
+    if (change.action === "payment_recorded") return t("admin.invoiceDetail.activity.paymentRecorded", { detail: bidiIsolate(change.after) });
+    if (change.action === "balance") return t("admin.invoiceDetail.activity.balanceChanged", { before: bidiIsolate(money(change.before, locale)), after: bidiIsolate(money(change.after, locale)) });
+    if (change.action === "refund") return t("admin.invoiceDetail.activity.refundProcessed", { detail: bidiIsolate(change.after) });
     if (change.action === "sent") return t("admin.invoiceDetail.activity.sentToCustomer");
     return change.after ? `${change.field}: ${change.after}` : change.field;
   };
@@ -287,7 +331,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-[var(--bg-tertiary)]" style={{ borderColor: "var(--border-color)", color: "#2878f0" }}><FileText size={18} /></div>
           <h1 className="font-mono text-xl font-bold" style={primary}>{t("admin.quoteInvoice.ui.invoice_51d86044")}{invoice.invoice_number}</h1>
-          <Badge value={displayStatus} status={rawStatus} />
+          <Badge value={displayStatusLabel} status={rawStatus} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 pl-11 text-xs" style={muted}>
           <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{t("admin.invoiceDetail.field.created")} {date(invoice.created_at || invoice.invoice_date, locale)}</span>
@@ -297,11 +341,11 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
-        <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 text-[13px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"><Eye size={15} />Preview</button>
-        {!invoice.sent_at && smallAction("Edit", () => router.push(`/admin/invoices/new?invoice=${encodeURIComponent(id)}`), Pencil)}
-        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><Printer size={16} />{isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
-        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><FileText size={16} />Download PDF</button>
-        {canReturn && smallAction("Return & Refund", () => setReturnOpen(true), RotateCcw, true)}
+        <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 text-[13px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"><Eye size={15} />{t("admin.invoiceDetail.action.preview")}</button>
+        {!invoice.sent_at && smallAction(t("common.edit"), () => router.push(`/admin/invoices/new?invoice=${encodeURIComponent(id)}`), Pencil)}
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><Printer size={16} />{isGeneratingPdf ? t("admin.invoiceDetail.action.preparing") : t("admin.pos.ui.print")}</button>
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><FileText size={16} />{t("admin.invoiceDetail.action.downloadPdf")}</button>
+        {canReturn && smallAction(t("admin.invoiceDetail.action.returnRefund"), () => setReturnOpen(true), RotateCcw, true)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? t("admin.invoiceDetail.action.saving") : t("admin.invoiceDetail.action.sendCustomer"),
           () => sendMutation.mutate(),
@@ -315,34 +359,49 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     <div className="grid items-start gap-4 lg:grid-cols-12">
       <main className="min-w-0 lg:col-span-8">
         <div className="grid gap-4 md:grid-cols-2">
-          <Panel title="Customer information" icon={UserRound}>
-            <div className="space-y-1 px-4 py-3 text-[13px]">
-              <div className="mb-2.5 flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-600">{String(invoice.customer_name || "C").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><div className="truncate text-[13px] font-bold text-[var(--text-primary)]">{invoice.customer_name || "—"}</div><div className="truncate text-xs text-[var(--text-muted)]">{invoice.customer_email || "Customer"}</div></div></div>
-              {invoice.customer_phone && <p className="text-xs text-[var(--text-secondary)]">{invoice.customer_phone}</p>}
-              {invoice.customer_address && <p className="whitespace-pre-wrap text-xs text-[var(--text-secondary)]">{invoice.customer_address}</p>}
+          <Panel title={t("admin.quoteInvoice.ui.customer_information_c996cd10")} icon={UserRound}>
+            <div className="space-y-4 px-5 py-4 text-[13px]">
+              <div className="flex min-w-0 items-center gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-base font-bold text-blue-600">{String(invoice.customer_name || "C").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><div className="truncate text-base font-semibold text-[var(--text-primary)]">{invoice.customer_name || "—"}</div><div className="mt-0.5 text-xs text-[var(--text-muted)]">{t("admin.documentDetail.field.customer")}</div></div></div>
+              <div className="grid gap-x-5 gap-y-4 border-t pt-4 sm:grid-cols-2" style={{ borderColor: "var(--border-color)" }}>
+                <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.invoiceDetail.field.email")}</p><p className="mt-1 break-words text-[13px] leading-5" style={primary}>{invoice.customer_email || invoice.customer_id?.email || t("admin.documentDetail.field.notProvided")}</p></div>
+                <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.invoiceDetail.field.phone")}</p><p className="mt-1 break-words text-[13px] leading-5" style={primary}>{invoice.customer_phone || invoice.customer_id?.phone || t("admin.documentDetail.field.notProvided")}</p></div>
+                <div className="min-w-0 sm:col-span-2"><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.invoiceDetail.field.address")}</p><p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-5" style={primary}>{invoice.customer_address || invoice.customer_id?.address || t("admin.documentDetail.field.notProvided")}</p></div>
+                {invoice.customer_id?.notes && <div className="min-w-0 border-t pt-3 sm:col-span-2" style={{ borderColor: "var(--border-color)" }}><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.documentDetail.field.customerNotes")}</p><p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-5" style={primary}>{invoice.customer_id.notes}</p></div>}
+              </div>
             </div>
           </Panel>
-          <Panel title="Invoice summary" icon={FileText}>
-            <div className="space-y-2 p-4 text-[13px]">
-              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.created")}</span><span>{date(invoice.invoice_date, locale)}</span></div>
-              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.dueDate")}</span><span>{date(invoice.due_date, locale)}</span></div>
-              <div className="flex justify-between gap-3"><span style={muted}>Items</span><span>{items.length}</span></div>
-              <div className="mt-2 flex justify-between border-t pt-2.5 text-sm font-bold" style={{ borderColor: "var(--border-color)" }}><span>Total</span><span style={{ color: "#079878" }}>{money(total, locale)}</span></div>
+          <Panel title={t("admin.documentDetail.panel.invoiceSummary")} icon={FileText}>
+            <div className="space-y-2.5 p-4 text-[12px]">
+              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.invoiceDate")}</span><span className="text-right" style={primary}>{date(invoice.invoice_date, locale)}</span></div>
+              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.dueDate")}</span><span className="text-right" style={primary}>{date(invoice.due_date, locale)}</span></div>
+              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.paymentTerms")}</span><span className="max-w-[60%] text-right" style={primary}>{paymentTermsLabel}</span></div>
+              <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.items")}</span><span style={primary}>{items.length}</span></div>
+              <div className="space-y-2 border-t pt-2.5" style={{ borderColor: "var(--border-color)" }}>
+                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.subtotal")}</span><span style={primary}>{money(subtotal, locale)}</span></div>
+                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.totalDiscount")}</span><span className="font-medium text-rose-600">− {money(discountTotal, locale)}</span></div>
+                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.tax")}</span><span style={primary}>{money(taxTotal, locale)}</span></div>
+                {returnAdjustment > 0 ? <>
+                  <div className="flex justify-between gap-3 border-t pt-2 text-[12px] font-bold" style={{ borderColor: "var(--border-color)" }}><span style={primary}>{t("admin.documentDetail.field.originalTotal")}</span><span style={{ color: "#079878" }}>{money(originalTotal, locale)}</span></div>
+                  <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.returnAdjustment")}</span><span className="font-medium text-rose-600">− {money(returnAdjustment, locale)}</span></div>
+                  <div className="flex justify-between gap-3 text-sm font-bold"><span style={primary}>{t("admin.documentDetail.field.adjustedTotal")}</span><span style={{ color: "#079878" }}>{money(total, locale)}</span></div>
+                </> : <div className="flex justify-between gap-3 border-t pt-2 text-sm font-bold" style={{ borderColor: "var(--border-color)" }}><span style={primary}>{t("admin.documentDetail.field.invoiceTotal")}</span><span style={{ color: "#079878" }}>{money(total, locale)}</span></div>}
+              </div>
+              {invoice.bank_details && <div className="border-t pt-2.5" style={{ borderColor: "var(--border-color)" }}><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.documentDetail.field.paymentInstructions")}</p><p className="mt-1 whitespace-pre-wrap break-words text-[11px] leading-4" style={primary}>{invoice.bank_details}</p></div>}
             </div>
           </Panel>
         </div>
         <div className="mt-4">
-          <Panel title="Products & items" icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{items.length} items</span>}>
-            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-xs"><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", "Product / variant", "SKU", "Quantity", "Unit price", "Discount", "Tax", "Amount"].map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}>{index + 1}</td><td className="max-w-[200px] px-3 py-3"><span className="block truncate font-semibold" style={primary}>{item.name || "—"}</span><span className="block truncate text-[10px]" style={muted}>{item.variant_name || ""}</span></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}>{item.sku || "—"}</td><td className="px-3 py-3">{item.quantity ?? item.qty ?? 0}</td><td className="whitespace-nowrap px-3 py-3">{money(item.unit_price, locale)}</td><td className="whitespace-nowrap px-3 py-3">{money(item.discount, locale)}</td><td className="whitespace-nowrap px-3 py-3">{money(item.tax, locale)}</td><td className="whitespace-nowrap px-3 py-3 font-semibold">{money(item.total ?? item.line_total, locale)}</td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-xs" style={muted}>No items added to this invoice.</td></tr>}</tbody></table></div>
+          <Panel title={t("admin.documentDetail.panel.productsItems")} icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{items.length} {t("admin.documentDetail.field.items")}</span>}>
+            <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[35%]"/><col className="w-[9%]"/><col className="w-[7%]"/><col className="w-[12%]"/><col className="w-[10%]"/><col className="w-[9%]"/><col className="w-[14%]"/></colgroup><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading) => <th key={heading} dir="auto" className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}><bdi dir="ltr">{index + 1}</bdi></td><td className="min-w-0 px-3 py-3 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5" style={primary}>{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4" style={muted}>{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3"><bdi dir="ltr">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.discount, locale)}</bdi>{Number(item.discount_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.discount_rate)}%</bdi> {t("admin.documentDetail.field.discountRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.tax, locale)}</bdi>{Number(item.tax_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.tax_rate)}%</bdi> {t("admin.documentDetail.field.taxRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3 font-semibold"><bdi dir="ltr">{money(item.total ?? item.line_total, locale)}</bdi></td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-sm" style={muted}>{t("admin.documentDetail.empty.noInvoiceItems")}</td></tr>}</tbody></table></div>
           </Panel>
         </div>
-        {invoice.terms && <div className="mt-4"><Panel title="Terms & conditions" icon={FileText}><div className="p-4 text-xs leading-5" style={muted}>{/<[a-z][\s\S]*>/i.test(invoice.terms) ? <div className="invoice-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(invoice.terms) }} /> : <p className="whitespace-pre-wrap">{invoice.terms}</p>}</div></Panel></div>}
+        {invoice.terms && <div className="mt-4"><Panel title={t("admin.documentDetail.panel.termsConditions")} icon={FileText}><div className="p-4 text-xs leading-5" style={muted}>{/<[a-z][\s\S]*>/i.test(invoice.terms) ? <div className="invoice-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(invoice.terms) }} /> : <p className="whitespace-pre-wrap">{invoice.terms}</p>}</div></Panel></div>}
       </main>
 
       <aside className="space-y-3.5 lg:col-span-4">
         <Panel title={t("admin.quoteInvoice.ui.status_payment_cb7d8510")} icon={CheckCircle2}>
           <div className="p-4">
-            <div className="flex items-center gap-2"><span className="text-sm font-semibold" style={primary}>{t("admin.quoteInvoice.ui.invoice_status_a5a0bffa")}</span><Badge value={displayStatus} status={rawStatus} /></div>
+            <div className="flex items-center gap-2"><span className="text-sm font-semibold" style={primary}>{t("admin.quoteInvoice.ui.invoice_status_a5a0bffa")}</span><Badge value={displayStatusLabel} status={rawStatus} /></div>
             <div className="relative mt-5 grid gap-1" style={{ gridTemplateColumns: `repeat(${timeline.length}, minmax(0, 1fr))` }}>
               <div className="absolute top-[5px] h-px" style={{ left: `${50 / timeline.length}%`, right: `${50 / timeline.length}%`, background: "var(--border-color)" }} />
               {timeline.map(([label, value, complete]) => <div key={label} className="relative flex flex-col items-center gap-1.5 text-center">
@@ -363,9 +422,9 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           </div>
         </Panel>
 
-        <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">{invoiceActivity.length}</span>} className="print:hidden">
-          <div className="max-h-[360px] overflow-y-auto px-3 py-3">
-            <ol className="space-y-0">
+          <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">{invoiceActivity.length}</span>} className="print:hidden">
+          <div className="max-h-[480px] overflow-y-auto px-4 py-4">
+            <ol className="space-y-1">
               {[...invoiceActivity].reverse().map((event, index, events) => {
                 const visibleChanges = (event.changes || []).filter((change) => {
                   if (event.type === "created") return change.action === "added";
@@ -387,13 +446,13 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
                 const eventDate = event.at && !Number.isNaN(new Date(event.at).getTime())
                   ? new Date(event.at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
                   : t("common.notProvided");
-                return <li key={event._id || `${event.type}-${index}`} className="relative flex gap-2.5 pb-3 last:pb-0">
+                return <li key={event._id || `${event.type}-${index}`} className="relative flex gap-3 pb-3 last:pb-0">
                   {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-slate-200 dark:bg-slate-700" />}
-                  <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ring-2 ring-[var(--bg-card)] ${created ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : returned ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"}`}><Icon size={11} /></span>
-                  <div className="min-w-0 flex-1 border-b border-[var(--border-color)] pb-2.5 last:border-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-2"><p className="min-w-0 text-[11px] font-bold leading-4 text-[var(--text-primary)]">{title}</p><time className="shrink-0 text-[9px] leading-4 text-[var(--text-muted)]">{eventDate}</time></div>
-                    <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">{t("admin.invoiceDetail.activity.by", { name: event.actor_name || t("admin.pos.ui.unknownStaff") })}</p>
-                    {visibleChanges.length > 0 && <ul className="mt-1.5 space-y-1">{visibleChanges.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-[var(--text-secondary)]"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
+                  <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2 ring-[var(--bg-card)] ${created ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : returned ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"}`}><Icon size={13} /></span>
+                  <div className="min-w-0 flex-1 border-b border-[var(--border-color)] pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><p dir="auto" className="min-w-0 text-[13px] font-semibold leading-5 text-[var(--text-primary)]">{title}</p><time dir="auto" className="text-[11px] leading-4 text-[var(--text-muted)]"><bdi>{eventDate}</bdi></time></div>
+                    <p dir="auto" className="mt-0.5 text-[12px] text-[var(--text-muted)]">{t("admin.invoiceDetail.activity.by", { name: bidiIsolate(event.actor_name || t("admin.pos.ui.unknownStaff")) })}</p>
+                    {visibleChanges.length > 0 && <ul className="mt-2 space-y-1.5">{visibleChanges.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-2 text-[12px] leading-5 text-[var(--text-secondary)]"><span className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span dir="auto" className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
                   </div>
                 </li>;
               })}

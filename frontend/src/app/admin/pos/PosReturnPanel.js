@@ -78,6 +78,8 @@ function SalePicker({ sales, value, onChange }) {
 
 export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setReturnSaleId, returnQuantities, setReturnQuantities, returnNote, setReturnNote, returnMutation, historySales, historyLoading, historyError }) {
   const { t, locale } = useTranslation();
+  const [reasonError, setReasonError] = useState(false);
+  const reasonInputRef = useRef(null);
   const previousRefund = (selectedSale?.returns || []).reduce((sum, entry) => sum + (Number(entry.refund_total) || 0), 0);
   const priorQuantity = (selectedSale?.returns || []).flatMap((entry) => entry.items || []).reduce((result, item) => {
     const id = String(item.variant_id);
@@ -94,7 +96,6 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
   const refundTotal = chosenItems.reduce((sum, row) => sum + row.refund, 0);
   const returnedCount = Object.values(priorQuantity).reduce((sum, quantity) => sum + quantity, 0);
   const totalCount = (selectedSale?.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-  const canSubmit = Boolean(selectedSale && selectedCount > 0 && refundTotal > 0 && returnNote.trim() && !returnMutation.isPending);
 
   return (
     <div className="space-y-4 pb-1">
@@ -103,7 +104,7 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
       </header>
 
       <div className="space-y-4">
-        <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); }}/>
+        <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); setReasonError(false); }}/>
         {!selectedSale ? <PosReturnHistoryPanel sales={historySales || []} isLoading={historyLoading} isError={historyError} /> : <div className="space-y-4 bg-white dark:bg-[var(--bg-card)]">
           <div className="grid gap-x-8 gap-y-4 border-b border-slate-200 px-4 pb-4 pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
             ["receipt", selectedSale.sale_number, ClipboardList],
@@ -122,10 +123,10 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
           </section>
 
 
-          <div className="grid items-start gap-3 border-t border-slate-200 px-4 pt-4 md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.9fr)_minmax(138px,auto)]">
-            <label className="min-w-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">{t("admin.pos.ui.reason2")} <span className="text-rose-500">*</span><input required maxLength={300} value={returnNote} onChange={(event) => setReturnNote(event.target.value)} placeholder={t("admin.pos.ui.eGDamagedItemWrongSize")} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"/><span className="mt-1 block text-[9px] font-normal normal-case tracking-normal text-slate-400">{returnNote.trim().length}{t("admin.pos.ui.300Characters")}</span></label>
+          <div className={`grid items-start gap-x-4 gap-y-3 border-t border-slate-200 px-4 pt-4 transition-[grid-template-columns] duration-200 ease-out ${reasonError ? "md:grid-cols-[minmax(0,1fr)_minmax(160px,220px)]" : "md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.9fr)_minmax(138px,auto)]"}`}>
+            <label className={`min-w-0 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-all duration-200 ${reasonError ? "md:col-span-2" : ""}`}>{t("admin.pos.ui.reason2")} <span className="text-rose-500">*</span><input ref={reasonInputRef} required maxLength={300} aria-invalid={reasonError} aria-describedby={reasonError ? "pos-return-reason-error" : undefined} value={returnNote} onChange={(event) => { setReturnNote(event.target.value); if (event.target.value.trim()) setReasonError(false); }} placeholder={t("admin.pos.ui.eGDamagedItemWrongSize")} className={`mt-1.5 h-11 w-full rounded-xl border bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none placeholder:text-slate-400 focus:ring-4 ${reasonError ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:border-blue-400 focus:ring-blue-50"}`}/>{reasonError ? <span id="pos-return-reason-error" role="alert" className="mt-1 block text-[10px] font-medium normal-case tracking-normal text-rose-600">{t("admin.pos.validation.returnReasonRequired")}</span> : <span className="mt-1 block text-[9px] font-normal normal-case tracking-normal text-slate-400">{returnNote.trim().length}{t("admin.pos.ui.300Characters")}</span>}</label>
             <div className="min-w-0"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{t("admin.pos.ui.refundSummary")}</span><div className="flex h-11 items-center justify-between gap-2 border-b border-slate-200 px-1"><span className="min-w-0 truncate text-[10px] font-semibold text-emerald-800">{t("admin.pos.ui.selectedItemCount", { count: selectedCount })}<span className="mx-1 text-emerald-300">·</span>{t("admin.pos.ui.prev")} {money(previousRefund, locale)}</span><strong className="shrink-0 text-base font-black tabular-nums tracking-tight text-emerald-800">{money(refundTotal, locale)}</strong></div></div>
-            <div><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-transparent" aria-hidden="true">{t("admin.pos.ui.action")}</span><button type="button" disabled={!canSubmit} onClick={() => returnMutation.mutate()} className="flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-3 text-xs font-extrabold text-white shadow-md shadow-blue-600/15 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-45">{returnMutation.isPending ? <><RotateCcw size={14} className="animate-spin"/>{t("admin.pos.ui.recording")}</> : <><RotateCcw size={14}/>{t("admin.pos.ui.confirmReturn")}</>}</button></div>
+            <div><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-transparent" aria-hidden="true">{t("admin.pos.ui.action")}</span><button type="button" disabled={!selectedSale || selectedCount === 0 || refundTotal <= 0 || returnMutation.isPending} onClick={() => { if (!returnNote.trim()) { setReasonError(true); reasonInputRef.current?.focus(); return; } setReasonError(false); returnMutation.mutate(); }} className="flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-3 text-xs font-extrabold text-white shadow-md shadow-blue-600/15 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-45">{returnMutation.isPending ? <><RotateCcw size={14} className="animate-spin"/>{t("admin.pos.ui.recording")}</> : <><RotateCcw size={14}/>{t("admin.pos.ui.confirmReturn")}</>}</button></div>
           </div>
         </div>}
       </div>
