@@ -9,7 +9,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
   Activity, ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2, ChevronRight,
-  Clock3, ContactRound, Mail, MapPin, Phone, Plus, RotateCcw, UserRound, Users,
+  Clock3, ContactRound, Mail, MapPin, Phone, Plus, RotateCcw, Tag, UserRound, Users,
 } from "lucide-react";
 
 const activityTypes = ["Call", "WhatsApp", "Email", "Meeting", "Other"];
