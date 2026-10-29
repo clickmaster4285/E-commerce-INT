@@ -549,15 +549,15 @@ export default function ManageStockPage() {
                 {/* ✅ DESKTOP TABLE (Hidden on mobile) */}
                 <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[13px] min-w-[860px]">
+                    <table className="w-full text-start text-[13px] min-w-[860px]">
                       <thead style={tableHeaderStyle}>
                         <tr>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.product")}</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.sku")}</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">{t("admin.manageStock.page.variant")}</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.currentStockLabel")}</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.status")}</th>
-                          <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.action")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.product")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.sku")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">{t("admin.manageStock.page.variant")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.currentStockLabel")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.status")}</th>
+                          <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.action")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -588,7 +588,7 @@ export default function ManageStockPage() {
                               <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(item.title, item.translations?.title, locale)}</span></td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{formatNumber(item.quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                               <td className="px-4 py-2.5"><StatusPill status={status} /></td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-right">
+                              <td className="px-4 py-2.5 whitespace-nowrap text-end">
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button onClick={() => openDetails(item)} disabled={adjustMutation.isPending} className="h-8 px-2.5 rounded-md text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }} title={t("admin.manageStock.page.viewDetails")}>
                                     <EyeIcon className="w-3.5 h-3.5" /> {t("admin.manageStock.page.view")}

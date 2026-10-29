@@ -18,6 +18,16 @@ const auditValue = (value) => String(value ?? "")
   .replace(/&gt;/gi, ">")
   .replace(/\s+/g, " ")
   .trim();
+const isEmptyOrZeroActivityValue = (value) => {
+  const text = String(value ?? "").trim();
+  if (!text || text === "—") return true;
+  const numeric = text.replace(/[^\d.-]/g, "");
+  return numeric !== "" && Number(numeric) === 0;
+};
+const isMeaningfulInvoiceActivityChange = (change) => {
+  if (!["Discount", "Tax", "Total discount", "Total tax"].includes(change.field)) return true;
+  return !(isEmptyOrZeroActivityValue(change.before) && isEmptyOrZeroActivityValue(change.after));
+};
 const invoiceActivity = (req, type, changes = []) => ({
   type,
   at: new Date(),
@@ -59,8 +69,10 @@ const compareInvoice = (current, next) => {
     if (!previous) {
       changes.push({ action: "added", field: "item", ...product, from_quantity: 0, to_quantity: Number(item.quantity) || 0 });
       changes.push({ action: "item_field", field: "Unit price", ...product, before: "—", after: String(Number(item.unit_price) || 0) });
-      changes.push({ action: "item_field", field: "Discount", ...product, before: "—", after: `${Number(item.discount_rate) || 0}% · ${Number(item.discount) || 0}` });
-      changes.push({ action: "item_field", field: "Tax", ...product, before: "—", after: `${Number(item.tax_rate) || 0}% · ${Number(item.tax) || 0}` });
+      const discountChange = { action: "item_field", field: "Discount", ...product, before: "—", after: `${Number(item.discount_rate) || 0}% · ${Number(item.discount) || 0}` };
+      const taxChange = { action: "item_field", field: "Tax", ...product, before: "—", after: `${Number(item.tax_rate) || 0}% · ${Number(item.tax) || 0}` };
+      if (isMeaningfulInvoiceActivityChange(discountChange)) changes.push(discountChange);
+      if (isMeaningfulInvoiceActivityChange(taxChange)) changes.push(taxChange);
       continue;
     }
     matchedPreviousIndexes.add(match.index);
@@ -237,22 +249,9 @@ exports.createInvoice = async (req, res) => {
           amount_paid: 0,
           remaining_balance: total,
           createdby: req.user?._id || null,
-          activity: [invoiceActivity(req, "created", [
-            ...data.items.flatMap((item) => {
-              const product = { product_name: item.name, sku: item.sku || "" };
-              return [
-                { action: "added", field: "item", ...product, from_quantity: 0, to_quantity: item.quantity },
-                { action: "item_field", field: "Unit price", ...product, before: "—", after: String(Number(item.unit_price) || 0) },
-                { action: "item_field", field: "Discount", ...product, before: "—", after: `${Number(item.discount_rate) || 0}% · ${Number(item.discount) || 0}` },
-                { action: "item_field", field: "Tax", ...product, before: "—", after: `${Number(item.tax_rate) || 0}% · ${Number(item.tax) || 0}` },
-              ];
-            }),
-            { action: "field", field: "Customer", before: "—", after: data.customer_name },
-            { action: "field", field: "Invoice total", before: "—", after: data.total },
-            { action: "field", field: "Total discount", before: "—", after: data.discount },
-            { action: "field", field: "Total tax", before: "—", after: data.tax },
-            { action: "field", field: "Due date", before: "—", after: new Date(data.due_date).toISOString().slice(0, 10) },
-          ])],
+          activity: [invoiceActivity(req, "created", data.items.map((item) => ({
+            action: "added", field: "item", product_name: item.name, sku: item.sku || "", from_quantity: 0, to_quantity: item.quantity,
+          })))],
         });
         break;
       } catch (error) { if (error.code !== 11000 || attempt === 4) throw error; }

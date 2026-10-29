@@ -367,6 +367,17 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           <div className="max-h-[360px] overflow-y-auto px-3 py-3">
             <ol className="space-y-0">
               {[...invoiceActivity].reverse().map((event, index, events) => {
+                const visibleChanges = (event.changes || []).filter((change) => {
+                  if (event.type === "created") return change.action === "added";
+                  if (!["Discount", "Tax", "Total discount", "Total tax"].includes(change.field)) return true;
+                  const isEmptyOrZero = (value) => {
+                    const text = String(value ?? "").trim();
+                    if (!text || text === "—") return true;
+                    const numeric = text.replace(/[^\d.-]/g, "");
+                    return numeric !== "" && Number(numeric) === 0;
+                  };
+                  return !(isEmptyOrZero(change.before) && isEmptyOrZero(change.after));
+                });
                 const created = event.type === "created";
                 const sent = event.type === "sent";
                 const payment = event.type === "payment";
@@ -382,7 +393,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
                   <div className="min-w-0 flex-1 border-b border-[var(--border-color)] pb-2.5 last:border-0 last:pb-0">
                     <div className="flex items-start justify-between gap-2"><p className="min-w-0 text-[11px] font-bold leading-4 text-[var(--text-primary)]">{title}</p><time className="shrink-0 text-[9px] leading-4 text-[var(--text-muted)]">{eventDate}</time></div>
                     <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">{t("admin.invoiceDetail.activity.by", { name: event.actor_name || t("admin.pos.ui.unknownStaff") })}</p>
-                    {event.changes?.length > 0 && <ul className="mt-1.5 space-y-1">{event.changes.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-[var(--text-secondary)]"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
+                    {visibleChanges.length > 0 && <ul className="mt-1.5 space-y-1">{visibleChanges.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-1.5 text-[10px] leading-4 text-[var(--text-secondary)]"><span className={`mt-1.5 h-1 w-1 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
                   </div>
                 </li>;
               })}

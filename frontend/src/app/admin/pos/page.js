@@ -44,11 +44,10 @@ import { storeApi } from "@/apis/admin/storeApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
 import { posApi } from "@/apis/admin/posApi";
 import PosReturnPanel from "./PosReturnPanel";
-import PosReturnHistoryPanel from "./PosReturnHistoryPanel";
 import { getProductImage } from "@/utils/homeCatalog";
 
 const PAGE_SIZE = 30;
-const HISTORY_PAGE_SIZE = 10;
+const HISTORY_PAGE_SIZE = 20;
 const money = (value, locale) => `Rs. ${(Number(value) || 0).toLocaleString(locale, { maximumFractionDigits: 2 })}`;
 const itemGrossTotal = (item) => (Number(item.unit_price) || 0) * (Number(item.quantity) || 0);
 const itemDiscountTotal = (item) => {
@@ -230,6 +229,7 @@ export default function PosPage() {
   const { productNameOf } = useLocalized();
   const queryClient = useQueryClient();
   const searchInputRef = useRef(null);
+  const saleFormRef = useRef(null);
   const customerBoxRef = useRef(null);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
@@ -246,6 +246,7 @@ export default function PosPage() {
   const [paymentReference, setPaymentReference] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
   const [notes, setNotes] = useState("");
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [cart, setCart] = useState([]);
   const [quantityDrafts, setQuantityDrafts] = useState({});
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
@@ -291,7 +292,7 @@ export default function PosPage() {
       }
       return allSales;
     },
-    enabled: activeView === "history" || activeView === "returns" || activeView === "return-history",
+    enabled: activeView === "history" || activeView === "returns",
   });
   const salesOverviewQuery = useQuery({
     queryKey: ["pos-sales-overview"],
@@ -720,29 +721,30 @@ export default function PosPage() {
   const matchingCustomers = Array.isArray(customerResults.data) ? customerResults.data : [];
 
   return (
-    <div dir={dir} className="admin-pos-workspace min-h-[calc(100vh-6rem)] w-full overflow-visible bg-[var(--bg-secondary)] px-0 pt-0 pb-2 text-[var(--text-primary)]">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 shadow-sm">
-        <nav className="flex flex-wrap gap-2" aria-label={t("admin.pos.ui.posSections")}>
-          {[["pos", ShoppingCart, t("admin.pos.ui.pos")], ["history", History, t("admin.pos.ui.saleHistoryTab")], ["returns", RotateCcw, t("admin.pos.ui.returnTab")], ["return-history", ClipboardList, t("admin.pos.ui.returnHistoryTab")], ["hold", Bookmark, `${t("admin.pos.ui.holdTab")}${heldCarts.length ? ` (${heldCarts.length})` : ""}`]].map(([key, Icon, label]) => (
+    <div dir={dir} className="admin-pos-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-[var(--bg-secondary)] px-0 py-0 text-[var(--text-primary)]">
+      <header className="flex min-h-12 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-color)] px-1">
+        <nav className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto whitespace-nowrap" aria-label={t("admin.pos.ui.posSections")}>
+          {[["pos", ShoppingCart, t("admin.pos.ui.pos")], ["history", History, t("admin.pos.ui.saleHistoryTab")], ["returns", RotateCcw, t("admin.pos.ui.returnTab")], ["hold", Bookmark, `${t("admin.pos.ui.holdTab")}${heldCarts.length ? ` (${heldCarts.length})` : ""}`]].map(([key, Icon, label]) => (
             <button key={key} type="button" onClick={() => {
     if (editingSaleId && key !== "pos") {
                 toast.error(t("admin.pos.toast.saveOrCancelEditBeforeLeaving"));
                 return;
               }
               setActiveView(key);
-            }} className={`inline-flex h-8 items-center gap-2 rounded-xl px-3 text-xs font-bold transition ${activeView === key ? "bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-blue-300 hover:text-blue-500"}`}>
-              <Icon size={14} />{label}
+            }} className={`inline-flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${activeView === key ? "border-blue-600 text-blue-600" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>
+              <Icon size={14} />{key === "hold" ? <>{t("admin.pos.ui.holdTab")}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeView === key ? "bg-blue-100 text-blue-700" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"}`}>{heldCarts.length}</span></> : label}
             </button>
           ))}
         </nav>
-        <div className="grid min-w-[260px] flex-1 grid-cols-3 gap-2 sm:max-w-[420px]">
-          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 shadow-sm"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--success-soft)] text-[var(--success-text)]"><CreditCard size={14}/></span><span className="min-w-0"><span className="block truncate text-[9px] font-medium text-[var(--text-muted)]">{t("admin.pos.ui.todaySSales")}</span><b className="block truncate text-xs text-[var(--text-primary)]">{salesOverviewQuery.isLoading ? "…" : formatMoney(salesOverviewQuery.data?.todayRevenue)}</b></span></div>
-          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 shadow-sm"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><History size={14}/></span><span className="min-w-0"><span className="block truncate text-[9px] font-medium text-[var(--text-muted)]">{t("admin.pos.ui.transactions")}</span><b className="block text-xs text-[var(--text-primary)]">{salesOverviewQuery.isLoading ? "…" : (salesOverviewQuery.data?.totalTransactions || 0).toLocaleString(locale)}</b></span></div>
-          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 py-1.5 shadow-sm"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><ShoppingCart size={14}/></span><span className="min-w-0"><span className="block truncate text-[9px] font-medium text-[var(--text-muted)]">{t("admin.pos.ui.itemsInCart")}</span><b className="block text-xs text-[var(--accent)]">{itemCount}</b></span></div>
+        <div className="hidden shrink-0 items-center gap-2 text-xs text-[var(--text-muted)] sm:flex">
+          <span className="font-medium text-[var(--text-secondary)]">{t("admin.pos.ui.today")}</span>
+          <span className="font-semibold text-[var(--text-primary)]">{salesOverviewQuery.isLoading ? "…" : formatMoney(salesOverviewQuery.data?.todayRevenue)}</span>
+          <span aria-hidden="true">·</span>
+          <span>{salesOverviewQuery.isLoading ? "…" : (salesOverviewQuery.data?.todayCount || 0).toLocaleString(locale)} {salesOverviewQuery.data?.todayCount === 1 ? t("admin.pos.ui.sale") : t("admin.pos.ui.sales")}</span>
         </div>
-      </div>
-      <div dir="ltr" className="grid items-start gap-y-3 gap-x-0 lg:grid-cols-[minmax(0,1fr)_min(31vw,420px)]">
-        <section dir={dir} className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-2 shadow-md transition-shadow duration-200 hover:shadow-lg sm:p-2.5">
+      </header>
+      <div dir="ltr" className="grid min-h-0 flex-1 grid-cols-1 items-stretch overflow-hidden lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section dir={dir} className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent py-2 pe-0 lg:overscroll-contain lg:pe-3">
           {activeView === "pos" ? <>
           <div className="relative z-20 mb-3 flex min-w-0 flex-wrap items-center gap-1.5">
             <div className="relative min-w-28 flex-1">
@@ -756,18 +758,20 @@ export default function PosPage() {
                 }}
                 placeholder={t("admin.pos.ui.searchProductsSKUOrName")}
                 aria-label={t("admin.pos.ui.searchProductsByNameOrSKU")}
-                className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-xs text-[var(--text-primary)] outline-none transition-all duration-200 placeholder:text-[var(--text-muted)] hover:border-[var(--accent)]/50 hover:shadow-sm focus:border-[var(--accent)] focus:shadow-md focus:ring-4 focus:ring-[var(--accent-soft)] sm:text-sm"
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  const scanned = search.trim().toLowerCase();
+                  const match = variantCards.find(({ variant }) => String(variant.sku || "").trim().toLowerCase() === scanned);
+                  if (!match) return;
+                  event.preventDefault();
+                  addToCart(match.product, match.variant);
+                  setSearch("");
+                  setCurrentPage(1);
+                }}
+                className="h-10 w-full rounded-lg border-0 bg-[#F3F4F6] ps-9 pe-11 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-900 sm:text-sm"
               />
+              <button type="button" onClick={() => searchInputRef.current?.focus()} className="absolute end-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-card)] hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={t("admin.pos.ui.focusTheSearchFieldToScanABarcode")} title={t("admin.pos.ui.useABarcodeScannerToTypeIntoTheSearchField")}><Barcode size={16} /></button>
             </div>
-            <button
-              type="button"
-              onClick={() => searchInputRef.current?.focus()}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-xs font-bold text-white shadow-[0_4px_12px_rgba(37,99,235,0.25)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
-              aria-label={t("admin.pos.ui.focusTheSearchFieldToScanABarcode")}
-              title={t("admin.pos.ui.useABarcodeScannerToTypeIntoTheSearchField")}
-            >
-              <Barcode size={16} />
-            </button>
             <PosDropdown
               value={selectedSort}
               options={[
@@ -780,13 +784,13 @@ export default function PosPage() {
               ariaLabel={t("admin.pos.ui.sortProducts")}
               prefix={`${t("admin.pos.ui.sortPrefix")}: `}
               className="w-28 shrink-0 sm:w-32"
-              buttonClassName="h-10 justify-between px-2 text-[10px] font-semibold"
+              buttonClassName="h-9 justify-between rounded-lg border-0 bg-transparent px-2 text-[11px] font-medium shadow-none hover:bg-[var(--bg-tertiary)]"
               menuClassName="w-48"
             />
             <div className="relative flex shrink-0 items-center gap-1">
-              <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-10 items-center gap-1.5 rounded-xl border px-2 text-[10px] font-semibold ${selectedCategory || selectedBrand || selectedStock ? "border-blue-300 bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-blue-500"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
-              <button type="button" onClick={() => setViewMode("grid")} aria-label={t("admin.pos.ui.gridView")} aria-pressed={viewMode === "grid"} className={`hidden h-10 w-9 items-center justify-center rounded-xl border sm:flex ${viewMode === "grid" ? "border-blue-300 bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)]"}`}><LayoutGrid size={14}/></button>
-              <button type="button" onClick={() => setViewMode("list")} aria-label={t("admin.pos.ui.listView")} aria-pressed={viewMode === "list"} className={`hidden h-10 w-9 items-center justify-center rounded-xl border sm:flex ${viewMode === "list" ? "border-blue-300 bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)]"}`}><List size={14}/></button>
+              <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedCategory || selectedBrand || selectedStock ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
+              <button type="button" onClick={() => setViewMode("grid")} aria-label={t("admin.pos.ui.gridView")} aria-pressed={viewMode === "grid"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "grid" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><LayoutGrid size={14}/></button>
+              <button type="button" onClick={() => setViewMode("list")} aria-label={t("admin.pos.ui.listView")} aria-pressed={viewMode === "list"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "list" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><List size={14}/></button>
               {filtersOpen && <div className="absolute end-0 top-full z-30 mt-2 w-56 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-xl">
                 <div className="mb-2 text-xs font-bold text-[var(--text-primary)]">{t("admin.pos.ui.productFilters")}</div>
                 <PosDropdown fieldLabel={t("admin.pos.ui.category")} value={selectedCategory} options={[{ value: "", label: t("admin.pos.ui.allCategories") }, ...categoryOptions.map((category) => ({ value: category, label: category }))]} onChange={selectCategory} ariaLabel={t("admin.pos.ui.filterByCategory")} className="mb-2" buttonClassName="h-9 rounded-lg px-2" menuClassName="w-full" />
@@ -802,9 +806,9 @@ export default function PosPage() {
               {t("admin.pos.ui.couldNotLoadProductsPleaseTryAgain")}
             </div>
           ) : productsLoading && products.length === 0 ? (
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
               {Array.from({ length: 8 }, (_, index) => (
-                <div key={index} className="h-56 animate-pulse rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)]" />
+                <div key={index} className="animate-pulse rounded-lg bg-[var(--bg-card)] p-2"><div className="aspect-square rounded-md bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-3/4 rounded bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-1/2 rounded bg-[var(--bg-tertiary)]"/></div>
               ))}
             </div>
           ) : variantCards.length === 0 ? (
@@ -812,7 +816,7 @@ export default function PosPage() {
               {t("admin.pos.ui.noProductVariantsFoundForTheseSearchAndFilterSettings")}
             </div>
           ) : (
-            <div className={viewMode === "list" ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"}>
+            <div className={viewMode === "list" ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]"}>
               {variantCards.map(({ product, variant }) => {
                 const image = getProductImage({ ...product, variants: [variant] });
                 const variantName = variant.title && variant.title !== "Default" ? variant.title : variantLabel(variant, t);
@@ -824,19 +828,19 @@ export default function PosPage() {
                 ), 0);
 
                 return (
-                  <article key={variant._id} role={inStock ? "button" : undefined} tabIndex={inStock ? 0 : undefined} aria-disabled={!inStock} aria-label={t("admin.pos.ui.addProductToCart", { product: productNameOf(product), variant: variantName })} onClick={() => { if (inStock) addToCart(product, variant); }} onKeyDown={(event) => { if (inStock && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); addToCart(product, variant); } }} className={`${viewMode === "list" ? "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 p-2 sm:p-2.5" : "flex flex-col overflow-hidden"} group min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm transition-all duration-200 ${inStock ? "cursor-pointer hover:-translate-y-0.5 hover:border-[var(--accent)]/40 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" : "cursor-not-allowed opacity-75"}`}>
+                  <article key={variant._id} role={inStock ? "button" : undefined} tabIndex={inStock ? 0 : undefined} aria-disabled={!inStock} aria-label={t("admin.pos.ui.addProductToCart", { product: productNameOf(product), variant: variantName })} onClick={() => { if (inStock) addToCart(product, variant); }} onKeyDown={(event) => { if (inStock && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); addToCart(product, variant); } }} className={`${viewMode === "list" ? "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 p-2 sm:p-2.5" : "flex flex-col overflow-hidden"} group min-w-0 rounded-lg bg-[var(--bg-card)] shadow-none transition ${inStock ? "cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" : "cursor-not-allowed opacity-60"}`}>
                   <div className={`relative ${viewMode === "list" ? "aspect-square rounded-xl" : "aspect-square rounded-t-2xl rounded-b-none"} w-full shrink-0 overflow-hidden bg-slate-100`}>
                       <FallbackImage nextImage src={image} alt={`${productNameOf(product)} ${variantName}`} fill unoptimized sizes="(max-width: 640px) 44vw, (max-width: 1280px) 22vw, 16vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.025]" />
-                      <span className={`absolute start-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold shadow-sm backdrop-blur-sm ${inStock ? "bg-emerald-50/95 text-emerald-700" : "bg-rose-50/95 text-rose-700"}`}>
-                        {inStock && <Check size={11} strokeWidth={3} />}{inStock ? t("admin.pos.ui.stockCount", { count: stockQuantity }) : t("admin.pos.ui.outOfStock")}
+                      <span className={`absolute start-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${!inStock ? "bg-rose-50/95 text-rose-700" : stockQuantity < 10 ? "bg-amber-50/95 text-amber-700" : "bg-emerald-50/95 text-emerald-700"}`}>
+                        {inStock && <Check size={11} strokeWidth={3} />}{!inStock ? t("admin.pos.ui.outOfStock") : stockQuantity < 10 ? t("admin.pos.ui.lowStock") : t("admin.pos.ui.inStock")}
                       </span>
-                      {heldQuantity > 0 && <span className="absolute bottom-2 start-2 inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50/95 px-2 py-1 text-[9px] font-bold text-amber-800 shadow-sm backdrop-blur-sm">{t("admin.pos.ui.onHold")} {heldQuantity}</span>}
-                      <span aria-hidden="true" title={inStock ? t("admin.pos.ui.addToCart") : t("admin.pos.ui.outOfStock")} className={`absolute bottom-2 end-2 flex h-9 w-9 items-center justify-center rounded-full text-white shadow-lg transition ${inStock ? "bg-blue-600 shadow-blue-900/25 group-hover:scale-105 group-hover:bg-blue-700" : "bg-slate-400 shadow-none"}`}><Plus size={19} strokeWidth={2.5}/></span>
+                      {heldQuantity > 0 && <span className="absolute bottom-2 start-2 inline-flex items-center rounded-full bg-amber-50/95 px-2 py-1 text-[9px] font-bold text-amber-800">{t("admin.pos.ui.onHold")} {heldQuantity}</span>}
+                      {inStock && <span aria-hidden="true" title={t("admin.pos.ui.addToCart")} className="absolute bottom-2 end-2 flex h-7 w-7 scale-95 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 transition group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"><Plus size={15} strokeWidth={2.5}/></span>}
                     </div>
                     <div className={`min-w-0 ${viewMode === "list" ? "" : "p-2 pt-1.5 sm:p-2.5 sm:pt-1.5"}`}>
-                    <h3 className="line-clamp-1 min-h-5 text-xs font-bold leading-5 tracking-tight text-[var(--text-primary)]" title={productNameOf(product)}>{productNameOf(product)}</h3>
-                    <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[10px] text-[var(--text-muted)]"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
-                    <p className="mt-0.5 truncate text-sm font-bold tracking-tight text-[var(--text-primary)]">{formatMoney(variant.selling_price)}</p>
+                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-medium leading-[18px] text-[var(--text-primary)]" title={productNameOf(product)}>{productNameOf(product)}</h3>
+                    <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[11px] text-[var(--text-muted)]"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{formatMoney(variant.selling_price)}</p>
                     </div>
                   </article>
                 );
@@ -876,17 +880,17 @@ export default function PosPage() {
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"><History size={13}/>{historySales.length.toLocaleString(locale)} {t("admin.pos.ui.saleCount", { count: historySales.length })}</span>
             </div>
 
-            <div className="mb-4 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-2.5 sm:grid-cols-[minmax(220px,1fr)_155px_155px_auto]">
+            <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(220px,1fr)_155px_155px_auto]">
               <label className="relative min-w-0"><Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={historySearch} onChange={(event) => { setHistorySearch(event.target.value); setHistoryPage(1); }} placeholder={t("admin.pos.ui.searchSaleCustomerOrPhone")} aria-label={t("admin.pos.ui.searchPOSSales")} className="h-10 w-full rounded-xl border border-slate-200 bg-white ps-9 pe-3 text-sm shadow-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-50"/></label>
               <PosDropdown value={historyPayment} options={[{ value: "all", label: `${t("admin.pos.ui.paymentPrefix")}: ${t("common.all")}` }, { value: "cash", label: `${t("admin.pos.ui.paymentPrefix")}: ${t("admin.pos.payment.cash")}` }, { value: "card", label: `${t("admin.pos.ui.paymentPrefix")}: ${t("admin.pos.payment.card")}` }, { value: "bank_transfer", label: `${t("admin.pos.ui.paymentPrefix")}: ${t("admin.pos.payment.bankTransfer")}` }]} onChange={(value) => { setHistoryPayment(value); setHistoryPage(1); }} ariaLabel={t("admin.pos.ui.filterSalesByPaymentMethod")} buttonClassName="h-10 shadow-sm" />
               <PosDropdown value={historyRange} options={[{ value: "all", label: `${t("admin.pos.ui.timePrefix")}: ${t("common.all")}` }, { value: "today", label: `${t("admin.pos.ui.timePrefix")}: ${t("admin.pos.ui.today")}` }, { value: "7days", label: `${t("admin.pos.ui.timePrefix")}: ${t("admin.pos.ui.last7Days")}` }, { value: "30days", label: `${t("admin.pos.ui.timePrefix")}: ${t("admin.pos.ui.last30Days")}` }]} onChange={(value) => { setHistoryRange(value); setHistoryPage(1); }} ariaLabel={t("admin.pos.ui.filterSalesByDate")} buttonClassName="h-10 shadow-sm" />
               <button type="button" onClick={() => { setHistorySearch(""); setHistoryPayment("all"); setHistoryRange("all"); setHistoryPage(1); }} className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700">{t("admin.pos.ui.resetFilters")}</button>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-start">
-                <thead className="border-b border-slate-200 bg-slate-50/90 text-[10px] uppercase tracking-wide text-slate-500">
-                  <tr>{["sale", "customer", "date", "payment", "items", "total", ""].map((label) => <th key={label} className={`px-4 py-3 text-start font-bold ${label === "sale" ? "ps-12" : ""}`}>{label ? t(`admin.pos.ui.historyTable.${label}`) : ""}</th>)}</tr>
+                <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.08em] text-slate-500">
+                  <tr>{["sale", "customer", "date", "payment", "items", "total", ""].map((label) => <th key={label} className={`px-4 py-3.5 text-start font-semibold ${label === "sale" ? "ps-12" : ""}`}>{label ? t(`admin.pos.ui.historyTable.${label}`) : ""}</th>)}</tr>
                 </thead>
                 <tbody>
                   {historyQuery.isLoading ? <tr><td colSpan={7} className="px-4 py-14 text-center text-sm text-slate-500">{t("admin.pos.ui.loadingSalesHistory")}</td></tr>
@@ -901,57 +905,60 @@ export default function PosPage() {
                         const latestEdit = editHistory[editHistory.length - 1] || null;
                         const latestEditDate = latestEdit?.edited_at ? new Date(latestEdit.edited_at) : null;
                         const isExpanded = expandedSaleId === sale._id;
-                        return <Fragment key={sale._id}><tr className={`border-b border-slate-100 text-xs transition-colors ${isExpanded ? "bg-blue-50/40" : "hover:bg-blue-50/40"}`}>
-                          <td className="px-4 py-3"><div className="flex items-center gap-2"><button type="button" aria-label={t(`admin.pos.ui.${isExpanded ? "hide" : "show"}SaleDetails`, { sale: sale.sale_number || t("common.notProvided") })} aria-expanded={isExpanded} onClick={() => setExpandedSaleId(isExpanded ? null : sale._id)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${isExpanded ? "border-blue-200 bg-blue-100 text-blue-700" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-700"}`}><ChevronRight size={14} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}/></button><div className="min-w-0"><Link href={`/admin/pos/history/${sale._id}`} className="font-mono text-[11px] font-bold text-blue-700 hover:text-blue-800">{sale.sale_number || t("common.notProvided")}</Link>{latestEdit ? <><span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{t("admin.pos.ui.saleEdited")}</span><span className="mt-1 block max-w-48 truncate text-[10px] text-slate-500" title={t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}>{t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}</span></> : <span className="mt-1 block text-[10px] text-slate-400">{t("admin.pos.ui.posTransaction")}</span>}</div></div></td>
-                          <td className="px-4 py-3"><span className="block max-w-[180px] truncate font-semibold text-slate-800">{sale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}</span>{sale.customer_snapshot?.phone && <span className="mt-1 block text-[10px] text-slate-500">{sale.customer_snapshot.phone}</span>}</td>
-                          <td className="whitespace-nowrap px-4 py-3"><span className="block font-medium text-slate-700">{saleDate ? saleDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span className="mt-1 block text-[10px] text-slate-500">{saleDate ? saleDate.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" }) : ""}</span></td>
-                          <td className="px-4 py-3"><span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold capitalize text-slate-600">{payment}</span></td>
-                          <td className="px-4 py-3"><span className="inline-flex min-w-8 justify-center rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold tabular-nums text-slate-700">{quantity}</span></td>
-                          <td className="whitespace-nowrap px-4 py-3 text-start font-extrabold tabular-nums text-slate-900">{formatMoney(sale.total)}</td>
-                          <td className="px-4 py-3 text-start"><SaleActionsMenu sale={sale} direction={dir} onEdit={editHistorySale} onPrint={printHistoryReceipt} /></td>
+                        return <Fragment key={sale._id}><tr className={`border-b border-slate-200 text-xs transition-colors ${isExpanded ? "bg-blue-50/40" : "hover:bg-white/70"}`}>
+                          <td className="px-4 py-4"><div className="flex items-center gap-2"><button type="button" aria-label={t(`admin.pos.ui.${isExpanded ? "hide" : "show"}SaleDetails`, { sale: sale.sale_number || t("common.notProvided") })} aria-expanded={isExpanded} onClick={() => setExpandedSaleId(isExpanded ? null : sale._id)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${isExpanded ? "border-blue-200 bg-blue-100 text-blue-700" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-700"}`}><ChevronRight size={14} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}/></button><div className="min-w-0"><Link href={`/admin/pos/history/${sale._id}`} className="font-mono text-xs font-semibold text-blue-700 hover:text-blue-800">{sale.sale_number || t("common.notProvided")}</Link>{latestEdit ? <><span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{t("admin.pos.ui.saleEdited")}</span><span className="mt-1 block max-w-48 truncate text-[10px] text-slate-500" title={t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}>{t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}</span></> : <span className="mt-1 block text-[10px] text-slate-500">{t("admin.pos.ui.posTransaction")}</span>}</div></div></td>
+                          <td className="px-4 py-4"><span className="block max-w-[180px] truncate text-[13px] font-medium text-slate-800">{sale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}</span>{sale.customer_snapshot?.phone && <span className="mt-1 block text-[11px] text-slate-500">{sale.customer_snapshot.phone}</span>}</td>
+                          <td className="whitespace-nowrap px-4 py-4"><span className="block font-medium text-slate-700">{saleDate ? saleDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span className="mt-1 block text-[11px] text-slate-500">{saleDate ? saleDate.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" }) : ""}</span></td>
+                          <td className="px-4 py-4"><span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium capitalize text-slate-700">{payment}</span></td>
+                          <td className="px-4 py-4"><span className="inline-flex min-w-8 justify-center rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold tabular-nums text-slate-700">{quantity}</span></td>
+                          <td className="whitespace-nowrap px-4 py-4 text-start text-[13px] font-semibold tabular-nums text-slate-900">{formatMoney(sale.total)}</td>
+                          <td className="px-4 py-4 text-start"><SaleActionsMenu sale={sale} direction={dir} onEdit={editHistorySale} onPrint={printHistoryReceipt} /></td>
                         </tr>{isExpanded && <tr className="border-b border-slate-100 bg-slate-50/70"><td colSpan={7} className="px-4 py-3 sm:px-12"><div className="grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(220px,1fr)]"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("admin.pos.ui.itemsInSaleCount", { count: quantity })}</p><div className="space-y-1.5">{previewItems.map((item, index) => { const image = getProductImage({ variants: [{ images: item.product_image ? [{ img_url: item.product_image }] : [] }] }); return <div key={`${item.variant_id || item.sku || item.product_name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5"><div className="flex min-w-0 items-center gap-2.5"><span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">{image ? <FallbackImage nextImage src={image} alt={productNameOf(item) || t("admin.pos.ui.product")} fill unoptimized sizes="36px" className="object-cover"/> : <ShoppingCart size={14} className="absolute inset-0 m-auto text-slate-400"/>}</span><span className="min-w-0 truncate text-xs font-medium text-slate-700">{productNameOf(item) || t("admin.pos.ui.product")}{item.variant_title ? <span className="font-normal text-slate-400"> · {item.variant_title}</span> : null}</span></div><span className="shrink-0 text-[11px] text-slate-500">× {item.quantity}</span></div>; })}{!saleItems.length && <p className="text-xs text-slate-500">{t("admin.pos.ui.noItemDetailsRecorded")}</p>}{saleItems.length > 4 && <Link href={`/admin/pos/history/${sale._id}`} className="inline-flex items-center gap-1 pt-1 text-xs font-bold text-blue-700 hover:text-blue-800">{t("admin.pos.ui.showMoreItems", { count: saleItems.length - 4 })}<ArrowUpRight size={13}/></Link>}</div></div><div><p className="mb-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">{t("admin.pos.ui.paymentSummary")}</p><div className="space-y-1.5 rounded-xl border border-slate-200/80 bg-white p-3 text-xs"><div className="flex justify-between gap-3 text-slate-500"><span>{t("admin.pos.ui.subtotal")}</span><span className="font-medium text-slate-700">{formatMoney(sale.subtotal)}</span></div>{Number(sale.discount_amount) > 0 && <div className="flex justify-between gap-3 text-slate-500"><span>{t("admin.pos.ui.discount")}</span><span className="font-medium text-emerald-700">− {formatMoney(sale.discount_amount)}</span></div>}<div className="flex justify-between gap-3 text-slate-500"><span>{t("admin.pos.ui.tax")}</span><span className="font-medium text-slate-700">{formatMoney(sale.tax_amount)}</span></div><div className="flex justify-between gap-3 border-t border-slate-100 pt-2 font-bold text-slate-900"><span>{t("admin.pos.ui.total")}</span><span>{formatMoney(sale.total)}</span></div>{sale.payment?.reference && <div className="flex justify-between gap-3 pt-1 text-slate-500"><span>{t("admin.pos.ui.reference")}</span><span className="max-w-[180px] truncate text-slate-700">{sale.payment.reference}</span></div>}</div>{sale.customer_snapshot?.phone && <p className="mt-2 text-[11px] text-slate-500">{t("admin.pos.ui.customerPhone")} <span className="font-medium text-slate-700">{sale.customer_snapshot.phone}</span></p>}</div></div></td></tr>}</Fragment>;
                       }) : <tr><td colSpan={7} className="px-4 py-14 text-center"><span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400"><History size={18}/></span><span className="block text-sm font-semibold text-slate-700">{t(historySearch || historyPayment !== "all" || historyRange !== "all" ? "admin.pos.ui.noSalesMatchFilters" : "admin.pos.ui.noSalesYet")}</span><span className="mt-1 block text-xs text-slate-500">{t(historySearch || historyPayment !== "all" || historyRange !== "all" ? "admin.pos.ui.tryAdjustingSearchOrFilters" : "admin.pos.ui.completedSalesWillAppearHere")}</span></td></tr>}
                 </tbody>
               </table>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-slate-500">
+            {historyPageCount > 1 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-slate-500">
               <span>{t("admin.pos.ui.showing")} <strong className="font-semibold text-slate-700">{historySales.length ? (historyPage - 1) * HISTORY_PAGE_SIZE + 1 : 0}-{Math.min(historyPage * HISTORY_PAGE_SIZE, historySales.length)}</strong> {t("admin.pos.ui.of")} <strong className="font-semibold text-slate-700">{historySales.length}</strong> {t("admin.pos.ui.sales")}</span>
               <div className="flex items-center gap-1">
                 <button type="button" aria-label={t("admin.pos.ui.previousSalesPage")} disabled={historyPage <= 1} onClick={() => setHistoryPage((page) => page - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={15}/></button>
                 {Array.from({ length: historyPageCount }, (_, index) => index + 1).slice(Math.max(0, historyPage - 3), historyPage + 2).map((page) => <button key={page} type="button" aria-current={page === historyPage ? "page" : undefined} onClick={() => setHistoryPage(page)} className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition ${page === historyPage ? "bg-blue-600 text-white shadow-sm" : "border border-transparent text-slate-600 hover:border-slate-200 hover:bg-white"}`}>{page}</button>)}
                 <button type="button" aria-label={t("admin.pos.ui.nextSalesPage")} disabled={historyPage >= historyPageCount} onClick={() => setHistoryPage((page) => page + 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={15}/></button>
               </div>
-            </div>
-          </div> : activeView === "returns" ? <PosReturnPanel sales={(historyQuery.data || []).filter((sale) => sale.status === "completed")} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={setReturnSaleId} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
-          : activeView === "return-history" ? <PosReturnHistoryPanel sales={historyQuery.data || []} isLoading={historyQuery.isLoading} isError={historyQuery.isError} />
+            </div>}
+          </div> : activeView === "returns" ?
+            <PosReturnPanel sales={(historyQuery.data || []).filter((sale) => sale.status === "completed")} historySales={historyQuery.data || []} historyLoading={historyQuery.isLoading} historyError={historyQuery.isError} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={(id) => { setReturnSaleId(id); if (!id) setReturnQuantities({}); }} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
           : <div>
             <div className="mb-4"><h2 className="text-lg font-extrabold text-slate-900">{t("admin.pos.ui.heldSales")}</h2><p className="mt-1 text-xs text-slate-500">{t("admin.pos.ui.savedCartsStayAvailableInThisBrowserUntilResumedOrRemoved")}</p></div>
             {heldCarts.length ? <div className="space-y-2">{heldCarts.map((held) => <article key={held.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Bookmark size={17}/></span><div className="min-w-0"><div className="truncate text-sm font-bold text-slate-900">{held.customer?.name || t("admin.pos.ui.walkInCustomer")} · {held.cart.length} {t("admin.pos.ui.items")}</div>{held.editingSaleNumber && <div className="mt-0.5 text-[10px] font-semibold text-blue-700">{t("admin.pos.ui.editDraftFor")} {held.editingSaleNumber} {t("admin.pos.ui.originalSaleUnchanged")}</div>}<div className="mt-1 text-xs text-slate-500">{new Date(held.createdAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })} · {formatMoney(held.cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0))}</div></div></div><div className="flex gap-2"><button type="button" onClick={() => resumeHeldCart(held, new Date().toISOString())} className="h-9 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">{t("admin.pos.ui.resumeSale")}</button><button type="button" onClick={() => setHeldCarts((current) => current.filter((item) => item.id !== held.id))} aria-label={t("admin.pos.ui.deleteHeldSale")} className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50"><Trash2 size={15}/></button></div></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center text-sm text-slate-500">{t("admin.pos.ui.noHeldSalesYetUseHoldInTheCartToSaveASaleForLater")}</div>}
           </div>}
         </section>
 
-        <form dir={dir} onSubmit={submitSale} className={`${cartDrawerOpen ? "fixed inset-x-0 top-0 bottom-0 z-[60] flex min-h-0 flex-col overflow-y-auto overflow-x-hidden sm:start-auto sm:w-[420px] lg:sticky lg:inset-x-auto lg:top-3 lg:bottom-auto lg:z-40 lg:h-[calc(100vh-8rem)] lg:w-full lg:overflow-y-auto" : "hidden lg:sticky lg:top-3 lg:z-40 lg:flex lg:h-[calc(100vh-8rem)] lg:w-full lg:overflow-y-auto"} min-w-0 self-start rounded-none p-3 text-[var(--text-primary)] transition-shadow duration-200 hover:shadow-xl sm:p-5 lg:min-h-0 lg:flex-col lg:border-e-0 lg:border-y-0 lg:p-3`} style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-md)" }}>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="flex items-center gap-2.5 text-base font-extrabold tracking-tight text-[var(--text-primary)]">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}><ShoppingCart size={17} /></span>
-              {t("admin.pos.ui.cart")}{itemCount})
+        <form ref={saleFormRef} dir={dir} onSubmit={submitSale} className={`${cartDrawerOpen ? "fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden sm:start-auto sm:w-[420px] lg:static lg:h-full lg:w-full" : "hidden lg:flex lg:h-full lg:w-full"} min-h-0 min-w-0 self-stretch overflow-hidden border-s border-[var(--border-color)] bg-[var(--bg-card)] p-3 text-[var(--text-primary)] lg:flex-col lg:p-3`}>
+          <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+            <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
+              <ShoppingCart size={17} className="shrink-0 text-[var(--text-secondary)]" />
+              <span>{t("admin.pos.ui.currentOrder")}</span>
+              {itemCount > 0 && <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{itemCount}</span>}
             </h2>
             <div className="flex items-center gap-2">
-              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[10px] font-bold text-[var(--text-muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger-text)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
+              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
               <button type="button" onClick={() => setCartDrawerOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] lg:hidden" aria-label={t("admin.pos.ui.closeCart")}><X size={18} /></button>
             </div>
           </div>
 
           {editingSaleId && <div className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-[var(--accent-soft)] px-3 py-2 text-xs font-bold text-[var(--accent)]"><Pencil size={13}/><span className="truncate">{t("admin.pos.ui.editing")} {editingSaleNumber}</span></div>}
 
-          <div className="relative mb-2" ref={customerBoxRef}>
-            <div className="flex h-9 w-full items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 shadow-sm transition-all duration-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-              <Search size={14} className="shrink-0 text-blue-500" />
-              <input role="combobox" aria-controls="pos-customer-options" aria-autocomplete="list" value={customerOpen ? customerSearch : selectedCustomer?.name || ""} onFocus={() => setCustomerOpen(true)} onChange={(event) => { setCustomerSearch(event.target.value); setCustomerOpen(true); }} placeholder={t("admin.pos.ui.searchCustomerByNameOrPhone")} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} aria-expanded={customerOpen} aria-haspopup="listbox" className="h-full min-w-0 flex-1 bg-transparent text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:font-normal placeholder:text-[var(--text-muted)]" />
-              <button type="button" onClick={() => setCustomerOpen((open) => !open)} aria-label={t(customerOpen ? "admin.pos.ui.closeCustomerList" : "admin.pos.ui.openCustomerList")} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-card-alt)]"><ChevronDown size={15} className={`transition-transform ${customerOpen ? "rotate-180" : ""}`} /></button>
-            </div>
-            {customerOpen && <div className="absolute start-0 end-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
+          <div className="relative mb-2 flex shrink-0 items-center gap-2" ref={customerBoxRef}>
+            <button type="button" role="combobox" aria-controls="pos-customer-options" aria-expanded={customerOpen} aria-haspopup="listbox" onClick={() => { setCustomerOpen((open) => !open); setCustomerSearch(""); }} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg bg-[var(--bg-tertiary)] px-2.5 text-start text-xs text-[var(--text-primary)] transition hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              <Search size={14} className="shrink-0 text-[var(--text-muted)]" />
+              <span className="min-w-0 flex-1 truncate font-medium">{selectedCustomer?.name || t("admin.pos.ui.walkInCustomer")}</span>
+              <ChevronDown size={14} className={`shrink-0 text-[var(--text-muted)] transition-transform ${customerOpen ? "rotate-180" : ""}`} />
+            </button>
+            <button type="button" onClick={() => { setShowCustomerForm(true); setCustomerOpen(false); }} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-blue-600 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-blue-950/40"><Plus size={13}/>{t("admin.pos.ui.addShort")}</button>
+            {customerOpen && <div className="absolute start-0 end-0 top-full z-40 mt-2 overflow-hidden rounded-lg bg-[var(--bg-card)] shadow-lg ring-1 ring-black/10">
+              <label className="relative block border-b border-[var(--border-color)] p-2"><Search size={14} className="absolute start-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/><input autoFocus value={customerSearch} onChange={(event) => { setCustomerSearch(event.target.value); setCustomerOpen(true); }} placeholder={t("admin.pos.ui.searchCustomerByNameOrPhone")} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} className="h-9 w-full rounded-md bg-[var(--bg-tertiary)] ps-8 pe-2 text-xs text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-blue-500/20"/></label>
               <div id="pos-customer-options" role="listbox" aria-label={t("admin.pos.ui.customers")} className="max-h-56 overflow-y-auto px-2 py-1">
                 <button type="button" role="option" aria-selected={!selectedCustomer} onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); setCustomerOpen(false); }} className={`my-0.5 w-full rounded-xl border px-3 py-2.5 text-start text-xs transition-all duration-150 ${!selectedCustomer ? "border-[var(--accent)]/20 bg-[var(--accent-soft)]" : "border-transparent hover:border-[var(--border-color)] hover:bg-[var(--bg-card-alt)]"}`}>
                   <span className="block font-bold">{t("admin.pos.ui.walkInCustomer")}</span><span className="mt-0.5 block text-[10px] text-[var(--text-muted)]">{t("admin.pos.ui.continueWithoutAssigningACustomer")}</span>
@@ -963,23 +970,19 @@ export default function PosPage() {
                 {!customerResults.isFetching && !customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.noSavedCustomersYet")}</p>}
                 {!customerResults.isFetching && customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-5 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.noCustomersFound")}</p>}
               </div>
-              <div className="border-t border-[var(--border-color)] bg-[var(--bg-card-alt)] p-2">
-                <button type="button" onClick={() => { setShowCustomerForm(true); setCustomerOpen(false); }} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] text-sm font-bold text-[var(--accent)] transition hover:shadow-md"><Plus size={15} /> {t("admin.pos.ui.addNewCustomer")}</button>
-              </div>
             </div>}
           </div>
 
           <CustomerFormModal open={showCustomerForm} form={customerForm} setForm={setCustomerForm} isPending={customerMutation.isPending} onSave={() => customerMutation.mutate()} onClose={() => setShowCustomerForm(false)} />
 
           {cart.length === 0 ? (
-            <div className="flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-card-alt)] px-5 py-8 text-center xl:min-h-0 xl:flex-1">
-              <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]"><ShoppingCart size={22} /></span>
-              <p className="text-sm font-bold text-[var(--text-primary)]">{t("admin.pos.ui.yourCartIsEmpty")}</p>
-              <p className="mt-1 max-w-[220px] text-xs leading-5 text-[var(--text-muted)]">{t("admin.pos.ui.addAProductVariantAndItWillAppearHere")}</p>
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-8 text-center">
+              <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]"><ShoppingCart size={22} /></span>
+              <p className="text-sm font-medium text-[var(--text-primary)]">{t("admin.pos.ui.noItemsYetTapAProductToAdd")}</p>
             </div>
           ) : (
           <>
-          <div className="mb-3 min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--border-color)]">
+          <div className="mb-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
             {cart.map((item) => (
               <article key={item.variant_id} className="border-b border-[var(--border-color)] px-2.5 py-2 last:border-0 hover:bg-[var(--bg-row-hover)]">
                 <div className="flex min-w-0 items-center gap-2.5">
@@ -1043,7 +1046,7 @@ export default function PosPage() {
             ))}
           </div>
 
-          <section className="shrink-0 border-t border-[var(--border-color)] pt-1.5">
+          <section className="shrink-0 border-t border-[var(--border-color)] pt-2">
             <div className="space-y-0.5 text-xs">
             <div className="flex items-center justify-between px-1 py-1">
               <span className="text-[var(--text-secondary)]">{t("admin.pos.ui.subtotal")}</span>
@@ -1071,49 +1074,43 @@ export default function PosPage() {
                 </span>
               <span className="font-medium text-[var(--text-primary)]">{formatMoney(tax)}</span>
             </div>
-            <div className="flex items-center justify-between rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-sm font-extrabold text-[var(--accent)]">
+            <div className="flex items-center justify-between border-t border-[var(--border-color)] px-1 pt-2 text-lg font-bold text-[var(--text-primary)]">
               <span>{t("admin.pos.ui.total")}</span>
-              <span>{formatMoney(total)}</span>
+              <span className="tabular-nums">{formatMoney(total)}</span>
             </div>
             </div>
           </section>
 
-          <label className="mt-1.5 block shrink-0">
-            <span className="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.pos.ui.paymentMethod")}</span>
-            <PosDropdown value={paymentMethod} options={paymentMethods.map((method) => ({ ...method, label: t(`admin.pos.payment.${method.value}`) }))} onChange={(value) => {
-              setPaymentMethod(value);
-              if (!["card", "bank_transfer"].includes(value)) setPaymentReference("");
-            }} ariaLabel={t("admin.pos.ui.paymentMethod")} className="w-full" buttonClassName="h-8 rounded-xl px-3" placement="top" />
-          </label>
+          <fieldset className="mt-1 shrink-0">
+            <legend className="mb-1 text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.pos.ui.paymentMethod")}</legend>
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-[var(--bg-tertiary)] p-1">
+              {paymentMethods.map(({ value, Icon }) => <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => { setPaymentMethod(value); if (!["card", "bank_transfer"].includes(value)) setPaymentReference(""); }} className={`flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${paymentMethod === value ? "bg-[var(--bg-card)] text-blue-600 shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><Icon size={13}/><span className="truncate">{paymentLabel(value, t)}</span></button>)}
+            </div>
+          </fieldset>
 
           {["card", "bank_transfer"].includes(paymentMethod) && <label className="mt-2 block shrink-0">
             <span className="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.pos.ui.transactionID")} <span className="text-red-500">*</span></span>
             <input type="text" required value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder={t("admin.pos.ui.enterTransactionID")} autoComplete="off" className="h-9 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-blue-100" />
           </label>}
 
-          <label className="mt-1.5 block shrink-0 text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.pos.ui.notes")} <span className="font-medium normal-case text-[var(--text-muted)]">{t("admin.pos.ui.optional")}</span>
-          <textarea
-            value={notes}
-            onChange={(event) => setNotes(event.target.value)}
-            rows={1}
-            placeholder={t("admin.pos.ui.addAnyNotesForThisSale")}
-            className="mt-1.5 w-full resize-none rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-xs font-medium text-[var(--text-primary)] outline-none transition-all placeholder:text-[var(--text-muted)] hover:shadow-md focus:shadow-md focus:ring-2 focus:ring-blue-200"
-          />
-          </label>
+          <div className="mt-1 shrink-0">
+            <button type="button" aria-expanded={notesExpanded || Boolean(notes)} onClick={() => setNotesExpanded((open) => !open)} className="flex h-7 items-center gap-1 text-[11px] font-medium text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"><Plus size={13} className={`transition-transform ${notesExpanded || notes ? "rotate-45" : ""}`}/>{t("admin.pos.ui.addNote")}</button>
+            {(notesExpanded || Boolean(notes)) && <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} placeholder={t("admin.pos.ui.addAnyNotesForThisSale")} className="mt-1 w-full resize-none rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />}
+          </div>
 
-          <div className={`mt-1.5 grid gap-2 ${editingSaleId ? "grid-cols-2" : "grid-cols-[1fr_1fr_1.5fr]"}`}>
-          {editingSaleId ? <button type="button" onClick={cancelSaleEdit} className="flex h-9 items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)]">{t("admin.pos.ui.cancelEdit")}</button> : <>
-          <button type="button" onClick={holdCart} disabled={!cart.length} className="flex h-9 items-center justify-center gap-2 rounded-xl border border-blue-300 bg-white text-sm font-extrabold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-45"><Bookmark size={15}/>{t("admin.pos.ui.hold")}</button>
-          <button type="button" onClick={printReceipt} disabled={!cart.length} className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-extrabold text-slate-700 transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-45"><Printer size={14}/>{t("admin.pos.ui.print")}</button>
+          <div className={`mt-2 grid shrink-0 gap-2 ${editingSaleId ? "grid-cols-[auto_minmax(0,1fr)]" : "grid-cols-[auto_auto_minmax(0,1fr)]"}`}>
+          {editingSaleId ? <button type="button" onClick={cancelSaleEdit} className="flex h-12 items-center justify-center rounded-lg px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)]">{t("admin.pos.ui.cancelEdit")}</button> : <>
+          <button type="button" onClick={holdCart} disabled={!cart.length} className="flex h-12 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-45"><Bookmark size={14}/>{t("admin.pos.ui.hold")}</button>
+          <button type="button" onClick={printReceipt} disabled={!cart.length} aria-label={t("admin.pos.ui.print")} title={t("admin.pos.ui.print")} className="flex h-12 w-10 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-45"><Printer size={15}/></button>
           </>}
           <button
             type="submit"
             disabled={saleMutation.isPending || cart.length === 0}
-            className="flex h-9 w-full shrink-0 items-center justify-center gap-2 rounded-xl text-sm font-extrabold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-            style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", boxShadow: "0 4px 14px rgba(37,99,235,0.35)" }}
+            className="flex h-12 w-full min-w-0 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 text-xs font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            id="pos-complete-sale"
           >
             <CreditCard size={15} />
-            {saleMutation.isPending ? (editingSaleId ? t("admin.pos.ui.savingChanges") : t("admin.pos.ui.processingSale")) : (editingSaleId ? t("common.saveChanges") : t("admin.pos.ui.completeSale"))}
+            {saleMutation.isPending ? (editingSaleId ? t("admin.pos.ui.savingChanges") : t("admin.pos.ui.processingSale")) : (editingSaleId ? t("common.saveChanges") : <>{t("admin.pos.ui.completeSale")} · {formatMoney(total)}</>)}
           </button>
           </div>
           </>

@@ -5,8 +5,23 @@ const eventTitle = (event) => event.summary || titleByType[event.type] || String
 const actorOf = (event) => event.actor_name || event.employee_name || event.actor_id?.name || event.employee_id?.name || "Staff";
 const timeOf = (event) => event.at || event.created_at || event.edited_at || event.date;
 
+const changesFor = (event) => {
+  const changes = Array.isArray(event?.changes) ? event.changes : [];
+  if (event?.type === "created") return changes.filter((change) => change.action === "added");
+  return changes.filter((change) => {
+    if (["added", "removed", "returned"].includes(change.action)) return true;
+    const before = change.before ?? change.from;
+    const after = change.after ?? change.to;
+    if (before === undefined || after === undefined) return true;
+    return String(before).trim() !== String(after).trim();
+  });
+};
+
 export default function ActivityTimeline({ events = [], title = "Activity history", emptyText = "No activity has been recorded yet." }) {
-  const sorted = [...events].filter(Boolean).sort((a, b) => new Date(timeOf(b) || 0).getTime() - new Date(timeOf(a) || 0).getTime());
+  const sorted = [...events].filter(Boolean)
+    .map((event) => ({ ...event, visibleChanges: changesFor(event) }))
+    .filter((event) => !(event.type === "updated" && !event.visibleChanges.length))
+    .sort((a, b) => new Date(timeOf(b) || 0).getTime() - new Date(timeOf(a) || 0).getTime());
   return <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
     <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3">
       <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Activity size={15} /></span>
@@ -20,8 +35,8 @@ export default function ActivityTimeline({ events = [], title = "Activity histor
           <div className="min-w-0"><p className="text-xs font-semibold text-[var(--text-primary)]">{eventTitle(event)}</p><p className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--text-muted)]"><UserRound size={11} />{actorOf(event)}</p></div>
           <time className="inline-flex shrink-0 items-center gap-1 text-[10px] text-[var(--text-muted)]"><Clock3 size={11} />{timeOf(event) ? new Date(timeOf(event)).toLocaleString() : ""}</time>
         </div>
-        {!!event.changes?.length && <div className="mt-2 space-y-1 rounded-lg bg-[var(--bg-card-alt)] px-3 py-2">
-          {event.changes.map((change, changeIndex) => {
+        {!!event.visibleChanges?.length && <div className="mt-2 space-y-1 rounded-lg bg-[var(--bg-card-alt)] px-3 py-2">
+          {event.visibleChanges.map((change, changeIndex) => {
             const product = change.product_name ? `${change.product_name}${change.variant_title ? ` · ${change.variant_title}` : ""}` : "";
             const label = change.action === "added" ? `Added ${product}` : change.action === "removed" ? `Removed ${product}` : product ? `${product} — ${change.field || "Item"}` : change.field || "Details";
             const before = change.before ?? change.from ?? (change.from_quantity != null ? String(change.from_quantity) : "—");

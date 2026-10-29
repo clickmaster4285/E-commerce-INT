@@ -52,10 +52,10 @@ const ORDER_STATUS_CONFIG = {
 };
 
 const PAYMENT_STATUS_CONFIG = {
-  paid:     { labelKey: "admin.orders.payment.paid", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-  pending:  { labelKey: "admin.orders.payment.unpaid", bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
-  failed:   { labelKey: "admin.orders.payment.failed", bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-  refunded: { labelKey: "admin.orders.payment.refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
+  paid:     { labelKey: "admin.orders.status.paid", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+  pending:  { labelKey: "admin.orders.status.unpaid", bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+  failed:   { labelKey: "admin.orders.status.failed", bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+  refunded: { labelKey: "admin.orders.status.refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
 };
 
 // Full payment method name (the order payload carries a short code: cod/bank/card)

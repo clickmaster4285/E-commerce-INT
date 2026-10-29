@@ -95,7 +95,7 @@ exports.getFinanceOverview = async (req, res) => {
         event.type === "created" ? "Invoice created" : event.type === "payment" ? "Payment recorded" : event.type === "return" ? "Return processed" : event.type === "sent" ? "Invoice sent" : "Invoice updated",
         event.at,
         event.actor_name,
-        (event.changes || []).map((change) => `${change.field || change.action || "Updated"}${change.before !== undefined || change.after !== undefined ? `: ${change.before || "—"} → ${change.after || "—"}` : ""}`).filter(Boolean).join(" · "),
+        (event.changes || []).filter((change) => event.type !== "created" || change.action === "added").map((change) => `${change.field || change.action || "Updated"}${change.before !== undefined || change.after !== undefined ? `: ${change.before || "—"} → ${change.after || "—"}` : change.from_quantity !== undefined ? `: ${change.from_quantity} → ${change.to_quantity}` : ""}`).filter(Boolean).join(" · "),
       ));
 
       for (const payment of invoicePayments) {

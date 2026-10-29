@@ -144,7 +144,7 @@ export default function PosSaleDetailPage() {
       actor: sale.created_by_name || sale.cashier_name || cashier.name || t("admin.pos.ui.unknownStaff"),
       changes: items.map((item) => ({ action: "added", product_name: productNameOf(item) || item.product_name, variant_title: item.variant_title, sku: item.sku, to_quantity: item.quantity })),
     },
-    ...(sale.edit_history || []).map((entry, index) => ({ ...entry, id: `edit-${index}`, type: "edited", at: entry.edited_at, actor: entry.edited_by_name || t("admin.pos.ui.unknownStaff") })),
+    ...(sale.edit_history || []).filter((entry) => Array.isArray(entry.changes) && entry.changes.length > 0).map((entry, index) => ({ ...entry, id: `edit-${index}`, type: "edited", at: entry.edited_at, actor: entry.edited_by_name || t("admin.pos.ui.unknownStaff") })),
     ...(sale.returns || []).map((entry, index) => ({ ...entry, id: `return-${index}`, type: "returned", at: entry.returned_at, actor: entry.returned_by_name || t("admin.pos.ui.unknownStaff") })),
   ].sort((a, b) => new Date(a.at || 0).getTime() - new Date(b.at || 0).getTime());
   const activityChangeLabel = (change) => {
