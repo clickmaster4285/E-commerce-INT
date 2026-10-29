@@ -111,7 +111,15 @@ exports.listQuotes = async (req, res) => {
 
 exports.getQuote = async (req, res) => {
   try {
-    const quote = await Quote.findOne({ _id: req.params.id, is_deleted: false }).populate("createdby", "name email").lean();
+    const quote = await Quote.findOne({ _id: req.params.id, is_deleted: false })
+      .populate("createdby", "name email")
+      .populate("items.product_id", "name translations.name")
+      .populate({
+        path: "items.variant_id",
+        select: "title translations.title product_id",
+        populate: { path: "product_id", select: "name translations.name" },
+      })
+      .lean();
     if (!quote) return res.status(404).json({ success: false, message: "Quote not found" });
     res.json({ success: true, data: quote });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }

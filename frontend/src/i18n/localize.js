@@ -113,6 +113,18 @@ export function localizedProductNameOf(product, locale) {
   );
 }
 
+/** Keep measurement-based variant labels (for example, 30ml) unchanged. */
+export function localizedVariantTitleOf(variant, locale) {
+  const source = String(variant?.title ?? "").trim();
+  if (!source) return source;
+  if (/\b\d+(?:[.,]\d+)?\s*(?:ml|l|g|kg|mg|mm|cm|m|in|ft|oz|lb|gb|tb|mah|w|v)\b/i.test(source)) {
+    return source;
+  }
+  return localizedContentField(source, variant?.translations?.title, locale, {
+    rejectAnyLatin: Boolean(TARGET_SCRIPTS[locale]),
+  });
+}
+
 /**
  * Hook form — pages me zyada use hota hai.
  *

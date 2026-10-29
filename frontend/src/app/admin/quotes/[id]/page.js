@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { quoteApi } from "@/apis/admin/quoteApi";
+import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
 import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import QuoteTemplateDesigner from "@/components/admin/QuoteTemplateDesigner";
@@ -47,6 +48,7 @@ function PreviewModal({ onClose, children }) {
 }
 
 export default function QuoteDetailPage({ params }) {const { t, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -63,9 +65,34 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
     ...quote,
     items: (quote.items || []).map((item) => {
       const variant = variantsById.get(String(item.variant_id?._id || item.variant_id || ""));
-      return { ...item, variant_name: item.variant_name || variant?.title || "" };
+      return {
+        ...item,
+        name: productNameOf(item.product_id || item.variant_id?.product_id) || item.name,
+        variant_name:
+          localizedVariantTitleOf(item.variant_id, locale) ||
+          localizedVariantTitleOf(variant, locale) ||
+          item.variant_name || "",
+      };
     }),
-  } : null, [quote, variantsById]);
+  } : null, [quote, variantsById, productNameOf, locale]);
+  const localizedQuoteActivity = useMemo(() => {
+    if (!quote) return [];
+    const activityItems = quoteWithVariantNames?.items || [];
+    const itemsBySku = new Map(activityItems.filter((item) => item.sku).map((item) => [String(item.sku), item]));
+    return (quote.activity || []).map((event) => ({
+      ...event,
+      changes: (event.changes || []).map((change) => {
+        const item = itemsBySku.get(String(change.sku || "")) ||
+          activityItems.find((entry) => String(entry.name || "").trim().toLowerCase() === String(change.product_name || "").trim().toLowerCase());
+        if (!item) return change;
+        return {
+          ...change,
+          product_name: item.name || change.product_name,
+          variant_title: item.variant_name || change.variant_title,
+        };
+      }),
+    }));
+  }, [quote, quoteWithVariantNames]);
   const sentAt = quote?.sent_at || getStatusEventDate(quote, "Sent") || (quote?.status === "Sent" ? quote.updated_at : null);
   useEffect(() => {
     if (searchParams.get("print") !== "1" || !quote || isLoading || isStoreLoading || isVariantsLoading || printHandled.current) return undefined;
@@ -165,7 +192,7 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
           </Panel>
         </div>
         <Panel title={t("admin.documentDetail.panel.productsItems")} icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{quoteWithVariantNames.items.length} {t("admin.documentDetail.field.items")}</span>}>
-          <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-start text-xs"><thead className="bg-[var(--bg-card-alt)] text-[var(--text-secondary)]"><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading) => <th key={heading} dir="auto" className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{quoteWithVariantNames.items.map((item, index) => <tr key={item._id || index} className="border-t border-[var(--border-color)]"><td className="px-3 py-3 text-[var(--text-muted)]"><bdi dir="ltr">{index + 1}</bdi></td><td className="max-w-[200px] px-3 py-3"><bdi dir="auto" className="block truncate font-semibold">{item.name || "—"}</bdi><bdi dir="auto" className="block truncate text-[10px] text-[var(--text-muted)]">{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono text-[var(--text-muted)]"><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3"><bdi dir="ltr">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.discount, locale)}</bdi>{Number(item.discount_rate) > 0 && <span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.discount_rate)}%</bdi> {t("admin.documentDetail.field.discountRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.tax, locale)}</bdi>{Number(item.tax_rate) > 0 && <span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.tax_rate)}%</bdi> {t("admin.documentDetail.field.taxRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3 font-semibold"><bdi dir="ltr">{money(item.line_total ?? item.total, locale)}</bdi></td></tr>)}{!quoteWithVariantNames.items.length && <tr><td colSpan={8} className="p-8 text-center text-sm text-[var(--text-muted)]">{t("admin.documentDetail.empty.noQuoteItems")}</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[35%]"/><col className="w-[9%]"/><col className="w-[7%]"/><col className="w-[12%]"/><col className="w-[10%]"/><col className="w-[9%]"/><col className="w-[14%]"/></colgroup><thead className="bg-[var(--bg-card-alt)] text-[var(--text-secondary)]"><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading) => <th key={heading} dir="auto" className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{quoteWithVariantNames.items.map((item, index) => <tr key={item._id || index} className="border-t border-[var(--border-color)]"><td className="px-3 py-3 text-[var(--text-muted)]"><bdi dir="ltr">{index + 1}</bdi></td><td className="min-w-0 px-3 py-3 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5">{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4 text-[var(--text-muted)]">{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono text-[var(--text-muted)]"><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3"><bdi dir="ltr">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.discount, locale)}</bdi>{Number(item.discount_rate) > 0 && <span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.discount_rate)}%</bdi> {t("admin.documentDetail.field.discountRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.tax, locale)}</bdi>{Number(item.tax_rate) > 0 && <span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.tax_rate)}%</bdi> {t("admin.documentDetail.field.taxRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3 font-semibold"><bdi dir="ltr">{money(item.line_total ?? item.total, locale)}</bdi></td></tr>)}{!quoteWithVariantNames.items.length && <tr><td colSpan={8} className="p-8 text-center text-sm text-[var(--text-muted)]">{t("admin.documentDetail.empty.noQuoteItems")}</td></tr>}</tbody></table></div>
         </Panel>
         {(quote.notes || quote.terms) && <Panel title={t("admin.documentDetail.panel.notesTerms")} icon={FileText}><div className="space-y-3 p-4 text-xs leading-5 text-[var(--text-secondary)]">{quote.notes && <p className="whitespace-pre-wrap">{quote.notes}</p>}{quote.terms && (/<[a-z][\s\S]*>/i.test(quote.terms) ? <div className="quote-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(quote.terms) }} /> : <p className="whitespace-pre-wrap">{quote.terms}</p>)}</div></Panel>}
       </main>
@@ -175,7 +202,7 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
             <div className="space-y-2 border-t border-[var(--border-color)] pt-3 text-xs"><div className="flex justify-between gap-3"><span className="text-[var(--text-muted)]">{t("admin.invoiceDetail.field.created")}</span><span className="text-right">{quote.created_at ? new Date(quote.created_at).toLocaleString(locale || undefined, { dateStyle: "medium", timeStyle: "short" }) : "—"}</span></div>{quote.status === "Sent" && <div className="flex justify-between gap-3"><span className="text-[var(--text-muted)]">{t("admin.documentDetail.field.sent")}</span><span className="text-right">{sentAt ? new Date(sentAt).toLocaleString(locale || undefined, { dateStyle: "medium", timeStyle: "short" }) : t("admin.documentDetail.field.notAvailable")}</span></div>}</div>
           </div>
         </Panel>
-        <ActivityTimeline events={quote.activity?.length ? quote.activity : [{ type: "created", at: quote.created_at, actor_name: quote.createdby?.name || "", changes: [] }]} title={t("admin.documentDetail.panel.quoteActivity")} emptyText={t("admin.documentDetail.activity.empty")} />
+        <ActivityTimeline events={localizedQuoteActivity.length ? localizedQuoteActivity : [{ type: "created", at: quote.created_at, actor_name: quote.createdby?.name || "", changes: [] }]} title={t("admin.documentDetail.panel.quoteActivity")} emptyText={t("admin.documentDetail.activity.empty")} />
       </aside>
     </div>
     {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)}><div ref={quotePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly form={{ customer_name: quote.customer_name || "", customer_email: quote.customer_email || "", customer_phone: quote.customer_phone || "", customer_address: quote.customer_address || "", quote_date: quote.quote_date ? String(quote.quote_date).slice(0, 10) : "", expiry_date: quote.expiry_date ? String(quote.expiry_date).slice(0, 10) : "", terms: quote.terms || "", notes: quote.notes || "", items: quoteWithVariantNames.items.map((item, index) => ({ ...item, row_id: item._id || "saved-" + index })) }} totals={{ subtotal: quote.subtotal, discount: quote.discount, tax: quote.tax, total: quote.total }} quoteNumber={quote.quote_number} quoteStatus={quote.status} savedDesign={quote.pdf_design || {}} money={money} /></div></PreviewModal>}

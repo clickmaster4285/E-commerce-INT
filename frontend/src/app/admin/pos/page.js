@@ -253,7 +253,7 @@ export default function PosPage() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [rateEditorVariantId, setRateEditorVariantId] = useState(null);
   const [activeView, setActiveView] = useState("pos");
-  const [viewMode, setViewMode] = useState("list");
+  const [viewMode, setViewMode] = useState("grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [heldCarts, setHeldCarts] = useState([]);
   const heldCartsLoaded = useRef(false);

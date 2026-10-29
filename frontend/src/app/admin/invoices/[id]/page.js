@@ -11,6 +11,7 @@ import {
 "lucide-react";
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
+import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
 import { downloadInvoicePdf, printInvoicePdf } from "@/lib/invoicePdf";
 import { storeApi } from "@/apis/admin/storeApi";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
@@ -76,6 +77,7 @@ function PreviewModal({ onClose, children }) {
 }
 
 export default function InvoiceDetailsPage({ params }) {const { t, locale } = useTranslation();
+  const { productNameOf } = useLocalized();
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -207,11 +209,13 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   });
   const previewItems = items.map((item, index) => {
     const [productName, ...variantParts] = String(item.name || "").split(" / ");
+    const localizedProductName = productNameOf(item.product_id || item.variant_id?.product_id) || productName || item.name || "";
+    const localizedVariantName = localizedVariantTitleOf(item.variant_id, locale);
     return {
       ...item,
       row_id: item._id || `invoice-item-${index}`,
-      name: productName || item.name || "",
-      variant_name: item.variant_name || variantParts.join(" / "),
+      name: localizedProductName,
+      variant_name: localizedVariantName || item.variant_name || variantParts.join(" / "),
       returned_quantity: returnedQuantityByItem.get(String(item._id || "")) || 0,
     };
   });
@@ -256,7 +260,17 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     ...returns.map((record, index) => ({ _id: `legacy-return-${index}`, type: "return", at: record.date, actor_name: "", changes: (record.items_returned || []).map((item) => ({ action: "returned", field: "item", product_name: item.name, from_quantity: 0, to_quantity: item.qty, before: "—", after: `${item.qty} returned · ${money(item.return_value, locale)}` })) })),
   ].sort((a, b) => new Date(a.at || 0).getTime() - new Date(b.at || 0).getTime());
   const invoiceActivityLabel = (change) => {
-    const product = [change.product_name, change.variant_title || change.sku].filter(Boolean).join(" · ") || t("admin.pos.ui.product");
+    const normalizedActivityName = String(change.product_name || "").trim().toLowerCase();
+    const matchingItem = items.find((item) => item.sku && String(item.sku) === String(change.sku)) ||
+      items.find((item) => String(item.name || "").trim().toLowerCase() === normalizedActivityName);
+    const [, ...snapshotVariantParts] = String(change.product_name || "").split(" / ");
+    const productName = matchingItem
+      ? productNameOf(matchingItem.product_id) || change.product_name
+      : change.product_name;
+    const variantTitle = matchingItem
+      ? localizedVariantTitleOf(matchingItem.variant_id, locale) || change.variant_title || snapshotVariantParts.join(" / ")
+      : change.variant_title || snapshotVariantParts.join(" / ");
+    const product = [productName, variantTitle].filter(Boolean).join(" · ") || change.sku || t("admin.pos.ui.product");
     if (change.action === "added") return t("admin.invoiceDetail.activity.productAdded", { product: bidiIsolate(product), quantity: bidiIsolate(change.to_quantity || 0) });
     if (change.action === "removed") return t("admin.invoiceDetail.activity.productRemoved", { product: bidiIsolate(product), quantity: bidiIsolate(change.from_quantity || 0) });
     if (change.action === "quantity") return t("admin.invoiceDetail.activity.quantityChanged", { product: bidiIsolate(product), from: bidiIsolate(change.from_quantity || 0), to: bidiIsolate(change.to_quantity || 0) });
@@ -378,7 +392,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
         <div className="mt-4">
           <Panel title={t("admin.documentDetail.panel.productsItems")} icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{items.length} {t("admin.documentDetail.field.items")}</span>}>
-            <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-start text-xs"><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading) => <th key={heading} dir="auto" className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}><bdi dir="ltr">{index + 1}</bdi></td><td className="max-w-[200px] px-3 py-3"><bdi dir="auto" className="block truncate font-semibold" style={primary}>{item.name || "—"}</bdi><bdi dir="auto" className="block truncate text-[10px]" style={muted}>{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3"><bdi dir="ltr">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.discount, locale)}</bdi>{Number(item.discount_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.discount_rate)}%</bdi> {t("admin.documentDetail.field.discountRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.tax, locale)}</bdi>{Number(item.tax_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.tax_rate)}%</bdi> {t("admin.documentDetail.field.taxRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3 font-semibold"><bdi dir="ltr">{money(item.total ?? item.line_total, locale)}</bdi></td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-sm" style={muted}>{t("admin.documentDetail.empty.noInvoiceItems")}</td></tr>}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[35%]"/><col className="w-[9%]"/><col className="w-[7%]"/><col className="w-[12%]"/><col className="w-[10%]"/><col className="w-[9%]"/><col className="w-[14%]"/></colgroup><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading) => <th key={heading} dir="auto" className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}><bdi dir="ltr">{index + 1}</bdi></td><td className="min-w-0 px-3 py-3 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5" style={primary}>{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4" style={muted}>{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3"><bdi dir="ltr">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.discount, locale)}</bdi>{Number(item.discount_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.discount_rate)}%</bdi> {t("admin.documentDetail.field.discountRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.tax, locale)}</bdi>{Number(item.tax_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.tax_rate)}%</bdi> {t("admin.documentDetail.field.taxRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3 font-semibold"><bdi dir="ltr">{money(item.total ?? item.line_total, locale)}</bdi></td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-sm" style={muted}>{t("admin.documentDetail.empty.noInvoiceItems")}</td></tr>}</tbody></table></div>
           </Panel>
         </div>
         {invoice.terms && <div className="mt-4"><Panel title={t("admin.documentDetail.panel.termsConditions")} icon={FileText}><div className="p-4 text-xs leading-5" style={muted}>{/<[a-z][\s\S]*>/i.test(invoice.terms) ? <div className="invoice-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(invoice.terms) }} /> : <p className="whitespace-pre-wrap">{invoice.terms}</p>}</div></Panel></div>}
