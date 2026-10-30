@@ -114,6 +114,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   ]);
   const store = storeResult?.data || storeResult || {};
   const isQuote = options.documentType === "quote";
+  const isInvoice = !isQuote && Boolean(invoice.invoice_number);
   const isDesigned = isQuote || options.applyDesign === true;
   const quoteHeader = isQuote ? getQuoteHeaderData(invoice) : null;
   const design = isDesigned ? (options.design || {}) : {};
@@ -547,8 +548,8 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       sku: item.sku || "-",
       quantity: String(item.quantity ?? 0),
       unit: money(item.unit_price),
-      discount: `${money(item.discount)}${Number(item.discount_rate) ? ` (${Number(item.discount_rate)}%)` : ""}`,
-      tax: `${money(item.tax)}${Number(item.tax_rate) ? ` (${Number(item.tax_rate)}%)` : ""}`,
+      discount: `${money(item.discount)}\n(${Number(item.discount_rate) || 0}%)`,
+      tax: `${money(item.tax)}\n(${Number(item.tax_rate) || 0}%)`,
       total: money(item.total),
     })[column.key]);
     let offset = 0;
@@ -600,8 +601,29 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
   const summaryWidth = 82;
   const summaryX = margin + contentWidth - summaryWidth;
   const summaryRows = [["Subtotal", money(invoice.subtotal)]];
-  if (!isDesigned || design.showDiscount !== false) summaryRows.push(["Discount", `- ${money(invoice.discount)}`]);
-  if (!isDesigned || design.showTax !== false) summaryRows.push([`Tax${Number(invoice.tax_rate) ? ` (${Number(invoice.tax_rate)}%)` : ""}`, `+ ${money(invoice.tax)}`]);
+  if (isQuote) {
+    const itemDiscount = Math.round((invoice.items || []).reduce((sum, item) => sum + (Number(item.discount) || 0), 0) * 100) / 100;
+    const overallDiscount = Number(invoice.overall_discount) || 0;
+    const taxableAmount = Math.round(Math.max(0, (Number(invoice.subtotal) || 0) - itemDiscount - overallDiscount) * 100) / 100;
+    summaryRows.push(["Item discounts", `- ${money(itemDiscount)}`]);
+    if (overallDiscount > 0) summaryRows.push([`Additional quote discount${Number(invoice.overall_discount_rate) ? ` (${Number(invoice.overall_discount_rate)}%)` : ""}`, `- ${money(overallDiscount)}`]);
+    summaryRows.push(["Taxable amount", money(taxableAmount)]);
+    summaryRows.push(["Total tax", `+ ${money(invoice.tax)}`]);
+  } else if (isInvoice) {
+    const itemDiscount = Math.round((invoice.items || []).reduce((sum, item) => {
+      const gross = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+      return sum + Math.round(gross * (Number(item.discount_rate) || 0)) / 100;
+    }, 0) * 100) / 100;
+    const additionalDiscount = Math.max(0, Math.round(((Number(invoice.discount) || 0) - itemDiscount) * 100) / 100);
+    const taxableAmount = Math.max(0, Math.round(((Number(invoice.subtotal) || 0) - (Number(invoice.discount) || 0)) * 100) / 100);
+    summaryRows.push(["Item discounts", `- ${money(itemDiscount)}`]);
+    if (additionalDiscount > 0) summaryRows.push(["Additional invoice discount", `- ${money(additionalDiscount)}`]);
+    summaryRows.push(["Taxable amount", money(taxableAmount)]);
+    summaryRows.push(["Total tax", `+ ${money(invoice.tax)}`]);
+  } else {
+    if (!isDesigned || design.showDiscount !== false) summaryRows.push(["Discount", `- ${money(invoice.discount)}`]);
+    if (!isDesigned || design.showTax !== false) summaryRows.push([`Tax${Number(invoice.tax_rate) ? ` (${Number(invoice.tax_rate)}%)` : ""}`, `+ ${money(invoice.tax)}`]);
+  }
   if (Number(invoice.shipping)) summaryRows.push(["Shipping", `+ ${money(invoice.shipping)}`]);
   const paidAmount = invoice.amount_paid == null
     ? paymentRecords.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0)
@@ -711,7 +733,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
 
 export async function createInvoicePdf(invoice, suppliedStore = null) {
   return createBusinessDocumentPdf(invoice, suppliedStore, {
-    design: invoice.pdf_design || {},
+    design: { ...(invoice.pdf_design || {}), showDiscount: true, showTax: true },
     applyDesign: Boolean(invoice.pdf_design && Object.keys(invoice.pdf_design).length),
   });
 }
@@ -775,6 +797,7 @@ async function createQuoteBusinessPdf(quote, suppliedStore = null) {
       ? ""
       : [quote.terms, quote.notes && `Additional Notes: ${quote.notes}`].filter(Boolean).join("\n\n"),
     items: (quote.items || []).map((item) => ({ ...item, total: item.total ?? item.line_total })),
+    pdf_design: { ...(quote.pdf_design || {}), showDiscount: true, showTax: true },
     shipping: 0,
     amount_paid: 0,
     remaining_balance: 0,

@@ -606,8 +606,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const previewItems = items.map((item, index) => {
     const selectedOption = variantOptionsById.get(String(item.variant_id || ""));
     const gross = Number(item.quantity || 0) * Number(item.unit_price || 0);
-    const discount = gross * Number(item.discount_rate || 0) / 100;
-    const tax = (gross - discount) * Number(item.tax_rate || 0) / 100;
+    const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+    const discount = item.discount != null ? Number(item.discount) || 0 : roundMoney(gross * Number(item.discount_rate || 0) / 100);
+    const tax = item.tax != null ? Number(item.tax) || 0 : roundMoney((gross - discount) * Number(item.tax_rate || 0) / 100);
     return {
       ...item,
       name: selectedOption?.name || item.name,
@@ -615,7 +616,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
       gross,
       discount,
       tax,
-      amount: gross - discount + tax,
+      amount: item.total != null ? Number(item.total) || 0 : roundMoney(gross - discount + tax),
       index: index + 1,
     };
   });
@@ -1066,8 +1067,8 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                           </td>
                           <td className="px-2 py-3 text-right text-[9px]">{item.quantity}</td>
                           <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.unit_price)}</td>
-                          <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.discount)}</td>
-                          <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.tax)}</td>
+                          <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.discount)}<span className="mt-0.5 block text-[7px] text-slate-400">{Number(item.discount_rate) || 0}%</span></td>
+                          <td className="px-2 py-3 text-right text-[8.5px]">{currency(item.tax)}<span className="mt-0.5 block text-[7px] text-slate-400">{Number(item.tax_rate) || 0}%</span></td>
                           <td className="px-2.5 py-3 text-right text-[8.5px] font-semibold">{currency(item.amount)}</td>
                         </tr>
                       ))}
@@ -1080,10 +1081,12 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   </table>
 
                   {/* Subtotals */}
-                  <div ref={previewSummaryRef} className="ml-auto mt-4 max-w-[230px] space-y-1.5 text-[9px]">
+                  <div ref={previewSummaryRef} className="ml-auto mt-4 max-w-[260px] space-y-1.5 text-[9px]">
                     <div className="flex justify-between text-slate-500"><span>{t("admin.quoteDesigner.subtotal")}</span><span>{currency(totals?.subtotal)}</span></div>
-                    {Number(totals?.discount || 0) > 0 && <div className="flex justify-between text-slate-500"><span>{t("admin.quoteInvoice.ui.discount_b524936d")}</span><span>- {currency(totals?.discount || 0)}</span></div>}
-                    {Number(totals?.tax || 0) > 0 && <div className="flex justify-between text-slate-500"><span>{t("admin.quoteInvoice.ui.tax_9be70f66")}</span><span>+ {currency(totals?.tax || 0)}</span></div>}
+                    {totals?.itemDiscount != null ? <div className="flex justify-between text-slate-500"><span>{t("admin.documentDetail.field.itemDiscount")}</span><span>− {currency(totals.itemDiscount)}</span></div> : Number(totals?.discount || 0) > 0 && <div className="flex justify-between text-slate-500"><span>{t("admin.quoteInvoice.ui.discount_b524936d")}</span><span>− {currency(totals?.discount || 0)}</span></div>}
+                    {totals?.overallDiscount > 0 && <div className="flex justify-between text-slate-500"><span>{t(isInvoice ? "admin.documentDetail.field.additionalInvoiceDiscount" : "admin.documentDetail.field.overallDiscount")}</span><span>− {currency(totals.overallDiscount)}</span></div>}
+                    {totals?.taxableAmount != null && <div className="flex justify-between border-t border-slate-200 pt-1 text-slate-500"><span>{t("admin.documentDetail.field.taxableAmount")}</span><span>{currency(totals.taxableAmount)}</span></div>}
+                    {(totals?.taxableAmount != null || Number(totals?.tax || 0) > 0) && <div className="flex justify-between text-slate-500"><span>{totals?.taxableAmount != null ? t("admin.documentDetail.field.totalTax") : t("admin.quoteInvoice.ui.tax_9be70f66")}</span><span>+ {currency(totals?.tax || 0)}</span></div>}
                     <div className="flex justify-between border-t-2 pt-1.5 text-[9.5px] font-extrabold text-slate-900" style={{ borderColor: accent }}>
                       <span>{t("admin.quoteInvoice.ui.total_b25928c6")}</span><span>{currency(totals?.total)}</span>
                     </div>

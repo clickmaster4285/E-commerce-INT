@@ -6,11 +6,12 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { customerApi } from "@/apis/admin/customerApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreVertical, Pencil, Plus, Search,
-  SlidersHorizontal, Smartphone, Trash2, Users, X,
+  CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreVertical, Pencil, Phone, Plus, Search,
+  Trash2, Users, X,
 } from "lucide-react";
 
 const emptyForm = { name: "", phone: "", email: "", address: "", notes: "" };
@@ -79,7 +80,6 @@ export default function CustomersPage() {
   }).length;
   const phoneCount = customers.filter((customer) => customer.phone?.trim()).length;
   const emailCount = customers.filter((customer) => customer.email?.trim()).length;
-  const percent = (count) => customers.length ? Math.round(count * 100 / customers.length) : 0;
 
   const openCreate = () => {
     setEditingId(null);
@@ -97,69 +97,60 @@ export default function CustomersPage() {
   };
 
   const statCards = [
-    { title: t("admin.customers.stats.total"), value: customers.length.toLocaleString(locale), meta: t("admin.customers.stats.allRegistered"), Icon: Users, tone: "accent" },
-    { title: t("admin.customers.stats.newThisMonth"), value: thisMonthCount.toLocaleString(locale), meta: t("admin.customers.stats.addedThisMonth"), Icon: Plus, tone: "blue" },
-    { title: t("admin.customers.stats.withPhone"), value: phoneCount.toLocaleString(locale), meta: t("admin.customers.stats.percentOfCustomers", { percent: percent(phoneCount) }), Icon: Smartphone, tone: "green" },
-    { title: t("admin.customers.stats.withEmail"), value: emailCount.toLocaleString(locale), meta: t("admin.customers.stats.percentOfCustomers", { percent: percent(emailCount) }), Icon: Mail, tone: "blue" },
+    { title: t("admin.customers.stats.total"), value: customers.length },
+    { title: t("admin.customers.stats.newThisMonth"), value: thisMonthCount, valueColor: "var(--success-text)" },
+    { title: t("admin.customers.stats.withPhone"), value: phoneCount, valueColor: "var(--accent)" },
+    { title: t("admin.customers.stats.withEmail"), value: emailCount, valueClass: "text-purple-500 dark:text-purple-300" },
   ];
 
   return (
-    <div dir={dir} className="admin-customers-page min-h-full space-y-4 p-1 text-[var(--text-primary)] sm:space-y-5 sm:p-2 lg:p-3">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={23} /></span>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{t("admin.customers.title")}</h1>
-            <p className="mt-0.5 text-xs text-[var(--text-muted)] sm:text-sm">{t("admin.customers.subtitle")}</p>
-          </div>
-        </div>
-        <button type="button" onClick={openCreate} className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 px-4 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(37,99,235,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0">
-          <Plus size={16} /> {t("admin.customers.add")}
-        </button>
-      </header>
+    <div dir={dir} className="admin-customers-page min-h-full space-y-4 text-[var(--text-primary)]">
+      <AdminPageHeader title={t("admin.customers.title")} subtitle={t("admin.customers.subtitle")} actions={<button type="button" onClick={openCreate} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus size={15} /> {t("admin.customers.add")}</button>} />
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t("admin.customers.statistics")}>
-        {statCards.map(({ title, value, meta, Icon, tone }) => (
-          <div key={title} className="group flex min-w-0 items-center gap-3.5 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--accent)]/30 hover:shadow-lg sm:p-5">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm transition-transform duration-200 group-hover:scale-105 ${tone === "green" ? "bg-[var(--success-soft)] text-[var(--success-text)]" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}><Icon size={19} /></span>
-            <div className="min-w-0"><p className="truncate text-xs font-semibold text-[var(--text-muted)]">{title}</p><div className="mt-1 flex flex-wrap items-baseline gap-x-2.5"><span className="text-2xl font-extrabold leading-none tracking-tight text-[var(--text-primary)]">{value}</span><span className="text-[10px] font-medium text-[var(--text-muted)]">{meta}</span></div></div>
+      <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4" aria-label={t("admin.customers.statistics")}>
+        {statCards.map(({ title, value, valueColor, valueClass }) => (
+          <div key={title} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3 sm:p-4">
+            <p className="truncate text-[11px] font-medium text-[var(--text-muted)] sm:text-xs">{title}</p>
+            <p className={`mt-1 truncate text-lg font-bold leading-tight sm:text-xl ${valueClass || ""}`} style={{ color: valueColor }}>{value.toLocaleString(locale)}</p>
           </div>
         ))}
       </section>
 
-      <div className="grid grid-cols-1 items-start gap-4">
-        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-lg shadow-slate-900/5">
-          <div className="grid min-w-0 grid-cols-1 gap-2 border-b border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_160px_170px_40px]">
-            <label className="relative block min-w-0 sm:col-span-2 xl:col-span-1">
+      <div className="min-w-0 space-y-4">
+        <div className="flex min-w-0 flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+          <label className="relative block w-full min-w-0 md:w-[400px]">
               <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search by name, phone, or email..." aria-label="Search customers" className="h-10 min-w-0 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white ps-9 pe-3 text-sm font-medium text-slate-900 outline-none shadow-sm transition-all placeholder:text-slate-400 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" />
-            </label>
-            <select value={filter} onChange={(event) => { setPage(1); setFilter(event.target.value); }} aria-label="Filter customers" className="h-10 min-w-0 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
-              <option value="all">All Customers</option><option value="phone">With Phone</option><option value="email">With Email</option>
-            </select>
-            <select value={sort} onChange={(event) => { setPage(1); setSort(event.target.value); }} aria-label="Sort customers" className="h-10 min-w-0 w-full rounded-2xl border-[1.5px] border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-200">
-              <option value="newest">Newest First</option><option value="oldest">Oldest First</option>
-            </select>
-            <span className="hidden h-10 w-10 shrink-0 items-center justify-center justify-self-start rounded-2xl border border-slate-200 bg-white text-slate-500 sm:flex xl:justify-self-end" title="Customer filters"><SlidersHorizontal size={15} /></span>
+              <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder={t("admin.customers.search.placeholder")} aria-label={t("admin.customers.search.aria")} className="h-9 min-w-0 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] ps-9 pe-3 text-[13px] text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-1 focus:ring-[var(--accent)]/40" />
+          </label>
+          <div className="flex w-full items-center gap-3 md:w-auto">
+            <CustomerSelect className="w-full sm:w-[140px]" value={filter} onChange={(value) => { setPage(1); setFilter(value); }} ariaLabel={t("admin.customers.filters.aria")}>
+              <option value="all">{t("admin.customers.filters.all")}</option><option value="phone">{t("admin.customers.filters.withPhone")}</option><option value="email">{t("admin.customers.filters.withEmail")}</option>
+            </CustomerSelect>
+            <CustomerSelect className="w-full sm:w-[140px]" value={sort} onChange={(value) => { setPage(1); setSort(value); }} ariaLabel={t("admin.customers.sort.aria")}>
+              <option value="newest">{t("admin.customers.sort.newest")}</option><option value="oldest">{t("admin.customers.sort.oldest")}</option>
+            </CustomerSelect>
           </div>
+        </div>
 
+        <section className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-[13px]">
-              <thead className="border-b border-slate-200 bg-slate-100 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                <tr><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Address</th><th className="px-4 py-3">Added On</th><th className="px-4 py-3 text-right">Actions</th></tr>
+            <table className="w-full min-w-[900px] table-fixed text-start text-[13px]">
+              <colgroup><col className="w-[22%]"/><col className="w-[15%]"/><col className="w-[22%]"/><col className="w-[14%]"/><col className="w-[18%]"/><col className="w-[9%]"/></colgroup>
+              <thead className="border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                <tr><th className="px-4 py-3 text-start">{t("admin.customers.table.customer")}</th><th className="px-4 py-3 text-start">{t("common.phone")}</th><th className="px-4 py-3 text-start">{t("common.email")}</th><th className="px-4 py-3 text-start">{t("admin.customers.table.address")}</th><th className="px-4 py-3 text-start">{t("admin.customers.table.addedOn")}</th><th className="whitespace-nowrap px-2 py-3 text-end">{t("admin.shared.label.actions")}</th></tr>
               </thead>
               <tbody>
                 {isLoading ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--text-muted)]">{t("admin.customers.loading")}</td></tr>
                   : isError ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--danger-text)]">{error?.response?.data?.message || t("admin.customers.loadFailed")} <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ["customers-admin"] })} className="ms-2 underline">{t("common.retry")}</button></td></tr>
                   : customerList.length === 0 ? <tr><td colSpan={6} className="px-3 py-7"><div className="flex flex-col items-center justify-center text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={18} /></span><p className="text-xs font-semibold text-[var(--text-primary)]">{search ? t("admin.customers.empty.searchTitle") : t("admin.customers.empty.title")}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search ? t("admin.customers.empty.searchDescription") : t("admin.customers.empty.description")}</p><button type="button" onClick={() => search ? (setPage(1), setSearch("")) : openCreate()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[10px] font-semibold text-[var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">{search ? <><X size={12} /> {t("admin.customers.search.clear")}</> : <><Plus size={12} /> {t("admin.customers.add")}</>}</button></div></td></tr>
                     : pageCustomers.map((customer) => (
-                      <tr key={customer._id} onClick={() => router.push(`/admin/customers/${customer._id}`)} className="cursor-pointer border-b border-slate-200 transition-colors duration-150 hover:bg-blue-50/60">
-                        <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{initials(customer.name)}</span><div className="min-w-0"><p className="max-w-40 truncate text-[13px] font-semibold text-slate-900">{customer.name}</p><span className="mt-0.5 inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">Customer</span></div></div></td>
-                        <td className="px-4 py-2.5 text-xs text-slate-600">{customer.phone || "—"}</td>
-                        <td className="px-4 py-2.5 text-xs text-slate-600"><span className="block max-w-48 truncate">{customer.email || "—"}</span></td>
-                        <td className="px-4 py-2.5 text-xs text-slate-600"><span className="block max-w-40 truncate">{customer.address || "—"}</span></td>
-                        <td className="px-4 py-2.5 text-xs text-slate-600">{dateTime(customer.created_at)}</td>
-                        <td className="px-4 py-2.5"><div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+                      <tr key={customer._id} onClick={() => router.push(`/admin/customers/${customer._id}`)} className="cursor-pointer border-b border-[var(--border-color)] transition-colors duration-150 hover:bg-[var(--bg-row-hover)]">
+                        <td className="px-4 py-2.5 text-start"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]">{initials(customer.name)}</span><div className="min-w-0"><p className="max-w-40 truncate text-[13px] font-semibold text-[var(--text-primary)]">{customer.name}</p></div></div></td>
+                        <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]">{customer.phone || "—"}</td>
+                        <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]"><span className="block max-w-48 truncate">{customer.email || "—"}</span></td>
+                        <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]"><span className="block max-w-40 truncate">{customer.address || "—"}</span></td>
+                        <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]">{dateTime(customer.created_at, locale, t)}</td>
+                        <td className="px-2 py-2.5"><div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
                           <CustomerRowMenu dir={dir} customer={customer} onView={(record) => router.push(`/admin/customers/${record._id}`)} onEdit={openEdit} onDelete={(record) => { if (window.confirm(`Delete ${record.name}?`)) deleteMutation.mutate(record._id); }} onCreateQuote={(record) => router.push(`/admin/quotes/new?customer=${record._id}`)} onCreateInvoice={(record) => router.push(`/admin/invoices/new?customer=${record._id}`)} />
                         </div></td>
                       </tr>
@@ -167,7 +158,7 @@ export default function CustomersPage() {
               </tbody>
             </table>
           </div>
-          {customerList.length > pageSize && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
+          {customerList.length > pageSize && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)] px-4 py-3 text-[13px] text-[var(--text-muted)]">
             <span>Showing {customerList.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, customerList.length)} of {customerList.length} customers</span>
             <div className="flex items-center gap-1"><button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label="Previous page"><ChevronLeft size={13} /></button>{Array.from({ length: pageCount }, (_, index) => index + 1).slice(Math.max(0, page - 3), page + 2).map((pageNumber) => <button key={pageNumber} type="button" onClick={() => setPage(pageNumber)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${pageNumber === page ? "bg-[var(--accent)] text-[var(--accent-text)]" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{pageNumber}</button>)}<button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label="Next page"><ChevronRight size={13} /></button></div>
           </footer>}
@@ -230,7 +221,7 @@ function CustomerRowMenu({ dir = "ltr", customer, onView, onEdit, onDelete, onCr
 
   return <>
     <button ref={buttonRef} type="button" onClick={toggleMenu} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-secondary)] transition hover:bg-[var(--bg-row-hover)] hover:text-[var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" aria-label={`Actions for ${customer.name}`} aria-haspopup="true" aria-expanded={open}><MoreVertical size={18} /></button>
-    {open && createPortal(<div ref={menuRef} className="fixed z-[9999] w-44 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-[0_8px_28px_rgba(15,23,42,0.2)]" style={{ top: position.top, left: position.left }}>
+    {open && createPortal(<div ref={menuRef} className="fixed z-[9999] w-44 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] py-1 shadow-md" style={{ top: position.top, left: position.left }}>
       <button type="button" onClick={run(onView)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><Eye size={14} />View details</button>
       <button type="button" onClick={run(onCreateQuote)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><ContactRound size={14} />Create quote</button>
       <button type="button" onClick={run(onCreateInvoice)} className={`${menuItem} text-[var(--text-secondary)]`} {...hover}><FilePlus2 size={14} />Create invoice</button>
@@ -238,4 +229,13 @@ function CustomerRowMenu({ dir = "ltr", customer, onView, onEdit, onDelete, onCr
       <button type="button" onClick={run(onDelete)} className={`${menuItem} text-[var(--danger-text)]`} {...hover}><Trash2 size={14} />Delete</button>
     </div>, document.body)}
   </>;
+}
+
+function CustomerSelect({ className = "", value, onChange, ariaLabel, children }) {
+  return <label className={`relative block min-w-0 ${className}`}>
+    <select value={value} onChange={(event) => onChange(event.target.value)} aria-label={ariaLabel} className="h-9 w-full appearance-none rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] ps-3 pe-8 text-[13px] text-[var(--text-primary)] outline-none transition focus:ring-1 focus:ring-[var(--accent)]/40">
+      {children}
+    </select>
+    <ChevronDown size={14} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+  </label>;
 }

@@ -29,9 +29,9 @@ export const toVendorPayload = (form) => ({
   bank_details: { bank: form.bank_bank, account_title: form.bank_account_title, account_no: form.bank_account_no },
 });
 
-const cardStyle = { border: "1px solid #dce8f8", background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)", boxShadow: "0 24px 70px rgba(15,23,42,0.25)" };
-const inputStyle = { backgroundColor: "#fff", border: "1px solid #dbe5f1", color: "#0f172a", boxShadow: "0 1px 2px rgba(15,23,42,0.03)" };
-const accentBtn = { background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff", boxShadow: "0 4px 10px rgba(37,99,235,0.2)" };
+const cardStyle = { border: "1px solid var(--border-color)", background: "var(--bg-card)", boxShadow: "var(--shadow-md)" };
+const inputStyle = { backgroundColor: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+const accentBtn = { background: "var(--accent)", color: "var(--accent-text)" };
 const phoneValue = (value) => {
   const digits = value.replace(/\D/g, "").slice(0, 15);
   return value.trimStart().startsWith("+") ? `+${digits}` : digits;
@@ -60,7 +60,7 @@ export default function VendorFormModal({ open, form, setForm, editing = false, 
   );
   const sectionTitle = (Icon, title, description) => (
     <div className="mb-3 flex items-start gap-2.5">
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "#eff6ff", color: "#2563eb" }}><Icon size={16} /></div>
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}><Icon size={16} /></div>
       <div><h4 className="text-[13px] font-bold text-slate-800">{title}</h4><p className="mt-0.5 text-[11px] text-slate-500">{description}</p></div>
     </div>
   );
@@ -69,9 +69,9 @@ export default function VendorFormModal({ open, form, setForm, editing = false, 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-sm sm:p-5" onClick={onClose}>
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl" style={cardStyle} onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b px-5 py-4 sm:px-6" style={{ borderColor: "#e5eef9", background: "linear-gradient(135deg, #f8fbff 0%, #eff6ff 100%)" }}>
+        <div className="flex items-center justify-between border-b px-5 py-4 sm:px-6" style={{ borderColor: "var(--border-color)", background: "var(--bg-tertiary)" }}>
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}><Building2 size={18} color="#fff" /></div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-md" style={{ background: "var(--accent)" }}><Building2 size={18} color="var(--accent-text)" /></div>
             <div className="min-w-0">
               <h3 className="text-base font-extrabold tracking-tight text-slate-900">{t(editing ? "admin.vendors.form.editTitle" : "admin.vendors.form.addTitle")}</h3>
               <p className="mt-0.5 text-xs text-slate-500">{t("admin.vendors.form.description")}</p>
@@ -137,14 +137,14 @@ export default function VendorFormModal({ open, form, setForm, editing = false, 
             </div>
             <label className="mt-4 flex cursor-pointer items-center justify-between rounded-xl border p-3.5 transition hover:border-blue-200 hover:bg-blue-50/40" style={{ borderColor: "#e5edf7" }}>
               <span><span className="block text-sm font-semibold text-slate-800">{t("admin.vendors.form.active")}</span><span className="mt-0.5 block text-xs text-slate-500">{t("admin.vendors.form.activeHelp")}</span></span>
-              <input type="checkbox" checked={!!form.is_active} onChange={(event) => update("is_active", event.target.checked)} className="h-4 w-4 cursor-pointer" style={{ accentColor: "#2563eb" }} />
+              <input type="checkbox" checked={!!form.is_active} onChange={(event) => update("is_active", event.target.checked)} className="h-4 w-4 cursor-pointer" style={{ accentColor: "var(--accent)" }} />
             </label>
           </section>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t px-5 py-3.5 sm:px-6" style={{ borderColor: "#e5eef9", background: "#fff" }}>
+        <div className="flex items-center justify-between gap-3 border-t px-5 py-3.5 sm:px-6" style={{ borderColor: "var(--border-color)", background: "var(--bg-card)" }}>
           <p className="hidden text-xs text-slate-500 sm:block"><span className="text-rose-500">*</span> {t("admin.vendors.form.requiredField")}</p>
           <div className="ml-auto flex gap-2">
-            <button type="button" onClick={onClose} className="h-10 rounded-xl border px-4 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50" style={{ borderColor: "#dbe5f1" }}>{t("admin.vendors.form.cancel")}</button>
+            <button type="button" onClick={onClose} className="h-10 rounded-xl border px-4 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50" style={{ borderColor: "var(--border-color)" }}>{t("admin.vendors.form.cancel")}</button>
             <button type="button" disabled={isPending || !form.name.trim()} onClick={onSave} className="h-10 rounded-xl px-5 text-[13px] font-bold transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50" style={accentBtn}>{isPending ? t("admin.vendors.form.saving") : t("admin.vendors.form.save")}</button>
           </div>
         </div>
