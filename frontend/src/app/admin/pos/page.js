@@ -8,7 +8,6 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
-  Barcode,
   Check,
   ChevronLeft,
   ChevronDown,
@@ -18,8 +17,6 @@ import {
   ClipboardList,
   History,
   RotateCcw,
-  LayoutGrid,
-  List,
   SlidersHorizontal,
   Minus,
   MoreVertical,
@@ -246,6 +243,7 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
+  const [additionalTaxRate, setAdditionalTaxRate] = useState("0");
   const [notes, setNotes] = useState("");
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [cart, setCart] = useState([]);
@@ -253,7 +251,7 @@ export default function PosPage() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [rateEditorVariantId, setRateEditorVariantId] = useState(null);
   const [activeView, setActiveView] = useState("pos");
-  const [viewMode, setViewMode] = useState("grid");
+  const viewMode = "grid";
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [heldCarts, setHeldCarts] = useState([]);
   const heldCartsLoaded = useRef(false);
@@ -364,8 +362,8 @@ export default function PosPage() {
   const holdCart = () => {
     if (editingSaleId) { toast.error(t("admin.pos.toast.cannotHoldEditedSale")); return; }
     if (!cart.length) { toast.error(t("admin.pos.toast.addItemsBeforeHolding")); return; }
-    setHeldCarts((current) => [{ id: `${Date.now()}`, createdAt: new Date().toISOString(), cart, customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, notes, editingSaleId, editingSaleNumber, editingOriginalQuantities }, ...current]);
-    setCart([]); setSelectedCustomer(null); setDiscountAmount(""); setNotes("");
+    setHeldCarts((current) => [{ id: `${Date.now()}`, createdAt: new Date().toISOString(), cart, customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, additionalTaxRate, notes, editingSaleId, editingSaleNumber, editingOriginalQuantities }, ...current]);
+    setCart([]); setSelectedCustomer(null); setDiscountAmount(""); setAdditionalTaxRate("0"); setNotes("");
     setPaymentReference("");
     setEditingSaleId(null); setEditingSaleNumber(""); setEditingOriginalQuantities({});
     toast.success(t("admin.pos.toast.saleHeld"));
@@ -373,12 +371,12 @@ export default function PosPage() {
   const resumeHeldCart = (held, restoredAt) => {
     const currentDraft = cart.length ? {
       id: `current-${held.id}`, createdAt: restoredAt, cart,
-      customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, notes,
+      customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, additionalTaxRate, notes,
       editingSaleId, editingSaleNumber, editingOriginalQuantities,
     } : null;
     setCart(held.cart || []); setSelectedCustomer(held.customer || null); setPaymentMethod(held.paymentMethod || "cash");
     setPaymentReference(held.paymentReference || "");
-    setDiscountAmount(held.discountAmount || ""); setNotes(held.notes || "");
+    setDiscountAmount(held.discountAmount || ""); setAdditionalTaxRate(held.additionalTaxRate ?? "0"); setNotes(held.notes || "");
     setEditingSaleId(held.editingSaleId || null); setEditingSaleNumber(held.editingSaleNumber || ""); setEditingOriginalQuantities(held.editingOriginalQuantities || {});
     setHeldCarts((current) => [...(currentDraft ? [currentDraft] : []), ...current.filter((item) => item.id !== held.id)]); setActiveView("pos");
     toast.success(t(currentDraft ? "admin.pos.toast.heldSaleRestoredWithDraft" : "admin.pos.toast.heldSaleRestored"));
@@ -422,6 +420,7 @@ export default function PosPage() {
     setPaymentMethod(sale.payment?.method || "cash");
     setPaymentReference(sale.payment?.reference || "");
     setDiscountAmount(String(Math.max(0, (Number(sale.discount_amount) || 0) - itemDiscountTotal)));
+    setAdditionalTaxRate(String(Math.max(0, Number(sale.additional_tax_rate) || 0)));
     setNotes(sale.notes || "");
     setEditingSaleId(sale._id);
     setEditingSaleNumber(sale.sale_number || t("common.notProvided"));
@@ -434,6 +433,7 @@ export default function PosPage() {
     setCart([]);
     setSelectedCustomer(null);
     setDiscountAmount("");
+    setAdditionalTaxRate("0");
     setNotes("");
     setPaymentReference("");
     setEditingSaleId(null);
@@ -491,12 +491,13 @@ export default function PosPage() {
     () => cart.reduce((sum, item) => sum + itemDiscountTotal(item), 0),
     [cart],
   );
-  const tax = useMemo(
+  const itemTax = useMemo(
     () => cart.reduce((sum, item) => sum + itemNetTotal(item) * item.tax_rate / 100, 0),
     [cart],
   );
   const taxableSubtotal = cart.reduce((sum, item) => sum + itemNetTotal(item), 0);
-  const effectiveTaxRate = taxableSubtotal > 0 ? (tax / taxableSubtotal) * 100 : 0;
+  const additionalTax = taxableSubtotal * (Math.min(100, Math.max(0, Number(additionalTaxRate) || 0)) / 100);
+  const tax = itemTax + additionalTax;
   const overallDiscount = Math.min(Math.max(Number(discountAmount) || 0, 0), subtotal - itemDiscount + tax);
   const discount = itemDiscount + overallDiscount;
   const total = Math.max(0, Math.round(Math.round(subtotal) + Math.round(tax) - discount));
@@ -607,6 +608,7 @@ export default function PosPage() {
         reference: paymentReference,
         amount_received: total,
         discount_amount: overallDiscount,
+        additional_tax_rate: Math.min(100, Math.max(0, Number(additionalTaxRate) || 0)),
         notes,
         items: cart.map((item) => ({
           variant_id: item.variant_id,
@@ -624,6 +626,7 @@ export default function PosPage() {
       setCart([]);
       setSelectedCustomer(null);
       setDiscountAmount("");
+      setAdditionalTaxRate("0");
       setNotes("");
       setPaymentReference("");
       setEditingSaleId(null);
@@ -785,9 +788,8 @@ export default function PosPage() {
                   setSearch("");
                   setCurrentPage(1);
                 }}
-                className="h-10 w-full rounded-lg border-0 bg-[#F3F4F6] ps-9 pe-11 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-900 sm:text-sm"
+                className="h-10 w-full rounded-lg border-0 bg-[#F3F4F6] ps-9 pe-3 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-900 sm:text-sm"
               />
-              <button type="button" onClick={() => searchInputRef.current?.focus()} className="absolute end-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-card)] hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={t("admin.pos.ui.focusTheSearchFieldToScanABarcode")} title={t("admin.pos.ui.useABarcodeScannerToTypeIntoTheSearchField")}><Barcode size={16} /></button>
             </div>
             <PosDropdown
               value={selectedSort}
@@ -799,15 +801,13 @@ export default function PosPage() {
               ]}
               onChange={(value) => { setSelectedSort(value); setCurrentPage(1); }}
               ariaLabel={t("admin.pos.ui.sortProducts")}
-              prefix={`${t("admin.pos.ui.sortPrefix")}: `}
-              className="w-28 shrink-0 sm:w-32"
+              prefix={`${t("admin.pos.ui.sortPrefix")} `}
+              className="w-36 shrink-0 sm:w-40"
               buttonClassName="h-9 justify-between rounded-lg border-0 bg-transparent px-2 text-[11px] font-medium shadow-none hover:bg-[var(--bg-tertiary)]"
               menuClassName="w-48"
             />
             <div ref={filtersPanelRef} className="relative flex shrink-0 items-center gap-1">
               <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedCategory || selectedBrand || selectedStock ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
-              <button type="button" onClick={() => setViewMode("grid")} aria-label={t("admin.pos.ui.gridView")} aria-pressed={viewMode === "grid"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "grid" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><LayoutGrid size={14}/></button>
-              <button type="button" onClick={() => setViewMode("list")} aria-label={t("admin.pos.ui.listView")} aria-pressed={viewMode === "list"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "list" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><List size={14}/></button>
               {filtersOpen && <div className="absolute end-0 top-full z-30 mt-2 w-56 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-xl">
                 <div className="mb-2 text-xs font-bold text-[var(--text-primary)]">{t("admin.pos.ui.productFilters")}</div>
                 <PosDropdown fieldLabel={t("admin.pos.ui.category")} value={selectedCategory} options={[{ value: "", label: t("admin.pos.ui.allCategories") }, ...categoryOptions.map((category) => ({ value: category, label: category }))]} onChange={selectCategory} ariaLabel={t("admin.pos.ui.filterByCategory")} className="mb-2" buttonClassName="h-9 rounded-lg px-2" menuClassName="w-full" />
@@ -959,7 +959,7 @@ export default function PosPage() {
               {itemCount > 0 && <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{itemCount}</span>}
             </h2>
             <div className="flex items-center gap-2">
-              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
+              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setAdditionalTaxRate("0"); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
               <button type="button" onClick={() => setCartDrawerOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] lg:hidden" aria-label={t("admin.pos.ui.closeCart")}><X size={18} /></button>
             </div>
           </div>
@@ -1084,12 +1084,16 @@ export default function PosPage() {
                 <span className="min-w-16 text-end font-medium">− {formatMoney(discount)}</span>
               </span>
             </label>
-            <div className="flex items-center justify-between px-1 py-1 text-xs">
-                <span className="text-[var(--text-secondary)]">
-                  {t("admin.pos.ui.tax2")}{Number(effectiveTaxRate.toFixed(2))}%)
+            <label className="flex items-center justify-between gap-2 px-1 py-1 text-xs">
+              <span className="shrink-0 text-[var(--text-secondary)]">{t("admin.pos.ui.tax2")}</span>
+              <span className="flex items-center gap-2">
+                <span className="relative block w-20">
+                  <input type="number" min="0" max="100" step="0.01" value={additionalTaxRate} onChange={(event) => setAdditionalTaxRate(event.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2 pe-6 text-end text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" aria-label={t("admin.pos.ui.tax2")} />
+                  <span className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-[10px] text-[var(--text-muted)]">%</span>
                 </span>
-              <span className="font-medium text-[var(--text-primary)]">{formatMoney(tax)}</span>
-            </div>
+                <span className="min-w-16 text-end font-medium text-[var(--text-primary)]">{formatMoney(tax)}</span>
+              </span>
+            </label>
             <div className="flex items-center justify-between border-t border-[var(--border-color)] px-1 pt-2 text-lg font-bold text-[var(--text-primary)]">
               <span>{t("admin.pos.ui.total")}</span>
               <span className="tabular-nums">{formatMoney(total)}</span>

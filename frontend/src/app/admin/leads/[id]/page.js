@@ -8,13 +8,12 @@ import { addLeadAsCustomer } from "@/lib/addLeadAsCustomer";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
-  Activity, ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2, ChevronRight,
-  Clock3, ContactRound, Mail, MapPin, Phone, Plus, RotateCcw, Tag, UserRound, Users,
+  Activity, ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2,
+  Clock3, ContactRound, Mail, MapPin, Phone, Plus, Tag, UserRound, Users,
 } from "lucide-react";
 
 const activityTypes = ["Call", "WhatsApp", "Email", "Meeting", "Other"];
 const nextStatuses = { New: ["Contacted"], Contacted: ["Qualified"], Qualified: ["Converted", "Lost"], Converted: ["Lost"] };
-const previousStatus = { Contacted: "New", Qualified: "Contacted", Converted: "Qualified" };
 const statusTone = { New: "bg-[var(--accent-soft)] text-[var(--accent)]", Contacted: "bg-blue-100 text-blue-700", Qualified: "bg-amber-100 text-amber-800", Converted: "bg-[var(--success-soft)] text-[var(--success-text)]", Lost: "bg-[var(--danger-soft)] text-[var(--danger-text)]" };
 const leadValueKey = (value) => `admin.leads.value.${String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
 const leadValueLabel = (value, t) => { const key = leadValueKey(value); const label = t(key); return label === key ? (String(value || "").replaceAll("_", " ") || t("common.notProvided")) : label; };
@@ -73,7 +72,6 @@ export default function LeadDetailPage({ params }) {
     statusMutation.mutate({ status: "Lost", lost_reason: reason });
   };
   const next = nextStatuses[lead.status] || [];
-  const previous = previousStatus[lead.status];
   const timeline = [
     ...(lead.history || []).map((entry) => ({ ...entry, key: `history-${entry._id}`, kind: "change" })),
     ...(lead.activities || []).map((entry) => ({ ...entry, key: `activity-${entry._id}`, kind: "activity" })),
@@ -82,13 +80,11 @@ export default function LeadDetailPage({ params }) {
   return <div dir={dir} className="space-y-4 text-[var(--text-primary)] sm:space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]"><Link href="/admin/leads" className="inline-flex items-center gap-1 transition hover:text-[var(--accent)]"><ArrowLeft size={14} /> {t("admin.leads.ui.leads")}</Link><ChevronRight size={13} /><span>{lead.lead_number}</span></div>
         <div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]"><ContactRound size={23} /></span><div><h1 className="text-xl font-bold tracking-tight sm:text-2xl">{lead.lead_type === "Business" && lead.company_name ? lead.company_name : lead.name}</h1><p className="mt-0.5 text-xs text-[var(--text-muted)]">{lead.lead_number} <span className="px-1">·</span> {leadValueLabel(lead.lead_type, t)} {t("admin.leads.ui.lead")}{lead.lead_type === "Business" ? ` · ${t("admin.leads.ui.contactName", { name: lead.name })}` : ""}</p></div></div>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">
         <span className={`rounded-full px-2.5 py-1.5 text-xs font-bold ${statusTone[lead.status] || statusTone.New}`}>{leadValueLabel(lead.status, t)}</span>
         {next.map((status) => <button key={status} type="button" disabled={statusMutation.isPending} onClick={() => changeStatus(status)} className={`inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition disabled:opacity-50 ${status === "Lost" ? "border border-[var(--danger)]/25 text-[var(--danger-text)] hover:bg-[var(--danger-soft)]" : "bg-[var(--accent-soft)] text-[var(--accent)] hover:brightness-95"}`}>{leadValueLabel(status, t)}<ArrowRight size={14} /></button>)}
-        {previous && <button type="button" disabled={statusMutation.isPending} onClick={() => changeStatus(previous)} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--danger)]/25 px-3 text-xs font-semibold text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)] disabled:opacity-50"><RotateCcw size={14} /> {t("admin.leads.ui.revertTo", { status: leadValueLabel(previous, t) })}</button>}
         {lead.status === "Converted" && (lead.customer_added ? <span className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--success-soft)] px-3 text-xs font-semibold text-[var(--success-text)]"><CheckCircle2 size={14} /> {t("admin.leads.ui.addedToCustomers")}</span> : <button type="button" disabled={customerMutation.isPending} onClick={() => customerMutation.mutate(lead)} className="inline-flex h-9 items-center gap-2 rounded-xl bg-[var(--accent)] px-3 text-xs font-semibold text-[var(--accent-text)] transition hover:brightness-95 disabled:opacity-50"><Users size={14} />{customerMutation.isPending ? t("admin.leads.ui.addingCustomer") : t("admin.leads.ui.addAsCustomer")}</button>)}
         <Link href="/admin/leads" className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"><ArrowLeft size={14} /> {t("admin.leads.ui.backToLeads")}</Link>
       </div>

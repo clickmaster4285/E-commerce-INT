@@ -68,9 +68,9 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
 }
 
 function PreviewModal({ onClose, children }) {
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div id="invoice-preview-modal" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section role="dialog" aria-modal="true" aria-label="Invoice preview" className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Eye size={17} /></span><div><h2 className="text-sm font-extrabold text-[var(--text-primary)]">Invoice preview</h2><p className="text-[10px] text-[var(--text-muted)]">Review the customer-facing invoice</p></div></div><button type="button" onClick={onClose} aria-label="Close preview" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"><X size={17} /></button></header>
+      <header className="document-preview-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Eye size={17} /></span><div><h2 className="text-sm font-extrabold text-[var(--text-primary)]">Invoice preview</h2><p className="text-[10px] text-[var(--text-muted)]">Review the customer-facing invoice</p></div></div><button type="button" onClick={onClose} aria-label="Close preview" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"><X size={17} /></button></header>
       <div className="min-h-0 overflow-auto bg-[var(--bg-secondary)] p-3 sm:p-5">{children}</div>
     </section>
   </div>;
@@ -86,6 +86,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const [returnOpen, setReturnOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [printQueued, setPrintQueued] = useState(false);
   const printHandled = useRef(false);
   const invoicePreviewRef = useRef(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_time: new Date().toTimeString().slice(0, 5), payment_method: "Cash", note: "" });
@@ -108,19 +109,39 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
 
   useEffect(() => {
     if (searchParams.get("print") !== "1" || !invoice || isLoading || isStoreLoading || printHandled.current) return undefined;
+    printHandled.current = true;
     const timer = window.setTimeout(() => {
-      if (printHandled.current) return;
-      printHandled.current = true;
-      printInvoicePdf(invoice, store, invoicePreviewRef.current)
-        .catch((printError) => { console.error("Could not print invoice PDF:", printError); toast.error("Could not print invoice"); })
-        .finally(() => {
-          printHandled.current = false;
-          setIsGeneratingPdf(false);
-          router.replace(`/admin/invoices/${id}`, { scroll: false });
-        });
-    }, 500);
+      setIsGeneratingPdf(true);
+      setPreviewOpen(true);
+      setPrintQueued(true);
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [id, invoice, isLoading, isStoreLoading, router, searchParams, store]);
+  }, [invoice, isLoading, isStoreLoading, searchParams]);
+
+  useEffect(() => {
+    if (!printQueued || !previewOpen || !invoicePreviewRef.current) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (document.fonts?.ready) await document.fonts.ready;
+        if (!cancelled) await printInvoicePdf(invoice, store, invoicePreviewRef.current);
+      } catch (printError) {
+        console.error("Could not print invoice:", printError);
+        toast.error(t("admin.invoiceDetail.message.pdfFailed"));
+      } finally {
+        if (!cancelled) {
+          setPrintQueued(false);
+          setIsGeneratingPdf(false);
+          printHandled.current = false;
+          if (searchParams.get("print") === "1") router.replace(`/admin/invoices/${id}`, { scroll: false });
+        }
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [id, invoice, printQueued, previewOpen, router, searchParams, store, t]);
 
   const paymentMutation = useMutation({
     mutationFn: (payment) => invoiceApi.recordPayment(id, payment),
@@ -172,14 +193,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const printInvoice = async () => {
     if (isGeneratingPdf || isStoreLoading) return;
     setIsGeneratingPdf(true);
-    try {
-      await printInvoicePdf(invoice, store, invoicePreviewRef.current);
-    } catch (printError) {
-      console.error("Could not print invoice PDF:", printError);
-      toast.error("Could not print invoice");
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    setPreviewOpen(true);
+    setPrintQueued(true);
   };
 
   if (isLoading) return <div className="space-y-3"><div className="skeleton h-8 w-1/3" /><div className="skeleton h-28 w-full" /><div className="skeleton h-52 w-full" /></div>;
@@ -225,6 +240,12 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const subtotal = Number(invoice.subtotal || 0);
   const discountTotal = Number(invoice.discount || 0);
   const taxTotal = Number(invoice.tax || 0);
+  const itemDiscountBase = Math.round(items.reduce((sum, item) => {
+    const gross = (Number(item.quantity ?? item.qty) || 0) * (Number(item.unit_price) || 0);
+    return sum + Math.round(gross * (Number(item.discount_rate) || 0)) / 100;
+  }, 0) * 100) / 100;
+  const additionalInvoiceDiscount = Math.max(0, Math.round((discountTotal - itemDiscountBase) * 100) / 100);
+  const taxableAmount = Math.max(0, Math.round((subtotal - discountTotal) * 100) / 100);
   const originalTotal = Number(invoice.original_total ?? (subtotal - discountTotal + taxTotal));
   const returnAdjustment = Math.max(0, originalTotal - total);
   const paymentProgress = total > 0 ? Math.min(100, Math.max(0, (paidAmount / total) * 100)) : 0;
@@ -377,9 +398,11 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
               <div className="flex justify-between gap-3"><span style={muted}>{t("admin.invoiceDetail.field.paymentTerms")}</span><span className="max-w-[60%] text-right" style={primary}>{paymentTermsLabel}</span></div>
               <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.items")}</span><span style={primary}>{items.length}</span></div>
               <div className="space-y-2 border-t pt-2.5" style={{ borderColor: "var(--border-color)" }}>
-                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.subtotal")}</span><span style={primary}>{money(subtotal, locale)}</span></div>
-                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.totalDiscount")}</span><span className="font-medium text-rose-600">− {money(discountTotal, locale)}</span></div>
-                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.tax")}</span><span style={primary}>{money(taxTotal, locale)}</span></div>
+                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.subtotal")}</span><bdi dir="ltr" className="text-end tabular-nums" style={primary}>{money(subtotal, locale)}</bdi></div>
+                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.itemDiscount")}</span><bdi dir="ltr" className="text-end tabular-nums font-medium text-rose-600">− {money(itemDiscountBase, locale)}</bdi></div>
+                {additionalInvoiceDiscount > 0 && <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.additionalInvoiceDiscount")}</span><bdi dir="ltr" className="text-end tabular-nums font-medium text-rose-600">− {money(additionalInvoiceDiscount, locale)}</bdi></div>}
+                <div className="flex justify-between gap-3 border-t pt-2" style={{ borderColor: "var(--border-color)" }}><span style={muted}>{t("admin.documentDetail.field.taxableAmount")}</span><bdi dir="ltr" className="text-end tabular-nums" style={primary}>{money(taxableAmount, locale)}</bdi></div>
+                <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.totalTax")}</span><bdi dir="ltr" className="text-end tabular-nums" style={primary}>{money(taxTotal, locale)}</bdi></div>
                 {returnAdjustment > 0 ? <>
                   <div className="flex justify-between gap-3 border-t pt-2 text-[12px] font-bold" style={{ borderColor: "var(--border-color)" }}><span style={primary}>{t("admin.documentDetail.field.originalTotal")}</span><span style={{ color: "#079878" }}>{money(originalTotal, locale)}</span></div>
                   <div className="flex justify-between gap-3"><span style={muted}>{t("admin.documentDetail.field.returnAdjustment")}</span><span className="font-medium text-rose-600">− {money(returnAdjustment, locale)}</span></div>
@@ -392,7 +415,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
         <div className="mt-4">
           <Panel title={t("admin.documentDetail.panel.productsItems")} icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{items.length} {t("admin.documentDetail.field.items")}</span>}>
-            <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[35%]"/><col className="w-[9%]"/><col className="w-[7%]"/><col className="w-[12%]"/><col className="w-[10%]"/><col className="w-[9%]"/><col className="w-[14%]"/></colgroup><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading) => <th key={heading} dir="auto" className="whitespace-nowrap px-3 py-2.5 font-semibold">{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}><bdi dir="ltr">{index + 1}</bdi></td><td className="min-w-0 px-3 py-3 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5" style={primary}>{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4" style={muted}>{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3"><bdi dir="ltr">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.discount, locale)}</bdi>{Number(item.discount_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.discount_rate)}%</bdi> {t("admin.documentDetail.field.discountRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3"><bdi dir="ltr" className="block">{money(item.tax, locale)}</bdi>{Number(item.tax_rate) > 0 && <span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.tax_rate)}%</bdi> {t("admin.documentDetail.field.taxRate")}</span>}</td><td className="whitespace-nowrap px-3 py-3 font-semibold"><bdi dir="ltr">{money(item.total ?? item.line_total, locale)}</bdi></td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-sm" style={muted}>{t("admin.documentDetail.empty.noInvoiceItems")}</td></tr>}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[30%]"/><col className="w-[8%]"/><col className="w-[8%]"/><col className="w-[12%]"/><col className="w-[12%]"/><col className="w-[12%]"/><col className="w-[14%]"/></colgroup><thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading, index) => <th key={heading} dir="auto" className={`whitespace-nowrap px-3 py-2.5 font-semibold ${index >= 3 ? "text-end" : "text-start"}`}>{heading}</th>)}</tr></thead><tbody>{previewItems.map((item, index) => <tr key={item._id || index} className="border-t" style={{ borderColor: "var(--border-color)" }}><td className="px-3 py-3" style={muted}><bdi dir="ltr">{index + 1}</bdi></td><td className="min-w-0 px-3 py-3 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5" style={primary}>{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4" style={muted}>{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-3 py-3 font-mono" style={muted}><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-3 py-3 text-end"><bdi dir="ltr" className="tabular-nums">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-3 py-3 text-end"><bdi dir="ltr" className="tabular-nums">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-3 py-3 text-end"><bdi dir="ltr" className="block tabular-nums">− {money(item.discount, locale)}</bdi><span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.discount_rate) || 0}%</bdi></span></td><td className="whitespace-nowrap px-3 py-3 text-end"><bdi dir="ltr" className="block tabular-nums">{money(item.tax, locale)}</bdi><span className="mt-0.5 block text-[10px]" style={muted}><bdi dir="ltr">{Number(item.tax_rate) || 0}%</bdi></span></td><td className="whitespace-nowrap px-3 py-3 text-end font-semibold"><bdi dir="ltr" className="tabular-nums">{money(item.total ?? item.line_total, locale)}</bdi></td></tr>)}{!previewItems.length && <tr><td colSpan={8} className="p-8 text-center text-sm" style={muted}>{t("admin.documentDetail.empty.noInvoiceItems")}</td></tr>}</tbody></table></div>
           </Panel>
         </div>
         {invoice.terms && <div className="mt-4"><Panel title={t("admin.documentDetail.panel.termsConditions")} icon={FileText}><div className="p-4 text-xs leading-5" style={muted}>{/<[a-z][\s\S]*>/i.test(invoice.terms) ? <div className="invoice-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(invoice.terms) }} /> : <p className="whitespace-pre-wrap">{invoice.terms}</p>}</div></Panel></div>}
@@ -495,7 +518,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       </aside>
     </div>
 
-    {previewOpen && <PreviewModal onClose={() => setPreviewOpen(false)}><div ref={invoicePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly documentType="invoice" storageKey={INVOICE_TEMPLATE_STORAGE_KEY} form={{ customer_name: invoice.customer_name || "", customer_email: invoice.customer_email || "", customer_phone: invoice.customer_phone || "", customer_address: invoice.customer_address || "", invoice_date: invoice.invoice_date || "", due_date: invoice.due_date || "", terms: invoice.terms || "", notes: "", items: previewItems }} totals={{ subtotal: invoice.subtotal, discount: invoice.discount, tax: invoice.tax, total: invoice.total }} quoteNumber={invoice.invoice_number} quoteStatus={displayStatus} savedDesign={invoice.pdf_design || {}} money={(value) => money(value, locale)} /></div></PreviewModal>}
+    {previewOpen && <PreviewModal onClose={() => { if (printQueued) { setPrintQueued(false); setIsGeneratingPdf(false); printHandled.current = false; } setPreviewOpen(false); }}><div id="invoice-document-preview" ref={invoicePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly documentType="invoice" storageKey={INVOICE_TEMPLATE_STORAGE_KEY} form={{ customer_name: invoice.customer_name || "", customer_email: invoice.customer_email || "", customer_phone: invoice.customer_phone || "", customer_address: invoice.customer_address || "", invoice_date: invoice.invoice_date || "", due_date: invoice.due_date || "", terms: invoice.terms || "", notes: "", items: previewItems }} totals={{ subtotal, itemDiscount: itemDiscountBase, overallDiscount: additionalInvoiceDiscount, taxableAmount, discount: invoice.discount, tax: invoice.tax, total: invoice.total }} quoteNumber={invoice.invoice_number} quoteStatus={displayStatus} savedDesign={invoice.pdf_design || {}} money={(value) => money(value, locale)} /></div></PreviewModal>}
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
@@ -505,20 +528,20 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       @media print {
         html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
         body * { visibility: hidden !important; }
-        #invoice-document-preview [data-quote-document-page="true"],
-        #invoice-document-preview [data-quote-document-page="true"] * { visibility: visible !important; }
-        #invoice-print-area > .grid { display: block !important; }
-        #invoice-print-area > .grid > main { display: block !important; width: 100% !important; max-width: none !important; }
-        #invoice-print-area > .grid > aside,
-        #invoice-print-area > :not(.grid) { display: none !important; }
-        #invoice-document-preview { display: block !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+        #invoice-print-area > :not(#invoice-preview-modal), #invoice-print-area > :not(#invoice-preview-modal) * { display: none !important; }
+        #invoice-preview-modal { display: block !important; position: absolute !important; inset: 0 !important; z-index: auto !important; overflow: visible !important; padding: 0 !important; background: #fff !important; backdrop-filter: none !important; }
+        #invoice-preview-modal, #invoice-preview-modal * { visibility: visible !important; }
+        #invoice-preview-modal > section { display: block !important; width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; }
+        #invoice-preview-modal .document-preview-modal-header { display: none !important; }
+        #invoice-preview-modal > section > div { overflow: visible !important; padding: 0 !important; background: #fff !important; }
+        #invoice-document-preview { display: block !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
         #invoice-document-preview .quote-saved-preview { margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: #fff !important; }
         #invoice-document-preview .quote-saved-preview > div { padding: 0 !important; background: #fff !important; }
         #invoice-document-preview .quote-no-print,
         #invoice-document-preview button,
         #invoice-document-preview a { display: none !important; }
         #invoice-document-preview .quote-preview-page-break { display: none !important; }
-        #invoice-document-preview [data-quote-document-page="true"] { width: 100% !important; max-width: none !important; height: auto !important; min-height: 0 !important; aspect-ratio: var(--quote-page-ratio) !important; margin: 0 !important; overflow: hidden !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
+        #invoice-document-preview [data-quote-document-page="true"] { display: block !important; width: 100% !important; max-width: none !important; height: auto !important; min-height: 0 !important; aspect-ratio: var(--quote-page-ratio) !important; margin: 0 !important; overflow: hidden !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; zoom: 1 !important; break-after: page; page-break-after: always; }
         #invoice-document-preview .quote-preview-page-number { display: block !important; position: absolute !important; right: 8mm !important; bottom: 6mm !important; margin: 0 !important; padding: 0 !important; }
         #invoice-document-preview [data-quote-document-page="true"]:last-child { break-after: auto; page-break-after: auto; }
         #invoice-document-preview, #invoice-document-preview * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }

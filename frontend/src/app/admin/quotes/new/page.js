@@ -675,7 +675,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
       !form.quote_date ||
       !form.expiry_date ||
       form.expiry_date < form.quote_date
-    ) {
+    ) {    
       toast.error("Expiry date must be on or after the quote date");
       return;
     }

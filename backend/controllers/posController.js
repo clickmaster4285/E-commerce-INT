@@ -205,7 +205,8 @@ const returnPosSaleItems = async (req, res) => {
     }
     const returnLines = [];
     let refundTotal = 0;
-    const taxInclusiveItemsTotal = sale.items.reduce((sum, line) => sum + (Number(line.line_total) || 0) * (1 + (Number(line.tax_rate) || 0) / 100), 0);
+    const additionalTaxRate = Math.min(100, Math.max(0, Number(sale.additional_tax_rate) || 0));
+    const taxInclusiveItemsTotal = sale.items.reduce((sum, line) => sum + (Number(line.line_total) || 0) * (1 + ((Number(line.tax_rate) || 0) + additionalTaxRate) / 100), 0);
     const itemDiscounts = sale.items.reduce((sum, line) => sum + (Number(line.discount_amount) || 0), 0);
     const saleLevelDiscount = Math.max(0, (Number(sale.discount_amount) || 0) - itemDiscounts);
     for (const requested of items) {
@@ -217,7 +218,7 @@ const returnPosSaleItems = async (req, res) => {
       const alreadyReturned = returnedSoFar.get(variantId) || 0;
       const requestedTotal = returnLines.filter((line) => String(line.variant_id) === variantId).reduce((sum, line) => sum + line.quantity, 0) + quantity;
       if (alreadyReturned + requestedTotal > original.quantity) throw new Error(`Only ${Math.max(0, original.quantity - alreadyReturned)} more ${original.product_name} item(s) can be returned`);
-      const gross = Number(original.line_total) * (1 + (Number(original.tax_rate) || 0) / 100);
+      const gross = Number(original.line_total) * (1 + ((Number(original.tax_rate) || 0) + additionalTaxRate) / 100);
       const allocatedSaleDiscount = taxInclusiveItemsTotal > 0 ? saleLevelDiscount * (gross / taxInclusiveItemsTotal) : 0;
       const refund = Math.round(Math.max(0, gross - allocatedSaleDiscount) / original.quantity * quantity);
       refundTotal += refund;
@@ -263,6 +264,10 @@ const savePosSale = async (req, res, existingSale = null) => {
     const normalizedItems = [];
     let subtotal = 0;
     let discountAmount = normalizeMoney(req.body.discount_amount || 0);
+    const additionalTaxRate = Number(req.body.additional_tax_rate ?? 0);
+    if (!Number.isFinite(additionalTaxRate) || additionalTaxRate < 0 || additionalTaxRate > 100) {
+      throw new Error("Additional tax must be between 0 and 100 percent");
+    }
     let itemDiscountTotal = 0;
     let taxAmount = 0;
 
@@ -350,6 +355,7 @@ const savePosSale = async (req, res, existingSale = null) => {
     }
 
     const finalSubtotal = Math.round(subtotal);
+    taxAmount += Math.max(0, subtotal - itemDiscountTotal) * (additionalTaxRate / 100);
     const finalTax = Math.round(taxAmount);
     const finalDiscount = Math.min(itemDiscountTotal + discountAmount, finalSubtotal + finalTax);
     const total = Math.max(0, Math.round(finalSubtotal + finalTax - finalDiscount));
@@ -445,6 +451,7 @@ const savePosSale = async (req, res, existingSale = null) => {
       subtotal: finalSubtotal,
       discount_amount: finalDiscount,
       tax_amount: finalTax,
+      additional_tax_rate: additionalTaxRate,
       total,
       payment: {
         method: paymentMethod,

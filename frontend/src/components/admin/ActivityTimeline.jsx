@@ -27,19 +27,20 @@ const changesFor = (event) => {
   });
 };
 
-export default function ActivityTimeline({ events = [], title = "Activity history", emptyText = "No activity has been recorded yet." }) {
+export default function ActivityTimeline({ events = [], title = "Activity history", emptyText = "No activity has been recorded yet.", variant = "default" }) {
   const { t, locale } = useTranslation();
+  const simple = variant === "simple";
   const sorted = [...events].filter(Boolean)
     .map((event) => ({ ...event, visibleChanges: changesFor(event) }))
     .filter((event) => !(event.type === "updated" && !event.visibleChanges.length))
     .sort((a, b) => new Date(timeOf(b) || 0).getTime() - new Date(timeOf(a) || 0).getTime());
-  return <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-    <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Activity size={15} /></span>
-      <h2 className="text-sm font-bold">{title}</h2>
+  return <section className={`overflow-hidden border border-[var(--border-color)] bg-[var(--bg-card)] ${simple ? "rounded-lg" : "rounded-2xl shadow-sm"}`}>
+    <div className={`flex items-center gap-2.5 border-b border-[var(--border-color)] px-4 py-3 ${simple ? "" : "bg-[var(--bg-card-alt)]"}`}>
+      {simple ? <Activity size={16} className="text-[var(--accent)]" /> : <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><Activity size={15} /></span>}
+      <h2 className="text-sm font-semibold">{title}</h2>
       <span className="ms-auto rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{sorted.length}</span>
     </div>
-    <div className="max-h-[620px] space-y-0 overflow-y-auto p-4">
+    <div className={`max-h-[620px] space-y-0 overflow-y-auto ${simple ? "p-3" : "p-4"}`}>
       {sorted.length ? sorted.map((event, index) => <article key={event._id || `${timeOf(event)}-${index}`} className="relative border-s border-[var(--border-color)] pb-5 ps-5 last:border-0 last:pb-0">
         <span className="absolute -start-[6px] top-1 h-3 w-3 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" />
         <div className="flex flex-wrap items-start justify-between gap-2">

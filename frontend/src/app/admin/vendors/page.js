@@ -9,29 +9,24 @@ import { localizedStrictField } from "@/i18n/localize";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import VendorFormModal, { emptyVendorForm, toVendorForm, toVendorPayload } from "@/components/admin/VendorFormModal";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import {
-  Users, UserCheck, UserX, DollarSign, Star, Plus, Search,
-  MoreVertical, ChevronLeft, ChevronRight,
+  Star, Plus, Search,
+  MoreVertical, ChevronDown, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // Same tokens as Brands/Products pages — no new design system.
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
-const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 const accentBtn = { backgroundColor: "var(--accent)", color: "var(--accent-text)" };
 
 const money = (n, locale = "en") => `Rs. ${new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale).format(Math.max(0, Number(n) || 0))}`;
 
-function StatCard({ icon: Icon, tint, label, value, delta }) {
+function StatCard({ label, value, valueColor }) {
   return (
-    <div className="rounded-xl p-4 flex items-center gap-3" style={cardStyle}>
-      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: tint }}>
-        <Icon size={18} style={{ color: "var(--accent)" }} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{label}</p>
-        <p className="text-[20px] font-bold leading-tight">{value}</p>
-        {delta && <p className="text-[11px]" style={{ color: "var(--success-text)" }}>{delta}</p>}
-      </div>
+    <div className="rounded-lg p-3 sm:p-4" style={cardStyle}>
+      <p className="truncate text-[11px] font-medium sm:text-xs" style={{ color: "var(--text-muted)" }}>{label}</p>
+      <p className="mt-1 truncate text-lg font-bold leading-tight sm:text-xl" style={{ color: valueColor || "var(--text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -159,7 +154,6 @@ export default function VendorsPage() {
   const safePage = Math.min(page, pages);
   const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const resetFilters = () => { setSearch(""); setStatus("all"); setCity("all"); setPage(1); };
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["vendors"] }); };
 
   const saveMutation = useMutation({
@@ -186,37 +180,38 @@ export default function VendorsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">{t("title")}</h1>
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{t("subtitle")}</p>
-        </div>
-        <button onClick={openCreate} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={accentBtn}>
-          <Plus size={15} /> {t("addVendor")}
-        </button>
+      <AdminPageHeader title={t("title")} subtitle={t("subtitle")} actions={<button onClick={openCreate} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={accentBtn}>
+        <Plus size={15} /> {t("addVendor")}
+      </button>} />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <StatCard label={t("totalVendors")} value={new Intl.NumberFormat(locale).format(stats.total)} />
+        <StatCard label={t("activeVendors")} value={new Intl.NumberFormat(locale).format(stats.active)} valueColor="var(--success-text)" />
+        <StatCard label={t("inactiveVendors")} value={new Intl.NumberFormat(locale).format(stats.inactive)} valueColor="var(--warning-text)" />
+        <StatCard label={t("totalPurchaseValue")} value={money(stats.purchase, locale)} valueColor="var(--accent)" />
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <StatCard icon={Users} tint="color-mix(in srgb, var(--accent) 14%, transparent)" label={t("totalVendors")} value={new Intl.NumberFormat(locale).format(stats.total)} delta={stats.fresh ? `↑ ${new Intl.NumberFormat(locale).format(stats.fresh)} ${t("newThisMonth")}` : `— ${t("noChange")}`} />
-        <StatCard icon={UserCheck} tint="var(--success-soft)" label={t("activeVendors")} value={new Intl.NumberFormat(locale).format(stats.active)} delta={stats.freshActive ? `↑ ${new Intl.NumberFormat(locale).format(stats.freshActive)} ${t("newThisMonth")}` : `— ${t("noChange")}`} />
-        <StatCard icon={UserX} tint="var(--danger-soft)" label={t("inactiveVendors")} value={new Intl.NumberFormat(locale).format(stats.inactive)} delta={`— ${t("noChange")}`} />
-        <StatCard icon={DollarSign} tint="color-mix(in srgb, #f59e0b 16%, transparent)" label={t("totalPurchaseValue")} value={money(stats.purchase, locale)} delta={t("lifetimePurchaseValue")} />
-      </div>
-
-      <div className="rounded-xl overflow-hidden min-w-0" style={cardStyle}>
-        <div className="p-3 grid sm:grid-cols-2 lg:grid-cols-[1fr_140px_140px_auto] gap-2" style={{ borderBottom: "1px solid var(--border-color)" }}>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Search size={14} /></span>
-              <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t("searchPlaceholder")} className="w-full h-9 pl-9 pr-3 rounded-md text-sm outline-none" style={inputStyle} />
-            </div>
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="h-9 px-2 rounded-md text-sm outline-none" style={inputStyle}>
-              <option value="all">{t("statusAll")}</option><option value="active">{tShared("status.active")}</option><option value="inactive">{tShared("status.inactive")}</option>
-            </select>
-            <select value={city} onChange={(e) => { setCity(e.target.value); setPage(1); }} className="h-9 px-2 rounded-md text-sm outline-none" style={inputStyle}>
-              <option value="all">{t("cityAll")}</option>{cities.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <button onClick={resetFilters} className="h-9 px-3 rounded-md text-[13px] font-semibold transition hover:opacity-80" style={{ ...cardStyle, borderRadius: "8px" }}>{tShared("action.reset")}</button>
+      <div className="min-w-0 space-y-3">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="relative w-full md:w-[400px]">
+            <span className="absolute start-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Search size={14} /></span>
+            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder={t("searchPlaceholder")} className="w-full h-9 ps-9 pe-3 rounded-lg text-[13px] outline-none" style={inputStyle} />
           </div>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
+              <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
+                <option value="all">{t("statusAll")}</option><option value="active">{tShared("status.active")}</option><option value="inactive">{tShared("status.inactive")}</option>
+              </select>
+              <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><ChevronDown size={14} /></span>
+            </div>
+            <div className="relative min-w-0 flex-1 sm:flex-none">
+              <select value={city} onChange={(e) => { setCity(e.target.value); setPage(1); }} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
+                <option value="all">{t("cityAll")}</option>{cities.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><ChevronDown size={14} /></span>
+            </div>
+          </div>
+        </div>
 
           {selected.length > 0 && (
             <div className="px-4 py-2 flex items-center justify-between text-[13px]" style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
@@ -225,6 +220,7 @@ export default function VendorsPage() {
             </div>
           )}
 
+          <div className="rounded-lg overflow-hidden" style={cardStyle}>
           {isLoading ? <p className="p-6 text-sm text-center" style={{ color: "var(--text-muted)" }}>{t("loading")}</p> : (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
@@ -232,9 +228,9 @@ export default function VendorsPage() {
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allOnPage} onChange={() => setSelected(allOnPage ? selected.filter((id) => !rows.some((r) => r._id === id)) : [...new Set([...selected, ...rows.map((r) => r._id)])])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
                     {[t("table.vendorCode"), t("table.name"), t("table.company"), t("table.city"), t("table.rating"), t("table.balancePayable"), t("table.status")].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
+                      <th key={h} className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
                     ))}
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{tShared("label.actions")}</th>
+                    <th className="min-w-20 whitespace-nowrap px-2 py-3 text-end text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{tShared("label.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -248,7 +244,7 @@ export default function VendorsPage() {
                       <td className="px-4 py-2.5 whitespace-nowrap"><span className="inline-flex items-center gap-1"><Star size={12} style={{ color: "#f59e0b" }} />{(Number(v.rating) || 0).toFixed(1)}</span></td>
                       <td className="px-4 py-2.5 font-semibold">{money(v.balance_payable, locale)}</td>
                       <td className="px-4 py-2.5"><Pill tone={v.is_active ? "active" : "inactive"}>{v.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill></td>
-                      <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <td className="min-w-20 px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <VendorRowMenu
                           v={v}
                           onView={(row) => router.push(`/admin/vendors/${row._id}`)}
@@ -265,8 +261,9 @@ export default function VendorsPage() {
               </table>
             </div>
           )}
+          </div>
 
-          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
+          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-4 py-3 text-[13px]" style={{ ...cardStyle, color: "var(--text-secondary)" }}>
             <span>{t("showingRange", { from: (safePage - 1) * PAGE_SIZE + (rows.length ? 1 : 0), to: (safePage - 1) * PAGE_SIZE + rows.length, total: filtered.length })}</span>
             <div className="flex items-center gap-1">
               <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronLeft size={14} /></button>

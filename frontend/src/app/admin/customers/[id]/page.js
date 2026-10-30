@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customerApi } from "@/apis/admin/customerApi";
 import ActivityTimeline from "@/components/admin/ActivityTimeline";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { toast } from "sonner";
 import {
-  ArrowLeft, CalendarDays, Check, ChevronRight, CreditCard, Mail, MapPin,
-  Eye, FilePlus2, Pencil, Phone, Tag, Trash2, UserRound, Users, X,
+  ArrowLeft, CalendarDays, Check, CreditCard, Mail, MapPin,
+  Eye, FilePlus2, Pencil, Phone, Tag, Trash2, UserRound, X,
 } from "lucide-react";
 
 const emptyForm = { name: "", phone: "", email: "", address: "", notes: "" };
@@ -59,8 +60,8 @@ export default function CustomerDetailPage({ params }) {
     updateMutation.mutate(form);
   };
 
-  if (isLoading) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center text-sm text-[var(--text-muted)]">{t("admin.customers.detail.loading")}</div>;
-  if (isError || !customer) return <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center"><p className="text-sm font-semibold">{t("admin.customers.detail.notFound")}</p><Link href="/admin/customers" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"><ArrowLeft size={14} /> {t("admin.customers.detail.back")}</Link></div>;
+  if (isLoading) return <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center text-sm text-[var(--text-muted)]">{t("admin.customers.detail.loading")}</div>;
+  if (isError || !customer) return <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center"><p className="text-sm font-semibold">{t("admin.customers.detail.notFound")}</p><Link href="/admin/customers" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"><ArrowLeft size={14} /> {t("admin.customers.detail.back")}</Link></div>;
 
   const facts = [
     { label: t("common.phone"), value: customer.phone || t("common.notProvided"), Icon: Phone },
@@ -70,13 +71,13 @@ export default function CustomerDetailPage({ params }) {
   ];
 
   return <div dir={dir} className="space-y-4 text-[var(--text-primary)]">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]"><Link href="/admin/customers" className="inline-flex items-center gap-1 transition hover:text-[var(--accent)]"><ArrowLeft size={14} /> {t("admin.customers.title")}</Link><ChevronRight size={13} /><span>{customer.name}</span></div>
-        <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={22} /></span><div><h1 className="text-xl font-bold tracking-tight sm:text-2xl">{customer.name}</h1><p className="mt-0.5 text-xs text-[var(--text-muted)]">{t("admin.customers.detail.subtitle")}</p></div></div>
-      </div>
-      <div className="flex gap-2"><button type="button" onClick={openEdit} className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 text-xs font-semibold text-[var(--text-secondary)] transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md"><Pencil size={14} /> {t("admin.customers.detail.edit")}</button><button type="button" onClick={() => { if (window.confirm(t("admin.customers.confirm.delete", { name: customer.name }))) deleteMutation.mutate(); }} disabled={deleteMutation.isPending} className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--danger)]/30 bg-[var(--bg-card)] px-4 text-xs font-semibold text-[var(--danger-text)] transition-all hover:-translate-y-0.5 hover:bg-[var(--danger-soft)] hover:shadow-md disabled:opacity-50"><Trash2 size={14} /> {t("common.delete")}</button></div>
-    </header>
+    <div className="flex min-w-0 items-start gap-3">
+      <Link href="/admin/customers" aria-label={t("admin.customers.title")} title={t("admin.customers.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-[var(--bg-row-hover)]" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></Link>
+      <div className="min-w-0 flex-1"><AdminPageHeader title={t("admin.customers.detail.pageTitle")} subtitle={customer.name} actions={<>
+        <button type="button" onClick={openEdit} className="inline-flex h-9 items-center gap-2 rounded-lg border px-3.5 text-[13px] font-semibold transition hover:bg-[var(--bg-row-hover)]" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)" }}><Pencil size={14} /> {t("admin.customers.detail.edit")}</button>
+        <button type="button" onClick={() => { if (window.confirm(t("admin.customers.confirm.delete", { name: customer.name }))) deleteMutation.mutate(); }} disabled={deleteMutation.isPending} className="inline-flex h-9 items-center gap-2 rounded-lg border px-3.5 text-[13px] font-semibold transition hover:bg-[var(--danger-soft)] disabled:opacity-50" style={{ borderColor: "var(--danger)", color: "var(--danger-text)" }}><Trash2 size={14} /> {t("common.delete")}</button>
+      </>} /></div>
+    </div>
 
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric icon={CreditCard} label={t("admin.customers.detail.totalPurchases")} value={String(customer.total_sales || 0)} />
@@ -86,28 +87,29 @@ export default function CustomerDetailPage({ params }) {
     </section>
 
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
-      <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+      <section className="overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
         <PanelHeader icon={UserRound} title={t("admin.customers.detail.information")} />
-        <div className="grid gap-x-8 gap-y-1 p-4 sm:grid-cols-2 sm:p-5">
+        <div className="grid gap-x-6 gap-y-0 p-3 sm:grid-cols-2 sm:p-4">
           {facts.map(({ label, value, Icon }) => <Fact key={label} icon={Icon} label={label} value={value} />)}
           <Fact icon={CalendarDays} label={t("admin.customers.detail.lastUpdated")} value={dateTime(customer.updated_at, locale, t)} />
         </div>
       </section>
 
       <div className="space-y-4">
-        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+        <section className="overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
           <PanelHeader icon={Tag} title={t("admin.customers.detail.notes")} />
-          <div className="min-h-36 p-4 sm:p-5"><p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{customer.notes || t("admin.customers.detail.noNotes")}</p></div>
+          <div className="p-4"><p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{customer.notes || t("admin.customers.detail.noNotes")}</p></div>
         </section>
-        <ActivityTimeline events={customer.activity?.length ? customer.activity : [{ type: "created", at: customer.created_at, actor_name: customer.createdby?.name || "Staff", changes: [] }]} title="Customer activity" />
+        <ActivityTimeline events={customer.activity?.length ? customer.activity : [{ type: "created", at: customer.created_at, actor_name: customer.createdby?.name || "Staff", changes: [] }]} title="Customer activity" variant="simple" />
       </div>
     </div>
 
-    <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
+    <section className="overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
       <PanelHeader icon={CreditCard} title={t("admin.customers.detail.purchaseHistory")} trailing={<span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-semibold text-[var(--accent)]">{t("admin.customers.detail.purchases", { count: customer.total_sales || 0 })}</span>} />
-      <div className="flex gap-2 border-b border-[var(--border-color)] px-4 py-3">{[["pos", t("admin.customers.detail.purchaseHistory")], ["quotes", "Quotes"], ["invoices", "Invoices"]].map(([key, label]) => <button key={key} type="button" onClick={() => setHistoryTab(key)} className={`rounded-lg px-3 py-2 text-xs font-semibold ${historyTab === key ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}>{label}</button>)}</div>     {historyTab === "pos" && <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-start">
-        <thead className="bg-[var(--bg-tertiary)] text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]"><tr><th className="px-4 py-3">{t("admin.customers.detail.posNumber")}</th><th className="px-4 py-3">{t("common.date")}</th><th className="px-4 py-3">{t("admin.pos.ui.paymentMethod")}</th><th className="px-4 py-3 text-end">{t("common.total")}</th><th className="w-14 px-4 py-3 text-end">{t("admin.customers.detail.view")}</th></tr></thead>
-        <tbody>{(customer.recent_sales || []).map((sale) => <tr key={sale._id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]"><td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">{sale.sale_number || `POS-${String(sale._id).slice(-6)}`}</td><td className="px-4 py-3 text-xs text-[var(--text-secondary)]">{dateTime(sale.created_at, locale, t)}</td><td className="px-4 py-3 text-xs capitalize text-[var(--text-secondary)]">{paymentLabel(sale.payment?.method, t)}</td><td className="px-4 py-3 text-end text-xs font-bold">{money(sale.total, locale)}</td><td className="px-4 py-3 text-end"><Link href={`/admin/pos/history/${sale._id}`} aria-label={t("admin.customers.detail.viewSale", { sale: sale.sale_number || t("admin.customers.detail.details") })} title={t("admin.customers.detail.viewSaleDetails")} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"><Eye size={15} /></Link></td></tr>)}
+      <div className="flex gap-5 border-b border-[var(--border-color)] px-4">{[["pos", t("admin.customers.detail.purchaseHistory")], ["quotes", "Quotes"], ["invoices", "Invoices"]].map(([key, label]) => <button key={key} type="button" onClick={() => setHistoryTab(key)} className={`border-b-2 px-1 py-3 text-xs font-medium transition-colors ${historyTab === key ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}>{label}</button>)}</div>
+      {historyTab === "pos" && <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-start">
+        <thead className="bg-[var(--bg-tertiary)] text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]"><tr><th className="px-4 py-3">{t("admin.customers.detail.posNumber")}</th><th className="px-4 py-3">{t("common.date")}</th><th className="px-4 py-3">{t("admin.pos.ui.paymentMethod")}</th><th className="px-4 py-3 text-end">{t("common.total")}</th><th className="w-14 px-4 py-3 text-end">{t("admin.customers.detail.view")}</th></tr></thead>
+        <tbody>{(customer.recent_sales || []).map((sale) => <tr key={sale._id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]"><td className="px-4 py-3 font-mono text-xs font-semibold text-[var(--accent)]">{sale.sale_number || `POS-${String(sale._id).slice(-6)}`}</td><td className="px-4 py-3 text-xs text-[var(--text-secondary)]">{dateTime(sale.created_at, locale, t)}</td><td className="px-4 py-3 text-xs capitalize text-[var(--text-secondary)]">{paymentLabel(sale.payment?.method, t)}</td><td className="px-4 py-3 text-end text-xs font-bold">{money(sale.total, locale)}</td><td className="px-4 py-3 text-end"><Link href={`/admin/pos/history/${sale._id}`} aria-label={t("admin.customers.detail.viewSale", { sale: sale.sale_number || t("admin.customers.detail.details") })} title={t("admin.customers.detail.viewSaleDetails")} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--accent)] transition hover:bg-[var(--bg-row-hover)]"><Eye size={15} /></Link></td></tr>)}
           {!(customer.recent_sales || []).length && <tr><td colSpan={5} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">{t("admin.customers.detail.noPurchases")}</td></tr>}
         </tbody>
       </table></div>}
@@ -126,8 +128,8 @@ export default function CustomerDetailPage({ params }) {
   </div>;
 }
 
-function Metric({ icon: Icon, label, value }) {
-  return <div className="flex items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Icon size={17} /></span><div className="min-w-0"><p className="text-[10px] font-semibold text-[var(--text-muted)]">{label}</p><p className="mt-1 truncate text-sm font-bold">{value}</p></div></div>;
+function Metric({ label, value }) {
+  return <div className="min-w-0 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3 sm:p-4"><p className="text-[11px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 truncate text-lg font-bold">{value}</p></div>;
 }
 function DocumentHistory({ records, numberKey, dateKey, hrefBase, emptyText }) {
   return <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left">
@@ -144,10 +146,10 @@ function DocumentHistory({ records, numberKey, dateKey, hrefBase, emptyText }) {
     </table></div>;
 }
 function PanelHeader({ icon: Icon, title, trailing }) {
-  return <div className="flex items-center gap-2.5 border-b border-[var(--border-color)] bg-[var(--bg-card-alt)] px-4 py-3"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm"><Icon size={15} /></span><h2 className="text-sm font-bold">{title}</h2><div className="ms-auto">{trailing}</div></div>;
+  return <div className="flex items-center gap-2 border-b border-[var(--border-color)] px-4 py-3"><Icon size={16} className="text-[var(--accent)]" /><h2 className="text-sm font-semibold">{title}</h2><div className="ms-auto">{trailing}</div></div>;
 }
-function Fact({ icon: Icon, label, value }) {
-  return <div className="group flex min-w-0 items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-row-hover)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] transition-colors group-hover:text-[var(--accent)]"><Icon size={15} /></span><div className="min-w-0"><p className="text-[10px] font-medium text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-xs font-semibold">{value}</p></div></div>;
+function Fact({ label, value }) {
+  return <div className="min-w-0 border-b border-[var(--border-color)] px-1 py-3"><p className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-[13px] font-medium text-[var(--text-primary)]">{value}</p></div>;
 }
 function EditField({ label, value, onChange, type = "text", required = false }) {
   return <label className="space-y-1.5 text-xs font-semibold text-[var(--text-secondary)]">{label}{required && <span className="text-[var(--danger-text)]"> *</span>}<input type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm font-normal text-[var(--text-primary)] outline-none transition hover:shadow-sm focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" /></label>;
