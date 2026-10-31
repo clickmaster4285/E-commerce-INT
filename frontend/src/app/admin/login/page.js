@@ -9,6 +9,7 @@ import { storeApi } from '@/apis/admin/storeApi';
 import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
 import { toast } from 'sonner';
 import { useTranslation } from '@/i18n/LanguageProvider';
+import AdminLanguageSwitcher from '@/components/adminComponents/AdminLanguageSwitcher';
 import {
   Mail,
   Lock,
@@ -242,13 +243,15 @@ export default function AdminLoginPage() {
       <aside
         className="relative z-20 hidden shrink-0 flex-col overflow-hidden px-8 py-7 text-white lg:flex lg:w-[48%] xl:w-[52%] xl:px-14 xl:py-10"
         style={{
-          background: '#0f172a', // Fallback color
+          background: locale === 'en'
+            ? '#0f172a'
+            : 'radial-gradient(circle at 82% 68%, rgba(59, 130, 246, 0.42), transparent 35%), linear-gradient(135deg, #020617, #172554 58%, #1e3a8a)',
         }}
       >
         {/* Background Image Layer - CSS fallback handles missing images */}
         <>
           <div
-            className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500"
+            className={`absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${locale === 'en' ? '' : 'hidden'}`}
             style={{ backgroundImage: `url(${LOGIN_BACKGROUND_IMAGE_SRC})` }}
           />
           {/* Keep the dashboard artwork bright while preserving text contrast. */}
@@ -327,9 +330,14 @@ export default function AdminLoginPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -start-24 h-80 w-80 rounded-full" style={{ background: 'radial-gradient(circle, rgba(37, 99, 235, 0.06), transparent 65%)' }} />
 
         {/* Admin portal context */}
-        <div className="absolute end-7 top-6 hidden items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]/90 px-3.5 py-2 text-[12px] font-medium text-[var(--text-secondary)] shadow-sm backdrop-blur-sm md:flex">
-          <ShieldCheck size={15} className="text-[var(--accent)]" aria-hidden="true" />
-          {t('admin.login.portal')}
+        <div className="absolute end-5 top-5 z-30 flex items-center gap-2 md:end-7 md:top-6">
+          <div className="rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]/90 px-2 py-1 shadow-sm backdrop-blur-sm">
+            <AdminLanguageSwitcher />
+          </div>
+          <div className="hidden items-center gap-2 rounded-full border border-[var(--border-color)] bg-[var(--bg-card)]/90 px-3.5 py-2 text-[12px] font-medium text-[var(--text-secondary)] shadow-sm backdrop-blur-sm md:flex">
+            <ShieldCheck size={15} className="text-[var(--accent)]" aria-hidden="true" />
+            {t('admin.login.portal')}
+          </div>
         </div>
 
         <div className="relative w-full max-w-[360px]">

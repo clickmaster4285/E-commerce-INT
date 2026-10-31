@@ -244,6 +244,7 @@ export default function ManageStockPage() {
   });
 
   const [adjustError, setAdjustError] = useState("");
+  const [adjustErrors, setAdjustErrors] = useState({});
   const [detailsTarget, setDetailsTarget] = useState(null);
   const itemsPerPage = 20;
 
@@ -391,11 +392,12 @@ export default function ManageStockPage() {
   const openAdjustModal = (item) => {
     setAdjustForm({ type: "add", quantity: "", reason: "", customReason: "" });
     setAdjustError("");
+    setAdjustErrors({});
     setAdjustTarget(item);
     setIsReasonOpen(false);
   };
 
-  const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); setIsReasonOpen(false); };
+  const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); setAdjustErrors({}); setIsReasonOpen(false); };
 
   useEffect(() => {
     if (!detailsTarget && !adjustTarget) return;
@@ -415,32 +417,37 @@ export default function ManageStockPage() {
   }, [detailsTarget, adjustTarget]);
 
   const validateAdjust = () => {
+    const errors = {};
     const qtyRaw = adjustForm.quantity.trim();
-    if (!qtyRaw) return t("admin.manageStock.validation.quantityRequired");
     const qty = Number(qtyRaw);
-    if (!Number.isInteger(qty) || qty < 0) return t("admin.manageStock.validation.quantityWholeNonnegative");
-    if (qty === 0) return t("admin.manageStock.validation.quantityPositive");
-    if (adjustForm.type === "remove" && qty > Number(adjustTarget.quantity ?? 0)) {
-      return t("admin.manageStock.validation.notEnoughStock", { qty: formatNumber(qty, locale), stock: formatNumber(adjustTarget.quantity, locale) });
+    if (!qtyRaw) errors.quantity = t("admin.manageStock.validation.quantityRequired");
+    else if (!Number.isInteger(qty) || qty < 0) errors.quantity = t("admin.manageStock.validation.quantityWholeNonnegative");
+    else if (qty === 0) errors.quantity = t("admin.manageStock.validation.quantityPositive");
+    else if (adjustForm.type === "remove" && qty > Number(adjustTarget.quantity ?? 0)) {
+      errors.quantity = t("admin.manageStock.validation.notEnoughStock", { qty: formatNumber(qty, locale), stock: formatNumber(adjustTarget.quantity, locale) });
     }
-    
-    if (!adjustForm.reason) return t("admin.manageStock.validation.reasonRequired");
-    if (adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim()) {
-      return t("admin.manageStock.validation.customReasonRequired");
-    }
-    // ✅ Explanation ab OPTIONAL nahi — required hai (har adjustment ka clear
-    // justification Stock History mein record hona zaroori hai).
+
+    if (!adjustForm.reason) errors.reason = t("admin.manageStock.validation.reasonRequired");
     if (!adjustForm.customReason.trim()) {
-      return t("admin.manageStock.validation.explanationRequired");
+      errors.customReason = adjustForm.reason === "__OTHER__"
+        ? t("admin.manageStock.validation.customReasonRequired")
+        : t("admin.manageStock.validation.explanationRequired");
     }
-    return "";
+    return errors;
   };
 
   const handleAdjustSubmit = (e) => {
     e.preventDefault();
-    const validationMsg = validateAdjust();
-    if (validationMsg) { setAdjustError(validationMsg); return; }
-    
+    const validationErrors = validateAdjust();
+    setAdjustErrors(validationErrors);
+    if (Object.keys(validationErrors).length) {
+      setAdjustError("");
+      toast.error(validationErrors.reason || Object.values(validationErrors)[0]);
+      const firstInvalidField = Object.keys(validationErrors)[0];
+      document.getElementById(`stock-adjust-${firstInvalidField}`)?.focus();
+      return;
+    }
+
     setAdjustError("");
     const finalReason = adjustForm.reason === "__OTHER__" 
       ? adjustForm.customReason.trim() 
@@ -992,7 +999,8 @@ export default function ManageStockPage() {
                           <button 
                             type="button" 
                             onClick={() => { 
-                              setAdjustError(""); 
+                              setAdjustError("");
+                              setAdjustErrors({});
                               setAdjustForm({ ...adjustForm, type: opt.value, quantity: "", reason: "", customReason: "" }); 
                               setIsReasonOpen(false); 
                             }} 
@@ -1021,17 +1029,30 @@ export default function ManageStockPage() {
 
                   {/* Quantity Input — stock sirf poore units mein (decimal allowed nahi) */}
                   <div>
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{t("admin.manageStock.page.quantity")} <span style={{ color: "var(--danger)" }}>*</span></label>
+                    <label htmlFor="stock-adjust-quantity" className="block text-[12px] font-medium mb-1.5" style={{ color: adjustErrors.quantity ? "var(--danger)" : "var(--text-secondary)" }}>{t("admin.manageStock.page.quantity")} <span style={{ color: "var(--danger)" }}>*</span></label>
                     <input 
-                      type="number" 
-                      min={1} 
+                      id="stock-adjust-quantity"
+                      type="number"
+                      min={1}
                       max={adjustForm.type === "remove" ? (adjustTarget.quantity ?? 0) : undefined}
-                      step="1" 
+                      step="1"
                       inputMode="numeric"
                       value={adjustForm.quantity} 
                       onKeyDown={(e) => { if ([".", ",", "-", "+", "e", "E"].includes(e.key)) e.preventDefault(); }}
+                      onWheel={(e) => {
+                        if (document.activeElement !== e.currentTarget) return;
+                        e.preventDefault();
+                        const maxStock = adjustForm.type === "remove" ? Number(adjustTarget.quantity ?? 0) : Infinity;
+                        const currentQuantity = Number(adjustForm.quantity) || 0;
+                        const nextQuantity = Math.max(1, Math.min(maxStock, currentQuantity + (e.deltaY < 0 ? 1 : -1)));
+                        if (nextQuantity === currentQuantity && adjustForm.quantity) return;
+                        setAdjustForm((current) => ({ ...current, quantity: String(nextQuantity) }));
+                        setAdjustErrors((current) => ({ ...current, quantity: "" }));
+                        setAdjustError("");
+                      }}
                       onChange={(e) => { 
-                        setAdjustError(""); 
+                        setAdjustError("");
+                        setAdjustErrors((current) => ({ ...current, quantity: "" }));
                         const maxStock = adjustForm.type === "remove" ? Number(adjustTarget.quantity ?? 0) : Infinity;
                         // ✅ Poore units hi maane jate hain — decimal point (0.09) ka sirf
                         // integer part rakha jata hai, baaki characters hata diye jate hain.
@@ -1042,12 +1063,13 @@ export default function ManageStockPage() {
                         }
                       }} 
                       disabled={adjustMutation.isPending} 
-                      className="h-11 sm:h-10 px-3 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50" 
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"} 
-                      onBlur={(e) => e.target.style.borderColor = "var(--border-color)"} 
+                      aria-invalid={Boolean(adjustErrors.quantity)}
+                      aria-describedby={adjustErrors.quantity ? "stock-adjust-quantity-error" : undefined}
+                      className={`h-11 sm:h-10 appearance-none px-3 rounded-lg text-[13px] w-full outline-none transition focus-visible:ring-2 ${adjustErrors.quantity ? "focus-visible:ring-red-500/20" : "focus-visible:ring-blue-500/20"} disabled:opacity-50`}
+                      style={{ backgroundColor: "var(--bg-tertiary)", border: `1px solid ${adjustErrors.quantity ? "var(--danger)" : "var(--border-color)"}`, color: "var(--text-primary)" }}
                       placeholder={t(adjustForm.type === "add" ? "admin.manageStock.page.unitsToAdd" : "admin.manageStock.page.unitsToRemove")}
                     />
+                    {adjustErrors.quantity && <p id="stock-adjust-quantity-error" role="alert" className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--danger)" }}>{adjustErrors.quantity}</p>}
             
                     {adjustForm.type === "remove" && (
                       <div className="flex items-center gap-1.5 mt-1.5">
@@ -1080,17 +1102,19 @@ export default function ManageStockPage() {
 
                 {/* Reason Dropdown */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.reason")}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: adjustErrors.reason ? "var(--danger)" : "var(--text-muted)" }}>{t("admin.manageStock.page.reason")} <span style={{ color: "var(--danger)" }}>*</span></p>
                   
                   <div className="relative" ref={dropdownRef}>
                     <button
+                      id="stock-adjust-reason"
                       type="button"
                       onClick={() => setIsReasonOpen(!isReasonOpen)}
                       disabled={adjustMutation.isPending}
                       className="h-11 sm:h-10 px-3 pr-8 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50 flex items-center justify-between"
+                      aria-describedby={adjustErrors.reason ? "stock-adjust-reason-error" : undefined}
                       style={{ 
                         backgroundColor: "var(--bg-tertiary)", 
-                        border: `1px solid ${isReasonOpen ? "var(--accent)" : "var(--border-color)"}`, 
+                        border: `1px solid ${adjustErrors.reason ? "var(--danger)" : isReasonOpen ? "var(--accent)" : "var(--border-color)"}`,
                         color: adjustForm.reason ? "var(--text-primary)" : "var(--text-muted)" 
                       }}
                     >
@@ -1110,6 +1134,8 @@ export default function ManageStockPage() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 setAdjustForm({ ...adjustForm, reason: r, customReason: r === "__OTHER__" ? adjustForm.customReason : "" });
+                                setAdjustErrors((current) => ({ ...current, reason: "", customReason: r === "__OTHER__" && !adjustForm.customReason.trim() ? t("admin.manageStock.validation.customReasonRequired") : "" }));
+                                setAdjustError("");
                                 setIsReasonOpen(false);
                               }}
                               className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-[var(--bg-tertiary)]"
@@ -1128,40 +1154,42 @@ export default function ManageStockPage() {
                       </div>
                     )}
                   </div>
+                  {adjustErrors.reason && <p id="stock-adjust-reason-error" role="alert" className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--danger)" }}>{adjustErrors.reason}</p>}
 
                   <div className="mt-3">
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
+                    <label htmlFor="stock-adjust-customReason" className="block text-[12px] font-medium mb-1.5" style={{ color: adjustErrors.customReason ? "var(--danger)" : "var(--text-secondary)" }}>
                       {t("admin.manageStock.page.explanation")} <span style={{ color: "var(--danger)" }}>*</span>
                     </label>
                     <textarea
+                      id="stock-adjust-customReason"
                       value={adjustForm.customReason}
-                      onChange={(e) => setAdjustForm({ ...adjustForm, customReason: e.target.value })}
+                      onChange={(e) => {
+                        setAdjustForm({ ...adjustForm, customReason: e.target.value });
+                        setAdjustErrors((current) => ({ ...current, customReason: "" }));
+                        setAdjustError("");
+                      }}
                       disabled={adjustMutation.isPending}
                       rows={3}
-                      className="w-full px-3 py-2.5 rounded-lg text-[13px] outline-none transition disabled:opacity-50 resize-none"
+                      aria-invalid={Boolean(adjustErrors.customReason)}
+                      aria-describedby={adjustErrors.customReason ? "stock-adjust-customReason-error" : undefined}
+                      className={`w-full px-3 py-2.5 rounded-lg text-[13px] outline-none transition focus-visible:ring-2 ${adjustErrors.customReason ? "focus-visible:ring-red-500/20" : "focus-visible:ring-blue-500/20"} disabled:opacity-50 resize-none`}
                       style={{ 
                         backgroundColor: "var(--bg-card)", 
-                        border: `1px solid ${!adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}`, 
+                        border: `1px solid ${adjustErrors.customReason ? "var(--danger)" : "var(--border-color)"}`,
                         color: "var(--text-primary)" 
                       }}
-                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                      onBlur={(e) => e.target.style.borderColor = !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}
                       placeholder={t(adjustForm.reason === "__OTHER__" ? "admin.manageStock.page.customReasonPlaceholder" : "admin.manageStock.page.explanationPlaceholder")}
                     />
-                    {!adjustForm.customReason.trim() && (
-                      <p className="text-[11px] mt-1.5" style={{ color: adjustError ? "var(--danger)" : "var(--text-muted)" }}>
-                        {adjustError ? t("admin.manageStock.validation.explanationRequired") : ""}
-                      </p>
-                    )}
+                    {adjustErrors.customReason && <p id="stock-adjust-customReason-error" role="alert" className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--danger)" }}>{adjustErrors.customReason}</p>}
                   </div>
                 </div>
 
-                {/* {adjustError && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+                {adjustError && (
+                  <div role="alert" className="flex items-center gap-2 rounded-lg p-3" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                     <AlertTriangleIcon />
                     <p className="text-[12px]" style={{ color: "var(--danger)" }}>{adjustError}</p>
                   </div>
-                )} */}
+                )}
               </div>
 
               {/* Footer Actions */}

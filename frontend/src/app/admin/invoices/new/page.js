@@ -37,6 +37,12 @@ const input = "h-10 w-full rounded-xl border border-[var(--border-color)] bg-[va
 const label = "mb-1.5 block text-[11px] font-semibold text-[var(--text-secondary)]";
 const rowId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const dateInput = (value) => value ? new Date(value).toISOString().slice(0, 10) : "";
+const mongoIdOf = (value) => {
+  const candidate = value && typeof value === "object" ? value._id ?? value.id : value;
+  if (candidate === null || candidate === undefined || typeof candidate === "object") return "";
+  const id = String(candidate).trim();
+  return /^[a-f\d]{24}$/i.test(id) ? id : "";
+};
 
 const emptyInvoice = () => ({ customer_id: "", customer_name: "", customer_email: "", customer_phone: "", customer_address: "", invoice_date: today(), due_date: today(), payment_terms: "Due on receipt", overall_discount_rate: "0", overall_discount_type: "percent", tax_rate: "0", bank_details: "", terms: "", items: [] });
 
@@ -88,7 +94,7 @@ export default function NewInvoicePage() {const { t } = useTranslation();
     return listOf(rawVariants).filter((variant) => !variant.is_deleted).map((variant) => {
       const stock = stockByVariant.get(String(variant._id || "")) || {};
       const product = variant.product_id && typeof variant.product_id === "object" ? variant.product_id : {};
-      const productId = product._id || variant.product_id || "";
+      const productId = mongoIdOf(product) || mongoIdOf(variant.product_id);
       return { id: String(variant._id || ""), product_id: String(productId), productName: stock.product_name || product.name || variant.name || "Product", variantName: variant.title || variant.sku || "Variant", sku: variant.sku || "", price: Number(variant.selling_price ?? stock.selling_price ?? stock.sell_price ?? 0), image: variant.images?.[0]?.img_url || stock.image || "", stock: Number(variant.quantity ?? stock.quantity ?? stock.stock ?? 0), categoryId: String(stock.category_id?._id || stock.category_id || ""), categoryName: stock.category_name || stock.category_id?.name || "", brandId: String(stock.brand_id?._id || stock.brand_id || ""), brandName: stock.brand_name || stock.brand_id?.name || "" };
     }).filter((variant) => variant.id && variant.product_id);
   }, [rawVariants, rawStock]);
@@ -111,14 +117,16 @@ export default function NewInvoicePage() {const { t } = useTranslation();
   useEffect(() => {
     if (!prefillQuoteId || !prefilledQuote || productsLoading || appliedQuoteId.current === prefillQuoteId) return;
     const quoteItems = (prefilledQuote.items || []).map((item) => {
-      const variantId = String(item.variant_id?._id || item.variant_id || "");
-      const selectedVariant = variants.find((variant) => variant.id === variantId);
+      const variantId = mongoIdOf(item.variant_id);
+      const selectedVariant = variants.find((variant) => variant.id === variantId)
+        || (item.sku ? variants.find((variant) => variant.sku === item.sku) : null);
+      const populatedVariantProductId = mongoIdOf(item.variant_id?.product_id);
       return {
         row_id: rowId(),
-        product_id: String(item.product_id?._id || item.product_id || selectedVariant?.product_id || ""),
-        variant_id: variantId,
+        product_id: mongoIdOf(item.product_id) || selectedVariant?.product_id || populatedVariantProductId,
+        variant_id: variantId || selectedVariant?.id || "",
         name: item.name || selectedVariant?.productName || "",
-        variant_name: "",
+        variant_name: item.variant_name || selectedVariant?.variantName || item.variant_id?.title || "",
         sku: item.sku || selectedVariant?.sku || "",
         image: selectedVariant?.image || "",
         quantity: Number(item.quantity) || 1,
