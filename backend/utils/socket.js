@@ -16,10 +16,12 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
   const mimeType = mimeMatch[1];
   const rawBuffer = Buffer.from(mimeMatch[2], "base64");
 
-  const maxSize = parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) * 1024 * 1024;
-  if (rawBuffer.length > maxSize) throw new Error(`Image too large (max ${process.env.MAX_UPLOAD_SIZE_MB}MB)`);
+  const configuredMaxSize = Number.parseInt(process.env.MAX_UPLOAD_SIZE_MB, 10) || 10;
+  const maxSize = configuredMaxSize * 1024 * 1024;
+  if (rawBuffer.length > maxSize) throw new Error(`Image too large (max ${configuredMaxSize}MB)`);
 
-  const storeDir = path.join(__dirname, "../uploads/store");
+  const uploadDir = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
+  const storeDir = path.join(uploadDir, process.env.STORE_UPLOAD_SUBDIR || "store");
   if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
 
   const safeName = (fileName || "logo")
@@ -103,16 +105,20 @@ const processEmployeeAvatar = async (base64Data) => {
   return `data:image/webp;base64,${optimized.toString("base64")}`;
 };
 
-const deleteOldLogo = async () => {
+const deleteOldLogo = async (logoUrlOverride) => {
   try {
     const Store = require("../models/Store");
     const existing = await Store.findOne();
     if (existing?.logo?.img_url) {
-      const imgUrl = existing.logo.img_url;
+      const imgUrl = logoUrlOverride ?? existing.logo.img_url;
+      if (!imgUrl) return;
+      const uploadDir = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
+      const storeSubdirectory = process.env.STORE_UPLOAD_SUBDIR || "store";
+      const fileName = path.basename(imgUrl);
       const possiblePaths = [
-        path.join(__dirname, "..", imgUrl),
-        path.join(__dirname, "..", "uploads", imgUrl.replace(/^uploads\//, "")),
-        imgUrl.startsWith("/") ? imgUrl : null,
+        path.join(uploadDir, storeSubdirectory, fileName),
+        path.join(__dirname, "..", "uploads", "store", fileName),
+        path.isAbsolute(imgUrl) ? imgUrl : null,
       ].filter(Boolean);
       for (const p of possiblePaths) {
         if (fs.existsSync(p)) { fs.unlinkSync(p); break; }
@@ -505,21 +511,39 @@ const initSocket = (server) => {
       if (!gate.allowed) return;
       try {
         const { updateStoreInfo } = require("../controllers/storeController");
+        const Store = require("../models/Store");
+        const existingStore = await Store.findOne().select("logo.img_url").lean();
+        const previousLogoUrl = existingStore?.logo?.img_url || "";
         let logoFile = null;
         if (payload?.logoBase64) {
-          try { await deleteOldLogo(); logoFile = await compressAndSaveLogo(payload.logoBase64, payload.logoFileName); }
-          catch (e) { log.error("❌ Logo processing error:", e.message); }
+          try {
+            logoFile = await compressAndSaveLogo(payload.logoBase64, payload.logoFileName);
+            if (!logoFile) throw new Error("Logo processing returned no file");
+          } catch (e) {
+            log.error("❌ Logo processing error:", e.message);
+            if (callback) callback({ success: false, message: `Logo upload failed: ${e.message}` });
+            return;
+          }
         }
         const { logoBase64, logoFileName, logoMimeType, ...bodyData } = payload || {};
         const req = {
           user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: gate.name || socket.userName, permissions: gate.permissions || {} },
           body: bodyData, file: logoFile, io
         };
+        let updateResponse = null;
+        const respond = (data) => {
+          updateResponse = data;
+          if (callback) callback(data);
+          if (data?.success) { io.emit("storeUpdated", data.data); io.emit("storeInfoChangedForProfile", data.data); }
+        };
         const res = {
-          status: (c) => ({ json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("storeUpdated", d.data); io.emit("storeInfoChangedForProfile", d.data); } } }),
-          json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("storeUpdated", d.data); io.emit("storeInfoChangedForProfile", d.data); } },
+          status: () => ({ json: respond }),
+          json: respond,
         };
         await updateStoreInfo(req, res);
+        if (updateResponse?.success && logoFile && previousLogoUrl && previousLogoUrl !== logoFile.relativePath) {
+          await deleteOldLogo(previousLogoUrl);
+        }
       } catch (e) { if (callback) callback({ success: false, message: e.message }); }
     });
 

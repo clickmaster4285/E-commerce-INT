@@ -893,7 +893,7 @@ export default function StoreInfoPage() {
             setIsEditing(false);
             toast.success(t("admin.storeInfo.toast.updated"));
           } else {
-            toast.error(t("admin.storeInfo.toast.updateFailed"));
+            toast.error(resp?.message || t("admin.storeInfo.toast.updateFailed"));
           }
           setLoading(false);
         }

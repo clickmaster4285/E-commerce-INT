@@ -304,6 +304,24 @@ function renderBoldText(text) {
   });
 }
 
+function renderRichTerms(html) {
+  const rendered = renderRichHtml(html).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  if (typeof window === "undefined" || !/<[a-z][\s\S]*>/i.test(rendered)) return rendered;
+  const doc = new window.DOMParser().parseFromString(rendered, "text/html");
+  const firstElement = doc.body.firstElementChild;
+  if (firstElement && /^terms\s*&\s*conditions$/i.test(firstElement.textContent.trim())) {
+    firstElement.remove();
+  } else {
+    const walker = doc.createTreeWalker(firstElement || doc.body, window.NodeFilter.SHOW_TEXT);
+    const firstText = walker.nextNode();
+    if (firstText) {
+      firstText.nodeValue = firstText.nodeValue.replace(/^\s*terms\s*&\s*conditions(?=\s*(?:[:—-]|\*\*|$))\s*(?:[:—-]\s*)?/i, "");
+      if (firstElement && !firstElement.textContent.trim() && !firstElement.querySelector("img, input, br")) firstElement.remove();
+    }
+  }
+  return doc.body.innerHTML;
+}
+
 function OptionalDocumentLogo({ src, alt = "", className = "", style }) {
   const [failedSrc, setFailedSrc] = useState(null);
   if (!src || failedSrc === src) return null;
@@ -311,8 +329,8 @@ function OptionalDocumentLogo({ src, alt = "", className = "", style }) {
 }
 
 function QuoteHeaderDetails({ number, status, date, validUntil, labels, title, titleSize, className = "", color = "#475569", emphasis = "#0f172a" }) {
-  return <div className={`space-y-0.5 text-[8px] leading-snug ${className}`} style={{ color }}>
-    <p className="mb-1 font-extrabold leading-none" style={{ color: emphasis, fontSize: `${titleSize}px` }}>{title}</p>
+  return <div className={`space-y-0.5 text-[8px] leading-snug ${className}`} style={{ color, textAlign: "right", lineHeight: 1.35 }}>
+    <p className="mb-1 whitespace-nowrap font-extrabold" style={{ color: emphasis, fontSize: `${titleSize}px`, lineHeight: 1.15 }}>{title}</p>
     <p>{labels.number}: <span className="font-semibold" style={{ color: emphasis }}>{number}</span></p>
     <p>{labels.status}: <span className="font-semibold" style={{ color: emphasis }}>{status}</span></p>
     <p>{labels.date}: <span className="font-semibold" style={{ color: emphasis }}>{date}</span></p>
@@ -353,7 +371,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const previewSummaryRef = useRef(null);
   const termsSectionRef = useRef(null);
   const [previewCanvasWidth, setPreviewCanvasWidth] = useState(0);
-  const [termsFitOnFirstPage, setTermsFitOnFirstPage] = useState(false);
+  const [termsFirstPageTextLength, setTermsFirstPageTextLength] = useState(0);
   const settingsPanelRef = useRef(null);
   const watermarkSettingsRef = useRef(null);
 
@@ -503,9 +521,9 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   };
 
   const { data: store = null } = useQuery({
-    queryKey: ["store-public"],
-    queryFn: () => storeApi.getPublic(),
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["admin-store-info"],
+    queryFn: () => storeApi.get(),
+    staleTime: 0,
   });
 
   /* Persist to localStorage */
@@ -623,12 +641,16 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const rawTerms = String(form?.terms || "");
   const hasTermsPage = design.showTerms !== false && Boolean(form?.terms || form?.notes);
   const hasRichTerms = /<[a-z][\s\S]*>/i.test(rawTerms);
-  const previewTermsText = (hasRichTerms ? htmlToPlainText(rawTerms) : rawTerms)
+  const previewTermsSource = (hasRichTerms ? htmlToPlainText(rawTerms) : rawTerms)
     .replace(/\r\n?/g, "\n")
     .replace(/^\s*#{1,6}\s*/gm, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/^\s*terms\s*&\s*conditions(?=\s*(?:[:—-]|\*\*|\n|$))\s*(?:[:—-]\s*)?/i, "")
     .trim();
-  const previewTermParagraphs = previewTermsText.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+  const additionalNotesText = form?.notes
+    ? `${t("admin.quoteInvoice.ui.additional_notes_41b5f2e6")}: ${form.notes}`
+    : "";
+  const completeTermsText = [previewTermsSource, additionalNotesText].filter(Boolean).join("\n\n");
+  const previewTermsText = completeTermsText.replace(/\*\*(.*?)\*\*/g, "$1").trim();
 
   const isAgencyLayout = design.template === "agency";
   const isMonoLayout = design.template === "mono";
@@ -675,9 +697,28 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     // Reserve the document's bottom padding and printed page number area.
     const reservedBottom = 38 * scale;
     const gap = 20 * scale;
-    const fits = summaryBottom + gap + termsHeight <= pageBottom - reservedBottom;
+    const availableHeight = Math.max(0, pageBottom - reservedBottom - summaryBottom - gap);
+    const fullLength = completeTermsText.length;
+    const headingHeight = 42 * scale;
+    let firstPageTextLength = 0;
+    if (availableHeight >= termsHeight) {
+      firstPageTextLength = fullLength;
+    } else if (availableHeight > headingHeight && fullLength > 0) {
+      const textHeight = Math.max(1, termsHeight - headingHeight);
+      const textRatio = Math.max(0, Math.min(0.94, (availableHeight - headingHeight) / textHeight));
+      const target = Math.floor(fullLength * textRatio);
+      let boundary = completeTermsText.lastIndexOf(" ", target);
+      if (boundary <= 0) boundary = target;
+      const boldMarkersBeforeBoundary = (completeTermsText.slice(0, boundary).match(/\*\*/g) || []).length;
+      if (boldMarkersBeforeBoundary % 2 === 1) {
+        const closingMarker = completeTermsText.indexOf("**", boundary);
+        if (closingMarker >= 0) boundary = closingMarker + 2;
+      }
+      firstPageTextLength = boundary;
+      if (firstPageTextLength < 20) firstPageTextLength = 0;
+    }
     const frame = window.requestAnimationFrame(() => {
-      setTermsFitOnFirstPage((current) => current === fits ? current : fits);
+      setTermsFirstPageTextLength((current) => current === firstPageTextLength ? current : firstPageTextLength);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [
@@ -685,6 +726,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     previewCanvasWidth,
     previewScale,
     previewTermsText,
+    completeTermsText,
     form?.notes,
     form?.customer_name,
     form?.customer_email,
@@ -698,15 +740,18 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
     design.template,
     design.showTerms,
   ]);
+  const termsFitOnFirstPage = termsFirstPageTextLength >= completeTermsText.length;
   const previewPageCount = 1 + Number(hasTermsPage && !termsFitOnFirstPage);
-  const termsSection = (
-    <section ref={termsSectionRef} className="mt-5 pt-0" style={{ lineHeight: design.lineSpacing || 1.5 }}>
-      <h3 className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{lbl(doc.termsLabel)}</h3>
+  const firstPageTermsText = completeTermsText.slice(0, termsFirstPageTextLength).trimEnd();
+  const continuedTermsText = completeTermsText.slice(termsFirstPageTextLength).trimStart();
+  const renderTermsSection = ({ text, continued = false, rich = false, measure = false }) => (
+    <section ref={measure ? termsSectionRef : undefined} className={measure ? "mt-5 pt-0" : "pt-0"} style={{ lineHeight: design.lineSpacing || 1.5 }}>
+      <h3 className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{continued ? `${lbl(doc.termsLabel)} (continued)` : lbl(doc.termsLabel)}</h3>
       <div className="min-w-0 space-y-4 break-words whitespace-pre-line text-slate-600 [&_.terms-rich-content_p]:mb-3 [&_.terms-rich-content_h1]:mb-2 [&_.terms-rich-content_h1]:font-bold [&_.terms-rich-content_h2]:mb-2 [&_.terms-rich-content_h2]:font-bold [&_.terms-rich-content_h3]:mb-2 [&_.terms-rich-content_h3]:font-bold [&_.terms-rich-content_ul]:list-disc [&_.terms-rich-content_ul]:pl-5 [&_.terms-rich-content_ol]:list-decimal [&_.terms-rich-content_ol]:pl-5 [&_.terms-rich-content_a]:text-blue-700 [&_.terms-rich-content_a]:underline" style={{ overflowWrap: "anywhere" }}>
-        {hasRichTerms
-          ? <div className="terms-rich-content" dangerouslySetInnerHTML={{ __html: renderRichHtml(rawTerms) }} />
-          : previewTermParagraphs.map((paragraph, index) => <p key={index}>{renderBoldText(paragraph)}</p>)}
-        {form?.notes && <p><strong>{t("admin.quoteInvoice.ui.additional_notes_41b5f2e6")}:</strong> {form.notes}</p>}
+        {rich
+          ? <div className="terms-rich-content" dangerouslySetInnerHTML={{ __html: renderRichTerms(rawTerms) }} />
+          : text.split(/\n\s*\n/).map((paragraph, index) => <p key={index}>{renderBoldText(paragraph)}</p>)}
+        {rich && form?.notes && <p><strong>{t("admin.quoteInvoice.ui.additional_notes_41b5f2e6")}:</strong> {form.notes}</p>}
       </div>
     </section>
   );
@@ -950,27 +995,29 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   margin: 0,
                 }}
               >
+                {hasTermsPage && <div aria-hidden="true" className="pointer-events-none invisible absolute inset-y-0 left-6 right-6 overflow-hidden sm:left-9 sm:right-9" style={{ zIndex: -1 }}>{renderTermsSection({ text: completeTermsText, rich: hasRichTerms, measure: true })}</div>}
                 {isAgencyLayout && <aside className="absolute inset-y-0 left-0 z-10 flex w-[30%] flex-col px-4 py-6 text-white sm:px-5" style={{ background: accent }}>
-                  {companyLogoUrl && <OptionalDocumentLogo src={companyLogoUrl} alt="Company logo" className="mb-4 h-8 w-auto max-w-24 object-contain" />}
-                  <p className="text-[10px] font-bold">{companyName}</p>
+                  {companyLogoUrl && <OptionalDocumentLogo src={companyLogoUrl} alt="Company logo" className="mb-4 h-12 w-auto max-w-32 object-contain" style={{ transform: "translateY(4px)" }} />}
+                  <p className="break-words font-bold leading-tight" style={{ fontSize: `${documentHeadingSize}px` }}>{companyName}</p>
                   <div className="mt-auto pt-6 text-[9px]"><p className="font-semibold text-white/70">{t("admin.quoteInvoice.ui.total_b25928c6").toUpperCase()}</p><p className="mt-0.5 text-sm font-extrabold">{money(totals?.total)}</p></div>
                 </aside>}
                 {/* Header */}
                 {isAgencyLayout && <header className="absolute right-6 top-5 z-20 text-right"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#475569" emphasis={accent} /></header>}
                 {!isAgencyLayout && (design.template === "bold" ? (
                   <header className="relative min-h-[112px] overflow-hidden border-b-2 border-slate-100 bg-white px-6 py-5 sm:px-9">
-                    <div className="pointer-events-none absolute right-0 top-0 h-full w-[42%]" style={{ background: accent, clipPath: "polygon(10% 0, 100% 0, 100% 100%, 30% 100%)" }} />
-                    <div className="relative z-10 flex items-start justify-between gap-4"><div className="flex min-w-0 items-start gap-2"><OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="mt-1 h-8 w-auto max-w-[90px] object-contain" /><p className="truncate pt-2 text-[11px] font-extrabold text-slate-900">{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-[42%]" style={{ background: accent }} />
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-[42%] w-[16%] bg-white" style={{ transform: "skewX(-28deg)" }} />
+                  <div className="relative z-10 flex items-center justify-between gap-4"><div className={`flex min-w-0 items-center ${companyLogoUrl ? "gap-3" : "gap-0"}`}>{companyLogoUrl && <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-14 w-auto max-w-14 shrink-0 object-contain" style={{ transform: "translateY(4px)" }} />}<p className="min-w-0 whitespace-normal break-words overflow-visible font-extrabold leading-tight text-slate-900" style={{ fontSize: `${documentHeadingSize}px` }}>{companyName}</p></div><div className="relative z-10 w-[25%] max-w-[172px] min-w-0 pt-1 text-right text-white"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div></div>
                     <div className="absolute bottom-0 left-6 right-6 h-[2px]" style={{ background: accent }} />
                   </header>
                 ) : isMinimalLayout ? (
                   <header className="relative border-b-[3px] px-6 pb-3 pt-5 sm:px-9" style={{ borderColor: accent }}>
                     {isMonoLayout && <span className="absolute inset-x-0 top-0 h-[7px] bg-zinc-900" />}
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-2">
-                        <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-7 w-auto max-w-[70px] object-contain" />
-                        <div>
-                          <p className="truncate text-[11px] font-extrabold">{companyName}</p>
+                      <div className={`flex min-w-0 items-center ${companyLogoUrl ? "gap-2" : "gap-0"}`}>
+                        {companyLogoUrl && <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-14 w-auto max-w-14 shrink-0 object-contain" style={{ transform: "translateY(4px)" }} />}
+                        <div className="min-w-0">
+                          <p className="min-w-0 whitespace-normal break-words overflow-visible font-extrabold leading-tight" style={{ fontSize: `${documentHeadingSize}px` }}>{companyName}</p>
 
                         </div>
                       </div>
@@ -981,17 +1028,17 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   </header>
                 ) : isCenteredLayout ? (
                   <header className="px-6 pb-4 pt-5 text-center sm:px-9" style={{ background: theme.tone || "#f8fafc" }}>
-                    <div className="flex justify-center">
-                      <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-8 w-auto max-w-[86px] object-contain" />
-                    </div>
-                    <div className="mt-2 flex items-start justify-between gap-3 text-left"><p className="pt-1 text-[9px] font-bold text-slate-700">{companyName}</p><div className="text-right"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} /></div></div>
+                    {companyLogoUrl && <div className="flex justify-center">
+                      <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-14 w-auto max-w-14 shrink-0 object-contain" style={{ transform: "translateY(4px)" }} />
+                    </div>}
+                    <div className="mt-2 flex items-start justify-between gap-3 text-left"><p className="min-w-0 break-words pt-1 font-bold leading-tight text-slate-700" style={{ fontSize: `${documentHeadingSize}px` }}>{companyName}</p><div className="text-right"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="#64748b" emphasis={accent} /></div></div>
                   </header>
                 ) : isSplitLayout ? (
                   <header className="flex items-center justify-between gap-4 px-6 pb-3 pt-5 sm:px-9">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-7 w-auto max-w-[70px] object-contain" />
+                    <div className={`flex min-w-0 items-center ${companyLogoUrl ? "gap-2" : "gap-0"}`}>
+                      {companyLogoUrl && <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-14 w-auto max-w-14 shrink-0 object-contain" style={{ transform: "translateY(4px)" }} />}
                       <div className="min-w-0">
-                        <p className="truncate text-[10.5px] font-extrabold">{companyName}</p>
+                        <p className="min-w-0 whitespace-normal break-words overflow-visible font-extrabold leading-tight" style={{ fontSize: `${documentHeadingSize}px` }}>{companyName}</p>
 
                       </div>
                     </div>
@@ -999,10 +1046,10 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   </header>
                 ) : (
                   <header className="flex items-start justify-between gap-4 px-6 py-5 sm:px-9" style={{ background: accent, color: "#fff" }}>
-                    <div className="flex min-w-0 items-start gap-3">
-                      <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-9 w-auto max-w-[86px] object-contain" />
+                    <div className={`flex min-w-0 items-center ${companyLogoUrl ? "gap-3" : "gap-0"}`}>
+                      {companyLogoUrl && <OptionalDocumentLogo src={companyLogoUrl} alt="Logo" className="h-14 w-auto max-w-14 shrink-0 object-contain" style={{ transform: "translateY(4px)" }} />}
                       <div className="min-w-0">
-                        <p className="truncate text-[10.5px] font-extrabold leading-tight">{companyName}</p>
+                        <p className="min-w-0 whitespace-normal break-words overflow-visible font-extrabold leading-tight" style={{ fontSize: `${documentHeadingSize}px` }}>{companyName}</p>
                       </div>
                     </div>
                     <div className="text-right shrink-0"><QuoteHeaderDetails title={documentHeading} titleSize={documentHeadingSize} number={displayQuoteNumber} status={displayQuoteStatus} labels={quoteHeaderLabels} date={quoteDateLabel} validUntil={validUntilLabel} color="rgba(255,255,255,.82)" emphasis="#ffffff" /></div>
@@ -1046,7 +1093,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   </div>
 
                   {/* Table */}
-                  <table className="mt-5 w-full text-left text-[9px]">
+                  <table className="quote-items-table mt-5 w-full text-left text-[9px]">
                     <thead>
                       <tr style={{ background: isBoldLayout ? accent : tintRgb(accent, 0.92), color: isBoldLayout ? "#fff" : accent }}>
                         <th className="px-2.5 py-2 font-bold">{t("admin.quoteDesigner.description")}</th>
@@ -1072,7 +1119,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                           <td className="px-2.5 py-3 text-right text-[8.5px] font-semibold">{currency(item.amount)}</td>
                         </tr>
                       ))}
-                      {previewItems.length === 0 && (
+                  {previewItems.length === 0 && (
                         <tr>
                           <td colSpan={6} className="px-2.5 py-4 text-[9px] text-slate-400">{t("admin.quoteDesigner.noQuoteItems")}</td>
                         </tr>
@@ -1091,7 +1138,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                       <span>{t("admin.quoteInvoice.ui.total_b25928c6")}</span><span>{currency(totals?.total)}</span>
                     </div>
                   </div>
-                  {hasTermsPage && termsFitOnFirstPage && termsSection}
+                  {hasTermsPage && firstPageTermsText && renderTermsSection({ text: firstPageTermsText, rich: termsFitOnFirstPage && hasRichTerms })}
 
                 </div>
                 {design.showPageNumbers !== false && <p className="quote-preview-page-number hidden mt-2 px-6 pb-1 text-right text-[8px] text-slate-400 sm:px-9">1 / {previewPageCount}</p>}
@@ -1103,7 +1150,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 className="relative m-0 block h-auto min-h-0 w-full min-w-0 max-w-none box-border overflow-hidden rounded-none bg-white px-6 pb-6 pt-6 text-slate-800 shadow-none ring-0 sm:px-9"
                 style={{
                   fontFamily: design.customTypography ? (FONT_OPTIONS.find((f) => FONT_MAP[f] === design.fontFamily) ? `"${FONT_OPTIONS.find((f) => FONT_MAP[f] === design.fontFamily)}", sans-serif` : "Arial, sans-serif") : "Arial, sans-serif",
-                  fontSize: "8px",
+                  fontSize: "13px",
                   fontStyle: design.italicNotes ? "italic" : "normal",
                   zoom: previewScale,
                   width: previewCanvasWidth > 0 ? `${previewCanvasWidth / previewScale}px` : "100%",
@@ -1118,15 +1165,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                   {design.watermarkUseLogo && companyLogoUrl ? <OptionalDocumentLogo src={companyLogoUrl} alt="" className="h-auto max-w-[70%] object-contain" style={{ width: `${220 * watermarkScale}px` }} /> : (design.watermarkText || "PAID")}
                 </div>}
 
-                <section ref={termsSectionRef} className="pt-0" style={{ lineHeight: design.lineSpacing || 1.5 }}>
-                  <h3 className="mb-5 text-[10px] font-extrabold uppercase tracking-[0.16em]" style={{ color: accent }}>{lbl(doc.termsLabel)}</h3>
-                  <div className="min-w-0 space-y-4 break-words whitespace-pre-line text-slate-600 [&_.terms-rich-content_p]:mb-3 [&_.terms-rich-content_h1]:mb-2 [&_.terms-rich-content_h1]:font-bold [&_.terms-rich-content_h2]:mb-2 [&_.terms-rich-content_h2]:font-bold [&_.terms-rich-content_h3]:mb-2 [&_.terms-rich-content_h3]:font-bold [&_.terms-rich-content_ul]:list-disc [&_.terms-rich-content_ul]:pl-5 [&_.terms-rich-content_ol]:list-decimal [&_.terms-rich-content_ol]:pl-5 [&_.terms-rich-content_a]:text-blue-700 [&_.terms-rich-content_a]:underline" style={{ overflowWrap: "anywhere" }}>
-                    {hasRichTerms
-                      ? <div className="terms-rich-content" dangerouslySetInnerHTML={{ __html: renderRichHtml(rawTerms) }} />
-                      : previewTermParagraphs.map((paragraph, index) => <p key={index}>{renderBoldText(paragraph)}</p>)}
-                    {form?.notes && <p><strong>{t("admin.quoteInvoice.ui.additional_notes_41b5f2e6")}:</strong> {form.notes}</p>}
-                  </div>
-                </section>
+                {renderTermsSection({ text: continuedTermsText, continued: termsFirstPageTextLength > 0, rich: termsFirstPageTextLength === 0 && hasRichTerms })}
                 {design.showPageNumbers !== false && <p className="quote-preview-page-number hidden mt-3 text-right text-[8px] text-slate-400">2 / {previewPageCount}</p>}
                 </article>
               </>}
