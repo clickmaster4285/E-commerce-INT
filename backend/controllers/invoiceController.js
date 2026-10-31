@@ -120,11 +120,18 @@ const buildInvoice = (body = {}) => {
     const quantity = Number(item.quantity);
     const unitPrice = Number(item.unit_price);
     const gross = quantity * unitPrice;
-    const discountRate = Math.max(0, Math.min(100, Number(item.discount_rate) || 0));
-    const taxRate = Math.max(0, Math.min(100, Number(item.tax_rate) || 0));
-    if (!mongoose.isValidObjectId(item.product_id) || !String(item.name || "").trim() || !Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(unitPrice) || unitPrice < 0) {
-      throw new Error("Check product names, quantities, prices, and discounts");
-    }
+    const name = String(item.name || "").trim();
+    const itemLabel = name ? ` for "${name}"` : " for an invoice item";
+    const rawDiscountRate = item.discount_rate == null || item.discount_rate === "" ? 0 : Number(item.discount_rate);
+    const rawTaxRate = item.tax_rate == null || item.tax_rate === "" ? 0 : Number(item.tax_rate);
+    if (!mongoose.isValidObjectId(item.product_id)) throw new Error(`Select a valid product${itemLabel}.`);
+    if (!name) throw new Error("Enter a product name for every invoice item.");
+    if (!Number.isInteger(quantity) || quantity < 1) throw new Error(`Quantity${itemLabel} must be a whole number greater than zero.`);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error(`Unit price${itemLabel} must be a valid non-negative amount.`);
+    if (!Number.isFinite(rawDiscountRate) || rawDiscountRate < 0 || rawDiscountRate > 100) throw new Error(`Discount${itemLabel} must be between 0% and 100%.`);
+    if (!Number.isFinite(rawTaxRate) || rawTaxRate < 0 || rawTaxRate > 100) throw new Error(`Tax${itemLabel} must be between 0% and 100%.`);
+    const discountRate = rawDiscountRate;
+    const taxRate = rawTaxRate;
     const discount = round(gross * discountRate / 100);
     const tax = round((gross - discount) * taxRate / 100);
     return {

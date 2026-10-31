@@ -68,13 +68,18 @@ const paymentLabel = (method, t) => {
   return key ? t(`admin.pos.payment.${key}`) : normalized.replaceAll("_", " ");
 };
 const variantLabel = (variant, t) => {
-  const attributes = Object.entries(variant?.attributes || {}).filter(([, value]) => (
-    value !== null && value !== undefined && String(value).trim() !== ""
-  ));
-  const size = attributes.find(([name]) => /size/i.test(name));
-  const value = size?.[1];
-  if (Array.isArray(value)) return value.join(", ");
-  return value ? String(value) : variant?.title || t("admin.pos.ui.defaultVariant");
+  const title = String(variant?.title || "").trim();
+  if (title && title.toLowerCase() !== "default") return title;
+
+  const readValue = (value) => {
+    if (Array.isArray(value)) return value.map(readValue).filter(Boolean).join(", ");
+    if (value && typeof value === "object") {
+      return readValue(value.label ?? value.value ?? value.name ?? value.title);
+    }
+    return value === null || value === undefined ? "" : String(value).trim();
+  };
+  const attributeValues = Object.values(variant?.attributes || {}).map(readValue).filter(Boolean);
+  return attributeValues.join(" / ") || title || t("admin.pos.ui.defaultVariant");
 };
 
 function PosDropdown({
@@ -399,23 +404,29 @@ export default function PosPage() {
       : sale.customer_id
         ? { _id: sale.customer_id, name: customerSnapshot.name, phone: customerSnapshot.phone }
         : null;
-    setCart(saleItems.map((item) => ({
-      variant_id: String(item.variant_id?._id || item.variant_id),
-      product_id: String(item.product_id?._id || item.product_id || ""),
-      product_name: productNameOf(item) || t("admin.pos.ui.product"),
-      variant_title: item.variant_title || t("admin.pos.ui.defaultVariant"),
-      sku: item.sku || "",
-      unit_price: Number(item.unit_price) || 0,
-      quantity: Number(item.quantity) || 1,
-      stock: Number.MAX_SAFE_INTEGER,
-      tax_rate: Number(item.tax_rate) || 0,
-      discount_rate: Number(item.discount_rate) || 0,
-      flat_discount: Number(item.flat_discount) || 0,
-      discount_type: Number(item.discount_rate) > 0 && Number(item.flat_discount) > 0
-        ? "combined"
-        : Number(item.flat_discount) > 0 ? "flat" : "percentage",
-      image: getProductImage({ variants: [{ images: item.product_image ? [{ img_url: item.product_image }] : [] }] }),
-    })));
+    setCart(saleItems.map((item) => {
+      const variantId = String(item.variant_id?._id || item.variant_id || "");
+      const saleCredit = Number(originalQuantities[variantId]) || 0;
+      return {
+        variant_id: variantId,
+        product_id: String(item.product_id?._id || item.product_id || ""),
+        product_name: productNameOf(item) || t("admin.pos.ui.product"),
+        variant_title: item.variant_title || t("admin.pos.ui.defaultVariant"),
+        sku: item.sku || "",
+        unit_price: Number(item.unit_price) || 0,
+        quantity: Number(item.quantity) || 1,
+        // The edited sale's old quantity is credited back by the server.
+        // Only that credit plus current on-hand stock is selectable here.
+        stock: Math.max(0, Number(item.available_stock) || 0) + saleCredit,
+        tax_rate: Number(item.tax_rate) || 0,
+        discount_rate: Number(item.discount_rate) || 0,
+        flat_discount: Number(item.flat_discount) || 0,
+        discount_type: Number(item.discount_rate) > 0 && Number(item.flat_discount) > 0
+          ? "combined"
+          : Number(item.flat_discount) > 0 ? "flat" : "percentage",
+        image: getProductImage({ variants: [{ images: item.product_image ? [{ img_url: item.product_image }] : [] }] }),
+      };
+    }));
     setSelectedCustomer(customer);
     setPaymentMethod(sale.payment?.method || "cash");
     setPaymentReference(sale.payment?.reference || "");
@@ -525,13 +536,13 @@ export default function PosPage() {
     setCart((currentCart) => {
       const existing = currentCart.find((item) => item.variant_id === variant._id);
       const currentQuantity = existing?.quantity || 0;
-      if (currentQuantity + quantityToAdd > (existing?.stock || availableStock)) {
-        toast.error(t("admin.pos.toast.moreAvailableForVariant", { count: Math.max((existing?.stock || availableStock) - currentQuantity, 0) }));
+      if (currentQuantity + quantityToAdd > availableStock) {
+        toast.error(t("admin.pos.toast.moreAvailableForVariant", { count: Math.max(availableStock - currentQuantity, 0) }));
         return currentCart;
       }
       if (existing) {
         return currentCart.map((item) => (
-          item.variant_id === variant._id ? { ...item, quantity: item.quantity + quantityToAdd, stock: Math.max(item.stock, availableStock) } : item
+          item.variant_id === variant._id ? { ...item, quantity: item.quantity + quantityToAdd, stock: availableStock } : item
         ));
       }
       const image = getProductImage({ ...product, variants: [variant] });
@@ -540,7 +551,7 @@ export default function PosPage() {
         product_id: product._id,
         product_name: product.name,
         translations: product.translations,
-        variant_title: variant.title || "Default",
+        variant_title: variantLabel(variant, t),
         sku: variant.sku || "",
         unit_price: Number(variant.selling_price) || 0,
         quantity: quantityToAdd,
@@ -836,7 +847,8 @@ export default function PosPage() {
             <div className={viewMode === "list" ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]"}>
               {variantCards.map(({ product, variant }) => {
                 const image = getProductImage({ ...product, variants: [variant] });
-                const variantName = variant.title && variant.title !== "Default" ? variant.title : variantLabel(variant, t);
+                const variantName = variantLabel(variant, t);
+                const productName = productNameOf(product);
                 const stockQuantity = Math.max(0, Number(variant.quantity) || 0);
                 const inStock = stockQuantity > 0;
                 const heldQuantity = heldCarts.reduce((total, held) => total + (held.cart || []).reduce(
@@ -851,12 +863,16 @@ export default function PosPage() {
                       <span className={`absolute start-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${!inStock ? "bg-rose-50/95 text-rose-700" : stockQuantity < 10 ? "bg-amber-50/95 text-amber-700" : "bg-emerald-50/95 text-emerald-700"}`}>
                         {inStock && <Check size={11} strokeWidth={3} />}{!inStock ? t("admin.pos.ui.outOfStock") : stockQuantity < 10 ? t("admin.pos.ui.lowStock") : t("admin.pos.ui.inStock")}
                       </span>
-                      {heldQuantity > 0 && <span className="absolute bottom-2 start-2 inline-flex items-center rounded-full bg-amber-50/95 px-2 py-1 text-[9px] font-bold text-amber-800">{t("admin.pos.ui.onHold")} {heldQuantity}</span>}
                       {inStock && <span aria-hidden="true" title={t("admin.pos.ui.addToCart")} className="absolute bottom-2 end-2 flex h-7 w-7 scale-95 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 transition group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"><Plus size={15} strokeWidth={2.5}/></span>}
                     </div>
                     <div className={`min-w-0 ${viewMode === "list" ? "" : "p-2 pt-1.5 sm:p-2.5 sm:pt-1.5"}`}>
-                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-medium leading-[18px] text-[var(--text-primary)]" title={productNameOf(product)}>{productNameOf(product)}</h3>
+                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-[var(--text-primary)]" title={variantName}>{variantName}</h3>
+                    <p className="truncate text-[10px] text-[var(--text-muted)]" title={productName}>{productName}</p>
                     <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[11px] text-[var(--text-muted)]"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-4">
+                      <span className={inStock ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-rose-700 dark:text-rose-400"}>{t("admin.pos.ui.availableStock", { count: stockQuantity })}</span>
+                      <span className="text-amber-700 dark:text-amber-400">{t("admin.pos.ui.onHold")} {heldQuantity}</span>
+                    </div>
                     <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{formatMoney(variant.selling_price)}</p>
                     </div>
                   </article>
@@ -1006,9 +1022,9 @@ export default function PosPage() {
                     <FallbackImage nextImage src={item.image} alt={productNameOf(item) || item.product_name} fill unoptimized className="object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{productNameOf(item) || item.product_name}</p>
+                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{item.variant_title && item.variant_title !== "Default" ? item.variant_title : productNameOf(item) || item.product_name}</p>
                     <div className="flex min-w-0 items-center justify-between gap-1">
-                    <p className="min-w-0 truncate text-[10px] text-[var(--text-secondary)]">{item.variant_title}{item.sku ? ` · ${item.sku}` : ""}</p>
+                    <p className="min-w-0 truncate text-[10px] text-[var(--text-secondary)]">{productNameOf(item) || item.product_name}{item.sku ? ` · ${item.sku}` : ""}</p>
                     <div className="flex shrink-0 items-center gap-1">
                       <div className="flex h-6 items-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
                         <button type="button" onClick={() => changeQuantity(item.variant_id, -1)} className="flex h-full w-6 items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)]" aria-label={t("admin.pos.ui.decreaseQuantity")}><Minus size={12} /></button>
