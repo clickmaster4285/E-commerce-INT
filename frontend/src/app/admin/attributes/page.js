@@ -118,6 +118,31 @@ const getDataTypeLabel = (type) => {
   return map[type] || type;
 };
 
+// Attribute options may arrive as strings, localized labels, or legacy objects.
+// Never coerce an object with String(), which renders as "[object Object]".
+const getAttributeOptionText = (entry, locale = "en", depth = 0) => {
+  if (typeof entry === "string" || typeof entry === "number") {
+    const text = String(entry).trim();
+    return /^\[object object\]$/i.test(text) ? "" : text;
+  }
+  if (!entry || typeof entry !== "object" || depth > 4) return "";
+
+  const candidates = [
+    entry.label_translations?.[locale],
+    entry.label_translations?.en,
+    entry[locale],
+    entry.en,
+    entry.label,
+    entry.value,
+    entry.name,
+  ];
+  for (const candidate of candidates) {
+    const text = getAttributeOptionText(candidate, locale, depth + 1);
+    if (text) return text;
+  }
+  return "";
+};
+
 const ATTRS_PER_PAGE = 15;
 
 // ==================== RIGHT SIDE DETAIL PANEL ====================
@@ -191,28 +216,8 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
   //    dono handle, "[object Object]" kabhi show nahi hota.
   //    Localize yahi kiya jata hai (values[].label_translations) — option ka raw
   //    `value` kabhi nahi badalta, wahi DB me rehta hai.
-  const getOptionLabel = (v) => {
-    if (v === null || v === undefined) return "";
-    if (typeof v === "string") return v;
-    const toText = (candidate, depth = 0) => {
-      if (typeof candidate === "string" || typeof candidate === "number") {
-        return String(candidate).trim();
-      }
-      if (!candidate || typeof candidate !== "object" || depth > 3) return "";
-      const localized = candidate[locale] || candidate.en;
-      const nested = localized || candidate.label || candidate.value || candidate.name;
-      if (nested && nested !== candidate) {
-        const text = toText(nested, depth + 1);
-        if (text) return text;
-      }
-      return "";
-    };
-    return toText(optionLabelOf(v))
-      || toText(v.label_translations?.[locale])
-      || toText(v.label)
-      || toText(v.value)
-      || toText(v.name);
-  };
+  const getOptionLabel = (v) => getAttributeOptionText(optionLabelOf(v), locale)
+    || getAttributeOptionText(v, locale);
 
   const options = (attr.values || []).map(getOptionLabel).filter(Boolean);
   const isActive = attr.is_active !== false;
@@ -588,8 +593,16 @@ export default function AttributesPage() {
     mutationFn: async (data) => {
       return await attributeApi.update(editingAttribute?._id, data);
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ["attributes"] });
+      // Keep the open options drawer in sync with the saved type and values.
+      // Otherwise the toast says saved while the drawer still shows its old
+      // Multi Select / zero-options snapshot until it is closed and reopened.
+      setDetailAttr((current) => (
+        current && String(current._id) === String(updated?._id)
+          ? { ...current, ...updated }
+          : current
+      ));
       setShowEditModal(false);
       setEditingAttribute(null);
       toast.success(t("toast.updated"));
@@ -650,8 +663,9 @@ export default function AttributesPage() {
     // ✅ Existing values ko {label, value} shape mein normalize karo — form modal jaisa hi
     const existing = (detailAttr.values || [])
       .map((v) => {
-        if (typeof v === "string") return { label: v, value: v.toLowerCase() };
-        return { label: String(v?.label || v?.value || ""), value: String(v?.value || v?.label || "").toLowerCase() };
+        const label = getAttributeOptionText(v, locale);
+        const value = getAttributeOptionText(v?.value, locale) || label;
+        return { label, value: value.toLowerCase() };
       })
       .filter((v) => v.label);
     const next = [...existing, { label: clean, value: clean.toLowerCase() }];
@@ -1053,19 +1067,17 @@ export default function AttributesPage() {
         initialData={editingAttribute ? {
           name: editingAttribute.name || "",
           data_type: editingAttribute.data_type || "multi_select",
-          values: (editingAttribute.values || []).map((v) => {
-            const label = typeof v === "string" ? v : (v?.label || v?.value || String(v));
-            return String(label);
-          }).filter(Boolean),
+          values: (editingAttribute.values || [])
+            .map((v) => getAttributeOptionText(v, locale))
+            .filter(Boolean),
           value: (() => {
             if (editingAttribute.data_type === "boolean") {
-              const vals = editingAttribute.values || [];
-              const trueEntry = vals.find(
-                (v) =>
-                  (v?.value || v)?.toString() === "true" ||
-                  (v?.label || v)?.toString()?.toLowerCase() === "yes"
-              );
-              return !!trueEntry;
+              return (editingAttribute.values || []).some((v) => {
+                const value = getAttributeOptionText(v?.value ?? v, locale).toLowerCase();
+                const label = getAttributeOptionText(v?.label_translations?.[locale], locale)
+                  || getAttributeOptionText(v?.label, locale);
+                return value === "true" || label.toLowerCase() === "yes";
+              });
             }
             return false;
           })(),
@@ -1074,10 +1086,21 @@ export default function AttributesPage() {
         isSaving={editAttributeMutation.isPending}
         onSave={async (payload) => {
           const valuesPayload = payload.data_type === "multi_select"
-            ? (payload.values || []).map((opt) => {
-                const label = String(opt || "").trim();
-                return { label, value: label.toLowerCase() };
-              })
+            ? (payload.values || []).map((opt, index) => {
+                // AttributeFormModal already returns { label, value } objects.
+                // String(object) here used to turn every option into
+                // "[object Object]", after which the API discarded them.
+                const label = getAttributeOptionText(opt, locale);
+                const value = typeof opt === "object" && opt !== null
+                  ? getAttributeOptionText(opt.value, locale) || label.toLowerCase()
+                  : label.toLowerCase();
+                return {
+                  label,
+                  value,
+                  sort_order: Number.isFinite(Number(opt?.sort_order)) ? Number(opt.sort_order) : index,
+                  is_active: opt?.is_active === false ? false : true,
+                };
+              }).filter((option) => option.label && option.value)
             : payload.data_type === "boolean"
             ? [
                 {

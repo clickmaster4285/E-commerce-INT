@@ -305,11 +305,22 @@ export default function ManageStockPage() {
   usePageTranslations({ model: "StockHistory", records: historyItems, locale, ready: tab === "history" && !historyFetching && historyPagination.page === historyPage, queryKey: historyQueryKey, queryClient });
 
   const adjustMutation = useMutation({
-    mutationFn: (data) => stockApi.adjust(data),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["stock"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-history"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+    mutationFn: async (data) => {
+      const response = await stockApi.adjust(data);
+      if (response?.success === false) {
+        throw new Error(response.message || t("admin.manageStock.toast.adjustFailed"));
+      }
+      return response;
+    },
+    onSuccess: async (res) => {
+      // Wait until the stock list and history reflect the server's saved value
+      // before showing success and closing the form, so stale quantities don't
+      // appear alongside the success message.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+      ]);
       toast.success(res?.message || t("admin.manageStock.toast.adjusted"));
       closeAdjustModal();
     },

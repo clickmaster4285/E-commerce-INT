@@ -24,6 +24,21 @@ const emitSocket = (event, data) => {
 const normalizeValues = (rawValues, existingValues = []) => {
   if (!Array.isArray(rawValues)) return [];
 
+  // Accept legacy/localized option objects without ever persisting the result
+  // of String(object) ("[object Object]").
+  const toOptionText = (candidate, depth = 0) => {
+    if (typeof candidate === "string" || typeof candidate === "number") {
+      const text = String(candidate).trim();
+      return /^\[object object\]$/i.test(text) ? "" : text;
+    }
+    if (!candidate || typeof candidate !== "object" || depth > 4) return "";
+    for (const key of ["en", "label", "value", "name"]) {
+      const text = toOptionText(candidate[key], depth + 1);
+      if (text) return text;
+    }
+    return "";
+  };
+
   const existingByValue = new Map();
   for (const prev of Array.isArray(existingValues) ? existingValues : []) {
     const key = String(prev?.value || "").trim().toLowerCase();
@@ -34,8 +49,15 @@ const normalizeValues = (rawValues, existingValues = []) => {
   const out = [];
   for (const v of rawValues) {
     if (!v) continue;
-    const label = String(v.label || v.value || "").trim();
-    const value = String(v.value || v.label || "").trim();
+    const label = toOptionText(v?.label_translations?.en)
+      || toOptionText(v?.label)
+      || toOptionText(v?.value)
+      || toOptionText(v?.name)
+      || toOptionText(v);
+    const value = toOptionText(v?.value)
+      || toOptionText(v?.label)
+      || toOptionText(v?.name)
+      || toOptionText(v);
     if (!value) continue;
     const key = value.toLowerCase();
     if (seen.has(key)) continue;

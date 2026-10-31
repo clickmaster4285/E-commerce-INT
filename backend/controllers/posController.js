@@ -143,7 +143,7 @@ const getPosSales = async (req, res) => {
       .populate("customer_id", "name phone email")
       .populate("cashier_id", "name email")
       .populate("items.product_id", "name translations")
-      .populate("items.variant_id", "images")
+      .populate("items.variant_id", "images quantity")
       .sort({ created_at: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -156,6 +156,7 @@ const getPosSales = async (req, res) => {
         return {
           ...item,
           product_image: item.product_image || variant?.images?.[0]?.img_url || "",
+          available_stock: variant ? Number(variant.quantity) || 0 : 0,
           variant_id: variant?._id || item.variant_id,
         };
       }),

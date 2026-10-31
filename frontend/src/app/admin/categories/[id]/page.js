@@ -69,6 +69,22 @@ function getId(value) {
   return "";
 }
 
+const getAttributeOptionText = (entry, locale = "en", depth = 0) => {
+  if (typeof entry === "string" || typeof entry === "number") {
+    const text = String(entry).trim();
+    return /^\[object object\]$/i.test(text) ? "" : text;
+  }
+  if (!entry || typeof entry !== "object" || depth > 4) return "";
+  for (const candidate of [
+    entry.label_translations?.[locale], entry.label_translations?.en,
+    entry[locale], entry.en, entry.label, entry.value, entry.name,
+  ]) {
+    const text = getAttributeOptionText(candidate, locale, depth + 1);
+    if (text) return text;
+  }
+  return "";
+};
+
 /* =========================================================
    PARENT CATEGORY RESTRICTION HELPERS
    Existing category data (`parent_category_id`) hi reuse hoti hai —
@@ -532,6 +548,7 @@ export default function CategoryDetailPage() {
   // ✅ NEW: Action Menu & Side Panel States
   const [activeMenuId, setActiveMenuId] = useState(null); // ID of attribute with open menu
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuAnchorRef = useRef(null);
   const [viewPanelAttr, setViewPanelAttr] = useState(null); // Attribute object for side panel
 
   useAttributeSocketSync();
@@ -621,13 +638,59 @@ export default function CategoryDetailPage() {
 
   // Click outside handler for menus
   useEffect(() => {
+    const closeMenu = () => {
+      menuAnchorRef.current = null;
+      setActiveMenuId(null);
+    };
     function handleClickOutside(event) {
       if (activeMenuId && !event.target.closest('.action-menu-container') && !event.target.closest('.dropdown-menu-portal')) {
-        setActiveMenuId(null);
+        closeMenu();
       }
     }
+    function handleKeyDown(event) {
+      if (event.key === "Escape") closeMenu();
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenuId]);
+
+  // Use the trigger's measured position like the product detail action menu.
+  useEffect(() => {
+    if (!activeMenuId || !menuAnchorRef.current) return;
+    const rect = menuAnchorRef.current.getBoundingClientRect();
+    const menuW = 192;
+    const menuH = 160;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openAbove = spaceBelow < menuH && spaceAbove > spaceBelow;
+    const desiredTop = openAbove ? rect.top - menuH - gap : rect.bottom + gap;
+    const maxTop = Math.max(8, window.innerHeight - menuH - 8);
+    const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
+    setMenuPos({ top: Math.max(8, Math.min(desiredTop, maxTop)), left });
+  }, [activeMenuId]);
+
+  // Close the fixed action menu as soon as the page or any nested scroller moves.
+  useEffect(() => {
+    if (!activeMenuId) return;
+    const closeMenuOnScroll = () => {
+      menuAnchorRef.current = null;
+      setActiveMenuId(null);
+    };
+    const closeMenuOnResize = () => {
+      menuAnchorRef.current = null;
+      setActiveMenuId(null);
+    };
+    window.addEventListener("scroll", closeMenuOnScroll, true);
+    window.addEventListener("resize", closeMenuOnResize);
+    return () => {
+      window.removeEventListener("scroll", closeMenuOnScroll, true);
+      window.removeEventListener("resize", closeMenuOnResize);
+    };
   }, [activeMenuId]);
 
   // Loading state
@@ -1048,13 +1111,16 @@ export default function CategoryDetailPage() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const btnEl = e.currentTarget;
-                                  const rect = btnEl.getBoundingClientRect();
-                                  const menuW = 192;
-                                  const adjustedLeft = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
-                                  setMenuPos({ top: rect.bottom + 4, left: adjustedLeft });
-                                  setActiveMenuId(isMenuOpen ? null : attrId);
+                                  if (isMenuOpen) {
+                                    menuAnchorRef.current = null;
+                                    setActiveMenuId(null);
+                                  } else {
+                                    menuAnchorRef.current = e.currentTarget;
+                                    setActiveMenuId(attrId);
+                                  }
                                 }}
+                                aria-haspopup="menu"
+                                aria-expanded={isMenuOpen}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                               >
                                 <Ico d={D.dots} className="w-4 h-4" />
@@ -1065,10 +1131,14 @@ export default function CategoryDetailPage() {
                                 const isTogglingThis = toggleStatusMutation.isPending && toggleStatusMutation.variables?.attrId === attrId;
                                 return createPortal(
                                   <div dir={dir} lang={locale}
-                                  className="fixed z-[9999] w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal"
+                                  role="menu"
+                                  className="fixed z-[9999] w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal animate-in fade-in zoom-in-95"
                                   style={{
                                     top: menuPos.top,
                                     left: menuPos.left,
+                                    maxHeight: "calc(100vh - 16px)",
+                                    overflowY: "auto",
+                                    boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
                                     pointerEvents: "auto",
                                   }}
                                   >
@@ -1155,19 +1225,17 @@ export default function CategoryDetailPage() {
         initialData={attrEditTarget ? {
           name: attrEditTarget.name || "",
           data_type: attrEditTarget.data_type || "multi_select",
-          values: (attrEditTarget.values || []).map((v) => {
-            // ✅ FIX ISSUE 2: Ensure we extract strings correctly when loading into form
-            if (typeof v === "string") return v;
-            if (typeof v === "object") return String(v.label || v.value || v.name || "");
-            return String(v);
-          }).filter(Boolean),
+          values: (attrEditTarget.values || [])
+            .map((v) => getAttributeOptionText(v, locale))
+            .filter(Boolean),
           value: (() => {
             if (attrEditTarget.data_type === "boolean") {
-              const vals = attrEditTarget.values || [];
-              const trueEntry = vals.find(
-                (v) => (v?.value || v)?.toString() === "true" || (v?.label || v)?.toString()?.toLowerCase() === "yes"
-              );
-              return !!trueEntry;
+              return (attrEditTarget.values || []).some((v) => {
+                const value = getAttributeOptionText(v?.value ?? v, locale).toLowerCase();
+                const label = getAttributeOptionText(v?.label_translations?.[locale], locale)
+                  || getAttributeOptionText(v?.label, locale);
+                return value === "true" || label.toLowerCase() === "yes";
+              });
             }
             return false;
           })(),
