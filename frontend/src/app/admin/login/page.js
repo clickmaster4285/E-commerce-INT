@@ -251,7 +251,7 @@ export default function AdminLoginPage() {
         {/* Background Image Layer - CSS fallback handles missing images */}
         <>
           <div
-            className={`absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500 ${locale === 'en' ? '' : 'hidden'}`}
+            className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat transition-opacity duration-500"
             style={{ backgroundImage: `url(${LOGIN_BACKGROUND_IMAGE_SRC})` }}
           />
           {/* Keep the dashboard artwork bright while preserving text contrast. */}
