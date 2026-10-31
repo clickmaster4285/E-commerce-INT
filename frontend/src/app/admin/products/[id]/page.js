@@ -2276,14 +2276,14 @@ export default function ProductDetailPage() {
               <div className="flex w-full max-w-md items-start gap-3">
                 {/* Main Clickable Image */}
                 <button 
+                  type="button"
                   onClick={() => openGallery(0)}
-                  className="block w-full relative overflow-hidden rounded-xl shadow-lg group-hover:shadow-2xl transition-all duration-300"
+                  className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl bg-[var(--bg-secondary)] shadow-lg transition-shadow duration-300 group-hover:shadow-2xl"
                 >
                   <FallbackImage
                     src={getImageUrl(firstVariant.images[0].img_url)}
                     alt={productNameOf(product)}
-                    className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
-                    style={{ maxHeight: 300 }}
+                    className="h-full w-full object-contain"
                   />
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">

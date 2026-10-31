@@ -16,6 +16,7 @@ import { ArrowRight, ImageOff, LayoutGrid, RotateCcw } from "lucide-react";
 import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
 import { formatPrice } from "@/utils/homeCatalog";
+import { smartImageLoader } from "@/utils/smartImageLoader";
 
 const PER_PAGE = 12;
 
@@ -92,10 +93,14 @@ export default function AllCategoriesResults({
               >
                 <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
                   <FallbackImage
+                    nextImage
                     src={category.image}
                     alt={category.name}
+                    fill
+                    loader={smartImageLoader}
+                    sizes="(max-width: 640px) 50vw, 33vw"
                     loading="lazy"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    className="object-cover transition duration-500 group-hover:scale-105"
                   />
                 </span>
                 <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
