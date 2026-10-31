@@ -19,7 +19,7 @@ const PAGE_FORMATS_MM = {
   "thermal-58": [58, 200],
   "thermal-80": [80, 200],
 };
-const getDocumentPageSpec = (design = {}) => {
+export const getDocumentPageSpec = (design = {}) => {
   const value = String(design.pageSize || "a4-portrait").toLowerCase();
   const isThermal = value.startsWith("thermal-");
   const [formatKey, requestedOrientation] = isThermal ? [value, "portrait"] : value.split("-");
@@ -106,6 +106,89 @@ const hexToRgb = (value, fallback = [36, 63, 103]) => {
   return match ? [parseInt(match[1].slice(0, 2), 16), parseInt(match[1].slice(2, 4), 16), parseInt(match[1].slice(4, 6), 16)] : fallback;
 };
 const tintRgb = (color, whiteRatio = 0.9) => color.map((channel) => Math.round(channel + (255 - channel) * whiteRatio));
+const replaceOklchColors = (value) => String(value).replace(/oklch\(([^()]*)\)/gi, (match, raw) => {
+  const [channels, alphaText] = raw.split("/");
+  const [lightnessText, chromaText, hueText] = channels.trim().split(/[\s,]+/);
+  const parsePercent = (part, scale = 1) => part?.endsWith("%") ? Number.parseFloat(part) / 100 * scale : Number.parseFloat(part);
+  const lightness = parsePercent(lightnessText);
+  const chroma = parsePercent(chromaText, 0.4);
+  const hueValue = Number.parseFloat(hueText);
+  const hue = hueText?.endsWith("turn") ? hueValue * Math.PI * 2
+    : hueText?.endsWith("rad") ? hueValue
+      : hueValue * Math.PI / 180;
+  if (![lightness, chroma, hue].every(Number.isFinite)) return "rgb(0, 0, 0)";
+  const a = chroma * Math.cos(hue);
+  const b = chroma * Math.sin(hue);
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const gamma = (linear) => Math.max(0, Math.min(1, linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055));
+  const red = gamma(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s);
+  const green = gamma(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s);
+  const blue = gamma(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s);
+  const alpha = alphaText ? Number.parseFloat(alphaText) / (alphaText.includes("%") ? 100 : 1) : 1;
+  return `rgba(${Math.round(red * 255)}, ${Math.round(green * 255)}, ${Math.round(blue * 255)}, ${Math.max(0, Math.min(1, alpha))})`;
+});
+const replaceModernCssColors = (value, colorContext) => replaceOklchColors(value).replace(/\b(lab|lch|oklab|color)\(([^()]*)\)/gi, (match, functionName, raw) => {
+  const [channelText, alphaText] = raw.split("/");
+  const channels = channelText.trim().split(/[\s,]+/).filter(Boolean);
+  const parseChannel = (part, percentScale = 1) => part?.endsWith("%") ? Number.parseFloat(part) / 100 * percentScale : Number.parseFloat(part);
+  const alpha = alphaText ? parseChannel(alphaText.trim(), 1) : 1;
+  if (["lab", "lch", "oklab"].includes(functionName.toLowerCase()) && channels.length >= 3) {
+    let lightness;
+    let a;
+    let b;
+    if (functionName.toLowerCase() === "lch") {
+      lightness = parseChannel(channels[0], 100);
+      const chroma = parseChannel(channels[1], 150);
+      const hue = parseChannel(channels[2]) * Math.PI / 180;
+      a = chroma * Math.cos(hue);
+      b = chroma * Math.sin(hue);
+    } else if (functionName.toLowerCase() === "oklab") {
+      lightness = parseChannel(channels[0], 1);
+      a = parseChannel(channels[1], 0.4);
+      b = parseChannel(channels[2], 0.4);
+      const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      const linear = [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+      ];
+      const gamma = (channel) => Math.max(0, Math.min(1, channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055));
+      const rgb = linear.map((channel) => Math.round(gamma(channel) * 255));
+      return `rgba(${rgb.join(", ")}, ${Math.max(0, Math.min(1, alpha))})`;
+    } else {
+      lightness = parseChannel(channels[0], 100);
+      a = parseChannel(channels[1], 125);
+      b = parseChannel(channels[2], 125);
+    }
+    const fy = (lightness + 16) / 116;
+    const fx = fy + a / 500;
+    const fz = fy - b / 200;
+    const inverseLab = (value) => value ** 3 > 216 / 24389 ? value ** 3 : (116 * value - 16) / (24389 / 27);
+    const x50 = 0.96422 * inverseLab(fx);
+    const y50 = inverseLab(fy);
+    const z50 = 0.82521 * inverseLab(fz);
+    const x = 0.9555766 * x50 - 0.0230393 * y50 + 0.0631636 * z50;
+    const y = -0.0282895 * x50 + 1.0099416 * y50 + 0.0210077 * z50;
+    const z = 0.0122982 * x50 - 0.020483 * y50 + 1.3299098 * z50;
+    const gamma = (channel) => Math.max(0, Math.min(1, channel <= 0.0031308 ? 12.92 * channel : 1.055 * channel ** (1 / 2.4) - 0.055));
+    const rgb = [3.2406 * x - 1.5372 * y - 0.4986 * z, -0.9689 * x + 1.8758 * y + 0.0415 * z, 0.0557 * x - 0.204 * y + 1.057 * z]
+      .map((channel) => Math.round(gamma(channel) * 255));
+    return `rgba(${rgb.join(", ")}, ${Math.max(0, Math.min(1, alpha))})`;
+  }
+  if (!colorContext) return "rgb(0, 0, 0)";
+  try {
+    colorContext.fillStyle = "#000000";
+    colorContext.fillStyle = match;
+    const normalized = colorContext.fillStyle;
+    return /\b(?:oklab|lab|lch|color)\(/i.test(normalized) ? "rgb(0, 0, 0)" : normalized;
+  } catch {
+    return "rgb(0, 0, 0)";
+  }
+});
 
 export async function createBusinessDocumentPdf(invoice, suppliedStore = null, options = {}) {
   const [{ jsPDF }, storeResult] = await Promise.all([
@@ -168,7 +251,14 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     ? (design.logoData || store.logo?.img_url || "")
     : (store.logo?.img_url || "");
   const logo = await loadImageData(logoUrl);
-  const logoTargetWidth = isDesigned ? Math.max(12, Math.min(50, Number(design.logoWidth) || 24)) : 23;
+  // Match the preview's enlarged Tailwind logo boxes (w-10 / w-11). The older
+  // vector fallback used a 24–30 mm logo and a 43 mm text offset, shifting the
+  // printed header away from the designed layout.
+  const logoTargetWidth = isDesigned
+    ? (headerLayout === "minimal" || headerLayout === "centered" || headerLayout === "split" ? 15 : 17)
+    : 23;
+  const previewHeaderPadding = 9.525; // Tailwind sm:px-9 at 96 CSS px/in.
+  const previewHeaderCompanyBaseline = 5.3 + logoTargetWidth / 2 + (documentTitleSize * 0.3528) / 2;
   const logoAlignment = isDesigned ? (design.logoAlignment || "left") : "left";
   const logoOffset = isDesigned ? Math.max(-16, Math.min(16, Number(design.logoOffset) || 0)) : 0;
   const alignedLogoX = (slotX, slotWidth, logoWidth) => {
@@ -211,11 +301,13 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
     if (logo) {
       const ratio = logo.width / Math.max(logo.height, 1);
       const width = logoTargetWidth;
-      const height = Math.min(23, width / ratio);
-      const logoX = alignedLogoX(margin, Math.max(40, logoTargetWidth), width);
-      pdf.addImage(logo.data, "PNG", logoX, 10 + (23 - height) / 2, width, height);
+      const height = Math.min(isDesigned ? logoTargetWidth : 23, width / ratio);
+      const logoX = isDesigned ? previewHeaderPadding : alignedLogoX(margin, Math.max(40, logoTargetWidth), width);
+      const logoY = isDesigned ? 6.5 + (logoTargetWidth - height) / 2 : 10 + (23 - height) / 2;
+      pdf.addImage(logo.data, "PNG", logoX, logoY, width, height);
       return;
     }
+    if (isDesigned) return;
     const initials = companyName.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase() || "MS";
     setText(13, bandHeader ? [255, 255, 255] : COLORS.ink, "bold");
     pdf.text(initials, alignedLogoX(margin, 40, 10), 23);
@@ -239,7 +331,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
         const height = Math.min(18, width * logo.height / Math.max(1, logo.width));
         pdf.addImage(logo.data, "PNG", baseMargin, 10, width, height);
       }
-      setText(11, [255, 255, 255], "bold");
+      setText(isDesigned ? documentTitleSize : 11, [255, 255, 255], "bold");
       pdf.text(pdf.splitTextToSize(companyName, sidebarWidth - baseMargin * 2).slice(0, 2), baseMargin, 37);
       setText(6.5, [235, 238, 255]);
       setText(documentTitleSize, accent, "bold");
@@ -264,9 +356,9 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       pdf.rect(pageWidth - 55, 0, 55, 65, "F");
       pdf.triangle(pageWidth - 84, 0, pageWidth - 55, 0, pageWidth - 55, 65, "F");
       drawLogoOrMonogram();
-      const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
-      setText(12, COLORS.ink, "bold");
-      pdf.text(companyName, textX, 17);
+      const textX = isDesigned ? previewHeaderPadding + logoTargetWidth + 2.1 : margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
+      setText(isDesigned ? documentTitleSize : 12, COLORS.ink, "bold");
+      pdf.text(pdf.splitTextToSize(companyName, Math.max(20, pageWidth - textX - 82)).slice(0, 2), textX, isDesigned ? previewHeaderCompanyBaseline : 17);
       setText(documentTitleSize, [255, 255, 255], "bold");
       pdf.text(documentTitle, pageWidth - baseMargin, 18, { align: "right" });
       setText(6.2, [255, 255, 255], "bold");
@@ -300,7 +392,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       const elegant = isDesigned && template === "elegant";
       if (logo) pdf.addImage(logo.data, "PNG", pageWidth / 2 - logoWidth / 2, elegant ? 4 : 5, logoWidth, logoHeight);
       if (elegant) {
-        setText(9, COLORS.ink, "bold");
+        setText(isDesigned ? documentTitleSize : 9, COLORS.ink, "bold");
         pdf.text(companyName, pageWidth / 2, logo ? 25 : 14, { align: "center" });
         setText(documentTitleSize, accent, "bold");
         pdf.text(documentTitle, pageWidth - margin, logo ? 23 : 18, { align: "right" });
@@ -311,7 +403,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
         y = 64;
       } else {
         const titleY = logo ? 30 : 17;
-        setText(isDesigned ? 20 : 14, accent, "bold");
+        setText(isDesigned ? documentTitleSize : 14, accent, "bold");
         pdf.text(companyName, pageWidth / 2, titleY, { align: "center" });
         setText(isDesigned ? documentTitleSize : 8, accent, "bold");
         if (isDesigned) {
@@ -334,11 +426,13 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
 
     drawLogoOrMonogram();
 
-    const textX = margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
+    const textX = isDesigned
+      ? previewHeaderPadding + (logo ? logoTargetWidth + 2.1 : 0)
+      : margin + Math.max(43, Math.min(logoTargetWidth + 3, contentWidth * 0.55));
     const headerColor = bandHeader ? [255, 255, 255] : isDesigned ? accent : COLORS.ink;
     const secondaryHeaderColor = bandHeader ? [232, 238, 248] : COLORS.muted;
-    setText(14, headerColor, "bold");
-    pdf.text(pdf.splitTextToSize(companyName, 78).slice(0, 1), textX, 17);
+    setText(isDesigned ? documentTitleSize : 14, headerColor, "bold");
+    pdf.text(pdf.splitTextToSize(companyName, 78).slice(0, 1), textX, isDesigned ? previewHeaderCompanyBaseline : 17);
     if (!isDesigned && store.tagline && !minimalHeader) {
       setText(7.5, secondaryHeaderColor);
       pdf.text(pdf.splitTextToSize(String(store.tagline), 78).slice(0, 1), textX, 23);
@@ -353,7 +447,7 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
       pdf.text(pdf.splitTextToSize(companyAddress, 82).slice(0, 2), textX, 35);
     }
 
-    const rightX = pageWidth - margin;
+    const rightX = pageWidth - (isDesigned ? previewHeaderPadding : margin);
     if (isDesigned) {
       setText(documentTitleSize, headerColor, "bold");
       pdf.text(documentTitle, rightX, 13, { align: "right" });
@@ -677,8 +771,18 @@ export async function createBusinessDocumentPdf(invoice, suppliedStore = null, o
 
   if (termsLines.length) {
     const termsLineHeight = 3.7 * spacingScale * (Number(design.lineSpacing) || 1.15);
-    // Use the remaining space on the current page first. If the terms do not
-    // fit, continue the remaining lines on the next page.
+    const termsSpacing = Number(design.lineSpacing) || 1.15;
+    const termsBlockHeight = (10 + termsLines.length * 3.7 + 4) * spacingScale * termsSpacing;
+    // Keep the terms together when they fit on a fresh page. Filling the last
+    // few millimeters of the current page can otherwise strand a sentence on
+    // an almost-empty continuation page.
+    const continuedPageStartY = isQuote ? margin : 25;
+    const freshPageTermsCapacity = bottomLimit - continuedPageStartY;
+    if (y + termsBlockHeight > bottomLimit && termsBlockHeight <= freshPageTermsCapacity) {
+      addPage();
+    }
+
+    // Very long terms still flow across pages, with a continued heading.
     let offset = 0;
     while (offset < termsLines.length) {
       if (y + 14 > bottomLimit) addPage();
@@ -764,17 +868,31 @@ export async function printInvoicePdf(invoice, suppliedStore = null, previewRoot
 
   const pdfUrl = URL.createObjectURL(pdf.output("blob"));
   let cleaned = false;
+  let finishNotified = false;
+  let finishFallback;
   const cleanup = () => {
     if (cleaned) return;
     cleaned = true;
+    if (finishFallback) window.clearTimeout(finishFallback);
     frame.remove();
     URL.revokeObjectURL(pdfUrl);
+  };
+  const notifyPrintFinished = () => {
+    if (finishNotified) return;
+    finishNotified = true;
+    window.dispatchEvent(new Event("afterprint"));
   };
 
   frame.onload = () => {
     window.setTimeout(() => {
-      frame.contentWindow?.focus();
-      frame.contentWindow?.print();
+      const printWindow = frame.contentWindow;
+      printWindow?.addEventListener("afterprint", notifyPrintFinished, { once: true });
+      printWindow?.focus();
+      printWindow?.print();
+      // Some Chromium PDF viewers omit afterprint on the parent window.
+      // print() returns after the dialog closes in the blocking case; this
+      // fallback also releases the UI if the embedded viewer drops the event.
+      finishFallback = window.setTimeout(notifyPrintFinished, 1500);
     }, 250);
   };
   frame.src = pdfUrl;
@@ -805,29 +923,63 @@ async function createQuoteBusinessPdf(quote, suppliedStore = null) {
   return createBusinessDocumentPdf(normalizedQuote, suppliedStore, { documentType: "quote", design: quote.pdf_design || {} });
 }
 
-async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot, fallbackPdf) {
+async function waitForStableDocumentPages(previewRoot) {
+  if (typeof window === "undefined" || !previewRoot) return;
+  let previousSignature = "";
+  let stableFrames = 0;
+  for (let frame = 0; frame < 20 && stableFrames < 2; frame += 1) {
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    const signature = Array.from(previewRoot.querySelectorAll("[data-quote-document-page='true']"), (page) => {
+      const rect = page.getBoundingClientRect();
+      return `${Math.round(rect.width)}x${Math.round(rect.height)}:${page.scrollHeight}:${page.textContent?.length || 0}`;
+    }).join("|");
+    stableFrames = signature && signature === previousSignature ? stableFrames + 1 : 0;
+    previousSignature = signature;
+  }
+}
+
+async function waitForDocumentPages(previewRoot) {
+  if (typeof window === "undefined" || !previewRoot) return [];
+  for (let frame = 0; frame < 45; frame += 1) {
+    const pages = Array.from(previewRoot.querySelectorAll("[data-quote-document-page='true']"));
+    if (pages.length) return pages;
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  }
+  return Array.from(previewRoot.querySelectorAll("[data-quote-document-page='true']"));
+}
+
+async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot, fallbackPdf, { requirePreview = false, captureScale = 3 } = {}) {
   let pdf;
-  const pages = previewRoot?.querySelectorAll?.("[data-quote-document-page='true']");
-  if (pages?.length) {
+  const initialPages = await waitForDocumentPages(previewRoot);
+  if (initialPages.length) {
     const [{ jsPDF }, html2canvasModule] = await Promise.all([
       import("jspdf"),
       import("html2canvas"),
     ]);
+    await document.fonts?.ready;
+    await waitForStableDocumentPages(previewRoot);
+    const pages = Array.from(previewRoot.querySelectorAll("[data-quote-document-page='true']"));
+    if (!pages.length) {
+      if (requirePreview) throw new Error("The designed document pages changed before PDF capture.");
+      return fallbackPdf(documentData, suppliedStore);
+    }
     const html2canvas = html2canvasModule.default;
     const { orientation, width, height } = getDocumentPageSpec(documentData?.pdf_design || {});
     const pageFormat = [width, height];
     pdf = new jsPDF({ orientation, unit: "mm", format: pageFormat, compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    const maxWidth = pageWidth - margin * 2;
-    const maxHeight = pageHeight - margin * 2;
+    // The captured DOM is already a complete designed page with its own
+    // margins. Adding a second PDF margin shrinks and shifts the template.
+    const maxWidth = pageWidth;
+    const maxHeight = pageHeight;
+    let outputPageCount = 0;
+    const showPageNumbers = documentData?.pdf_design?.showPageNumbers !== false;
 
     try {
       for (let index = 0; index < pages.length; index += 1) {
         const page = pages[index];
-        const canvas = await html2canvas(page, {
-          scale: 2,
+        const captureOptions = {
           useCORS: true,
           allowTaint: false,
           backgroundColor: "#ffffff",
@@ -835,23 +987,45 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
           windowWidth: Math.max(document.documentElement.clientWidth, page.scrollWidth),
           onclone: (clonedDocument) => {
             const colorContext = clonedDocument.createElement("canvas").getContext("2d");
+            const normalizeColorRules = (rules) => {
+              Array.from(rules || []).forEach((rule) => {
+                if (rule.style) {
+                  Array.from(rule.style).forEach((property) => {
+                    const value = rule.style.getPropertyValue(property);
+                    if (/\b(?:oklch|oklab|lab|lch|color)\(/i.test(value)) rule.style.setProperty(property, replaceModernCssColors(value, colorContext), rule.style.getPropertyPriority(property));
+                  });
+                }
+                if (rule.cssRules) normalizeColorRules(rule.cssRules);
+              });
+            };
+            Array.from(clonedDocument.styleSheets).forEach((styleSheet) => {
+              try { normalizeColorRules(styleSheet.cssRules); } catch { /* Ignore cross-origin stylesheets. */ }
+            });
+            const captureRoot = clonedDocument.querySelector("[data-quote-pdf-capture-root='true']");
+            if (captureRoot) {
+              captureRoot.style.setProperty("position", "fixed", "important");
+              captureRoot.style.setProperty("left", "0", "important");
+              captureRoot.style.setProperty("top", "0", "important");
+              captureRoot.style.setProperty("width", `${Math.max(...Array.from(pages, (page) => page.getBoundingClientRect().width))}px`, "important");
+              captureRoot.style.setProperty("pointer-events", "auto", "important");
+              captureRoot.style.setProperty("z-index", "2147483647", "important");
+            }
             const clonedPage = clonedDocument.querySelectorAll("[data-quote-document-page='true']")[index];
             if (!clonedPage) return;
             const visiblePageWidth = clonedPage.getBoundingClientRect().width;
             const pageZoom = Number.parseFloat(clonedDocument.defaultView.getComputedStyle(clonedPage).zoom) || 1;
             const printPageHeight = visiblePageWidth * (pageHeight / pageWidth) / pageZoom;
-            clonedPage.style.setProperty("height", `${printPageHeight}px`, "important");
             clonedPage.style.setProperty("min-height", `${printPageHeight}px`, "important");
-            clonedPage.style.setProperty("aspect-ratio", `${pageWidth} / ${pageHeight}`, "important");
-            const pageNumber = clonedPage.querySelector(".quote-preview-page-number");
-            if (pageNumber) {
-              pageNumber.style.setProperty("display", "block", "important");
-              pageNumber.style.setProperty("position", "absolute", "important");
-              pageNumber.style.setProperty("right", "32px", "important");
-              pageNumber.style.setProperty("bottom", "20px", "important");
-              pageNumber.style.setProperty("margin", "0", "important");
-              pageNumber.style.setProperty("padding", "0", "important");
+            clonedPage.style.setProperty("height", "auto", "important");
+            clonedPage.style.setProperty("aspect-ratio", "auto", "important");
+            clonedPage.style.setProperty("overflow", "visible", "important");
+            for (let ancestor = clonedPage.parentElement; ancestor && ancestor !== captureRoot; ancestor = ancestor.parentElement) {
+              ancestor.style.setProperty("overflow", "visible", "important");
+              ancestor.style.setProperty("height", "auto", "important");
+              ancestor.style.setProperty("max-height", "none", "important");
             }
+            const pageNumber = clonedPage.querySelector(".quote-preview-page-number");
+            if (pageNumber) pageNumber.style.setProperty("display", "none", "important");
             const sourceNodes = [page, ...page.querySelectorAll("*")];
             const clonedNodes = [clonedPage, ...clonedPage.querySelectorAll("*")];
             const colorProperties = ["color", "background-color", "border-top-color", "border-right-color", "border-bottom-color", "border-left-color", "outline-color", "text-decoration-color", "fill", "stroke"];
@@ -859,8 +1033,14 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
               const clonedNode = clonedNodes[nodeIndex];
               if (!clonedNode) return;
               const computed = window.getComputedStyle(sourceNode);
+              for (let styleIndex = 0; styleIndex < computed.length; styleIndex += 1) {
+                const property = computed.item(styleIndex);
+                const value = computed.getPropertyValue(property);
+                if (/\b(?:oklch|oklab|lab|lch|color)\(/i.test(value)) clonedNode.style.setProperty(property, replaceModernCssColors(value, colorContext), "important");
+              }
               colorProperties.forEach((property) => {
                 let value = computed.getPropertyValue(property);
+                if (/\b(?:oklch|oklab|lab|lch|color)\(/i.test(value)) value = replaceModernCssColors(value, colorContext);
                 if (value && colorContext && value !== "none" && !value.startsWith("url(")) {
                   colorContext.fillStyle = "#000000";
                   colorContext.fillStyle = value;
@@ -875,30 +1055,119 @@ async function createPreviewDocumentPdf(documentData, suppliedStore, previewRoot
               clonedNode.style.setProperty("text-shadow", "none", "important");
             });
           },
-        });
-        if (index > 0) pdf.addPage(pageFormat, orientation);
-        const scale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
-        const width = canvas.width * scale;
-        const height = canvas.height * scale;
-        const x = (pageWidth - width) / 2;
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", x, margin, width, height, undefined, "FAST");
+        };
+        let canvas;
+        try {
+          // Lossless PNG keeps small print legible. Retry at a lower canvas
+          // scale if a large quote exceeds the browser's high-resolution limit.
+          canvas = await html2canvas(page, { ...captureOptions, scale: captureScale });
+        } catch (highResolutionError) {
+          if (captureScale <= 2) throw highResolutionError;
+          console.warn("High-resolution document capture failed; retrying at 2x:", highResolutionError);
+          canvas = await html2canvas(page, { ...captureOptions, scale: 2 });
+        }
+        const pageRect = page.getBoundingClientRect();
+        const pixelScale = canvas.width / Math.max(1, pageRect.width);
+        const pageCanvasHeight = Math.max(1, Math.round(canvas.width * pageHeight / pageWidth));
+        const rowBounds = Array.from(page.querySelectorAll(".quote-items-table tbody tr"), (row) => {
+          const rect = row.getBoundingClientRect();
+          return { top: Math.max(0, (rect.top - pageRect.top) * pixelScale), bottom: Math.max(0, (rect.bottom - pageRect.top) * pixelScale) };
+        }).filter((row) => row.bottom > row.top);
+        const tableHead = page.querySelector(".quote-items-table thead");
+        const tableHeadRect = tableHead?.getBoundingClientRect();
+        const tableHeadTop = tableHeadRect ? Math.max(0, (tableHeadRect.top - pageRect.top) * pixelScale) : 0;
+        const tableHeadHeight = tableHeadRect ? Math.max(0, tableHeadRect.height * pixelScale) : 0;
+        const firstRowTop = rowBounds[0]?.top ?? Number.POSITIVE_INFINITY;
+        const lastRowBottom = rowBounds.at(-1)?.bottom ?? 0;
+        const slices = [];
+        let sourceTop = 0;
+        while (sourceTop < canvas.height) {
+          const repeatTableHead = sourceTop > firstRowTop && sourceTop < lastRowBottom && tableHeadHeight > 0;
+          const repeatedHeadHeight = repeatTableHead ? Math.min(tableHeadHeight, pageCanvasHeight / 3) : 0;
+          const contentCapacity = Math.max(1, pageCanvasHeight - repeatedHeadHeight);
+          let sourceBottom = Math.min(canvas.height, sourceTop + contentCapacity);
+          const overflowingRow = rowBounds.find((row) => row.top >= sourceTop && row.top < sourceBottom && row.bottom > sourceBottom);
+          if (overflowingRow) {
+            const completeRows = rowBounds.filter((row) => row.top >= sourceTop && row.bottom <= sourceBottom);
+            if (completeRows.length) sourceBottom = completeRows[completeRows.length - 1].bottom;
+            else sourceBottom = overflowingRow.top > sourceTop ? overflowingRow.top : sourceBottom;
+          }
+          if (sourceBottom <= sourceTop) sourceBottom = Math.min(canvas.height, sourceTop + contentCapacity);
+          slices.push({ sourceTop, sourceBottom, repeatedHeadHeight, repeatTableHead });
+          sourceTop = sourceBottom;
+        }
+
+        for (const [sliceIndex, slice] of slices.entries()) {
+          // html2canvas can include a few overflow pixels from the page's
+          // zoomed layout. Do not turn that empty tail into an extra PDF page.
+          if (sliceIndex > 0) {
+            try {
+              const pixels = canvas.getContext("2d", { willReadFrequently: true })
+                ?.getImageData(0, slice.sourceTop, canvas.width, Math.max(1, slice.sourceBottom - slice.sourceTop)).data;
+              if (pixels) {
+                let hasVisibleContent = false;
+                for (let offset = 0; offset < pixels.length; offset += 4 * 16) {
+                  if (pixels[offset] < 238 || pixels[offset + 1] < 238 || pixels[offset + 2] < 238) {
+                    hasVisibleContent = true;
+                    break;
+                  }
+                }
+                if (!hasVisibleContent) continue;
+              }
+            } catch {
+              // Keep the slice if the browser does not allow canvas inspection.
+            }
+          }
+          if (outputPageCount > 0) pdf.addPage(pageFormat, orientation);
+          const pageCanvas = document.createElement("canvas");
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = pageCanvasHeight;
+          const context = pageCanvas.getContext("2d");
+          context.fillStyle = "#ffffff";
+          context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          if (slice.repeatTableHead) {
+            context.drawImage(canvas, 0, tableHeadTop, canvas.width, slice.repeatedHeadHeight, 0, 0, pageCanvas.width, slice.repeatedHeadHeight);
+          }
+          const bodyHeight = Math.min(slice.sourceBottom - slice.sourceTop, pageCanvasHeight - slice.repeatedHeadHeight);
+          context.drawImage(canvas, 0, slice.sourceTop, canvas.width, bodyHeight, 0, slice.repeatedHeadHeight, pageCanvas.width, bodyHeight);
+          pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", 0, 0, maxWidth, maxHeight, undefined, "FAST");
+          outputPageCount += 1;
+        }
+      }
+      if (showPageNumbers) {
+        for (let pageNumber = 1; pageNumber <= outputPageCount; pageNumber += 1) {
+          pdf.setPage(pageNumber);
+          pdf.setFontSize(6);
+          pdf.setTextColor(148, 163, 184);
+          pdf.text(`${pageNumber} / ${outputPageCount}`, pageWidth - 7, pageHeight - 4, { align: "right" });
+        }
       }
     } catch (captureError) {
-      console.warn("Document preview capture failed; using the PDF renderer instead:", captureError);
+      console.warn("Document preview capture failed:", captureError);
+      // A quote with many rows can exceed canvas/PDF memory limits after the
+      // DOM capture succeeds (for example while slicing or encoding PNGs).
+      // Rebuild the whole PDF at 2x so no partially-written PDF is returned.
+      if (captureScale > 2) {
+        return createPreviewDocumentPdf(documentData, suppliedStore, previewRoot, fallbackPdf, { requirePreview, captureScale: 2 });
+      }
+      // Designed documents must keep the saved designer layout. Do not
+      // silently switch to the separate vector layout, whose spacing differs.
+      if (requirePreview) throw captureError;
       return fallbackPdf(documentData, suppliedStore);
     }
   } else {
+    if (requirePreview) throw new Error("The designed document preview is not ready for PDF export.");
     pdf = await fallbackPdf(documentData, suppliedStore);
   }
   return pdf;
 }
 
 async function createInvoicePdfDocument(invoice, suppliedStore = null, previewRoot = null) {
-  return createPreviewDocumentPdf(invoice, suppliedStore, previewRoot, createInvoicePdf);
+  return createPreviewDocumentPdf(invoice, suppliedStore, previewRoot, createInvoicePdf, { requirePreview: true });
 }
 
 async function createQuotePdfDocument(quote, suppliedStore = null, previewRoot = null) {
-  return createPreviewDocumentPdf(quote, suppliedStore, previewRoot, createQuoteBusinessPdf);
+  return createPreviewDocumentPdf(quote, suppliedStore, previewRoot, createQuoteBusinessPdf, { requirePreview: true });
 }
 
 export async function downloadQuotePdf(quote, suppliedStore = null, previewRoot = null) {
@@ -925,18 +1194,29 @@ export async function printQuotePdf(quote, suppliedStore = null, previewRoot = n
   document.body.appendChild(frame);
 
   let pdfUrl;
+  let finishNotified = false;
+  let finishFallback;
   const cleanup = () => {
     frame.remove();
+    if (finishFallback) window.clearTimeout(finishFallback);
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+  };
+  const notifyPrintFinished = () => {
+    if (finishNotified) return;
+    finishNotified = true;
+    window.dispatchEvent(new Event("afterprint"));
   };
 
   try {
     const pdf = await createQuotePdfDocument(quote, suppliedStore, previewRoot);
     pdfUrl = URL.createObjectURL(pdf.output("blob"));
     frame.onload = () => {
+      const printWindow = frame.contentWindow;
+      printWindow?.addEventListener("afterprint", notifyPrintFinished, { once: true });
       window.setTimeout(() => {
-        frame.contentWindow?.focus();
-        frame.contentWindow?.print();
+        printWindow?.focus();
+        printWindow?.print();
+        finishFallback = window.setTimeout(notifyPrintFinished, 1500);
       }, 250);
     };
     frame.src = pdfUrl;

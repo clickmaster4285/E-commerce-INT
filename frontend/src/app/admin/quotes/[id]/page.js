@@ -7,13 +7,13 @@ import { quoteApi } from "@/apis/admin/quoteApi";
 import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
 import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
-import QuoteTemplateDesigner from "@/components/admin/QuoteTemplateDesigner";
+import QuoteTemplateDesigner, { getSavedQuotePdfDesign, QUOTE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
 import ActivityTimeline from "@/components/admin/ActivityTimeline";
 import { renderRichHtml } from "@/lib/termsContent";
-import { downloadQuotePdf } from "@/lib/invoicePdf";
+import { downloadQuotePdf, getDocumentPageSpec, printQuotePdf } from "@/lib/invoicePdf";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Check, Download, Printer, FilePlus2, Pencil, ReceiptText, X,
+  ArrowLeft, ChevronRight, Check, Download, Printer, FilePlus2, Pencil, ReceiptText, X,
   Send, Eye, UserRound, CalendarDays, PackageCheck, Wallet, FileText } from
 "lucide-react";
 
@@ -55,8 +55,10 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
   const qc = useQueryClient();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [downloadQueued, setDownloadQueued] = useState(false);
   const [printQueued, setPrintQueued] = useState(false);
   const printHandled = useRef(false);
+  const downloadPreviewRef = useRef(null);
   const quotePreviewRef = useRef(null);
   const { data: quote, isLoading, isError, error } = useQuery({ queryKey: ["quote-admin", id], queryFn: () => quoteApi.getById(id) });
   const { data: store = null, isLoading: isStoreLoading } = useQuery({ queryKey: ["store-public"], queryFn: () => storeApi.getPublic(), staleTime: 5 * 60 * 1000 });
@@ -103,19 +105,45 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
     printHandled.current = true;
     const timer = window.setTimeout(() => {
       setIsGeneratingPdf(true);
-      setPreviewOpen(true);
       setPrintQueued(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [isLoading, isStoreLoading, isVariantsLoading, quote, searchParams]);
   useEffect(() => {
-    if (!printQueued || !previewOpen || !quotePreviewRef.current) return undefined;
+    if (!downloadQueued || !downloadPreviewRef.current) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (document.fonts?.ready) await document.fonts.ready;
+        if (cancelled) return;
+        const pdfQuote = quoteWithVariantNames || quote;
+        const quoteDesign = pdfQuote.pdf_design && Object.keys(pdfQuote.pdf_design).length
+          ? pdfQuote.pdf_design
+          : getSavedQuotePdfDesign(QUOTE_TEMPLATE_STORAGE_KEY);
+        await downloadQuotePdf({ ...pdfQuote, pdf_design: quoteDesign }, store, downloadPreviewRef.current);
+        toast.success("Quote PDF downloaded");
+      } catch (downloadError) {
+        console.error("Could not generate quote PDF:", downloadError);
+        toast.error("Could not generate quote PDF");
+      } finally {
+        if (!cancelled) {
+          setDownloadQueued(false);
+          setIsGeneratingPdf(false);
+        }
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [downloadQueued, quote, quoteWithVariantNames, store]);
+  useEffect(() => {
+    if (!printQueued || !downloadPreviewRef.current) return undefined;
     let cancelled = false;
     const finishPrint = () => {
       if (cancelled) return;
       setPrintQueued(false);
       setIsGeneratingPdf(false);
-      setPreviewOpen(false);
       printHandled.current = false;
       if (searchParams.get("print") === "1") router.replace(`/admin/quotes/${id}`, { scroll: false });
     };
@@ -123,7 +151,13 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
     const timer = window.setTimeout(async () => {
       try {
         if (document.fonts?.ready) await document.fonts.ready;
-        if (!cancelled) window.print();
+        if (!cancelled) {
+          const pdfQuote = quoteWithVariantNames || quote;
+          const quoteDesign = pdfQuote.pdf_design && Object.keys(pdfQuote.pdf_design).length
+            ? pdfQuote.pdf_design
+            : getSavedQuotePdfDesign(QUOTE_TEMPLATE_STORAGE_KEY);
+          await printQuotePdf({ ...pdfQuote, pdf_design: quoteDesign }, store, downloadPreviewRef.current);
+        }
       } catch (printError) {
         console.error("Could not print quote:", printError);
         toast.error("Could not print quote");
@@ -135,7 +169,7 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
       window.clearTimeout(timer);
       window.removeEventListener("afterprint", finishPrint);
     };
-  }, [id, printQueued, previewOpen, router, searchParams]);
+  }, [id, printQueued, router, searchParams, quote, quoteWithVariantNames, store]);
   const statusMutation = useMutation({
     mutationFn: (status) => quoteApi.updateStatus(id, status),
     onSuccess: () => {toast.success("Quote status updated");qc.invalidateQueries({ queryKey: ["quote-admin", id] });qc.invalidateQueries({ queryKey: ["quotes-admin"] });},
@@ -151,22 +185,13 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
     onError: (e) => toast.error(e?.response?.data?.message || "Could not send quote")
   });
   const downloadPdf = async () => {
-    if (isGeneratingPdf) return;
+    if (isGeneratingPdf || isStoreLoading || isVariantsLoading) return;
     setIsGeneratingPdf(true);
-    try {
-      await downloadQuotePdf(quoteWithVariantNames || quote, store, quotePreviewRef.current);
-      toast.success("Quote PDF downloaded");
-    } catch (downloadError) {
-      console.error("Could not generate quote PDF:", downloadError);
-      toast.error("Could not generate quote PDF");
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    setDownloadQueued(true);
   };
   const printQuote = async () => {
     if (isGeneratingPdf || isStoreLoading || isVariantsLoading) return;
     setIsGeneratingPdf(true);
-    setPreviewOpen(true);
     setPrintQueued(true);
   };
 
@@ -178,14 +203,13 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
     <header className="quote-no-print overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
       <div className="flex flex-col gap-3 p-3 sm:p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <nav aria-label={t("admin.quoteInvoice.ui.breadcrumb_c766e665")} className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium text-[var(--text-muted)]"><button type="button" onClick={() => router.push("/admin/quotes")} className="hover:text-blue-600">{t("admin.quoteInvoice.ui.quotes_7b0257ce")}</button><span aria-hidden="true">›</span><span>{t("admin.quoteInvoice.ui.quote_details_4443d16a")}</span></nav>
+          <nav aria-label={t("admin.quoteInvoice.ui.breadcrumb_c766e665")} className="mb-1.5 flex items-center gap-1.5 text-sm text-[var(--text-muted)]"><button type="button" onClick={() => router.push("/admin/quotes")} className="inline-flex items-center gap-1 hover:text-blue-600"><ArrowLeft size={14} />{t("admin.quoteInvoice.ui.quotes_7b0257ce")}</button><ChevronRight size={13} /><span className="text-[var(--text-primary)]">{quote.quote_number}</span></nav>
           <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-300"><ReceiptText size={20} /></span><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><h1 className="text-xl font-extrabold tracking-tight sm:text-2xl text-[var(--text-primary)]">{quote.quote_number}</h1><span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusStyle[quote.status] || statusStyle.Draft}`}>{t(`admin.quoteInvoice.status.${String(quote.status || "Draft").toLowerCase()}`)}</span></div><p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">{t("admin.quoteInvoice.ui.quote_for_aaca8b54")} {quote.customer_name}</p></div></div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={() => setPreviewOpen(true)} className="quote-no-print inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"><Eye size={14} /> Preview</button>
           <button type="button" disabled={isGeneratingPdf || isStoreLoading || isVariantsLoading} onClick={printQuote} className="quote-no-print inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"><Printer size={14} /> {isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
           <button type="button" disabled={isGeneratingPdf || isStoreLoading || isVariantsLoading} onClick={downloadPdf} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-950"><Download size={14} /> {isGeneratingPdf || isStoreLoading || isVariantsLoading ? "Preparing PDF..." : "Download PDF"}</button>
-          <button type="button" onClick={() => router.push("/admin/quotes")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-transparent bg-[var(--bg-tertiary)] px-3 text-xs font-medium text-[var(--text-secondary)] transition hover:bg-slate-200 dark:hover:bg-[var(--bg-tertiary)]"><ArrowLeft size={14} /> {t("admin.quoteInvoice.ui.all_quotes_0900db5f")}</button>
           {quote.status === "Accepted" && <button type="button" onClick={() => router.push(`/admin/invoices/new?quote=${quote._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 text-xs font-bold text-white shadow-sm transition hover:shadow-md"><FilePlus2 size={14} /> {t("admin.quoteInvoice.ui.convert_to_invoice_ff42ae9b")}</button>}
           {["Pending", "Draft"].includes(quote.status) && <><button type="button" onClick={() => router.push(`/admin/quotes/new?quote=${quote._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700"><Pencil size={13} /> {t("admin.quoteInvoice.ui.edit_quote_540f4206")}</button><button type="button" disabled={sendMutation.isPending} onClick={() => sendMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 text-xs font-bold text-white shadow-sm transition hover:shadow-md disabled:cursor-wait disabled:opacity-60"><Send size={13} /> {sendMutation.isPending ? "Updating..." : "Mark as Sent"}</button></>}
           {quote.status === "Sent" && <><button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("Accepted")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"><Check size={14} /> {t("admin.quoteInvoice.ui.accept_bb54db51")}</button><button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("Rejected")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-[var(--bg-card)] px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"><X size={14} /> {t("admin.quoteInvoice.ui.reject_2b03b592")}</button></>}
@@ -236,6 +260,7 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
         <ActivityTimeline events={localizedQuoteActivity.length ? localizedQuoteActivity : [{ type: "created", at: quote.created_at, actor_name: quote.createdby?.name || "", changes: [] }]} title={t("admin.documentDetail.panel.quoteActivity")} emptyText={t("admin.documentDetail.activity.empty")} />
       </aside>
     </div>
+    {(downloadQueued || printQueued) && <div aria-hidden="true" data-quote-pdf-capture-root="true" style={{ position: "fixed", left: "-12000px", top: 0, width: `${Math.round(getDocumentPageSpec(quote.pdf_design || {}).width / 25.4 * 96)}px`, pointerEvents: "none", zIndex: -1 }}><div ref={downloadPreviewRef} className="w-full"><QuoteTemplateDesigner previewOnly form={{ customer_name: quote.customer_name || "", customer_email: quote.customer_email || "", customer_phone: quote.customer_phone || "", customer_address: quote.customer_address || "", quote_date: quote.quote_date ? String(quote.quote_date).slice(0, 10) : "", expiry_date: quote.expiry_date ? String(quote.expiry_date).slice(0, 10) : "", terms: quote.terms || "", notes: quote.notes || "", items: quoteWithVariantNames.items.map((item, index) => ({ ...item, row_id: item._id || "saved-" + index })) }} totals={{ subtotal: quote.subtotal, itemDiscount: itemDiscountTotal, overallDiscount: additionalQuoteDiscount, taxableAmount, discount: quote.discount, tax: quote.tax, total: quote.total }} quoteNumber={quote.quote_number} quoteStatus={quote.status} savedDesign={quote.pdf_design || {}} money={money} /></div></div>}
     {previewOpen && <PreviewModal onClose={() => { if (printQueued) { setPrintQueued(false); setIsGeneratingPdf(false); printHandled.current = false; } setPreviewOpen(false); }}><div id="quote-document-preview" ref={quotePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly form={{ customer_name: quote.customer_name || "", customer_email: quote.customer_email || "", customer_phone: quote.customer_phone || "", customer_address: quote.customer_address || "", quote_date: quote.quote_date ? String(quote.quote_date).slice(0, 10) : "", expiry_date: quote.expiry_date ? String(quote.expiry_date).slice(0, 10) : "", terms: quote.terms || "", notes: quote.notes || "", items: quoteWithVariantNames.items.map((item, index) => ({ ...item, row_id: item._id || "saved-" + index })) }} totals={{ subtotal: quote.subtotal, itemDiscount: itemDiscountTotal, overallDiscount: additionalQuoteDiscount, taxableAmount, discount: quote.discount, tax: quote.tax, total: quote.total }} quoteNumber={quote.quote_number} quoteStatus={quote.status} savedDesign={quote.pdf_design || {}} money={money} /></div></PreviewModal>}
       <style jsx global>{`
         @page { size: A4 portrait; margin: 10mm; }

@@ -12,11 +12,11 @@ import {
 import { toast } from "sonner";
 import { invoiceApi } from "@/apis/admin/invoiceApi";
 import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
-import { downloadInvoicePdf, printInvoicePdf } from "@/lib/invoicePdf";
+import { downloadInvoicePdf, getDocumentPageSpec, printInvoicePdf } from "@/lib/invoicePdf";
 import { storeApi } from "@/apis/admin/storeApi";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
-import QuoteTemplateDesigner, { INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
+import QuoteTemplateDesigner, { getSavedQuotePdfDesign, INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
 import { renderRichHtml } from "@/lib/termsContent";
 
 const edge = { border: "1px solid var(--border-color)" };
@@ -87,8 +87,10 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [printQueued, setPrintQueued] = useState(false);
+  const [downloadQueued, setDownloadQueued] = useState(false);
   const printHandled = useRef(false);
   const invoicePreviewRef = useRef(null);
+  const invoiceCaptureRef = useRef(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: new Date().toISOString().slice(0, 10), payment_time: new Date().toTimeString().slice(0, 5), payment_method: "Cash", note: "" });
   const { data: invoice, isLoading, isError, refetch } = useQuery({
     queryKey: ["invoice-admin", id],
@@ -112,19 +114,23 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
     printHandled.current = true;
     const timer = window.setTimeout(() => {
       setIsGeneratingPdf(true);
-      setPreviewOpen(true);
       setPrintQueued(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [invoice, isLoading, isStoreLoading, searchParams]);
 
   useEffect(() => {
-    if (!printQueued || !previewOpen || !invoicePreviewRef.current) return undefined;
+    if (!printQueued || !invoiceCaptureRef.current) return undefined;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
         if (document.fonts?.ready) await document.fonts.ready;
-        if (!cancelled) await printInvoicePdf(invoice, store, invoicePreviewRef.current);
+        if (!cancelled) {
+          const invoiceDesign = invoice.pdf_design && Object.keys(invoice.pdf_design).length
+            ? invoice.pdf_design
+            : getSavedQuotePdfDesign(INVOICE_TEMPLATE_STORAGE_KEY);
+          await printInvoicePdf({ ...invoice, pdf_design: invoiceDesign }, store, invoiceCaptureRef.current);
+        }
       } catch (printError) {
         console.error("Could not print invoice:", printError);
         toast.error(t("admin.invoiceDetail.message.pdfFailed"));
@@ -141,7 +147,36 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [id, invoice, printQueued, previewOpen, router, searchParams, store, t]);
+  }, [id, invoice, printQueued, router, searchParams, store, t]);
+
+  useEffect(() => {
+    if (!downloadQueued || !invoiceCaptureRef.current) return undefined;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        if (document.fonts?.ready) await document.fonts.ready;
+        if (!cancelled) {
+          const invoiceDesign = invoice.pdf_design && Object.keys(invoice.pdf_design).length
+            ? invoice.pdf_design
+            : getSavedQuotePdfDesign(INVOICE_TEMPLATE_STORAGE_KEY);
+          await downloadInvoicePdf({ ...invoice, pdf_design: invoiceDesign }, store, invoiceCaptureRef.current);
+          toast.success("Invoice PDF downloaded");
+        }
+      } catch (downloadError) {
+        console.error("Could not generate invoice PDF:", downloadError);
+        toast.error("Could not generate invoice PDF");
+      } finally {
+        if (!cancelled) {
+          setDownloadQueued(false);
+          setIsGeneratingPdf(false);
+        }
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [downloadQueued, invoice, store]);
 
   const paymentMutation = useMutation({
     mutationFn: (payment) => invoiceApi.recordPayment(id, payment),
@@ -179,21 +214,12 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   const downloadPdf = async () => {
     if (isGeneratingPdf || isStoreLoading) return;
     setIsGeneratingPdf(true);
-    try {
-      await downloadInvoicePdf(invoice, store, invoicePreviewRef.current);
-      toast.success("Invoice PDF downloaded");
-    } catch (downloadError) {
-      console.error("Could not generate invoice PDF:", downloadError);
-      toast.error("Could not generate invoice PDF");
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    setDownloadQueued(true);
   };
 
   const printInvoice = async () => {
     if (isGeneratingPdf || isStoreLoading) return;
     setIsGeneratingPdf(true);
-    setPreviewOpen(true);
     setPrintQueued(true);
   };
 
@@ -518,7 +544,8 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       </aside>
     </div>
 
-    {previewOpen && <PreviewModal onClose={() => { if (printQueued) { setPrintQueued(false); setIsGeneratingPdf(false); printHandled.current = false; } setPreviewOpen(false); }}><div id="invoice-document-preview" ref={invoicePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly documentType="invoice" storageKey={INVOICE_TEMPLATE_STORAGE_KEY} form={{ customer_name: invoice.customer_name || "", customer_email: invoice.customer_email || "", customer_phone: invoice.customer_phone || "", customer_address: invoice.customer_address || "", invoice_date: invoice.invoice_date || "", due_date: invoice.due_date || "", terms: invoice.terms || "", notes: "", items: previewItems }} totals={{ subtotal, itemDiscount: itemDiscountBase, overallDiscount: additionalInvoiceDiscount, taxableAmount, discount: invoice.discount, tax: invoice.tax, total: invoice.total }} quoteNumber={invoice.invoice_number} quoteStatus={displayStatus} savedDesign={invoice.pdf_design || {}} money={(value) => money(value, locale)} /></div></PreviewModal>}
+    {(printQueued || downloadQueued) && <div aria-hidden="true" data-quote-pdf-capture-root="true" style={{ position: "fixed", left: "-12000px", top: 0, width: `${Math.round(getDocumentPageSpec(invoice.pdf_design || {}).width / 25.4 * 96)}px`, pointerEvents: "none", zIndex: -1 }}><div ref={invoiceCaptureRef} className="w-full"><QuoteTemplateDesigner previewOnly documentType="invoice" storageKey={INVOICE_TEMPLATE_STORAGE_KEY} form={{ customer_name: invoice.customer_name || "", customer_email: invoice.customer_email || "", customer_phone: invoice.customer_phone || "", customer_address: invoice.customer_address || "", invoice_date: invoice.invoice_date || "", due_date: invoice.due_date || "", terms: invoice.terms || "", notes: "", items: previewItems }} totals={{ subtotal, itemDiscount: itemDiscountBase, overallDiscount: additionalInvoiceDiscount, taxableAmount, discount: invoice.discount, tax: invoice.tax, total: invoice.total }} quoteNumber={invoice.invoice_number} quoteStatus={displayStatus} savedDesign={invoice.pdf_design || {}} money={(value) => money(value, locale)} /></div></div>}
+    {previewOpen && <PreviewModal onClose={() => { setPreviewOpen(false); }}><div id="invoice-document-preview" ref={invoicePreviewRef} className="mx-auto w-full max-w-5xl"><QuoteTemplateDesigner previewOnly documentType="invoice" storageKey={INVOICE_TEMPLATE_STORAGE_KEY} form={{ customer_name: invoice.customer_name || "", customer_email: invoice.customer_email || "", customer_phone: invoice.customer_phone || "", customer_address: invoice.customer_address || "", invoice_date: invoice.invoice_date || "", due_date: invoice.due_date || "", terms: invoice.terms || "", notes: "", items: previewItems }} totals={{ subtotal, itemDiscount: itemDiscountBase, overallDiscount: additionalInvoiceDiscount, taxableAmount, discount: invoice.discount, tax: invoice.tax, total: invoice.total }} quoteNumber={invoice.invoice_number} quoteStatus={displayStatus} savedDesign={invoice.pdf_design || {}} money={(value) => money(value, locale)} /></div></PreviewModal>}
 
     {paymentOpen && <InvoicePaymentModal invoice={invoice} form={paymentForm} setForm={setPaymentForm} isPending={paymentMutation.isPending} onClose={() => setPaymentOpen(false)} onSubmit={() => paymentMutation.mutate(paymentForm)} />}
     {returnOpen && canReturn && <InvoiceReturnModal invoice={invoice} isPending={returnMutation.isPending} onClose={() => setReturnOpen(false)} onSubmit={(payload) => returnMutation.mutate(payload)} />}
