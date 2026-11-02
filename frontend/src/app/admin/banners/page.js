@@ -1633,4 +1633,3 @@ export default function BannersPage() {
     </div>
   );
 }
-
