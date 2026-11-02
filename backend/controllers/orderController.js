@@ -711,6 +711,8 @@ const getAllOrders = async (req, res) => {
     const [orders, total] = await Promise.all([
       Order.find(query)
         .populate("user_id", "name email phone")
+        .populate("items.product_id", "name translations")
+        .populate("items.variant_id", "title translations")
         .sort({ created_at: -1 })
         .skip(skip)
         .limit(Number(limit))
@@ -1079,6 +1081,8 @@ const getOrderByIdAdmin = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate("user_id", "name email phone")
+      .populate("items.product_id", "name translations")
+      .populate("items.variant_id", "title translations")
       .lean();
 
     if (!order) {

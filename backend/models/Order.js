@@ -75,6 +75,18 @@ const orderSchema = new mongoose.Schema(
     },
     notes: { type: String, default: "" },
     cancel_reason: { type: String, default: "" },   // ✅ ADD
+    translations: {
+      notes: { type: Map, of: String, default: () => ({}) },
+      cancel_reason: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      notes: { type: String, default: "" },
+      cancel_reason: { type: String, default: "" },
+    },
+    translation_status: {
+      notes: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      cancel_reason: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
     // ✅ NEW: Root level deal tracking
     deal_ids: [{
       type: mongoose.Schema.Types.ObjectId,

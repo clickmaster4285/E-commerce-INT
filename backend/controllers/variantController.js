@@ -117,7 +117,7 @@ const getVariants = async (req, res) => {
   try {
     const variants = await Variant.find()
       .select("-__v")
-      .populate("product_id", "name")
+      .populate("product_id", "name translations.name")
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 

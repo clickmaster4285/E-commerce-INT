@@ -1,20 +1,25 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import Image from "next/image";
+
 import Link from "next/link";
-import { ArrowRight, ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { smartImageLoader } from "@/utils/smartImageLoader";
 import SectionHeading from "./SectionHeading";
-import useScrollFade from "@/hooks/useScrollFade";
+import useScrollFade from "../../hooks/user/useScrollFade";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 function getCategoryImage(category) {
   return category?.image || null;
 }
 
 function CategoryCard({ category, tabIndex }) {
+  const { t } = useTranslation();
+  const { fieldOf } = useLocalized();
+  const categoryName = fieldOf(category, "name");
   const image = getCategoryImage(category);
-  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <Link
@@ -25,31 +30,25 @@ function CategoryCard({ category, tabIndex }) {
       className="group flex h-auto w-[180px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-0 text-left shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-200 ease-out hover:-translate-y-[3px] hover:border-[var(--user-accent)]/35 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:-translate-y-[3px] focus-visible:border-[var(--user-accent)]/40 focus-visible:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] active:scale-[0.98]"
     >
       <span className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-t-xl bg-[var(--user-bg-hover)]">
-        {image && !imageFailed ? (
-          <Image
-            src={image}
-            alt={category.name}
-            fill
-            loader={smartImageLoader}
-            sizes="(max-width: 639px) 140px, 168px"
-            className="object-cover object-center transition-transform duration-200 ease-out group-hover:scale-105 group-focus-visible:scale-105"
-            onError={() => setImageFailed(true)}
-            draggable={false}
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center text-[var(--user-text-subtle)]">
-            <ImageOff size={24} strokeWidth={1.5} aria-hidden="true" />
-          </span>
-        )}
+        <FallbackImage
+          nextImage
+          src={image}
+          alt={categoryName}
+          fill
+          loader={smartImageLoader}
+          sizes="(max-width: 639px) 140px, 168px"
+          className="object-cover object-center transition-transform duration-200 ease-out group-hover:scale-105 group-focus-visible:scale-105"
+          draggable={false}
+        />
       </span>
 
       <span className="flex min-h-0 flex-col gap-1 px-3.5 py-3">
         <span className="line-clamp-2 min-h-0 break-words text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--user-text)]">
-          {category.name}
+          {categoryName}
         </span>
         {category.count != null && category.count !== "" ? (
           <span className="text-[11px] font-normal leading-4 text-[var(--user-text-muted)]">
-            {category.count} {Number(category.count) === 1 ? "product" : "products"}
+            {t("cart.itemsCount", { count: category.count })}
           </span>
         ) : null}
       </span>
@@ -71,6 +70,7 @@ function CategorySkeletonCard() {
 }
 
 export function CategoryCarousel({ categories = [], header, isLoading = false }) {
+  const { t } = useTranslation();
   const viewportRef = useRef(null);
   const trackRef = useRef(null);
   const segmentWidthRef = useRef(0);
@@ -269,17 +269,17 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
   return (
     <div>
       <SectionHeading
-        title="Explore Our Categories"
+        title={t("home.exploreCategories")}
         titleId="home-categories-heading"
-        subtitle="Find everything you need in one place."
+        subtitle={t("home.categoriesSubtitle")}
         className="mb-5 px-1"
       >
         <div className="flex shrink-0 items-end gap-4">
           <Link
-            href="/filtering-product"
+            href="/filtering-product?allCategories=1"
             className="group inline-flex items-center gap-1 text-[13px] font-medium text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
           >
-            View All
+            {t("common.viewAll")}
             <ArrowRight size={16} className="transition-transform duration-150 group-hover:translate-x-0.5" />
           </Link>
           <span
@@ -291,7 +291,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
               type="button"
               onClick={() => scrollByCards(-1)}
               disabled={!canScrollLeft || categories.length < 2}
-              aria-label="Previous categories"
+              aria-label={t("home.previousCategories")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] shadow-sm transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
             >
               <ChevronLeft size={16} strokeWidth={2} />
@@ -300,7 +300,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
               type="button"
               onClick={() => scrollByCards(1)}
               disabled={!canScrollRight || categories.length < 2}
-              aria-label="Next categories"
+              aria-label={t("home.nextCategories")}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] shadow-sm transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
             >
               <ChevronRight size={16} strokeWidth={2} />
@@ -311,7 +311,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
       <div
         ref={viewportRef}
         role="region"
-        aria-label="Scrollable product categories"
+        aria-label={t("home.scrollableCategories")}
         aria-busy={showSkeletons}
         tabIndex={0}
         onKeyDown={onKeyDown}

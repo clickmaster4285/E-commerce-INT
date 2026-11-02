@@ -2,6 +2,7 @@ const Banner = require("../models/Banner");
 const fs = require("fs");
 const path = require("path");
 const { getIO } = require("../utils/socket");
+const { queueTranslationSync } = require("../utils/translationService");
 
 const emitSocketEvent = (event, data) => {
   try {
@@ -20,7 +21,7 @@ const deleteFile = (filePath) => {
 exports.getBanner = async (req, res) => {
   try {
     const banner = await Banner.findById(req.params.id)
-      .populate("primaryButton.dealId", "name isActive startDate endDate");
+      .populate("primaryButton.dealId", "name translations isActive startDate endDate");
     if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
     res.json({ success: true, data: banner });
   } catch (err) {
@@ -133,6 +134,7 @@ exports.createBanner = async (req, res) => {
     data.updatedby = req.user?._id || null;
 
     const banner = await Banner.create(data);
+    queueTranslationSync(Banner, banner._id);
 
     emitSocketEvent("banner:created", { success: true, data: banner });
     emitSocketEvent("bannerCreated", { success: true, data: banner });
@@ -194,6 +196,7 @@ exports.updateBanner = async (req, res) => {
     const updated = await Banner.findByIdAndUpdate(req.params.id, data, { new: true })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
+    queueTranslationSync(Banner, updated._id);
 
     emitSocketEvent("banner:updated", { success: true, data: updated });
     emitSocketEvent("bannerUpdated", { success: true, data: updated });
@@ -240,6 +243,7 @@ exports.duplicateBanner = async (req, res) => {
     copy.createdby = req.user?._id || null;
     copy.updatedby = req.user?._id || null;
     const newBanner = await Banner.create(copy);
+    queueTranslationSync(Banner, newBanner._id);
 
     emitSocketEvent("banner:created", { success: true, data: newBanner });
     emitSocketEvent("bannerCreated", { success: true, data: newBanner });

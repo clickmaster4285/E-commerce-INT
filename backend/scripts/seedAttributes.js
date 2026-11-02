@@ -1,9 +1,54 @@
 // backend/scripts/seedAttributes.js
 const Attribute = require("../models/Attribute");
 const log = require("../utils/logger");
+const { hashText } = require("../utils/translationService");
 
 const toValues = (arr) =>
   arr.map((v, i) => ({ label: v, value: v, sort_order: i, is_active: true }));
+
+const toPlainMap = (map) => {
+  if (!map) return {};
+  return typeof map.toObject === "function" ? map.toObject() : { ...map };
+};
+
+/**
+ * 🌍 Seed `values` ko DB me likhte waqt option-level translations (Urdu /
+ * Arabic) ko bachana zaroori hai.
+ *
+ * Ye function server START par chalti hai (`server.js` -> `seedAttributes()`),
+ * aur dev me har backend file edit par nodemon restart hota hai. Pehle yahan
+ * seed ke plain `{label, value}` seedha `$set` hote the — jis se har restart
+ * par SAARI option translations mit jati thi (translation backfill ke baad bhi
+ * turant wipe ho jati thi).
+ *
+ * Ab: jis option ka `value` (stable machine code) aur `label` dono match hain,
+ * uski existing translations carry over hoti hain. Label badal gaya ho to
+ * translation jaan-boojh kar chhodi jati hai — stale hash se service use dobara
+ * generate kar degi.
+ */
+const carryOverLabelTranslations = (seedValues, existingDoc) => {
+  const existing = existingDoc?.values || [];
+  return (seedValues || []).map((v) => {
+    const label = String(v.label ?? "").trim();
+    const value = String(v.value ?? "").trim();
+    const key = value.toLowerCase();
+
+    const prev = existing.find(
+      (p) => String(p?.value ?? "").trim().toLowerCase() === key
+    );
+    if (!prev) return v;
+
+    const prevHash = prev.label_source || hashText(prev.label);
+    if (prevHash !== hashText(label)) return v; // label badli → regenerate
+
+    const carried = toPlainMap(prev.label_translations);
+    return {
+      ...v,
+      ...(Object.keys(carried).length ? { label_translations: carried } : {}),
+      label_source: prevHash,
+    };
+  });
+};
 
 const YES_NO = [
   { label: "Yes", value: "yes", sort_order: 0, is_active: true },
@@ -199,6 +244,15 @@ async function seedAttributes() {
     const dupes = codes.filter((c, i) => codes.indexOf(c) !== i);
     if (dupes.length) throw new Error(`Duplicate codes in config: ${dupes.join(", ")}`);
 
+    // Purane attributes ek hi baar me le lo — har attribute ke liye alag
+    // query nahi, warna 65 round trips.
+    const existingAttrs = await Attribute.find(
+      { code: { $in: ATTRIBUTES_TO_SEED.map((a) => a.code) } }
+    )
+      .select("code values")
+      .lean();
+    const existingByCode = new Map(existingAttrs.map((d) => [d.code, d]));
+
     for (const attr of ATTRIBUTES_TO_SEED) {
       const doc = {
         name: attr.name,
@@ -206,7 +260,8 @@ async function seedAttributes() {
         data_type: attr.data_type,
         variant_allowed: attr.variant_allowed ?? false,
         unit: attr.unit || null,
-        values: attr.values,
+        // 🌍 Option labels ki translations bacha lo (restart-wipe fix).
+        values: carryOverLabelTranslations(attr.values, existingByCode.get(attr.code)),
         is_active: true,
       };
 

@@ -3,6 +3,7 @@ const log = require("../utils/logger");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
+const { queueTranslationSync } = require("../utils/translationService");
 
 const emitSocketEvent = (event, data) => {
   try {
@@ -146,6 +147,7 @@ const createDeal = async (req, res) => {
       createdBy: req.user?._id || req.user?.id || null,
       updatedBy: req.user?._id || req.user?.id || null,
     });
+    queueTranslationSync(Deal, deal._id);
 
     emitSocketEvent("deal:created", { success: true, data: deal });
     emitSocketEvent("dealCreated", { success: true, data: deal });
@@ -251,10 +253,10 @@ const getDeals = async (req, res) => {
     const [deals, total, baseTotal, activeCount, inactiveCount, scheduledCount, expiredCount, disabledCount] =
       await Promise.all([
         Deal.find(query)
-          .populate("productIds", "name sku images selling_price")
-          .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
-          .populate("categoryIds", "name code")
-          .populate("brandIds", "name logo")
+          .populate("productIds", "name translations sku images selling_price")
+          .populate("bundleRule.freeProduct", `${BUNDLE_FREE_PRODUCT_FIELDS} translations`)
+          .populate("categoryIds", "name translations code")
+          .populate("brandIds", "name translations logo")
           .populate("createdBy", "name email role")
           .populate("updatedBy", "name email role")
           .sort({
@@ -314,11 +316,11 @@ const getDealById = async (req, res) => {
     const { id } = req.params;
 
     const deal = await Deal.findById(id)
-      .populate("productIds", "name sku images selling_price cost_price")
-      .populate("categoryIds", "name code")
-      .populate("brandIds", "name logo")
-      .populate("bundleProducts.product", "name sku images selling_price")
-      .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
+      .populate("productIds", "name translations sku images selling_price cost_price")
+      .populate("categoryIds", "name translations code")
+      .populate("brandIds", "name translations logo")
+      .populate("bundleProducts.product", "name translations sku images selling_price")
+      .populate("bundleRule.freeProduct", `${BUNDLE_FREE_PRODUCT_FIELDS} translations`)
       .populate("createdBy", "name email role")
       .populate("updatedBy", "name email role");
 
@@ -371,13 +373,14 @@ const updateDeal = async (req, res) => {
       null;
 
     await deal.save();
+    queueTranslationSync(Deal, deal._id);
 
     const updatedDeal = await Deal.findById(id)
-      .populate("productIds", "name sku images selling_price")
-      .populate("categoryIds", "name code")
-      .populate("brandIds", "name logo")
-      .populate("bundleProducts.product", "name sku images selling_price")
-      .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
+      .populate("productIds", "name translations sku images selling_price")
+      .populate("categoryIds", "name translations code")
+      .populate("brandIds", "name translations logo")
+      .populate("bundleProducts.product", "name translations sku images selling_price")
+      .populate("bundleRule.freeProduct", `${BUNDLE_FREE_PRODUCT_FIELDS} translations`)
       .populate("createdBy", "name email role")
       .populate("updatedBy", "name email role");
 
@@ -619,8 +622,8 @@ const getActiveDealById = async (req, res) => {
     // ✅ Deterministic order (_id tie-break) taake pages overlap na hon
     const [productsToShow] = await Promise.all([
       Product.find(productsQuery)
-        .populate("category_id", "name")
-        .populate("brand_id", "name")
+        .populate("category_id", "name translations")
+        .populate("brand_id", "name translations")
         .sort({ created_at: -1, _id: -1 })
         .skip(skip)
         .limit(limit)

@@ -4,11 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
 import { discountApi } from "@/apis/user/discountApi";
 import { dealApi } from "@/apis/user/dealApi";
-import { useSocket } from "@/hooks/useSocket";
+import { useUserSocket } from "@/hooks/user/useUserSocket";
 
 export function useDiscounts() {
   const queryClient = useQueryClient();
-  const { socket } = useSocket();
+  const { socket } = useUserSocket();
 
   const { data: discounts = [], isLoading: isLoadingDiscounts } = useQuery({
     queryKey: ["publicDiscounts"],

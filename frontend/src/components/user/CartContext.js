@@ -309,6 +309,7 @@ export function CartProvider({ children }) {
           dealId: dealInfo.dealId || null,
           dealType: dealInfo.dealType || null,
           dealName: dealInfo.dealName || null,
+          dealTranslations: dealInfo.dealTranslations || {},
           dealBadge: dealInfo.dealBadge || null,
           dealSavings: Number(dealInfo.savings) || 0,
           dealOriginalPrice: Number(dealInfo.originalPrice) || 0,
@@ -365,7 +366,17 @@ export function CartProvider({ children }) {
         : regularPrice;
       save(
         cartRef.current.map((i) =>
-          i.key === key ? { ...i, ...dealData, qty: nextQty, price: unitPrice, stock: stock ?? i.stock } : i
+          i.key === key
+            ? {
+                ...i,
+                ...dealData,
+                translations: product.translations || i.translations || {},
+                brandTranslations: product.brand_id?.translations || i.brandTranslations || {},
+                qty: nextQty,
+                price: unitPrice,
+                stock: stock ?? i.stock,
+              }
+            : i
         )
       );
     } else {
@@ -377,6 +388,8 @@ export function CartProvider({ children }) {
           variant_id: variant?._id || null,
           name: product.name,
           brand: product.brand_id?.name || product.brand || "",
+          translations: product.translations || {},
+          brandTranslations: product.brand_id?.translations || {},
           price: linePrice,
           regularPrice,
           image: variant?.images?.[0]?.img_url || "",
@@ -464,6 +477,8 @@ export function CartProvider({ children }) {
         variant_id: p.variant?._id || null,
         name: p.product.name,
         brand: p.product.brand_id?.name || p.product.brand || "",
+        translations: p.product.translations || {},
+        brandTranslations: p.product.brand_id?.translations || {},
         price: regularPrice, // deal applies only when the condition is met
         regularPrice,
         image: p.variant?.images?.[0]?.img_url || "",
@@ -478,6 +493,7 @@ export function CartProvider({ children }) {
         // ✅ Bundle tracking (cart + checkout + order)
         bundleId,
         bundleName: bundle.name || "Bundle",
+        bundleTranslations: bundle.translations || {},
         bundleImage: bundle.imageUrl || bundle.image || "",
         bundlePrice: Number(bundle.bundlePrice) || 0, // legacy combo price (optional)
         bundleOriginalPrice: originalTotal,
@@ -771,6 +787,7 @@ export function CartProvider({ children }) {
           dealId: null,
           dealType: null,
           dealName: null,
+          dealTranslations: {},
           dealBadge: null,
           dealSavings: 0,
           dealOriginalPrice: 0,
@@ -820,6 +837,7 @@ export function CartProvider({ children }) {
         dealId: deal._id,
         dealType: deal.type,
         dealName: deal.name,
+        dealTranslations: deal.translations || {},
         dealBadge: null,
         dealSavings: 0,
         dealOriginalPrice: regularPrice,

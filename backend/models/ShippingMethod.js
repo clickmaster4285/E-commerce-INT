@@ -5,6 +5,9 @@ const mongoose = require("mongoose");
 const shippingMethodSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 60 },
+    translations: { name: { type: Map, of: String, default: () => ({}) } },
+    translation_source: { name: { type: String, default: "" } },
+    translation_status: { name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" } },
     code: { type: String, required: true, unique: true, trim: true, lowercase: true },
     fee: { type: Number, default: 0, min: 0 },
     min_days: { type: Number, default: 2, min: 0 },

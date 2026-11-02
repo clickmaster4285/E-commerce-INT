@@ -47,6 +47,10 @@ const storeSchema = new mongoose.Schema({
   return_policy: { type: String, default: "" },
   privacy_policy: { type: String, default: "" },
   terms_conditions: { type: String, default: "" },
+  quote_terms_conditions: { type: String, default: "" },
+  invoice_terms_conditions: { type: String, default: "" },
+  quote_terms_translations: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+  invoice_terms_translations: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
 
 }, { timestamps: true });
 

@@ -1,4 +1,5 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import { Plus, Trash2, Copy, ChevronDown, AlertTriangle, Upload, X, Image as ImageIcon, Tag as TagIcon, Copy as CopyIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -342,7 +343,7 @@ export default function VariantCard({
             <div className="flex items-center gap-2 flex-wrap">
               {(v.images || []).map((image, fi) => (
                 <div key={`${image.file?.name || image.img_url}-${fi}`} className="relative">
-                  <img src={image.preview || image.img_url} alt={image.file?.name || "variant"} className="w-16 h-16 rounded-lg object-cover border" style={{ borderColor: "var(--border-color)" }} />
+                  <FallbackImage src={image.preview || image.img_url} alt={image.file?.name || "variant"} className="w-16 h-16 rounded-lg object-cover border" style={{ borderColor: "var(--border-color)" }} />
                   <button type="button" onClick={() => { if (image.preview?.startsWith("blob:")) URL.revokeObjectURL(image.preview); handleRemoveImage(fi); }}
                     className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5 text-white"><X size={12} /></button>
                 </div>

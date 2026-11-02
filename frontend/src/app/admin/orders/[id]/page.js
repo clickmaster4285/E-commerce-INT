@@ -1,9 +1,14 @@
 "use client";
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
+import { shippingApi } from "@/apis/admin/shippingApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField, useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== ICONS ==================== */
 const ArrowLeftIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>);
@@ -24,8 +29,10 @@ const ChevronRightIcon = ({ className = "w-4 h-4" }) => (<svg className={classNa
 const ReceiptIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 17h6M9 13h6M9 9h3m9 12V5a2 2 0 00-2-2H5a2 2 0 00-2 2v16l3-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5z" /></svg>);
 
 /* ==================== HELPERS ==================== */
-const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
-const formatDateTime = (d) => d ? new Date(d).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale;
+const formatDate = (d, locale = "en") => d ? new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" }).format(new Date(d)) : "—";
+const formatDateTime = (d, locale = "en") => d ? new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(d)) : "—";
+const formatCurrency = (value, locale = "en") => new Intl.NumberFormat(locale === "en" ? "en-PK" : intlLocale(locale), { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(Number(value) || 0);
 
 const API_BASE = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (itemOrPath) => {
@@ -45,19 +52,22 @@ const ORDER_STATUS_CONFIG = {
 };
 
 const PAYMENT_STATUS_CONFIG = {
-  paid:     { label: "Paid",     bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-  pending:  { label: "Unpaid",   bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
-  failed:   { label: "Failed",   bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
-  refunded: { label: "Refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
+  paid:     { labelKey: "admin.orders.status.paid", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+  pending:  { labelKey: "admin.orders.status.unpaid", bg: "var(--warning-soft)", color: "var(--warning-text)", border: "color-mix(in srgb, var(--warning) 28%, transparent)" },
+  failed:   { labelKey: "admin.orders.status.failed", bg: "var(--danger-soft)",  color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+  refunded: { labelKey: "admin.orders.status.refunded", bg: "rgba(100,116,139,0.10)", color: "var(--text-muted)", border: "rgba(100,116,139,0.25)" },
 };
 
 // Full payment method name (the order payload carries a short code: cod/bank/card)
 const PAYMENT_METHOD_LABEL = {
-  cod: "Cash on Delivery",
-  bank: "Bank Transfer",
-  card: "Card Payment",
+  cod: "admin.orders.detail.cashOnDelivery",
+  bank: "admin.orders.detail.bankTransfer",
+  card: "admin.orders.detail.cardPayment",
 };
-const paymentMethodLabel = (method) => PAYMENT_METHOD_LABEL[method] || (method ? String(method).toUpperCase() : "—");
+const paymentMethodLabel = (method, t) => {
+  const key = PAYMENT_METHOD_LABEL[method];
+  return key ? t(key) : (method ? String(method).toUpperCase() : "—");
+};
 
 // ✅ Promo line = koi bhi deal ya bundle wali line
 function isPromoLine(item) {
@@ -75,11 +85,12 @@ function itemLineSavings(item) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const item = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
   return (
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {status}
+      {t(`admin.orders.status.${status}`)}
     </span>
   );
 }
@@ -96,7 +107,7 @@ function OrderItemImage({ item, size = 60 }) {
     );
   }
   return (
-    <img src={src} alt={item?.name || "Product"} loading="lazy" onError={() => setFailed(true)}
+    <FallbackImage src={src} alt={item?.name || ""} loading="lazy" onError={() => setFailed(true)}
       className="shrink-0 object-cover rounded-lg"
       style={{ width: `${size}px`, height: `${size}px`, border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }} />
   );
@@ -104,30 +115,30 @@ function OrderItemImage({ item, size = 60 }) {
 
 /* ==================== DEAL / BUNDLE HELPERS ==================== */
 // Converts a deal type into a human-readable label (same wording as checkout/cart)
-function dealLabel(item) {
+function dealLabel(item, t) {
   const type = item?.deal_type || "";
   if (type === "buy_x_get_y") {
     const b = Number(item.deal_buy_quantity) || 0;
     const g = Number(item.deal_get_quantity) || 0;
-    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+    return b > 0 && g > 0 ? t("admin.orders.detail.buyXGetY", { buy: b, get: g }) : t("admin.orders.detail.buyXGetYGeneric");
   }
-  if (type === "free_shipping") return "Free Shipping";
-  if (type === "percentage") return item.deal_name || item.discount_name || "Percentage Deal";
-  if (type === "fixed_amount") return item.deal_name || item.discount_name || "Fixed Amount Deal";
-  if (type === "bundle") return item.deal_name || "Bundle Deal";
+  if (type === "free_shipping") return t("admin.orders.detail.freeShippingDeal");
+  if (type === "percentage") return item.deal_name || item.discount_name || t("admin.orders.detail.percentageDeal");
+  if (type === "fixed_amount") return item.deal_name || item.discount_name || t("admin.orders.detail.fixedAmountDeal");
+  if (type === "bundle") return item.deal_name || t("admin.orders.detail.bundleDeal");
   return item.deal_name || "";
 }
 
 // All promos applied to one item (deal + bundle) — used for badges
-function itemPromoBadges(item) {
+function itemPromoBadges(item, t, locale) {
   const badges = [];
-  const dl = dealLabel(item);
+  const dl = dealLabel(item, t);
   if (dl) badges.push({ key: "deal", text: dl, tone: "warning" });
   if (Number(item.free_items) > 0) {
-    badges.push({ key: "free", text: `${item.free_items} FREE`, tone: "success" });
+    badges.push({ key: "free", text: t("admin.orders.detail.freeUnitCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(item.free_items) }), tone: "success" });
   }
   if (item.bundle_id || item.bundle_name) {
-    badges.push({ key: "bundle", text: item.bundle_name ? `Combo: ${item.bundle_name}` : "Combo", tone: "info" });
+    badges.push({ key: "bundle", text: item.bundle_name ? t("admin.orders.detail.comboName", { name: item.bundle_name }) : t("admin.orders.detail.combo"), tone: "info" });
   }
   if (!dl && !item.bundle_id) {
     const dn = item.discount_name || "";
@@ -151,61 +162,63 @@ function PromoTag({ children, tone = "warning" }) {
 }
 
 // ✅ "Why this deal applied" — a professional order view shows this explanation
-function promoReason(group) {
+function promoReason(group, t, locale) {
   const rows = group.items || [];
   const paid = rows.reduce((s, it) => s + (Number(it.qty) || 0), 0);
-  const unitWord = (n) => `${n} unit${n === 1 ? "" : "s"}`;
+  const number = (n) => new Intl.NumberFormat(intlLocale(locale)).format(n);
 
   if (group.kind === "bundle") {
-    return `Combo bundle price applied — ${unitWord(paid)} across ${rows.length} product${rows.length === 1 ? "" : "s"} were charged at the combo rate instead of separate prices.`;
+    return t("admin.orders.detail.reasonBundle", { units: number(paid), products: number(rows.length) });
   }
   if (group.type === "buy_x_get_y") {
-    return `Customer ordered ${unitWord(paid)} — the "Buy ${group.buyQty} Get ${group.getQty}" rule qualified (minimum ${group.buyQty}), so ${unitWord(group.freeUnits)} were added FREE of charge.`;
+    return t("admin.orders.detail.reasonBuyXGetY", { units: number(paid), buy: number(group.buyQty), get: number(group.getQty), minimum: number(group.buyQty), freeUnits: number(group.freeUnits) });
   }
   if (group.type === "free_shipping") {
-    return "Free-shipping deal applied — delivery charge was waived for this line.";
+    return t("admin.orders.detail.reasonFreeShipping");
   }
   if (group.type === "percentage") {
-    return `Percentage deal applied — unit price was reduced for the qualifying quantity (${unitWord(paid)}).`;
+    return t("admin.orders.detail.reasonPercentage", { units: number(paid) });
   }
   if (group.type === "fixed_amount") {
-    return `Fixed-amount deal applied — a flat amount was deducted from the unit price for ${unitWord(paid)}.`;
+    return t("admin.orders.detail.reasonFixedAmount", { units: number(paid) });
   }
-  return `Deal applied on ${unitWord(paid)} — pricing and savings were adjusted for this line.`;
+  return t("admin.orders.detail.reasonGeneric", { units: number(paid) });
 }
 
 // One-line item-level reason (shown in the items table)
-function itemPromoReason(item) {
+function itemPromoReason(item, t, locale) {
+  const amount = (value) => formatCurrency(Number(value) || 0, locale);
   const type = item?.deal_type || "";
   if (type === "buy_x_get_y") {
     const b = Number(item.deal_buy_quantity) || 0;
     const g = Number(item.deal_get_quantity) || 0;
-    return `Deal qualified (Buy ${b} Get ${g}) → ${item.free_items} free, saves Rs. ${Number(item.deal_savings || 0).toLocaleString()}`;
+    return t("admin.orders.detail.itemReasonBuyXGetY", { buy: b, get: g, freeUnits: new Intl.NumberFormat(intlLocale(locale)).format(item.free_items || 0), amount: amount(item.deal_savings) });
   }
   if (item?.bundle_name) {
-    return `Combo bundle rate applied → saves Rs. ${Number(item.bundle_savings || 0).toLocaleString()}`;
+    return t("admin.orders.detail.itemReasonBundle", { amount: amount(item.bundle_savings) });
   }
   if (Number(item?.savings) > 0) {
-    const dn = item.discount_name || "Discount";
-    return `${dn} applied → Rs. ${Number(item.savings).toLocaleString()} off per unit`;
+    const dn = item.discount_name || t("admin.orders.detail.discount");
+    return t("admin.orders.detail.itemReasonDiscount", { discount: dn, amount: amount(item.savings) });
   }
-  if (type) return "Deal applied on this line";
+  if (type) return t("admin.orders.detail.itemReasonDeal");
   return "";
 }
 
 const STATUS_FLOW = ["pending", "confirmed", "shipped", "delivered"];
 const ORDER_STEP_LABEL = {
-  pending: "Placed",
-  confirmed: "Confirmed",
-  processing: "Processing",
-  shipped: "Shipped",
-  delivered: "Delivered",
+  pending: "admin.orders.detail.placed",
+  confirmed: "admin.orders.status.confirmed",
+  processing: "admin.orders.status.processing",
+  shipped: "admin.orders.status.shipped",
+  delivered: "admin.orders.status.delivered",
 };
 
 // Vertical timeline — only timestamps actually recorded on the order
 // (placed = created_at, current stage = updated_at). Other stages have no
 // stored timestamps, so no time is shown for them.
 function OrderTimeline({ order }) {
+  const { t, locale } = useTranslation();
   const cancelled = order.status === "cancelled";
   const effective = order.status === "processing" ? "confirmed" : order.status;
   const currentIdx = STATUS_FLOW.indexOf(effective);
@@ -213,8 +226,8 @@ function OrderTimeline({ order }) {
   const rows = [];
   if (cancelled) {
     rows.push({
-      key: "cancelled", label: "Cancelled", done: true, danger: true,
-      note: order.cancel_reason || "", time: `Cancelled ${formatDateTime(order.updated_at)}`,
+      key: "cancelled", label: t("admin.orders.status.cancelled"), done: true, danger: true,
+      note: order.cancel_reason || "", time: `${t("admin.orders.status.cancelled")} ${formatDateTime(order.updated_at, locale)}`,
     });
   } else {
     [...STATUS_FLOW].reverse().forEach((step) => {
@@ -223,12 +236,12 @@ function OrderTimeline({ order }) {
       const isCurrent = currentIdx === i && step !== "pending";
       rows.push({
         key: step,
-        label: isCurrent ? ORDER_STEP_LABEL[order.status] || ORDER_STEP_LABEL[step] : ORDER_STEP_LABEL[step],
+        label: t(isCurrent ? ORDER_STEP_LABEL[order.status] || ORDER_STEP_LABEL[step] : ORDER_STEP_LABEL[step]),
         done,
         current: isCurrent,
         time: step === "pending"
-          ? formatDateTime(order.created_at)
-          : isCurrent ? `Last update ${formatDateTime(order.updated_at)}` : "",
+          ? formatDateTime(order.created_at, locale)
+          : isCurrent ? `${t("admin.orders.detail.lastUpdate")} ${formatDateTime(order.updated_at, locale)}` : "",
       });
     });
   }
@@ -263,6 +276,7 @@ function OrderTimeline({ order }) {
 
 /* ==================== ACTION BUTTONS (Mobile Optimized) ==================== */
 function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending, isPaymentPending }) {
+  const { t } = useTranslation();
   const status = order.status;
   const payStatus = order.payment?.status || "pending";
 
@@ -271,7 +285,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
         style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
         <LockIcon className="w-4 h-4" style={{ color: "var(--danger-text)" }} />
-        <span className="text-xs font-semibold" style={{ color: "var(--danger-text)" }}>This order is cancelled</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--danger-text)" }}>{t("admin.orders.detail.cancelled")}</span>
       </div>
     );
   }
@@ -285,7 +299,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
           style={{ backgroundColor: "var(--success)", color: "#fff" }}>
           {isPaymentPending ? <Spinner className="w-4 h-4" /> : <BanknoteIcon className="w-4 h-4" />}
-          Payment Received
+          {t("admin.orders.detail.paymentReceived")}
         </button>
       );
     }
@@ -293,7 +307,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
       <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg w-full sm:w-auto"
         style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
         <CheckCircleIcon className="w-4 h-4" style={{ color: "var(--success-text)" }} />
-        <span className="text-xs font-semibold" style={{ color: "var(--success-text)" }}>Order completed & payment received</span>
+        <span className="text-xs font-semibold" style={{ color: "var(--success-text)" }}>{t("admin.orders.detail.completed")}</span>
       </div>
     );
   }
@@ -305,7 +319,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/10"
           style={{ backgroundColor: "var(--info)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
-          Confirm Order
+          {t("admin.orders.detail.confirmOrder")}
         </button>
       )}
 
@@ -314,7 +328,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/10"
           style={{ backgroundColor: "var(--indigo)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <TruckIcon className="w-4 h-4" />}
-          Mark as Shipped
+          {t("admin.orders.detail.markShipped")}
         </button>
       )}
 
@@ -323,7 +337,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
           className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-500/10"
           style={{ backgroundColor: "var(--success)", color: "#fff" }}>
           {isPending ? <Spinner className="w-4 h-4" /> : <HomeIcon className="w-4 h-4" />}
-          Mark as Delivered
+          {t("admin.orders.detail.markDelivered")}
         </button>
       )}
 
@@ -331,7 +345,7 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
         className="h-11 sm:h-10 w-full sm:w-auto px-4 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ backgroundColor: "var(--bg-card)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)", color: "var(--danger-text)" }}>
         <BanIcon className="w-4 h-4" />
-        Cancel Order
+        {t("admin.orders.detail.cancelOrder")}
       </button>
     </div>
   );
@@ -339,6 +353,8 @@ function OrderActions({ order, onUpdate, onCancel, onPaymentReceived, isPending,
 
 /* ==================== MAIN PAGE ==================== */
 export default function OrderDetailPage({ params }) {
+  const { t, locale } = useTranslation();
+  const { contentOf, productNameOf } = useLocalized();
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -353,6 +369,13 @@ export default function OrderDetailPage({ params }) {
     },
     retry: 1,
   });
+  usePageTranslations({ model: "Order", records: order ? [order] : [], locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  const { data: shippingMethods = [], isLoading: shippingMethodsLoading } = useQuery({ queryKey: ["adminShippingMethods"], queryFn: shippingApi.getMethods, retry: false });
+  usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient });
+  const orderProducts = useMemo(() => (order?.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id), [order]);
+  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  const orderVariants = useMemo(() => (order?.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id), [order]);
+  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status, cancel_reason }) => orderApi.updateStatus(id, { status, ...(cancel_reason ? { cancel_reason } : {}) }),
@@ -360,10 +383,10 @@ export default function OrderDetailPage({ params }) {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success(`Order marked as ${variables.status}`);
+      toast.success(t("admin.orders.toast.markedStatus", { status: t(`admin.orders.status.${variables.status}`) }));
       setCancelConfirm(false);
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
+    onError: () => toast.error(t("admin.orders.toast.updateOrderFailed")),
   });
 
   const updatePaymentMutation = useMutation({
@@ -372,15 +395,15 @@ export default function OrderDetailPage({ params }) {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success("Payment marked as received");
+      toast.success(t("admin.orders.detail.paymentMarked"));
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update payment"),
+    onError: () => toast.error(t("admin.orders.detail.paymentFailed")),
   });
 
   const handlePaymentReceived = () => updatePaymentMutation.mutate({ id });
   const handleUpdate = (status) => updateStatusMutation.mutate({ id, status });
   const handleCancel = () => {
-    if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
+    if (!cancelReason.trim()) return toast.error(t("admin.orders.detail.cancelRequired"));
     updateStatusMutation.mutate({ id, status: "cancelled", cancel_reason: cancelReason.trim() });
   };
 
@@ -427,7 +450,7 @@ export default function OrderDetailPage({ params }) {
         map.set(key, {
           key,
           kind: "deal",
-          label: dealLabel(it),
+          label: dealLabel(it, t),
           name: it.deal_name || "",
           type: it.deal_type || "",
           buyQty: Number(it.deal_buy_quantity) || 0,
@@ -464,7 +487,7 @@ export default function OrderDetailPage({ params }) {
     });
 
     // Har group ke saath "kyun lagi" wali explanation
-    return Array.from(map.values()).map((g) => ({ ...g, description: promoReason(g) }));
+    return Array.from(map.values()).map((g) => ({ ...g, description: promoReason(g, t, locale) }));
   }, [order]);
 
   const dealGroups = promoGroups.filter((g) => g.kind === "deal");
@@ -517,13 +540,13 @@ export default function OrderDetailPage({ params }) {
         <button onClick={() => router.push("/admin/orders")}
           className="mb-4 h-11 sm:h-9 px-4 rounded-lg text-sm font-semibold flex items-center gap-2 transition hover:opacity-90"
           style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-          <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" /> Back to Orders
+          <ArrowLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" /> {t("admin.orders.detail.backToOrders")}
         </button>
         <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
           <XCircleIcon className="w-8 h-8 opacity-60" />
-          <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>Order not found or failed to load.</p>
+          <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.notFound")}</p>
           <button onClick={() => refetch()} className="h-11 sm:h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
-            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+            style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{t("admin.orders.detail.retry")}</button>
         </div>
       </div>
     );
@@ -534,24 +557,24 @@ export default function OrderDetailPage({ params }) {
       <div className="w-full space-y-4 p-3 sm:p-4">
 
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-1 text-[12px]" aria-label="Breadcrumb">
+        <nav className="flex items-center gap-1 text-[12px]" aria-label={t("admin.orders.detail.breadcrumbNav")}>
           <button type="button" onClick={() => router.push("/admin/orders")}
             className="font-medium hover:underline" style={{ color: "var(--text-muted)" }}>
-            Orders
+            {t("admin.orders.page.title")}
           </button>
           <ChevronRightIcon className="w-3.5 h-3.5" />
-          <span className="font-semibold">Order Details</span>
+          <span className="font-semibold">{t("admin.orders.detail.breadcrumb")}</span>
         </nav>
 
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">Order {order.order_number}</h1>
+              <h1 className="text-[20px] sm:text-[22px] leading-7 font-bold tracking-tight truncate">{t("admin.orders.detail.orderPrefix", { number: order.order_number })}</h1>
               <StatusBadge status={order.status} />
             </div>
             <p className="text-[12px] sm:text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>
-              {formatDateTime(order.created_at)}
+              {formatDateTime(order.created_at, locale)}
             </p>
           </div>
           <div className="w-full md:w-auto">
@@ -570,29 +593,29 @@ export default function OrderDetailPage({ params }) {
             Order Status / Payment (status + method + amount) / Total Amount */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <StatCard
-            label="Order Status"
+            label={t("admin.orders.page.status")}
             icon={<BoxIcon className="w-5 h-5" />}
             accent="var(--info-text)"
             accentSoft="var(--info-soft)"
-            value={ORDER_STEP_LABEL[order.status] || order.status}
+            value={t(ORDER_STEP_LABEL[order.status] || `admin.orders.status.${order.status}`)}
             sub={order.status === "cancelled"
-              ? `Cancelled ${formatDateTime(order.updated_at)}`
-              : `Updated ${formatDateTime(order.updated_at)}`}
+              ? `${t("admin.orders.status.cancelled")} ${formatDateTime(order.updated_at, locale)}`
+              : `${t("admin.orders.detail.lastUpdate")} ${formatDateTime(order.updated_at, locale)}`}
           />
           <StatCard
-            label="Payment"
+            label={t("admin.orders.page.payment")}
             icon={<BanknoteIcon className="w-5 h-5" />}
             accent="var(--success-text)"
             accentSoft="var(--success-soft)"
-            value={(PAYMENT_STATUS_CONFIG[payStatus] || {}).label || "Unpaid"}
-            sub={`Via ${paymentMethodLabel(order.payment?.method)}`}
+            value={t((PAYMENT_STATUS_CONFIG[payStatus] || PAYMENT_STATUS_CONFIG.pending).labelKey)}
+            sub={t("admin.orders.detail.via", { method: t(`admin.orders.detail.${({ cod: "cashOnDelivery", bank: "bankTransfer", card: "cardPayment" })[order.payment?.method] || "paymentMethod"}`) })}
           />
           <StatCard
-            label="Total Amount"
+            label={t("admin.orders.detail.totalAmount")}
             icon={<ReceiptIcon className="w-5 h-5" />}
             accent="var(--warning-text)"
             accentSoft="var(--warning-soft)"
-            value={`Rs. ${Number(order.total || 0).toLocaleString()}`}
+            value={formatCurrency(order.total, locale)}
           />
         </div>
 
@@ -606,13 +629,13 @@ export default function OrderDetailPage({ params }) {
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
                 style={{ borderBottom: "1px solid var(--border-color)" }}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-[15px] font-bold">Order Items ({itemRows})</h2>
-                  {freeUnits > 0 && <PromoTag tone="success">{freeUnits} free unit{freeUnits === 1 ? "" : "s"}</PromoTag>}
-                  {dealGroups.length > 0 && <PromoTag tone="warning">{dealGroups.length} deal applied</PromoTag>}
-                  {bundleGroups.length > 0 && <PromoTag tone="info">{bundleGroups.length} bundle applied</PromoTag>}
+                  <h2 className="text-[15px] font-bold">{t("admin.orders.detail.orderItems", { count: new Intl.NumberFormat(intlLocale(locale)).format(itemRows) })}</h2>
+                  {freeUnits > 0 && <PromoTag tone="success">{t("admin.orders.detail.freeUnitCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(freeUnits) })}</PromoTag>}
+                  {dealGroups.length > 0 && <PromoTag tone="warning">{t("admin.orders.detail.dealsAppliedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(dealGroups.length) })}</PromoTag>}
+                  {bundleGroups.length > 0 && <PromoTag tone="info">{t("admin.orders.detail.bundlesAppliedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(bundleGroups.length) })}</PromoTag>}
                 </div>
                 <span className="text-[11px] font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                  {paidUnits} paid unit{paidUnits === 1 ? "" : "s"}{freeUnits > 0 ? ` + ${freeUnits} free` : ""}
+                  {t("admin.orders.detail.paidUnitCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(paidUnits) })}{freeUnits > 0 ? ` + ${t("admin.orders.detail.freeUnitCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(freeUnits) })}` : ""}
                 </span>
               </div>
 
@@ -620,17 +643,17 @@ export default function OrderDetailPage({ params }) {
                 <table className="w-full text-[13px] min-w-[760px]" style={{ tableLayout: "fixed" }}>
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product</th>
-                      <th className="w-[116px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Price</th>
-                      <th className="w-[70px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Qty</th>
-                      <th className="w-[200px] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Deal Details</th>
-                      <th className="w-[124px] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Amount</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.product")}</th>
+                      <th className="w-[116px] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.price")}</th>
+                      <th className="w-[70px] px-2 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.qty")}</th>
+                      <th className="w-[200px] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.dealDetails")}</th>
+                      <th className="w-[124px] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.amount")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(order.items || []).map((item, idx) => {
-                      const badges = itemPromoBadges(item);
-                      const reason = itemPromoReason(item);
+                      const badges = itemPromoBadges(item, t, locale);
+                      const reason = itemPromoReason(item, t, locale);
                       const lineSaved = itemLineSavings(item);
                       return (
                         <tr key={`${order._id}-item-${idx}`}
@@ -639,12 +662,12 @@ export default function OrderDetailPage({ params }) {
                             <div className="flex items-start gap-3 min-w-0">
                               <OrderItemImage item={item} size={56} />
                               <div className="min-w-0">
-                                <p className="font-semibold" title={item.name}>{item.name}</p>
+                                <p className="font-semibold" title={item.name}>{productNameOf(item.product_id) || item.name}</p>
                                 {item.brand && (
-                                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>Brand {item.brand}</p>
+                                  <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.brand", { brand: item.brand })}</p>
                                 )}
-                                {item.variantTitle && (
-                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>Variant: {item.variantTitle}</p>
+                                {(item.variant_id?.title || item.variantTitle) && (
+                                  <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.variantLabel", { variant: contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title) })}</p>
                                 )}
                               </div>
                             </div>
@@ -652,13 +675,13 @@ export default function OrderDetailPage({ params }) {
                           <td className="px-3 py-3 text-right align-top">
                             {Number(item.original_price) > Number(item.price) && (
                               <span className="block text-[11px] line-through whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                                Rs. {Number(item.original_price).toLocaleString()}
+                                {formatCurrency(item.original_price, locale)}
                               </span>
                             )}
-                            <span className="font-semibold whitespace-nowrap">Rs. {Number(item.price || 0).toLocaleString()}</span>
+                            <span className="font-semibold whitespace-nowrap">{formatCurrency(item.price, locale)}</span>
                             {Number(item.savings) > 0 && !isPromoLine(item) && (
                               <span className="block text-[10px] whitespace-nowrap" style={{ color: "var(--success-text)" }}>
-                                save Rs. {Number(item.savings).toLocaleString()}/unit
+                                {t("admin.orders.detail.savePerUnit", { amount: formatCurrency(item.savings, locale) })}
                               </span>
                             )}
                           </td>
@@ -666,7 +689,7 @@ export default function OrderDetailPage({ params }) {
                             <span className="font-bold">{item.qty}</span>
                             {Number(item.free_items) > 0 && (
                               <span className="block text-[10px] font-bold whitespace-nowrap" style={{ color: "var(--success-text)" }}>
-                                +{item.free_items} free
+                                {t("admin.orders.detail.freeUnitCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(item.free_items) })}
                               </span>
                             )}
                           </td>
@@ -688,11 +711,11 @@ export default function OrderDetailPage({ params }) {
                           </td>
                           <td className="px-4 py-3 text-right align-top">
                             <span className="font-bold whitespace-nowrap">
-                              Rs. {(Number(item.price || 0) * (Number(item.qty) || 0)).toLocaleString()}
+                              {formatCurrency(Number(item.price || 0) * (Number(item.qty) || 0), locale)}
                             </span>
                             {lineSaved > 0 && (
                               <span className="block text-[10px] font-semibold whitespace-nowrap" style={{ color: "var(--success-text)" }}>
-                                Saved: Rs. {lineSaved.toLocaleString()}
+                                {t("admin.orders.detail.savedAmount", { amount: formatCurrency(lineSaved, locale) })}
                               </span>
                             )}
                           </td>
@@ -712,43 +735,43 @@ export default function OrderDetailPage({ params }) {
                 then Subtotal + Shipping + Tax = Total Amount.
                 Savings are already adjusted in the prices — never deducted twice. */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Order Summary</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.orderSummary")}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <div className="space-y-1.5">
                   {totalSaved > 0 && (
                     <>
-                      <TotalRow label="Original price (before discounts)" value={`Rs. ${(Number(order.subtotal || 0) + totalSaved).toLocaleString()}`} />
-                      <TotalRow label="Less: total saved" value={`− Rs. ${totalSaved.toLocaleString()}`} accent="var(--success-text)" />
+                  <TotalRow label={t("admin.orders.detail.originalPrice")} value={formatCurrency(Number(order.subtotal || 0) + totalSaved, locale)} />
+                  <TotalRow label={t("admin.orders.detail.lessSaved")} value={`− ${formatCurrency(totalSaved, locale)}`} accent="var(--success-text)" />
                     </>
                   )}
-                  <TotalRow label="Subtotal (after discounts)" value={`Rs. ${Number(order.subtotal || 0).toLocaleString()}`} />
-                  <TotalRow label="+ Shipping Charges" value={`Rs. ${Number(order.shipping || 0).toLocaleString()}`} />
-                  <TotalRow label="+ Tax" value={`Rs. ${Number(order.tax || 0).toLocaleString()}`} />
+                  <TotalRow label={t("admin.orders.detail.subtotalAfter")} value={formatCurrency(order.subtotal, locale)} />
+                  <TotalRow label={t("admin.orders.detail.shippingCharges")} value={formatCurrency(order.shipping, locale)} />
+                  <TotalRow label={`+ ${t("admin.orders.detail.tax")}`} value={formatCurrency(order.tax, locale)} />
                   <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
-                    <span>Total Amount</span>
-                    <span>Rs. {Number(order.total || 0).toLocaleString()}</span>
+                    <span>{t("admin.orders.detail.totalAmount")}</span>
+                    <span>{formatCurrency(order.total, locale)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5 pt-3 mt-3 md:pt-0 md:mt-0 md:border-l md:pl-6"
                   style={{ borderColor: "var(--border-color)" }}>
                   <p className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: "var(--text-muted)" }}>
-                    Savings
+                    {t("admin.orders.detail.savings")}
                   </p>
                   {priceDiscounts > 0 && (
-                    <TotalRow label="Price discounts (MRP → sale price)" value={`Rs. ${priceDiscounts.toLocaleString()}`} accent="var(--success-text)" />
+                  <TotalRow label={t("admin.orders.detail.priceDiscounts")} value={formatCurrency(priceDiscounts, locale)} accent="var(--success-text)" />
                   )}
                   {dealSavings > 0 && (
-                    <TotalRow label="Deal savings (deal offer)" value={`Rs. ${dealSavings.toLocaleString()}`} accent="var(--success-text)" />
+                    <TotalRow label={t("admin.orders.detail.dealSavings")} value={formatCurrency(dealSavings, locale)} accent="var(--success-text)" />
                   )}
                   {bundleSavings > 0 && (
-                    <TotalRow label="Bundle savings (combo rate)" value={`Rs. ${bundleSavings.toLocaleString()}`} accent="var(--success-text)" />
+                    <TotalRow label={t("admin.orders.detail.bundleSavings")} value={formatCurrency(bundleSavings, locale)} accent="var(--success-text)" />
                   )}
                   {totalSaved > 0 && (
                     <>
                       <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
-                        <span>Total Saved</span>
-                        <span style={{ color: "var(--success-text)" }}>Rs. {totalSaved.toLocaleString()}</span>
+                        <span>{t("admin.orders.detail.totalSaved")}</span>
+                        <span style={{ color: "var(--success-text)" }}>{formatCurrency(totalSaved, locale)}</span>
                       </div>
                     </>
                   )}
@@ -761,7 +784,7 @@ export default function OrderDetailPage({ params }) {
 
             {/* ---- Customer & Shipping Address ---- */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Customer &amp; Shipping Address</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.customerShippingAddress")}</h2>
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
                   style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>
@@ -775,7 +798,7 @@ export default function OrderDetailPage({ params }) {
               </div>
 
               <p className="text-[10px] font-bold uppercase tracking-wide mt-4 mb-1.5" style={{ color: "var(--text-muted)" }}>
-                Shipping Address
+                {t("admin.orders.detail.shippingAddress")}
               </p>
               <p className="text-[13px] leading-relaxed">
                 {order.address_snapshot?.street_address1}
@@ -790,19 +813,20 @@ export default function OrderDetailPage({ params }) {
 
             {/* ---- Order Timeline ---- */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Order Timeline</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.orderTimeline")}</h2>
               <OrderTimeline order={order} />
             </div>
 
             {/* ---- Additional Information ----
                 (Order number / date already shown in the header — not repeated) */}
             <div className="rounded-lg p-4" style={cardStyle}>
-              <h2 className="text-[15px] font-bold mb-3">Additional Information</h2>
+              <h2 className="text-[15px] font-bold mb-3">{t("admin.orders.detail.additionalInformation")}</h2>
               <div className="space-y-1.5 text-[13px]">
-                <InfoRow label="Shipping Method" value={order.shipping_method ? String(order.shipping_method).replace(/_/g, " ") : "—"} capitalize />
+                <InfoRow label={t("admin.orders.detail.shippingMethod")} value={order.shipping_method === "standard" ? t("admin.orders.page.standardShipping") : order.shipping_method === "express" ? t("admin.orders.page.expressShipping") : (shippingMethods.find((method) => method.code === order.shipping_method || String(method._id) === String(order.shipping_method)) ? localizedStrictField(shippingMethods.find((method) => method.code === order.shipping_method || String(method._id) === String(order.shipping_method)).name, shippingMethods.find((method) => method.code === order.shipping_method || String(method._id) === String(order.shipping_method)).translations?.name, locale) : order.shipping_method ? String(order.shipping_method).replace(/_/g, " ") : "—")} capitalize />
                 {order.status === "cancelled" && order.cancel_reason && (
-                  <InfoRow label="Cancellation Reason" value={order.cancel_reason} />
+                  <InfoRow label={t("admin.purchaseOrders.view.cancelReason")} value={contentOf(order.cancel_reason, order.translations?.cancel_reason)} />
                 )}
+                {order.notes && <InfoRow label={t("admin.customers.detail.notes")} value={contentOf(order.notes, order.translations?.notes)} />}
               </div>
             </div>
           </div>
@@ -813,14 +837,14 @@ export default function OrderDetailPage({ params }) {
         {(dealGroups.length > 0 || bundleGroups.length > 0 || discountGroups.length > 0) && (
           <div className="rounded-lg p-4" style={cardStyle}>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <h2 className="text-[15px] font-bold">Deal &amp; Bundle Summary</h2>
+              <h2 className="text-[15px] font-bold">{t("admin.orders.detail.dealBundleSummary")}</h2>
             </div>
 
             <div className={promoGridClass}>
               {dealGroups.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                    Deals Applied ({dealGroups.length})
+                    {t("admin.orders.detail.dealsAppliedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(dealGroups.length) })}
                   </p>
                   {dealGroups.map((g) => <PromoGroupCard key={g.key} group={g} />)}
                 </div>
@@ -829,7 +853,7 @@ export default function OrderDetailPage({ params }) {
               {bundleGroups.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                    Bundles Applied ({bundleGroups.length})
+                    {t("admin.orders.detail.bundlesAppliedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(bundleGroups.length) })}
                   </p>
                   {bundleGroups.map((g) => <PromoGroupCard key={g.key} group={g} />)}
                 </div>
@@ -838,7 +862,7 @@ export default function OrderDetailPage({ params }) {
               {discountGroups.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                    Discounts Applied ({discountGroups.length})
+                    {t("admin.orders.detail.discountsAppliedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(discountGroups.length) })}
                   </p>
                   {discountGroups.map((g) => <PromoGroupCard key={g.key} group={g} />)}
                 </div>
@@ -860,19 +884,19 @@ export default function OrderDetailPage({ params }) {
                 <AlertIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">Cancel Order {order.order_number}?</h3>
+                <h3 className="text-sm font-semibold">{t("admin.orders.detail.cancelOrderQuestion", { number: order.order_number })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  This will mark the order as cancelled and restore stock. This action cannot be undone.
+                  {t("admin.orders.detail.cancelWarning")}
                 </p>
                 <div className="mt-3">
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                    Cancellation Reason <span style={{ color: "var(--danger-text)" }}>*</span>
+                    {t("admin.orders.detail.cancellationReason")} <span style={{ color: "var(--danger-text)" }}>*</span>
                   </label>
                   <textarea
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={3}
-                    placeholder="e.g. Stock unavailable, customer request..."
+                    placeholder={t("admin.orders.detail.cancelPlaceholder")}
                     className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                   />
@@ -883,12 +907,12 @@ export default function OrderDetailPage({ params }) {
               <button onClick={() => setCancelConfirm(false)} disabled={updateStatusMutation.isPending}
                 className="h-11 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border order-2 sm:order-1"
                 style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>
-                Keep Order
+                {t("admin.orders.detail.keepOrder")}
               </button>
               <button onClick={handleCancel} disabled={updateStatusMutation.isPending || !cancelReason.trim()}
                 className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                {updateStatusMutation.isPending ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel"}
+                {updateStatusMutation.isPending ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> {t("admin.orders.detail.cancelling")}</> : t("admin.orders.detail.confirmCancel")}
               </button>
             </div>
           </div>
@@ -930,6 +954,7 @@ function StatCard({ label, icon, value, sub, accent = "var(--accent)", accentSof
 
 // Deal / bundle / discount group card — why it applied + which products + how much saved
 function PromoGroupCard({ group }) {
+  const { t, locale } = useTranslation();
   const promoTag = group.kind === "deal" ? "warning" : "info";
 
   return (
@@ -939,7 +964,7 @@ function PromoGroupCard({ group }) {
         {group.name && group.name !== group.label && (
           <span className="text-[11px] font-semibold truncate" style={{ color: "var(--text-secondary)" }}>{group.name}</span>
         )}
-        {group.freeUnits > 0 && <PromoTag tone="success">+{group.freeUnits} free</PromoTag>}
+        {group.freeUnits > 0 && <PromoTag tone="success">{t("admin.orders.detail.freeUnitCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(group.freeUnits) })}</PromoTag>}
       </div>
 
       {group.description && (
@@ -950,14 +975,14 @@ function PromoGroupCard({ group }) {
 
       {group.items?.length > 0 && (
         <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: "var(--text-muted)" }}>
-          <span className="font-semibold">Products: </span>
+          <span className="font-semibold">{t("admin.orders.detail.productsCount")} </span>
           {group.items.map((it) => `${it.name} (×${it.qty}${Number(it.free_items) > 0 ? ` +${it.free_items} free` : ""})`).join(", ")}
         </p>
       )}
 
       {group.savings > 0 && (
         <p className="text-[11px] font-bold mt-1.5" style={{ color: "var(--success-text)" }}>
-          Savings: Rs. {group.savings.toLocaleString()}
+          {t("admin.orders.detail.savedAmount", { amount: formatCurrency(group.savings, locale) })}
         </p>
       )}
     </div>

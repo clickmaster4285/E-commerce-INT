@@ -7,9 +7,10 @@ const compression = require("compression");
 const bcrypt = require("bcryptjs");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const cookieParser = require("cookie-parser");
 
-const net = require('net');
+const spawn = require("child_process").spawn;
 
 const connectDB = require("./config/db");
 const log = require("./utils/logger");
@@ -47,6 +48,13 @@ const attributeRoutes = require("./routes/attributeRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
 const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+const customerRoutes = require("./routes/customerRoutes");
+const leadRoutes = require("./routes/leadRoutes");
+const quoteRoutes = require("./routes/quoteRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
+const posRoutes = require("./routes/posRoutes");
+const financeRoutes = require("./routes/financeRoutes");
+const translationRoutes = require("./routes/translationRoutes");
 
 // ==========================================
 // APP & SERVER SETUP
@@ -57,7 +65,7 @@ const server = http.createServer(app);
 
 const PORT = Number(process.env.PORT);
 // TRUST_PROXY sirf env se — blank/off ho to proxy trust nahi hota
-if (String(process.env.TRUST_PROXY).trim()) {
+if (String(process.env.TRUST_PROXY || "").trim()) {
   app.set("trust proxy", String(process.env.TRUST_PROXY).trim());
 }
 const HOST = process.env.HOST;
@@ -69,6 +77,8 @@ const REQUEST_SIZE_LIMIT = process.env.REQUEST_SIZE_LIMIT;
 const UPLOAD_CACHE_MAX_AGE = process.env.UPLOAD_CACHE_MAX_AGE;
 const UPLOAD_DIR = process.env.UPLOAD_DIR;
 const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR;
+const BUNDLE_UPLOAD_SUBDIR = process.env.BUNDLE_UPLOAD_SUBDIR;
+const REVIEW_UPLOAD_SUBDIR = process.env.REVIEW_UPLOAD_SUBDIR;
 const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE;
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 
@@ -91,14 +101,14 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (buildAllowedOrigins().includes(origin)) return callback(null, true);
     
-    if (NODE_ENV !== "production") {
+    if (NODE_ENV === "development") {
       try {
         const url = new URL(origin);
         if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return callback(null, true);
       } catch (error) { return callback(new Error("Invalid request origin")); }
     }
 
-    if (process.env.ALLOW_LOCAL_NETWORK === "true") {
+    if (NODE_ENV === "development" && process.env.ALLOW_LOCAL_NETWORK === "true") {
       try {
         const url = new URL(origin);
         const isPrivate = /^192\.168\.\d+\.\d+$/.test(url.hostname) || 
@@ -136,7 +146,7 @@ const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
 app.use(
   "/uploads",
   express.static(uploadDir, {
-    maxAge: "1y",
+    maxAge: UPLOAD_CACHE_MAX_AGE,
     immutable: true,
     etag: true,
   }),
@@ -152,8 +162,19 @@ app.use(
 //    hi silent chhodi gayi hai.
 // ==========================================
 const startupLog = {
+  info: (msg) => console.log(`ℹ️ ${msg}`),
   error: (msg) => console.error(`❌ ${msg}`),
 };
+
+function checkPortAvailable(port) {
+  return new Promise((resolve) => {
+    const net = require("net");
+    const probe = net.createServer();
+    probe.once("error", (error) => resolve(error.code !== "EADDRINUSE"));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port);
+  });
+}
 
 // ==========================================
 // SOCKET.IO — init + status (startup console ke liye)
@@ -202,6 +223,13 @@ app.use(`${API_PREFIX}/shipping`, shippingRoutes);
 app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
 app.use(`${API_PREFIX}/vendors`, vendorRoutes);
 app.use(`${API_PREFIX}/purchase-orders`, purchaseOrderRoutes);
+app.use(`${API_PREFIX}/customers`, customerRoutes);
+app.use(`${API_PREFIX}/leads`, leadRoutes);
+app.use(`${API_PREFIX}/quotes`, quoteRoutes);
+app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
+app.use(`${API_PREFIX}/pos`, posRoutes);
+app.use(`${API_PREFIX}/finance`, financeRoutes);
+app.use(`${API_PREFIX}/translations`, translationRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
@@ -218,10 +246,10 @@ const createUploadDirectories = () => {
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
   if (!fs.existsSync(storeUploadDir)) fs.mkdirSync(storeUploadDir, { recursive: true });
   // ✅ Bundle cover images
-  const bundleUploadDir = path.join(uploadDir, "bundles");
+  const bundleUploadDir = path.join(uploadDir, BUNDLE_UPLOAD_SUBDIR);
   if (!fs.existsSync(bundleUploadDir)) fs.mkdirSync(bundleUploadDir, { recursive: true });
   // ✅ Review media (images + video)
-  const reviewUploadDir = path.join(uploadDir, "reviews");
+  const reviewUploadDir = path.join(uploadDir, REVIEW_UPLOAD_SUBDIR);
   if (!fs.existsSync(reviewUploadDir)) fs.mkdirSync(reviewUploadDir, { recursive: true });
 };
 
@@ -273,7 +301,7 @@ const seedDefaultData = async () => {
               profile: true, employees: true, discounts: true,
               deals: true, bundles: true, store: true, banners: true,
               manageStock: true, shipping: true, order: true, attribute: true,
-              vendors: true, purchaseOrders: true,
+              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
             },
           });
           log.info("✅ Default Admin Employee Created (employees collection)");
@@ -289,20 +317,138 @@ const seedDefaultData = async () => {
   }
 };
 
-function checkPortAvailable(port) {
-  return new Promise((resolve) => {
-    const server = net.createServer();
-    server.once('error', (err) => {
-      if (err.code === 'EADDRINUSE') resolve(false);
-      else resolve(true);
+// ==========================================
+// 🔤 ARGOS / LOCAL TRANSLATION SERVER (dev companion)
+// Backend start hote hi local translation bridge (scripts/argosTranslateServer.py —
+// LibreTranslate-compatible; utils/libreTranslate.js aur routes/translationRoutes
+// isi ko call karte hain) saath chalu ho jaye. Design:
+//   • Sirf dev mode me (NODE_ENV !== "production") — production ka startup
+//     pehle jaisa hi rehta hai.
+//   • agar configured URL par bridge pehle se zinda hai to REUSE hota hai —
+//     duplicate process start nahi hota (server restart par bhi; loading bridge
+//     ke bind hone tak chhota sa grace wait bhi hota hai).
+//   • Start command backend/package.json ke existing script se aati hai
+//     (hardcode nahi) aur port LIBRETRANSLATE_URL se derive hota hai —
+//     libreTranslate.js ka client isi URL par call karta hai.
+//   • Ye background me hota hai — Express server kabhi block nahi hota
+//     (pehli baar model download/load me minutes lag sakte hain).
+// ==========================================
+const TRANSLATION_API_URL = String(process.env.LIBRETRANSLATE_URL || "").replace(/\/+$/, "");
+const TRANSLATION_READY_TIMEOUT_MS = Number(process.env.TRANSLATE_READY_TIMEOUT_MS);
+const TRANSLATION_REUSE_GRACE_MS = Number(process.env.TRANSLATE_REUSE_GRACE_MS);
+const TRANSLATION_HEALTHCHECK_TIMEOUT_MS = Number(process.env.TRANSLATE_HEALTHCHECK_TIMEOUT_MS);
+const TRANSLATION_READY_POLL_INTERVAL_MS = Number(process.env.TRANSLATE_READY_POLL_INTERVAL_MS);
+const TRANSLATION_REUSE_POLL_INTERVAL_MS = Number(process.env.TRANSLATE_REUSE_POLL_INTERVAL_MS);
+const ARGOS_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+let argosProcess = null;
+const isTranslationServiceUp = async () => {
+  try {
+    const response = await fetch(`${TRANSLATION_API_URL}/healthz`, {
+      signal: AbortSignal.timeout(TRANSLATION_HEALTHCHECK_TIMEOUT_MS),
     });
-    server.once('listening', () => {
-      server.close();
-      resolve(true);
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+const waitTranslationServiceReady = async () => {
+  const deadline = Date.now() + TRANSLATION_READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (await isTranslationServiceUp()) return true;
+    await ARGOS_SLEEP(TRANSLATION_READY_POLL_INTERVAL_MS);
+  }
+  return false;
+};
+
+/** package.json me se wahi script dhoondo jo argosTranslateServer.py chalati hai. */
+const findArgosScript = () => {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
+    for (const [name, command] of Object.entries(pkg.scripts || {})) {
+      if (String(command).includes("argosTranslateServer.py")) return { name, command };
+    }
+  } catch { /* package.json na mile to niche clear error dikhega */ }
+  return null;
+};
+
+const startArgosServer = async () => {
+  if (!TRANSLATION_API_URL) {
+    startupLog.error("Argos translation bridge configure nahi hai — backend/.env me LIBRETRANSLATE_URL set karein");
+    return;
+  }
+
+  // Duplicate guard: python bridge apna port model load/prewarm ke BAAD bind
+  // karta hai. Restart par purana bridge abhi "loading" me ho sakta hai —
+  // spawn ke faislay se pehle thodi der tak reuse ka wait karo, warna do
+  // processes aa jate hain (doosra baad me port bind karne par crash hota hai).
+  let serviceUp = await isTranslationServiceUp();
+  if (!serviceUp) {
+    const graceDeadline = Date.now() + TRANSLATION_REUSE_GRACE_MS;
+    while (!serviceUp && Date.now() < graceDeadline) {
+      await ARGOS_SLEEP(TRANSLATION_REUSE_POLL_INTERVAL_MS);
+      serviceUp = await isTranslationServiceUp();
+    }
+  }
+  if (serviceUp) {
+    startupLog.info(`Argos Translator running at ${TRANSLATION_API_URL} (existing service)`);
+    return;
+  }
+
+  const script = findArgosScript();
+  if (!script) {
+    startupLog.error(`Argos translation bridge nahi start hua — package.json me "argosTranslateServer.py" wala script nahi mila`);
+    return;
+  }
+
+  // Node client jis port par call karega, python bridge usi par sunna chahiye.
+  // ARGOS_PORT pehle se set hai to user ki ki hui value jeetegi.
+  const targetPort = (() => {
+    try { return Number(new URL(TRANSLATION_API_URL).port) || 80; } catch { return null; }
+  })();
+  const childEnv = { ...process.env };
+  if (!childEnv.ARGOS_PORT && targetPort) {
+    childEnv.ARGOS_PORT = String(targetPort);
+  }
+
+  try {
+    argosProcess = spawn(script.command, {
+      shell: true,
+      cwd: __dirname, // script ka "scripts/argosTranslateServer.py" relative path isi se resolve hota hai
+      env: childEnv,
+      stdio: "ignore",
+      windowsHide: true,
     });
-    server.listen(port);
+  } catch (error) {
+    argosProcess = null;
+    startupLog.error(`Argos translation bridge spawn failed: ${error.message}`);
+    return;
+  }
+
+  argosProcess.once("error", (error) => {
+    const message = error.code === "ENOENT"
+      ? `"uv" executable is process ke PATH me nahi mila (uv installed hai to PATH check karein)`
+      : error.message;
+    startupLog.error(`Argos translation bridge start nahi ho saka: ${message}`);
   });
-}
+
+  argosProcess.once("exit", (code, signal) => {
+    if (signal === "SIGTERM") return; // graceful shutdown — error nahi
+    startupLog.error(`Argos translation bridge exit ho gaya (code: ${code ?? signal ?? "unknown"})`);
+  });
+
+  // Blocking nahi — sirf status report.
+  waitTranslationServiceReady()
+    .then((ready) => {
+      if (ready) {
+        startupLog.info(`Argos Translator running at ${TRANSLATION_API_URL}`);
+      } else {
+        startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
+      }
+    })
+    .catch(() => {});
+};
 
 // ==========================================
 // SERVER STARTUP
@@ -330,17 +476,28 @@ const startServer = async () => {
     
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
-      // ✅ Pehle ye block poora silent tha — process bina kuch bataye exit ho jata tha
-      startupLog.error(`Port ${PORT} already in use (EADDRINUSE) — doosra backend chal raha hai.`);
-      console.error(`💡 Fix: taskkill /PID <pid> /F   |   ya .env me PORT badal do`);
+      startupLog.error(`Port ${PORT} already in use — stop the existing service or configure a different PORT.`);
       process.exit(1);
     }
 
     server.listen(PORT, HOST, () => {
-      // ✅ Sirf 2 lines — server start + socket status. Extra info nahi.
       console.log(`✅ ${STARTUP_MESSAGE}`);
+      const address = server.address();
+      const boundHost = typeof address === "object" && address ? address.address : HOST;
+      const isWildcardHost = !boundHost || ["0.0.0.0", "::", "::ffff:0.0.0.0"].includes(boundHost);
+      const apiPath = API_PREFIX ? `/${String(API_PREFIX).replace(/^\/+|\/+$/g, "")}` : "";
+      console.log(`🔗 Local: http://localhost:${PORT}${apiPath}`);
+      if (isWildcardHost) {
+        const localIPv4s = [...new Set(Object.values(os.networkInterfaces()).flatMap((interfaces) =>
+          (interfaces || [])
+            .filter((network) => !network.internal && (network.family === "IPv4" || network.family === 4))
+            .map((network) => network.address),
+        ))];
+        for (const ip of localIPv4s) console.log(`📡 Network: http://${ip}:${PORT}${apiPath}`);
+      }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
+    if (NODE_ENV === "development") startArgosServer();
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi
     startupLog.error(`Server start failed: ${error.message}`);

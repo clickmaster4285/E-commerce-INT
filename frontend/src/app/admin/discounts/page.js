@@ -9,7 +9,11 @@ import { productApi } from "../../../apis/admin/productApi";
 import { categoryApi } from "../../../apis/admin/categoryApi";
 import { brandApi } from "../../../apis/admin/brandApi";
 import { attributeApi } from "../../../apis/admin/attributeApi";
-import useDiscountSocketSync from "../../../hooks/useDiscountSocketSync";
+import useDiscountSocketSync from "../../../hooks/admin/useDiscountSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { translate } from "@/i18n/translations";
 import { toNonNegative, validateNonNegative } from "./_components/discountUtils";
 import { DiscountFormModal, SelectionModal } from "./_components/discountModals";
 
@@ -40,7 +44,7 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
-// ✅ Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
+// âœ… Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
 const RupeeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12M6 8h12M6 13h3m-3 0 8.5 8M9 13c6.667 0 6.667-10 0-10" /></svg>);
 
 /* ==================== HELPERS ==================== */
@@ -67,26 +71,40 @@ const getName = (item, type) => {
   return item?.name || "Unnamed";
 };
 
-const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+const formatCurrency = (amount, locale = "en") => new Intl.NumberFormat(
+  locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale,
+  { style: "currency", currency: "PKR" },
+).format(amount || 0);
 
-const formatTarget = (target) => {
-  if (!target) return "All Products";
-  const map = { all: "All Products", all_products: "All Products", product: "Specific Products", specific_products: "Specific Products", category: "Categories", specific_categories: "Categories", brand: "Brands" };
-  return map[target] || String(target).replaceAll("_", " ");
+// Target/value summaries parte hain â†’ inhe `t` chahiye, isliye caller pass karta hai.
+const formatTarget = (target, t) => {
+  if (!target) return t("admin.discounts.page.allProducts");
+  const map = {
+    all: "admin.discounts.page.allProducts",
+    all_products: "admin.discounts.page.allProducts",
+    product: "admin.discounts.page.specificProducts",
+    specific_products: "admin.discounts.page.specificProducts",
+    category: "admin.discounts.page.categories",
+    specific_categories: "admin.discounts.page.categories",
+    brand: "admin.discounts.page.brands",
+    specific_brands: "admin.discounts.page.brands",
+    specific_tags: "admin.discounts.page.specificTags",
+  };
+  return map[target] ? t(map[target]) : String(target).replaceAll("_", " ");
 };
 
-const formatValue = (discount) => {
+const formatValue = (discount, t, locale) => {
   const type = discount?.value_type || discount?.valueType || discount?.type || "percentage";
   const value = Number(discount?.value ?? 0);
-  if (type === "percentage") return `${value}% OFF`;
-  if (type === "fixed_amount" || type === "fixed") return `Rs. ${value} OFF`;
-  if (type === "fixed_price") return `Fixed Rs. ${value}`;
-  return `Rs. ${value} OFF`;
+  if (type === "percentage") return `${value}% ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_amount" || type === "fixed") return `${formatCurrency(value, locale)} ${t("admin.shipping.page.off")}`;
+  if (type === "fixed_price") return `${t("admin.discounts.form.fixedPriceType")} ${formatCurrency(value, locale)}`;
+  return `${formatCurrency(value, locale)} ${t("admin.shipping.page.off")}`;
 };
 
 
 const getDiscountStatus = (discount) => {
-  // ✅ Sirf Active/Inactive model — scheduled/expired/disabled/draft sab "inactive"
+  // âœ… Sirf Active/Inactive model — scheduled/expired/disabled/draft sab "inactive"
   const end = discount?.end_at || discount?.endDate;
   const isExpired = end && new Date(end) < new Date();
   if (discount?.isActive === false) return "inactive";
@@ -112,9 +130,10 @@ const dateToISO = (value) => {
 };
 
 const StatusBadge = ({ status }) => {
+  const { t } = useTranslation();
   const config = {
-    active: { text: "Active", bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
-    inactive: { text: "Inactive", bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
+    active: { text: t("admin.banners.page.active"), bg: "var(--success-soft)", color: "var(--success-text)", border: "color-mix(in srgb, var(--success) 28%, transparent)" },
+    inactive: { text: t("common.inactive"), bg: "var(--danger-soft)", color: "var(--danger-text)", border: "color-mix(in srgb, var(--danger) 28%, transparent)" },
   };
   const item = config[status] || config.inactive;
   return (
@@ -127,6 +146,7 @@ const StatusBadge = ({ status }) => {
 
 /* ==================== CUSTOM MODAL SELECT ==================== */
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
+  const { t, dir } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const containerRef = useRef(null);
@@ -159,7 +179,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
   return (
     <div className="relative w-full" ref={containerRef}>
       <button type="button" ref={buttonRef} onClick={handleToggle} disabled={disabled}
-        className="flex h-10 md:h-9 w-full items-center justify-between gap-2 rounded-md px-3 text-left text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-10 md:h-9 w-full items-center justify-between gap-2 rounded-md px-3 text-start text-[16px] md:text-[13px] outline-none transition disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
         <span className="flex min-w-0 items-center gap-2">
           {SelectedIcon && (
@@ -172,30 +192,30 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <ChevronDownIcon className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
       {isOpen && (
-        <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
+        <div dir={dir} className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.noOptionsAvailable")}</div>
           ) : (
             options.map((opt) => {
               const active = value === opt.value;
               const OptionIcon = opt.icon;
 
-              // ✅ Plain option (icon/description na ho) — purana simple row
+              // âœ… Plain option (icon/description na ho) — purana simple row
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
+                    className="block w-full px-3 py-2 text-start text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
                     style={{ color: active ? "var(--accent)" : "var(--text-primary)", backgroundColor: active ? "var(--accent-soft)" : "transparent" }}>
                     {opt.label}
                   </button>
                 );
               }
 
-              // ✅ Rich row — icon badge + title + example description + selected tick
+              // âœ… Rich row — icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-start transition-colors hover:bg-[var(--bg-tertiary)]"
                   style={{
                     backgroundColor: active ? "var(--accent-soft)" : "transparent",
                     borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
@@ -269,12 +289,12 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // ✅ Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}
     onKeyDown={nonNegative ? (e) => {
-      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      // âœ… "-", "+", "e", "E" type karne hi nahi dena (negative value block)
       if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
     } : undefined}
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
@@ -298,17 +318,18 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 
 /* =========================================================
    SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
-   ✅ Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
+   âœ… Wahi pattern jo products page par use hua hai: wrapper, paddings aur column
       widths real table / grid cards jaise hi rakhe gaye hain, is liye data aane
       par layout shift nahi hota (pehle yahan sirf spinner tha).
-   ✅ Sirf loading state ke liye — real table/grid design me koi change nahi.
+   âœ… Sirf loading state ke liye — real table/grid design me koi change nahi.
 ========================================================= */
 // `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
 function DiscountRowsSkeleton({ rows = 10 }) {
+  const { t } = useTranslation();
   return (
-    <tbody aria-busy="true" aria-label="Loading discounts">
+    <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1174c380be73")}>
       {Array.from({ length: rows }).map((_, i) => (
         <tr key={`discount-skeleton-${i}`} style={{ borderBottom: "1px solid var(--border-color)" }}>
           {/* checkbox */}
@@ -337,8 +358,9 @@ function DiscountRowsSkeleton({ rows = 10 }) {
 }
 
 function DiscountCardsSkeleton({ cards = 8, cardStyle }) {
+  const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label="Loading discounts">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" aria-busy="true" aria-label={t("admin.promotions.ui.generated.1174c380be73")}>
       {Array.from({ length: cards }).map((_, i) => (
         <div key={`discount-card-skeleton-${i}`} className="rounded-lg p-4 flex flex-col gap-3" style={cardStyle}>
           <div className="flex items-start justify-between">
@@ -407,7 +429,7 @@ const humanizeKey = (key) => {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-// ✅ Flatten any attribute value shape (string / number / array / {value|label|name} / nested {Key: "val"})
+// âœ… Flatten any attribute value shape (string / number / array / {value|label|name} / nested {Key: "val"})
 const attrValueText = (value) => {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value.trim();
@@ -423,7 +445,7 @@ const attrValueText = (value) => {
   return "";
 };
 
-// ✅ Build a clean attribute list from product.specifications + variant.attributes
+// âœ… Build a clean attribute list from product.specifications + variant.attributes
 // Merges values by attribute name across all variants (de-duplicated, order preserved)
 const getProductAttributes = (product) => {
   if (!product) return [];
@@ -467,7 +489,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--bg-tertiary)]"
+    className="w-full px-3 py-2.5 text-start text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--bg-tertiary)]"
     style={{ color: danger ? "var(--danger-text)" : success ? "var(--success-text)" : "var(--text-primary)" }}
   >
     {icon} {label}
@@ -476,6 +498,8 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
 
 /* ==================== MAIN COMPONENT ==================== */
 export default function DiscountsPage() {
+  const { t, locale } = useTranslation();
+  const { nameOf } = useLocalized();
   const queryClient = useQueryClient();
   const router = useRouter();
   const pathname = usePathname();
@@ -498,6 +522,7 @@ export default function DiscountsPage() {
   const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [activeFormType, setActiveFormType] = useState(null);
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
+  const [typeMenuPosition, setTypeMenuPosition] = useState(null);
   const typeMenuRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -515,11 +540,12 @@ export default function DiscountsPage() {
   });
   const [formErrors, setFormErrors] = useState({});
 
-  const { data: paginatedDiscountsData, isLoading } = useQuery({
+  const { data: paginatedDiscountsData, isLoading, isFetching } = useQuery({
     queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
     queryFn: () => discountApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: search || "", status: statusFilter === "all" ? "" : statusFilter, applyTo: targetFilter === "all" ? "" : targetFilter }),
   });
   const discounts = paginatedDiscountsData?.items || paginatedDiscountsData || normalizeArrayResponse(paginatedDiscountsData);
+  usePageTranslations({ model: "Discount", records: discounts, locale, ready: !isFetching && paginatedDiscountsData?.pagination?.page === currentPage, queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter], queryClient });
   const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
   const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
@@ -535,6 +561,17 @@ export default function DiscountsPage() {
     document.addEventListener("click", handleOutsideClick);
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    if (!isTypeMenuOpen) return undefined;
+    const closeOnViewportChange = () => setIsTypeMenuOpen(false);
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    window.addEventListener("resize", closeOnViewportChange);
+    return () => {
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+      window.removeEventListener("resize", closeOnViewportChange);
+    };
+  }, [isTypeMenuOpen]);
 
   useEffect(() => {
     const timer = setTimeout(() => setCurrentPage(1), 0);
@@ -575,14 +612,14 @@ export default function DiscountsPage() {
     onMutate: (_, variables) => markSelfAction(variables.id ? "update" : "create"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success(variables.id ? "Discount updated successfully" : "Discount created successfully");
+      toast.success(variables.id ? t("admin.discounts.toast.updated") : t("admin.discounts.toast.created"));
       setShowModal(false);
       resetForm();
     },
     onError: (error) => {
-      const msg = error?.response?.data?.message || error?.message || "Failed to save discount";
+      const msg = error?.response?.data?.message || error?.message || t("admin.discounts.toast.saveFailed");
       if (msg && msg.toLowerCase().includes("already exists")) {
-        setFormErrors({ code: "This discount code already exists. Please use a different code." });
+        setFormErrors({ code: t("admin.discounts.validation.codeExists") });
         return;
       }
       toast.error(msg);
@@ -596,9 +633,9 @@ export default function DiscountsPage() {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
       setDeleteTarget(null);
       setSelectedIds([]);
-      toast.success("Discount deleted successfully");
+      toast.success(t("admin.discounts.toast.deleted"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to delete discount"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.deleteFailed")),
   });
 
   const toggleStatusMutation = useMutation({
@@ -610,9 +647,9 @@ export default function DiscountsPage() {
     onMutate: () => markSelfAction("update"),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["discounts"] });
-      toast.success(variables.newStatus === "active" ? "Discount activated" : "Discount deactivated");
+      toast.success(variables.newStatus === "active" ? t("admin.discounts.toast.activated") : t("admin.discounts.toast.deactivated"));
     },
-    onError: (error) => toast.error(error?.response?.data?.message || error?.message || "Failed to update status"),
+    onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.statusFailed")),
   });
 
   const filteredDiscounts = useMemo(() => {
@@ -633,7 +670,7 @@ export default function DiscountsPage() {
   const totalPages = pagination.pages || 1;
   const totalDiscounts = pagination.total || discounts.length;
 
-  // ✅ Stats server se aate hain (poora dataset — search respect, status se independent).
+  // âœ… Stats server se aate hain (poora dataset — search respect, status se independent).
   //    Purana response (stats missing) ho to current page se fallback.
   const serverStats = paginatedDiscountsData?.stats || null;
   const stats = useMemo(() => {
@@ -680,7 +717,7 @@ export default function DiscountsPage() {
       usage_per_customer: discount?.usage_per_customer ?? discount?.perUserLimit ?? "",
       start_at: toDateInput(discount?.start_at || discount?.startDate),
       end_at: toDateInput(discount?.end_at || discount?.endDate),
-      // ✅ Form options "active"/"disabled" hain — prefill usi value me karo
+      // âœ… Form options "active"/"disabled" hain — prefill usi value me karo
       // warna select khaali (placeholder) dikhta hai
       status: discount?.status === "active" ? "active" : "disabled",
     });
@@ -702,24 +739,24 @@ export default function DiscountsPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setFormErrors({});
-    if (!String(formData.name || "").trim()) return toast.error("Discount name is required");
+    if (!String(formData.name || "").trim()) return toast.error(t("admin.discounts.validation.nameRequired"));
     const manualCode = String(formData.code || "").trim();
     if (!manualCode) {
-      setFormErrors({ code: "Discount code is required." });
+      setFormErrors({ code: t("admin.discounts.validation.codeRequired") });
       return;
     }
-    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error("Valid discount value is required");
-    if (Number(formData.value) < 0) return toast.error("Discount value cannot be less than 0");
-    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error("Percentage cannot exceed 100");
+    if (formData.value === "" || !Number.isFinite(Number(formData.value))) return toast.error(t("admin.discounts.validation.valueRequired"));
+    if (Number(formData.value) < 0) return toast.error(t("admin.discounts.validation.valueNegative"));
+    if (formData.value_type === "percentage" && Number(formData.value) > 100) return toast.error(t("admin.discounts.validation.percentageMax"));
 
-    // ✅ Discount value aur limits 0 se kam kabhi nahi (negative values block)
+    // âœ… Discount value aur limits 0 se kam kabhi nahi (negative values block)
     const nonNegativeError = validateNonNegative([
-      ["Discount value", formData.value],
-      ["Minimum order amount", formData.min_order_amount],
-      ["Minimum quantity", formData.has_min_quantity ? formData.min_quantity : ""],
-      ["Total usage limit", formData.usage_limit],
-      ["Per customer limit", formData.usage_per_customer],
-    ]);
+      [t("admin.discounts.form.discountValue"), formData.value],
+      [t("admin.discounts.form.minOrderAmount"), formData.min_order_amount],
+      [t("admin.discounts.form.minQuantity"), formData.has_min_quantity ? formData.min_quantity : ""],
+      [t("admin.discounts.form.totalUsageLimit"), formData.usage_limit],
+      [t("admin.discounts.form.perCustomerLimit"), formData.usage_per_customer],
+    ], t);
     if (nonNegativeError) return toast.error(nonNegativeError);
 
     let target_type = "all_products";
@@ -728,21 +765,21 @@ export default function DiscountsPage() {
 
     if (activeFormType === "product") {
       target_type = "specific_products"; applyTo = "specific_products";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one product");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectProduct"));
       payloadExtras.selected_product_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "category") {
       target_type = "specific_categories"; applyTo = "specific_categories";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one category");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectCategory"));
       payloadExtras.selected_category_ids = formData.selected_ids.map((id) => String(id?._id || id));
     } else if (activeFormType === "brand") {
       target_type = "brand"; applyTo = "brand";
-      if (formData.selected_ids.length === 0) return toast.error("Select at least one brand");
+      if (formData.selected_ids.length === 0) return toast.error(t("admin.discounts.validation.selectBrand"));
       payloadExtras.selected_brand_ids = formData.selected_ids.map((id) => String(id?._id || id));
     }
 
     const startDate = formData.start_at ? dateToISO(formData.start_at) : new Date().toISOString();
     const endDate = formData.end_at ? dateToISO(formData.end_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    if (new Date(endDate) <= new Date(startDate)) return toast.error("End date must be after start date");
+    if (new Date(endDate) <= new Date(startDate)) return toast.error(t("admin.discounts.validation.dateOrder"));
 
     const finalMinQuantity = formData.has_min_quantity && formData.min_quantity 
       ? Number(formData.min_quantity) 
@@ -785,10 +822,10 @@ export default function DiscountsPage() {
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
   const discountTypes = [
-    { key: "all", title: "All Products Discount", desc: "Apply discount on all products", icon: GlobeIcon },
-    { key: "product", title: "Product Discount", desc: "Apply discount on specific products", icon: BoxIcon },
-    { key: "category", title: "Category Discount", desc: "Apply discount on entire categories", icon: FolderIcon },
-    { key: "brand", title: "Brand Discount", desc: "Apply discount on specific brands", icon: AwardIcon },
+    { key: "all", title: t("admin.discounts.page.allProductsDiscount"), desc: t("admin.discounts.page.applyAllProducts"), icon: GlobeIcon },
+    { key: "product", title: t("admin.discounts.page.productDiscount"), desc: t("admin.discounts.page.applySpecificProducts"), icon: BoxIcon },
+    { key: "category", title: t("admin.discounts.page.categoryDiscount"), desc: t("admin.discounts.page.applyCategories"), icon: FolderIcon },
+    { key: "brand", title: t("admin.discounts.page.brandDiscount"), desc: t("admin.discounts.page.applyBrands"), icon: AwardIcon },
   ];
 
   const openDiscountForm = (type) => {
@@ -835,7 +872,7 @@ export default function DiscountsPage() {
           aria-expanded={open}
           className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
-          title="Actions"
+          title={t("admin.featuredProducts.ui.actions")}
         >
           <DotsIcon className="w-4 h-4" />
         </button>
@@ -856,17 +893,17 @@ export default function DiscountsPage() {
             >
               <MenuItem
                 icon={<EyeIcon className="w-4 h-4" />}
-                label="View Details"
+                label={t("admin.promotions.ui.generated.e45a7490664f")}
                 onClick={() => { setActionMenu(null); handleView(id); }}
               />
               <MenuItem
                 icon={<EditIcon className="w-4 h-4" />}
-                label="Edit Discount"
+                label={t("admin.promotions.ui.generated.5beba536c8fd")}
                 onClick={() => { setActionMenu(null); openEdit(discount); }}
               />
               <MenuItem
                 icon={<PowerIcon className="w-4 h-4" />}
-                label={getDiscountStatus(discount) === "active" ? "Deactivate" : "Activate"}
+                label={getDiscountStatus(discount) === "active" ? t("admin.brands.ui.deactivate") : t("admin.brands.ui.activate")}
                 danger={getDiscountStatus(discount) === "active"}
                 success={getDiscountStatus(discount) !== "active"}
                 onClick={() => { setActionMenu(null); handleToggleStatus(discount); }}
@@ -874,7 +911,7 @@ export default function DiscountsPage() {
               <div className="my-1 mx-2 border-t" style={{ borderColor: "var(--border-color)" }} />
               <MenuItem
                 icon={<TrashIcon className="w-4 h-4" />}
-                label="Delete"
+                label={t("admin.promotions.ui.generated.9485989ff514")}
                 danger
                 onClick={() => { setActionMenu(null); setDeleteTarget([discount]); }}
               />
@@ -895,8 +932,8 @@ export default function DiscountsPage() {
           {/* Title & Actions Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-[24px] leading-7 font-bold tracking-tight">Discount Management</h1>
-              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Create and manage promotional discounts for your store.</p>
+              <h1 className="text-[24px] leading-7 font-bold tracking-tight">{t("admin.discounts.page.title")}</h1>
+              <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.subtitle")}</p>
             </div>
             
             <div className="flex items-center gap-2">
@@ -907,7 +944,7 @@ export default function DiscountsPage() {
                   onClick={() => setViewMode("list")} 
                   className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
                   style={viewMode === "list" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
-                  title="List view"
+                  title={t("admin.discounts.page.listView")}
                 >
                   <ListIcon />
                 </button>
@@ -916,7 +953,7 @@ export default function DiscountsPage() {
                   onClick={() => setViewMode("grid")} 
                   className="h-9 w-9 rounded-lg flex items-center justify-center transition" 
                   style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} 
-                  title="Grid view"
+                  title={t("admin.discounts.page.gridView")}
                 >
                   <GridIcon />
                 </button>
@@ -926,21 +963,44 @@ export default function DiscountsPage() {
               <div className="relative shrink-0" ref={typeMenuRef}>
                 <button 
                   type="button" 
-                  onClick={() => setIsTypeMenuOpen((open) => !open)} 
+                  onClick={(event) => {
+                    if (isTypeMenuOpen) {
+                      setIsTypeMenuOpen(false);
+                      return;
+                    }
+                    const buttonRect = event.currentTarget.getBoundingClientRect();
+                    const contentRect = typeMenuRef.current?.closest("main")?.getBoundingClientRect();
+                    const menuWidth = Math.min(224, Math.max(180, (contentRect?.width || window.innerWidth) - 16));
+                    const estimatedMenuHeight = Math.min(352, window.innerHeight - 16);
+                    const menuTop = buttonRect.bottom + estimatedMenuHeight + 8 <= window.innerHeight
+                      ? buttonRect.bottom + 8
+                      : Math.max(8, buttonRect.top - estimatedMenuHeight - 8);
+                    const minLeft = (contentRect?.left || 0) + 8;
+                    const maxLeft = Math.max(minLeft, Math.min(
+                      window.innerWidth - menuWidth - 8,
+                      (contentRect?.right || window.innerWidth) - menuWidth - 8
+                    ));
+                    setTypeMenuPosition({
+                      top: menuTop,
+                      left: Math.min(Math.max(buttonRect.left, minLeft), maxLeft),
+                      width: menuWidth,
+                    });
+                    setIsTypeMenuOpen(true);
+                  }}
                   aria-expanded={isTypeMenuOpen} 
                   className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:brightness-110 transition" 
                   style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                 >
-                  <PlusIcon /> New Discount <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
+                  <PlusIcon /> {t("admin.discounts.page.new")} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
                 </button>
                 {isTypeMenuOpen && (
-                  <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
+                  <div className="fixed z-[100] max-h-[min(22rem,calc(100vh-1rem))] overflow-y-auto rounded-xl p-1.5" style={{ top: typeMenuPosition?.top, left: typeMenuPosition?.left, width: typeMenuPosition?.width, backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", boxShadow: "var(--shadow-lg)" }}>
                     {discountTypes.map((dt) => {
                       const Icon = dt.icon;
                       return (
-                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-[var(--bg-tertiary)]">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
-                          <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
+                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-[var(--bg-tertiary)]">
+                          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
+                          <span className="min-w-0 flex-1"><span className="block break-words text-[12px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="mt-0.5 block whitespace-normal break-words text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
                         </button>
                       );
                     })}
@@ -952,9 +1012,9 @@ export default function DiscountsPage() {
 
           {/* Stats Cards Row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <StatCard title="Total Discounts" value={stats.total} cardStyle={cardStyle} />
-            <StatCard title="Active" value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
-            <StatCard title="Inactive" value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.total")} value={stats.total} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.active")} value={stats.active} valueStyle={{ color: "var(--success-text)" }} cardStyle={cardStyle} />
+            <StatCard title={t("admin.discounts.page.inactive")} value={stats.inactive} valueStyle={{ color: "var(--danger-text)" }} cardStyle={cardStyle} />
           </div>
 
           {/* Search Bar & Filters Row */}
@@ -963,7 +1023,7 @@ export default function DiscountsPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
               <input 
                 type="text" 
-                placeholder="Search by discount name or code..." 
+                placeholder={t("admin.discounts.page.search")} 
                 value={search} 
                 onChange={(e) => setSearch(e.target.value)} 
                 className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]" 
@@ -972,8 +1032,8 @@ export default function DiscountsPage() {
             </div>
             
             <div className="flex flex-wrap gap-3">
-              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", "All Status"], ["active", "Active"], ["inactive", "Inactive"]]} />
-              <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", "All Targets"], ["all_products", "All Products"], ["product", "Specific Products"], ["category", "Categories"], ["brand", "Brands"]]} />
+              <Select value={statusFilter} onChange={setStatusFilter} inputStyle={inputStyle} options={[["all", t("admin.brands.ui.allStatus")], ["active", t("admin.discounts.page.active")], ["inactive", t("admin.discounts.page.inactive")]]} />
+              <Select value={targetFilter} onChange={setTargetFilter} inputStyle={inputStyle} options={[["all", t("common.all")], ["all_products", t("admin.discounts.page.allProducts")], ["product", t("admin.discounts.page.specificProducts")], ["category", t("admin.discounts.page.categories")], ["brand", t("admin.discounts.page.brands")]]} />
             </div>
           </div>
 
@@ -982,17 +1042,17 @@ export default function DiscountsPage() {
         {/* BULK BAR */}
         {selectedIds.length > 0 && (
           <div className="flex items-center justify-between rounded-lg px-4 h-11" style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} selected</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length}{" "}{t("admin.promotions.ui.generated.835f3b50e337")}</p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Clear</button>
-              <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> Delete Selected</button>
+              <button onClick={() => setSelectedIds([])} className="h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.discounts.page.clear")}</button>
+              <button onClick={() => setDeleteTarget(discounts.filter((d) => selectedIds.includes(d._id || d.id)))} className="h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90" style={{ backgroundColor: "var(--danger)" }}><TrashIcon className="w-3.5 h-3.5" /> {t("admin.discounts.page.deleteSelected")}</button>
             </div>
           </div>
         )}
 
         {/* TABLE / GRID */}
         {isLoading ? (
-          /* ✅ SKELETON — spinner ki jagah real layout ka skeleton:
+          /* âœ… SKELETON — spinner ki jagah real layout ka skeleton:
              list view me wahi table shell + shimmer rows, grid view me shimmer cards */
           viewMode === "list" ? (
             <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -1001,11 +1061,11 @@ export default function DiscountsPage() {
                   <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                     <tr>
                       <th className="px-4 py-3 w-10"><span className="skeleton block h-4 w-4 rounded" /></th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
-                      <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                      <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.discount")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.value")}</th>
+                      <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                      <th className="px-4 py-3 text-end" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.actions")}</th>
                     </tr>
                   </thead>
                   <DiscountRowsSkeleton rows={itemsPerPage} />
@@ -1018,7 +1078,7 @@ export default function DiscountsPage() {
         ) : paginatedDiscounts.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
             <TagIcon className="w-8 h-8 mb-3 opacity-50" />
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? "No discounts found" : "No discounts created yet"}</p>
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search ? t("admin.discounts.page.noMatch") : t("admin.discounts.page.noneYet")}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
@@ -1027,11 +1087,11 @@ export default function DiscountsPage() {
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={paginatedDiscounts.length > 0 && paginatedDiscounts.every((d) => selectedIds.includes(d._id || d.id))} onChange={(e) => setSelectedIds(e.target.checked ? paginatedDiscounts.map((d) => d._id || d.id) : [])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Discount</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Applies To</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Value</th>
-                    <th className="px-4 py-3 text-left" style={{ color: "var(--text-muted)" }}>Status</th>
-                    <th className="px-4 py-3 text-right" style={{ color: "var(--text-muted)" }}>Actions</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.discount")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.value")}</th>
+                    <th className="px-4 py-3 text-start" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.status")}</th>
+                    <th className="px-4 py-3 text-end" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1046,12 +1106,12 @@ export default function DiscountsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{discount?.name || "Untitled Discount"}</p>
+                              <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo)}</td>
-                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount)}</span></td>
+                        <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatTarget(discount?.target_type || discount?.applyTo, t)}</td>
+                        <td className="px-4 py-3"><span className="font-bold text-emerald-500">{formatValue(discount, t, locale)}</span></td>
                         <td className="px-4 py-3"><StatusBadge status={status} /></td>
                         <td className="px-4 py-3 whitespace-nowrap w-1"><ActionButtons discount={discount} /></td>
                       </tr>
@@ -1070,10 +1130,10 @@ export default function DiscountsPage() {
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{discount?.name || "Untitled Discount"}</p>
+                  <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount)}</span>
+                  <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t, locale)}</span>
                   <ActionButtons discount={discount} />
                 </div>
               </div>
@@ -1084,7 +1144,7 @@ export default function DiscountsPage() {
         {/* PAGINATION */}
         {totalDiscounts > itemsPerPage && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)} of {totalDiscounts} discounts</p>
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{totalDiscounts}{" "}{t("admin.nav.item.discounts")}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
@@ -1139,14 +1199,13 @@ export default function DiscountsPage() {
       {deleteTarget && (
         <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-xl p-5" style={cardStyle}>
-            <h3 className="text-base font-semibold">Delete Discount?</h3>
-            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-              Are you sure you want to delete {deleteTarget.length === 1 ? <span className="font-semibold">{deleteTarget[0]?.name}</span> : `${deleteTarget.length} discounts`}?
+            <h3 className="text-base font-semibold">{t("admin.discounts.page.deleteQuestion")}</h3>
+            <p className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>{deleteTarget.length === 1 ? <span className="font-semibold">{nameOf(deleteTarget[0])}</span> : `${deleteTarget.length} discounts`}?
             </p>
             <div className="flex gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>Cancel</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 h-9 rounded-md text-sm" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{t("admin.discounts.delete.cancel")}</button>
               <button onClick={confirmDelete} disabled={deleteMutation.isPending} className="flex-1 h-9 rounded-md text-sm font-semibold text-white flex items-center justify-center gap-2" style={{ backgroundColor: "var(--danger)" }}>
-                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" /> Deleting...</> : "Delete"}
+                {deleteMutation.isPending ? <><Spinner className="w-3.5 h-3.5" />{" "}{t("admin.brands.ui.deleting")}</> : t("admin.discounts.delete.confirm")}
               </button>
             </div>
           </div>
@@ -1155,4 +1214,3 @@ export default function DiscountsPage() {
     </div>
   );
 }
-

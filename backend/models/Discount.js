@@ -25,6 +25,18 @@ const discountSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    translations: {
+      name: { type: Map, of: String, default: () => ({}) },
+      description: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      name: { type: String, default: "" },
+      description: { type: String, default: "" },
+    },
+    translation_status: {
+      name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      description: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
 
     // =====================================================
     // DISCOUNT VALUE

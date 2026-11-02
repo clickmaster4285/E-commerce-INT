@@ -272,6 +272,259 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* ==========================================
+   RTL LANGUAGE FONTS
+   ------------------------------------------
+   The `lang` attribute is set on <html> (and mirrored on the app wrapper by
+   LanguageProvider), so these selectors switch the whole site's typeface the
+   moment Arabic or Urdu is chosen — English keeps the default Inter stack.
+   ========================================== */
+html[lang="ar"] body,
+[lang="ar"] {
+  font-family: "Cairo", "Tajawal", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[lang="ur"] body,
+[lang="ur"] {
+  font-family: "Noto Nastaliq Urdu", "Cairo", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+}
+
+/* ==========================================
+   URDU (Noto Nastaliq) — TYPOGRAPHY REPAIR
+   ------------------------------------------
+   Nastaliq is a *descending* script: marks (nuqte, zair) hang far below the
+   baseline and harkat stack above the ascender. An Inter/Cairo box of 14px at
+   line-height 1.4 literally shaves them off, and the app-wide `tracking-*` /
+   `uppercase` utilities join the individual harf together — which is what
+   makes Urdu read as "chipke hue lafz". Both are repaired below.
+
+   WHY `html:has([lang="ur"])` AND NOT `html[lang="ur"]`:
+   the root layout hardcodes `<html lang="en">`; only the LanguageProvider
+   wrapper carries the real locale. So `html[lang="ur"]` never matches (the
+   rule right above is effectively dead) — but `html:has([lang="ur"])` is true
+   whenever Urdu is active AND, unlike a bare `[lang="ur"]` prefix, it also
+   reaches portals mounted outside that wrapper (Sonner toasts, which live in
+   <Providers> — a sibling of <LanguageProvider>).
+
+   English and Arabic are untouched: every rule below requires a `[lang="ur"]`
+   element to exist somewhere in the document.
+   ========================================== */
+
+/* ---- 1. BASE METRICS ------------------------------------------- */
+html:has([lang="ur"]) {
+  /* `!important` on an inherited property outranks the descendant
+     `tracking-*` / `uppercase` utilities — tracking joins harf in Nastaliq. */
+  letter-spacing: 0 !important;
+  /* Add a little room between Urdu words while keeping joined letters intact. */
+  word-spacing: 0.06em;
+  text-transform: none !important;
+  /* Nastaliq words run long — break instead of overflowing their box. */
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* Tailwind tracking utilities set letter-spacing directly on headings, labels,
+   and table cells, so the root-level reset above cannot override them. Reset
+   each text element on the customer and lead screens where Urdu Nastaliq was
+   appearing crowded, and give adjacent words a readable gap. */
+html:has([lang="ur"]) :is(.admin-customers-page, .admin-leads-page) * {
+  letter-spacing: 0 !important;
+  word-spacing: 0.14em;
+  text-transform: none;
+}
+
+/* Order-history labels use many short Urdu words in compact cards and filter
+   controls. Give those words a little more separation without changing LTR. */
+html:has([lang="ur"]) .user-orders-page * {
+  letter-spacing: 0 !important;
+  word-spacing: 0.14em;
+  text-transform: none;
+}
+
+html:has([lang="ur"]) .user-orders-page :is(
+  h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, strong, em
+) {
+  line-height: 2;
+}
+
+html:has([lang="ur"]) .user-orders-page :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 2.2;
+  padding-block: 2px;
+}
+
+html:has([lang="ur"]) :is(.admin-customers-page, .admin-leads-page) :is(
+  h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, strong, em
+) {
+  line-height: 2;
+}
+
+html:has([lang="ur"]) body,
+[lang="ur"] {
+  line-height: 2;
+  /* 14px -> 15px. Text that already carries an explicit Tailwind `text-*`
+     keeps its own size, so this only lifts size-less / inherited text. */
+  font-size: 15px;
+}
+
+/* ---- 2. HEADINGS -----------------------------------------------
+   Page titles use one-off sizes (text-[24px] leading-7, text-[20px]
+   leading-tight …) so they are normalised by tag rather than by class. */
+html:has([lang="ur"]) :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 2.2;
+  /* headroom so the marks stacked above the letter are never clipped */
+  padding-block: 2px;
+}
+
+/* ---- 3. NEUTRALISE THE TOO-TIGHT LEADING UTILITIES -------------
+   `leading-*` is inherited, so a bare `[lang="ur"]` line-height loses to a
+   `.leading-none` sitting on the element itself. Re-state them by class. */
+html:has([lang="ur"]) :is(
+  .leading-none,
+  .leading-tight,
+  .leading-snug,
+  .leading-4,
+  .leading-5,
+  .leading-6
+) {
+  line-height: 2;
+}
+
+/* ---- 4. LET TEXT WRAP INSTEAD OF TRUNCATING --------------------
+   `truncate` / `whitespace-nowrap` clip Nastaliq mid-glyph and are the single
+   biggest source of "text kata hua". Reset on text-bearing tags only. */
+html:has([lang="ur"])
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, figcaption, strong, em).truncate,
+html:has([lang="ur"])
+  :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, figcaption, strong, em).whitespace-nowrap {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* Attribute labels use compact text-size utilities; Nastaliq needs taller
+   line boxes and must be allowed to wrap instead of clipping glyphs. */
+html:has([lang="ur"]) :is(.admin-attributes-page, .admin-attributes-detail-panel)
+  :is(h1, h2, h3, h4, p, span, a, label, button, li, td, th, strong, em) {
+  letter-spacing: 0 !important;
+  word-spacing: 0.1em;
+  text-transform: none !important;
+  line-height: 2 !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* ---- 5. FIXED-HEIGHT TEXT BOXES MUST BE ABLE TO GROW -----------
+   Guards, so we never touch media, icon or decorative boxes:
+     :not(:empty)                     → empty bars/dividers (e.g. the sidebar's
+                                       `h-4 w-[3px]` active indicator) are empty,
+                                       so `height: auto` would collapse them to 0
+     :not(:has(img, video, canvas)) → avatars / thumbnails / media keep their
+                                     square size
+     :not(.w-5 … .w-11)             → square icon buttons (h-8 w-8) keep theirs
+   The `min-height` rules below then act as a floor, so pills, chips and
+   buttons keep the exact box they have in English and only grow when the
+   Nastaliq glyphs actually need more room. */
+html:has([lang="ur"])
+  :is(span, p, a, label, button, li, td, th, dd, dt)
+  :is(.h-4, .h-5, .h-6, .h-7, .h-8, .h-9, .h-10, .h-11)
+  :not(:empty)
+  :not(:has(img, video, canvas))
+  :not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) {
+  height: auto;
+  overflow: visible;
+}
+
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-4:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-5:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1.25rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-6:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1.5rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-7:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 1.75rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-8:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-9:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.25rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-10:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.5rem; }
+html:has([lang="ur"]) :is(span, p, a, label, button, li, td, th, dd, dt).h-11:not(:empty):not(:has(img, video, canvas)):not(.w-5, .w-6, .w-7, .w-8, .w-9, .w-10, .w-11) { min-height: 2.75rem; }
+
+/* ---- 6. ADMIN PAGE HEADER (point 3) ----------------------------
+   The heading gets line-height 2.2 + padding above, so the subtitle needs a
+   real gap (6-8px) instead of the LTR `mt-1`, otherwise the two lines touch.
+   `padding-block` would make the Tailwind `mt-*` win, so margin it is. */
+html:has([lang="ur"]) .admin-page-header__title {
+  /* +1 step over the English text-[24px] */
+  font-size: 25px;
+}
+
+html:has([lang="ur"]) .admin-page-header__subtitle {
+  margin-top: 8px;
+  line-height: 1.9;
+}
+
+/* ---- 7. SONNER TOASTS -----------------------------------------
+   The toaster renders into its own portal at <body> level and ships its own
+   `font-family` + `line-height: 1.4/1.5`, so it needs an explicit override —
+   higher specificity than sonner's injected stylesheet. */
+html:has([lang="ur"]) [data-sonner-toaster] {
+  font-family: "Noto Nastaliq Urdu", "Cairo", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 2;
+}
+
+html:has([lang="ur"]) [data-sonner-toast][data-styled="true"] {
+  font-size: 15px;
+  line-height: 2;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ur"]) [data-sonner-toast] [data-title],
+html:has([lang="ur"]) [data-sonner-toast] [data-description] {
+  line-height: 1.9;
+  white-space: normal;
+}
+
+/* ==========================================
+   ARABIC RTL TYPOGRAPHY
+   ------------------------------------------
+   Arabic uses Cairo and a tighter rhythm than Urdu Nastaliq. Normalize
+   tracking and line boxes across both storefront and admin text so labels,
+   buttons and headings stay readable without making the UI feel oversized.
+   ========================================== */
+html:has([lang="ar"]) {
+  letter-spacing: 0 !important;
+  word-spacing: 0.02em;
+  text-transform: none !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+html:has([lang="ar"]) body,
+html:has([lang="ar"]) [lang="ar"],
+html:has([lang="ar"]) [data-sonner-toaster] {
+  font-family: "Noto Naskh Arabic", "Cairo", serif !important;
+}
+
+html:has([lang="ar"]) :is(p, span, a, label, button, li, td, th, dd, dt, strong, em) {
+  letter-spacing: 0 !important;
+  line-height: 1.9;
+  text-transform: none !important;
+}
+
+html:has([lang="ar"]) :is(h1, h2, h3, h4, h5, h6) {
+  letter-spacing: 0 !important;
+  line-height: 1.8 !important;
+  padding-block: 0.04em;
+  text-transform: none !important;
+}
+
+html:has([lang="ar"]) :is(.leading-none, .leading-tight, .leading-snug, .leading-4, .leading-5, .leading-6) {
+  line-height: 1.9 !important;
+}
+
+html:has([lang="ar"]) [data-sonner-toaster],
+html:has([lang="ar"]) [data-sonner-toast][data-styled="true"] {
+  font-family: "Noto Naskh Arabic", "Cairo", serif !important;
+  letter-spacing: 0;
+  line-height: 1.9;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -344,6 +597,13 @@ input[type="radio"] {
   accent-color: var(--accent);
 }
 
+/* Keep the PO date picker clickable while showing the app's calendar icon. */
+.po-expected-date::-webkit-calendar-picker-indicator {
+  width: 2rem;
+  cursor: pointer;
+  opacity: 0;
+}
+
 /* BASE_APPEND_MARKER */
 /* NOTE: Base styles (html/body/a/button/headings) sirf upar ek hi baar define hain —
    yahan pehle ek duplicate block tha jo CSS bloat kar raha tha, usay hata diya gaya hai. */
@@ -374,6 +634,72 @@ input[type="radio"] {
 
 main {
   min-width: 0;
+}
+
+/* Admin pages used min-h-screen inside a viewport-sized scrollport, which made
+   even short pages taller than the space below the navbar. Let the shell fill
+   the available scroll area while each page grows only when its content does. */
+.admin-panel main > div {
+  min-height: 100%;
+}
+
+.admin-panel main > div > [class~="min-h-screen"] {
+  min-height: auto !important;
+}
+
+/* Hide the browser's native number steppers in quote fields so they do not
+   collide with the percent suffix shown inside discount and tax inputs. */
+.quote-template-designer input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.quote-template-designer input[type="number"]::-webkit-inner-spin-button,
+.quote-template-designer input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Admin pages mix physical Tailwind text-left/right utilities with localized
+   RTL content. Resolve those alignments logically so headers and cell values
+   stay on the same edge in Urdu/Arabic, while nested LTR content stays LTR. */
+.admin-panel[dir="rtl"] :is(.text-left, [class*=":text-left"]) {
+  text-align: start !important;
+}
+
+.admin-panel[dir="rtl"] :is(.text-right, [class*=":text-right"]) {
+  text-align: end !important;
+}
+
+.admin-panel[dir="rtl"] [style*="text-align: left"],
+.admin-panel[dir="rtl"] [style*="text-align:left"] {
+  text-align: start !important;
+}
+
+.admin-panel[dir="rtl"] [style*="text-align: right"],
+.admin-panel[dir="rtl"] [style*="text-align:right"] {
+  text-align: end !important;
+}
+
+/* Keep admin actions aligned in Urdu/Arabic. The script-specific rules above
+   allow text to wrap and let fixed-height text controls grow so glyphs are not
+   clipped. Wrapping button labels makes neighboring actions land on different
+   baselines/heights after a locale switch. Keep each action on one line and
+   center its contents; responsive button groups can wrap as a group. */
+html:has([lang="ur"]) .admin-panel :is(button, [role="button"]),
+html:has([lang="ar"]) .admin-panel :is(button, [role="button"]) {
+  white-space: nowrap !important;
+  align-items: center;
+  vertical-align: middle;
+}
+
+html:has([lang="ur"]) .admin-panel :is(button, [role="button"]).truncate,
+html:has([lang="ar"]) .admin-panel :is(button, [role="button"]).truncate,
+html:has([lang="ur"]) .admin-panel :is(button, [role="button"]) .truncate,
+html:has([lang="ar"]) .admin-panel :is(button, [role="button"]) .truncate {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 .sidebar-wrapper {
@@ -584,6 +910,12 @@ main {
 /* Dark theme: chevron stroke lighter taake dark inputs par clearly dikhe */
 html.dark .select-field {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238fa3bf' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="datetime-local"] {
+  color-scheme: dark;
 }
 
 /* ============================================================
@@ -1118,3 +1450,114 @@ html.dark input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 60px #1e2233 inset;
   -webkit-text-fill-color: #e6e8f0;
 }
+
+/* Keep POS surfaces and controls aligned with the active admin theme. */
+html.dark .admin-pos-workspace [class~="bg-white"] {
+  background-color: var(--bg-card) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="bg-slate-50"], [class~="bg-slate-50/60"], [class~="bg-slate-50/70"], [class~="bg-slate-50/90"],
+  [class~="bg-slate-100"], [class~="bg-slate-100/50"], [class~="bg-blue-50"],
+  [class~="bg-slate-100/60"], [class~="bg-blue-50/40"], [class~="bg-blue-50/50"], [class~="bg-blue-50/60"], [class~="bg-blue-100"]
+) {
+  background-color: var(--bg-card-alt) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="text-slate-900"], [class~="text-slate-800"], [class~="text-slate-700"]
+) {
+  color: var(--text-primary) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="text-slate-600"], [class~="text-slate-500"], [class~="text-slate-400"]
+) {
+  color: var(--text-muted) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="text-blue-700"], [class~="text-blue-600"]
+) {
+  color: var(--accent) !important;
+}
+html.dark .admin-pos-workspace :is(
+  [class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-200/80"],
+  [class~="border-slate-200/90"], [class~="border-blue-100"], [class~="border-blue-200"]
+) {
+  border-color: var(--border-color) !important;
+}
+
+/* Let POS use the entire admin content viewport; its own panes handle scrolling. */
+.admin-panel main:has(.admin-pos-workspace) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden !important;
+}
+.admin-panel main:has(.admin-pos-workspace) > div {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+.admin-pos-workspace {
+  flex: 1 1 auto;
+}
+
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-Italic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Lato";
+  src: url("/fonts/Lato-BoldItalic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-Italic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Ubuntu";
+  src: url("/fonts/Ubuntu-BoldItalic.ttf") format("truetype");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+

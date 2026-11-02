@@ -8,7 +8,7 @@ const list = (res) => {
 };
 
 export const brandApi = {
-  // ✅ PUBLIC — bina login (slim=1: storefront ko _id/name/logo hi chahiye)
+  // ✅ PUBLIC — bina login; slim response includes localized brand-name data.
   getAll: () => userHttp.get("/brands", { params: { slim: 1 } }).then(list),
   getById: (id) =>
     userHttp.get(`/brands/${id}`).then((res) => res.data?.data || res.data),

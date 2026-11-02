@@ -15,7 +15,7 @@ const num = (value) => {
 const WINDOW_MINUTES = num(process.env.RATE_LIMIT_WINDOW_MINUTES);
 const WINDOW_MS = Math.max(1, WINDOW_MINUTES) * 60 * 1000;
 
-const USER_MULTIPLIER = num(process.env.RATE_LIMIT_USER_MULTIPLIER);
+const USER_MULTIPLIER = num(process.env.RATE_LIMIT_USER_MULTIPLIER)
 const ADMIN_MULTIPLIER = num(process.env.RATE_LIMIT_ADMIN_MULTIPLIER);
 
 // ✅ FIX: undefined par "undefined" string na bane

@@ -1,10 +1,14 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { stockApi } from "../../../apis/admin/stockApi";
 import { toast } from "sonner";
-import { useStockSocketSync } from "@/hooks/useStockSocketSync";
+import { useStockSocketSync } from "../../../hooks/admin/useStockSocketSync";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedField, localizedProductNameOf, useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
 const getImageUrl = (url) => {
@@ -115,6 +119,27 @@ const STATUS_META = {
 
 const ADD_REASONS = ["New Purchase", "Customer Return", "Inventory Correction", "Supplier Bonus"];
 const REMOVE_REASONS = ["Sale / Order Fulfillment", "Damaged / Defective", "Expired", "Lost / Stolen", "Internal Use / Sample"];
+const REASON_KEYS = {
+  "New Purchase": "newPurchase", "Customer Return": "customerReturn", "Inventory Correction": "inventoryCorrection",
+  "Supplier Bonus": "supplierBonus", "Sale / Order Fulfillment": "saleFulfillment", "Damaged / Defective": "damaged",
+  Expired: "expired", "Lost / Stolen": "lost", "Internal Use / Sample": "internal",
+};
+
+const stockProductNameOf = (item, locale) => {
+  const name = String(item?.product_name || "");
+  // Stock overview returns the whole Product translations object
+  // ({ name: { ur: ... } }), while history passes just the product_name
+  // locale map ({ ur: ... }). Normalize both to the shape the shared helper
+  // expects: translations.name[locale].
+  const nameTranslations = item?.product_translations?.name ?? item?.product_translations;
+  const displayName = localizedProductNameOf(
+    { name, translations: { name: nameTranslations } },
+    locale
+  );
+  return /wikipedia|wikipédia|ویکیپیڈیا|维基百科|विकिपीडिया/i.test(displayName || "")
+    ? name
+    : displayName;
+};
 
 // ✅ Stock history ka "Explanation" text:
 // 1) Naya `explanation` field (adjust form ka notes) — agar mojood ho to wahi.
@@ -126,20 +151,23 @@ const explanationOf = (h) => {
   return reason || "—";
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (date, locale = "en") => {
   if (!date) return "—";
-  return new Date(date).toLocaleString("en-US", {
+  return new Intl.DateTimeFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale, {
     day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-  });
+  }).format(new Date(date));
 };
+
+const formatNumber = (value, locale) => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale).format(Number(value) || 0);
 
 /* ================= Small Components ================= */
 const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
+  const { t, locale } = useTranslation();
   const image = getImageUrl(item?.image);
   return image ? (
-    <img
+    <FallbackImage
       src={image}
-      alt={item?.product_name || "Product"}
+      alt={stockProductNameOf(item, locale) || t("admin.manageStock.page.product")}
       className={`${size} shrink-0 rounded-lg object-cover`}
       style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}
     />
@@ -147,7 +175,7 @@ const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
     <div
       className={`${size} shrink-0 rounded-lg flex items-center justify-center`}
       style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
-      aria-label="No product image"
+      aria-label={t("admin.manageStock.page.noImage")}
     >
       <BoxIcon className="h-5 w-5" />
     </div>
@@ -161,11 +189,12 @@ const Avatar = ({ name, size = "w-8 h-8" }) => (
 );
 
 const StatusPill = ({ status }) => {
+  const { t } = useTranslation();
   const meta = STATUS_META[status] || STATUS_META.in;
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-[12px] px-2 py-1 rounded-md whitespace-nowrap" style={{ backgroundColor: meta.backgroundColor, color: meta.color }}>
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: meta.color }} />
-      {meta.label}
+      {t(`admin.manageStock.status.${status}`)}
     </span>
   );
 };
@@ -194,6 +223,8 @@ const FilterPill = ({ value, label, count, active, onSelect }) => (
 
 /* ================= Main Component ================= */
 export default function ManageStockPage() {
+  const { t, locale } = useTranslation();
+  const { contentOf, nameOf } = useLocalized();
   const queryClient = useQueryClient();
   useStockSocketSync();
 
@@ -213,6 +244,7 @@ export default function ManageStockPage() {
   });
 
   const [adjustError, setAdjustError] = useState("");
+  const [adjustErrors, setAdjustErrors] = useState({});
   const [detailsTarget, setDetailsTarget] = useState(null);
   const itemsPerPage = 20;
 
@@ -237,20 +269,31 @@ export default function ManageStockPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  const { data: paginatedStockData, isLoading: loading, isError, error } = useQuery({
-    queryKey: ["stock", "paginated", currentPage, debouncedSearch, statusFilter],
+  const stockQueryKey = ["stock", "paginated", currentPage, debouncedSearch, statusFilter];
+  const { data: paginatedStockData, isLoading: loading, isFetching: stockFetching, isError, error } = useQuery({
+    queryKey: stockQueryKey,
     queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch, status: statusFilter }),
     retry: false,
   });
-  const stockItems = Array.isArray(paginatedStockData?.items)
+  const stockItems = useMemo(() => Array.isArray(paginatedStockData?.items)
     ? paginatedStockData.items
     : Array.isArray(paginatedStockData)
       ? paginatedStockData
-      : [];
+      : [], [paginatedStockData]);
   const stockPagination = paginatedStockData?.pagination || { total: stockItems.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  usePageTranslations({ model: "Variant", records: stockItems, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+  const stockProducts = useMemo(() => stockItems
+    .filter((item) => item.product_id && item.product_name)
+    .map((item) => ({ _id: String(item.product_id), name: item.product_name })), [stockItems]);
+  usePageTranslations({ model: "Product", records: stockProducts, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+  const stockBrands = useMemo(() => stockItems
+    .filter((item) => item.brand_id && item.brand_name)
+    .map((item) => ({ _id: String(item.brand_id), name: item.brand_name })), [stockItems]);
+  usePageTranslations({ model: "Brand", records: stockBrands, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
 
-  const { data: paginatedHistoryData, isLoading: historyLoading } = useQuery({
-    queryKey: ["stock-history", "paginated", historyPage],
+  const historyQueryKey = ["stock-history", "paginated", historyPage];
+  const { data: paginatedHistoryData, isLoading: historyLoading, isFetching: historyFetching } = useQuery({
+    queryKey: historyQueryKey,
     queryFn: () => stockApi.getHistoryPaginated({ page: historyPage, limit: itemsPerPage }),
     enabled: tab === "history",
   });
@@ -260,25 +303,38 @@ export default function ManageStockPage() {
       ? paginatedHistoryData
       : [];
   const historyPagination = paginatedHistoryData?.pagination || { total: historyItems.length, page: historyPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  usePageTranslations({ model: "StockHistory", records: historyItems, locale, ready: tab === "history" && !historyFetching && historyPagination.page === historyPage, queryKey: historyQueryKey, queryClient });
 
   const adjustMutation = useMutation({
-    mutationFn: (data) => stockApi.adjust(data),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["stock"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-history"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success(res?.message || "Stock adjusted successfully");
+    mutationFn: async (data) => {
+      const response = await stockApi.adjust(data);
+      if (response?.success === false) {
+        throw new Error(response.message || t("admin.manageStock.toast.adjustFailed"));
+      }
+      return response;
+    },
+    onSuccess: async (res) => {
+      // Wait until the stock list and history reflect the server's saved value
+      // before showing success and closing the form, so stale quantities don't
+      // appear alongside the success message.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["stock"] }),
+        queryClient.invalidateQueries({ queryKey: ["stock-history"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+      ]);
+      toast.success(res?.message || t("admin.manageStock.toast.adjusted"));
       closeAdjustModal();
     },
     onError: (err) => {
-      const msg = err.response?.data?.message || err.message || "Stock adjustment failed";
+      const msg = err.response?.data?.message || err.message || t("admin.manageStock.toast.adjustFailed");
       setAdjustError(msg);
     },
   });
 
   // ===== Stock Details Drawer: variant-specific history (existing API reuse) =====
-  const { data: detailsHistoryData, isLoading: detailsHistoryLoading, isError: detailsHistoryError } = useQuery({
-    queryKey: ["stock-history", "variant", detailsTarget?._id],
+  const detailsHistoryQueryKey = ["stock-history", "variant", detailsTarget?._id];
+  const { data: detailsHistoryData, isLoading: detailsHistoryLoading, isFetching: detailsHistoryFetching, isError: detailsHistoryError } = useQuery({
+    queryKey: detailsHistoryQueryKey,
     queryFn: () => stockApi.getHistoryPaginated({ page: 1, limit: 50, variantId: detailsTarget._id }),
     enabled: !!detailsTarget?._id,
   });
@@ -287,6 +343,7 @@ export default function ManageStockPage() {
     : Array.isArray(detailsHistoryData)
       ? detailsHistoryData
       : [];
+  usePageTranslations({ model: "StockHistory", records: detailsHistory, locale, ready: !!detailsTarget?._id && !detailsHistoryFetching, queryKey: detailsHistoryQueryKey, queryClient });
 
   const openDetails = (item) => setDetailsTarget(item);
   const closeDetails = () => setDetailsTarget(null);
@@ -335,11 +392,12 @@ export default function ManageStockPage() {
   const openAdjustModal = (item) => {
     setAdjustForm({ type: "add", quantity: "", reason: "", customReason: "" });
     setAdjustError("");
+    setAdjustErrors({});
     setAdjustTarget(item);
     setIsReasonOpen(false);
   };
 
-  const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); setIsReasonOpen(false); };
+  const closeAdjustModal = () => { setAdjustTarget(null); setAdjustError(""); setAdjustErrors({}); setIsReasonOpen(false); };
 
   useEffect(() => {
     if (!detailsTarget && !adjustTarget) return;
@@ -359,32 +417,37 @@ export default function ManageStockPage() {
   }, [detailsTarget, adjustTarget]);
 
   const validateAdjust = () => {
+    const errors = {};
     const qtyRaw = adjustForm.quantity.trim();
-    if (!qtyRaw) return "Quantity is required";
     const qty = Number(qtyRaw);
-    if (!Number.isInteger(qty) || qty < 0) return "Quantity must be a valid non-negative whole number";
-    if (qty === 0) return "Quantity must be greater than 0";
-    if (adjustForm.type === "remove" && qty > Number(adjustTarget.quantity ?? 0)) {
-      return `Cannot remove ${qty} units. Only ${adjustTarget.quantity} in stock.`;
+    if (!qtyRaw) errors.quantity = t("admin.manageStock.validation.quantityRequired");
+    else if (!Number.isInteger(qty) || qty < 0) errors.quantity = t("admin.manageStock.validation.quantityWholeNonnegative");
+    else if (qty === 0) errors.quantity = t("admin.manageStock.validation.quantityPositive");
+    else if (adjustForm.type === "remove" && qty > Number(adjustTarget.quantity ?? 0)) {
+      errors.quantity = t("admin.manageStock.validation.notEnoughStock", { qty: formatNumber(qty, locale), stock: formatNumber(adjustTarget.quantity, locale) });
     }
-    
-    if (!adjustForm.reason) return "Please select a reason for this adjustment";
-    if (adjustForm.reason === "__OTHER__" && !adjustForm.customReason.trim()) {
-      return "Please specify the custom reason";
-    }
-    // ✅ Explanation ab OPTIONAL nahi — required hai (har adjustment ka clear
-    // justification Stock History mein record hona zaroori hai).
+
+    if (!adjustForm.reason) errors.reason = t("admin.manageStock.validation.reasonRequired");
     if (!adjustForm.customReason.trim()) {
-      return "Please add an explanation for this stock adjustment";
+      errors.customReason = adjustForm.reason === "__OTHER__"
+        ? t("admin.manageStock.validation.customReasonRequired")
+        : t("admin.manageStock.validation.explanationRequired");
     }
-    return "";
+    return errors;
   };
 
   const handleAdjustSubmit = (e) => {
     e.preventDefault();
-    const validationMsg = validateAdjust();
-    if (validationMsg) { setAdjustError(validationMsg); return; }
-    
+    const validationErrors = validateAdjust();
+    setAdjustErrors(validationErrors);
+    if (Object.keys(validationErrors).length) {
+      setAdjustError("");
+      toast.error(validationErrors.reason || Object.values(validationErrors)[0]);
+      const firstInvalidField = Object.keys(validationErrors)[0];
+      document.getElementById(`stock-adjust-${firstInvalidField}`)?.focus();
+      return;
+    }
+
     setAdjustError("");
     const finalReason = adjustForm.reason === "__OTHER__" 
       ? adjustForm.customReason.trim() 
@@ -438,28 +501,28 @@ export default function ManageStockPage() {
         {/* ✅ UPDATED HEADER - Mobile optimized */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-[20px] sm:text-[24px] leading-tight sm:leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Manage Stock</h1>
-            <p className="text-[12px] sm:text-[13px] mt-0.5 sm:mt-1" style={{ color: "var(--text-muted)" }}>Easily monitor and manage product inventory.</p>
+            <h1 className="text-[20px] sm:text-[24px] leading-tight sm:leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.title")}</h1>
+            <p className="text-[12px] sm:text-[13px] mt-0.5 sm:mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.subtitleCurrent")}</p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <TabButton value="stock" label="Current Stock" icon={<ListIcon />} active={tab === "stock"} onSelect={handleTabChange} />
-            <TabButton value="history" label="Stock History" icon={<ClockIcon />} active={tab === "history"} onSelect={handleTabChange} />
+            <TabButton value="stock" label={t("admin.manageStock.page.currentStock")} icon={<ListIcon />} active={tab === "stock"} onSelect={handleTabChange} />
+            <TabButton value="history" label={t("admin.manageStock.page.tabHistory")} icon={<ClockIcon />} active={tab === "history"} onSelect={handleTabChange} />
           </div>
         </div>
 
                {/* ✅ UPDATED STAT CARDS - Mobile optimized */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {[
-            { label: "Total Units", value: summary.totalUnits, sub: `${summary.totalVariants} variants`, icon: <BoxIcon className="h-5 w-5" />, color: "var(--accent)", backgroundColor: "var(--accent-soft)" },
-            { label: "In Stock", value: summary.inStock, sub: "Healthy inventory", icon: <CheckIcon className="h-5 w-5" />, color: "var(--success-text)", backgroundColor: "var(--success-soft)" },
-            { label: "Total Products", value: summary.totalProducts, sub: "Unique products", icon: <ListIcon className="h-5 w-5" />, color: "var(--purple-text)", backgroundColor: "var(--purple-soft)" },
-            { label: "Out of Stock", value: summary.outOfStock, sub: "Restock required", icon: <BoxIcon className="h-5 w-5" />, color: "var(--danger-text)", backgroundColor: "var(--danger-soft)" },
+            { label: t("admin.manageStock.page.totalUnits"), value: summary.totalUnits, sub: `${formatNumber(summary.totalVariants, locale)} ${t("admin.manageStock.page.variants")}`, icon: <BoxIcon className="h-5 w-5" />, color: "var(--accent)", backgroundColor: "var(--accent-soft)" },
+            { label: t("admin.manageStock.page.inStock"), value: summary.inStock, sub: t("admin.manageStock.page.healthyInventory"), icon: <CheckIcon className="h-5 w-5" />, color: "var(--success-text)", backgroundColor: "var(--success-soft)" },
+            { label: t("admin.manageStock.page.totalProducts"), value: summary.totalProducts, sub: t("admin.manageStock.page.uniqueProducts"), icon: <ListIcon className="h-5 w-5" />, color: "var(--purple-text)", backgroundColor: "var(--purple-soft)" },
+            { label: t("admin.manageStock.page.outOfStock"), value: summary.outOfStock, sub: t("admin.manageStock.page.restockRequired"), icon: <BoxIcon className="h-5 w-5" />, color: "var(--danger-text)", backgroundColor: "var(--danger-soft)" },
           ].map((card) => (
             <div key={card.label} className="rounded-xl p-4 flex items-start gap-3" style={cardStyle}>
               <div className="h-10 w-10 shrink-0 rounded-lg flex items-center justify-center" style={{ backgroundColor: card.backgroundColor, color: card.color }}>{card.icon}</div>
               <div className="min-w-0">
                 <p className="text-[11px] sm:text-xs font-medium" style={{ color: "var(--text-muted)" }}>{card.label}</p>
-                <p className="text-xl font-bold mt-0.5" style={{ color: card.color }}>{card.value}</p>
+                <p className="text-xl font-bold mt-0.5" style={{ color: card.color }}>{formatNumber(card.value, locale)}</p>
                 <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{card.sub}</p>
               </div>
             </div>
@@ -477,7 +540,7 @@ export default function ManageStockPage() {
                 <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><SearchIcon /></span>
                 <input 
                   type="text" 
-                  placeholder="Search by product name, SKU or variant..." 
+                  placeholder={t("admin.manageStock.page.search")}
                   value={search} 
                   onChange={(e) => handleSearchChange(e.target.value)} 
                   className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent-soft)]" 
@@ -488,31 +551,31 @@ export default function ManageStockPage() {
               {/* Filters (Right Side) */}
               <div className="flex items-center gap-3 w-full md:w-auto">
                 {["all", "in", "low", "out"].map((f) => (
-                  <FilterPill key={f} value={f} label={f === "all" ? "All" : STATUS_META[f].label} count={filterCounts[f]} active={statusFilter === f} onSelect={handleStatusFilterChange} />
+                  <FilterPill key={f} value={f} label={t(f === "all" ? "admin.manageStock.page.all" : `admin.manageStock.status.${f}`)} count={formatNumber(filterCounts[f], locale)} active={statusFilter === f} onSelect={handleStatusFilterChange} />
                 ))}
               </div>
             </div>
 
             {loading ? (
-              <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading stock...</span></div>
+              <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.loading")}</span></div>
             ) : isError ? (
-              <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><AlertTriangleIcon /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{error?.message || "Failed to load stock"}</p></div>
+              <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><AlertTriangleIcon /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.loadingError")}</p></div>
             ) : filteredItems.length === 0 ? (
-              <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><BoxIcon className="w-8 h-8" /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{search || statusFilter !== "all" ? "No stock items match your filters" : "No product variants found"}</p></div>
+              <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><BoxIcon className="w-8 h-8" /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t(search || statusFilter !== "all" ? "admin.manageStock.page.noFilterMatch" : "admin.manageStock.page.noVariants")}</p></div>
             ) : (
               <>
                 {/* ✅ DESKTOP TABLE (Hidden on mobile) */}
                 <div className="hidden md:block rounded-lg overflow-hidden" style={cardStyle}>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[13px] min-w-[860px]">
+                    <table className="w-full text-start text-[13px] min-w-[860px]">
                       <thead style={tableHeaderStyle}>
                         <tr>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Product</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">SKU</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">Variant</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Current Stock</th>
-                          <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Status</th>
-                          <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider">Action</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.product")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.sku")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">{t("admin.manageStock.page.variant")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.currentStockLabel")}</th>
+                          <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.status")}</th>
+                          <th className="px-4 py-3 text-end text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.action")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -520,36 +583,36 @@ export default function ManageStockPage() {
                           const status = getStockStatus(item);
                           // ✅ Category/brand assign nahi hai to ye line bilkul render nahi hoti
                           //    (backend ab "Uncategorized"/"No brand" jaisa fake text nahi bhejta).
-                          const metaLine = [item.category_name, item.brand_name].filter(Boolean).join(" · ");
+                          const metaLine = [localizedField(item.category_name, item.category_translations, locale), nameOf({ name: item.brand_name, translations: { name: item.brand_translations }, brand_code: true })].filter(Boolean).join(" · ");
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
 <td className="px-4 py-2.5">
   <div className="flex items-center gap-2.5">
     <ProductThumbnail item={item} />
     <div className="flex items-center gap-1.5 min-w-0">
-      <span className="font-medium text-[13px] truncate max-w-[160px] block">{item.product_name}</span>
+      <span className="font-medium text-[13px] truncate max-w-[160px] block">{stockProductNameOf(item, locale)}</span>
         {metaLine && (
           <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{metaLine}</span>
         )}
       {item.product_is_deleted && (
-        <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-          Deleted
+                                  <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+          {t("admin.manageStock.page.deleted")}
         </span>
       )}
     </div>
   </div>
 </td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
-                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{item.title}</span></td>
-                              <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{item.quantity} units</span></td>
+                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(item.title, item.translations?.title, locale)}</span></td>
+                              <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{formatNumber(item.quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                               <td className="px-4 py-2.5"><StatusPill status={status} /></td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-right">
+                              <td className="px-4 py-2.5 whitespace-nowrap text-end">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button onClick={() => openDetails(item)} disabled={adjustMutation.isPending} className="h-8 px-2.5 rounded-md text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }} title="View Stock Details">
-                                    <EyeIcon className="w-3.5 h-3.5" /> View
+                                  <button onClick={() => openDetails(item)} disabled={adjustMutation.isPending} className="h-8 px-2.5 rounded-md text-[12px] font-semibold transition hover:opacity-80 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }} title={t("admin.manageStock.page.viewDetails")}>
+                                    <EyeIcon className="w-3.5 h-3.5" /> {t("admin.manageStock.page.view")}
                                   </button>
-                                  <button onClick={() => openAdjustModal(item)} disabled={adjustMutation.isPending} className="h-8 px-3 rounded-md text-[12px] font-semibold transition hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }} title="Adjust Stock">
-                                    <EditIcon className="w-3.5 h-3.5" /> Adjust Stock
+                                  <button onClick={() => openAdjustModal(item)} disabled={adjustMutation.isPending} className="h-8 px-3 rounded-md text-[12px] font-semibold transition hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }} title={t("admin.manageStock.page.adjustTitle")}>
+                                    <EditIcon className="w-3.5 h-3.5" /> {t("admin.manageStock.page.adjustTitle")}
                                   </button>
                                 </div>
                               </td>
@@ -577,10 +640,10 @@ export default function ManageStockPage() {
                           </div>
                                                <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-[13px] font-medium truncate leading-tight">{item.product_name}</p>
+                            <p className="text-[13px] font-medium truncate leading-tight">{stockProductNameOf(item, locale)}</p>
                               {item.product_is_deleted && (
                                 <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
-                                  Deleted
+                                  {t("admin.manageStock.page.deleted")}
                                 </span>
                               )}
                             </div>
@@ -589,7 +652,7 @@ export default function ManageStockPage() {
                         </div>
                         <div className="flex items-center justify-between gap-2 min-w-0">
                           <span className="text-[12px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>
-                            {item.quantity} units
+                            {formatNumber(item.quantity, locale)} {t("admin.manageStock.page.units")}
                           </span>
                           <StatusPill status={status} />
                         </div>
@@ -599,7 +662,7 @@ export default function ManageStockPage() {
                             className="flex-shrink-0 min-h-[44px] px-3 rounded-md transition hover:opacity-80 flex items-center justify-center text-[12px] font-semibold gap-1.5"
                             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
                           >
-                            <EyeIcon className="w-4 h-4" /> Details
+                            <EyeIcon className="w-4 h-4" /> {t("admin.manageStock.page.details")}
                           </button>
                           <button
                             onClick={() => openAdjustModal(item)}
@@ -607,7 +670,7 @@ export default function ManageStockPage() {
                             className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center text-[12px] font-semibold gap-1.5"
                             style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                           >
-                            <EditIcon className="w-4 h-4" /> Adjust
+                            <EditIcon className="w-4 h-4" /> {t("admin.manageStock.page.adjust")}
                           </button>
                         </div>
                       </div>
@@ -619,9 +682,9 @@ export default function ManageStockPage() {
 
             {!loading && !isError && (stockPagination?.total || 0) > itemsPerPage && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>Showing {paginationStart}-{paginationEnd} of {stockPagination?.total || stockItems.length} stock items</p>
+                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingItemsRange", { from: formatNumber(paginationStart, locale), to: formatNumber(paginationEnd, locale), total: formatNumber(stockPagination?.total || stockItems.length, locale) })}</p>
                 <div className="flex items-center gap-2">
-                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {currentPage} of {stockTotalPages}</span>
+                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(currentPage, locale), pages: formatNumber(stockTotalPages, locale) })}</span>
                   <button onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                   <span className="hidden sm:inline-flex items-center gap-1">
                     {renderPageNumbers(currentPage, stockTotalPages, setCurrentPage)}
@@ -637,24 +700,24 @@ export default function ManageStockPage() {
         {tab === "history" && (
           <>
             {historyLoading ? (
-              <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading stock history...</span></div>
+              <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.loadingHistory")}</span></div>
             ) : historyItems.length === 0 ? (
-              <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><ClockIcon className="w-8 h-8" /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>No stock adjustments yet</p></div>
+              <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><ClockIcon className="w-8 h-8" /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.noHistory")}</p></div>
             ) : (
               <div className="rounded-lg overflow-hidden" style={cardStyle}>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px] min-w-[900px]">
                     <thead style={tableHeaderStyle}>
                       <tr>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Product</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">SKU</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell">Variant</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Previous Stock</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">Change</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">New Stock</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">Reason</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">Updated By</th>
-                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell">Date/Time</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.product")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.sku")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell">{t("admin.manageStock.page.variant")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.previousStock")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.change")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider">{t("admin.manageStock.page.newStock")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">{t("admin.manageStock.page.reason")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell">{t("admin.manageStock.page.updatedBy")}</th>
+                        <th className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell">{t("admin.manageStock.page.dateTime")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -663,15 +726,15 @@ export default function ManageStockPage() {
                         const isSet = h.adjustment_type === "set";
                         return (
                           <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistoryItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
-                            <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={h.product_name} /><span className="font-medium text-[13px] truncate max-w-[150px]">{h.product_name}</span></div></td>
+                          <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)}</span></div></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
-                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.variant_title}</span></td>
-                            <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{h.previous_quantity} units</span></td>
+                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(h.variant_title, h.translations?.variant_title, locale)}</span></td>
+                            <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{formatNumber(h.previous_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "var(--warning)" : change > 0 ? "var(--success-text)" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
-                            <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{h.new_quantity} units</span></td>
-                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{h.reason || "—"}</span></td>
+                            <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{formatNumber(h.new_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
+                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{localizedField(h.reason, h.translations?.reason, locale) || "—"}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name}</span></td>
-                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[12px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDateTime(h.created_at)}</span></td>
+                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[12px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDateTime(h.created_at, locale)}</span></td>
                           </tr>
                         );
                       })}
@@ -683,9 +746,9 @@ export default function ManageStockPage() {
 
             {!historyLoading && (historyPagination?.total || 0) > itemsPerPage && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>Showing {(historyPage - 1) * itemsPerPage + 1}-{Math.min(historyPage * itemsPerPage, historyPagination?.total || historyItems.length)} of {historyPagination?.total || historyItems.length} records</p>
+                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingRecordsRange", { from: formatNumber((historyPage - 1) * itemsPerPage + 1, locale), to: formatNumber(Math.min(historyPage * itemsPerPage, historyPagination?.total || historyItems.length), locale), total: formatNumber(historyPagination?.total || historyItems.length, locale) })}</p>
                 <div className="flex items-center gap-2">
-                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>Page {historyPage} of {historyPagination?.pages || 1}</span>
+                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(historyPage, locale), pages: formatNumber(historyPagination?.pages || 1, locale) })}</span>
                   <button onClick={() => historyPage > 1 && setHistoryPage(historyPage - 1)} disabled={historyPage === 1} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                   <span className="hidden sm:inline-flex items-center gap-1">
                     {renderPageNumbers(historyPage, historyPagination?.pages || 1, setHistoryPage)}
@@ -717,8 +780,8 @@ export default function ManageStockPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                   <div className="min-w-0">
-                    <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>Stock Details</h3>
-                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
+                    <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.stockDetails")}</h3>
+                    <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{stockProductNameOf(detailsTarget, locale)}</p>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-[11px] truncate max-w-[180px]" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</span>
                       <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsTarget.sku}</span>
@@ -736,13 +799,13 @@ export default function ManageStockPage() {
                 {/* PRODUCT INFORMATION */}
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                   <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Product Information</h4>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.productInformation")}</h4>
                   </div>
                   <div className="p-4 space-y-3">
                     <div className="flex items-center gap-3">
                       <ProductThumbnail item={detailsTarget} size="h-12 w-12" />
                       <div className="min-w-0">
-                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{detailsTarget.product_name}</p>
+                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{stockProductNameOf(detailsTarget, locale)}</p>
                         <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{detailsTarget.title || "—"}</p>
                       </div>
                     </div>
@@ -762,16 +825,16 @@ export default function ManageStockPage() {
                 {/* INVENTORY OVERVIEW */}
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                   <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Inventory Overview</h4>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.inventoryOverview")}</h4>
                   </div>
                   <div className="p-4">
                     <div className="rounded-lg p-4 text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                      <p className="text-[10px] font-medium leading-tight" style={{ color: "var(--text-muted)" }}>Current Stock</p>
+                      <p className="text-[10px] font-medium leading-tight" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.currentStockLabel")}</p>
                       <p className="text-[24px] font-bold mt-1 leading-tight" style={{ color: "var(--text-primary)" }}>{qty}</p>
-                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>units</p>
+                      <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.units")}</p>
                     </div>
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>Status</span>
+                      <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.status")}</span>
                       <StatusPill status={status} />
                     </div>
                   </div>
@@ -780,8 +843,8 @@ export default function ManageStockPage() {
                 {/* STOCK HISTORY (variant-specific) */}
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                   <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Stock History</h4>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{detailsHistory.length} records</span>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.stockHistory")}</h4>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{t("admin.manageStock.page.recordsCount", { count: formatNumber(detailsHistory.length, locale) })}</span>
                   </div>
                   <div className="p-4">
                     {detailsHistoryLoading ? (
@@ -794,9 +857,9 @@ export default function ManageStockPage() {
                         ))}
                       </div>
                     ) : detailsHistoryError ? (
-                      <p className="text-[12px] text-center py-3" style={{ color: "var(--danger)" }}>Unable to load stock history.</p>
+                      <p className="text-[12px] text-center py-3" style={{ color: "var(--danger)" }}>{t("admin.manageStock.page.historyError")}</p>
                     ) : detailsHistory.length === 0 ? (
-                      <p className="text-[12px] text-center py-3" style={{ color: "var(--text-muted)" }}>No stock activity recorded yet.</p>
+                      <p className="text-[12px] text-center py-3" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.noActivity")}</p>
                     ) : (
                       <div className="space-y-3">
                         {detailsHistory.map((h) => {
@@ -805,20 +868,20 @@ export default function ManageStockPage() {
                             <div key={h._id} className="p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[13px] font-bold" style={{ color: changeColor(change) }}>
-                                  {change > 0 ? `+${change}` : change} units
+                                  {change > 0 ? `+${formatNumber(change, locale)}` : formatNumber(change, locale)} {t("admin.manageStock.page.units")}
                                 </span>
-                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{h.reason || h.adjustment_type || "—"}</span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{localizedField(h.reason, h.translations?.reason, locale) || h.adjustment_type || "—"}</span>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
-                                <span style={{ color: "var(--text-muted)" }}>Previous Stock: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.previous_quantity ?? 0}</span></span>
-                                <span style={{ color: "var(--text-muted)" }}>New Stock: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.new_quantity ?? 0}</span></span>
-                                <span className="truncate" style={{ color: "var(--text-muted)" }}>Updated By: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name || "—"}</span></span>
-                                <span style={{ color: "var(--text-muted)" }}>Date: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatDateTime(h.created_at)}</span></span>
+                                <span style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.previousStock")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatNumber(h.previous_quantity, locale)}</span></span>
+                                <span style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.newStock")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatNumber(h.new_quantity, locale)}</span></span>
+                                <span className="truncate" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.updatedBy")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name || "—"}</span></span>
+                                <span style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.date")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatDateTime(h.created_at, locale)}</span></span>
                               </div>
                               {/* ✅ Explanation — adjust form ka notes (full text, wrap ke sath) */}
                               <div className="mt-2.5 pt-2" style={{ borderTop: "1px dashed var(--border-color)" }}>
-                                <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Explanation</span>
-                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{explanationOf(h)}</p>
+                                <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.explanation")}</span>
+                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{contentOf(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation : h.translations?.reason)}</p>
                               </div>
                             </div>
                           );
@@ -830,32 +893,32 @@ export default function ManageStockPage() {
                 {/* RECENT ACTIVITY */}
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                   <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Recent Activity</h4>
+                    <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.recentActivity")}</h4>
                   </div>
                   <div className="p-4">
                     {latest ? (
                       <div className="grid grid-cols-1 gap-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Action</span>
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.action")}</span>
                           <span className="text-[12px] font-semibold" style={{ color: changeColor(latest.change_quantity ?? 0) }}>
-                            {(latest.change_quantity ?? 0) > 0 ? "Added" : "Removed"} {Math.abs(latest.change_quantity ?? 0)} units
+                            {t((latest.change_quantity ?? 0) > 0 ? "admin.manageStock.page.added" : "admin.manageStock.page.removed")} {formatNumber(Math.abs(latest.change_quantity ?? 0), locale)} {t("admin.manageStock.page.units")}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Reason</span>
-                          <span className="text-[12px] truncate max-w-[200px]" style={{ color: "var(--text-secondary)" }}>{latest.reason || "—"}</span>
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.reason")}</span>
+                          <span className="text-[12px] truncate max-w-[200px]" style={{ color: "var(--text-secondary)" }}>{localizedField(latest.reason, latest.translations?.reason, locale) || "—"}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Performed By</span>
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.performedBy")}</span>
                           <span className="text-[12px] truncate max-w-[160px]" style={{ color: "var(--text-secondary)" }}>{latest.performed_by_name || "—"}</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Date & Time</span>
-                          <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{formatDateTime(latest.created_at)}</span>
+                          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.dateTime")}</span>
+                          <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{formatDateTime(latest.created_at, locale)}</span>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>No stock activity recorded yet.</p>
+                      <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.noActivity")}</p>
                     )}
                   </div>
                 </div>
@@ -863,14 +926,14 @@ export default function ManageStockPage() {
 
               {/* FOOTER ACTIONS */}
               <div className="px-5 py-4 shrink-0 flex items-center gap-3" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-                <button onClick={closeDetails} className="flex-1 h-10 rounded-lg text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Close</button>
+                <button onClick={closeDetails} className="flex-1 h-10 rounded-lg text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("common.close")}</button>
                 <button
                   onClick={() => { const t = detailsTarget; closeDetails(); openAdjustModal(t); }}
                   disabled={adjustMutation.isPending}
                   className="flex-1 h-10 rounded-lg text-[13px] font-semibold transition hover:opacity-90 disabled:opacity-50"
                   style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}
                 >
-                  Adjust Stock
+                  {t("admin.manageStock.page.adjustStock")}
                 </button>
               </div>
             </div>
@@ -885,8 +948,8 @@ export default function ManageStockPage() {
             {/* Modal Header */}
             <div className="px-4 sm:px-6 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
               <div>
-                <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>Adjust Stock</h3>
-                <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>Update inventory quantity for this variant</p>
+                <h3 className="text-[15px] font-semibold" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.adjustTitle")}</h3>
+                <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.adjustSubtitle")}</p>
               </div>
               <button onClick={closeAdjustModal} disabled={adjustMutation.isPending} className="p-1.5 rounded-md transition disabled:opacity-50 hover:opacity-70" style={{ color: "var(--text-muted)", backgroundColor: "var(--bg-tertiary)" }}>
                 <CloseIcon className="w-5 h-5 sm:w-4 sm:h-4" />
@@ -898,22 +961,22 @@ export default function ManageStockPage() {
                 
                 {/* Product Info */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Product Information</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.productInformation")}</p>
                   <div className="flex items-center gap-3 sm:gap-3.5 p-3 sm:p-3.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                     <ProductThumbnail item={adjustTarget} size="h-12 w-12" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{adjustTarget.product_name}</p>
+                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--text-primary)" }}>{stockProductNameOf(adjustTarget, locale)}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{adjustTarget.sku}</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{adjustTarget.title}</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[10px] uppercase tracking-wide font-medium" style={{ color: "var(--text-muted)" }}>In Stock</p>
+                      <p className="text-[10px] uppercase tracking-wide font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.inStock")}</p>
                       <div className="flex items-center gap-1.5 mt-0.5 justify-end">
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: getStockStatus(adjustTarget) === "out" ? "var(--danger)" : getStockStatus(adjustTarget) === "low" ? "var(--warning)" : "var(--success-text)" }} />
                         <p className="text-[16px] font-bold" style={{ color: getStockStatus(adjustTarget) === "out" ? "var(--danger)" : getStockStatus(adjustTarget) === "low" ? "var(--warning)" : "var(--success-text)" }}>{adjustTarget.quantity}</p>
-                        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>units</span>
+                        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.units")}</span>
                       </div>
                     </div>
                   </div>
@@ -921,11 +984,11 @@ export default function ManageStockPage() {
 
                 {/* Adjustment Type */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Stock Adjustment</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.adjustment")}</p>
                   <div className="grid grid-cols-2 gap-3 mb-3.5">
                     {[
-                      { value: "add", label: "Add Stock", icon: "+", color: "var(--success-text)" },
-                      { value: "remove", label: "Remove Stock", icon: "−", color: "var(--danger)" },
+                      { value: "add", labelKey: "admin.manageStock.page.addStock", icon: "+", color: "var(--success-text)" },
+                      { value: "remove", labelKey: "admin.manageStock.page.removeStock", icon: "−", color: "var(--danger)" },
                     ].map((opt) => {
                       const isActive = adjustForm.type === opt.value;
                       const currentStock = Number(adjustTarget.quantity ?? 0);
@@ -936,7 +999,8 @@ export default function ManageStockPage() {
                           <button 
                             type="button" 
                             onClick={() => { 
-                              setAdjustError(""); 
+                              setAdjustError("");
+                              setAdjustErrors({});
                               setAdjustForm({ ...adjustForm, type: opt.value, quantity: "", reason: "", customReason: "" }); 
                               setIsReasonOpen(false); 
                             }} 
@@ -949,12 +1013,12 @@ export default function ManageStockPage() {
                             }}
                           >
                             <span className="text-[16px] font-bold leading-none">{opt.icon}</span>
-                            <span className="text-[11px] font-medium leading-tight mt-0.5">{opt.label}</span>
+                            <span className="text-[11px] font-medium leading-tight mt-0.5">{t(opt.labelKey)}</span>
                           </button>
                           
                           {opt.value === "remove" && isRemoveDisabled && (
                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 rounded-lg text-[11px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10" style={{ backgroundColor: "var(--danger)", color: "#fff", boxShadow: "0 4px 6px rgba(0,0,0,0.1)" }}>
-                              No stock available to remove
+                              {t("admin.manageStock.page.noStockToRemove")}
                               <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent" style={{ borderTopColor: "var(--danger)" }} />
                             </div>
                           )}
@@ -965,17 +1029,30 @@ export default function ManageStockPage() {
 
                   {/* Quantity Input — stock sirf poore units mein (decimal allowed nahi) */}
                   <div>
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>Quantity <span style={{ color: "var(--danger)" }}>*</span></label>
+                    <label htmlFor="stock-adjust-quantity" className="block text-[12px] font-medium mb-1.5" style={{ color: adjustErrors.quantity ? "var(--danger)" : "var(--text-secondary)" }}>{t("admin.manageStock.page.quantity")} <span style={{ color: "var(--danger)" }}>*</span></label>
                     <input 
-                      type="number" 
-                      min={1} 
+                      id="stock-adjust-quantity"
+                      type="number"
+                      min={1}
                       max={adjustForm.type === "remove" ? (adjustTarget.quantity ?? 0) : undefined}
-                      step="1" 
+                      step="1"
                       inputMode="numeric"
                       value={adjustForm.quantity} 
                       onKeyDown={(e) => { if ([".", ",", "-", "+", "e", "E"].includes(e.key)) e.preventDefault(); }}
+                      onWheel={(e) => {
+                        if (document.activeElement !== e.currentTarget) return;
+                        e.preventDefault();
+                        const maxStock = adjustForm.type === "remove" ? Number(adjustTarget.quantity ?? 0) : Infinity;
+                        const currentQuantity = Number(adjustForm.quantity) || 0;
+                        const nextQuantity = Math.max(1, Math.min(maxStock, currentQuantity + (e.deltaY < 0 ? 1 : -1)));
+                        if (nextQuantity === currentQuantity && adjustForm.quantity) return;
+                        setAdjustForm((current) => ({ ...current, quantity: String(nextQuantity) }));
+                        setAdjustErrors((current) => ({ ...current, quantity: "" }));
+                        setAdjustError("");
+                      }}
                       onChange={(e) => { 
-                        setAdjustError(""); 
+                        setAdjustError("");
+                        setAdjustErrors((current) => ({ ...current, quantity: "" }));
                         const maxStock = adjustForm.type === "remove" ? Number(adjustTarget.quantity ?? 0) : Infinity;
                         // ✅ Poore units hi maane jate hain — decimal point (0.09) ka sirf
                         // integer part rakha jata hai, baaki characters hata diye jate hain.
@@ -986,18 +1063,19 @@ export default function ManageStockPage() {
                         }
                       }} 
                       disabled={adjustMutation.isPending} 
-                      className="h-11 sm:h-10 px-3 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50" 
-                      style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} 
-                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"} 
-                      onBlur={(e) => e.target.style.borderColor = "var(--border-color)"} 
-                      placeholder={adjustForm.type === "add" ? "Units to add" : "Units to remove"} 
+                      aria-invalid={Boolean(adjustErrors.quantity)}
+                      aria-describedby={adjustErrors.quantity ? "stock-adjust-quantity-error" : undefined}
+                      className={`h-11 sm:h-10 appearance-none px-3 rounded-lg text-[13px] w-full outline-none transition focus-visible:ring-2 ${adjustErrors.quantity ? "focus-visible:ring-red-500/20" : "focus-visible:ring-blue-500/20"} disabled:opacity-50`}
+                      style={{ backgroundColor: "var(--bg-tertiary)", border: `1px solid ${adjustErrors.quantity ? "var(--danger)" : "var(--border-color)"}`, color: "var(--text-primary)" }}
+                      placeholder={t(adjustForm.type === "add" ? "admin.manageStock.page.unitsToAdd" : "admin.manageStock.page.unitsToRemove")}
                     />
+                    {adjustErrors.quantity && <p id="stock-adjust-quantity-error" role="alert" className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--danger)" }}>{adjustErrors.quantity}</p>}
             
                     {adjustForm.type === "remove" && (
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <InfoIcon className="w-3.5 h-3.5" style={{ color: "var(--warning)" }} />
                         <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                          Maximum removable: <span className="font-semibold" style={{ color: "var(--warning)" }}>{adjustTarget.quantity} units</span>
+                          {t("admin.manageStock.page.maximumRemovable", { quantity: formatNumber(adjustTarget.quantity, locale) })} <span className="font-semibold" style={{ color: "var(--warning)" }}>{t("admin.manageStock.page.units")}</span>
                         </p>
                       </div>
                     )}
@@ -1007,7 +1085,7 @@ export default function ManageStockPage() {
                   {adjustForm.quantity.trim() && computedNewStock !== null && (
                     <div className="mt-3 p-3 rounded-lg flex items-center justify-between" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>New Stock</span>
+                        <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.newStockLabel")}</span>
                         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{adjustTarget.quantity}</span>
                         <span className="text-[11px] font-semibold" style={{ color: adjustForm.type === "add" ? "var(--success-text)" : "var(--danger)" }}>
                           {adjustForm.type === "add" ? `+${Number(adjustForm.quantity.trim())}` : `−${Number(adjustForm.quantity.trim())}`}
@@ -1016,7 +1094,7 @@ export default function ManageStockPage() {
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>=</span>
                         <span className="text-[15px] font-bold" style={{ color: computedNewStock === 0 ? "var(--danger)" : "var(--success-text)" }}>{computedNewStock}</span>
-                        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>units</span>
+                        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.units")}</span>
                       </div>
                     </div>
                   )}
@@ -1024,22 +1102,24 @@ export default function ManageStockPage() {
 
                 {/* Reason Dropdown */}
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: "var(--text-muted)" }}>Reason</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: adjustErrors.reason ? "var(--danger)" : "var(--text-muted)" }}>{t("admin.manageStock.page.reason")} <span style={{ color: "var(--danger)" }}>*</span></p>
                   
                   <div className="relative" ref={dropdownRef}>
                     <button
+                      id="stock-adjust-reason"
                       type="button"
                       onClick={() => setIsReasonOpen(!isReasonOpen)}
                       disabled={adjustMutation.isPending}
                       className="h-11 sm:h-10 px-3 pr-8 rounded-lg text-[13px] w-full outline-none transition disabled:opacity-50 flex items-center justify-between"
+                      aria-describedby={adjustErrors.reason ? "stock-adjust-reason-error" : undefined}
                       style={{ 
                         backgroundColor: "var(--bg-tertiary)", 
-                        border: `1px solid ${isReasonOpen ? "var(--accent)" : "var(--border-color)"}`, 
+                        border: `1px solid ${adjustErrors.reason ? "var(--danger)" : isReasonOpen ? "var(--accent)" : "var(--border-color)"}`,
                         color: adjustForm.reason ? "var(--text-primary)" : "var(--text-muted)" 
                       }}
                     >
                       <span className="truncate">
-                        {adjustForm.reason ? (adjustForm.reason === "__OTHER__" ? "Other (Specify below)" : adjustForm.reason) : "Select a reason..."}
+                        {adjustForm.reason ? (adjustForm.reason === "__OTHER__" ? t("admin.manageStock.page.reasonOther") : t(`admin.manageStock.reason.${REASON_KEYS[adjustForm.reason] || "other"}`)) : t("admin.manageStock.page.selectReason")}
                       </span>
                       <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isReasonOpen ? "rotate-180" : ""}`} />
                     </button>
@@ -1054,6 +1134,8 @@ export default function ManageStockPage() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 setAdjustForm({ ...adjustForm, reason: r, customReason: r === "__OTHER__" ? adjustForm.customReason : "" });
+                                setAdjustErrors((current) => ({ ...current, reason: "", customReason: r === "__OTHER__" && !adjustForm.customReason.trim() ? t("admin.manageStock.validation.customReasonRequired") : "" }));
+                                setAdjustError("");
                                 setIsReasonOpen(false);
                               }}
                               className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-[var(--bg-tertiary)]"
@@ -1064,7 +1146,7 @@ export default function ManageStockPage() {
                             >
                               {adjustForm.reason === r && <span className="w-1.5 h-1.5 rounded-full bg-[var(--success-text)] shrink-0" />}
                               <span className={adjustForm.reason === r ? "font-medium" : ""}>
-                                {r === "__OTHER__" ? "Other (Specify below)" : r}
+                                {r === "__OTHER__" ? t("admin.manageStock.page.reasonOther") : t(`admin.manageStock.reason.${REASON_KEYS[r] || "other"}`)}
                               </span>
                             </button>
                           ))}
@@ -1072,47 +1154,49 @@ export default function ManageStockPage() {
                       </div>
                     )}
                   </div>
+                  {adjustErrors.reason && <p id="stock-adjust-reason-error" role="alert" className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--danger)" }}>{adjustErrors.reason}</p>}
 
                   <div className="mt-3">
-                    <label className="block text-[12px] font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
-                      Explanation <span style={{ color: "var(--danger)" }}>*</span>
+                    <label htmlFor="stock-adjust-customReason" className="block text-[12px] font-medium mb-1.5" style={{ color: adjustErrors.customReason ? "var(--danger)" : "var(--text-secondary)" }}>
+                      {t("admin.manageStock.page.explanation")} <span style={{ color: "var(--danger)" }}>*</span>
                     </label>
                     <textarea
+                      id="stock-adjust-customReason"
                       value={adjustForm.customReason}
-                      onChange={(e) => setAdjustForm({ ...adjustForm, customReason: e.target.value })}
+                      onChange={(e) => {
+                        setAdjustForm({ ...adjustForm, customReason: e.target.value });
+                        setAdjustErrors((current) => ({ ...current, customReason: "" }));
+                        setAdjustError("");
+                      }}
                       disabled={adjustMutation.isPending}
                       rows={3}
-                      className="w-full px-3 py-2.5 rounded-lg text-[13px] outline-none transition disabled:opacity-50 resize-none"
+                      aria-invalid={Boolean(adjustErrors.customReason)}
+                      aria-describedby={adjustErrors.customReason ? "stock-adjust-customReason-error" : undefined}
+                      className={`w-full px-3 py-2.5 rounded-lg text-[13px] outline-none transition focus-visible:ring-2 ${adjustErrors.customReason ? "focus-visible:ring-red-500/20" : "focus-visible:ring-blue-500/20"} disabled:opacity-50 resize-none`}
                       style={{ 
                         backgroundColor: "var(--bg-card)", 
-                        border: `1px solid ${!adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}`, 
+                        border: `1px solid ${adjustErrors.customReason ? "var(--danger)" : "var(--border-color)"}`,
                         color: "var(--text-primary)" 
                       }}
-                      onFocus={(e) => e.target.style.borderColor = "var(--accent)"}
-                      onBlur={(e) => e.target.style.borderColor = !adjustForm.customReason.trim() && adjustError ? "var(--danger)" : "var(--border-color)"}
-                      placeholder={adjustForm.reason === "__OTHER__" ? "Please specify the custom reason..." : "Explain why this stock is being adjusted..."}
+                      placeholder={t(adjustForm.reason === "__OTHER__" ? "admin.manageStock.page.customReasonPlaceholder" : "admin.manageStock.page.explanationPlaceholder")}
                     />
-                    {!adjustForm.customReason.trim() && (
-                      <p className="text-[11px] mt-1.5" style={{ color: adjustError ? "var(--danger)" : "var(--text-muted)" }}>
-                        {adjustError ? "Explanation is required." : ""}
-                      </p>
-                    )}
+                    {adjustErrors.customReason && <p id="stock-adjust-customReason-error" role="alert" className="mt-1.5 text-[11px] font-medium" style={{ color: "var(--danger)" }}>{adjustErrors.customReason}</p>}
                   </div>
                 </div>
 
-                {/* {adjustError && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
+                {adjustError && (
+                  <div role="alert" className="flex items-center gap-2 rounded-lg p-3" style={{ backgroundColor: "var(--danger-soft)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                     <AlertTriangleIcon />
                     <p className="text-[12px]" style={{ color: "var(--danger)" }}>{adjustError}</p>
                   </div>
-                )} */}
+                )}
               </div>
 
               {/* Footer Actions */}
               <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row gap-2 sm:gap-3 shrink-0" style={{ borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-                <button type="button" onClick={closeAdjustModal} disabled={adjustMutation.isPending} className="w-full sm:flex-1 h-11 sm:h-10 rounded-lg text-[13px] font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>Cancel</button>
+                <button type="button" onClick={closeAdjustModal} disabled={adjustMutation.isPending} className="w-full sm:flex-1 h-11 sm:h-10 rounded-lg text-[13px] font-medium transition disabled:opacity-50 hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.manageStock.page.cancel")}</button>
                 <button type="submit" disabled={adjustMutation.isPending} className="w-full sm:flex-1 h-11 sm:h-10 rounded-lg text-[13px] font-semibold transition disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                  {adjustMutation.isPending ? (<><Spinner className="w-4 h-4" /> Updating...</>) : "Update Stock"}
+                  {adjustMutation.isPending ? (<><Spinner className="w-4 h-4" /> {t("admin.manageStock.page.updating")}</>) : t("admin.manageStock.page.updateStock")}
                 </button>
               </div>
             </form>

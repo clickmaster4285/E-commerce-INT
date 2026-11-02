@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -14,6 +15,8 @@ import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
+import { slugKey } from "@/utils/slugKey";
+import { useTranslation } from "../../i18n/LanguageProvider";
 
 import {
   FolderOpen,
@@ -36,6 +39,10 @@ import {
   Star, // Added for Featured Products
   SlidersHorizontal, // Added for Attributes
   MessageSquareText, // Reviews
+  ContactRound,
+  FileText,
+  Receipt,
+  DollarSign,
 } from "lucide-react";
 
 // ============================================================
@@ -52,41 +59,35 @@ function StoreMark({
   logoUrl,
   name,
   letter,
-  color,
+  color = "var(--accent)",
   sizeClass = "h-8 w-8",
-  letterClass = "text-sm",
   roundedClass = "rounded-lg",
 }) {
-  const [logoFailed, setLogoFailed] = useState(false);
-
-  if (logoUrl && !logoFailed) {
-    return (
-      <span
-        className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden bg-white shadow-sm ring-1 ring-black/10`}
-      >
-        <img
-          src={logoUrl}
-          alt={name}
-          onError={() => setLogoFailed(true)}
-          className="h-full w-full object-contain p-[3px]"
-        />
-      </span>
-    );
-  }
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [logoUrl]);
+  const showLogo = Boolean(logoUrl && !imageFailed);
 
   return (
     <span
-      aria-hidden="true"
-      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center shadow-sm ring-1 ring-white/15`}
-      style={{
-        backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${color} 82%, #ffffff), color-mix(in srgb, ${color} 72%, #000000))`,
-      }}
+      aria-label={name}
+      className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden shadow-sm ${
+        showLogo ? "bg-white ring-1 ring-black/10" : "text-white ring-1 ring-white/20"
+      }`}
+      style={showLogo ? undefined : { background: `linear-gradient(135deg, ${color}, #4338ca)` }}
     >
-      <span
-        className={`font-semibold uppercase tracking-tight text-white ${letterClass}`}
-      >
-        {letter}
-      </span>
+      {showLogo ? (
+        <FallbackImage
+          key={logoUrl}
+          src={logoUrl}
+          alt={name}
+          onError={() => setImageFailed(true)}
+          className="h-full w-full object-contain p-[3px]"
+        />
+      ) : (
+        <span aria-hidden="true" className="text-sm font-extrabold tracking-wide">
+          {letter || "S"}
+        </span>
+      )}
     </span>
   );
 }
@@ -117,8 +118,16 @@ const sidebarSections = [
     items: ["Vendors", "Purchase Orders"],
   },
   {
+    title: "POS & CUSTOMER MANAGEMENT",
+    items: ["POS", "Customers", "Leads", "Quotes", "Invoices"],
+  },
+  {
+    title: "FINANCE",
+    items: ["Finance"],
+  },
+  {
     title: "STORE",
-    items: ["Store Info"],
+    items: ["Store Info", "Terms & Conditions"],
   },
   {
     title: "TEAM & ACCOUNT",
@@ -132,6 +141,7 @@ const sidebarSections = [
 
 const allMenuItems = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: "dashboard" },
+  { name: "Finance", icon: DollarSign, path: "/admin/finance", permissionKey: "finance" },
   { name: "Brands", icon: Tag, path: "/admin/brands", permissionKey: "brands" },
   { name: "Categories", icon: FolderOpen, path: "/admin/categories", permissionKey: "categories" },
   { 
@@ -154,7 +164,13 @@ const allMenuItems = [
   { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
   { name: "Vendors", icon: Users, path: "/admin/vendors", permissionKey: "vendors" },
   { name: "Purchase Orders", icon: Package, path: "/admin/purchase-orders", permissionKey: "purchaseOrders" },
+  { name: "Customers", icon: Users, path: "/admin/customers", permissionKey: "customers" },
+  { name: "Leads", icon: ContactRound, path: "/admin/leads", permissionKey: "leads" },
+  { name: "Quotes", icon: FileText, path: "/admin/quotes", permissionKey: "quotes" },
+  { name: "Invoices", icon: Receipt, path: "/admin/invoices", permissionKey: "invoices", fallbackKey: "quotes" },
+  { name: "POS", icon: ShoppingCart, path: "/admin/pos", permissionKey: "pos" },
   { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
+  { name: "Terms & Conditions", icon: FileText, path: "/admin/terms-conditions", permissionKey: "store" },
   { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },
 ];
 
@@ -450,6 +466,23 @@ export default function Sidebar({ onNavigate, userData }) {
   }, [handleConnect, handleProfileData, handleProfileUpdated, handlePermissionsUpdated]);
 
   // ============================================================
+  // I18N (admin only)
+  // ============================================================
+  // `name` / `title` stay the stable lookup key — paths, permissionKey and icons
+  // are untouched. If a key is ever missing we fall back to the English label.
+  const { t, dir, locale } = useTranslation();
+  const navLabel = useCallback(
+    (kind, label) => {
+      const key = `admin.nav.${kind}.${slugKey(label)}`;
+      const translated = t(key);
+      // The translator returns the key itself when missing — fall back to the
+      // raw English label so the sidebar never shows a dotted key.
+      return translated === key ? label : translated;
+    },
+    [t],
+  );
+
+  // ============================================================
   // VISIBLE MENU ITEMS
   // ============================================================
 
@@ -594,9 +627,9 @@ export default function Sidebar({ onNavigate, userData }) {
         <button
           type="button"
           onClick={() => setIsMobileOpen(true)}
-          aria-label="Open sidebar"
-          className="
-            fixed top-4 left-4 z-[60]
+          aria-label={t("admin.sidebar.open")}
+          className={`
+            fixed top-4 ${dir === "rtl" ? "right-4 left-auto" : "left-4 right-auto"} z-[60]
             flex h-10 w-10 items-center justify-center
             rounded-lg
             bg-[var(--bg-sidebar)]
@@ -605,7 +638,7 @@ export default function Sidebar({ onNavigate, userData }) {
             transition-all duration-300
             hover:bg-[var(--bg-sidebar-hover)]
             md:hidden
-          "
+          `}
         >
           <Menu size={20} />
         </button>
@@ -630,16 +663,18 @@ export default function Sidebar({ onNavigate, userData }) {
           SIDEBAR
       ====================================================== */}
       <aside
+        dir={dir}
+        lang={locale}
         className={`
-          fixed inset-y-0 left-0 z-50
+          fixed inset-y-0 ${dir === "rtl" ? "right-0 left-auto border-l border-r-0" : "left-0 right-auto border-r border-l-0"} z-50
           flex h-screen w-[280px] flex-col
-          border-r border-[var(--border-sidebar)]
+          border-[var(--border-sidebar)]
           bg-[var(--bg-sidebar)]
           text-[var(--text-sidebar)]
           transition-[width,transform] duration-300 ease-in-out
           md:relative md:translate-x-0
           ${iconOnly ? "md:w-[64px]" : "md:w-[var(--sidebar-width)]"}
-          ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
+          ${isMobileOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full"}
         `}
       >
         {/* ==================================================
@@ -672,7 +707,7 @@ export default function Sidebar({ onNavigate, userData }) {
                   {displayName}
                 </span>
                 <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
-                  Admin Panel
+                  {t("admin.sidebar.adminPanel")}
                 </span>
               </span>
             )}
@@ -682,7 +717,7 @@ export default function Sidebar({ onNavigate, userData }) {
           <button
             type="button"
             onClick={handleCloseMobile}
-            aria-label="Close sidebar"
+            aria-label={t("admin.sidebar.close")}
             className="
               shrink-0 rounded-md p-1
               text-[var(--text-sidebar-muted)]
@@ -699,8 +734,8 @@ export default function Sidebar({ onNavigate, userData }) {
           <button
             type="button"
             onClick={toggleCollapse}
-            aria-label={iconOnly ? "Expand sidebar" : "Collapse sidebar"}
-            title={iconOnly ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={iconOnly ? t("admin.sidebar.expand") : t("admin.sidebar.collapse")}
+            title={iconOnly ? t("admin.sidebar.expand") : t("admin.sidebar.collapse")}
             className="
               hidden h-7 w-7 shrink-0 items-center justify-center
               rounded-lg
@@ -719,7 +754,7 @@ export default function Sidebar({ onNavigate, userData }) {
             NAVIGATION
         ================================================== */}
         <nav
-          aria-label="Main navigation"
+          aria-label={t("admin.sidebar.navigation")}
           className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-2"}`}
         >
           {sidebarSections.map((section) => {
@@ -733,13 +768,13 @@ export default function Sidebar({ onNavigate, userData }) {
                     className="mx-auto my-2 h-px w-6 rounded-full"
                     style={{ backgroundColor: "var(--sidebar-divider)" }}
                   />
-                ) : (
+                ) : section.title !== "POS & CUSTOMER MANAGEMENT" ? (
                   <div className="px-2.5 pt-1.5 pb-1">
                     <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
-                      {section.title}
+                      {navLabel("section", section.title)}
                     </span>
                   </div>
-                )}
+                ) : null}
                 <div className="space-y-0.5">
                   {sectionItems.map((item) => {
                     const Icon = item.icon;
@@ -753,8 +788,8 @@ export default function Sidebar({ onNavigate, userData }) {
                         href={item.path}
                         onClick={handleCloseMobile}
                         aria-current={active ? "page" : undefined}
-                        title={iconOnly ? item.name : undefined}
-                        aria-label={iconOnly ? item.name : undefined}
+                        title={iconOnly ? navLabel("item", item.name) : undefined}
+                        aria-label={iconOnly ? navLabel("item", item.name) : undefined}
                         className={`
                           group relative flex h-9
                           items-center gap-2.5
@@ -784,7 +819,7 @@ export default function Sidebar({ onNavigate, userData }) {
                               : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"
                           }`}
                         />
-                        {!iconOnly && <span className="truncate">{item.name}</span>}
+                        {!iconOnly && <span className="truncate">{navLabel("item", item.name)}</span>}
                       </Link>
                     );
                   })}
@@ -804,8 +839,8 @@ export default function Sidebar({ onNavigate, userData }) {
             </p>
           ) : (
             <p className="text-center text-[10px] text-[var(--text-sidebar-muted)]">
-              Powered by{" "}
-              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> v1.0
+              {t("admin.sidebar.poweredBy")}{" "}
+              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> {t("admin.sidebar.version")}
             </p>
           )}
         </div>

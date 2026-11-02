@@ -1,10 +1,13 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 /* Shared discount modals — moved out of page.js (App Router pages cannot have named exports). */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { attributeApi } from "../../../../apis/admin/attributeApi";
 import { toNonNegative } from "./discountUtils";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedNameOf, localizedProductNameOf } from "@/i18n/localize";
 
 /* ==================== ICONS ==================== */
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -33,7 +36,7 @@ const CalendarIcon = ({ className = "w-4 h-4" }) => (<svg className={className} 
 const SettingsIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>);
 const PercentIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21a4 4 0 01-4-4V5a2 2 0 012-2h14a2 2 0 012 2v12a4 4 0 01-4 4H7z" /></svg>);
 const LayersIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l9 5-9 5-9-5 9-5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9 5 9-5" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 17l9 5 9-5" /></svg>);
-// ✅ Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
+// âœ… Rupee icon — "Fixed Amount / Fixed Price" wale discount type ke liye (badge look)
 const RupeeIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3h12M6 8h12M6 13h3m-3 0 8.5 8M9 13c6.667 0 6.667-10 0-10" /></svg>);
 
 const getId = (item) => {
@@ -42,14 +45,20 @@ const getId = (item) => {
   return String(item);
 };
 
-const getName = (item, type) => {
-  if (type === "product") return item?.name || item?.title || "Unnamed Product";
-  if (type === "category") return item?.name || item?.categoryName || "Unnamed Category";
-  if (type === "brand") return item?.name || item?.brandName || "Unnamed Brand";
-  return item?.name || "Unnamed";
+// Naam DB se aata hai â†’ `localized*Of` already translations map padhta hai.
+// Sirf missing-name fallback k liye `t` chahiye, isliye caller pass karta hai.
+const getName = (item, type, locale = "en", t = null) => {
+  const unnamed = (key) => (t ? t(key) : "");
+  if (type === "product") return localizedProductNameOf(item, locale) || item?.title || unnamed("admin.shared.label.product");
+  if (type === "category" || type === "brand") return localizedNameOf(item, locale) || item?.categoryName || item?.brandName || unnamed("admin.shared.label.name");
+  return localizedNameOf(item, locale) || unnamed("admin.shared.label.name");
 };
 
-const formatCurrency = (amount) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR' }).format(amount || 0);
+const formatCurrency = (amount) => {
+  const locale = typeof document === "undefined" ? "en" : document.querySelector(".contents[lang]")?.getAttribute("lang") || "en";
+  const intlLocale = locale === "ur" ? "ur-PK" : locale === "en" ? "en-PK" : locale;
+  return new Intl.NumberFormat(intlLocale, { style: 'currency', currency: 'PKR' }).format(amount || 0);
+};
 
 const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -100,13 +109,13 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
         <div className={`absolute z-[100] w-full overflow-y-auto rounded-md border shadow-xl max-h-64 ${dropUp ? "bottom-full mb-1" : "mt-1"}`}
              style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>No options available</div>
+            <div className="px-3 py-2 text-xs text-center" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.noOptionsAvailable")}</div>
           ) : (
             options.map((opt) => {
               const active = value === opt.value;
               const OptionIcon = opt.icon;
 
-              // ✅ Plain option (icon/description na ho) — purana simple row
+              // âœ… Plain option (icon/description na ho) — purana simple row
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
@@ -117,7 +126,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
                 );
               }
 
-              // ✅ Rich row — icon badge + title + example description + selected tick
+              // âœ… Rich row — icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
                   className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -193,12 +202,12 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     inputMode={nonNegative ? (integer ? "numeric" : "decimal") : undefined}
     onChange={(e) => {
       const next = nonNegative ? toNonNegative(e.target.value, integer) : e.target.value;
-      // ✅ Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
+      // âœ… Upper bound (e.g. percentage max 100) — typing/paste se hi clamp ho jata hai
       const clamped = max !== undefined && next !== "" && Number(next) > max ? String(max) : next;
       onChange(clamped);
     }}
     onKeyDown={nonNegative ? (e) => {
-      // ✅ "-", "+", "e", "E" type karne hi nahi dena (negative value block)
+      // âœ… "-", "+", "e", "E" type karne hi nahi dena (negative value block)
       if (["-", "+", "e", "E"].includes(e.key)) e.preventDefault();
     } : undefined}
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
@@ -221,6 +230,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
 );
 
 function Select({ value, onChange, options, inputStyle }) {
+  const { t } = useTranslation();
   return (
     <div className="relative">
       <select value={value} onChange={(e) => onChange(e.target.value)} className="appearance-none h-10 md:h-9 w-[170px] pl-3 pr-8 rounded-lg text-[16px] md:text-[13px] outline-none cursor-pointer" style={inputStyle}>
@@ -316,12 +326,17 @@ const getProductAttributes = (product) => {
 };
 
 /* ==================== FORM MODAL ==================== */
-const DISCOUNT_TYPE_LABELS = { all: "All Products Discount", product: "Product Discount", category: "Category Discount", brand: "Brand Discount" };
+const DISCOUNT_TYPE_LABELS = {
+  all: "admin.discounts.page.allProductsDiscount",
+  product: "admin.discounts.page.productDiscount",
+  category: "admin.discounts.page.categoryDiscount",
+  brand: "admin.discounts.page.brandDiscount",
+};
 const DISCOUNT_TYPE_SUBTITLES = {
-  all: "This discount will apply to all products in your store automatically.",
-  product: "Select specific products to apply this discount to.",
-  category: "Apply this discount to entire categories.",
-  brand: "Apply this discount to specific brands.",
+  all: "admin.discounts.detail.appliesToAll",
+  product: "admin.discounts.page.applySpecificProducts",
+  category: "admin.discounts.page.applyCategories",
+  brand: "admin.discounts.page.applyBrands",
 };
 const DISCOUNT_TYPE_ICONS = { all: GlobeIcon, product: BoxIcon, category: FolderIcon, brand: AwardIcon };
 
@@ -333,15 +348,16 @@ const TargetIconFor = (formType) => {
 };
 
 export function DiscountFormModal({ formType, formData, setFormData, formErrors, setFormErrors, editingDiscount, saveMutation, setShowModal, resetForm, setSelector, handleSubmit, inputStyle, products, categories, brands }) {
+  const { t, locale, dir } = useTranslation();
   const [viewingProduct, setViewingProduct] = useState(null);
 
-  const typeLabel = DISCOUNT_TYPE_LABELS[formType] || "Discount";
+  const typeLabel = t(DISCOUNT_TYPE_LABELS[formType] || "admin.discounts.page.discount");
   const TypeIcon = DISCOUNT_TYPE_ICONS[formType] || TagIcon;
 
   const selConfig = {
-    product: { key: "selected_ids", items: products, label: "Products", sub: "Select specific products to include in this discount" },
-    category: { key: "selected_ids", items: categories, label: "Categories", sub: "Apply this discount to entire categories" },
-    brand: { key: "selected_ids", items: brands, label: "Brands", sub: "Apply this discount to specific brands" },
+    product: { key: "selected_ids", items: products, label: t("admin.brands.detail.products"), sub: t("admin.discounts.page.applySpecificProducts") },
+    category: { key: "selected_ids", items: categories, label: t("admin.discounts.page.categories"), sub: t("admin.discounts.page.applyCategories") },
+    brand: { key: "selected_ids", items: brands, label: t("admin.brands.page.title"), sub: t("admin.discounts.page.applyBrands") },
   };
 
   const sel = formType !== "all" ? selConfig[formType] : null;
@@ -370,7 +386,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
+    <div dir={dir} lang={locale} className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4">
       <div
         className="w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
         style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}
@@ -389,7 +405,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                 {editingDiscount ? `Edit ${typeLabel}` : `Create ${typeLabel}`}
               </h3>
               <p className="text-[11px] sm:text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
-                {DISCOUNT_TYPE_SUBTITLES[formType]}
+                {t(DISCOUNT_TYPE_SUBTITLES[formType])}
               </p>
             </div>
           </div>
@@ -399,7 +415,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
             disabled={saveMutation.isPending}
             className="shrink-0 p-2 rounded-md transition hover:bg-red-500/10 hover:text-red-500"
             style={{ color: "var(--text-muted)" }}
-            title="Close"
+            title={t("admin.featuredProducts.ui.close")}
           >
             <CloseIcon className="w-5 h-5" />
           </button>
@@ -411,32 +427,32 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
             {/* BASIC INFORMATION */}
             <section>
-              <SectionHeader icon={InfoIcon} title="Basic Information" subtitle="Give your discount a clear identity" />
+              <SectionHeader icon={InfoIcon} title={t("admin.discounts.form.basicInfo")} subtitle={t("admin.discounts.form.basicInfoSubtitle")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="space-y-4">
-                  <FormField label="Discount Name" required fullWidth>
+                  <FormField label={t("admin.discounts.form.discountName")} required fullWidth>
                     <TextInput
                       value={formData.name}
                       onChange={(v) => setFormData({ ...formData, name: v })}
-                      placeholder="e.g., Summer Sale 2026"
+                      placeholder={t("admin.discounts.form.namePlaceholder")}
                       style={inputStyle}
                     />
                   </FormField>
-                  <FormField label="Discount Code" required hint="Enter a unique code, e.g., SUMMER20">
+                  <FormField label={t("admin.discounts.form.discountCode")} required hint={t("admin.discounts.form.codePlaceholder")}>
                     <TextInput
                       value={formData.code}
                       onChange={(v) => { setFormData({ ...formData, code: v }); setFormErrors(prev => ({ ...prev, code: undefined })); }}
-                      placeholder="e.g., SUMMER20"
+                      placeholder={t("admin.discounts.form.codePlaceholder")}
                       style={{ ...inputStyle, textTransform: "uppercase" }}
                       className={formErrors.code ? "ring-2 ring-red-500/50" : ""}
                     />
                     {formErrors.code && <p className="text-[11px] mt-1 text-red-400 font-medium">{formErrors.code}</p>}
                   </FormField>
-                  <FormField label="Description" fullWidth>
+                  <FormField label={t("common.description")} fullWidth>
                     <TextArea
                       value={formData.description}
                       onChange={(v) => setFormData({ ...formData, description: v })}
-                      placeholder="Add optional details customers will see for this discount..."
+                      placeholder={t("admin.discounts.form.descriptionPlaceholder")}
                       rows={3}
                       style={inputStyle}
                     />
@@ -450,15 +466,14 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
               <section>
                 <SectionHeader
                   icon={TargetIconFor(formType)}
-                  title={`Target Selection — ${sel.label}`}
+                  title={t("admin.discounts.form.targetSelectionFor", { type: sel.label })}
                   subtitle={sel.sub}
                   right={
                     formType === 'product' && ids.length > 0 ? (
                       <span
                         className="px-2.5 py-1 rounded-md text-[11px] font-bold border whitespace-nowrap"
                         style={{ backgroundColor: "var(--success-soft)", borderColor: "color-mix(in srgb, var(--success) 28%, transparent)", color: "var(--success-text)" }}
-                      >
-                        Total: {formatCurrency(totalSelectedValue)}
+                      >{t("admin.promotions.ui.generated.c948faf45197")}{" "}{formatCurrency(totalSelectedValue)}
                       </span>
                     ) : null
                   }
@@ -481,11 +496,11 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                       <div className="min-w-0">
                         <p className="text-[13px] font-semibold truncate">
                           {ids.length > 0
-                            ? `${ids.length} ${sel.label.toLowerCase()} selected`
-                            : `No ${sel.label.toLowerCase()} selected yet`}
+                            ? t("admin.discounts.form.selectedCount", { count: ids.length })
+                            : t("admin.discounts.form.noneSelected", { type: sel.label })}
                         </p>
                         <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
-                          {ids.length > 0 ? "Click below to manage the selection" : `Choose which ${sel.label.toLowerCase()} this discount applies to`}
+                          {ids.length > 0 ? t("admin.discounts.form.clickToManage") : t("admin.discounts.form.targetSelectionFor")}
                         </p>
                       </div>
                     </div>
@@ -495,8 +510,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                       className="shrink-0 h-9 px-3.5 rounded-md text-[12px] font-semibold flex items-center gap-1.5 transition hover:brightness-110"
                       style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
                     >
-                      <PlusIcon className="w-3.5 h-3.5" />
-                      Select {sel.label}
+                      <PlusIcon className="w-3.5 h-3.5" />{t("admin.promotions.ui.generated.81448fe27324")}{" "}{sel.label}
                     </button>
                   </div>
 
@@ -533,16 +547,16 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
                                   style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                                 >
-                                  {getInitials(getName(item, formType))}
+                                  {getInitials(getName(item, formType, locale, t))}
                                 </span>
-                                <p className="text-[13px] font-medium truncate">{getName(item, formType)}</p>
+                                <p className="text-[13px] font-medium truncate">{getName(item, formType, locale, t)}</p>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => removeSelectedItem(id)}
                                 className="shrink-0 p-1.5 rounded-md hover:bg-red-500/10 hover:text-red-500 transition"
                                 style={{ color: "var(--text-muted)" }}
-                                title="Remove"
+                                title={t("admin.discounts.form.remove")}
                               >
                                 <CloseIcon className="w-3.5 h-3.5" />
                               </button>
@@ -557,8 +571,8 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                           className="flex items-center justify-between gap-3 pt-2 mt-1 px-1 text-[11px]"
                           style={{ borderTop: "1px dashed var(--border-color)", color: "var(--text-muted)" }}
                         >
-                          <span>Selected Products: <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{selectedItemsDetails.length}</span></span>
-                          <span>Total Value: <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalSelectedValue)}</span></span>
+                          <span>{t("admin.discounts.form.selectedProducts")}{" "}<span className="font-semibold" style={{ color: "var(--text-primary)" }}>{selectedItemsDetails.length}</span></span>
+                          <span>{t("admin.discounts.form.totalValue")}{" "}<span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalSelectedValue)}</span></span>
                         </div>
                       )}
                     </div>
@@ -569,52 +583,52 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
             {/* DISCOUNT VALUE */}
             <section>
-              <SectionHeader icon={PercentIcon} title="Discount Value" subtitle="Configure how the discount is calculated" />
+              <SectionHeader icon={PercentIcon} title={t("admin.discounts.form.discountValueSection")} subtitle={t("admin.discounts.form.discountValueSubtitle")} />
               <div className="rounded-lg p-4 space-y-4" style={cardStyle}>
-                <FormField label="Discount Type" fullWidth>
+                <FormField label={t("admin.discounts.detail.discountType")} fullWidth>
                   <CustomModalSelect
                     value={formData.value_type}
                     onChange={(val) => setFormData({ ...formData, value_type: val })}
                     options={[
                       {
                         value: "percentage",
-                        label: "Percentage Discount (%)",
+                        label: t("admin.discounts.form.percentageType"),
                         icon: PercentIcon,
-                        description: "Example: 10% off on the order total",
+                        description: t("admin.promotions.ui.generated.eceafc961d8e"),
                       },
                       {
                         value: "fixed_amount",
-                        label: "Fixed Amount Discount (Rs.)",
+                        label: t("admin.discounts.form.fixedAmountType"),
                         icon: RupeeIcon,
-                        description: "Example: Rs. 1,000 off on the order total",
+                        description: t("admin.promotions.ui.generated.06a00e224c1e"),
                       },
                       {
                         value: "fixed_price",
-                        label: "Fixed Sale Price (Rs.)",
+                        label: t("admin.discounts.form.fixedPriceType"),
                         icon: TagIcon,
-                        description: "Example: Sell at a fixed price, e.g. Rs. 7,000",
+                        description: t("admin.promotions.ui.generated.4f00e83f4f20"),
                       },
                     ]}
-                    placeholder="Select discount type"
+                    placeholder={t("admin.discounts.form.selectDiscountType")}
                   />
                 </FormField>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {formData.value_type === "percentage" && (
-                    <FormField label="Discount Percentage (%)" fullWidth hint="Value must be between 0 and 100 (max 100)">
-                      <TextInput type="number" nonNegative max={100} value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 20" style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.discountPercentage")} fullWidth hint={t("admin.discounts.form.valueRangeHint")}>
+                      <TextInput type="number" nonNegative max={100} value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.percentagePlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_amount" && (
-                    <FormField label="Discount Amount (Rs.)" fullWidth hint="Negative values are not allowed (minimum 0)">
-                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 500" style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.discountAmount")} fullWidth hint={t("admin.discounts.form.negativeHint")}>
+                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.amountPlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
 
                   {formData.value_type === "fixed_price" && (
-                    <FormField label="Fixed Price (Rs.)" fullWidth hint="Negative values are not allowed (minimum 0)">
-                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder="e.g., 999" style={inputStyle} />
+                    <FormField label={t("admin.discounts.form.fixedPrice")} fullWidth hint={t("admin.discounts.form.negativeHint")}>
+                      <TextInput type="number" nonNegative value={formData.value} onChange={(v) => setFormData({ ...formData, value: v })} placeholder={t("admin.discounts.form.pricePlaceholder")} style={inputStyle} />
                     </FormField>
                   )}
                 </div>
@@ -625,20 +639,20 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
             <section>
               <SectionHeader 
                 icon={LayersIcon} 
-                title="Conditions & Limits" 
-                subtitle="Control when and how often the discount can be used" 
+                title={t("admin.discounts.form.conditionsLimits")} 
+                subtitle={t("admin.discounts.form.conditionsLimitsSubtitle")} 
               />
               <div className="rounded-lg p-5 space-y-5" style={cardStyle}>
                 
                 {/* Row 1: Min Order Amount & Min Quantity */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField label="Min Order Amount (Rs.)" hint="Leave empty for no minimum">
+                  <FormField label={t("admin.discounts.form.minOrderAmount")} hint={t("admin.discounts.form.minOrderHint")}>
                     <TextInput 
                       type="number" 
                       nonNegative
                       value={formData.min_order_amount} 
                       onChange={(v) => setFormData({ ...formData, min_order_amount: v })} 
-                      placeholder="e.g., 1000" 
+                      placeholder={t("admin.discounts.form.minOrderPlaceholder")} 
                       style={inputStyle} 
                     />
                   </FormField>
@@ -646,7 +660,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                   {/* Min Quantity with Checkbox Logic */}
                   <div>
                     <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide flex items-center justify-between" style={{ color: "var(--text-secondary)" }}>
-                      <span>Min Quantity</span>
+                      <span>{t("admin.discounts.form.minQuantity")}</span>
                       <span 
                         className="flex items-center gap-2 cursor-pointer select-none group" 
                         onClick={() => {
@@ -658,9 +672,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                           }));
                         }}
                       >
-                        <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">
-                          Enable Limit
-                        </span>
+                        <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">{t("admin.promotions.ui.generated.562d9326316b")}</span>
                         <div 
                           className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                             formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
@@ -678,7 +690,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                         integer
                         value={formData.min_quantity} 
                         onChange={(v) => setFormData({ ...formData, min_quantity: v })} 
-                        placeholder={formData.has_min_quantity ? "e.g., 2" : "Disabled"} 
+                        placeholder={formData.has_min_quantity ? t("admin.discounts.form.minQuantityPlaceholder") : t("admin.discounts.form.disabledPlaceholder")} 
                         disabled={!formData.has_min_quantity}
                         style={{
                           ...inputStyle,
@@ -688,9 +700,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                       />
                     </div>
                     {!formData.has_min_quantity && (
-                      <p className="text-[10px] mt-1.5 italic" style={{ color: "var(--text-muted)" }}>
-                        Discount applies regardless of quantity
-                      </p>
+                      <p className="text-[10px] mt-1.5 italic" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.form.quantityHint")}</p>
                     )}
                   </div>
                 </div>
@@ -700,25 +710,25 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
                 {/* Row 2: Usage Limits */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField label="Total Usage Limit" hint="Leave empty for unlimited uses">
+                  <FormField label={t("admin.discounts.form.totalUsageLimit")} hint={t("admin.discounts.form.unlimitedHint")}>
                     <TextInput 
                       type="number" 
                       nonNegative
                       integer
                       value={formData.usage_limit} 
                       onChange={(v) => setFormData({ ...formData, usage_limit: v })} 
-                      placeholder="Unlimited" 
+                      placeholder={t("admin.discounts.detail.unlimited")} 
                       style={inputStyle} 
                     />
                   </FormField>
-                  <FormField label="Per Customer Limit" hint="Leave empty for unlimited per user">
+                  <FormField label={t("admin.discounts.form.perCustomerLimit")} hint={t("admin.discounts.form.unlimitedHint")}>
                     <TextInput 
                       type="number" 
                       nonNegative
                       integer
                       value={formData.usage_per_customer} 
                       onChange={(v) => setFormData({ ...formData, usage_per_customer: v })} 
-                      placeholder="Unlimited" 
+                      placeholder={t("admin.discounts.detail.unlimited")} 
                       style={inputStyle} 
                     />
                   </FormField>
@@ -729,24 +739,24 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
             {/* SCHEDULE & STATUS */}
             <section>
-              <SectionHeader icon={CalendarIcon} title="Schedule & Status" subtitle="Control when the discount is live" />
+              <SectionHeader icon={CalendarIcon} title={t("admin.discounts.form.scheduleStatus")} subtitle={t("admin.discounts.form.scheduleStatusSubtitle")} />
               <div className="rounded-lg p-4" style={cardStyle}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Start Date">
+                  <FormField label={t("admin.discounts.form.startDate")}>
                     <TextInput type="datetime-local" value={formData.start_at} onChange={(v) => setFormData({ ...formData, start_at: v })} style={inputStyle} />
                   </FormField>
-                  <FormField label="End Date">
+                  <FormField label={t("admin.promotions.ui.generated.269c8b374312")}>
                     <TextInput type="datetime-local" value={formData.end_at} onChange={(v) => setFormData({ ...formData, end_at: v })} style={inputStyle} />
                   </FormField>
-                  <FormField label="Status" fullWidth>
+                  <FormField label={t("admin.brands.detail.productTableStatus")} fullWidth>
                     <CustomModalSelect
                       value={formData.status}
                       onChange={(val) => setFormData({ ...formData, status: val })}
                       options={[
-                        { value: "active", label: "Active" },
-                        { value: "disabled", label: "Inactive" },
+                        { value: "active", label: t("admin.banners.page.active") },
+                        { value: "disabled", label: t("common.inactive") },
                       ]}
-                      placeholder="Select Status"
+                      placeholder={t("admin.discounts.form.selectStatus")}
                     />
                   </FormField>
                 </div>
@@ -766,9 +776,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
             disabled={saveMutation.isPending}
             className="h-9 px-4 rounded-md text-[13px] font-semibold transition hover:opacity-80 disabled:opacity-50"
             style={{ backgroundColor: "transparent", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-          >
-            Cancel
-          </button>
+          >{t("admin.discounts.delete.cancel")}</button>
           <button
             type="submit"
             onClick={handleSubmit}
@@ -777,9 +785,9 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
           >
             {saveMutation.isPending ? (
-              <><Spinner className="w-4 h-4" /> Saving...</>
+              <><Spinner className="w-4 h-4" /> {t("admin.discounts.form.saving")}</>
             ) : (
-              editingDiscount ? "Update Discount" : "Create Discount"
+              editingDiscount ? t("admin.discounts.form.update") : t("admin.discounts.form.create")
             )}
           </button>
         </div>
@@ -798,16 +806,17 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
 
 /* ==================== SELECTION MODAL ==================== */
 export function SelectionModal({ type, items, selectedIds, onClose, onApply, inputStyle, cardStyle }) {
+  const { t, locale, dir } = useTranslation();
   const [search, setSearch] = useState("");
   const [draftIds, setDraftIds] = useState(selectedIds.map(id => String(id?._id || id)));
 
   const filtered = useMemo(() => {
     const term = search.toLowerCase().trim();
     if (!term) return items;
-    return items.filter((item) => getName(item, type).toLowerCase().includes(term));
-  }, [items, search, type]);
+    return items.filter((item) => getName(item, type, locale, t).toLowerCase().includes(term));
+  }, [items, search, type, locale]);
 
-  const title = type === "product" ? "Products" : type === "category" ? "Categories" : "Brands";
+  const title = type === "product" ? t("common.product") + "s" : type === "category" ? t("common.category") + "s" : t("common.brand") + "s";
   const TypeIcon = type === "product" ? BoxIcon : type === "category" ? FolderIcon : AwardIcon;
   const toggle = (id) => {
     const cleanId = String(id?._id || id);
@@ -825,7 +834,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
   }, [items, draftIds, type]);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div dir={dir} lang={locale} className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div
         className="w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden rounded-xl shadow-2xl"
         style={cardStyle}
@@ -843,10 +852,8 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               <TypeIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <h3 className="text-[15px] font-bold truncate">Select {title}</h3>
-              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
-                Multi-select {title.toLowerCase()} to include in this discount
-              </p>
+              <h3 className="text-[15px] font-bold truncate">{title}</h3>
+              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.563bf1031bfb")}{" "}{title.toLowerCase()}{" "}{t("admin.promotions.ui.generated.f936d324fc3a")}</p>
             </div>
           </div>
           <button
@@ -869,7 +876,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${title.toLowerCase()}...`}
+              placeholder={t("admin.discounts.page.search") + (type ? " (" + type + ")" : "")}
               className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
               style={inputStyle}
             />
@@ -880,7 +887,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
         <div className="flex-1 overflow-y-auto px-3 py-2 min-h-0">
           {filtered.length === 0 ? (
             <div className="py-10 text-center">
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>No {title.toLowerCase()} found</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.fd1286353570")}{" "}{title.toLowerCase()}{" "}{t("admin.promotions.ui.generated.2739bb260ce4")}</p>
             </div>
           ) : (
             <div className="space-y-1">
@@ -921,9 +928,9 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                     {type === "product" ? (
                       <>
                         {image ? (
-                          <img
+                          <FallbackImage
                             src={image}
-                            alt={getName(item, type)}
+                            alt={getName(item, type, locale, t)}
                             className="w-9 h-9 rounded-md object-cover shrink-0"
                             style={{ border: "1px solid var(--border-color)" }}
                             onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
@@ -938,14 +945,14 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                             border: "1px solid var(--border-color)",
                           }}
                         >
-                          {getInitials(getName(item, type))}
+                          {getInitials(getName(item, type, locale, t))}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p
                             className={`text-[13px] truncate ${selected ? "font-semibold" : "font-medium"}`}
                             style={{ color: selected ? "var(--accent)" : "var(--text-primary)" }}
                           >
-                            {getName(item, type)}
+                            {getName(item, type, locale, t)}
                           </p>
                           <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>
                             {formatCurrency(price)}
@@ -958,14 +965,14 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[10px] font-bold"
                           style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}
                         >
-                          {getInitials(getName(item, type))}
+                          {getInitials(getName(item, type, locale, t))}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p
                             className={`text-[13px] truncate ${selected ? "font-semibold" : "font-medium"}`}
                             style={{ color: selected ? "var(--accent)" : "var(--text-primary)" }}
                           >
-                            {getName(item, type)}
+                            {getName(item, type, locale, t)}
                           </p>
                         </div>
                       </>
@@ -984,9 +991,8 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
         >
           <div className="flex items-center gap-2">
             <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{draftIds.length}</span> selected
-              {type === "product" && draftIds.length > 0 && (
-                <> · <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalDraftValue)}</span></>
+              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{draftIds.length}</span>{" "}{t("admin.promotions.ui.generated.835f3b50e337")}{type === "product" && draftIds.length > 0 && (
+                <> Â· <span className="font-bold" style={{ color: "var(--success-text)" }}>{formatCurrency(totalDraftValue)}</span></>
               )}
             </span>
             {draftIds.length > 0 && (
@@ -995,9 +1001,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
                 onClick={clearAll}
                 className="text-[11px] font-semibold underline hover:opacity-80"
                 style={{ color: "var(--text-muted)" }}
-              >
-                Clear
-              </button>
+              >{t("admin.featuredProducts.modal.clear")}</button>
             )}
           </div>
           <div className="flex gap-2">
@@ -1006,17 +1010,13 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               onClick={onClose}
               className="h-9 px-3.5 rounded-md text-[12px] font-semibold transition hover:opacity-80"
               style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
-            >
-              Cancel
-            </button>
+            >{t("admin.discounts.delete.cancel")}</button>
             <button
               type="button"
               onClick={() => onApply(draftIds)}
               className="h-9 px-4 rounded-md text-[12px] font-bold transition hover:brightness-110"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
-            >
-              Apply Selection
-            </button>
+            >{t("admin.promotions.ui.generated.71c040c39bf4")}</button>
           </div>
         </div>
       </div>
@@ -1026,7 +1026,9 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
 
 /* ==================== SELECTED PRODUCT ROW ==================== */
 function SelectedProductRow({ product, price, image, onView, onRemove }) {
-  const name = getName(product, "product");
+  const { t } = useTranslation();
+  const { locale } = useTranslation();
+  const name = getName(product, "product", locale, t);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
 
   return (
@@ -1035,7 +1037,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
     >
       {image ? (
-        <img
+        <FallbackImage
           src={image}
           alt={name}
           className="w-11 h-11 rounded-md object-cover shrink-0"
@@ -1065,8 +1067,7 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
           </span>
           {variantCount > 1 && (
             <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-              · {variantCount} variants
-            </span>
+              Â· {variantCount}{" "}{t("admin.products.table.variantsUnit")}</span>
           )}
         </div>
       </div>
@@ -1081,18 +1082,18 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
             border: "1px solid var(--border-color)",
             color: "var(--accent)",
           }}
-          title="View attributes"
+          title={t("admin.promotions.ui.generated.5a300e039e9e")}
         >
           <InfoIcon className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">View Attributes</span>
-          <span className="sm:hidden">Details</span>
+          <span className="hidden sm:inline">{t("admin.promotions.ui.generated.5a300e039e9e")}</span>
+          <span className="sm:hidden">{t("admin.promotions.ui.generated.e9711657b066")}</span>
         </button>
         <button
           type="button"
           onClick={onRemove}
           className="h-8 w-8 rounded-md flex items-center justify-center transition hover:bg-red-500/10 hover:text-red-500"
           style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-muted)" }}
-          title="Remove"
+          title={t("admin.discounts.form.remove")}
         >
           <CloseIcon className="w-3.5 h-3.5" />
         </button>
@@ -1103,7 +1104,9 @@ function SelectedProductRow({ product, price, image, onView, onRemove }) {
 
 /* ==================== PRODUCT DETAILS MODAL ==================== */
 function ProductDetailsModal({ product, onClose }) {
-  const name = getName(product, "product");
+  const { t } = useTranslation();
+  const { locale } = useTranslation();
+  const name = getName(product, "product", locale, t);
   const price = getProductPrice(product);
   const image = getProductImage(product);
   const variantCount = Array.isArray(product?.variants) ? product.variants.length : 0;
@@ -1123,7 +1126,7 @@ function ProductDetailsModal({ product, onClose }) {
     const have = new Set(base.map((a) => String(a.name).toLowerCase()));
     const assigned = (categoryAttributes || [])
       .filter((a) => a && a.name && a.is_active !== false && !have.has(String(a.name).toLowerCase()))
-      .map((a) => ({ name: a.name, value: "Not set" }));
+      .map((a) => ({ name: a.name, value: t("admin.discounts.detail.notSet") }));
     return [...base, ...assigned];
   }, [product, categoryAttributes]);
 
@@ -1149,10 +1152,8 @@ function ProductDetailsModal({ product, onClose }) {
               <BoxIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <h3 className="text-[15px] font-bold truncate">Product Details</h3>
-              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
-                Attributes and pricing information
-              </p>
+              <h3 className="text-[15px] font-bold truncate">{t("admin.productDetail.page.productDetails")}</h3>
+              <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.2b40e560e581")}</p>
             </div>
           </div>
           <button
@@ -1160,7 +1161,7 @@ function ProductDetailsModal({ product, onClose }) {
             onClick={onClose}
             className="shrink-0 p-2 rounded-md transition hover:bg-red-500/10 hover:text-red-500"
             style={{ color: "var(--text-muted)" }}
-            title="Close"
+            title={t("admin.featuredProducts.ui.close")}
           >
             <CloseIcon className="w-5 h-5" />
           </button>
@@ -1170,7 +1171,7 @@ function ProductDetailsModal({ product, onClose }) {
         <div className="flex-1 overflow-y-auto p-5">
           <div className="flex items-center gap-4 mb-5">
             {image ? (
-              <img
+              <FallbackImage
                 src={image}
                 alt={name}
                 className="w-16 h-16 rounded-lg object-cover shrink-0"
@@ -1198,8 +1199,7 @@ function ProductDetailsModal({ product, onClose }) {
               </p>
               {variantCount > 0 && (
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  {variantCount} {variantCount === 1 ? "variant" : "variants"} available
-                </p>
+                  {variantCount} {variantCount === 1 ? "variant" : "variants"}{" "}{t("admin.promotions.ui.generated.7b231a50a498")}</p>
               )}
             </div>
           </div>
@@ -1212,7 +1212,7 @@ function ProductDetailsModal({ product, onClose }) {
               >
                 <TagIcon className="h-3.5 w-3.5" />
               </span>
-              <h4 className="text-[12px] font-bold uppercase tracking-wide">Attributes</h4>
+              <h4 className="text-[12px] font-bold uppercase tracking-wide">{t("admin.nav.item.attributes")}</h4>
               <span className="ml-auto text-[10px]" style={{ color: "var(--text-muted)" }}>
                 {attributes.length} {attributes.length === 1 ? "attribute" : "attributes"}
               </span>
@@ -1220,9 +1220,7 @@ function ProductDetailsModal({ product, onClose }) {
 
             {attributes.length === 0 ? (
               <div className="rounded-md py-6 text-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
-                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-                  No attributes available for this product
-                </p>
+                <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.0b712085b9b1")}</p>
               </div>
             ) : (
               <div
@@ -1260,9 +1258,7 @@ function ProductDetailsModal({ product, onClose }) {
             onClick={onClose}
             className="h-9 px-4 rounded-md text-[12px] font-bold transition hover:brightness-110"
             style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
-          >
-            Close
-          </button>
+          >{t("admin.featuredProducts.ui.close")}</button>
         </div>
       </div>
     </div>

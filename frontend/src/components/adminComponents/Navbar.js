@@ -1,5 +1,6 @@
 'use client';
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState, useEffect, useRef } from 'react';
 import {
   Menu, Sun, Moon, LogOut, User, ChevronDown
@@ -10,6 +11,8 @@ import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
 import { disconnectSidebarSocket } from "./Sidebar";
+import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 // ✅ GLOBAL singleton socket for navbar
 let navbarSocket = null;
@@ -31,10 +34,44 @@ function getNavbarSocket() {
 }
 
 const profileOptions = [
-  { name: "Profile Settings", icon: User, path: "/admin/profile?tab=general" },
+  { name: "admin.navbar.profile", icon: User, path: "/admin/profile?tab=general" },
 ];
 
+function UserAvatar({ src, name, className = "", style }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [src]);
+
+  const showAvatar = Boolean(src && !imageFailed);
+  const initial = name?.trim()?.charAt(0)?.toUpperCase() || "U";
+
+  return (
+    <span
+      aria-label={name}
+      className={`${className} inline-flex items-center justify-center overflow-hidden rounded-full ${
+        showAvatar ? "" : "font-bold text-white"
+      }`}
+      style={showAvatar ? style : {
+        ...style,
+        background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 58%, var(--bg-sidebar)))",
+      }}
+    >
+      {showAvatar ? (
+        <FallbackImage
+          key={src}
+          src={src}
+          alt={name}
+          onError={() => setImageFailed(true)}
+          className="h-full w-full rounded-full object-cover"
+        />
+      ) : (
+        <span aria-hidden="true">{initial}</span>
+      )}
+    </span>
+  );
+}
+
 export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
+  const { t, dir, locale } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
   const isDark = theme === 'dark';
@@ -116,12 +153,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
   const displayName = currentUser.name || "User";
   const displayEmail = currentUser.email || "";
   const userRole = currentUser.role || userData?.role || "";
-  const firstLetter = displayName?.charAt(0)?.toUpperCase() || "U";
   const isAdmin = userRole?.toLowerCase() === "admin";
-  
-  const avatarGradient = isAdmin
-    ? 'linear-gradient(135deg, var(--accent), var(--info))'
-    : 'linear-gradient(135deg, var(--accent), var(--success))';
 
   useEffect(() => {
     const handler = (e) => {
@@ -139,10 +171,10 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
     
     try {
       await adminHttp.post("/users/logout");
-      toast.success("Logged out successfully!");
+      toast.success(t("admin.navbar.logoutSuccess"));
     } catch (e) {
       console.error("Logout error:", e);
-      toast.error("Logout failed. Please try again.");
+      toast.error(t("admin.navbar.logoutFailed"));
     } finally {
       // ✅ Step 1: Dono sockets disconnect karo
       if (navbarSocket) {
@@ -174,7 +206,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         <button
           type="button"
           onClick={onMenuClick}
-          aria-label="Open menu"
+          aria-label={t("admin.navbar.openMenu")}
           className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-95 md:hidden"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--accent-soft)'}
@@ -191,8 +223,8 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         <button
           type="button"
           onClick={toggleTheme}
-          aria-label="Toggle theme"
-          title={isDark ? 'Light mode' : 'Dark mode'}
+          aria-label={t("admin.navbar.toggleTheme")}
+          title={isDark ? t("admin.navbar.lightMode") : t("admin.navbar.darkMode")}
           className="flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150 active:scale-95"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={(e) => {
@@ -206,6 +238,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
         >
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
+
+        {/* Language Switcher (admin-only, cookie based) */}
+        <AdminLanguageSwitcher />
 
         {/* Divider */}
         <div
@@ -233,31 +268,16 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                 e.currentTarget.style.backgroundColor = 'transparent';
             }}
           >
-            {/* Avatar — logged-in employee/admin ki apni picture, warna initial */}
-            {currentUser.avatar ? (
-              <img
-                src={currentUser.avatar}
-                alt={displayName}
-                className="h-7 w-7 shrink-0 rounded-full object-cover transition-shadow duration-200"
-                style={{
-                  boxShadow: isOpen || isProfileActive
-                    ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
-                    : '0 1px 3px rgba(0,0,0,0.2)',
-                }}
-              />
-            ) : (
-              <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white transition-shadow duration-200"
-                style={{
-                  background: avatarGradient,
-                  boxShadow: isOpen || isProfileActive
-                    ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
-                    : '0 1px 3px rgba(0,0,0,0.2)',
-                }}
-              >
-                {firstLetter}
-              </div>
-            )}
+            <UserAvatar
+              src={currentUser.avatar}
+              name={displayName}
+              className="h-7 w-7 shrink-0 rounded-full object-cover transition-shadow duration-200"
+              style={{
+                boxShadow: isOpen || isProfileActive
+                  ? `0 0 0 2px var(--accent-soft), 0 2px 8px var(--accent-soft)`
+                  : '0 1px 3px rgba(0,0,0,0.2)',
+              }}
+            />
 
             {/* ✅ Display Name — Sirf asli naam */}
             <div className="hidden sm:flex flex-col items-start leading-none">
@@ -286,7 +306,9 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
               <div className="fixed inset-0 z-40 sm:hidden" onClick={() => setIsOpen(false)} />
 
               <div
-                className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl"
+                dir={dir}
+                lang={locale}
+                className="absolute end-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border-card)',
@@ -300,26 +322,14 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                   style={{ borderBottom: '1px solid var(--border-color)' }}
                 >
                   <div className="flex items-center gap-3">
-                    {currentUser.avatar ? (
-                      <img
-                        src={currentUser.avatar}
-                        alt={displayName}
-                        className="h-10 w-10 shrink-0 rounded-full object-cover"
-                        style={{
-                          boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                        }}
-                      />
-                    ) : (
-                      <div
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-                        style={{
-                          background: avatarGradient,
-                          boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                        }}
-                      >
-                        {firstLetter}
-                      </div>
-                    )}
+                    <UserAvatar
+                      src={currentUser.avatar}
+                      name={displayName}
+                      className="h-10 w-10 shrink-0 rounded-full object-cover"
+                      style={{
+                        boxShadow: `0 2px 8px ${isAdmin ? 'rgba(139, 92, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                      }}
+                    />
                     <div className="min-w-0 flex-1">
                       <p
                         className="text-[13px] font-semibold truncate"
@@ -382,7 +392,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                           className="shrink-0"
                           style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }}
                         />
-                        {option.name}
+                        {t(option.name)}
                       </Link>
                     );
                   })}
@@ -408,7 +418,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
                     }}
                   >
                     <LogOut size={15} className="shrink-0" />
-                    Sign Out
+                    {t("admin.navbar.logout")}
                   </button>
                 </div>
               </div>

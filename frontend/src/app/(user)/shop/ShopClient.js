@@ -26,7 +26,8 @@ import AllDealsResults from "@/components/user/AllDealsResults";
 import AllCategoriesResults from "@/components/user/AllCategoriesResults";
 import SectionHeading from "@/components/user/SectionHeading";
 import { Store } from "lucide-react";
-import { useHomeCatalog } from "@/hooks/useHomeCatalog";
+import { useHomeCatalog } from "../../../hooks/user/useHomeCatalog";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* Mobile drawer: band ho to zero JS — sirf kholne par load. */
 const SidebarDrawer = dynamic(() => import("@/components/user/HomeSidebar"), {
@@ -159,6 +160,7 @@ function ShopParamsSync({
 }
 
 function ShopContent() {
+  const { dir } = useTranslation();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -474,16 +476,16 @@ function ShopContent() {
           </span>
         </SectionHeading>
 
-        <div className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+        <div dir={dir} className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
           {/* LEFT SIDEBAR — ghar wali look/data/options (same component) */}
           <HomeSidebar
             {...sidebarProps}
             scrollable
-            className="sticky top-[7.25rem] hidden w-56 shrink-0 rounded-l-none border-l-0 lg:block xl:w-60 2xl:w-64"
+            className={`sticky top-[7.25rem] hidden w-56 shrink-0 lg:block xl:w-60 2xl:w-64 ${dir === "rtl" ? "rounded-r-none border-r-0" : "rounded-l-none border-l-0"}`}
           />
 
           {/* MAIN COLUMN */}
-          <div className="w-full min-w-0 flex-1">
+          <div dir={dir} className="w-full min-w-0 flex-1">
             {/* MOBILE FILTER TRIGGER */}
             <div className="mb-4 flex items-center justify-between gap-3 lg:hidden">
               <button

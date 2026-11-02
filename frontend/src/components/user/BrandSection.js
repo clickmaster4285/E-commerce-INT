@@ -1,13 +1,18 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { brandApi } from "@/apis/user/brandApi";
 import { Package } from "lucide-react";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
 export default function BrandSection() {
+  const { t, dir } = useTranslation();
+  const { fieldOf } = useLocalized();
   // ✅ Real brands database se
   // ✅ Client-side slice for display only; endpoint has no server pagination ye
   const { data: brandsRaw = [], isLoading, isError } = useQuery({
@@ -27,12 +32,12 @@ export default function BrandSection() {
   };
 
   return (
-    <section className="px-3 lg:px-6 py-5 lg:py-12">
+    <section className="px-3 lg:px-6 py-5 lg:py-12" dir={dir}>
       <div className="user-shell mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">
           <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
-            Top Brands
+            {t("header.topBrands")}
           </h2>
         </div>
 
@@ -51,7 +56,7 @@ export default function BrandSection() {
         {/* ERROR */}
         {isError && (
           <div className="text-center py-8 text-[var(--user-text-muted)] text-sm">
-            Brands are unavailable right now.
+            {t("admin.brands.ui.loadFailed")}
           </div>
         )}
 
@@ -68,6 +73,7 @@ export default function BrandSection() {
                 {/* ✅ List 2x duplicate = seamless loop */}
                 {[...brands, ...brands].map((brand, i) => {
                   const logoUrl = getLogoUrl(brand.logo);
+                  const brandName = fieldOf(brand, "name") || brand.name;
 
                   return (
                     <Link
@@ -76,25 +82,13 @@ export default function BrandSection() {
                       className="mr-3 w-[8.75rem] sm:w-[10rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[8.125rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
                     >
                       {/* ✅ Logo (white circle) */}
-                      {logoUrl ? (
-                        <div className="w-14 h-14 rounded-full bg-[var(--user-text)] flex items-center justify-center p-2">
-                          <img
-                            src={logoUrl}
-                            alt={brand.name}
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-14 h-14 rounded-full bg-[var(--user-bg-hover)] border border-[var(--user-border)] flex items-center justify-center">
-                          <span className="text-2xl font-black text-[var(--user-accent)]">
-                            {brand.name?.charAt(0)}
-                          </span>
-                        </div>
-                      )}
+                      <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-2">
+                        <FallbackImage src={logoUrl} alt={brandName} className="max-h-full max-w-full object-contain" />
+                      </span>
 
                       {/* ✅ Brand name */}
                       <p className="text-xs text-[var(--user-text-muted)] text-center capitalize line-clamp-1 w-full">
-                        {brand.name}
+                        {brandName}
                       </p>
                     </Link>
                   );
@@ -108,7 +102,7 @@ export default function BrandSection() {
         {!isLoading && !isError && brands.length === 0 && (
           <div className="text-center py-8 text-[var(--user-text-subtle)] text-sm">
             <Package size={32} className="mx-auto mb-2 opacity-50" />
-            No brands available yet.
+            {t("admin.brands.page.noBrands")}
           </div>
         )}
       </div>

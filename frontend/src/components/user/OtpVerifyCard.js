@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck, RotateCw, ArrowLeft, AlertCircle, Clock } from "lucide-react";
 import OtpInput from "./OtpInput";
 import { getApiErrorMessage, getApiRetryAfter } from "@/apis/user/authApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /**
  * OtpVerifyCard — OTP verification UI (email verify + forgot password dono ke liye).
@@ -22,6 +23,7 @@ export default function OtpVerifyCard({
   resendAfterSeconds = 60,
   icon: Icon = ShieldCheck,
 }) {
+  const { t } = useTranslation();
   const [otp, setOtp] = useState("");
   const [formKey, setFormKey] = useState(0);
   const [error, setError] = useState("");
@@ -44,7 +46,7 @@ export default function OtpVerifyCard({
 
   const handleVerify = async () => {
     if (otp.length < 6) {
-      setError("Please enter the complete 6-digit code.");
+      setError(t("auth.otp.completeCode"));
       return;
     }
     setError("");
@@ -52,7 +54,7 @@ export default function OtpVerifyCard({
     try {
       await onVerify(otp);
     } catch (err) {
-      setError(getApiErrorMessage(err, "Verification failed. Please try again."));
+      setError(getApiErrorMessage(err, t("auth.otp.verifyFailed")));
     } finally {
       setVerifying(false);
     }
@@ -71,7 +73,7 @@ export default function OtpVerifyCard({
     } catch (err) {
       const retryAfter = getApiRetryAfter(err);
       if (retryAfter) setCooldown(retryAfter);
-      setError(getApiErrorMessage(err, "Could not resend the code. Please try again."));
+      setError(getApiErrorMessage(err, t("auth.otp.resendFailed")));
     } finally {
       setResending(false);
     }
@@ -83,12 +85,12 @@ export default function OtpVerifyCard({
         <div className="flex items-center gap-2 mb-3">
           <Icon size={16} className="text-[var(--user-accent)]" />
           <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
-            Verification
+            {t("auth.otp.verification")}
           </span>
         </div>
         <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">{title}</h2>
         <p className="text-[var(--user-text-muted)] text-sm">
-          {subtitle || "Enter the 6-digit code we sent to"}{" "}
+          {subtitle || t("auth.otp.sentSubtitle")}{" "}
           <span className="font-semibold text-[var(--user-text)]">{email}</span>
         </p>
       </div>
@@ -106,10 +108,10 @@ export default function OtpVerifyCard({
         <Clock size={13} className="text-[var(--user-accent)]" />
         {expiresLeft > 0 ? (
           <span className="text-[var(--user-text-muted)]">
-            Code expires in <span className="text-[var(--user-text)]">{mmss(expiresLeft)}</span>
+            {t("auth.otp.expiresIn")} <span className="text-[var(--user-text)]">{mmss(expiresLeft)}</span>
           </span>
         ) : (
-          <span className="text-[var(--user-danger)]">Code expired — please resend</span>
+          <span className="text-[var(--user-danger)]">{t("auth.otp.expired")}</span>
         )}
       </div>
 
@@ -127,7 +129,7 @@ export default function OtpVerifyCard({
         className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {verifying ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
-        {verifying ? "Verifying..." : submitLabel}
+        {verifying ? t("auth.otp.verifying") : submitLabel}
       </button>
 
       <div className="flex items-center justify-between gap-3 mt-4">
@@ -155,7 +157,7 @@ export default function OtpVerifyCard({
           ) : (
             <RotateCw size={13} />
           )}
-          {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+          {cooldown > 0 ? t("auth.otp.resendIn", { seconds: cooldown }) : t("auth.otp.resendCode")}
         </button>
       </div>
     </div>

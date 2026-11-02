@@ -1,12 +1,12 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Plus,
   Check,
-  Package,
   Layers,
   ChevronDown,
   Loader2,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useCart } from "./CartContext";
 import { productApi } from "@/apis/user/productApi";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -58,6 +59,7 @@ export function resolveBundleItems(bundle, products = []) {
 }
 
 export default function BundleCard({ bundle, className = "" }) {
+  const { fieldOf, productNameOf } = useLocalized();
   const [added, setAdded] = useState(false);
   const [showItems, setShowItems] = useState(false);
   const { addBundleToCart } = useCart();
@@ -89,7 +91,8 @@ export default function BundleCard({ bundle, className = "" }) {
     [bundle, products]
   );
 
-  const name = bundle?.name || "Bundle Deal";
+  const name = fieldOf(bundle, "name") || bundle?.name || "Bundle Deal";
+  const description = fieldOf(bundle, "description");
   const bundlePrice = Number(bundle?.bundlePrice) || 0;
 
   const originalPrice =
@@ -124,18 +127,12 @@ export default function BundleCard({ bundle, className = "" }) {
     >
       {/* ✅ SIRF bundle ki manual cover image — individual product images nahi */}
       <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
-        {image ? (
-          <img
-            src={image}
-            alt={name}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Package size={44} className="text-[var(--user-text-subtle)]" />
-          </div>
-        )}
+        <FallbackImage
+          src={image}
+          alt={name}
+          loading="lazy"
+          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+        />
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">
           <span className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[0.625rem] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
@@ -164,9 +161,9 @@ export default function BundleCard({ bundle, className = "" }) {
           {name}
         </h3>
 
-        {bundle?.description ? (
+        {description ? (
           <p className="mt-1 text-[0.6875rem] line-clamp-1 text-[var(--user-text-subtle)]">
-            {bundle.description}
+            {description}
           </p>
         ) : null}
 
@@ -198,7 +195,7 @@ export default function BundleCard({ bundle, className = "" }) {
                   <span className="text-[var(--user-accent)] font-bold">
                     {quantity}×
                   </span>
-                  <span className="truncate">{product.name}</span>
+                  <span className="truncate">{productNameOf(product)}</span>
                 </li>
               ))
             )}

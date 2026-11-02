@@ -1,5 +1,6 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -15,6 +16,8 @@ import {
 } from "@/utils/bundleCalculator";
 import ProductCard from "./ProductCard";
 import SectionHeading from "./SectionHeading";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -28,15 +31,15 @@ const getImageUrl = (img) => {
 const getProductImage = (p) =>
   getImageUrl(p?.variants?.[0]?.images?.[0]?.img_url || p?.image || p?.images?.[0]?.img_url);
 
-function getDealTypeLabel(type) {
+function getDealTypeLabel(type, t) {
   const labels = {
-    percentage: "Mega Sale",
-    fixed_amount: "Price Drop",
-    buy_x_get_y: "Buy & Get",
-    bundle: "Bundle Offer",
-    free_shipping: "Free Shipping",
+    percentage: t("deals.megaSale"),
+    fixed_amount: t("deals.priceDrop"),
+    buy_x_get_y: t("deals.buyGet"),
+    bundle: t("deals.bundleOffer"),
+    free_shipping: t("deals.freeShipping"),
   };
-  return labels[type] || "Hot Deal";
+  return labels[type] || t("deals.hotDeal");
 }
 
 function getDealConfig(type) {
@@ -50,18 +53,18 @@ function getDealConfig(type) {
   return configs[type] || { gradient: "from-orange-500 via-amber-500 to-red-600", hex: "#f97316" };
 }
 
-function getDealBadgeText(deal) {
+function getDealBadgeText(deal, t) {
   if (!deal?.type) return null;
-  if (deal.type === "percentage") return `${deal.discountValue}% OFF`;
-  if (deal.type === "fixed_amount") return `Rs. ${deal.discountValue} OFF`;
+  if (deal.type === "percentage") return t("deals.percentOff", { percent: deal.discountValue });
+  if (deal.type === "fixed_amount") return t("deals.amountOff", { amount: `Rs. ${deal.discountValue}` });
   if (deal.type === "buy_x_get_y") {
     const b = deal.buyQuantity || 0;
     const g = deal.getQuantity || 0;
-    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+    return b > 0 && g > 0 ? t("deals.buyQuantityGet", { buy: b, get: g }) : t("deals.buyXGetY");
   }
-  if (deal.type === "bundle") return "Bundle Deal";
-  if (deal.type === "free_shipping") return "Free Shipping";
-  return deal.type.replace(/_/g, " ").toUpperCase();
+  if (deal.type === "bundle") return t("deals.bundleDeal");
+  if (deal.type === "free_shipping") return t("deals.freeShipping");
+  return getDealTypeLabel(deal.type, t);
 }
 
 /* ✅ PERF: countdown sirf tab tick karta hai jab section viewport me ho.
@@ -168,6 +171,8 @@ export default function DealsSection({ embedded = false }) {
    DEAL ENGINE
 ===================================================== */
 function DealEngine({ deals }) {
+  const { locale, t } = useTranslation();
+  const { fieldOf } = useLocalized();
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef(null);
@@ -212,6 +217,8 @@ function DealEngine({ deals }) {
         })();
 
   const activeDeal = deals[current];
+  const activeDealName = fieldOf(activeDeal, "name");
+  const activeDealDescription = fieldOf(activeDeal, "description");
   const activeDealId = activeDeal?._id || activeDeal?.id || null;
 
   // ✅ Carousel deal ke products — server (12 tak, variants ke saath).
@@ -224,7 +231,7 @@ function DealEngine({ deals }) {
     retry: 1,
   });
   const cfg = getDealConfig(activeDeal.type);
-  const badgeText = activeDeal.type === "fixed_amount" ? null : getDealBadgeText(activeDeal);
+  const badgeText = activeDeal.type === "fixed_amount" ? null : getDealBadgeText(activeDeal, t);
   const sectionRef = useRef(null);
   const sectionVisible = useInViewport(sectionRef);
   const time = useCountdown(activeDeal.endDate, sectionVisible);
@@ -233,7 +240,8 @@ function DealEngine({ deals }) {
     [activeDealDetail],
   );
 
-  const endsLabel = new Date(activeDeal.endDate).toLocaleDateString("en-US", {
+  const dateLocale = locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale;
+  const endsLabel = new Date(activeDeal.endDate).toLocaleDateString(dateLocale, {
     day: "numeric",
     month: "short",
   });
@@ -270,7 +278,7 @@ function DealEngine({ deals }) {
         ? "high"
         : "normal";
   const tone = urgency === "critical" ? "#ef4444" : urgency === "high" ? "#f59e0b" : cfg.hex;
-  const typeLabel = getDealTypeLabel(activeDeal.type);
+  const typeLabel = getDealTypeLabel(activeDeal.type, t);
   const cubeLabel = activeDeal.type === "percentage" ? "%" : "Rs";
 
   // ✅ Image stage — deal image + products ki images (crisp, unique, max 6)
@@ -290,7 +298,7 @@ function DealEngine({ deals }) {
     <div ref={sectionRef} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       {/* Header — flat, solid */}
       <div className="deal-anim" style={dealAnim("dealFadeIn", 0, 0.5)}>
-        <SectionHeading title="Hot Deals" subtitle="Best offers · limited time">
+        <SectionHeading title={t("deals.hotDeals")} subtitle={t("deals.bestOffersLimited")}>
         <span
           className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-[var(--user-text-muted)]"
           style={{ color: cfg.hex }}
@@ -299,7 +307,7 @@ function DealEngine({ deals }) {
             className="deal-anim h-1.5 w-1.5 rounded-full"
             style={{ backgroundColor: cfg.hex, animation: "dealBlink 1.4s ease-in-out infinite" }}
           />
-          {deals.length} Live
+          {t("deals.liveCount", { count: deals.length })}
         </span>
         </SectionHeading>
       </div>
@@ -338,7 +346,7 @@ function DealEngine({ deals }) {
                 <PodiumStage
                   key={`stage-${activeDeal._id}`}
                   images={slides}
-                  name={activeDeal.name}
+                  name={activeDealName}
                   hex={cfg.hex}
                 />
               </div>
@@ -349,7 +357,7 @@ function DealEngine({ deals }) {
                   className="deal-anim text-[0.6875rem] font-bold uppercase tracking-[0.18em] text-white/80"
                   style={dealAnim("dealSlideLeft", 0.05)}
                 >
-                  {badgeText ? `Get ${badgeText}` : typeLabel} · Limited offer
+                  {badgeText ? t("deals.getOffer", { offer: badgeText }) : typeLabel} · {t("deals.limitedOffer")}
                 </p>
 
                 <h3
@@ -359,7 +367,7 @@ function DealEngine({ deals }) {
                     ...dealAnim("dealSlideLeft", 0.12, 0.7),
                   }}
                 >
-                  {activeDeal.name}
+                  {activeDealName}
                 </h3>
 
                 <span
@@ -373,8 +381,8 @@ function DealEngine({ deals }) {
                   className="deal-anim mt-2.5 text-xs text-white/65 line-clamp-1"
                   style={dealAnim("dealSlideLeft", 0.3)}
                 >
-                  {products.length > 0 ? `${products.length} products · ` : ""}Ends {endsLabel}
-                  {activeDeal.description ? ` · ${activeDeal.description}` : ""}
+                  {products.length > 0 ? `${products.length} · ` : ""}{endsLabel}
+                  {activeDealDescription ? ` · ${activeDealDescription}` : ""}
                 </p>
 
                 {/* Shop Now — inline color: `.user-theme a { color: inherit }` outranks Tailwind text-* on links */}
@@ -383,7 +391,7 @@ function DealEngine({ deals }) {
                   className="deal-anim group/cta mt-3 inline-flex items-center justify-center gap-2.5 rounded-full border-2 border-white/80 px-6 py-2 text-xs font-black uppercase tracking-wider transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/15 active:scale-95"
                   style={{ color: "#ffffff", ...dealAnim("dealSlideLeft", 0.38) }}
                 >
-                  Shop Now
+                  {t("deals.shopNow")}
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[#0a0a0a] transition-transform duration-300 group-hover/cta:translate-x-1">
                     <ArrowRight size={12} />
                   </span>
@@ -402,7 +410,7 @@ function DealEngine({ deals }) {
                         <span className="flex items-center gap-1.5 text-white/85">
                           <Clock size={13} style={{ color: tone }} />
                           <span className="text-[0.625rem] font-black uppercase tracking-[0.16em]">
-                            {urgency === "normal" ? "Deal ends in" : "Hurry — ends in"}
+                            {urgency === "normal" ? t("deals.endsIn") : t("deals.hurryEndsIn")}
                           </span>
                         </span>
                         <span className="flex items-center gap-1.5 text-[0.625rem] font-bold text-white/80">
@@ -410,15 +418,15 @@ function DealEngine({ deals }) {
                             className="deal-anim h-1.5 w-1.5 rounded-full"
                             style={{ backgroundColor: tone, animation: "dealBlink 1.4s ease-in-out infinite" }}
                           />
-                          {urgency === "critical" ? "Almost over" : urgency === "high" ? "Ends today" : "Sale live"}
+                          {urgency === "critical" ? t("deals.almostOver") : urgency === "high" ? t("deals.endsToday") : t("deals.saleLive")}
                         </span>
                       </div>
 
                       <div className="mt-2.5 grid grid-cols-4 gap-2">
-                        <CountBox v={time.d} l="Days" tone={urgency === "normal" ? null : tone} />
-                        <CountBox v={time.h} l="Hrs" tone={urgency === "normal" ? null : tone} />
-                        <CountBox v={time.m} l="Min" tone={urgency === "normal" ? null : tone} />
-                        <CountBox v={time.s} l="Sec" tone={urgency === "normal" ? null : tone} />
+                        <CountBox v={time.d} l={t("deals.days")} tone={urgency === "normal" ? null : tone} />
+                        <CountBox v={time.h} l={t("deals.hoursShort")} tone={urgency === "normal" ? null : tone} />
+                        <CountBox v={time.m} l={t("deals.minutesShort")} tone={urgency === "normal" ? null : tone} />
+                        <CountBox v={time.s} l={t("deals.secondsShort")} tone={urgency === "normal" ? null : tone} />
                       </div>
 
                       {timePct !== null && (
@@ -433,9 +441,9 @@ function DealEngine({ deals }) {
                           </div>
                           <div className="mt-1.5 flex items-center justify-between text-[0.625rem] font-semibold tabular-nums text-white/60">
                             <span>
-                              {time.d}d {time.h}h {time.m}m left
+                              {t("deals.timeLeft", { days: time.d, hours: time.h, minutes: time.m })}
                             </span>
-                            <span style={{ color: tone }}>{Math.round(timePct)}% done</span>
+                            <span style={{ color: tone }}>{t("deals.percentDone", { percent: Math.round(timePct) })}</span>
                           </div>
                         </>
                       )}
@@ -444,7 +452,7 @@ function DealEngine({ deals }) {
                       {totalStock > 0 && totalStock <= 15 && (
                         <div className="mt-2.5 flex items-center gap-2">
                           <span className="flex items-center gap-1 whitespace-nowrap rounded-full border border-amber-300/40 bg-amber-400/15 px-2 py-0.5 text-[0.625rem] font-black uppercase tracking-wider text-amber-200">
-                            <Flame size={11} /> Only {totalStock} left
+                            <Flame size={11} /> {t("deals.onlyLeft", { count: totalStock })}
                           </span>
                           <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
                             <div
@@ -460,7 +468,7 @@ function DealEngine({ deals }) {
                     </>
                   ) : (
                     <span className="inline-block rounded-full border border-white/25 bg-white/15 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">
-                      Deal Expired
+                      {t("deals.expired")}
                     </span>
                   )}
                 </div>
@@ -542,6 +550,7 @@ function DealEngine({ deals }) {
    is applied by the cart — the deal only kicks in once it is met.
 ===================================================== */
 export function BundleDealPanel({ deal, products, allProducts = [], variant = "dark" }) {
+  const { t } = useTranslation();
   const { addBundleToCart } = useCart();
   const [added, setAdded] = useState(false);
   const isLight = variant === "light";
@@ -630,10 +639,10 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
     <div className={theme.wrap}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className={`flex items-center gap-1.5 text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-wider ${theme.label}`}>
-          <Layers size={12} /> {items.length}-Product Combo
+          <Layers size={12} /> {t("deals.productCombo", { count: items.length })}
         </span>
         <span className={`text-[0.6875rem] sm:text-xs font-bold ${theme.price}`}>
-          Total value Rs. {totalValue.toLocaleString()}
+          {t("deals.totalValue", { amount: `Rs. ${totalValue.toLocaleString()}` })}
         </span>
       </div>
 
@@ -652,8 +661,7 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
           </span>
           {requiredQty > 0 && (
             <span className={`text-[0.625rem] sm:text-[0.6875rem] font-semibold ${theme.hint}`}>
-              Requires {requiredQty} {requiredQty === 1 ? "item" : "items"} — reward is
-              applied automatically in the cart.
+              {t("deals.requiresQuantity", { count: requiredQty })}
             </span>
           )}
         </div>
@@ -666,11 +674,11 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
           className={`inline-flex items-center justify-center gap-2 h-10 px-5 rounded-xl text-[0.6875rem] sm:text-xs font-black uppercase tracking-wider shadow-lg hover:scale-[1.03] active:scale-95 transition ${theme.cta}`}
         >
           <ShoppingCart size={15} />
-          {added ? "Added ✓" : `Add all ${items.length} products to cart`}
+          {added ? t("common.added") : t("deals.addAllToCart", { count: items.length })}
         </button>
 
         <p className={`text-[0.625rem] sm:text-[0.6875rem] font-semibold ${theme.hint}`}>
-          Add the combo, then increase the quantity to meet the offer condition.
+          {t("deals.comboCartHint")}
         </p>
       </div>
     </div>
@@ -748,7 +756,7 @@ function PodiumStage({ images, name, hex }) {
 
   const card = (src, size, key, delay) =>
     src ? (
-      <img
+      <FallbackImage
         key={`${key}-${src}`}
         src={src}
         alt={key === "c" ? name || "Deal product" : ""}
@@ -814,6 +822,7 @@ function PodiumStage({ images, name, hex }) {
 const MAX_DEAL_CARDS = 12;
 
 function ProductsRow({ products, deal, hex }) {
+  const { t } = useTranslation();
   const scrollRef = useRef(null);
   const [canScrollL, setCanScrollL] = useState(false);
   const [canScrollR, setCanScrollR] = useState(true);
@@ -851,13 +860,13 @@ function ProductsRow({ products, deal, hex }) {
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--user-bg-hover)]">
             <PackageOpen className="h-5 w-5 text-[var(--user-text-muted)]" />
           </span>
-          <p className="text-sm font-semibold text-[var(--user-text)]">Products coming soon</p>
+          <p className="text-sm font-semibold text-[var(--user-text)]">{t("deals.productsComingSoon")}</p>
         </div>
         <Link
           href="/shop?allDeals=1"
           className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--user-border)] px-5 py-2 text-sm font-medium text-[var(--user-text-secondary)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] sm:ml-auto sm:w-auto"
         >
-          Browse All Deals
+          {t("deals.browseAll")}
           <ArrowRight size={14} />
         </Link>
       </div>
@@ -870,9 +879,9 @@ function ProductsRow({ products, deal, hex }) {
   const bundleDealPrice = Number(deal?.type === "bundle" ? deal.bundlePrice : 0) || 0;
   const headerDealSummary =
     deal?.type === "fixed_amount" && fixedDealAmount > 0
-      ? `Deal total Rs. ${fixedDealAmount.toLocaleString()} OFF`
+      ? t("deals.amountOff", { amount: `Rs. ${fixedDealAmount.toLocaleString()}` })
       : deal?.type === "bundle" && bundleDealPrice > 0
-        ? `Bundle total Rs. ${bundleDealPrice.toLocaleString()}`
+        ? t("deals.bundleTotal", { amount: `Rs. ${bundleDealPrice.toLocaleString()}` })
         : null;
 
   return (
@@ -880,7 +889,7 @@ function ProductsRow({ products, deal, hex }) {
       <div className="mb-3 flex items-center justify-between gap-2">
         <h4 className="flex items-center gap-1.5 text-xs font-normal sm:text-sm" style={{ color: hex }}>
           <Package size={13} />
-          Products in this deal
+          {t("deals.productsInDeal")}
         </h4>
         <span className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {headerDealSummary ? (
@@ -889,7 +898,7 @@ function ProductsRow({ products, deal, hex }) {
             </span>
           ) : null}
           <span className="text-[0.625rem] font-normal sm:text-[0.6875rem]" style={{ color: `${hex}cc` }}>
-            {products.length} {products.length === 1 ? "item" : "items"}
+            {t("deals.itemCount", { count: products.length })}
           </span>
           {products.length > MAX_DEAL_CARDS ? (
             <Link
@@ -897,14 +906,14 @@ function ProductsRow({ products, deal, hex }) {
               className="inline-flex items-center gap-1 text-[0.625rem] font-normal transition-opacity hover:opacity-80 sm:text-[0.6875rem]"
               style={{ color: hex }}
             >
-              View all
+              {t("common.viewAll")}
               <ArrowRight size={12} />
             </Link>
           ) : null}
           {canScrollL ? (
             <button
               onClick={() => scroll("left")}
-              aria-label="Scroll left"
+              aria-label={t("common.scrollLeft")}
               className="hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] shadow-sm transition-colors hover:text-[var(--user-text)] sm:flex"
             >
               <ChevronLeft size={15} />
@@ -913,7 +922,7 @@ function ProductsRow({ products, deal, hex }) {
           {canScrollR ? (
             <button
               onClick={() => scroll("right")}
-              aria-label="Scroll right"
+              aria-label={t("common.scrollRight")}
               className="hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] shadow-sm transition-colors hover:text-[var(--user-text)] sm:flex"
             >
               <ChevronRight size={15} />

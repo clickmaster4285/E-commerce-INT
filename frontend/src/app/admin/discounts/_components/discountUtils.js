@@ -21,12 +21,12 @@ export const toNonNegative = (raw, integer = false) => {
 };
 
 // ✅ Numeric fields ka common validation — negative ya invalid value block hoti hai
-export const validateNonNegative = (entries) => {
+export const validateNonNegative = (entries, t) => {
   for (const [label, raw] of entries) {
     if (raw === "" || raw === null || raw === undefined) continue;
     const num = Number(raw);
-    if (!Number.isFinite(num)) return `${label} must be a valid number`;
-    if (num < 0) return `${label} cannot be less than 0`;
+    if (!Number.isFinite(num)) return t ? t("admin.discounts.utils.mustBeNumber", { field: label }) : `${label} must be a valid number`;
+    if (num < 0) return t ? t("admin.discounts.utils.cannotBeNegative", { field: label }) : `${label} cannot be less than 0`;
   }
   return "";
 };

@@ -7,6 +7,13 @@ const Employee = require("../models/Employee");
 const { getNextCategoryCode } = require("../utils/categoryCodeHelper");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { queueTranslationSync } = require("../utils/translationService");
+
+// Populated attribute ke saath `translations` zaroori — attribute ka `name`
+// translate hota hai aur options ke labels `values[].label_translations` me
+// hote hain. Inke bina frontend hamesha English fallback dikha raha hota.
+const ATTRIBUTE_POPULATE_SELECT =
+  "name code description data_type values variant_allowed is_active translations translation_source translation_status";
 
 // createdby/updatedby creator User ya Employee dono ho sakta hai.
 // Model ref Employee hai, isliye populate fail hone par User se resolve karo.
@@ -394,6 +401,9 @@ const createCategory = async (req, res) => {
       updatedby: null,
     });
 
+    // 🌍 Urdu + Arabic translation background me generate (response block nahi hota)
+    queueTranslationSync(Category, category._id);
+
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
@@ -426,8 +436,8 @@ const getCategories = async (req, res) => {
     // ✅ FIX: Fetch all categories globally
     const categories = await Category.find({ is_deleted: false })
       .select("-__v")
-      .populate("parent_category_id", "name category_code")
-      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
+      .populate("parent_category_id", "name category_code translations")
+      .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .sort({ sort_order: 1, created_at: -1 })
@@ -447,8 +457,8 @@ const getCategoryById = async (req, res) => {
       is_deleted: false,
     })
       .select("-__v")
-      .populate("parent_category_id", "name category_code")
-      .populate("attributes.attribute_id", "name code data_type values variant_allowed is_active")
+      .populate("parent_category_id", "name category_code translations")
+      .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();
@@ -548,20 +558,35 @@ const updateCategory = async (req, res) => {
     }
 
     // Check if there are any actual changes before setting updatedby
+    // ✅ FIX: Robust change detection that properly handles boolean fields like is_active
     const fieldsToCompare = Object.keys(updateData);
     const hasActualChanges = fieldsToCompare.some((key) => {
       const newVal = updateData[key];
       const oldVal = existingCategory[key];
+      
       // Handle array comparison for attributes
       if (Array.isArray(newVal) && Array.isArray(oldVal)) {
         return JSON.stringify(newVal) !== JSON.stringify(oldVal);
       }
-      if (newVal !== undefined && newVal !== null && oldVal !== undefined && oldVal !== null) {
-        return String(newVal) !== String(oldVal);
+      
+      // ✅ FIX: Handle boolean fields explicitly - critical for is_active changes
+      if (typeof newVal === "boolean" && typeof oldVal === "boolean") {
+        return newVal !== oldVal;
       }
-      // If new value is explicitly provided and different from old
+      
+      // Handle null/undefined edge cases
+      if (newVal === undefined && oldVal === undefined) return false;
+      if (newVal === null && oldVal === null) return false;
+      if (newVal === undefined && oldVal === null) return false;
+      if (newVal === null && oldVal === undefined) return false;
+      
+      // If new value is explicitly provided in request body, compare properly
       if (key in req.body) {
-        return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+        // For non-primitive values, use JSON stringify
+        if (typeof newVal === "object" || typeof oldVal === "object") {
+          return JSON.stringify(newVal) !== JSON.stringify(oldVal);
+        }
+        return String(newVal) !== String(oldVal);
       }
       return false;
     });
@@ -587,6 +612,9 @@ const updateCategory = async (req, res) => {
     if (!updatedCategory) {
       return res.status(404).json({ success: false, message: "Category not found" });
     }
+
+    // 🌍 English change → hash badla → translation dobara generate hogi
+    queueTranslationSync(Category, updatedCategory._id);
 
     emitSocketEvent("categoryUpdated", updatedCategory.toObject());
 

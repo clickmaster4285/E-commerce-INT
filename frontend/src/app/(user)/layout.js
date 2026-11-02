@@ -13,12 +13,14 @@ import { QuickBuyProvider } from "../../components/user/QuickBuyContext";
 import { storeApi } from "@/apis/user/storeApi";
 import { Home, ShoppingCart, User, Heart } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
-import { useUserSocketSync } from "@/hooks/useUserSocketSync";
+import { useUserSocketSync } from "../../hooks/user/useUserSocketSync";
 import { initThemeFromCookie } from "@/lib/theme";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
   const pathname = usePathname();
+  const { t } = useTranslation();
   const { count } = useCart();
   const { count: wishlistCount } = useWishlist();
 
@@ -35,7 +37,7 @@ function MobileNav() {
     >
       <div className="grid grid-cols-4 h-16">
         <Link href="/" className="h-full">
-          <NavItem icon={<Home size={20} />} label="Home" active={isActive("/")} />
+          <NavItem icon={<Home size={20} />} label={t("mobileNav.home")} active={isActive("/")} />
         </Link>
 
         <Link href="/wishlist" className="h-full">
@@ -50,7 +52,7 @@ function MobileNav() {
                 )}
               </span>
             }
-            label="Wishlist"
+            label={t("mobileNav.wishlist")}
             active={isActive("/wishlist")}
           />
         </Link>
@@ -67,13 +69,13 @@ function MobileNav() {
                 )}
               </span>
             }
-            label="Cart"
+            label={t("mobileNav.cart")}
             active={isActive("/cart")}
           />
         </Link>
 
         <Link href="/account" className="h-full">
-          <NavItem icon={<User size={20} />} label="Account" active={isActive("/account")} />
+          <NavItem icon={<User size={20} />} label={t("mobileNav.account")} active={isActive("/account")} />
         </Link>
       </div>
     </nav>
@@ -99,6 +101,7 @@ function NavItem({ icon, label, active }) {
 
 export default function UserLayout({ children }) {
   useUserSocketSync();
+  const { dir, locale } = useTranslation();
   const pathname = usePathname();
   const queryClient = useQueryClient();
 
@@ -139,6 +142,8 @@ export default function UserLayout({ children }) {
         <QuickBuyProvider>
         <div
           id="user-theme"
+          dir={dir}
+          lang={locale}
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
         >
           <Header />

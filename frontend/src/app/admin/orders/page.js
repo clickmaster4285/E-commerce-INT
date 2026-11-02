@@ -1,10 +1,15 @@
 "use client";
 
+import FallbackImage from "@/components/common/FallbackImage";
 import React, { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { orderApi } from "@/apis/admin/orderApi";
+import { shippingApi } from "@/apis/admin/shippingApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField, useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== ICONS ==================== */
 const SearchIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>);
@@ -29,16 +34,29 @@ const XCircleIcon = ({ className = "w-4 h-4" }) => (<svg className={className} f
 const BanknoteIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 7h20v10H2V7zm10 5a2 2 0 100-4 2 2 0 000 4zm-6 0h.01M18 12h.01" /></svg>);
 
 /* ==================== HELPERS ==================== */
-const formatDate = (d) => d ? new Date(d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale;
+const formatDate = (d, locale = "en") => d ? new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric" }).format(new Date(d)) : "—";
 
 // ✅ Product history me "KAB order hua" exact dekhna ho to time bhi chahiye
-const formatDateTime = (d) => d
-  ? new Date(d).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
+const formatDateTime = (d, locale = "en") => d
+  ? new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(d))
   : "—";
+const formatCurrency = (value, locale = "en") => new Intl.NumberFormat(locale === "en" ? "en-PK" : intlLocale(locale), { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(Number(value) || 0);
+const formatNumber = (value, locale = "en") => new Intl.NumberFormat(intlLocale(locale)).format(Number(value) || 0);
+const paymentMethodLabel = (method, t) => {
+  const labels = { cod: "cashOnDelivery", bank: "bankTransfer", card: "cardPayment" };
+  return labels[method] ? t(`admin.orders.detail.${labels[method]}`) : method || "—";
+};
+const shippingMethodLabel = (method, t, methods = [], locale = "en") => {
+  const labels = { standard: "standardShipping", express: "expressShipping" };
+  if (labels[method]) return t(`admin.orders.page.${labels[method]}`);
+  const custom = methods.find((entry) => entry.code === method || String(entry._id) === String(method));
+  return custom ? localizedStrictField(custom.name, custom.translations?.name, locale) : method ? String(method).replace(/_/g, " ") : t("common.notProvided");
+};
 
 // ✅ Line item product se match karta hai? (String compare — ObjectId vs string safe)
 const isProductMatch = (item, productId) =>
-  Boolean(productId) && item?.product_id != null && String(item.product_id) === String(productId);
+  Boolean(productId) && item?.product_id != null && String(item.product_id?._id || item.product_id) === String(productId);
 
 // ✅ Order items ko aise order karo ki filtered product pehle dikhe
 const orderItemsForDisplay = (order, productId) => {
@@ -99,7 +117,7 @@ function OrderItemImage({ item, size = 60 }) {
     );
   }
   return (
-    <img src={src} alt={item?.name || "Product"} loading="lazy" onError={() => setFailed(true)}
+    <FallbackImage src={src} alt={item?.name || "Product"} loading="lazy" onError={() => setFailed(true)}
       className="shrink-0 object-cover rounded-lg"
       style={{ width: `${size}px`, height: `${size}px`, border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }} />
   );
@@ -116,20 +134,20 @@ const orderDealCount = (order) => (order?.deal_ids || []).length;
 const orderBundleCount = (order) => (order?.bundle_ids || []).length;
 
 // Deal type → human-readable label (checkout/cart wali wording)
-function dealLabel(item) {
+function dealLabel(item, t) {
   const type = item?.deal_type || "";
   if (type === "buy_x_get_y") {
     const b = Number(item.deal_buy_quantity) || 0;
     const g = Number(item.deal_get_quantity) || 0;
-    return b > 0 && g > 0 ? `Buy ${b} Get ${g}` : "Buy X Get Y";
+    return b > 0 && g > 0 ? t("admin.orders.page.buyXGetY", { buy: b, get: g }) : t("admin.orders.page.buyXGetYGeneric");
   }
-  if (type === "free_shipping") return "Free Shipping";
-  if (type === "bundle") return item.deal_name || "Bundle Deal";
+  if (type === "free_shipping") return t("admin.orders.page.freeShipping");
+  if (type === "bundle") return item.deal_name || t("admin.orders.page.bundleDeal");
   return item.deal_name || item.discount_name || "";
 }
 
 // ✅ Sirf tab label do jab us line par waqai koi deal lagi ho
-const itemDealTag = (item) => (item?.deal_type ? dealLabel(item) : "");
+const itemDealTag = (item, t) => (item?.deal_type ? dealLabel(item, t) : "");
 
 function PromoTag({ children, tone = "warning" }) {
   const tones = {
@@ -164,33 +182,37 @@ function SkeletonRows({ rows = 6 }) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation();
   const item = ORDER_STATUS_CONFIG[status] || ORDER_STATUS_CONFIG.pending;
   return (
     <span className="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {status}
+      {t(`admin.orders.status.${status}`)}
     </span>
   );
 }
 
 function PaymentBadge({ status }) {
+  const { t } = useTranslation();
   const item = PAYMENT_STATUS_CONFIG[status] || PAYMENT_STATUS_CONFIG.pending;
   return (
     <span className="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide"
       style={{ backgroundColor: item.bg, color: item.color, border: `1px solid ${item.border}` }}>
-      {item.label}
+      {t(`admin.orders.status.${status === "paid" ? "paid" : status === "refunded" ? "refunded" : status === "failed" ? "failed" : "unpaid"}`)}
     </span>
   );
 }
 
 function FilterSelect({ value, onChange, options, width = 160 }) {
+  const { t } = useTranslation();
+  const filterKeys = { "All Status": "allStatuses", "All Payments": "allPayments", "All Shipping": "allShipping", "All Time": "allTime", Today: "today", Yesterday: "yesterday", "Last 7 days": "last7Days", "Last 30 days": "last30Days", Pending: "status.pending", Confirmed: "status.confirmed", Processing: "status.processing", Shipped: "status.shipped", Delivered: "status.delivered", Cancelled: "status.cancelled", Paid: "status.paid", Unpaid: "status.unpaid", Failed: "status.failed", Standard: "standardShipping", Express: "expressShipping" };
   return (
     <div className="relative">
-      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Filter orders"
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={t("admin.orders.page.filterOrders")}
         className="appearance-none h-9 pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer"
         style={{ width: `${width}px`, backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
         {options.map(([val, label]) => (
-          <option key={`${val}-${label}`} value={val}>{label}</option>
+          <option key={`${val}-${label}`} value={val}>{filterKeys[label]?.startsWith("status.") ? t(`admin.orders.${filterKeys[label]}`) : t(`admin.orders.page.${filterKeys[label] || label}`)}</option>
         ))}
       </select>
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
@@ -211,16 +233,19 @@ export default function OrdersPage() {
 }
 
 function OrdersFallback() {
+  const { t } = useTranslation();
   return (
     <div className="w-full min-h-screen flex items-center justify-center p-10">
       <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-muted)" }}>
-        <Spinner className="w-4 h-4" /> Loading orders...
+        <Spinner className="w-4 h-4" /> {t("admin.orders.page.loading")}
       </div>
     </div>
   );
 }
 
 function OrdersView() {
+  const { t, locale } = useTranslation();
+  const { productNameOf, contentOf } = useLocalized();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -248,8 +273,9 @@ function OrdersView() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
 
+  const ordersQueryKey = ["admin-orders", page, pageSize, statusFilter, search, paymentFilter, shippingFilter, dateRange, productId];
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["admin-orders", page, pageSize, statusFilter, search, paymentFilter, shippingFilter, dateRange, productId],
+    queryKey: ordersQueryKey,
     // ✅ Saare filters backend pe jaate hain — pagination aur counts sahi rehte hain
     queryFn: () => orderApi.getAll({
       page, limit: pageSize, status: statusFilter, search,
@@ -314,7 +340,7 @@ if (lastProductId !== productId) {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update order"),
+    onError: () => toast.error(t("admin.orders.toast.updateOrderFailed")),
   });
 
   const updatePaymentMutation = useMutation({
@@ -322,12 +348,19 @@ if (lastProductId !== productId) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success("Payment marked as received");
+      toast.success(t("admin.orders.toast.paymentReceived"));
     },
-    onError: (error) => toast.error(error.response?.data?.message || error.message || "Failed to update payment"),
+    onError: () => toast.error(t("admin.orders.toast.paymentFailed")),
   });
 
   const orders = useMemo(() => data?.data || [], [data]);
+  const { data: shippingMethods = [], isLoading: shippingMethodsLoading } = useQuery({ queryKey: ["adminShippingMethods"], queryFn: shippingApi.getMethods, retry: false });
+  usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient });
+  usePageTranslations({ model: "Order", records: orders, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const orderProducts = useMemo(() => orders.flatMap((order) => (order.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id)), [orders]);
+  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const orderVariants = useMemo(() => orders.flatMap((order) => (order.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id)), [orders]);
+  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
   const pagination = data?.pagination || {};
   const total = pagination.total || 0;
   const totalPages = pagination.totalPages || 1;
@@ -370,11 +403,11 @@ if (lastProductId !== productId) {
       await Promise.all(targets.map((id) => orderApi.updateStatus(id, { status })));
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success(`${targets.length} order${targets.length > 1 ? "s" : ""} marked as ${status}`);
+      toast.success(t("admin.orders.toast.bulkStatus", { count: formatNumber(targets.length, locale), status: t(`admin.orders.status.${status}`) }));
       setSelectedIds([]);
       setBulkCancelConfirm(false);
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || "Bulk update failed");
+      toast.error(t("admin.orders.toast.bulkUpdateFailed"));
     } finally {
       setBulkBusy(false);
     }
@@ -382,17 +415,17 @@ if (lastProductId !== productId) {
   const openCancelModal = (ids) => { setCancelIds(ids); setCancelReason(""); setBulkCancelConfirm(true); };
 
   const runCancelWithReason = async () => {
-    if (!cancelReason.trim()) return toast.error("Cancellation reason is required");
+    if (!cancelReason.trim()) return toast.error(t("admin.orders.toast.cancelRequired"));
     if (!cancelIds.length) return;
     setCancelBusy(true);
     try {
       await Promise.all(cancelIds.map((id) => orderApi.updateStatus(id, { status: "cancelled", cancel_reason: cancelReason.trim() })));
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
-      toast.success(`${cancelIds.length} order${cancelIds.length > 1 ? "s" : ""} cancelled`);
+      toast.success(t("admin.orders.toast.bulkCancelled", { count: formatNumber(cancelIds.length, locale) }));
       setSelectedIds([]); setBulkCancelConfirm(false); setCancelIds([]);
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message || "Bulk cancel failed");
+      toast.error(t("admin.orders.toast.bulkCancelFailed"));
     } finally { setCancelBusy(false); }
   };
   const handleSort = (key) => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
@@ -426,7 +459,7 @@ if (lastProductId !== productId) {
   if (productFilterActive) {
     activeFilters.push({
       key: "product",
-      label: `Product: ${productName || "Selected product"}`,
+      label: t("admin.orders.page.productFilter", { name: productName || t("admin.orders.page.selectedProduct") }),
       clear: clearProductFilter,
     });
   }
@@ -434,7 +467,7 @@ if (lastProductId !== productId) {
   if (statusFilter !== "all") activeFilters.push({ key: "status", label: `Status: ${statusFilter}`, clear: () => { setStatusFilter("all"); setPage(1); } });
   if (paymentFilter !== "all") activeFilters.push({ key: "payment", label: `Payment: ${PAYMENT_STATUS_CONFIG[paymentFilter]?.label || paymentFilter}`, clear: () => { setPaymentFilter("all"); setPage(1); } });
   if (shippingFilter !== "all") activeFilters.push({ key: "shipping", label: `Shipping: ${shippingFilter}`, clear: () => { setShippingFilter("all"); setPage(1); } });
-  if (dateRange !== "all") activeFilters.push({ key: "date", label: `Date: ${({ today: "Today", yesterday: "Yesterday", "7d": "Last 7 days", "30d": "Last 30 days" })[dateRange]}`, clear: () => { setDateRange("all"); setPage(1); } });
+  if (dateRange !== "all") activeFilters.push({ key: "date", label: t("admin.orders.page.dateFilter", { date: t(`admin.orders.page.${({ today: "today", yesterday: "yesterday", "7d": "last7Days", "30d": "last30Days" })[dateRange]}`) }), clear: () => { setDateRange("all"); setPage(1); } });
   const clearAllFilters = () => {
     setSearchInput(""); setSearch("");
     setStatusFilter("all"); setPaymentFilter("all");
@@ -444,11 +477,11 @@ if (lastProductId !== productId) {
   };
 
   const statCards = [
-    { title: "Total Orders", value: allCount?.pagination?.total ?? "—", valueClass: "" },
-    { title: "Pending", value: pendingCount?.pagination?.total ?? "—", valueClass: "text-amber-400" },
-    { title: "Shipped", value: shippedCount?.pagination?.total ?? "—", valueClass: "text-indigo-400" },
-    { title: "Delivered", value: deliveredCount?.pagination?.total ?? "—", valueClass: "text-emerald-400" },
-    { title: "Cancelled", value: cancelledCount?.pagination?.total ?? "—", valueClass: "text-red-400" },
+    { title: t("admin.orders.page.totalOrders"), value: allCount?.pagination?.total ?? "—", valueClass: "" },
+    { title: t("admin.orders.status.pending"), value: pendingCount?.pagination?.total ?? "—", valueClass: "text-amber-400" },
+    { title: t("admin.orders.status.shipped"), value: shippedCount?.pagination?.total ?? "—", valueClass: "text-indigo-400" },
+    { title: t("admin.orders.status.delivered"), value: deliveredCount?.pagination?.total ?? "—", valueClass: "text-emerald-400" },
+    { title: t("admin.orders.status.cancelled"), value: cancelledCount?.pagination?.total ?? "—", valueClass: "text-red-400" },
   ];
 
   const openDetailPage = (order) => router.push(`/admin/orders/${order._id}`);
@@ -456,21 +489,21 @@ if (lastProductId !== productId) {
   return (
     <div className="w-full min-h-screen" style={{ color: "var(--text-primary)" }}>
       <div aria-live="polite" className="sr-only">
-        {selectedIds.length > 0 ? `${selectedIds.length} orders selected` : ""}
-        {updateStatusMutation.isSuccess ? "Order status updated" : ""}
+        {selectedIds.length > 0 ? t("admin.orders.page.selectedCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(selectedIds.length) }) : ""}
+        {updateStatusMutation.isSuccess ? t("admin.orders.page.retryStatus") : ""}
       </div>
 
       <div className="w-full space-y-4 sm:space-y-5 p-3 sm:p-4 md:p-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-[22px] sm:text-[24px] leading-7 font-bold tracking-tight">Order Management</h1>
-            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>Track, verify, and fulfil customer orders</p>
+            <h1 className="text-[22px] sm:text-[24px] leading-7 font-bold tracking-tight">{t("admin.orders.page.title")}</h1>
+            <p className="text-[13px] mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {isError && (
               <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 transition hover:opacity-90"
                 style={{ backgroundColor: "var(--danger, var(--danger))", color: "#fff" }}>
-                Retry Loading
+                {t("admin.orders.page.retryLoading")}
               </button>
             )}
           </div>
@@ -506,15 +539,15 @@ if (lastProductId !== productId) {
             </span>
             <input 
               type="text" 
-              placeholder="Search order #, customer name or phone..." 
+              placeholder={t("admin.orders.page.searchPlaceholder")}
               value={searchInput} 
               onChange={(e) => handleSearchInput(e.target.value)} 
-              aria-label="Search orders"
+              aria-label={t("admin.orders.page.search")}
               className="w-full h-9 pl-9 pr-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-emerald-500/40 motion-reduce:transition-none"
               style={inputStyle} 
             />
             {searchInput && (
-              <button onClick={() => handleSearchInput("")} aria-label="Clear search" className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
+              <button onClick={() => handleSearchInput("")} aria-label={t("admin.orders.page.clearSearch")} className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-70 p-1"
                 style={{ color: "var(--text-muted)" }}>
                 <CloseIcon className="w-4 h-4" />
               </button>
@@ -541,11 +574,11 @@ if (lastProductId !== productId) {
               <span key={f.key || f.label} className="inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-[11px] font-medium"
                 style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)", color: "var(--success-text)" }}>
                 {f.label}
-                <button onClick={f.clear} aria-label={`Remove filter ${f.label}`} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
+                <button onClick={f.clear} aria-label={t("admin.orders.page.removeFilter", { label: f.label })} className="hover:opacity-70 p-0.5"><XIcon className="w-3 h-3" /></button>
               </span>
             ))}
             <button onClick={clearAllFilters} className="text-[11px] font-semibold underline underline-offset-2 hover:opacity-80 px-2 py-1"
-              style={{ color: "var(--text-muted)" }}>Clear all</button>
+              style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.clearAll")}</button>
           </div>
         )}
 
@@ -553,27 +586,27 @@ if (lastProductId !== productId) {
         {selectedIds.length > 0 && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-lg px-3 sm:px-4 py-3 sm:py-2.5"
             style={{ backgroundColor: "var(--success-soft)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" }}>
-            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{selectedIds.length} order{selectedIds.length > 1 ? "s" : ""} selected</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--success-text)" }}>{t("admin.orders.page.selectedCount", { count: formatNumber(selectedIds.length, locale) })}</p>
             <div className="flex flex-wrap items-center gap-2">
               <button onClick={() => runBulkStatus("confirmed")} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                {bulkBusy ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />} Confirm
+                {bulkBusy ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />} {t("admin.orders.page.confirm")}
               </button>
               <button onClick={() => runBulkStatus("shipped")} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                <TruckIcon className="w-3.5 h-3.5" /> Shipped
+                <TruckIcon className="w-3.5 h-3.5" /> {t("admin.orders.status.shipped")}
               </button>
               <button onClick={() => openCancelModal(selectedIds)} disabled={bulkBusy}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-semibold text-white flex items-center gap-1.5 transition hover:opacity-90 disabled:opacity-50 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                <BanIcon className="w-3.5 h-3.5" /> Cancel
+                <BanIcon className="w-3.5 h-3.5" /> {t("common.cancel")}
               </button>
               <button onClick={() => setSelectedIds([])}
                 className="h-11 sm:h-8 px-3 rounded-md text-xs font-medium transition hover:opacity-80 flex-1 sm:flex-none justify-center"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>
-                Clear
+                {t("admin.orders.page.clearAll")}
               </button>
             </div>
           </div>
@@ -583,16 +616,16 @@ if (lastProductId !== productId) {
         {isLoading ? (
           <div className="rounded-lg overflow-hidden" style={cardStyle}>
             <div className="px-6 py-4 flex items-center gap-2" style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-              <Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading orders...</span>
+              <Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.loading")}</span>
             </div>
             <table className="w-full text-[13px]"><SkeletonRows rows={6} /></table>
           </div>
         ) : isError ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
             <AlertIcon className="w-8 h-8 opacity-60" />
-            <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>Failed to load orders. Please check your connection.</p>
+            <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.loadFailed")}</p>
             <button onClick={() => refetch()} className="h-10 sm:h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90"
-              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>Retry</button>
+              style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>{t("admin.orders.page.retry")}</button>
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-2" style={cardStyle}>
@@ -600,16 +633,16 @@ if (lastProductId !== productId) {
             {/* ✅ Product filter active hai + koi order nahi -> specific message */}
             <p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>
               {productFilterActive
-                ? "No orders found for this product."
+                ? t("admin.orders.page.noProductOrders")
                 : activeFilters.length > 0
-                  ? "No orders match your filters"
-                  : "No orders yet"}
+                  ? t("admin.orders.page.noMatchingOrders")
+                  : t("admin.orders.page.noOrders")}
             </p>
             {productFilterActive && (
               <button onClick={clearProductFilter}
                 className="mt-2 px-4 h-9 rounded-lg text-[13px] font-semibold transition hover:opacity-90"
                 style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
-                Show all orders
+                {t("admin.orders.page.showAllOrders")}
               </button>
             )}
           </div>
@@ -627,15 +660,15 @@ if (lastProductId !== productId) {
                   <tr>
                 
                     <th className="w-[36px] px-1 py-3" />
-                    <SortHeader label="Order #" sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="12%" />
-                    <SortHeader label="Customer" sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="16%" />
+                    <SortHeader label={t("admin.orders.page.orderNumber")} sortKey="order_number" sortConfig={sortConfig} onSort={handleSort} width="12%" />
+                    <SortHeader label={t("admin.orders.page.customer")} sortKey="customer" sortConfig={sortConfig} onSort={handleSort} width="16%" />
                     <th className="px-3 py-4 text-left text-[12px] font-semibold uppercase tracking-wider hidden md:table-cell"
-                      style={{ color: "var(--text-muted)", width: "28%" }}>Products</th>
-                    <SortHeader label="Total" sortKey="total" sortConfig={sortConfig} onSort={handleSort} align="right" width="12%" />
+                      style={{ color: "var(--text-muted)", width: "28%" }}>{t("admin.orders.page.products")}</th>
+                    <SortHeader label={t("admin.orders.page.total")} sortKey="total" sortConfig={sortConfig} onSort={handleSort} align="right" width="12%" />
                     <th className="px-3 py-4 text-center text-[12px] font-semibold uppercase tracking-wider hidden lg:table-cell"
-                      style={{ color: "var(--text-muted)", width: "9%" }}>Payment</th>
-                    <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} align="center" width="11%" />
-                    <SortHeader label="Date" sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} hidden width="9%" />
+                      style={{ color: "var(--text-muted)", width: "9%" }}>{t("admin.orders.page.payment")}</th>
+                    <SortHeader label={t("admin.orders.page.status")} sortKey="status" sortConfig={sortConfig} onSort={handleSort} align="center" width="11%" />
+                    <SortHeader label={t("admin.orders.page.date")} sortKey="created_at" sortConfig={sortConfig} onSort={handleSort} hidden width="9%" />
                     <th className="w-[80px] px-3 py-4 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap rounded-tr-lg"
                       style={{ color: "var(--text-secondary)" }}></th>
                   </tr>
@@ -661,7 +694,7 @@ if (lastProductId !== productId) {
                           <td className="px-1 py-2.5 align-middle text-center" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => setExpandedRows((prev) => isExpanded ? prev.filter((x) => x !== order._id) : [...prev, order._id])}
-                              aria-label={isExpanded ? "Collapse items preview" : "Expand items preview"}
+                              aria-label={t(isExpanded ? "admin.orders.page.collapsePreview" : "admin.orders.page.expandPreview")}
                               aria-expanded={isExpanded}
                               className="p-1 rounded-md hover:bg-white/5 transition motion-reduce:transition-none"
                               style={{ color: "var(--text-muted)" }}>
@@ -702,43 +735,43 @@ if (lastProductId !== productId) {
                                     boxShadow: "inset 2px 0 0 var(--accent)",
                                   } : undefined}>
                                   <OrderItemImage item={item} size={22} />
-                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{item.name}</span>
+                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{productNameOf(item.product_id) || item.name}</span>
                                   <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: isMatch ? "var(--accent)" : "var(--text-secondary)" }}>
                                     ×{item.qty}
                                   </span>
-                                  {itemDealTag(item) && (
-                                    <span className="shrink-0"><PromoTag tone="warning">{itemDealTag(item)}</PromoTag></span>
+                                  {itemDealTag(item, t) && (
+                                    <span className="shrink-0"><PromoTag tone="warning">{itemDealTag(item, t)}</PromoTag></span>
                                   )}
                                   {Number(item.free_items) > 0 && (
-                                    <span className="shrink-0 hidden xl:inline-block"><PromoTag tone="success">+{item.free_items} free</PromoTag></span>
+                                  <span className="shrink-0 hidden xl:inline-block"><PromoTag tone="success">{t("admin.orders.page.freeCount", { count: formatNumber(item.free_items, locale) })}</PromoTag></span>
                                   )}
                                   {item.bundle_name && (
-                                    <span className="shrink-0"><PromoTag tone="info">Combo</PromoTag></span>
+                                <span className="shrink-0"><PromoTag tone="info">{t("admin.orders.page.combo")}</PromoTag></span>
                                   )}
                                 </div>
                                 );
                               })}
                               {orderItemsForDisplay(order, productId).length > 2 && (
                                 <p className="text-[10px] pl-[29px]" style={{ color: "var(--text-muted)" }}>
-                                  +{orderItemsForDisplay(order, productId).length - 2} more item{orderItemsForDisplay(order, productId).length - 2 === 1 ? "" : "s"}
+                                  {t("admin.orders.page.moreItems", { count: formatNumber(orderItemsForDisplay(order, productId).length - 2, locale), item: t("admin.orders.page.item") })}
                                 </p>
                               )}
                               <p className="text-[10px] pl-[29px]" style={{ color: "var(--text-muted)" }}>
-                                {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"} · {orderPaidUnits(order)} unit{orderPaidUnits(order) === 1 ? "" : "s"}
-                                {orderFreeUnits(order) > 0 ? ` (+${orderFreeUnits(order)} free)` : ""}
+                                {t("admin.orders.page.itemsAndUnits", { items: formatNumber(orderItemRows(order), locale), units: formatNumber(orderPaidUnits(order), locale) })}
+                                {orderFreeUnits(order) > 0 ? ` (+${t("admin.orders.page.freeCount", { count: formatNumber(orderFreeUnits(order), locale) })})` : ""}
                               </p>
                             </div>
                           </td>
                           <td className="px-4 py-2.5 align-middle text-right box-border">
-                            <p className="font-bold whitespace-nowrap">Rs. {order.total?.toLocaleString()}</p>
+                            <p className="font-bold whitespace-nowrap">{formatCurrency(order.total, locale)}</p>
                             {orderFreeUnits(order) > 0 && (
                               <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--success-text)" }}>
-                                +{orderFreeUnits(order)} free
+                                {t("admin.orders.page.freeCount", { count: formatNumber(orderFreeUnits(order), locale) })}
                               </p>
                             )}
                             {(order.items || []).some((it) => it.savings > 0) && (
                               <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
-                                saved Rs. {(order.items || []).reduce((s, it) => s + Number(it.savings || 0), 0).toLocaleString()}
+                                {t("admin.orders.page.savedAmount", { amount: formatCurrency((order.items || []).reduce((s, it) => s + Number(it.savings || 0), 0), locale) })}
                               </p>
                             )}
                           </td>
@@ -746,22 +779,22 @@ if (lastProductId !== productId) {
                             <div className="inline-flex flex-col items-center gap-1">
                               <PaymentBadge status={payStatus} />
                               <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                                {order.payment?.method || "—"}
+                                {paymentMethodLabel(order.payment?.method, t)}
                               </span>
                             </div>
                           </td>
                           <td className="px-3 py-2.5 align-middle text-center box-border"><StatusBadge status={order.status} /></td>
                           <td className="px-4 py-2.5 align-middle text-[13px] whitespace-nowrap hidden lg:table-cell box-border"
                             style={{ color: "var(--text-muted)" }}
-                            title={formatDateTime(order.created_at)}>
+                            title={formatDateTime(order.created_at, locale)}>
                             {/* ✅ Product history me exact time chahiye — date + time dikhao */}
-                            {productFilterActive ? formatDateTime(order.created_at) : formatDate(order.created_at)}
+                            {productFilterActive ? formatDateTime(order.created_at, locale) : formatDate(order.created_at, locale)}
                           </td>
                           <td className="px-3 py-2.5 align-middle whitespace-nowrap text-right relative box-border" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end items-center">
                               <button
                                 onClick={() => setActionMenuFor(actionMenuFor === order._id ? null : order._id)}
-                                aria-label={`Actions for order ${order.order_number}`}
+                                aria-label={t("admin.orders.page.actionsFor", { number: order.order_number })}
                                 aria-haspopup="menu"
                                 aria-expanded={actionMenuFor === order._id}
                                 className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-white/5 flex items-center justify-center"
@@ -774,26 +807,26 @@ if (lastProductId !== productId) {
                                 <div className="fixed inset-0 z-20" onClick={() => setActionMenuFor(null)} />
                                 <div role="menu" className="absolute right-3 top-12 z-30 w-48 rounded-lg shadow-xl border py-1 text-left"
                                   style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-                                  <MenuItem icon={<EyeIcon />} label="View Details"
+                                  <MenuItem icon={<EyeIcon />} label={t("admin.shared.action.viewDetails")}
                                     onClick={() => { openDetailPage(order); setActionMenuFor(null); }} />
                                   {order.status === "pending" && (
-                                    <MenuItem icon={<CheckIcon />} label="Confirm Order"
+                                    <MenuItem icon={<CheckIcon />} label={t("admin.orders.detail.confirmOrder")}
                                       onClick={() => { updateStatusMutation.mutate({ id: order._id, status: "confirmed" }); setActionMenuFor(null); }} />
                                   )}
                                   {(order.status === "confirmed" || order.status === "processing") && (
-                                    <MenuItem icon={<TruckIcon />} label="Mark as Shipped"
+                                    <MenuItem icon={<TruckIcon />} label={t("admin.orders.detail.markShipped")}
                                       onClick={() => { updateStatusMutation.mutate({ id: order._id, status: "shipped" }); setActionMenuFor(null); }} />
                                   )}
                                   {order.status === "shipped" && (
-                                    <MenuItem icon={<HomeIcon />} label="Mark as Delivered"
+                                    <MenuItem icon={<HomeIcon />} label={t("admin.orders.detail.markDelivered")}
                                       onClick={() => { updateStatusMutation.mutate({ id: order._id, status: "delivered" }); setActionMenuFor(null); }} />
                                   )}
                                   {order.status === "delivered" && order.payment?.method === "cod" && order.payment?.status !== "paid" && (
-                                    <MenuItem icon={<BanknoteIcon />} label="Payment Received"
+                                    <MenuItem icon={<BanknoteIcon />} label={t("admin.orders.detail.paymentReceived")}
                                       onClick={() => { updatePaymentMutation.mutate({ id: order._id }); setActionMenuFor(null); }} />
                                   )}
                                   {["pending", "confirmed", "processing", "shipped"].includes(order.status) && (
-                                    <MenuItem icon={<BanIcon />} label="Cancel Order" danger
+                                    <MenuItem icon={<BanIcon />} label={t("admin.orders.detail.cancelOrder")} danger
                                       onClick={() => { openCancelModal([order._id]); setActionMenuFor(null); }} />
                                   )}
                                 </div>
@@ -808,13 +841,13 @@ if (lastProductId !== productId) {
                               {/* ✅ Preview summary — kitni lines, kitni units, kya promos */}
                               <div className="flex flex-wrap items-center gap-2 mb-2.5">
                                 <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-                                  {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"} · {orderPaidUnits(order)} unit{orderPaidUnits(order) === 1 ? "" : "s"}
+                                  {t("admin.orders.page.itemsAndUnits", { items: formatNumber(orderItemRows(order), locale), units: formatNumber(orderPaidUnits(order), locale) })}
                                 </span>
                                 {orderFreeUnits(order) > 0 && (
-                                  <PromoTag tone="success">{orderFreeUnits(order)} free</PromoTag>
+                                  <PromoTag tone="success">{t("admin.orders.page.freeCount", { count: formatNumber(orderFreeUnits(order), locale) })}</PromoTag>
                                 )}
-                                {orderDealCount(order) > 0 && <PromoTag tone="warning">Deal applied</PromoTag>}
-                                {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
+                                {orderDealCount(order) > 0 && <PromoTag tone="warning">{t("admin.orders.page.dealApplied")}</PromoTag>}
+                                {orderBundleCount(order) > 0 && <PromoTag tone="info">{t("admin.orders.page.comboApplied")}</PromoTag>}
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
                                 {/* ✅ Matched product pehle + highlight */}
@@ -828,17 +861,17 @@ if (lastProductId !== productId) {
                                     }}>
                                     <OrderItemImage item={item} size={36} />
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-xs font-medium truncate" title={item.name}>{item.name}</p>
+                                      <p className="text-xs font-medium truncate" title={item.name}>{productNameOf(item.product_id) || item.name}</p>
                                       <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                                        Qty {item.qty} × Rs. {item.price?.toLocaleString()}{item.variantTitle ? ` • ${item.variantTitle}` : ""}
+                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{(item.variant_id?.title || item.variantTitle) ? ` · ${contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title)}` : ""}
                                       </p>
-                                      {(dealLabel(item) || Number(item.free_items) > 0 || item.bundle_name) && (
+                                      {(dealLabel(item, t) || Number(item.free_items) > 0 || item.bundle_name) && (
                                         <p className="flex flex-wrap items-center gap-1 mt-1">
-                                          {dealLabel(item) && <PromoTag tone="warning">{dealLabel(item)}</PromoTag>}
+                                          {dealLabel(item, t) && <PromoTag tone="warning">{dealLabel(item, t)}</PromoTag>}
                                           {Number(item.free_items) > 0 && (
-                                            <PromoTag tone="success">+{item.free_items} free</PromoTag>
+                                            <PromoTag tone="success">{t("admin.orders.page.freeCount", { count: formatNumber(item.free_items, locale) })}</PromoTag>
                                           )}
-                                          {item.bundle_name && <PromoTag tone="info">Combo</PromoTag>}
+                                          {item.bundle_name && <PromoTag tone="info">{t("admin.orders.page.combo")}</PromoTag>}
                                         </p>
                                       )}
                                     </div>
@@ -865,6 +898,7 @@ if (lastProductId !== productId) {
                   <OrderCard
                     key={order._id}
                     order={order}
+                    shippingMethods={shippingMethods}
                     isSelected={isSelected}
                     payStatus={payStatus}
                     menuOpen={actionMenuFor === order._id}
@@ -889,12 +923,12 @@ if (lastProductId !== productId) {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-3 sm:p-4" style={cardStyle}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
               <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>
-                Showing {filteredOrders.length > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + pageSize, total)} of {total}
+                {t("admin.orders.page.showingRange", { from: new Intl.NumberFormat(intlLocale(locale)).format(filteredOrders.length > 0 ? startIndex + 1 : 0), to: new Intl.NumberFormat(intlLocale(locale)).format(Math.min(startIndex + pageSize, total)), total: new Intl.NumberFormat(intlLocale(locale)).format(total) })}
               </p>
               <div className="flex items-center gap-2">
-                <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>Rows:</label>
+                <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.rows")}</label>
                 <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  aria-label="Rows per page"
+                  aria-label={t("admin.orders.page.rowsPerPage")}
                   className="appearance-none h-9 sm:h-8 pl-2 pr-7 rounded-md text-[12px] outline-none cursor-pointer"
                   style={{ ...inputStyle, backgroundColor: "var(--bg-tertiary)" }}>
                   {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
@@ -902,7 +936,7 @@ if (lastProductId !== productId) {
               </div>
               {totalPages > 1 && (
                 <div className="flex items-center gap-1.5">
-                  <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>Go to:</label>
+                  <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.goTo")}</label>
                   <input type="number" min="1" max={totalPages} value={jumpTo}
                     onChange={(e) => setJumpTo(e.target.value)}
                     onKeyDown={(e) => {
@@ -911,7 +945,7 @@ if (lastProductId !== productId) {
                         if (n >= 1 && n <= totalPages) { setPage(n); setJumpTo(""); }
                       }
                     }}
-                    aria-label="Jump to page"
+                    aria-label={t("admin.orders.page.jumpToPage")}
                     className="w-16 sm:w-14 h-9 sm:h-8 rounded-md text-[12px] text-center outline-none"
                     style={inputStyle} />
                 </div>
@@ -963,21 +997,21 @@ if (lastProductId !== productId) {
                 <AlertIcon className="w-5 h-5" style={{ color: "var(--danger, var(--danger))" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">Cancel {selectedIds.length} order{selectedIds.length > 1 ? "s" : ""}?</h3>
+                <h3 className="text-sm font-semibold">{t("admin.orders.page.cancelCount", { count: formatNumber(selectedIds.length, locale) })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                  Orders will be marked as cancelled:{" "}
+                  {t("admin.orders.page.ordersCancelledList")}{" "}
                   <span className="font-mono">{orders.filter((o) => selectedIds.includes(o._id)).map((o) => o.order_number).slice(0, 4).join(", ")}</span>
-                  {selectedIds.length > 4 && ` +${selectedIds.length - 4} more`}.
+                  {selectedIds.length > 4 && ` ${t("admin.orders.page.moreCount", { count: new Intl.NumberFormat(intlLocale(locale)).format(selectedIds.length - 4) })}`}.
                 </p>
                 <div className="mt-3">
                   <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-primary)" }}>
-                    Cancellation Reason <span style={{ color: "var(--danger-text)" }}>*</span>
+                    {t("admin.orders.page.cancellationReason")} <span style={{ color: "var(--danger-text)" }}>*</span>
                   </label>
                   <textarea
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                     rows={3}
-                    placeholder="e.g. Stock unavailable, customer request..."
+                  placeholder={t("admin.orders.page.cancelReasonPlaceholder")}
                     className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none transition focus:ring-1 focus:ring-red-500/40"
                     style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                   />
@@ -987,11 +1021,11 @@ if (lastProductId !== productId) {
             <div className="flex flex-col sm:flex-row gap-2 mt-5">
               <button onClick={() => setBulkCancelConfirm(false)} disabled={bulkBusy}
                 className="h-11 sm:h-9 rounded-md text-sm font-medium transition disabled:opacity-50 hover:opacity-80 border order-2 sm:order-1"
-                style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>Cancel</button>
+                style={{ borderColor: "var(--border-color)", color: "var(--text-primary)", backgroundColor: "var(--bg-tertiary)" }}>{t("common.cancel")}</button>
               <button onClick={runCancelWithReason} disabled={bulkBusy || cancelBusy || !cancelReason.trim()}
                 className="h-11 sm:h-9 rounded-md text-sm font-semibold text-white transition disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2 order-1 sm:order-2"
                 style={{ backgroundColor: "var(--danger, var(--danger))" }}>
-                {bulkBusy ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> Cancelling...</> : "Yes, Cancel Orders"}
+                {bulkBusy ? <><Spinner className="w-4 h-4 sm:w-3.5 sm:h-3.5" /> {t("admin.orders.page.cancelling")}</> : t("admin.orders.page.confirmCancel")}
               </button>
             </div>
           </div>
@@ -1015,6 +1049,7 @@ const SUMMARY_STATUS_TONES = {
 /* ✅ Product history summary panel — table ke upar, sirf product filter active hone par.
    Units + revenue me CANCELLED orders include nahi hote (frontend note bhi dikhata hai). */
 function ProductSummaryPanel({ summary, loading, productName, cardStyle }) {
+  const { t, locale } = useTranslation();
   if (loading && !summary) {
     return (
       <div className="rounded-lg p-4" style={cardStyle} aria-busy="true">
@@ -1033,11 +1068,11 @@ function ProductSummaryPanel({ summary, loading, productName, cardStyle }) {
   if (!summary) return null;
 
   const stats = [
-    { label: "Total Orders", value: summary.totalOrders ?? 0 },
-    { label: "Units Sold", value: summary.unitsSold ?? 0 },
-    { label: "Revenue", value: `Rs. ${(summary.revenue ?? 0).toLocaleString()}` },
-    { label: "First Order", value: formatDate(summary.firstOrderDate) },
-    { label: "Latest Order", value: formatDate(summary.lastOrderDate) },
+    { label: t("admin.orders.page.totalOrders"), value: formatNumber(summary.totalOrders ?? 0, locale) },
+    { label: t("admin.orders.page.unitsSold"), value: formatNumber(summary.unitsSold ?? 0, locale) },
+    { label: t("admin.orders.page.revenue"), value: formatCurrency(summary.revenue ?? 0, locale) },
+    { label: t("admin.orders.page.firstOrder"), value: formatDate(summary.firstOrderDate, locale) },
+    { label: t("admin.orders.page.latestOrder"), value: formatDate(summary.lastOrderDate, locale) },
   ];
 
   return (
@@ -1045,10 +1080,10 @@ function ProductSummaryPanel({ summary, loading, productName, cardStyle }) {
       <div className="flex flex-wrap items-center gap-2">
         <PackageIcon className="w-4 h-4" />
         <p className="text-[13px] font-bold">
-          Product history{productName ? `: ${productName}` : ""}
+          {t("admin.orders.page.productHistory")}{productName ? `: ${productName}` : ""}
         </p>
         <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-          across all statuses
+          {t("admin.orders.page.acrossAllStatuses")}
         </span>
       </div>
 
@@ -1065,7 +1100,7 @@ function ProductSummaryPanel({ summary, loading, productName, cardStyle }) {
       {/* Status breakdown */}
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-          By status:
+          {t("admin.orders.page.byStatus")}
         </span>
         {SUMMARY_STATUS_KEYS.map((key) => (
           <span key={`by-status-${key}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide"
@@ -1079,10 +1114,7 @@ function ProductSummaryPanel({ summary, loading, productName, cardStyle }) {
       {/* ✅ Cancelled exclusion ka clear note (requirement 7) */}
       {summary.cancelledOrders > 0 && (
         <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-          {summary.cancelledOrders} cancelled order{summary.cancelledOrders === 1 ? "" : "s"} (
-          {summary.cancelledUnits} unit{summary.cancelledUnits === 1 ? "" : "s"}, Rs.{" "}
-          {(summary.cancelledRevenue ?? 0).toLocaleString()}) list me hain, lekin units sold aur revenue
-          me count nahi kiye gaye.
+          {t("admin.orders.page.cancelledOrdersExcluded", { count: formatNumber(summary.cancelledOrders, locale), units: formatNumber(summary.cancelledUnits, locale), revenue: formatCurrency(summary.cancelledRevenue ?? 0, locale) })}
         </p>
       )}
     </div>
@@ -1118,7 +1150,8 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
 }
 
 // Mobile Order Card - Optimized for touch
-function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
+function OrderCard({ order, shippingMethods = [], isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
+  const { t, locale } = useTranslation();
   return (
     <div className="rounded-xl p-4 space-y-3 cursor-pointer transition box-border max-w-full"
       style={cardStyle} onClick={onOpen}>
@@ -1128,7 +1161,7 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
                
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-[15px] break-words">{order.order_number}</p>
-            <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDate(order.created_at)}</p>
+            <p className="text-[11px] mt-0.5 whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDate(order.created_at, locale)}</p>
           </div>
         </div>
         <div className="shrink-0 pt-0.5"><StatusBadge status={order.status} /></div>
@@ -1141,7 +1174,7 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
           {(order.address_snapshot?.full_name || "U").charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1 leading-snug">
-          <p className="font-medium text-[13px] break-words line-clamp-2">{order.address_snapshot?.full_name || order.user_id?.name || "Unknown"}</p>
+          <p className="font-medium text-[13px] break-words line-clamp-2">{order.address_snapshot?.full_name || order.user_id?.name || t("common.notProvided")}</p>
           <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-muted)" }}>{order.user_id?.email || order.address_snapshot?.phone}</p>
         </div>
       </div>
@@ -1163,10 +1196,10 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
             </span>
           )}
           <span className="ml-auto text-[11px] whitespace-nowrap font-medium text-right" style={{ color: "var(--text-secondary)" }}>
-            {orderItemRows(order)} item{orderItemRows(order) === 1 ? "" : "s"}
+            {formatNumber(orderItemRows(order), locale)} {t(orderItemRows(order) === 1 ? "admin.orders.page.item" : "admin.orders.page.items")}
             {orderPaidUnits(order) !== orderItemRows(order) && (
               <span className="block text-[10px]" style={{ color: "var(--text-muted)" }}>
-                {orderPaidUnits(order)} units
+                {formatNumber(orderPaidUnits(order), locale)} {t("admin.orders.page.units")}
               </span>
             )}
           </span>
@@ -1176,9 +1209,9 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
       {/* ✅ Promo tags — deal / combo / free units (mobile card) */}
       {(orderDealCount(order) > 0 || orderBundleCount(order) > 0 || orderFreeUnits(order) > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {orderDealCount(order) > 0 && <PromoTag tone="warning">Deal applied</PromoTag>}
-          {orderBundleCount(order) > 0 && <PromoTag tone="info">Combo applied</PromoTag>}
-          {orderFreeUnits(order) > 0 && <PromoTag tone="success">+{orderFreeUnits(order)} free</PromoTag>}
+          {orderDealCount(order) > 0 && <PromoTag tone="warning">{t("admin.orders.page.dealApplied")}</PromoTag>}
+          {orderBundleCount(order) > 0 && <PromoTag tone="info">{t("admin.orders.page.comboApplied")}</PromoTag>}
+          {orderFreeUnits(order) > 0 && <PromoTag tone="success">{t("admin.orders.page.freeCount", { count: formatNumber(orderFreeUnits(order), locale) })}</PromoTag>}
         </div>
       )}
 
@@ -1186,18 +1219,18 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
         <PaymentBadge status={payStatus} />
         <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-          {order.payment?.method || "—"} • {order.shipping_method || "standard"}
+          {paymentMethodLabel(order.payment?.method, t)} • {shippingMethodLabel(order.shipping_method || "standard", t, shippingMethods, locale)}
         </span>
       </div>
 
       {/* Footer - Total & Actions */}
       <div className="flex items-center justify-between pt-3 relative" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex-1 min-w-0 pr-3">
-          <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>Total</p>
-          <p className="font-bold text-[18px] text-emerald-500">Rs. {order.total?.toLocaleString()}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.orders.detail.totalAmount")}</p>
+          <p className="font-bold text-[18px] text-emerald-500">{formatCurrency(order.total, locale)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={onToggleMenu} aria-label="Actions" aria-haspopup="menu" aria-expanded={menuOpen}
+          <button onClick={onToggleMenu} aria-label={t("admin.orders.page.actions")} aria-haspopup="menu" aria-expanded={menuOpen}
             className="min-w-[48px] min-h-[48px] p-3 rounded-xl transition hover:bg-white/5 flex items-center justify-center"
             style={{ color: "var(--text-secondary)", backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
             <DotsIcon className="w-5 h-5" />
@@ -1208,15 +1241,15 @@ function OrderCard({ order, isSelected, payStatus, menuOpen, cardStyle, onToggle
             <div className="fixed inset-0 z-20" onClick={onCloseMenu} />
             <div role="menu" className="absolute right-4 bottom-16 z-30 w-56 rounded-xl shadow-2xl border py-2 text-left"
               style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-              <MenuItem icon={<EyeIcon />} label="View Details" onClick={onViewDetails} />
-              {order.status === "pending" && <MenuItem icon={<CheckIcon />} label="Confirm Order" onClick={() => onQuickStatus("confirmed")} />}
-              {(order.status === "confirmed" || order.status === "processing") && <MenuItem icon={<TruckIcon />} label="Mark as Shipped" onClick={() => onQuickStatus("shipped")} />}
-              {order.status === "shipped" && <MenuItem icon={<HomeIcon />} label="Mark as Delivered" onClick={() => onQuickStatus("delivered")} />}
+              <MenuItem icon={<EyeIcon />} label={t("admin.shared.action.viewDetails")} onClick={onViewDetails} />
+              {order.status === "pending" && <MenuItem icon={<CheckIcon />} label={t("admin.orders.detail.confirmOrder")} onClick={() => onQuickStatus("confirmed")} />}
+              {(order.status === "confirmed" || order.status === "processing") && <MenuItem icon={<TruckIcon />} label={t("admin.orders.detail.markShipped")} onClick={() => onQuickStatus("shipped")} />}
+              {order.status === "shipped" && <MenuItem icon={<HomeIcon />} label={t("admin.orders.detail.markDelivered")} onClick={() => onQuickStatus("delivered")} />}
               {order.status === "delivered" && order.payment?.method === "cod" && order.payment?.status !== "paid" && (
-                <MenuItem icon={<BanknoteIcon />} label="Payment Received" onClick={onMarkPayment} />
+                <MenuItem icon={<BanknoteIcon />} label={t("admin.orders.detail.paymentReceived")} onClick={onMarkPayment} />
               )}
               {["pending", "confirmed", "processing", "shipped"].includes(order.status) && (
-                <MenuItem icon={<BanIcon />} label="Cancel Order" danger onClick={onCancel} />
+                <MenuItem icon={<BanIcon />} label={t("admin.orders.detail.cancelOrder")} danger onClick={onCancel} />
               )}
             </div>
           </>
