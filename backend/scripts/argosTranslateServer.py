@@ -9,13 +9,13 @@ Endpoints:
   GET  /healthz
   POST /translate
 
-Configure ARGOS_HOST and ARGOS_PORT in backend/.env or the process environment.
+Configure bridge settings in backend/.env.
 The pinned, MIT-licensed M2M100 model is downloaded once to the user cache.
 """
 
 import hashlib
 import json
-import os
+import multiprocessing
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,22 +24,22 @@ from urllib.request import Request, urlopen
 
 
 def _load_bridge_env():
-    """Load bridge bind settings for direct Python starts; preserve process env."""
+    """Read bridge configuration directly from backend/.env."""
     env_file = Path(__file__).resolve().parents[1] / ".env"
     if not env_file.is_file():
-        return
+        raise FileNotFoundError(f"Backend environment file not found: {env_file}")
+    values = {}
     for raw_line in env_file.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        if key not in {"ARGOS_HOST", "ARGOS_PORT"} or key in os.environ:
-            continue
-        os.environ[key] = value.strip().strip("\"'")
+        values[key] = value.strip().strip("\"'")
+    return values
 
 
-_load_bridge_env()
+CONFIG = _load_bridge_env()
 
 # Windows console par Urdu/Arabic output ko safely print karne ke liye.gbhghg
 for _stream in ("stdout", "stderr"):
@@ -48,17 +48,17 @@ for _stream in ("stdout", "stderr"):
     except Exception:
         pass
 
-PORT = int(os.environ["ARGOS_PORT"])
-HOST = os.environ["ARGOS_HOST"]
+PORT = int(CONFIG["ARGOS_PORT"])
+HOST = CONFIG["ARGOS_HOST"]
 MAX_BODY_BYTES = 4 * 1024 * 1024
-SOURCE_LANG = os.environ.get("TRANSLATE_SOURCE_LANG", "en")
+SOURCE_LANG = CONFIG.get("TRANSLATE_SOURCE_LANG", "en")
 
 REQUIRED_TARGETS = {"ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"}
 PREWARM = sorted(
     REQUIRED_TARGETS
     | {
         item.strip().lower()
-        for item in os.environ.get("TRANSLATE_TARGET_LOCALES", "").split(",")
+        for item in CONFIG.get("TRANSLATE_TARGET_LOCALES", "").split(",")
         if item.strip()
     }
 )
@@ -95,13 +95,9 @@ MODEL_FILES = {
     "spm.128k.model": (2423393, "d8f7c76ed2a5e0822be39f0a4f95a55eb19c78f4593ce609e2edbc2aea4d380a"),
     "config.json": (158, "531f7f8d8bf8b73a1580b73c04b58bf134ac490284f4f7af6c20ad238499ae37"),
 }
-_cache_root = Path(
-    os.environ.get("TRANSLATION_MODEL_CACHE")
-    or os.environ.get("LOCALAPPDATA")
-    or (Path.home() / ".cache")
-)
+_cache_root = Path(CONFIG.get("TRANSLATION_MODEL_CACHE") or (Path.home() / ".cache"))
 MODEL_DIR = Path(
-    os.environ.get("TRANSLATION_MODEL_DIR")
+    CONFIG.get("TRANSLATION_MODEL_DIR")
     or (_cache_root / "ecommerce-translation" / "m2m100-ct2-int8")
 )
 
@@ -212,7 +208,7 @@ def _load_model():
         device="cpu",
         compute_type="int8",
         inter_threads=1,
-        intra_threads=max(1, min(4, os.cpu_count() or 1)),
+        intra_threads=max(1, min(4, multiprocessing.cpu_count() or 1)),
     )
     tokenizer = sentencepiece.SentencePieceProcessor(
         model_file=str(MODEL_DIR / "spm.128k.model")
