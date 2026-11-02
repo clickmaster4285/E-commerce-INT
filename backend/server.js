@@ -1,15 +1,33 @@
-require("dotenv").config({
-  path: require("path").join(__dirname, ".env"),
-  quiet: true,
-});
+const path = require("path");
+const fs = require("fs");
+const dotenv = require("dotenv");
+const backendEnvPath = path.join(__dirname, ".env");
+dotenv.config({ path: backendEnvPath, quiet: true });
+
+// Argos configuration has one source of truth: backend/.env. dotenv normally
+// preserves shell/service variables, so apply every Argos/translation key from
+// the file (and clear missing ones) before importing the translation client.
+const argosEnv = fs.existsSync(backendEnvPath)
+  ? dotenv.parse(fs.readFileSync(backendEnvPath))
+  : {};
+const argosEnvPrefixes = ["ARGOS_", "LIBRETRANSLATE_", "TRANSLATE_", "TRANSLATION_"];
+const argosEnvKeys = new Set([
+  ...Object.keys(argosEnv),
+  ...Object.keys(process.env),
+].filter((key) => argosEnvPrefixes.some((prefix) => key.startsWith(prefix))));
+for (const key of argosEnvKeys) {
+  if (Object.prototype.hasOwnProperty.call(argosEnv, key)) {
+    process.env[key] = argosEnv[key];
+  } else {
+    delete process.env[key];
+  }
+}
 
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const compression = require("compression");
 const bcrypt = require("bcryptjs");
-const path = require("path");
-const fs = require("fs");
 const os = require("os");
 const cookieParser = require("cookie-parser");
 
@@ -406,7 +424,7 @@ const startArgosServer = async () => {
   }
 
   // Node client jis port par call karega, python bridge usi par sunna chahiye.
-  // ARGOS_PORT pehle se set hai to user ki ki hui value jeetegi.
+  // ARGOS_PORT backend/.env se hi liya jata hai; URL port fallback bhi wahi source hai.
   const targetPort = (() => {
     try { return Number(new URL(TRANSLATION_API_URL).port) || 80; } catch { return null; }
   })();

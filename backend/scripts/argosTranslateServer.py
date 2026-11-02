@@ -9,14 +9,12 @@ Endpoints:
   GET  /healthz
   POST /translate
 
-Configure bridge settings in backend/.env.
-The pinned, MIT-licensed M2M100 model is downloaded once to the user cache.
+Configure bridge and model settings in backend/.env.
+The configured M2M100 model is downloaded once to TRANSLATION_MODEL_DIR.
 """
 
 import hashlib
 import json
-import multiprocessing
-import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,20 +23,17 @@ from urllib.request import Request, urlopen
 
 
 def _load_bridge_env():
-    """Read backend/.env values, while allowing service env to override them."""
+    """Read Argos configuration from backend/.env only."""
     env_file = Path(__file__).resolve().parents[1] / ".env"
     values = {}
-    if env_file.is_file():
-        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            values[key.strip()] = value.strip().strip("\"'")
-    # Linux service managers (systemd, containers, hosting panels) commonly
-    # inject configuration into the process environment instead of deploying
-    # a .env file. Keep those settings available to the bridge as well.
-    values.update(os.environ)
+    if not env_file.is_file():
+        raise FileNotFoundError(f"Backend environment file not found: {env_file}")
+    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip("\"'")
     return values
 
 
@@ -51,36 +46,43 @@ for _stream in ("stdout", "stderr"):
     except Exception:
         pass
 
-PORT = int(CONFIG["ARGOS_PORT"])
-HOST = CONFIG["ARGOS_HOST"]
-MAX_BODY_BYTES = 4 * 1024 * 1024
-SOURCE_LANG = CONFIG.get("TRANSLATE_SOURCE_LANG", "en")
+def _required_config(key):
+    value = CONFIG.get(key, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing required Argos setting in backend/.env: {key}")
+    return value
 
-REQUIRED_TARGETS = {"ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"}
-PREWARM = sorted(
-    REQUIRED_TARGETS
-    | {
-        item.strip().lower()
-        for item in CONFIG.get("TRANSLATE_TARGET_LOCALES", "").split(",")
-        if item.strip()
-    }
-)
 
-LANGUAGE_NAMES = {
-    "en": "English",
-    "ar": "Arabic",
-    "ur": "Urdu",
-    "az": "Azerbaijani",
-    "sq": "Albanian",
-    "fr": "French",
-    "de": "German",
-    "es": "Spanish",
-    "tr": "Turkish",
-    "zh": "Chinese",
-    "ru": "Russian",
-    "hi": "Hindi",
-    "pt": "Portuguese",
-}
+def _int_config(key):
+    try:
+        value = int(_required_config(key))
+    except ValueError as exc:
+        raise RuntimeError(f"Argos setting {key} must be an integer") from exc
+    if value <= 0:
+        raise RuntimeError(f"Argos setting {key} must be a positive integer")
+    return value
+
+
+def _float_config(key):
+    try:
+        return float(_required_config(key))
+    except ValueError as exc:
+        raise RuntimeError(f"Argos setting {key} must be numeric") from exc
+
+
+HOST = _required_config("ARGOS_HOST")
+PORT = _int_config("ARGOS_PORT")
+MAX_BODY_BYTES = _int_config("TRANSLATION_MAX_BODY_BYTES")
+SOURCE_LANG = _required_config("TRANSLATE_SOURCE_LANG").lower()
+SOURCE_LANG_NAME = _required_config("TRANSLATE_SOURCE_LANGUAGE_NAME")
+TRANSLATION_BATCH_SIZE = _int_config("TRANSLATE_BATCH_SIZE")
+PREWARM = sorted({
+    item.strip().lower()
+    for item in _required_config("TRANSLATE_TARGET_LOCALES").split(",")
+    if item.strip()
+})
+if not PREWARM:
+    raise RuntimeError("TRANSLATE_TARGET_LOCALES must contain at least one language")
 
 import ctranslate2
 import sentencepiece
@@ -90,31 +92,43 @@ except ImportError:
     argos_translate = None
 
 _LOCK = threading.Lock()
-MODEL_REPOSITORY = "JustFrederik/m2m_100_418m_ct2_int8"
-MODEL_REVISION = "1aeed44db4dd61a486bba44acf54c76507082a2c"
-MODEL_FILES = {
-    "model.bin": (490667638, "6c8ef4e814a02d5947ab80710f93f3d4e776bf4b668ab3bb7996ff050b69d111"),
-    "shared_vocabulary.txt": (1159930, "bd440aa21b8ca3453fc792a0018a1f3fe68b3464aadddd4d16a4b72f73c86d8c"),
-    "spm.128k.model": (2423393, "d8f7c76ed2a5e0822be39f0a4f95a55eb19c78f4593ce609e2edbc2aea4d380a"),
-    "config.json": (158, "531f7f8d8bf8b73a1580b73c04b58bf134ac490284f4f7af6c20ad238499ae37"),
-}
-_cache_root = Path(CONFIG.get("TRANSLATION_MODEL_CACHE") or (Path.home() / ".cache"))
-MODEL_DIR = Path(
-    CONFIG.get("TRANSLATION_MODEL_DIR")
-    or (_cache_root / "ecommerce-translation" / "m2m100-ct2-int8")
+MODEL_REPOSITORY = _required_config("TRANSLATION_MODEL_REPOSITORY")
+MODEL_REVISION = _required_config("TRANSLATION_MODEL_REVISION")
+MODEL_DOWNLOAD_TIMEOUT_SECONDS = _int_config("TRANSLATION_MODEL_DOWNLOAD_TIMEOUT_SECONDS")
+MODEL_DOWNLOAD_RETRIES = _int_config("TRANSLATION_MODEL_DOWNLOAD_RETRIES")
+MODEL_DOWNLOAD_CHUNK_BYTES = _int_config("TRANSLATION_MODEL_DOWNLOAD_CHUNK_BYTES")
+TRANSLATION_DEVICE = _required_config("TRANSLATION_DEVICE")
+TRANSLATION_ENGINE = _required_config("TRANSLATION_ENGINE").lower()
+TRANSLATION_COMPUTE_TYPE = _required_config("TRANSLATION_COMPUTE_TYPE")
+TRANSLATION_INTER_THREADS = _int_config("TRANSLATION_INTER_THREADS")
+TRANSLATION_INTRA_THREADS = _int_config("TRANSLATION_INTRA_THREADS")
+TRANSLATION_BEAM_SIZE = _int_config("TRANSLATION_BEAM_SIZE")
+TRANSLATION_MAX_DECODING_LENGTH = _int_config("TRANSLATION_MAX_DECODING_LENGTH")
+TRANSLATION_USER_AGENT = _required_config("TRANSLATION_USER_AGENT")
+TRANSLATION_MODEL_BASE_URL = _required_config("TRANSLATION_MODEL_BASE_URL").rstrip("/")
+TRANSLATION_PREWARM_TEXT = _required_config("TRANSLATION_PREWARM_TEXT")
+TRANSLATION_LENGTH_PENALTY = _float_config("TRANSLATION_LENGTH_PENALTY")
+MODEL_FILES = {}
+for _entry in _required_config("TRANSLATION_MODEL_FILES").split(";"):
+    _parts = [part.strip() for part in _entry.split(",")]
+    if len(_parts) != 3 or not _parts[0] or not _parts[1].isdigit():
+        raise RuntimeError("TRANSLATION_MODEL_FILES entries must be name,size,sha256")
+    _name, _size, _sha = _parts
+    if len(_sha) != 64 or any(char not in "0123456789abcdefABCDEF" for char in _sha):
+        raise RuntimeError(f"Invalid SHA-256 configured for translation model file {_name}")
+    MODEL_FILES[_name] = (int(_size), _sha.lower())
+if not MODEL_FILES:
+    raise RuntimeError("TRANSLATION_MODEL_FILES must contain at least one file")
+if TRANSLATION_ENGINE not in {"ct2", "argos"}:
+    raise RuntimeError("TRANSLATION_ENGINE must be either 'ct2' or 'argos'")
+
+_model_dir_config = Path(_required_config("TRANSLATION_MODEL_DIR")).expanduser()
+MODEL_DIR = (
+    _model_dir_config if _model_dir_config.is_absolute()
+    else Path(__file__).resolve().parents[1] / _model_dir_config
 )
 
-SUPPORTED_TARGETS = {"ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"}
-unsupported_targets = sorted(set(PREWARM) - SUPPORTED_TARGETS)
-if unsupported_targets:
-    raise RuntimeError(
-        "The local M2M100 model does not support configured target(s): "
-        + ", ".join(unsupported_targets)
-    )
-if SOURCE_LANG != "en":
-    raise RuntimeError("The local M2M100 model requires English source text")
-
-PAIRS = [("en", target) for target in sorted(set(PREWARM))]
+PAIRS = [(SOURCE_LANG, target) for target in PREWARM]
 _TRANSLATOR = None
 _TOKENIZER = None
 _ARGOS_TRANSLATIONS = {}
@@ -123,7 +137,7 @@ _ARGOS_TRANSLATIONS = {}
 def _sha256(path):
     digest = hashlib.sha256()
     with path.open("rb") as model_file:
-        for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+        for chunk in iter(lambda: model_file.read(MODEL_DOWNLOAD_CHUNK_BYTES), b""):
             digest.update(chunk)
     return digest.hexdigest()
 
@@ -135,21 +149,17 @@ def _download_model_file(name, expected_size, expected_hash):
             return
 
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    url = (
-        f"https://huggingface.co/{MODEL_REPOSITORY}/resolve/"
-        f"{MODEL_REVISION}/{name}"
-    )
-    request = Request(url, headers={"User-Agent": "ecommerce-local-translator/1.0"})
+    url = f"{TRANSLATION_MODEL_BASE_URL}/{MODEL_REPOSITORY}/resolve/{MODEL_REVISION}/{name}"
     temp_path = path.with_suffix(path.suffix + ".download")
-    for attempt in range(3):
+    for attempt in range(MODEL_DOWNLOAD_RETRIES):
         offset = temp_path.stat().st_size if temp_path.exists() else 0
-        headers = {"User-Agent": "ecommerce-local-translator/1.0"}
+        headers = {"User-Agent": TRANSLATION_USER_AGENT}
         if offset:
             headers["Range"] = f"bytes={offset}-"
         request = Request(url, headers=headers)
 
         try:
-            with urlopen(request, timeout=60) as response:
+            with urlopen(request, timeout=MODEL_DOWNLOAD_TIMEOUT_SECONDS) as response:
                 if offset and response.status != 206:
                     offset = 0
                 if response.status == 206:
@@ -158,7 +168,7 @@ def _download_model_file(name, expected_size, expected_hash):
                         raise RuntimeError(f"Invalid model download range for {name}")
                 with temp_path.open("ab" if offset else "wb") as output:
                     while True:
-                        chunk = response.read(1024 * 1024)
+                        chunk = response.read(MODEL_DOWNLOAD_CHUNK_BYTES)
                         if not chunk:
                             break
                         output.write(chunk)
@@ -189,7 +199,9 @@ def _load_model():
     if _TRANSLATOR is not None or _ARGOS_TRANSLATIONS:
         return
 
-    if argos_translate is not None:
+    if TRANSLATION_ENGINE == "argos":
+        if argos_translate is None:
+            raise RuntimeError("TRANSLATION_ENGINE=argos requires argostranslate to be installed")
         try:
             installed = {
                 pair: argos_translate.get_translation_from_codes(*pair)
@@ -197,10 +209,11 @@ def _load_model():
             }
         except Exception:
             installed = {}
-        if PAIRS and all(installed.values()):
-            _ARGOS_TRANSLATIONS = installed
-            print("  [model] using installed Argos Translate packages", flush=True)
-            return
+        if not PAIRS or not all(installed.values()):
+            raise RuntimeError("Argos Translate packages are not installed for every configured language pair")
+        _ARGOS_TRANSLATIONS = installed
+        print("  [model] using installed Argos Translate packages", flush=True)
+        return
 
     for name, (expected_size, expected_hash) in MODEL_FILES.items():
         print(f"  [model] checking {name}", flush=True)
@@ -208,10 +221,10 @@ def _load_model():
 
     translator = ctranslate2.Translator(
         str(MODEL_DIR),
-        device="cpu",
-        compute_type="int8",
-        inter_threads=1,
-        intra_threads=max(1, min(4, multiprocessing.cpu_count() or 1)),
+        device=TRANSLATION_DEVICE,
+        compute_type=TRANSLATION_COMPUTE_TYPE,
+        inter_threads=TRANSLATION_INTER_THREADS,
+        intra_threads=TRANSLATION_INTRA_THREADS,
     )
     tokenizer = sentencepiece.SentencePieceProcessor(
         model_file=str(MODEL_DIR / "spm.128k.model")
@@ -234,12 +247,12 @@ def _translate_one(src, tgt, text):
     if argos_translation is not None:
         return argos_translation.translate(text).strip()
 
-    source_tokens = ["__en__", *_TOKENIZER.encode(text, out_type=str), "</s>"]
+    source_tokens = [f"__{src}__", *_TOKENIZER.encode(text, out_type=str), "</s>"]
     result = _TRANSLATOR.translate_batch(
         [source_tokens],
         target_prefix=[[f"__{tgt}__"]],
-        beam_size=4,
-        max_decoding_length=256,
+        beam_size=TRANSLATION_BEAM_SIZE,
+        max_decoding_length=TRANSLATION_MAX_DECODING_LENGTH,
     )[0]
     output_tokens = result.hypotheses[0]
     if output_tokens and output_tokens[0] == f"__{tgt}__":
@@ -252,7 +265,7 @@ def _translate_many(src, tgt, texts):
     if (src, tgt) not in PAIRS:
         raise LookupError(f"no {src}->{tgt} model")
 
-    if src == "en" and (src, tgt) in _ARGOS_TRANSLATIONS:
+    if (src, tgt) in _ARGOS_TRANSLATIONS:
         argos_translation = _ARGOS_TRANSLATIONS[(src, tgt)]
         package_translation = getattr(argos_translation, "underlying", None)
         package = getattr(package_translation, "pkg", None)
@@ -291,11 +304,11 @@ def _translate_many(src, tgt, texts):
             tokenized,
             target_prefix=target_prefix,
             replace_unknowns=True,
-            max_batch_size=argos_translate.settings.batch_size,
+            max_batch_size=TRANSLATION_BATCH_SIZE,
             batch_type="tokens",
-            beam_size=max(1, argos_translate.settings.beam_size),
+            beam_size=TRANSLATION_BEAM_SIZE,
             num_hypotheses=1,
-            length_penalty=0.2,
+            length_penalty=TRANSLATION_LENGTH_PENALTY,
             return_scores=True,
         )
 
@@ -330,14 +343,14 @@ def _translate_many(src, tgt, texts):
         return ["" for _ in texts]
 
     source_tokens = [
-        ["__en__", *_TOKENIZER.encode(text, out_type=str), "</s>"]
+        [f"__{src}__", *_TOKENIZER.encode(text, out_type=str), "</s>"]
         for _, text in nonempty
     ]
     translated = _TRANSLATOR.translate_batch(
         source_tokens,
         target_prefix=[[f"__{tgt}__"]] * len(source_tokens),
-        beam_size=4,
-        max_decoding_length=256,
+        beam_size=TRANSLATION_BEAM_SIZE,
+        max_decoding_length=TRANSLATION_MAX_DECODING_LENGTH,
     )
     results = ["" for _ in texts]
     for (index, _), result in zip(nonempty, translated):
@@ -354,7 +367,7 @@ def _translate_many(src, tgt, texts):
 def prewarm():
     for target in PREWARM:
         try:
-            _translate_one(SOURCE_LANG, target, "Welcome to our store")
+            _translate_one(SOURCE_LANG, target, TRANSLATION_PREWARM_TEXT)
             print(f"  [model] {SOURCE_LANG}->{target}: ready", flush=True)
         except Exception as exc:
             print(f"  [model] {SOURCE_LANG}->{target}: FAILED ({exc})", flush=True)
@@ -387,7 +400,7 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 [{
                     "code": SOURCE_LANG,
-                    "name": LANGUAGE_NAMES[SOURCE_LANG],
+                    "name": SOURCE_LANG_NAME,
                     "targets": _targets_from(SOURCE_LANG),
                 }],
             )
@@ -480,7 +493,7 @@ def main():
     print(f"  Listening: http://{HOST}:{PORT}", flush=True)
     print(f"  Targets: {', '.join(PREWARM)}", flush=True)
     _load_model()
-    if _ARGOS_TRANSLATIONS:
+    if TRANSLATION_ENGINE == "argos":
         print("  Engine: installed Argos Translate packages", flush=True)
     else:
         print(f"  Engine: M2M100 CTranslate2 ({MODEL_REVISION})", flush=True)

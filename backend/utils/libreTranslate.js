@@ -12,32 +12,41 @@
 //   • Service down ho to THROW karke caller ko English fallback karne dena
 //     hai — is liye hard failure nahi, balki `null` return hota hai.
 //
-// Env (backend/.env):
-//   LIBRETRANSLATE_URL=http://localhost:<ARGOS_PORT>
-//   LIBRETRANSLATE_API_KEY=            (optional — sirf agar instance par
-//                                       `--api-keys` enable kiya ho)
-//   TRANSLATE_TARGET_LOCALES=ur,ar,es,fr,de,hi,zh,pt,tr (comma separated)
-//   TRANSLATE_BATCH_SIZE=10            (ek request me kitne strings)
-//   TRANSLATE_TIMEOUT_MS=30000
-//   TRANSLATE_MAX_RETRIES=3
+// All bridge/client configuration is required from backend/.env.
 
 const log = require("./logger");
 
-const API_URL = String(process.env.LIBRETRANSLATE_URL || "").replace(/\/+$/, "");
-const API_KEY = process.env.LIBRETRANSLATE_API_KEY || "";
-const TIMEOUT_MS = Number(process.env.TRANSLATE_TIMEOUT_MS) || 30000;
-const MAX_RETRIES = Number(process.env.TRANSLATE_MAX_RETRIES) || 3;
-const BATCH_SIZE = Number(process.env.TRANSLATE_BATCH_SIZE) || 10;
+function requiredEnv(name, { allowEmpty = false } = {}) {
+  if (process.env[name] === undefined || (!allowEmpty && !String(process.env[name]).trim())) {
+    throw new Error(`Missing ${name} in backend/.env`);
+  }
+  return String(process.env[name]).trim();
+}
 
-const SOURCE_LANG = "en";
-const REQUIRED_TARGET_LOCALES = ["ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"];
-const TARGET_LOCALES = [...new Set([
-  ...REQUIRED_TARGET_LOCALES,
-  ...String(process.env.TRANSLATE_TARGET_LOCALES || "")
+function positiveIntegerEnv(name) {
+  const value = Number(requiredEnv(name));
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} in backend/.env must be a positive integer`);
+  }
+  return value;
+}
+
+const API_URL = requiredEnv("LIBRETRANSLATE_URL").replace(/\/+$/, "");
+const API_KEY = requiredEnv("LIBRETRANSLATE_API_KEY", { allowEmpty: true });
+const TIMEOUT_MS = positiveIntegerEnv("TRANSLATE_TIMEOUT_MS");
+const MAX_RETRIES = positiveIntegerEnv("TRANSLATE_MAX_RETRIES");
+const BATCH_SIZE = positiveIntegerEnv("TRANSLATE_BATCH_SIZE");
+const RETRY_BASE_DELAY_MS = positiveIntegerEnv("TRANSLATE_RETRY_BASE_DELAY_MS");
+const SOURCE_LANG = requiredEnv("TRANSLATE_SOURCE_LANG").toLowerCase();
+const TARGET_LOCALES = [...new Set(
+  requiredEnv("TRANSLATE_TARGET_LOCALES")
     .split(",")
     .map((locale) => locale.trim().toLowerCase())
-    .filter(Boolean),
-])];
+    .filter(Boolean)
+)];
+if (!TARGET_LOCALES.length) {
+  throw new Error("TRANSLATE_TARGET_LOCALES in backend/.env must list at least one language");
+}
 
 // ✅ Serial queue — ek waqt me sirf ek request jaari ho.
 let queue = Promise.resolve();
@@ -75,9 +84,8 @@ function warnUnreachableOnce(reason) {
       `    URL: ${API_URL || "(set nahi hai)"}\n` +
       `    Urdu abhi English fallback dikha raha hoga. Fix:\n` +
       `      1. Local translation bridge chalao: npm run argos:serve\n` +
-      `      2. Urdu model install karo (translate-ur)\n` +
-      `      3. backend/.env me LIBRETRANSLATE_URL sahi port ke saath set karo\n` +
-      `      4. ` + "`npm run backfill:translations`" + ` chalao\n` +
+      `      2. backend/.env me bridge URL/port aur Argos settings check karo\n` +
+      `      3. ` + "`npm run backfill:translations`" + ` chalao\n` +
       `    Check: ` + "`npm run translation:check`" + `\n`
   );
 }
@@ -125,7 +133,7 @@ async function requestWithRetry(batch, target) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       // Exponential backoff: 1s, 2s, 4s ...
-      await sleep(1000 * 2 ** (attempt - 1));
+      await sleep(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
     }
 
     const controller = new AbortController();
