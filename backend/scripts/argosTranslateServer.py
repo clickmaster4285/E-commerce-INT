@@ -16,6 +16,7 @@ The pinned, MIT-licensed M2M100 model is downloaded once to the user cache.
 import hashlib
 import json
 import multiprocessing
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -24,18 +25,20 @@ from urllib.request import Request, urlopen
 
 
 def _load_bridge_env():
-    """Read bridge configuration directly from backend/.env."""
+    """Read backend/.env values, while allowing service env to override them."""
     env_file = Path(__file__).resolve().parents[1] / ".env"
-    if not env_file.is_file():
-        raise FileNotFoundError(f"Backend environment file not found: {env_file}")
     values = {}
-    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        key = key.strip()
-        values[key] = value.strip().strip("\"'")
+    if env_file.is_file():
+        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip("\"'")
+    # Linux service managers (systemd, containers, hosting panels) commonly
+    # inject configuration into the process environment instead of deploying
+    # a .env file. Keep those settings available to the bridge as well.
+    values.update(os.environ)
     return values
 
 

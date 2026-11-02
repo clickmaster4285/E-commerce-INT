@@ -420,7 +420,7 @@ const startArgosServer = async () => {
       shell: true,
       cwd: __dirname, // script ka "scripts/argosTranslateServer.py" relative path isi se resolve hota hai
       env: childEnv,
-      stdio: "ignore",
+      stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
   } catch (error) {
@@ -428,6 +428,18 @@ const startArgosServer = async () => {
     startupLog.error(`Argos translation bridge spawn failed: ${error.message}`);
     return;
   }
+
+  // Bridge startup/download failures were previously hidden, making Linux
+  // deployments look like a generic connection refusal. Forward its output.
+  const forwardArgosOutput = (stream, level) => {
+    stream?.on("data", (chunk) => {
+      for (const line of chunk.toString("utf8").split(/\r?\n/).filter(Boolean)) {
+        startupLog[level](`[argos] ${line}`);
+      }
+    });
+  };
+  forwardArgosOutput(argosProcess.stdout, "info");
+  forwardArgosOutput(argosProcess.stderr, "error");
 
   argosProcess.once("error", (error) => {
     const message = error.code === "ENOENT"
