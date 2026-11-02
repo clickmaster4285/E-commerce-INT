@@ -108,6 +108,7 @@ TRANSLATION_USER_AGENT = _required_config("TRANSLATION_USER_AGENT")
 TRANSLATION_MODEL_BASE_URL = _required_config("TRANSLATION_MODEL_BASE_URL").rstrip("/")
 TRANSLATION_PREWARM_TEXT = _required_config("TRANSLATION_PREWARM_TEXT")
 TRANSLATION_LENGTH_PENALTY = _float_config("TRANSLATION_LENGTH_PENALTY")
+TRANSLATION_TOKENIZER_MODEL_FILE = _required_config("TRANSLATION_TOKENIZER_MODEL_FILE")
 MODEL_FILES = {}
 for _entry in _required_config("TRANSLATION_MODEL_FILES").split(";"):
     _parts = [part.strip() for part in _entry.split(",")]
@@ -119,6 +120,8 @@ for _entry in _required_config("TRANSLATION_MODEL_FILES").split(";"):
     MODEL_FILES[_name] = (int(_size), _sha.lower())
 if not MODEL_FILES:
     raise RuntimeError("TRANSLATION_MODEL_FILES must contain at least one file")
+if TRANSLATION_TOKENIZER_MODEL_FILE not in MODEL_FILES:
+    raise RuntimeError("TRANSLATION_TOKENIZER_MODEL_FILE must be listed in TRANSLATION_MODEL_FILES")
 if TRANSLATION_ENGINE not in {"ct2", "argos"}:
     raise RuntimeError("TRANSLATION_ENGINE must be either 'ct2' or 'argos'")
 
@@ -173,7 +176,7 @@ def _download_model_file(name, expected_size, expected_hash):
                             break
                         output.write(chunk)
         except Exception:
-            if attempt == 2:
+            if attempt == MODEL_DOWNLOAD_RETRIES - 1:
                 raise
             continue
 
@@ -227,7 +230,7 @@ def _load_model():
         intra_threads=TRANSLATION_INTRA_THREADS,
     )
     tokenizer = sentencepiece.SentencePieceProcessor(
-        model_file=str(MODEL_DIR / "spm.128k.model")
+        model_file=str(MODEL_DIR / TRANSLATION_TOKENIZER_MODEL_FILE)
     )
 
     _TRANSLATOR = translator
