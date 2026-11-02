@@ -1,4 +1,7 @@
-require("dotenv").config({ quiet: true });
+require("dotenv").config({
+  path: require("path").join(__dirname, ".env"),
+  quiet: true,
+});
 
 const express = require("express");
 const http = require("http");
@@ -322,8 +325,8 @@ const seedDefaultData = async () => {
 // Backend start hote hi local translation bridge (scripts/argosTranslateServer.py —
 // LibreTranslate-compatible; utils/libreTranslate.js aur routes/translationRoutes
 // isi ko call karte hain) saath chalu ho jaye. Design:
-//   • Sirf dev mode me (NODE_ENV !== "production") — production ka startup
-//     pehle jaisa hi rehta hai.
+//   • Sirf jab LIBRETRANSLATE_URL env configured ho — dev aur production dono
+//     me, same env URL ko health-check/reuse aur bridge bind ke liye use karein.
 //   • agar configured URL par bridge pehle se zinda hai to REUSE hota hai —
 //     duplicate process start nahi hota (server restart par bhi; loading bridge
 //     ke bind hone tak chhota sa grace wait bhi hota hai).
@@ -497,7 +500,7 @@ const startServer = async () => {
       }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
-    if (NODE_ENV === "development") startArgosServer();
+    if (TRANSLATION_API_URL) startArgosServer();
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi
     startupLog.error(`Server start failed: ${error.message}`);
