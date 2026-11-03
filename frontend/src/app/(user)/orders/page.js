@@ -20,7 +20,7 @@ import {
   Package, Loader2, ShoppingBag, Calendar, MapPin, CreditCard,
   CheckCircle2, Clock, Truck, XCircle, ArrowRight, ArrowLeft, Banknote,
   Landmark, Zap, Trash2, Play, Tag, Navigation, ChevronLeft, ChevronRight,
-  AlertTriangle, Search, ChevronDown, Check, ArrowUpDown, X
+  AlertTriangle, Search, ChevronDown, Check, ArrowUpDown, X, MessageCircle
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -933,6 +933,9 @@ function OrdersContent({ compact = false }) {
                     {order.status === "pending" && (
                       <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-medium hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={13} /> {t("user.orders.cancelOrder")}</button>
                     )}
+                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[var(--user-border)] px-3.5 py-2 text-xs font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+                      <MessageCircle size={14} /> Chat about this order
+                    </button>
                     <Link href={`/orders/${order._id}`} className="flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
                       {t("user.orders.viewDetails")} <ArrowRight size={15} />
                     </Link>

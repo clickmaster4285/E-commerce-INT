@@ -17,6 +17,7 @@ const log = require("./utils/logger");
 const User = require("./models/User");
 const Employee = require("./models/Employee");
 const Store = require("./models/Store");
+const ChatConversation = require("./models/ChatConversation");
 const { initSocket } = require("./utils/socket");
 
 // ✅ Seed script ko import karein (Data yahan nahi, wahan rahega)
@@ -55,6 +56,7 @@ const invoiceRoutes = require("./routes/invoiceRoutes");
 const posRoutes = require("./routes/posRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const translationRoutes = require("./routes/translationRoutes");
+const chatRoutes = require("./routes/chatRoutes");
 
 // ==========================================
 // APP & SERVER SETUP
@@ -195,6 +197,8 @@ app.use((req, res, next) => { req.io = io; next(); });
 const { limiters } = require("./middleware/rateLimit");
 app.use(API_PREFIX, (req, res, next) => {
   if (req.path === "/health") return next();
+  // Chat has a dedicated limiter so storefront browsing cannot exhaust its API budget.
+  if (req.path === "/chats" || req.path.startsWith("/chats/")) return next();
   return limiters.global(req, res, next);
 });
 
@@ -230,6 +234,7 @@ app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
 app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
+app.use(`${API_PREFIX}/chats`, chatRoutes);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
@@ -456,6 +461,7 @@ const startArgosServer = async () => {
 const startServer = async () => {
   try {
     await connectDB();
+    await ChatConversation.ensureChatIndexes();
     createUploadDirectories();
     
     // Yahan sab kuch auto-run hoga

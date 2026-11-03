@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const log = require("./logger");
 
 let io = null;
@@ -412,6 +413,94 @@ const initSocket = (server) => {
   // ==========================================
   io.on("connection", (socket) => {
     if (socket.userId) socket.join(`employee:${socket.userId}`);
+    if (socket.userId && socket.userType === "user" && String(socket.userRole || "").toLowerCase() === "user") {
+      socket.join(`chat:customer:${socket.userId}`);
+    }
+
+    // Chat rooms are always joined through authenticated, server-side authorization.
+    socket.on("chat:inbox:join", async (callback) => {
+      if (socket.userType !== "employee" || !["admin", "manager", "staff"].includes(String(socket.userRole || "").toLowerCase())) {
+        if (typeof callback === "function") callback({ success: false, message: "Support access required" });
+        return;
+      }
+      const gate = await requireSocketPermission(socket, "order", callback);
+      if (!gate.allowed) return;
+      socket.join("chat:admins");
+      try {
+        const ChatConversation = require("../models/ChatConversation");
+        const [row] = await ChatConversation.aggregate([{ $group: { _id: null, total: { $sum: "$unread_admin_count" } } }]);
+        if (typeof callback === "function") callback({ success: true, data: { count: Number(row?.total) || 0 } });
+      } catch (error) {
+        if (typeof callback === "function") callback({ success: false, message: "Could not load unread count" });
+      }
+    });
+
+    socket.on("chat:conversation:join", async (payload, callback) => {
+      const id = typeof payload === "string" ? payload : payload?.conversationId;
+      const mongoose = require("mongoose");
+      if (!socket.userId || !mongoose.isValidObjectId(id)) {
+        if (typeof callback === "function") callback({ success: false, message: "Invalid conversation" });
+        return;
+      }
+      try {
+        const ChatConversation = require("../models/ChatConversation");
+        const conversation = await ChatConversation.findById(id).select("customer_id").lean();
+        if (!conversation) {
+          if (typeof callback === "function") callback({ success: false, message: "Conversation not found" });
+          return;
+        }
+        let allowed = socket.userType === "user" && String(conversation.customer_id) === String(socket.userId);
+        if (socket.userType === "employee" && ["admin", "manager", "staff"].includes(String(socket.userRole || "").toLowerCase())) {
+          const gate = await requireSocketPermission(socket, "order", callback);
+          allowed = gate.allowed;
+        }
+        if (!allowed) {
+          if (typeof callback === "function") callback({ success: false, message: "You are not allowed to access this conversation" });
+          return;
+        }
+        socket.join(`chat:conversation:${id}`);
+        if (typeof callback === "function") callback({ success: true });
+      } catch (error) {
+        if (typeof callback === "function") callback({ success: false, message: "Could not join conversation" });
+      }
+    });
+
+    socket.on("chat:guest:join", async (payload, callback) => {
+      const id = payload?.conversationId;
+      const token = typeof payload?.guestToken === "string" ? payload.guestToken.trim() : "";
+      const mongoose = require("mongoose");
+      if (!token || !mongoose.isValidObjectId(id)) {
+        if (typeof callback === "function") callback({ success: false, message: "Guest chat authorization required" });
+        return;
+      }
+      try {
+        const ChatConversation = require("../models/ChatConversation");
+        const conversation = await ChatConversation.findById(id).select("+guest_token_hash").lean();
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        if (!conversation?.guest_token_hash || conversation.guest_token_hash !== tokenHash) {
+          if (typeof callback === "function") callback({ success: false, message: "Guest chat access denied" });
+          return;
+        }
+        socket.join(`chat:conversation:${id}`);
+        socket.join(`chat:guest:${tokenHash}`);
+        if (typeof callback === "function") callback({ success: true });
+      } catch (error) {
+        if (typeof callback === "function") callback({ success: false, message: "Could not join guest conversation" });
+      }
+    });
+
+    socket.on("chat:conversation:leave", async (payload) => {
+      const id = typeof payload === "string" ? payload : payload?.conversationId;
+      if (typeof id === "string" && socket.rooms.has(`chat:conversation:${id}`)) socket.leave(`chat:conversation:${id}`);
+    });
+
+    socket.on("chat:typing", (payload) => {
+      const id = typeof payload?.conversationId === "string" ? payload.conversationId : "";
+      const room = `chat:conversation:${id}`;
+      if (!id || !socket.rooms.has(room) || typeof payload?.isTyping !== "boolean") return;
+      const senderType = socket.userType === "employee" ? "admin" : "customer";
+      socket.to(room).emit("chat:typing", { conversation_id: id, sender_type: senderType, isTyping: payload.isTyping });
+    });
 
     socket.on("join:employee", (employeeId) => socket.join(`employee:${employeeId}`));
     socket.on("leave:employee", (employeeId) => socket.leave(`employee:${employeeId}`));
