@@ -16,7 +16,7 @@ cron.schedule('* * * * *', async () => {
           { endDate: null },
           { endDate: { $exists: false } },
           { endDate: { $gt: now } },
-        ],
+        ],   
       },
       { $set: { status: 'active' } }
     );
