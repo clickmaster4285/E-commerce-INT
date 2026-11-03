@@ -1127,13 +1127,13 @@ const [viewMode, setViewMode] = useState(() => {
           {/* Right: controls */}
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             <label className="me-2 flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
-              <span>{ts("pagination.rowsPerPage")}</span>
+              <span>{t("pagination.rowsPerPage")}</span>
               <select
                 value={productsPerPage}
                 onChange={(event) => { setProductsPerPage(Number(event.target.value)); setCurrentPage(1); }}
                 className="h-8 rounded-md px-2 text-[12px] outline-none"
                 style={{ backgroundColor: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}
-                aria-label={ts("pagination.rowsPerPage")}
+                aria-label={t("pagination.rowsPerPage")}
               >
                 {[10, 20, 50].map((size) => <option key={size} value={size}>{fmt(size)}</option>)}
               </select>

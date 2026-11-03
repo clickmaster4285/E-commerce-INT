@@ -88,8 +88,6 @@ const initialForm = (quote) =>
             Number(item.quantity || 0) * Number(item.unit_price || 0);
           return {
             ...item,
-            product_id: item.product_id?._id || item.product_id || null,
-            variant_id: item.variant_id?._id || item.variant_id || "",
             row_id: item._id || `saved-${index}`,
             quantity: item.quantity || 1,
             unit_price: item.unit_price || 0,
@@ -612,7 +610,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
         "Select at least one variant that has not already been added",
       );
       return;
-    }
+    }s
     setForm((current) => ({
       ...current,
       items: [
@@ -669,11 +667,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
       toast.error("Select a customer or lead and enter their name");
       return;
     }
-    const itemsToSave = form.items.filter((item) =>
-      [item.name, item.variant_name, item.sku, item.product_id, item.variant_id]
-        .some((value) => String(value || "").trim()),
-    );
-    if (!itemsToSave.length || itemsToSave.some((item) => !String(item.name || "").trim())) {
+    if (!form.items.length || form.items.some((item) => !item.variant_id)) {
       toast.error("Add a product to each quote item");
       return;
     }
@@ -696,7 +690,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
       customer_address: form.customer_address.trim(),
       quote_date: form.quote_date,
       expiry_date: form.expiry_date,
-      items: itemsToSave
+      items: form.items
         .filter((item) => String(item.name || "").trim())
         .map(({ row_id, variant_name, ...item }) => ({
           ...item,
