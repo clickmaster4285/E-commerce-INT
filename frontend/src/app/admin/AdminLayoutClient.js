@@ -20,6 +20,7 @@ const ROUTE_PERMISSIONS = {
   '/admin/dashboard': 'dashboard',
   '/admin/brands': 'brands',
     '/admin/orders': 'order',
+    '/admin/chats': 'order',
 
   '/admin/categories': 'categories',
   '/admin/attributes': 'attribute',
@@ -687,8 +688,8 @@ export default function AdminLayout({ children }) {
         {/* Keep the scrollport LTR so switching to an RTL locale does not move
             its horizontal origin and crop the left side of admin pages. Apply
             locale direction to the content wrapper instead. */}
-        <main ref={adminMainRef} dir="ltr" className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain bg-[var(--bg-secondary)] px-3 sm:px-5 py-4 sm:py-6">
-          <div dir={dir} lang={locale} className="mx-auto min-w-0 w-full max-w-[1600px]">{children}</div>
+        <main ref={adminMainRef} dir="ltr" className={`min-h-0 min-w-0 flex-1 ${pathname === '/admin/chats' ? 'overflow-hidden p-0' : 'overflow-y-auto overflow-x-auto overscroll-contain px-3 py-4 sm:px-5 sm:py-6'} bg-[var(--bg-secondary)]`}>
+          <div dir={dir} lang={locale} className={pathname === '/admin/chats' ? "h-full min-w-0 w-full" : "mx-auto min-w-0 w-full max-w-[1600px]"}>{children}</div>
         </main>
 
       </div>

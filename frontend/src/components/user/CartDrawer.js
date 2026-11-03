@@ -362,7 +362,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
     const handleRemove = (row) => {
       const key = row.key;
       setRemovingKeys((prev) => new Set(prev).add(key));
-      const t = setTimeout(() => {
+      const removeTimer = setTimeout(() => {
         removeFromCart(key);
         clearTimeout(qtyTimers.current[key]);
         delete qtyTimers.current[key];
@@ -378,7 +378,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
         });
         toast.success(t("admin.shared.toast.deleted"), { duration: 5000, action: { label: t("admin.shared.action.undo"), onClick: () => restoreItems([row.raw]) } });
       }, REMOVE_ANIM_MS);
-      timersRef.current.push(t);
+      timersRef.current.push(removeTimer);
     };
 
     const goCheckout = () => {

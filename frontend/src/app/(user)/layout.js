@@ -11,11 +11,12 @@ import VariantQuickBuyDrawer from "../../components/user/VariantQuickBuyDrawer";
 import { CartProvider, useCart } from "../../components/user/CartContext";
 import { QuickBuyProvider } from "../../components/user/QuickBuyContext";
 import { storeApi } from "@/apis/user/storeApi";
-import { Home, ShoppingCart, User, Heart } from "lucide-react";
+import { Home, ShoppingCart, User, Heart, MessageCircle } from "lucide-react";
 import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext";
 import { useUserSocketSync } from "../../hooks/user/useUserSocketSync";
 import { initThemeFromCookie } from "@/lib/theme";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import SupportChatWidget from "@/components/chat/SupportChatWidget";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
@@ -35,7 +36,7 @@ function MobileNav() {
       className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <div className="grid grid-cols-4 h-16">
+      <div className="grid grid-cols-5 h-16">
         <Link href="/" className="h-full">
           <NavItem icon={<Home size={20} />} label={t("mobileNav.home")} active={isActive("/")} />
         </Link>
@@ -73,6 +74,10 @@ function MobileNav() {
             active={isActive("/cart")}
           />
         </Link>
+
+        <button type="button" onClick={() => window.dispatchEvent(new Event("support-chat:open"))} className="h-full w-full">
+          <NavItem icon={<MessageCircle size={20} />} label={t("mobileNav.chats")} active={isActive("/chats")} />
+        </button>
 
         <Link href="/account" className="h-full">
           <NavItem icon={<User size={20} />} label={t("mobileNav.account")} active={isActive("/account")} />
@@ -134,7 +139,7 @@ export default function UserLayout({ children }) {
   const hideFooter =
     pathname === "/cart" || pathname?.startsWith("/cart/") ||
     pathname === "/checkout" || pathname?.startsWith("/checkout/") ||
-    pathname === "/orders" || pathname?.startsWith("/orders/");
+    pathname === "/orders" || pathname?.startsWith("/orders/") || pathname === "/chats";
 
   return (
     <WishlistProvider>
@@ -151,6 +156,7 @@ export default function UserLayout({ children }) {
           {!hideFooter && <Footer />}
           <CartDrawer />
           <VariantQuickBuyDrawer />
+          <SupportChatWidget />
           <MobileNav />
         </div>
         </QuickBuyProvider>

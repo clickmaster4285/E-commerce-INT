@@ -67,6 +67,32 @@
   --user-transition:    0.2s ease;
 }
 
+/* Storefront chat surfaces follow the customer theme (Tailwind's `dark`
+   variant is reserved for the admin panel and does not use `user-dark`). */
+:root.user-dark .user-chat-thread {
+  border-color: var(--user-border) !important;
+  background-color: var(--user-bg-card) !important;
+  color: var(--user-text) !important;
+}
+:root.user-dark .user-chat-thread .bg-white { background-color: var(--user-bg-card) !important; }
+:root.user-dark .user-chat-thread > .flex-1 { background-color: var(--user-bg) !important; }
+:root.user-dark .user-chat-thread .bg-slate-50 { background-color: var(--user-bg-input) !important; }
+:root.user-dark .user-chat-thread .bg-slate-100 { background-color: var(--user-bg-hover) !important; }
+:root.user-dark .user-chat-thread .bg-blue-100 { background-color: #173456 !important; }
+:root.user-dark .user-chat-thread .text-slate-900,
+:root.user-dark .user-chat-thread .text-slate-800 { color: var(--user-text) !important; }
+:root.user-dark .user-chat-thread .text-slate-700,
+:root.user-dark .user-chat-thread .text-slate-600 { color: var(--user-text-secondary) !important; }
+:root.user-dark .user-chat-thread .text-slate-500,
+:root.user-dark .user-chat-thread .text-slate-400 { color: var(--user-text-muted) !important; }
+:root.user-dark .user-chat-thread .border-slate-100,
+:root.user-dark .user-chat-thread .border-slate-200 { border-color: var(--user-border) !important; }
+:root.user-dark .user-chat-thread .border-red-200 { border-color: #6d3337 !important; }
+:root.user-dark .user-chat-thread .bg-red-50 { background-color: #321b20 !important; }
+:root.user-dark .user-chat-thread .text-red-700 { color: #fda4af !important; }
+:root.user-dark .user-chat-thread .text-blue-700 { color: #93c5fd !important; }
+:root.user-dark .user-chat-thread .text-emerald-500 { color: #34d399 !important; }
+
 /* ==========================================
    USER THEME — LIGHT MODE (Default)
 ========================================== */

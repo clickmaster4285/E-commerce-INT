@@ -274,7 +274,7 @@ const CancelConfirmModal = ({ orderNumber, canceling, onClose, onConfirm }) => (
         <div className="w-16 h-16 rounded-2xl bg-[var(--user-danger)] flex items-center justify-center mb-4">
           <XCircle size={28} className="text-white" />
         </div>
-        <h3 className="text-lg font-black text-[var(--user-text)]">Cancel "{orderNumber}"?</h3>
+        <h3 className="text-lg font-black text-[var(--user-text)]">Cancel “{orderNumber}”?</h3>
         <p className="text-xs text-[var(--user-text-muted)] mt-2 leading-relaxed">Items will be restored to stock. This cannot be undone.</p>
       </div>
       <div className="flex gap-3">
@@ -444,6 +444,9 @@ export default function OrderDetailPage({ params }) {
                 ) : (
                   order.status !== "cancelled" && <p className="text-[0.625rem] text-[var(--user-text-muted)] inline-flex items-center gap-1.5"><Lock size={12} /> Order locked — cannot be modified</p>
                 )}
+                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--user-border)] px-4 py-2.5 text-xs font-bold text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+                  <MessageCircle size={15} /> Chat about this order
+                </button>
               </div>
             </div>
           </div>
@@ -873,6 +876,9 @@ export default function OrderDetailPage({ params }) {
             <XCircle size={16} /> Cancel Order
           </button>
         )}
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="w-full h-12 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-semibold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-2">
+          <MessageCircle size={16} /> Chat about this order
+        </button>
       </div>
     </div>
 
