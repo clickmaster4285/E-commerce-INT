@@ -35,7 +35,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
-const PER_PAGE = 20;
+const DEFAULT_PER_PAGE = 10;
 const MODAL_PER_PAGE = 8;
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "") ;
@@ -89,7 +89,7 @@ function StatusBadge({ status }) {
 /* ==========================================================
    TABLE SKELETON — same row pattern as Products page
    ========================================================== */
-function TableSkeleton({ rows = PER_PAGE }) {
+function TableSkeleton({ rows = DEFAULT_PER_PAGE }) {
   return (
     <tbody>
       {Array.from({ length: rows }).map((_, i) => (
@@ -354,8 +354,8 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
   }, [search]);
 
   const { data, isLoading, isFetching, isError, refetch } = useQuery({
-    queryKey: ["manage-featured", page, debounced],
-    queryFn: () => productApi.getPaginated({ page, limit: MODAL_PER_PAGE, search: debounced }),
+    queryKey: ["manage-featured", page, debounced, locale],
+    queryFn: () => productApi.getPaginated({ page, limit: MODAL_PER_PAGE, search: debounced, locale, admin_list: true, admin_context: "featured-manager" }),
     enabled: open,
     retry: false,
   });
@@ -371,7 +371,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
     records: products,
     locale,
     ready: open && !isFetching && Number(pagination.page || page) === page,
-    queryKey: ["manage-featured", page, debounced],
+    queryKey: ["manage-featured", page, debounced, locale],
     queryClient,
   });
   usePageTranslations({
@@ -379,7 +379,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
     records: categories,
     locale,
     ready: open && !isFetching && Number(pagination.page || page) === page,
-    queryKey: ["manage-featured", page, debounced],
+    queryKey: ["manage-featured", page, debounced, locale],
     queryClient,
   });
   usePageTranslations({
@@ -387,7 +387,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
     records: brands,
     locale,
     ready: open && !isFetching && Number(pagination.page || page) === page,
-    queryKey: ["manage-featured", page, debounced],
+    queryKey: ["manage-featured", page, debounced, locale],
     queryClient,
   });
 
@@ -696,6 +696,7 @@ export default function FeaturedProductsPage() {
   useProductSocketSync();
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage, setProductsPerPage] = useState(DEFAULT_PER_PAGE);
   const [viewMode, setViewMode] = useState("list");
   // ✅ "Manage Products" popup — multi-select featured manager
   const [manageOpen, setManageOpen] = useState(false);
@@ -704,20 +705,24 @@ export default function FeaturedProductsPage() {
   // sort="featured-recent" → featured_at desc (jo abhi featured hua wo top par).
   // Default created_at sort is page kaam ka nahi tha (bulk seed me sab same).
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ["featured-products", currentPage, search],
+    queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryFn: () =>
       productApi.getPaginated({
         page: currentPage,
-        limit: PER_PAGE,
+        limit: productsPerPage,
         search: search || "",
         featured: true,
         sort: "featured-recent",
+        locale,
+        admin_list: true,
+        admin_inventory: true,
+        admin_context: "featured",
       }),
     retry: false,
   });
 
   const products = useMemo(() => data?.products || [], [data]);
-  const pagination = data?.pagination || { total: 0, pages: 1, limit: PER_PAGE };
+  const pagination = data?.pagination || { total: 0, pages: 1, limit: DEFAULT_PER_PAGE };
   const categories = useMemo(() => products.map((product) => product?.category_id).filter((item) => item?._id), [products]);
   const brands = useMemo(() => products.map((product) => product?.brand_id).filter((item) => item?._id), [products]);
   usePageTranslations({
@@ -725,7 +730,7 @@ export default function FeaturedProductsPage() {
     records: products,
     locale,
     ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
-    queryKey: ["featured-products", currentPage, search],
+    queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryClient,
   });
   usePageTranslations({
@@ -733,7 +738,7 @@ export default function FeaturedProductsPage() {
     records: categories,
     locale,
     ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
-    queryKey: ["featured-products", currentPage, search],
+    queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryClient,
   });
   usePageTranslations({
@@ -741,12 +746,12 @@ export default function FeaturedProductsPage() {
     records: brands,
     locale,
     ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
-    queryKey: ["featured-products", currentPage, search],
+    queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryClient,
   });
   const totalRecords = Number(pagination.total) || 0;
   const totalPages = Math.max(1, Number(pagination.pages) || 1);
-  const pageLimit = Number(pagination.limit) || PER_PAGE;
+  const pageLimit = Number(pagination.limit) || productsPerPage;
   const firstRow = totalRecords === 0 ? 0 : (currentPage - 1) * pageLimit + 1;
   const lastRow = Math.min(currentPage * pageLimit, totalRecords);
 
@@ -878,7 +883,7 @@ export default function FeaturedProductsPage() {
               </thead>
 
               {isLoading ? (
-                <TableSkeleton rows={PER_PAGE} />
+                <TableSkeleton rows={productsPerPage} />
               ) : (
                 <tbody style={{ animation: "fadeIn 0.22s ease" }}>
                   {isError ? (
@@ -964,7 +969,7 @@ export default function FeaturedProductsPage() {
       )}
 
       {/* PAGINATION — same simple pattern as Products page */}
-      {!isLoading && !isError && totalRecords > PER_PAGE && (
+      {!isLoading && !isError && totalRecords > 0 && (
         <div
           className="flex flex-col gap-3 rounded-lg px-4 py-3 lg:flex-row lg:items-center lg:justify-between"
           style={cardStyle}
@@ -982,6 +987,18 @@ export default function FeaturedProductsPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-1.5" role="navigation" aria-label={t("admin.featuredProducts.ui.pagination")}>
+            <label className="me-2 flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+              <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+              <select
+                value={productsPerPage}
+                onChange={(event) => { setProductsPerPage(Number(event.target.value)); setCurrentPage(1); }}
+                className="h-8 rounded-md px-2 text-[12px] outline-none"
+                style={{ backgroundColor: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}
+                aria-label={t("admin.shared.pagination.rowsPerPage")}
+              >
+                {[10, 20, 50].map((size) => <option key={size} value={size}>{fmt(size, locale)}</option>)}
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => goToPage(currentPage - 1)}

@@ -77,6 +77,7 @@ const sanitizeOptionLabels = (raw) => {
 };
 
 const getCategoryName = (categoryId, categories) => {
+  if (categoryId && typeof categoryId === "object" && categoryId.name) return categoryId.name;
   const category = categories.find((item) => String(item._id) === String(categoryId));
   return category?.name || "None";
 };
@@ -85,6 +86,7 @@ const getCategoryName = (categoryId, categories) => {
 // chahiye (translations map `name` ke saath hi), plain name string nahi.
 const getCategoryDoc = (categoryId, categories) => {
   if (!categoryId) return null;
+  if (typeof categoryId === "object" && categoryId._id) return categoryId;
   return (categories || []).find((item) => String(item._id) === String(categoryId)) || null;
 };
 
@@ -286,7 +288,7 @@ const [viewMode, setViewMode] = useState(() => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -341,7 +343,7 @@ const [viewMode, setViewMode] = useState(() => {
   // Queries
   const { data: paginatedCategoriesData, isLoading: categoriesLoading, isFetching: categoriesFetching } = useQuery({
     // ✅ Server-side pagination — search/filter/sort/page sab backend par jate hain
-    queryKey: ["admin-categories", "paginated", currentPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction],
+    queryKey: ["admin-categories", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction],
     queryFn: () => categoryApi.getAllPaginated({
       page: currentPage,
       limit: itemsPerPage,
@@ -349,11 +351,17 @@ const [viewMode, setViewMode] = useState(() => {
       parent: filterParent,
       sort: sortConfig.key || "",
       order: sortConfig.direction,
+      locale,
     }),
     retry: false,
     staleTime: 0,
-    // ✅ Page change par purana page visible rehta hai (flicker nahi)
-    placeholderData: (previousData) => previousData,
+  });
+
+  const { data: categoryOptions = [] } = useQuery({
+    queryKey: ["admin-categories", "options", locale],
+    queryFn: () => categoryApi.getOptions(locale),
+    enabled: showCreateModal || showEditModal,
+    staleTime: 60_000,
   });
 
   const { data: allAttributes = [] } = useQuery({
@@ -526,8 +534,15 @@ const [viewMode, setViewMode] = useState(() => {
     fetchNextCode();
   };
 
-  const handleOpenEdit = (category) => {
-    const loadedAttrs = (category.attributes || []).map((a, i) => {
+  const handleOpenEdit = async (category) => {
+    let completeCategory;
+    try {
+      completeCategory = await categoryApi.getById(category._id, locale, true);
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message || t("admin.shared.toast.loadFailed"));
+      return;
+    }
+    const loadedAttrs = (completeCategory.attributes || []).map((a, i) => {
       let value = a.value;
       const attrObj = a.attribute_id;
       const dataType = (attrObj && typeof attrObj === "object") ? attrObj.data_type : null;
@@ -554,15 +569,15 @@ const [viewMode, setViewMode] = useState(() => {
       };
     });
     setFormData({
-      category_code: category.category_code || "",
-      name: category.name || "",
-      description: category.description || "",
-      parent_category_id: getId(category.parent_category_id),
-      status: category.is_active !== false ? "active" : "inactive",
+      category_code: completeCategory.category_code || "",
+      name: completeCategory.name || "",
+      description: completeCategory.description || "",
+      parent_category_id: getId(completeCategory.parent_category_id),
+      status: completeCategory.is_active !== false ? "active" : "inactive",
       attributes: loadedAttrs,
     });
-    setEditingCategory(category);
-    setAutoCode(category.category_code || "");
+    setEditingCategory(completeCategory);
+    setAutoCode(completeCategory.category_code || "");
     // Har naye Edit modal me status "clean" — tab tak admin usse chua nahi,
     // is liye save par `is_active` nahi jayega (stale value se dobara enable
     // hone se protected).
@@ -749,9 +764,19 @@ const [viewMode, setViewMode] = useState(() => {
   /* ---------- Derived data (server side paginated) ---------- */
   // ✅ Backend se sirf current page ki categories aati hain
   const categories = Array.isArray(paginatedCategoriesData?.items) ? paginatedCategoriesData.items : [];
-  usePageTranslations({ model: "Category", records: categories, locale, ready: !categoriesFetching && paginatedCategoriesData?.pagination?.page === currentPage, queryKey: ["admin-categories", "paginated", currentPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction], queryClient });
+  const pageAlreadyTranslated = locale === "en" || (categories.length > 0 && categories.every((category) =>
+    typeof category.translations?.name?.[locale] === "string" && category.translations.name[locale].trim().length > 0 &&
+    (!category.description || (typeof category.translations?.description?.[locale] === "string" && category.translations.description[locale].trim().length > 0))
+  ));
+  const categoryPageTranslationsReady = usePageTranslations({ model: "Category", records: categories, locale, ready: !categoriesFetching && !!paginatedCategoriesData?.pagination, queryKey: ["admin-categories", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction], queryClient, alreadyTranslated: pageAlreadyTranslated, fallbackAfterRetries: true });
+  const localizedNameReady = (category) => locale === "en" || categoryPageTranslationsReady || Boolean(
+    category?.translations?.name?.[locale]?.trim()
+  );
+  const localizedDescriptionReady = (category) => locale === "en" || categoryPageTranslationsReady || !category?.description || Boolean(
+    category?.translations?.description?.[locale]?.trim()
+  );
+  const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse";
   // ✅ Poori list (lightweight) — parent dropdown + parent name ke liye
-  const categoryOptions = Array.isArray(paginatedCategoriesData?.options) ? paginatedCategoriesData.options : [];
   const categoryCounts = paginatedCategoriesData?.counts || { total: 0, root: 0, child: 0, withAttributes: 0 };
   const pagination = paginatedCategoriesData?.pagination || {
     total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false,
@@ -760,8 +785,10 @@ const [viewMode, setViewMode] = useState(() => {
   const paginatedCategories = categories;                          // current page (server se)
   const totalCategories = pagination.total || 0;                   // filtered total
   const totalPages = pagination.pages || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
+  const displayedPage = pagination.page || currentPage;
+  const startIndex = (displayedPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + categories.length, totalCategories);
+  const formatPageNumber = (value) => new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
 
   // ✅ Search debounce (300ms) + page reset + selection clear
   // (setState setTimeout callback ke andar — effect body mein sync setState nahi)
@@ -840,14 +867,14 @@ const [viewMode, setViewMode] = useState(() => {
     let cancelled = false;
     (async () => {
       try {
-        const record = await categoryApi.getById(editId);
+        const record = await categoryApi.getById(editId, locale, true);
         if (!cancelled) openWith(record);
       } catch {
         // category mila hi nahi — chup chaap chhod do
       }
     })();
     return () => { cancelled = true; };
-  }, [searchParams, categories, categoriesLoading]);
+  }, [searchParams, categories, categoriesLoading, locale]);
 
   const allCategories = categoryCounts.total || 0;
   const rootCategoriesCount = categoryCounts.root || 0;
@@ -1596,11 +1623,11 @@ const [viewMode, setViewMode] = useState(() => {
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
-                            <span className="font-medium text-[13px] truncate max-w-[140px]">{nameOf(category)}</span>
+                            {localizedNameReady(category) ? <span className="font-medium text-[13px] truncate max-w-[140px]">{nameOf(category)}</span> : <span className={`${translationSkeleton} w-28`} aria-label={t("page.updating")} />}
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(category) || "—"}</p></td>
-                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentDoc ? nameOf(parentDoc) : "—"}</td>
+                        <td className="px-4 py-2.5 hidden lg:table-cell max-w-[200px]">{localizedDescriptionReady(category) ? <p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(category) || "—"}</p> : <span className={`${translationSkeleton} w-32`} aria-label={t("page.updating")} />}</td>
+                        <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{parentName === "None" ? "—" : parentDoc ? (localizedNameReady(parentDoc) ? nameOf(parentDoc) : <span className={`${translationSkeleton} w-20 align-middle`} aria-label={t("page.updating")} />) : "—"}</td>
                         <td className="px-4 py-2.5">
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             style={isActive
@@ -1632,12 +1659,12 @@ const [viewMode, setViewMode] = useState(() => {
                     <input type="checkbox" checked={isMobileSelected} onChange={() => toggleSelect(category._id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded cursor-pointer shrink-0" style={{ accentColor: "var(--accent)" }} />
                     <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-4 h-4" /></div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate leading-tight">{nameOf(category)}</p>
+                      {localizedNameReady(category) ? <p className="text-[13px] font-medium truncate leading-tight">{nameOf(category)}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("page.updating")} />}
                       <p className="text-[11px] font-mono truncate mt-0.5" style={{ color: "var(--text-secondary)" }}>{category.category_code || "—"}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
-                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : nameOf(parentDoc)}</span>
+                    <span className="text-[11px] truncate min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : parentDoc ? (localizedNameReady(parentDoc) ? nameOf(parentDoc) : <span className={`${translationSkeleton} w-20 align-middle`} aria-label={t("page.updating")} />) : "—"}</span>
                     <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap" style={isMobileActive ? { backgroundColor: "var(--success-soft)", color: "var(--success-text)", border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)" } : { backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>{isMobileActive ? t("status.active") : t("status.inactive")}</span>
                   </div>
                   <div className="flex items-center justify-end pt-2" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -1659,11 +1686,11 @@ const [viewMode, setViewMode] = useState(() => {
                     <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><FolderIcon className="w-5 h-5" /></div>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(category)}</p>
+                    {localizedNameReady(category) ? <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(category)}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("page.updating")} />}
                     <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{category.category_code || "—"}</p>
                   </div>
                   <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : nameOf(parentDoc)}</span>
+                    <span className="text-[10px] sm:text-[12px] truncate flex-1 min-w-0" style={{ color: "var(--text-muted)" }}>{parentName === "None" ? t("parent.none") : parentDoc ? (localizedNameReady(parentDoc) ? nameOf(parentDoc) : <span className={`${translationSkeleton} w-20 align-middle`} aria-label={t("page.updating")} />) : "—"}</span>
                     <ActionButtons category={category} />
                   </div>
                 </div>
@@ -1673,29 +1700,43 @@ const [viewMode, setViewMode] = useState(() => {
         )}
 
         {/* ===== Pagination (server side) ===== */}
-        {totalCategories > 20 && (
+        {totalCategories > itemsPerPage && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
             <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              {t("page.showingRange", { from: startIndex + 1, to: Math.min(endIndex, totalCategories), total: totalCategories })}
+              {t("page.showingRange", { from: formatPageNumber(categories.length ? startIndex + 1 : 0), to: formatPageNumber(endIndex), total: formatPageNumber(totalCategories) })}
               {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>{t("page.updating")}</span> : null}
             </p>
+            <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+              <span>{t("admin.categories.page.rowsPerPage")}</span>
+              <select
+                value={itemsPerPage}
+                onChange={(event) => { setItemsPerPage(Number(event.target.value)); setCurrentPage(1); setSelectedIds([]); }}
+                className="h-9 w-[84px] rounded-lg px-3 text-[13px] outline-none cursor-pointer"
+                style={inputStyle}
+                aria-label={t("admin.categories.page.rowsPerPage")}
+              >
+                {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+              </select>
+            </label>
+            </div>
             <div className="flex items-center gap-2">
-              <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("page.pageOf", { page: currentPage, total: totalPages })}</span>
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("page.prev")}><ChevronLeftIcon className="w-4 h-4" /></button>
+              <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("page.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}</span>
+              <button onClick={() => goToPage(displayedPage - 1)} disabled={displayedPage === 1 || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("page.prev")}><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
-                      <button onClick={() => goToPage(page)} disabled={categoriesFetching && currentPage !== page} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
+                      <button onClick={() => goToPage(page)} disabled={categoriesFetching && displayedPage !== page} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: displayedPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: displayedPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${displayedPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{formatPageNumber(page)}</button>
                     )}
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("page.next")}><ChevronRightIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(displayedPage + 1)} disabled={displayedPage === totalPages || categoriesFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("page.next")}><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-        {paginatedCategories.length > 0 && totalCategories <= 20 && (
+        {paginatedCategories.length > 0 && totalCategories <= itemsPerPage && (
           <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
             {t("page.showingCount", { count: paginatedCategories.length, total: totalCategories })}
             {categoriesFetching && !categoriesLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>{t("page.updating")}</span> : null}

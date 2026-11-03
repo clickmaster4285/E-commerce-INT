@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
@@ -34,7 +34,7 @@ const SlidersIcon = ({ className = "w-4 h-4" }) => (
 // `.skeleton` (globals.css) apna border-radius deta hai, is liye pills/circles ke liye inline radius
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
-function AttributeRowsSkeleton({ rows = ATTRS_PER_PAGE }) {
+function AttributeRowsSkeleton({ rows = DEFAULT_ATTRS_PER_PAGE }) {
   const { t } = useTranslation();
   return (
     <tbody aria-busy="true" aria-label={t("common.loading")}>
@@ -143,7 +143,26 @@ const getAttributeOptionText = (entry, locale = "en", depth = 0) => {
   return "";
 };
 
-const ATTRS_PER_PAGE = 15;
+const DEFAULT_ATTRS_PER_PAGE = 10;
+const LOCALE_SCRIPT_PATTERNS = {
+  ar: /\p{Script=Arabic}/u,
+  ur: /\p{Script=Arabic}/u,
+  hi: /\p{Script=Devanagari}/u,
+  zh: /\p{Script=Han}/u,
+};
+
+const hasStrictLocaleText = (source, translated, locale) => {
+  const sourceText = String(source || "").trim();
+  const translatedText = String(translated || "").trim();
+  if (!translatedText || translatedText.localeCompare(sourceText, undefined, { sensitivity: "accent" }) === 0) return false;
+  const scriptPattern = LOCALE_SCRIPT_PATTERNS[locale];
+  return !scriptPattern || scriptPattern.test(translatedText);
+};
+
+const needsLocaleTranslation = (value) => {
+  const sourceText = String(value || "").trim();
+  return sourceText.length >= 3 && /\p{L}/u.test(sourceText) && !/^\d+(?:[.,]\d+)?$/.test(sourceText);
+};
 
 // ==================== RIGHT SIDE DETAIL PANEL ====================
 function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isAddingOption = false }) {
@@ -151,7 +170,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
   const { nameOf, optionLabelOf } = useLocalized();
   // Static UI labels — `t()` se.
   const { t: __t, locale, dir } = useTranslation();
-  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
+  const t = useCallback((k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p), [__t]);
   // ✅ Slide-in/out animation — mount par drawer right se smoothly slide hota hai,
   //    close par pehle slide-out animation, phir parent se unmount hota hai.
   const [visible, setVisible] = useState(false);
@@ -424,7 +443,7 @@ export default function AttributesPage() {
   // Static UI labels (headers, stats, buttons, toasts) — database ke nahi,
   // is liye `t()` se aati hain. Nahi milne par English fallback rehta hai.
   const { t: __t, locale } = useTranslation();
-  const t = (k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p);
+  const t = useCallback((k, p) => __t(k.startsWith("admin.") || k.startsWith("common.") ? k : `admin.attributes.${k}`, p), [__t]);
   // `code` aur har option ka raw `value` kabhi translate nahi hote (variant
   // matching unhi par chalti hai) — sirf `name` + option `label` localized.
   const { nameOf, attributeOf, optionLabelOf, text } = useLocalized();
@@ -434,6 +453,7 @@ export default function AttributesPage() {
   const [search, setSearch] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [attributePage, setAttributePage] = useState(1);
+  const [attributesPerPage, setAttributesPerPage] = useState(DEFAULT_ATTRS_PER_PAGE);
   
   // Debounced search
   useEffect(() => {
@@ -469,8 +489,9 @@ export default function AttributesPage() {
     if (!editParam || editParamHandled) return;
     const openFromUrl = async () => {
       try {
-        const attr = await attributeApi.getById(editParam);
-        openEditModal(attr);
+        const attr = await attributeApi.getById(editParam, { admin_detail: true, locale });
+        setEditingAttribute(attr);
+        setShowEditModal(true);
       } catch (err) {
         console.error("Failed to load attribute for edit:", err);
         toast.error(t("toast.loadFailed"));
@@ -478,38 +499,62 @@ export default function AttributesPage() {
       setEditParamHandled(true);
     };
     openFromUrl();
-  }, [editParam, editParamHandled]);
+  }, [editParam, editParamHandled, locale, t]);
 
   // ===== SERVER-SIDE PAGINATED QUERY =====
   const { data: paginatedAttrsData, isLoading: attributesLoading, isFetching } = useQuery({
-    queryKey: ["attributes", "paginated", attributePage, search],
+    queryKey: ["attributes", "paginated", attributePage, attributesPerPage, search, statusFilter, sortConfig.key, sortConfig.direction, locale],
     queryFn: () =>
       attributeApi.getAllPaginated({
         page: attributePage,
-        limit: ATTRS_PER_PAGE,
+        limit: attributesPerPage,
         search,
+        status: statusFilter,
+        sort: sortConfig.key || "",
+        direction: sortConfig.direction,
+        locale,
+        admin_list: true,
       }),
     retry: false,
     staleTime: 0,
-    keepPreviousData: true,
   });
 
   // Normalize response (handles both paginated and legacy array)
-  const attributesRaw = Array.isArray(paginatedAttrsData)
+  const attributesRaw = useMemo(() => Array.isArray(paginatedAttrsData)
     ? paginatedAttrsData
-    : paginatedAttrsData?.items || paginatedAttrsData?.data || paginatedAttrsData?.attributes || [];
+    : paginatedAttrsData?.items || paginatedAttrsData?.data || paginatedAttrsData?.attributes || [], [paginatedAttrsData]);
   
   const pagination = Array.isArray(paginatedAttrsData)
-    ? { total: attributesRaw.length, page: 1, limit: ATTRS_PER_PAGE, pages: 1 }
-    : paginatedAttrsData?.pagination || { total: 0, page: 1, limit: ATTRS_PER_PAGE, pages: 1 };
+    ? { total: attributesRaw.length, page: 1, limit: attributesPerPage, pages: 1 }
+    : paginatedAttrsData?.pagination || { total: 0, page: 1, limit: attributesPerPage, pages: 1 };
 
+  const attributesAlreadyTranslated = locale === "en" || (attributesRaw.length > 0 && attributesRaw.every((attr) => attr.translations?.name?.[locale]?.trim()));
   usePageTranslations({
     model: "Attribute",
     records: attributesRaw,
     locale,
     ready: !isFetching && pagination.page === attributePage,
-    queryKey: ["attributes", "paginated", attributePage, search],
+    queryKey: ["attributes", "paginated", attributePage, attributesPerPage, search, statusFilter, sortConfig.key, sortConfig.direction, locale],
     queryClient,
+    alreadyTranslated: attributesAlreadyTranslated,
+  });
+
+  const categoryRecords = attributesRaw
+    .filter((attribute) => attribute.category_id && attribute.category)
+    .map((attribute) => ({
+      _id: String(attribute.category_id),
+      name: attribute.category,
+      translations: { name: attribute.category_translations || {} },
+    }));
+  const categoriesAlreadyTranslated = locale === "en" || (categoryRecords.length > 0 && categoryRecords.every((category) => category.translations.name?.[locale]?.trim()));
+  usePageTranslations({
+    model: "Category",
+    records: categoryRecords,
+    locale,
+    ready: !isFetching && pagination.page === attributePage,
+    queryKey: ["attributes", "paginated", attributePage, attributesPerPage, search, statusFilter, sortConfig.key, sortConfig.direction, locale],
+    queryClient,
+    alreadyTranslated: categoriesAlreadyTranslated,
   });
 
   // Client-side sort within the current page (server handles search + paging)
@@ -521,7 +566,7 @@ export default function AttributesPage() {
       switch (sortConfig.key) {
         case "name": va = a.name?.toLowerCase() || ""; vb = b.name?.toLowerCase() || ""; break;
         case "type": va = a.data_type || ""; vb = b.data_type || ""; break;
-        case "options": va = a.values?.length || 0; vb = b.values?.length || 0; break;
+        case "options": va = a.options_count || 0; vb = b.options_count || 0; break;
         default: return 0;
       }
       if (va < vb) return sortConfig.direction === "asc" ? -1 : 1;
@@ -533,35 +578,20 @@ export default function AttributesPage() {
 
   const totalAttributes = pagination.total || 0;
   const totalAttributePages = Math.max(1, pagination.pages || 1);
-  const attrStartIndex = totalAttributes === 0 ? 0 : (attributePage - 1) * ATTRS_PER_PAGE + 1;
-  const attrEndIndex = Math.min(attributePage * ATTRS_PER_PAGE, totalAttributes);
+  const attrStartIndex = totalAttributes === 0 ? 0 : (attributePage - 1) * attributesPerPage + 1;
+  const attrEndIndex = Math.min(attributePage * attributesPerPage, totalAttributes);
 
   // Scroll to top on page change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [attributePage]);
 
-  // ===== ALL ATTRIBUTES (for stats) =====
-  const { data: allAttrs = [] } = useQuery({
-    queryKey: ["attributes", "all"],
-    queryFn: () => attributeApi.getAll(),
+  const { data: stats = {} } = useQuery({
+    queryKey: ["attributes", "stats"],
+    queryFn: attributeApi.getStats,
     retry: false,
     staleTime: 0,
   });
-
-  // ===== STATS (computed from real API data) =====
-  const stats = useMemo(() => {
-    const all = Array.isArray(allAttrs) ? allAttrs : [];
-    const total = all.length;
-    const active = all.filter((a) => a.is_active !== false).length;
-    const withOptions = all.filter((a) => Array.isArray(a.values) && a.values.length > 0).length;
-    
-    const LEGACY_DATA_TYPE_MAP = { select: "multi_select", color: "multi_select", date: "text", datetime: "text", url: "text", measurement: "decimal" };
-    const SUPPORTED_TYPES = ["multi_select", "boolean"];
-    const dataTypeSet = new Set(all.map((a) => LEGACY_DATA_TYPE_MAP[a.data_type] || a.data_type).filter((t) => SUPPORTED_TYPES.includes(t)));
-    
-    return { total, active, withOptions, dataTypes: dataTypeSet.size };
-  }, [allAttrs]);
 
   const goToAttributePage = (p) => {
     if (p >= 1 && p <= totalAttributePages && p !== attributePage) {
@@ -584,9 +614,24 @@ export default function AttributesPage() {
   });
 
   // ===== EDIT ATTRIBUTE =====
-  const openEditModal = (attr) => {
-    setEditingAttribute(attr);
-    setShowEditModal(true);
+  const openEditModal = async (attr) => {
+    try {
+      const fullAttribute = Array.isArray(attr?.values) ? attr : await attributeApi.getById(attr?._id, { admin_detail: true, locale });
+      setEditingAttribute(fullAttribute);
+      setShowEditModal(true);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error?.message || t("toast.loadFailed"));
+    }
+  };
+
+  const openAttributeDetails = async (attr) => {
+    if (!attr?._id) return;
+    try {
+      const fullAttribute = Array.isArray(attr.values) ? attr : await attributeApi.getById(attr._id, { admin_detail: true, locale });
+      setDetailAttr(fullAttribute);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || error?.message || t("toast.loadFailed"));
+    }
   };
 
   const editAttributeMutation = useMutation({
@@ -686,7 +731,7 @@ export default function AttributesPage() {
 
   const SortHeader = ({ label, sortKey }) => (
     <th className="px-4 py-3 text-left">
-      <button onClick={() => setSortConfig(prev => ({ key: sortKey, direction: prev.key === sortKey && prev.direction === "asc" ? "desc" : "asc" }))}
+      <button onClick={() => { setAttributePage(1); setSortConfig(prev => ({ key: sortKey, direction: prev.key === sortKey && prev.direction === "asc" ? "desc" : "asc" })); }}
         className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-wider transition hover:opacity-80"
         style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
         {label} <SortIndicator active={sortConfig.key === sortKey} direction={sortConfig.direction} />
@@ -694,8 +739,8 @@ export default function AttributesPage() {
     </th>
   );
 
-  const Pagination = ({ current, total, go, label }) => {
-    if (total <= 1) return null;
+  const Pagination = ({ current, total, go, label, pageSize, totalRecords, onPageSizeChange }) => {
+    if (totalRecords <= 0) return null;
     const pages = [];
     if (total <= 5) for (let i = 1; i <= total; i++) pages.push(i);
     else if (current <= 3) pages.push(1, 2, 3, 4, "...", total);
@@ -705,7 +750,19 @@ export default function AttributesPage() {
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4 mt-4" style={cardStyle}>
         <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{label}</p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="me-2 flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+            <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              className="h-8 rounded-md px-2 text-[12px] outline-none"
+              style={{ backgroundColor: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}
+              aria-label={t("admin.shared.pagination.rowsPerPage")}
+            >
+              {[10, 20, 50].map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
           <button onClick={() => go(current - 1)} disabled={current === 1}
             className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80"
             style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.prev")}>
@@ -801,7 +858,7 @@ export default function AttributesPage() {
               onClick={(e) => { 
                 e.stopPropagation(); 
                 setOpen(false); 
-                setDetailAttr(attr); // ✅ Opens Right Panel
+                openAttributeDetails(attr);
               }}
               className={menuItemClass}
               style={{ color: "var(--text-primary)" }}
@@ -894,10 +951,10 @@ export default function AttributesPage() {
         <div className={`space-y-5 origin-top-left transition-all duration-300 ease-out ${detailAttr ? "scale-[0.98] opacity-60 pointer-events-none select-none" : "scale-100 opacity-100"}`}>
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.total")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{stats.total}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.active")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{stats.active}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.withOptions")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{stats.withOptions}</p></div>
-          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.dataTypes")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{stats.dataTypes}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.total")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1">{stats.total ?? 0}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.active")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-emerald-500">{stats.active ?? 0}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.withOptions")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-blue-500">{stats.withOptions ?? 0}</p></div>
+          <div className="rounded-lg p-3 sm:p-4" style={cardStyle}><p className="text-[11px] sm:text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{t("stat.dataTypes")}</p><p className="text-[18px] sm:text-[20px] font-bold mt-1 text-purple-500">{stats.dataTypes ?? 0}</p></div>
         </div>
 
         {/* ===== Professional Toolbar: Search Left, Filters Right ===== */}
@@ -948,7 +1005,7 @@ export default function AttributesPage() {
                     <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)", width: "52px" }}>{t("table.actions")}</th>
                   </tr>
                 </thead>
-                <AttributeRowsSkeleton rows={ATTRS_PER_PAGE} />
+                <AttributeRowsSkeleton rows={attributesPerPage} />
               </table>
             </div>
           ) : filteredAttributes.length === 0 ? (
@@ -972,16 +1029,22 @@ export default function AttributesPage() {
                 <tbody>
                   {filteredAttributes.map((attr, index) => {
                     const isActive = attr.is_active !== false;
-                    const opts = attr.values?.length || 0;
+                    const opts = Number(attr.options_count ?? attr.values?.length) || 0;
+                    // Never show the source-language name when this row is
+                    // still missing the currently selected locale.
+                    const localizedAttributeName = nameOf(attr);
+                    const localizedCategoryName = text(attr.category, attr.category_translations);
+                    const attributeTextReady = locale === "en" || !needsLocaleTranslation(attr.name) || hasStrictLocaleText(attr.name, localizedAttributeName, locale);
+                    const categoryTextReady = locale === "en" || !attr.category_id || !needsLocaleTranslation(attr.category) || hasStrictLocaleText(attr.category, localizedCategoryName, locale);
                     return (
                       <tr
                         key={attr._id}
                         tabIndex={0}
                         aria-label={`View options for ${nameOf(attr)}`}
                         title={t("action.viewOptions")}
-                        onClick={() => setDetailAttr(attr)}
+                        onClick={() => openAttributeDetails(attr)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDetailAttr(attr); }
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAttributeDetails(attr); }
                         }}
                         className="transition cursor-pointer outline-none"
                         style={{ borderBottom: index < filteredAttributes.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}
@@ -995,7 +1058,9 @@ export default function AttributesPage() {
                               <SlidersIcon className="w-4 h-4" />
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-medium text-[13px] break-words block leading-[2] py-1" style={{ color: "var(--text-primary)" }}>{nameOf(attr)}</span>
+                              {attributeTextReady
+                                ? <span className="font-medium text-[13px] break-words block leading-[2] py-1" style={{ color: "var(--text-primary)" }}>{localizedAttributeName}</span>
+                                : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("common.loading")} />}
                               {attr.code && <span className="text-[10px] font-mono" style={{ color: "var(--text-muted)" }}>{attr.code}</span>}
                             </div>
                           </div>
@@ -1012,7 +1077,7 @@ export default function AttributesPage() {
                         </td>
                         <td className="px-4 py-2.5">
                           <span className="text-[12px] font-medium capitalize" style={{ color: "var(--text-secondary)" }}>
-                            {text(attr.category, attr.category_translations) || "—"}
+                            {categoryTextReady ? (localizedCategoryName || "—") : <span className="skeleton inline-block h-3 w-20 rounded" aria-label={t("common.loading")} />}
                           </span>
                         </td>
                         <td className="px-4 py-2.5">
@@ -1035,6 +1100,9 @@ export default function AttributesPage() {
         </div>
 
         <Pagination current={attributePage} total={totalAttributePages} go={goToAttributePage}
+          pageSize={attributesPerPage}
+          totalRecords={totalAttributes}
+          onPageSizeChange={(size) => { setAttributesPerPage(size); setAttributePage(1); }}
           label={totalAttributes > 0 ? `${t("table.showingRange", { start: attrStartIndex, end: attrEndIndex, total: totalAttributes })}` : t("table.empty")} />
         </div>
 

@@ -1,21 +1,16 @@
 import adminHttp from "../axiosInstance";
-// ✅ Server-side pagination response unwrap — baaki modules (stock/discounts)
-// ke pattern ke mutabiq { items, counts, countries, pagination }
-const paginated = (res, fallbackLimit) => {
+// Server-side pagination must include pagination metadata; never fall back to
+// rendering an unbounded legacy response in the admin brand list.
+const paginated = (res) => {
   const d = res?.data;
-  if (Array.isArray(d)) {
-    return {
-      items: d,
-      counts: { total: d.length, active: 0, inactive: 0, withLogo: 0 },
-      countries: [],
-      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
-    };
+  if (!Array.isArray(d?.data) || !d?.pagination) {
+    throw new Error("Brand list API did not return server-side pagination data.");
   }
   return {
-    items: Array.isArray(d?.data) ? d.data : [],
+    items: d.data,
     counts: d?.counts || { total: 0, active: 0, inactive: 0, withLogo: 0 },
     countries: Array.isArray(d?.countries) ? d.countries : [],
-    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+    pagination: d.pagination,
   };
 };
 
@@ -29,8 +24,8 @@ export const adminBrandApi = {
     }),
 
   // ✅ Server side pagination — page/limit/search/status/country + sorting
-  getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all", country = "all", sort = "", order = "" } = {}) => {
-    const params = { page, limit };
+  getAllPaginated: ({ page = 1, limit = 10, search = "", status = "all", country = "all", sort = "", order = "", locale = "en" } = {}) => {
+    const params = { page, limit, locale };
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (country && country !== "all") params.country = country;
@@ -38,10 +33,10 @@ export const adminBrandApi = {
       params.sort = sort;
       params.order = order || "asc";
     }
-    return adminHttp.get("/brands/admin/all", { params }).then((res) => paginated(res, limit));
+    return adminHttp.get("/brands/admin/all", { params }).then(paginated);
   },
   
-  getById: (id) => adminHttp.get(`/brands/${id}`).then((res) => res.data?.data || res.data),
+  getById: (id, locale = "en") => adminHttp.get(`/brands/${id}`, { params: { locale } }).then((res) => res.data?.data || res.data),
   
   getNextCode: () => adminHttp.get("/brands/next-code").then((res) => res.data?.data || res.data),
   

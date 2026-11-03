@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { Country } from "country-state-city";
@@ -385,14 +386,27 @@ export default function BrandDetailPage() {
   const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
   const { data: brand, isLoading: loading } = useQuery({
-    queryKey: ["brand", brandId],
-    queryFn: () => brandApi.getById(brandId),
+    queryKey: ["brand", brandId, locale],
+    queryFn: () => brandApi.getById(brandId, locale),
     enabled: !!brandId,
+  });
+  usePageTranslations({
+    model: "Brand",
+    records: brand ? [brand] : [],
+    locale,
+    ready: !loading && !!brand,
+    queryKey: ["brand", brandId, locale],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || !!(
+      brand?.translations?.name?.[locale]?.trim() &&
+      (!brand.description || brand.translations?.description?.[locale]?.trim())
+    ),
   });
 
   const { data: brandProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ["brand-products", brandId],
-    queryFn: () => productApi.getByBrand(brandId),
+    queryKey: ["brand-products", brandId, locale],
+    queryFn: () => productApi.getByBrand(brandId, locale),
     enabled: !!brandId,
   });
 

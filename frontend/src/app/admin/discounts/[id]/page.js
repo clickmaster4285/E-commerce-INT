@@ -319,17 +319,19 @@ export default function DiscountDetailPage() {
     start_at: "", end_at: "", status: "active",
   });
   const [formErrors, setFormErrors] = useState({});
+  const [targetPage, setTargetPage] = useState(1);
+  const [targetPageSize, setTargetPageSize] = useState(10);
 
   const { data: discount, isLoading: loading } = useQuery({
-    queryKey: ["discount", discountId],
-    queryFn: () => discountApi.getById(discountId),
+    queryKey: ["discount", discountId, locale],
+    queryFn: () => discountApi.getById(discountId, { compact: true, locale }),
     enabled: !!discountId,
   });
-  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showEdit });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showEdit });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
-  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000, enabled: showEdit });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
 
@@ -366,14 +368,44 @@ export default function DiscountDetailPage() {
   const targetsProducts = applyToKey === "specific_products" || applyToKey === "product";
   const targetsCategories = applyToKey === "specific_categories" || applyToKey === "category";
   const targetsBrands = applyToKey === "specific_brands" || applyToKey === "brand";
-  const assignedProducts = targetsProducts ? (discount?.selectedProducts || []) : [];
-  const assignedCategories = targetsCategories ? (discount?.selectedCategories || []) : [];
-  const assignedBrands = targetsBrands ? (discount?.selectedBrands || []) : [];
-  usePageTranslations({ model: "Discount", records: discount ? [discount] : [], locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
-  usePageTranslations({ model: "Product", records: assignedProducts, locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
-  usePageTranslations({ model: "Category", records: assignedCategories, locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
-  usePageTranslations({ model: "Brand", records: assignedBrands, locale, ready: !!discount && !loading, queryKey: ["discount", discountId], queryClient });
+  const targetKey = targetsProducts ? "products" : targetsCategories ? "categories" : targetsBrands ? "brands" : "";
+  const targetModel = targetsProducts ? "Product" : targetsCategories ? "Category" : "Brand";
+  const targetIds = targetsProducts ? discount?.selectedProducts : targetsCategories ? discount?.selectedCategories : targetsBrands ? discount?.selectedBrands : [];
+  const { data: targetPageData, isFetching: targetsFetching } = useQuery({
+    queryKey: ["discount", discountId, "targets", targetKey, locale, targetPage, targetPageSize],
+    queryFn: () => discountApi.getTargetsPaginated(discountId, { type: targetKey, page: targetPage, limit: targetPageSize, locale }),
+    enabled: !!discountId && !!targetKey && !!discount,
+  });
+  const targetRecords = targetPageData?.items || [];
+  const targetPagination = targetPageData?.pagination || { total: targetIds?.length || 0, page: targetPage, limit: targetPageSize, pages: 1, hasNext: false, hasPrev: false };
+  const assignedProducts = targetsProducts ? targetRecords : [];
+  const assignedCategories = targetsCategories ? targetRecords : [];
+  const assignedBrands = targetsBrands ? targetRecords : [];
+  const assignedProductCount = targetsProducts ? (targetIds?.length || 0) : 0;
+  const assignedCategoryCount = targetsCategories ? (targetIds?.length || 0) : 0;
+  const assignedBrandCount = targetsBrands ? (targetIds?.length || 0) : 0;
+  const discountTranslationReady = locale === "en" || Boolean(discount?.translations?.name?.[locale]?.trim());
+  const discountTranslationPageReady = usePageTranslations({ model: "Discount", records: discount ? [discount] : [], locale, ready: !!discount && !loading, queryKey: ["discount", discountId, locale], queryClient, alreadyTranslated: discountTranslationReady, fallbackAfterRetries: true });
+  const targetPageAlreadyTranslated = locale === "en" || (targetRecords.length > 0 && targetRecords.every((record) => Boolean(record?.translations?.name?.[locale]?.trim())));
+  const targetTranslationReady = usePageTranslations({ model: targetModel, records: targetRecords, locale, ready: !!targetPageData && !targetsFetching, queryKey: ["discount", discountId, "targets", targetKey, locale, targetPage, targetPageSize], queryClient, alreadyTranslated: targetPageAlreadyTranslated, fallbackAfterRetries: true });
   const targetsEverything = !targetsProducts && !targetsCategories && !targetsBrands;
+  const targetStart = targetPagination.total ? (targetPagination.page - 1) * targetPageSize + 1 : 0;
+  const targetEnd = Math.min((targetPagination.page - 1) * targetPageSize + targetRecords.length, targetPagination.total);
+  const targetNumber = (value) => new Intl.NumberFormat(intlLocale(locale), { useGrouping: false }).format(value);
+  const targetPager = targetPagination.total > targetPageSize ? (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3" style={{ borderColor: "var(--border-color)" }}>
+      <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.showingRange", { from: targetNumber(targetStart), to: targetNumber(targetEnd), total: targetNumber(targetPagination.total) })}</span>
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-[10px]" style={{ color: "var(--text-secondary)" }}>
+          <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+          <select value={targetPageSize} onChange={(event) => { setTargetPageSize(Number(event.target.value)); setTargetPage(1); }} className="h-8 rounded-md px-2" style={inputStyle}>{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{targetNumber(size)}</option>)}</select>
+        </label>
+        <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.categories.page.pageOf", { page: targetNumber(targetPagination.page), total: targetNumber(targetPagination.pages) })}</span>
+        <button type="button" onClick={() => setTargetPage((page) => Math.max(1, page - 1))} disabled={!targetPagination.hasPrev || targetsFetching} title={t("admin.categories.page.prev")} className="h-8 w-8 rounded-md border disabled:opacity-40" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>‹</button>
+        <button type="button" onClick={() => setTargetPage((page) => Math.min(targetPagination.pages, page + 1))} disabled={!targetPagination.hasNext || targetsFetching} title={t("admin.categories.page.next")} className="h-8 w-8 rounded-md border disabled:opacity-40" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>›</button>
+      </div>
+    </div>
+  ) : null;
 
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
@@ -545,7 +577,7 @@ export default function DiscountDetailPage() {
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</h1>
+            <h1 className="text-[17px] font-bold" style={{ color: "var(--text-primary)" }}>{discountTranslationReady || discountTranslationPageReady ? (nameOf(discount) || t("admin.discounts.detail.discountCreated")) : <span className="inline-block h-5 w-36 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} />}</h1>
             <div className="flex items-center gap-1.5 mt-1 text-[10px]" style={{ color: "var(--accent)" }}><Tag className="w-3 h-3" /> {discount.code || "—"}</div>
           </div>
           <div className="flex items-center gap-2">
@@ -574,17 +606,17 @@ export default function DiscountDetailPage() {
         <div className="space-y-3">
           <InfoCard icon={Tag} title={t("admin.categories.form.basicInfo")} action={<button type="button" onClick={openEdit} className="text-[9px] font-semibold" style={{ color: "var(--accent)" }}><Edit3 className="w-3 h-3 inline mr-1" />{" "}{t("admin.promotions.ui.generated.9ead47a82a0d")}</button>}>
             <DataRow icon={Hash} label={t("admin.promotions.ui.generated.e6fb06210faf")} value={discount.code} mono />
-            <DataRow icon={Tag} label={t("admin.discounts.detail.name")} value={nameOf(discount)} />
-            <DataRow icon={Activity} label={t("admin.discounts.detail.description")} value={descriptionOf(discount) || "—"} />
+            <DataRow icon={Tag} label={t("admin.discounts.detail.name")} value={discountTranslationReady || discountTranslationPageReady ? nameOf(discount) : <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />} />
+            <DataRow icon={Activity} label={t("admin.discounts.detail.description")} value={discountTranslationReady || discountTranslationPageReady ? (descriptionOf(discount) || "—") : <span className="inline-block h-3 w-32 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />} />
             <DataRow icon={Percent} label={t("admin.promotions.ui.generated.d0a3e7f81a98")} value={discount.type === "percentage" ? t("admin.discounts.detail.percentage") : discount.type === "fixed" ? t("admin.discounts.detail.fixed") : t("admin.discounts.form.fixedPriceType")} />
             <DataRow icon={DollarSign} label={t("admin.discounts.detail.value")} value={formatDiscountValue(discount, locale, t)} highlight />
             <DataRow icon={Target} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />
             <DataRow icon={Activity} label={t("admin.brands.detail.productTableStatus")} value={isActive ? t("admin.discounts.page.active") : t("admin.discounts.page.inactive")} highlight={isActive} />
           </InfoCard>
-          <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")} action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProducts.length ? `View All (${assignedProducts.length})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
-            {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
-              : targetsCategories ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedCategories.length}{" "}{t("admin.promotions.ui.generated.c1c9bccd8a9c")}{assignedCategories.length === 1 ? "y" : "ies"}.</p>
-              : targetsBrands ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedBrands.length}{" "}{t("admin.promotions.ui.generated.064e2f5eddac")}{assignedBrands.length === 1 ? "" : "s"}.</p>
+          <InfoCard icon={Package} title={t("admin.discounts.detail.applicableProducts")} action={<span className="text-[9px]" style={{ color: "var(--accent)" }}>{assignedProductCount ? `View All (${assignedProductCount})` : targetsEverything ? "Preview" : "Not targeted"}</span>}>
+            {assignedProducts.length ? <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{assignedProducts.slice(0, 4).map((product) => <div key={product._id} className="min-w-0"><div className="h-14 rounded-md flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}><Package className="w-6 h-6" style={{ color: "var(--text-muted)" }} /></div><p className="text-[9px] font-semibold truncate mt-1" style={{ color: "var(--text-primary)" }}>{locale === "en" || targetTranslationReady || product?.translations?.name?.[locale]?.trim() ? productNameOf(product) : <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />}</p><p className="text-[8px]" style={{ color: "var(--text-muted)" }}>{product.sku || "—"}</p></div>)}</div>
+              : targetsCategories ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedCategoryCount}{" "}{t("admin.promotions.ui.generated.c1c9bccd8a9c")}{assignedCategoryCount === 1 ? "y" : "ies"}.</p>
+              : targetsBrands ? <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.ad3231d362ff")}{" "}{assignedBrandCount}{" "}{t("admin.promotions.ui.generated.064e2f5eddac")}{assignedBrandCount === 1 ? "" : "s"}.</p>
               : <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{t("admin.brands.detail.allProducts")}</p>}
           </InfoCard>
         </div>
@@ -595,7 +627,7 @@ export default function DiscountDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title={t("admin.promotions.ui.generated.08d79bb915ec")}><DataRow icon={Globe} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />{targetsProducts && <DataRow icon={Package} label={t("admin.promotions.ui.generated.73402e32460b")} value={`${assignedProducts.length} ${t("common.product")}${assignedProducts.length === 1 ? "" : "s"}`} />}{targetsCategories && <DataRow icon={Layers} label={t("admin.promotions.ui.generated.c107fd7d0b1c")} value={`${assignedCategories.length} ${t("common.category")}${assignedCategories.length === 1 ? "" : "s"}`} />}{targetsBrands && <DataRow icon={Tag} label={t("admin.promotions.ui.generated.796088a7739e")} value={`${assignedBrands.length} ${t("common.brand")}${assignedBrands.length === 1 ? "" : "s"}`} />}</InfoCard></div>
+          <div id="d-target" className="scroll-mt-4"><InfoCard icon={Target} title={t("admin.promotions.ui.generated.08d79bb915ec")}><DataRow icon={Globe} label={t("admin.discounts.detail.applyTo")} value={formatTarget(discount.applyTo, locale)} />{targetsProducts && <DataRow icon={Package} label={t("admin.promotions.ui.generated.73402e32460b")} value={`${assignedProductCount} ${t("common.product")}${assignedProductCount === 1 ? "" : "s"}`} />}{targetsCategories && <DataRow icon={Layers} label={t("admin.promotions.ui.generated.c107fd7d0b1c")} value={`${assignedCategoryCount} ${t("common.category")}${assignedCategoryCount === 1 ? "" : "s"}`} />}{targetsBrands && <DataRow icon={Tag} label={t("admin.promotions.ui.generated.796088a7739e")} value={`${assignedBrandCount} ${t("common.brand")}${assignedBrandCount === 1 ? "" : "s"}`} />}</InfoCard></div>
           <InfoCard icon={User} title={t("admin.brands.detail.createdBy")}><div className="flex items-center gap-2"><Avatar user={discount.createdBy} size="md" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.createdBy?.name || discount.createdBy?.email || t("admin.discounts.detail.system")}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.categories.detail.createdAt")}{" "}{formatDateTime(discount.createdAt)}</p></div></div></InfoCard>
           {hasUpdates && <InfoCard icon={User} title={t("admin.brands.detail.updatedBy")}><div className="flex items-center gap-2"><Avatar user={discount.updatedBy} size="md" color="blue" /><div className="min-w-0"><p className="text-[10px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{discount.updatedBy?.name || discount.updatedBy?.email || t("admin.discounts.detail.system")}</p><p className="text-[9px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.updated")}{" "}{formatDateTime(discount.updatedAt)}</p></div></div></InfoCard>}
         </div>
@@ -626,20 +658,20 @@ export default function DiscountDetailPage() {
             <div className="p-4 rounded-lg mb-5" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <p className="text-[11px] font-medium uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.page.appliesToHeading")}</p>
               <p className="text-[15px] font-bold" style={{ color: "var(--text-primary)" }}>
-                {formatTarget(discount.applyTo || discount.target_type)}
+                {formatTarget(discount.applyTo || discount.target_type, locale)}
               </p>
             </div>
 
             {assignedProducts.length > 0 && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a953deb1b78a")}{assignedProducts.length})
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a953deb1b78a")}{assignedProductCount})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {assignedProducts.map((product) => (
                     <span key={product._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Box className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                      {productNameOf(product) || t("common.product")}
+                      {locale === "en" || targetTranslationReady || product?.translations?.name?.[locale]?.trim() ? (productNameOf(product) || t("common.product")) : <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />}
                       {product.sku && <span className="text-[9px] font-mono opacity-60">({product.sku})</span>}
                     </span>
                   ))}
@@ -649,14 +681,14 @@ export default function DiscountDetailPage() {
 
             {assignedCategories.length > 0 && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.214773db1630")}{assignedCategories.length})
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.214773db1630")}{assignedCategoryCount})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {assignedCategories.map((cat) => (
                     <span key={cat._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Layers className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                      {nameOf(cat) || t("common.category")}
+                      {locale === "en" || targetTranslationReady || cat?.translations?.name?.[locale]?.trim() ? (nameOf(cat) || t("common.category")) : <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />}
                     </span>
                   ))}
                 </div>
@@ -665,14 +697,14 @@ export default function DiscountDetailPage() {
 
             {assignedBrands.length > 0 && (
               <div className="mb-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a48f90037d50")}{assignedBrands.length})
+                <p className="text-[11px] font-bold uppercase tracking-wide mb-3" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.a48f90037d50")}{assignedBrandCount})
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {assignedBrands.map((brand) => (
                     <span key={brand._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium"
                       style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                       <Tag className="w-3 h-3" style={{ color: "var(--accent)" }} />
-                      {nameOf(brand) || t("common.brand")}
+                      {locale === "en" || targetTranslationReady || brand?.translations?.name?.[locale]?.trim() ? (nameOf(brand) || t("common.brand")) : <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />}
                     </span>
                   ))}
                 </div>
@@ -686,12 +718,19 @@ export default function DiscountDetailPage() {
               </div>
             )}
 
-            {!targetsEverything && assignedProducts.length + assignedCategories.length + assignedBrands.length === 0 && (
+            {targetKey && (targetsFetching || !targetPageData) && (
+              <div className="space-y-2" aria-label={t("admin.categories.page.updating")}>
+                {Array.from({ length: 5 }).map((_, index) => <div key={index} className="h-8 rounded-md bg-[var(--bg-tertiary)] animate-pulse" />)}
+              </div>
+            )}
+
+            {!targetsEverything && targetPageData && targetPagination.total === 0 && (
               <div className="flex items-center gap-3 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
                 <AlertTriangle className="w-5 h-5 shrink-0" style={{ color: "var(--warning)" }} />
                 <span className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.discounts.detail.noTargetAssigned")}</span>
               </div>
             )}
+            {targetPager}
           </InfoCard>
         </div>
 

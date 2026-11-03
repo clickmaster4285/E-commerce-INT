@@ -17,24 +17,13 @@ const getObject = (response) => {
   return response?.data?.data || response?.data;
 };
 
-// ✅ Server-side pagination response unwrap — baaki modules (brands/stock) ke
-// same pattern ke mutabiq { items, counts, options, pagination }
+// Server-side pagination unwrap; the list endpoint returns only page rows.
 const getPaginated = (response, fallbackLimit) => {
   const payload = response?.data;
-
-  if (Array.isArray(payload)) {
-    return {
-      items: payload,
-      counts: { total: payload.length, root: 0, child: 0, withAttributes: 0 },
-      options: [],
-      pagination: { total: payload.length, page: 1, limit: payload.length || 1, pages: 1, hasNext: false, hasPrev: false },
-    };
-  }
 
   return {
     items: Array.isArray(payload?.data) ? payload.data : [],
     counts: payload?.counts || { total: 0, root: 0, child: 0, withAttributes: 0 },
-    options: Array.isArray(payload?.options) ? payload.options : [],
     pagination: payload?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
   };
 };
@@ -51,8 +40,8 @@ export const adminCategoryApi = {
       .then(getList),
 
   // ✅ Server side pagination — page/limit/search/parent + sorting
-  getAllPaginated: ({ page = 1, limit = 20, search = "", parent = "all", sort = "", order = "" } = {}) => {
-    const params = { page, limit };
+  getAllPaginated: ({ page = 1, limit = 10, search = "", parent = "all", sort = "", order = "", locale = "en" } = {}) => {
+    const params = { page, limit, locale };
     if (search) params.search = search;
     if (parent && parent !== "all") params.parent = parent;
     if (sort) {
@@ -64,9 +53,14 @@ export const adminCategoryApi = {
       .then((response) => getPaginated(response, limit));
   },
 
-  getById: (id) =>
+  getOptions: (locale = "en") =>
     adminHttp
-      .get(`/categories/${id}`)
+      .get("/categories/admin/options", { params: { locale } })
+      .then(getList),
+
+  getById: (id, locale = "en", includeAttributes = false) =>
+    adminHttp
+      .get(`/categories/${id}`, { params: { locale, ...(includeAttributes && { includeAttributes: "true" }) } })
       .then(getObject),
 
   getNextCode: () =>
@@ -82,14 +76,22 @@ export const adminCategoryApi = {
         );
       }),
 
-  getAttributes: (categoryId) =>
+  getAttributes: (categoryId, locale = "en") =>
     adminHttp
-      .get(`/categories/${categoryId}/attributes`)
+      .get(`/categories/${categoryId}/attributes`, { params: { locale } })
       .then(getList),
 
-  getAttributesHierarchy: (categoryId) =>
+  getAttributesPaginated: (categoryId, { page = 1, limit = 10, locale = "en" } = {}) =>
     adminHttp
-      .get(`/categories/${categoryId}/attributes-hierarchy`)
+      .get(`/categories/${categoryId}/attributes`, { params: { page, limit, locale } })
+      .then((response) => ({
+        items: Array.isArray(response?.data?.data) ? response.data.data : [],
+        pagination: response?.data?.pagination || { total: 0, page, limit, pages: 1, hasNext: false, hasPrev: false, variantAttributes: 0 },
+      })),
+
+  getAttributesHierarchy: (categoryId, locale = "en") =>
+    adminHttp
+      .get(`/categories/${categoryId}/attributes-hierarchy`, { params: { locale } })
       .then(getList),
 
   create: (data) =>

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import AttributeFormModal from "@/components/admin/AttributeFormModal";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* =========================================================
    ICONS
@@ -531,6 +532,8 @@ export default function CategoryDetailPage() {
   const backPath = "/admin/categories";
 
   const [tab, setTab] = useState("attributes");
+  const [attributePage, setAttributePage] = useState(1);
+  const [attributePageSize, setAttributePageSize] = useState(10);
   const [showDelete, setShowDelete] = useState(false);
   
   // ✅ NEW: Edit Modal States
@@ -555,27 +558,68 @@ export default function CategoryDetailPage() {
 
   // Queries
   const { data: allCategories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: categoryApi.getAll,
+    queryKey: ["admin-categories", "options", locale],
+    queryFn: () => categoryApi.getOptions(locale),
+    enabled: showEditModal,
+    staleTime: 60_000,
   });
 
   const { data: category, isLoading: loading } = useQuery({
-    queryKey: ["category", categoryId],
-    queryFn: () => categoryApi.getById(categoryId),
+    queryKey: ["category", categoryId, locale],
+    queryFn: () => categoryApi.getById(categoryId, locale),
     enabled: !!categoryId,
     retry: false,
   });
 
-  const { data: categoryAttributes = [] } = useQuery({
-    queryKey: ["category-attributes", categoryId],
-    queryFn: () => categoryApi.getAttributes(categoryId),
+  const { data: categoryAttributesData, isFetching: categoryAttributesFetching } = useQuery({
+    queryKey: ["category-attributes", categoryId, locale, attributePage, attributePageSize],
+    queryFn: () => categoryApi.getAttributesPaginated(categoryId, { page: attributePage, limit: attributePageSize, locale }),
     enabled: !!categoryId,
   });
+  const categoryAttributes = categoryAttributesData?.items || [];
+  const attributePagination = categoryAttributesData?.pagination || { total: 0, page: attributePage, limit: attributePageSize, pages: 1, variantAttributes: 0 };
+  const displayedAttributePage = attributePagination.page || attributePage;
+  const formatPageNumber = (value) => new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
+  const parentTranslationRecord = useMemo(() => (
+    category?.parent_category_id && typeof category.parent_category_id === "object"
+      ? category.parent_category_id
+      : null
+  ), [category]);
+  const categoryTranslationRecords = useMemo(() => (
+    category ? [category, ...(parentTranslationRecord ? [parentTranslationRecord] : [])] : []
+  ), [category, parentTranslationRecord]);
+  const categoryTranslationsReady = usePageTranslations({
+    model: "Category",
+    records: categoryTranslationRecords,
+    locale,
+    ready: !loading && !!category,
+    queryKey: ["category", categoryId, locale],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || !!(
+      category?.translations?.name?.[locale]?.trim() &&
+      (!category.description || category.translations?.description?.[locale]?.trim()) &&
+      (!parentTranslationRecord || parentTranslationRecord.translations?.name?.[locale]?.trim())
+    ),
+  });
+  const attributeTranslationsReady = usePageTranslations({
+    model: "Attribute",
+    records: categoryAttributes,
+    locale,
+    ready: !categoryAttributesFetching && !!categoryAttributesData,
+    queryKey: ["category-attributes", categoryId, locale, attributePage, attributePageSize],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || (categoryAttributes.length > 0 && categoryAttributes.every((attribute) =>
+      attribute.translations?.name?.[locale]?.trim()
+    )),
+  });
+  const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle";
 
   // Derived data
   const variantAttributes = useMemo(() => {
-    return categoryAttributes.filter((attr) => attr.category_config?.is_variant_option);
-  }, [categoryAttributes]);
+    return attributePagination.variantAttributes || 0;
+  }, [attributePagination.variantAttributes]);
 
   // Parent ka poora doc chahiye — `nameOf()` translations map ke saath kaam
   // karta hai (plain `.name` sirf English deta hai). Populated parent ya
@@ -745,12 +789,12 @@ export default function CategoryDetailPage() {
           <Ico d={D.chevron} className="w-3 h-3" />
           {parentCategoryDoc && (
             <>
-              <span className="max-w-[180px] truncate">{nameOf(parentCategoryDoc)}</span>
+              <span className="max-w-[180px] truncate">{categoryTranslationsReady ? nameOf(parentCategoryDoc) : <span className={`${translationSkeleton} w-24`} aria-label={t("detail.loading")} />}</span>
               <Ico d={D.chevron} className="w-3 h-3" />
             </>
           )}
           <span className="max-w-[240px] truncate font-medium text-[var(--text-primary)]">
-            {nameOf(category)}
+            {categoryTranslationsReady ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
           </span>
         </nav>
 
@@ -792,7 +836,7 @@ export default function CategoryDetailPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-[16px] leading-tight font-bold text-[var(--text-primary)]">
-                  {nameOf(category)}
+                  {categoryTranslationsReady ? nameOf(category) : <span className={`${translationSkeleton} w-36`} aria-label={t("detail.loading")} />}
                 </h2>
                 <span
                   className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold"
@@ -812,7 +856,7 @@ export default function CategoryDetailPage() {
               )}
               {category.description && (
                 <p className="mt-2 max-w-md text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  {descriptionOf(category)}
+                  {categoryTranslationsReady ? descriptionOf(category) : <span className={`${translationSkeleton} w-48`} aria-label={t("detail.loading")} />}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -876,7 +920,7 @@ export default function CategoryDetailPage() {
                 {t("detail.categoryName")}
               </span>
               <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
-                {nameOf(category)}
+                {categoryTranslationsReady ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
               </span>
             </div>
             <div className="flex items-center justify-between gap-8">
@@ -903,7 +947,7 @@ export default function CategoryDetailPage() {
                 {t("form.attributes")}
               </span>
               <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">
-                {categoryAttributes.length}
+                {formatPageNumber(attributePagination.total)}
               </span>
             </div>
           </div>
@@ -913,7 +957,7 @@ export default function CategoryDetailPage() {
       {/* TABS */}
       <div className="flex items-center gap-1 border-b" style={{ borderColor: "var(--border-color)" }}>
         {[
-          { id: "attributes", label: t("detail.attributesTab"), count: categoryAttributes.length, icon: D.box },
+          { id: "attributes", label: t("detail.attributesTab"), count: attributePagination.total, icon: D.box },
           { id: "history", label: t("detail.historyTab"), icon: D.clock },
         ].map((item) => {
           const active = tab === item.id;
@@ -955,14 +999,14 @@ export default function CategoryDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3 className="text-[15px] font-bold text-[var(--text-primary)]">
-                {t("detail.attributeCount", { count: categoryAttributes.length })}
+                {t("detail.attributeCount", { count: formatPageNumber(attributePagination.total) })}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                {t("detail.assignedTo", { name: nameOf(category) })}
+                {categoryTranslationsReady ? t("detail.assignedTo", { name: nameOf(category) }) : <span className={`${translationSkeleton} w-40`} aria-label={t("detail.loading")} />}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {variantAttributes.length > 0 && (
+              {variantAttributes > 0 && (
                 <span
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold"
                   style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}
@@ -970,13 +1014,19 @@ export default function CategoryDetailPage() {
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
-                  {t("detail.variantAttributes", { count: variantAttributes.length })}
+                  {t("detail.variantAttributes", { count: formatPageNumber(variantAttributes) })}
                 </span>
               )}
             </div>
           </div>
 
-          {categoryAttributes.length === 0 ? (
+          {categoryAttributesFetching && !categoryAttributesData ? (
+            <div className="rounded-xl p-5 space-y-3" style={cardStyle} aria-label={t("common.loading")}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-10 rounded-lg animate-pulse" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+              ))}
+            </div>
+          ) : categoryAttributes.length === 0 ? (
             <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <Ico d={D.box} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
@@ -1035,7 +1085,7 @@ export default function CategoryDetailPage() {
                           className="transition-colors hover:bg-[var(--bg-tertiary)]/20 relative group cursor-pointer"
                           style={{ borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none", opacity: isActive ? 1 : 0.5 }}
                         >
-                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{idx + 1}</td>
+                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{formatPageNumber((displayedAttributePage - 1) * attributePagination.limit + idx + 1)}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", border: "1px solid var(--purple-soft)" }}>
@@ -1043,7 +1093,7 @@ export default function CategoryDetailPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p>
+                                  {attributeTranslationsReady ? <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("detail.loading")} />}
                                   {isVariant && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
                                       {t("detail.variant")}
@@ -1212,6 +1262,25 @@ export default function CategoryDetailPage() {
                   </tbody>
                 </table>
               </div>
+              {attributePagination.total > attributePageSize && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3">
+                  <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+                    <span>{t("page.showingRange", { from: formatPageNumber((displayedAttributePage - 1) * attributePageSize + 1), to: formatPageNumber(Math.min(displayedAttributePage * attributePageSize, attributePagination.total)), total: formatPageNumber(attributePagination.total) })}</span>
+                    <label className="flex items-center gap-2">
+                      <span>{t("admin.categories.page.rowsPerPage")}</span>
+                      <select value={attributePageSize} onChange={(event) => { setAttributePageSize(Number(event.target.value)); setAttributePage(1); }} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[11px] text-[var(--text-primary)]">
+                        {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                      </select>
+                    </label>
+                    {categoryAttributesFetching && <span>{t("page.updating")}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setAttributePage(Math.max(1, displayedAttributePage - 1))} disabled={displayedAttributePage <= 1 || categoryAttributesFetching} title={t("page.prev")} aria-label={t("page.prev")} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40">{t("page.prev")}</button>
+                    <span className="text-[11px] text-[var(--text-muted)]">{t("page.pageOf", { page: formatPageNumber(displayedAttributePage), total: formatPageNumber(attributePagination.pages) })}</span>
+                    <button type="button" onClick={() => setAttributePage(Math.min(attributePagination.pages, displayedAttributePage + 1))} disabled={displayedAttributePage >= attributePagination.pages || categoryAttributesFetching} title={t("page.next")} aria-label={t("page.next")} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40">{t("page.next")}</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1416,8 +1485,8 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   // ✅ NEW: Disabled parent option ka inline explanation (hover / focus / invalid attempt)
   const [parentRestrictionHint, setParentRestrictionHint] = useState("");
 
-  const { data: category, isLoading: categoryLoading } = useQuery({ queryKey: ["category", categoryId], queryFn: () => categoryApi.getById(categoryId), enabled: !!categoryId });
-  const { data: allCategories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
+  const { data: category, isLoading: categoryLoading } = useQuery({ queryKey: ["category", categoryId, locale, "edit"], queryFn: () => categoryApi.getById(categoryId, locale, true), enabled: !!categoryId });
+  const { data: allCategories = [] } = useQuery({ queryKey: ["admin-categories", "options", locale], queryFn: () => categoryApi.getOptions(locale), enabled: !!categoryId, staleTime: 60_000 });
   const { data: allAttributes = [] } = useQuery({ queryKey: ["all-attributes"], queryFn: () => attributeApi.getAll(), enabled: showAttrSelectModal || showCreateAttrModal });
 
   useEffect(() => {

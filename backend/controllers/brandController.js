@@ -187,7 +187,10 @@ const getBrands = async (req, res) => {
 // ================================
 const getBrandById = async (req, res) => {
   try {
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
+      .select("brand_code name description translations logo country is_active created_at updated_at createdby updatedby")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();
@@ -196,13 +199,31 @@ const getBrandById = async (req, res) => {
       return res.status(404).json({ success: false, message: "Brand not found" });
     }
 
-    const products = await Product.find({ brand_id: brand._id })
-      .populate("category_id", "name translations")
-      .select("name brand_id category_id status created_at");
+    const nameTranslation = locale === "en" ? "" : brand.translations?.name?.[locale];
+    const descriptionTranslation = locale === "en" ? "" : brand.translations?.description?.[locale];
+    const responseBrand = {
+      _id: brand._id,
+      brand_code: brand.brand_code,
+      name: brand.name,
+      description: brand.description,
+      ...(locale !== "en" && {
+        translations: {
+          name: nameTranslation ? { [locale]: nameTranslation } : {},
+          description: descriptionTranslation ? { [locale]: descriptionTranslation } : {},
+        },
+      }),
+      logo: brand.logo?.img_url ? { img_url: brand.logo.img_url, img_size: brand.logo.img_size } : null,
+      country: brand.country,
+      is_active: brand.is_active,
+      created_at: brand.created_at,
+      createdby: brand.createdby ? { _id: brand.createdby._id, name: brand.createdby.name, email: brand.createdby.email } : null,
+      updated_at: brand.updated_at,
+      updatedby: brand.updatedby ? { _id: brand.updatedby._id, name: brand.updatedby.name, email: brand.updatedby.email } : null,
+    };
 
     res.status(200).json({
       success: true,
-      data: { ...brand, products },
+      data: responseBrand,
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -214,7 +235,10 @@ const getBrandById = async (req, res) => {
 // ================================
 const getBrandWithProducts = async (req, res) => {
   try {
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
+      .select("brand_code name description translations logo country is_active created_at updated_at createdby updatedby")
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 
@@ -223,12 +247,34 @@ const getBrandWithProducts = async (req, res) => {
     }
 
     const products = await Product.find({ brand_id: brand._id })
-      .populate("category_id", "name translations")
-      .select("name brand_id category_id status created_at");
+      .select("name product_code sku description status category_id translations")
+      .populate("category_id", "name translations");
+
+    const nameTranslation = locale === "en" ? "" : brand.translations?.name?.[locale];
+    const descriptionTranslation = locale === "en" ? "" : brand.translations?.description?.[locale];
+    const responseBrand = {
+      _id: brand._id,
+      brand_code: brand.brand_code,
+      name: brand.name,
+      description: brand.description,
+      ...(locale !== "en" && {
+        translations: {
+          name: nameTranslation ? { [locale]: nameTranslation } : {},
+          description: descriptionTranslation ? { [locale]: descriptionTranslation } : {},
+        },
+      }),
+      logo: brand.logo?.img_url ? { img_url: brand.logo.img_url, img_size: brand.logo.img_size } : null,
+      country: brand.country,
+      is_active: brand.is_active,
+      created_at: brand.created_at,
+      createdby: brand.createdby ? { _id: brand.createdby._id, name: brand.createdby.name, email: brand.createdby.email } : null,
+      updated_at: brand.updated_at,
+      updatedby: brand.updatedby ? { _id: brand.updatedby._id, name: brand.updatedby.name, email: brand.updatedby.email } : null,
+    };
 
     res.status(200).json({
       success: true,
-      data: { ...brand.toObject(), products },
+      data: { ...responseBrand, products },
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
@@ -435,12 +481,14 @@ const getBrandsAdmin = async (req, res) => {
     }
 
     /* ---------- SERVER SIDE PAGINATION ---------- */
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
 
     const search = String(req.query.search || "").trim();
     const status = String(req.query.status || "all").trim().toLowerCase();
     const country = String(req.query.country || "").trim();
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
 
     const filter = { is_deleted: false };
 
@@ -466,9 +514,12 @@ const getBrandsAdmin = async (req, res) => {
 
     const activeFilter = { is_deleted: false };
 
-    const [total, brands, totalBrands, activeBrands, withLogo, countryList] =
+    const total = await Brand.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+
+    const [brands, totalBrands, activeBrands, withLogo, countryList] =
       await Promise.all([
-        Brand.countDocuments(filter),
         Brand.find(filter)
           .sort({ [sortField]: sortOrder, _id: 1 })
           .skip((page - 1) * limit)
@@ -482,11 +533,32 @@ const getBrandsAdmin = async (req, res) => {
         Brand.distinct("country", activeFilter),
       ]);
 
-    const pages = Math.max(1, Math.ceil(total / limit));
+    // Return only the currently selected translation to the paginated admin
+    // screen. This keeps the page payload language-specific and avoids exposing
+    // mixed locale values in its row data.
+    const pageBrands = brands.map((brand) => {
+      const nameTranslation = locale === "en" ? "" : brand.translations?.name?.[locale];
+      const descriptionTranslation = locale === "en" ? "" : brand.translations?.description?.[locale];
+      return {
+        _id: brand._id,
+        brand_code: brand.brand_code,
+        name: brand.name,
+        description: brand.description,
+        ...(locale !== "en" && {
+          translations: {
+            name: nameTranslation ? { [locale]: nameTranslation } : {},
+            description: descriptionTranslation ? { [locale]: descriptionTranslation } : {},
+          },
+        }),
+        logo: brand.logo?.img_url ? { img_url: brand.logo.img_url } : null,
+        country: brand.country,
+        is_active: brand.is_active,
+      };
+    });
 
     res.status(200).json({
       success: true,
-      data: brands,
+      data: pageBrands,
       counts: {
         total: totalBrands,
         active: activeBrands,

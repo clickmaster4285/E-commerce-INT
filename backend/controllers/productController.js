@@ -762,6 +762,81 @@ const applyListPopulates = (query, slim) => {
 //    niche rehte hain aur created_at → _id se deterministic order milta hai.
 const FEATURED_RECENT_SORT = { featured_at: -1, created_at: -1, _id: -1 };
 
+const projectLocaleFields = (document, locale, fields = ["name", "description"]) => {
+  if (!document || typeof document !== "object") return document;
+  const translations = {};
+  if (locale !== "en") {
+    for (const field of fields) {
+      const value = document.translations?.[field]?.[locale];
+      translations[field] = typeof value === "string" && value.trim() ? { [locale]: value } : {};
+    }
+  }
+  return { ...document, translations };
+};
+
+const projectProductLocale = (product, locale) => ({
+  ...projectLocaleFields(product, locale),
+  ...(product?.category_id && { category_id: projectLocaleFields(product.category_id, locale, ["name", "description"]) }),
+  ...(product?.brand_id && { brand_id: projectLocaleFields(product.brand_id, locale, ["name", "description"]) }),
+});
+
+const getAdminListVariantSummaries = async (productIds) => {
+  if (!productIds.length) return new Map();
+  const summaries = await Variant.aggregate([
+    { $match: { product_id: { $in: productIds }, is_deleted: { $ne: true } } },
+    { $sort: { created_at: 1, _id: 1 } },
+    {
+      $group: {
+        _id: "$product_id",
+        variantCount: { $sum: 1 },
+        firstSku: { $first: "$sku" },
+        firstImageUrl: { $first: { $arrayElemAt: ["$images.img_url", 0] } },
+        firstSellingPrice: { $first: "$selling_price" },
+        firstQuantity: { $first: "$quantity" },
+      },
+    },
+  ]);
+  return new Map(summaries.map((summary) => [String(summary._id), summary]));
+};
+
+const toAdminProductListRow = (product, variantSummary, locale, context = "products", includeInventory = false) => {
+  const localized = projectLocaleFields(product, locale);
+  const featuredContext = context === "featured" || context === "featured-manager";
+  const projectRelation = (relation) => {
+    if (!relation) return null;
+    const projected = projectLocaleFields(relation, locale, ["name"]);
+    return {
+      _id: projected._id,
+      name: projected.name,
+      ...(locale !== "en" ? { translations: projected.translations } : {}),
+    };
+  };
+  const productFields = {
+    _id: product._id,
+    name: product.name,
+    ...(locale !== "en" ? { translations: featuredContext ? { name: localized.translations.name } : localized.translations } : {}),
+    category_id: projectRelation(product.category_id),
+    brand_id: projectRelation(product.brand_id),
+    status: product.status,
+    is_featured: Boolean(product.is_featured),
+  };
+  if (!featuredContext) {
+    productFields.description = product.description || "";
+    productFields.tax = product.tax;
+    productFields.variantCount = variantSummary?.variantCount || 0;
+  }
+  return {
+    ...productFields,
+    variants: variantSummary
+      ? [{
+        sku: variantSummary.firstSku || "",
+        images: variantSummary.firstImageUrl ? [{ img_url: variantSummary.firstImageUrl }] : [],
+        ...(includeInventory ? { selling_price: variantSummary.firstSellingPrice || 0, quantity: variantSummary.firstQuantity || 0 } : {}),
+      }]
+      : [],
+  };
+};
+
 // ======================================================
 // GET ALL PRODUCTS (OPTIONAL SERVER-SIDE PAGINATION)
 // ✅ Non-breaking: agar ?limit= nahi bheja gaya to purana full-array response hi milega
@@ -772,12 +847,22 @@ const getProducts = async (req, res) => {
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0; // 0 = legacy mode (cap 50; admin 20 bhejta hai)
     const sort = String(req.query.sort || "newest");
+    const adminList = String(req.query.admin_list || "") === "1";
+    const adminInventory = adminList && String(req.query.admin_inventory || "") === "1";
+    const adminListContext = String(req.query.admin_context || "products");
+    const adminProductSelect = adminListContext === "featured" || adminListContext === "featured-manager"
+      ? "name translations category_id brand_id status is_featured"
+      : "name description translations category_id brand_id tax status is_featured";
     // ✅ Storefront lists (?slim=1) — 3 populates kam (payload + DB round-trips)
     const slimList = String(req.query.slim || "") === "1";
 
     // ---- Filter build ----
     // ✅ Shared helper — same filter summary stats endpoint (/products/stats) bhi use karta hai.
     const { filter } = await buildProductFilter(req.query);
+    const brandDetailList = String(req.query.brand_detail || "") === "1" && Boolean(req.query.brand_id);
+    const hasLocaleProjection = typeof req.query.locale === "string" && req.query.locale.trim().length > 0;
+    const requestedBrandLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const brandLocale = /^[a-z]{2}$/.test(requestedBrandLocale) ? requestedBrandLocale : "en";
     // ✅ Shop facets (storefront) + BundleCard ids — legacy callers inhe bhejte hi nahi
     const shop = parseShopParams(req.query);
     if (shop.ids.length) {
@@ -785,6 +870,41 @@ const getProducts = async (req, res) => {
     } else if (shop.hasShopFilters) {
       const facetIds = await applyShopFacets(filter, shop);
       filter._id = { $in: facetIds && facetIds.length ? facetIds : [new mongoose.Types.ObjectId()] };
+    }
+
+    // Brand detail only needs the fields rendered in its related-products tab.
+    // Keep this opt-in projection separate from other product list consumers.
+    if (brandDetailList) {
+      const products = await Product.find(filter)
+        .select("name product_code sku description status category_id translations")
+        .populate("category_id", "name translations")
+        .sort(PRODUCT_LIST_SORT)
+        .lean();
+      const rows = products.map((product) => {
+        const productName = brandLocale === "en" ? "" : product.translations?.name?.[brandLocale];
+        const productDescription = brandLocale === "en" ? "" : product.translations?.description?.[brandLocale];
+        const categoryName = brandLocale === "en" ? "" : product.category_id?.translations?.name?.[brandLocale];
+        return {
+          _id: product._id,
+          name: product.name,
+          product_code: product.product_code,
+          sku: product.sku,
+          description: product.description,
+          status: product.status,
+          ...(brandLocale !== "en" && {
+            translations: {
+              name: productName ? { [brandLocale]: productName } : {},
+              description: productDescription ? { [brandLocale]: productDescription } : {},
+            },
+          }),
+          category_id: product.category_id ? {
+            _id: product.category_id._id,
+            name: product.category_id.name,
+            ...(brandLocale !== "en" && { translations: { name: categoryName ? { [brandLocale]: categoryName } : {} } }),
+          } : null,
+        };
+      });
+      return res.status(200).json(rows);
     }
 
     const isPriceSort = sort === "price-asc" || sort === "price-desc";
@@ -869,10 +989,30 @@ const getProducts = async (req, res) => {
       const dSafe = Math.min(page, dPages);
       pageIds = scored.slice((dSafe - 1) * limit, dSafe * limit).map((s) => s.id);
       const dProducts = pageIds.length
-        ? await applyListPopulates(Product.find({ _id: { $in: pageIds } }), slimList).lean()
+        ? adminList
+          ? await Product.find({ _id: { $in: pageIds } })
+            .select(adminProductSelect)
+            .populate("category_id", "name translations")
+            .populate("brand_id", "name translations")
+            .lean()
+          : await applyListPopulates(Product.find({ _id: { $in: pageIds } }), slimList).lean()
         : [];
       const dOrder = new Map(pageIds.map((id, i) => [String(id), i]));
       dProducts.sort((a, b) => dOrder.get(String(a._id)) - dOrder.get(String(b._id)));
+      if (adminList) {
+        const summaries = await getAdminListVariantSummaries(pageIds);
+        return res.status(200).json({
+          products: dProducts.map((product) => toAdminProductListRow(product, summaries.get(String(product._id)), brandLocale, adminListContext, adminInventory)),
+          pagination: {
+            total: dTotal,
+            page: dSafe,
+            limit,
+            pages: dPages,
+            hasNext: dSafe < dPages,
+            hasPrev: dSafe > 1,
+          },
+        });
+      }
       const dVariants = await Variant.find({
         product_id: { $in: pageIds },
         is_deleted: { $ne: true },
@@ -886,7 +1026,7 @@ const getProducts = async (req, res) => {
       });
       return res.status(200).json({
         products: dProducts.map((p) => ({
-          ...p,
+          ...(hasLocaleProjection ? projectProductLocale(p, brandLocale) : p),
           variants: dMap[String(p._id)] || [],
           price: Number((dMap[String(p._id)] || [])[0]?.selling_price) || 0,
         })),
@@ -949,14 +1089,34 @@ const getProducts = async (req, res) => {
       });
     }
 
-    const products = await applyListPopulates(
-      Product.find({ _id: { $in: pageIds } }),
-      slimList,
-    ).lean();
+    const products = adminList
+      ? await Product.find({ _id: { $in: pageIds } })
+        .select(adminProductSelect)
+        .populate("category_id", "name translations")
+        .populate("brand_id", "name translations")
+        .lean()
+      : await applyListPopulates(Product.find({ _id: { $in: pageIds } }), slimList).lean();
 
     // page order preserve karo
     const orderMap = new Map(pageIds.map((id, i) => [String(id), i]));
     products.sort((a, b) => orderMap.get(String(a._id)) - orderMap.get(String(b._id)));
+
+    if (adminList) {
+      const summaries = await getAdminListVariantSummaries(pageIds);
+      const result = products.map((product) => toAdminProductListRow(product, summaries.get(String(product._id)), brandLocale, adminListContext, adminInventory));
+      return res.status(200).json({
+        products: result,
+        ...(stats ? { stats } : {}),
+        pagination: {
+          total,
+          page: safePage,
+          limit,
+          pages,
+          hasNext: safePage < pages,
+          hasPrev: safePage > 1,
+        },
+      });
+    }
 
     const variants = await Variant.find({
       product_id: { $in: pageIds },
@@ -970,7 +1130,7 @@ const getProducts = async (req, res) => {
     });
 
     const result = products.map((p) => ({
-      ...p,
+      ...(hasLocaleProjection ? projectProductLocale(p, brandLocale) : p),
       variants: variantsMap[String(p._id)] || [],
       price: Number((variantsMap[String(p._id)] || [])[0]?.selling_price) || 0,
     }));
@@ -1320,6 +1480,9 @@ const getProductById = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
+    const hasLocaleProjection = typeof req.query.locale === "string" && req.query.locale.trim().length > 0;
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const productLocale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
 
     // ⭐ Populate audit users so the Activity tab can show WHO created /
     // updated each variant by name (instead of a raw ObjectId).
@@ -1457,7 +1620,7 @@ const getProductById = async (req, res) => {
     }
 
     return res.status(200).json({
-      ...product,
+      ...(hasLocaleProjection ? projectProductLocale(product, productLocale) : product),
       variants,
       purchaseOrderHistory,
       ratingSummary,

@@ -4,6 +4,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
 const {
   getAttributeById,
+  getAttributeStats,
   getAttributes,
   createAttribute,
   updateAttribute,
@@ -13,6 +14,7 @@ const {
 } = require("../controllers/attributeController");
 
 router.get("/", authMiddleware, checkPermission("attribute"), getAttributes);
+router.get("/stats", authMiddleware, checkPermission("attribute"), getAttributeStats);
 router.post("/", authMiddleware, checkPermission("attribute"), createAttribute);
 router.get("/:id/categories", authMiddleware, checkPermission("attribute"), getAttributeCategories);
 router.put("/:id/categories", authMiddleware, checkPermission("attribute"), updateAttributeCategories);
