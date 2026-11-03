@@ -33,15 +33,26 @@ export const attributeApi = {
     return adminHttp.get("/attributes", { params: query }).then(unwrap);
   },
 
-  getAllPaginated: ({ page = 1, limit = 20, search = "", category = "" } = {}) => {
+  getAllPaginated: ({ page = 1, limit = 20, search = "", category = "", status = "", sort = "", direction = "asc", locale = "", admin_list = false } = {}) => {
     const query = { page, limit };
     if (search) query.search = search;
     if (category && category !== "all") query.category = category;
+    if (status && status !== "all") query.status = status;
+    if (sort) query.sort = sort;
+    if (direction) query.direction = direction;
+    if (locale) query.locale = locale;
+    if (admin_list) query.admin_list = "1";
     return adminHttp.get("/attributes", { params: query }).then((res) => paginated(res, limit));
   },
 
-  getById: (id) =>
-    adminHttp.get(`/attributes/${id}`).then(unwrapObject),
+  getStats: () => adminHttp.get("/attributes/stats").then((res) => res.data?.stats || {}),
+
+  getById: (id, { admin_detail = false, locale = "" } = {}) => {
+    const params = {};
+    if (admin_detail) params.admin_detail = "1";
+    if (locale) params.locale = locale;
+    return adminHttp.get(`/attributes/${id}`, { params }).then(unwrapObject);
+  },
 
   getByCategory: (categoryId) =>
     adminHttp

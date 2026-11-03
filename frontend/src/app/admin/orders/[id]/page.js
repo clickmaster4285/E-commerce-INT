@@ -362,27 +362,28 @@ export default function OrderDetailPage({ params }) {
   const [cancelReason, setCancelReason] = useState("");
 
   const { data: order, isLoading, isError, refetch } = useQuery({
-    queryKey: ["admin-order", id],
+    // ✅ Locale query key me — slim detail response selected locale ki translations
+    // ke saath aata hai (brands/banner detail ka pattern)
+    queryKey: ["admin-order", id, locale],
     queryFn: async () => {
-      const body = await orderApi.getById(id);
+      const body = await orderApi.getById(id, locale);
       return body?.data || null;
     },
     retry: 1,
   });
-  usePageTranslations({ model: "Order", records: order ? [order] : [], locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  usePageTranslations({ model: "Order", records: order ? [order] : [], locale, ready: !!order && !isLoading, queryKey: ["admin-order", id, locale], queryClient });
   const { data: shippingMethods = [], isLoading: shippingMethodsLoading } = useQuery({ queryKey: ["adminShippingMethods"], queryFn: shippingApi.getMethods, retry: false });
   usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient });
   const orderProducts = useMemo(() => (order?.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id), [order]);
-  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id, locale], queryClient });
   const orderVariants = useMemo(() => (order?.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id), [order]);
-  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id], queryClient });
+  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !!order && !isLoading, queryKey: ["admin-order", id, locale], queryClient });
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status, cancel_reason }) => orderApi.updateStatus(id, { status, ...(cancel_reason ? { cancel_reason } : {}) }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
       toast.success(t("admin.orders.toast.markedStatus", { status: t(`admin.orders.status.${variables.status}`) }));
       setCancelConfirm(false);
     },
@@ -394,7 +395,6 @@ export default function OrderDetailPage({ params }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
       toast.success(t("admin.orders.detail.paymentMarked"));
     },
     onError: () => toast.error(t("admin.orders.detail.paymentFailed")),

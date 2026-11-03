@@ -175,7 +175,7 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
       <SectionHeading
         title={t("header.topBrands")}
         subtitle={t("admin.brands.page.title")}
-        href="/filtering-product"
+        href="/brands"
         linkLabel={t("common.all")}
       />
 

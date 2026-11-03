@@ -45,7 +45,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
     <section>
       <SectionHeading
         title={t("admin.categories.page.title")}
-        href="/filtering-product"
+        href="/filtering-product?allCategories=1"
         linkLabel={t("admin.dashboard.topProducts.viewAll")}
       />
 
@@ -78,7 +78,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
 
       <div className="mt-3 flex justify-center lg:hidden">
         <Link
-          href="/filtering-product"
+          href="/filtering-product?allCategories=1"
           className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-medium text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
         >
           {t("admin.dashboard.topProducts.viewAll")}

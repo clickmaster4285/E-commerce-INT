@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { purchaseOrderApi } from "@/apis/admin/purchaseOrderApi";
@@ -8,16 +8,16 @@ import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { localizedStrictField } from "@/i18n/localize";
 import { createPortal } from "react-dom";
 import {
-  ClipboardList, Hourglass, CheckCircle2, DollarSign, Plus, Search,
-  X, ChevronLeft, ChevronRight, MoreVertical, Printer,
+  Plus, Search, ChevronDown, ChevronLeft, ChevronRight, MoreVertical,
 } from "lucide-react";
 
 // Same tokens as Vendors/Brands pages — no new design system.
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
-const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
+const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 const accentBtn = { backgroundColor: "var(--accent)", color: "var(--accent-text)" };
 const intlLocale = (locale = "en") => locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-PK" : locale;
 const money = (n, locale = "en") => new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "PKR", maximumFractionDigits: 0 }).format(Math.max(0, Number(n) || 0));
@@ -26,18 +26,25 @@ const fmtDate = (d, locale = "en") => (d ? new Intl.DateTimeFormat(intlLocale(lo
 const STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"];
 const PAY_STATUSES = ["unpaid", "partial", "paid"];
 const RANGES = [["all", "All time"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]];
-const PAGE_SIZE = 20;
 
-function StatCard({ icon: Icon, tint, label, value, delta, down }) {
+// ✅ Sortable column header — brands/vendors page ka SortHeader ka pattern
+// (module level — render ke andar component define karne se state reset hoti hai)
+function SortHeader({ label, sortKey, sortConfig, onSort }) {
   return (
-    <div className="rounded-xl p-4 flex items-center gap-3" style={cardStyle}>
-      <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: tint }}>
-        <Icon size={18} style={{ color: "var(--accent)" }} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[12px] font-medium truncate" style={{ color: "var(--text-muted)" }}>{label}</p>
-        <p className="text-[20px] font-bold leading-tight">{value} {delta && <span className="text-[11px] font-semibold" style={{ color: down ? "var(--danger-text)" : "var(--success-text)" }}>{delta}</span>}</p>
-      </div>
+    <th className="px-2 py-3 text-start text-[12px] font-semibold uppercase tracking-wide leading-tight whitespace-nowrap">
+      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
+        {label}
+        <ChevronDown size={12} className={`transition-transform ${sortConfig.key === sortKey && sortConfig.direction === "asc" ? "rotate-180" : ""}`} style={{ opacity: sortConfig.key === sortKey ? 0.7 : 0.35 }} />
+      </button>
+    </th>
+  );
+}
+
+function StatCard({ label, value, valueColor }) {
+  return (
+    <div className="rounded-lg p-3 sm:p-4" style={cardStyle}>
+      <p className="truncate text-[11px] font-medium sm:text-xs" style={{ color: "var(--text-muted)" }}>{label}</p>
+      <p className="mt-1 truncate text-lg font-bold leading-tight sm:text-xl" style={{ color: valueColor || "var(--text-primary)" }}>{value}</p>
     </div>
   );
 }
@@ -123,79 +130,109 @@ export default function PurchaseOrdersPage() {
   const { productNameOf } = useLocalized();
   const router = useRouter();
   const qc = useQueryClient();
-  const [draft, setDraft] = useState({ search: "", status: "all", vendor: "all", range: "all", payment: "all" });
-  const [applied, setApplied] = useState(draft);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [filters, setFilters] = useState({ status: "all", vendor: "all", range: "all", payment: "all" });
+  const [sortConfig, setSortConfig] = useState({ key: "created", direction: "desc" });
   const [page, setPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selected, setSelected] = useState([]);
 
-  // All POs (looped pages, limit 100) so stats + filters are exact without backend changes.
-  const { data: allPOs = [], isLoading } = useQuery({
-    queryKey: ["pos-all"],
-    queryFn: async () => {
-      const out = [];
-      let p = 1;
-      for (;;) {
-        const res = await purchaseOrderApi.getAll({ page: p, limit: 100 });
-        out.push(...(res?.data || []));
-        const pg = res?.pagination || {};
-        if (!pg.totalPages || p >= pg.totalPages) break;
-        p += 1;
-      }
-      return out;
-    },
+  // ✅ Search debounce (300ms) + page/selection reset — search ab server-side hai
+  const searchTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+  useEffect(() => {
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+      setSelected([]);
+    }, 300);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [search]);
+
+  // ✅ Filters — page reset + cross-page selection clear (brands ka pattern)
+  const changeFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); setSelected([]); };
+
+  const handleSort = (key) => {
+    // ✅ Server side sorting — sort badalne par pehle page par wapas (brands ka pattern)
+    setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    setPage(1);
+    setSelected([]);
+  };
+
+  // ✅ Server-side pagination + server-side search/filter/sort/range (brands ka pattern)
+  const posQueryKey = ["pos", "paginated", locale, page, itemsPerPage, debouncedSearch, filters.status, filters.vendor, filters.range, filters.payment, sortConfig.key, sortConfig.direction];
+  const { data: poData, isLoading, isFetching } = useQuery({
+    queryKey: posQueryKey,
+    queryFn: () => purchaseOrderApi.getAll({
+      page,
+      limit: itemsPerPage,
+      search: debouncedSearch,
+      status: filters.status,
+      vendor: filters.vendor,
+      payment_status: filters.payment,
+      range: filters.range,
+      sort: sortConfig.key || "",
+      order: sortConfig.direction,
+      locale,
+    }),
+    retry: false,
   });
+
+  // ✅ Sirf current page ke POs backend se aate hain
+  const rows = useMemo(() => Array.isArray(poData?.data) ? poData.data : [], [poData]);
+  const poCounts = poData?.counts || { total: 0, pending: 0, received: 0, value: 0 };
+  const pagination = poData?.pagination || { total: 0, page, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  const pageVendors = useMemo(() => [...new Map(rows.map((po) => po.vendor_id).filter((vendor) => vendor && typeof vendor === "object" && vendor._id).map((vendor) => [String(vendor._id), vendor])).values()], [rows]);
+  const pageVendorsAlreadyTranslated = locale === "en" || (pageVendors.length > 0 && pageVendors.every((vendor) => !vendor.name?.trim() || vendor.translations?.name?.[locale]?.trim()));
+  const pageVendorsTranslationsReady = usePageTranslations({ model: "Vendor", records: pageVendors, locale, ready: !isFetching && pagination.page === page, queryKey: posQueryKey, queryClient: qc, alreadyTranslated: pageVendorsAlreadyTranslated, fallbackAfterRetries: true });
+  const poVendorNames = rows.map((po) => ({ name: po.vendor_id?.name || po.vendor_snapshot?.name || "", translation: po.vendor_id?.translations?.name?.[locale] })).filter(({ name }) => name.trim());
+  const translatablePOVendorCount = poVendorNames.length;
+  const untranslatedPOVendorCount = poVendorNames.filter(({ translation }) => !translation?.trim()).length;
+  const showPOVendorTranslationSkeletons = locale !== "en" && translatablePOVendorCount > 0 && untranslatedPOVendorCount / translatablePOVendorCount >= 0.8 && !pageVendorsTranslationsReady;
+
+  // ✅ Brand pagination jaisa number formatting (locale-aware, no grouping)
+  const pageFormatter = useMemo(() => new Intl.NumberFormat(intlLocale(locale), { useGrouping: false }), [locale]);
+  const formatPageNumber = (value) => pageFormatter.format(value);
+
+  const total = pagination.total || 0;                                  // filtered total
+  const totalPages = pagination.pages || 1;
+  const displayedPage = pagination.page || page;
+  const rowLimit = pagination.limit || itemsPerPage;
+  const startIndex = total > 0 ? (displayedPage - 1) * rowLimit + 1 : 0;
+  const endIndex = Math.min(displayedPage * rowLimit, total);
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 5) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+    else {
+      if (displayedPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
+      else if (displayedPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      else pages.push(1, "...", displayedPage - 1, displayedPage, displayedPage + 1, "...", totalPages);
+    }
+    return pages;
+  };
+
+  const goToPage = (target) => {
+    const n = Number(target);
+    // ✅ Cross-page selection clear (brands ka pattern)
+    if (Number.isFinite(n) && n >= 1 && n <= totalPages && n !== displayedPage) {
+      setPage(n);
+      setSelected([]);
+    }
+  };
+
   const { data: vendorsRaw } = useQuery({ queryKey: ["vendors-all"], queryFn: () => vendorApi.getAll() });
   const vendorList = useMemo(() => {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted);
   }, [vendorsRaw]);
-  usePageTranslations({ model: "Vendor", records: vendorList, locale, ready: !isLoading && !!vendorsRaw, queryKey: ["vendors-all"], queryClient: qc });
   const vendorById = useMemo(() => new Map(vendorList.map((vendor) => [String(vendor._id), vendor])), [vendorList]);
 
-  const now = Date.now(), DAY = 86400000;
-  const pctChange = (cur, prev) => {
-    if (!prev) return cur ? "↑ 100%" : null;
-    const d = Math.round(((cur - prev) / prev) * 100);
-    return `${d < 0 ? "↓" : "↑"} ${Math.abs(d)}%`;
-  };
-  const stats = useMemo(() => {
-    const inWin = (d, days) => d && d >= now - days * DAY;
-    const cur = allPOs.filter((p) => inWin(new Date(p.created_at).getTime(), 30));
-    const prev = allPOs.filter((p) => { const t = new Date(p.created_at).getTime(); return t < now - 30 * DAY && t >= now - 60 * DAY; });
-    const pending = (l) => l.filter((p) => ["pending", "confirmed"].includes(p.status)).length;
-    const received = (l) => l.filter((p) => ["delivered", "closed"].includes(p.status)).length;
-    const value = (l) => l.reduce((s, p) => s + (Number(p.total) || 0), 0);
-    return {
-      total: allPOs.length, totalDelta: pctChange(cur.length, prev.length),
-      pending: pending(allPOs), pendingDelta: pctChange(pending(cur), pending(prev)), pendingDown: pending(cur) < pending(prev),
-      received: received(allPOs), receivedDelta: pctChange(received(cur), received(prev)), receivedDown: received(cur) < received(prev),
-      value: value(allPOs), valueDelta: pctChange(value(cur), value(prev)),
-    };
-  }, [allPOs]);
+  // ✅ Stats server counts se — poore collection ke (looped pages ki zaroorat khatam)
+  const stats = poCounts;
 
-  const filtered = useMemo(() => {
-    const q = applied.search.trim().toLowerCase();
-    const cutoff = applied.range === "all" ? 0 : now - Number(applied.range) * DAY;
-    return allPOs.filter((p) => {
-      if (applied.status !== "all" && p.status !== applied.status) return false;
-      if (applied.payment !== "all" && p.payment_status !== applied.payment) return false;
-      if (applied.vendor !== "all" && String(p.vendor_id?._id || p.vendor_id) !== applied.vendor) return false;
-      if (cutoff && new Date(p.created_at).getTime() < cutoff) return false;
-      if (q && ![p.po_number, p.vendor_snapshot?.name, p.status].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
-      return true;
-    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }, [allPOs, applied]);
-
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  usePageTranslations({ model: "PurchaseOrder", records: rows, locale, ready: !isLoading, queryKey: ["pos-all"], queryClient: qc });
-  const poProducts = useMemo(() => rows.flatMap((po) => (po.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id)), [rows]);
-  usePageTranslations({ model: "Product", records: poProducts, locale, ready: !isLoading, queryKey: ["pos-all"], queryClient: qc });
-  const poVariants = useMemo(() => rows.flatMap((po) => (po.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id)), [rows]);
-  usePageTranslations({ model: "Variant", records: poVariants, locale, ready: !isLoading, queryKey: ["pos-all"], queryClient: qc });
-
-  const refresh = () => { qc.invalidateQueries({ queryKey: ["pos-all"] }); qc.invalidateQueries({ queryKey: ["po"] }); };
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["pos"] }); qc.invalidateQueries({ queryKey: ["po"] }); };
   const useActionMutation = (fn, ok) => useMutation({
     mutationFn: fn,
     onSuccess: () => { toast.success(ok); refresh(); },
@@ -218,85 +255,37 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.list.operations")} › {t("admin.purchaseOrders.page.title")}</p>
-          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: "#0f172a" }}>{t("admin.purchaseOrders.page.title")}</h1>
-          <p className="text-xs mt-1 font-medium" style={{ color: "#64748b" }}>{t("admin.purchaseOrders.page.subtitle")}</p>
-        </div>
-        <button onClick={() => router.push("/admin/purchase-orders/new")} className="h-10 px-5 rounded-2xl text-[13px] font-extrabold flex items-center gap-2 transition-all duration-200 hover:scale-[1.03] hover:shadow-xl active:scale-[0.98] shadow-lg" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff", boxShadow: "0 4px 14px rgba(37,99,235,0.35)" }}>
-          <Plus size={16} strokeWidth={2.5} /> {t("admin.purchaseOrders.list.create")}
-        </button>
+      <AdminPageHeader title={t("admin.purchaseOrders.page.title")} subtitle={t("admin.purchaseOrders.page.subtitle")} actions={<button onClick={() => router.push("/admin/purchase-orders/new")} className="inline-flex h-9 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition hover:opacity-90" style={accentBtn}>
+        <Plus size={16} /> {t("admin.purchaseOrders.list.create")}
+      </button>} />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <StatCard label={t("admin.purchaseOrders.list.totalPOs")} value={formatPageNumber(stats.total)} />
+        <StatCard label={t("admin.purchaseOrders.list.pending")} value={formatPageNumber(stats.pending)} valueColor="var(--warning-text)" />
+        <StatCard label={t("admin.purchaseOrders.list.received")} value={formatPageNumber(stats.received)} valueColor="var(--success-text)" />
+        <StatCard label={t("admin.purchaseOrders.list.totalValue")} value={money(stats.value, locale)} valueColor="var(--accent)" />
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        <div className="rounded-2xl p-4 shadow-md transition hover:shadow-xl hover:-translate-y-0.5" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}>
-              <ClipboardList size={20} color="#fff" />
+      <div className="min-w-0 space-y-3">
+          <div className="flex min-w-0 flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative w-full xl:w-[400px] xl:shrink-0">
+              <span className="absolute start-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><Search size={14} /></span>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("admin.purchaseOrders.list.searchPlaceholder")} className="h-9 w-full rounded-lg ps-9 pe-3 text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle} />
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.list.totalPOs")}</p>
-              <p className="text-xl font-extrabold leading-tight" style={{ color: "#0f172a" }}>{stats.total} <span className="text-[11px] font-bold" style={{ color: stats.totalDelta?.includes("↓") ? "#dc2626" : "#059669" }}>{stats.totalDelta}</span></p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl p-4 shadow-md transition hover:shadow-xl hover:-translate-y-0.5" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}>
-              <Hourglass size={20} color="#fff" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.list.pending")}</p>
-              <p className="text-xl font-extrabold leading-tight" style={{ color: "#0f172a" }}>{stats.pending} <span className="text-[11px] font-bold" style={{ color: stats.pendingDown ? "#dc2626" : "#059669" }}>{stats.pendingDelta}</span></p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl p-4 shadow-md transition hover:shadow-xl hover:-translate-y-0.5" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}>
-              <CheckCircle2 size={20} color="#fff" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.list.received")}</p>
-              <p className="text-xl font-extrabold leading-tight" style={{ color: "#0f172a" }}>{stats.received} <span className="text-[11px] font-bold" style={{ color: stats.receivedDown ? "#dc2626" : "#059669" }}>{stats.receivedDelta}</span></p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl p-4 shadow-md transition hover:shadow-xl hover:-translate-y-0.5" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0" }}>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)" }}>
-              <DollarSign size={20} color="#fff" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider truncate" style={{ color: "#94a3b8" }}>{t("admin.purchaseOrders.list.totalValue")}</p>
-              <p className="text-xl font-extrabold leading-tight truncate" style={{ color: "#0f172a" }}>{money(stats.value, locale)} <span className="text-[11px] font-bold" style={{ color: stats.valueDelta?.includes("↓") ? "#dc2626" : "#059669" }}>{stats.valueDelta}</span></p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 items-start">
-        <div className="rounded-2xl overflow-hidden shadow-lg" style={{ background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)", border: "1px solid #e2e8f0", boxShadow: "0 10px 30px rgba(15,23,42,0.06), 0 2px 8px rgba(15,23,42,0.04)" }}>
-          <div className="p-3 grid sm:grid-cols-2 lg:grid-cols-[1fr_130px_150px_130px_140px_auto_auto] gap-2" style={{ borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }}>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: "#94a3b8" }}><Search size={14} /></span>
-              <input value={draft.search} onChange={(e) => setDraft({ ...draft, search: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") { setApplied(draft); setPage(1); } }} placeholder={t("admin.purchaseOrders.list.searchPlaceholder")} className="w-full h-10 pl-10 pr-4 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }} />
-            </div>
-            <select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
+            <div className="grid w-full min-w-0 grid-cols-2 gap-2 xl:flex xl:w-auto xl:shrink-0 xl:gap-2">
+            <div className="relative min-w-0"><select value={filters.status} onChange={(e) => changeFilter("status", e.target.value)} className="h-9 w-full min-w-0 appearance-none rounded-lg ps-3 pe-8 text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30 xl:w-[140px]" style={inputStyle}>
               <option value="all">{t("admin.purchaseOrders.list.statusAll")}</option>{STATUSES.map((s) => <option key={s} value={s}>{t(`admin.purchaseOrders.status.${s}`)}</option>)}
-            </select>
-            <select value={draft.vendor} onChange={(e) => setDraft({ ...draft, vendor: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
+            </select><ChevronDown size={14} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} /></div>
+            <div className="relative min-w-0"><select value={filters.vendor} onChange={(e) => changeFilter("vendor", e.target.value)} className="h-9 w-full min-w-0 appearance-none rounded-lg ps-3 pe-8 text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30 xl:w-[140px]" style={inputStyle}>
               <option value="all">{t("admin.purchaseOrders.list.vendorAll")}</option>{vendorList.map((v) => <option key={v._id} value={v._id}>{v.name}</option>)}
-            </select>
-            <select value={draft.range} onChange={(e) => setDraft({ ...draft, range: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
+            </select><ChevronDown size={14} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} /></div>
+            <div className="relative min-w-0"><select value={filters.range} onChange={(e) => changeFilter("range", e.target.value)} className="h-9 w-full min-w-0 appearance-none rounded-lg ps-3 pe-8 text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30 xl:w-[140px]" style={inputStyle}>
               {RANGES.map(([value]) => <option key={value} value={value}>{t(`admin.purchaseOrders.list.range.${value}`)}</option>)}
-            </select>
-            <select value={draft.payment} onChange={(e) => setDraft({ ...draft, payment: e.target.value })} className="h-10 px-3 rounded-2xl text-sm outline-none font-medium shadow-sm transition-all duration-200 hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-200" style={{ backgroundColor: "#fff", border: "1.5px solid #e2e8f0", color: "#0f172a" }}>
+            </select><ChevronDown size={14} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} /></div>
+            <div className="relative min-w-0"><select value={filters.payment} onChange={(e) => changeFilter("payment", e.target.value)} className="h-9 w-full min-w-0 appearance-none rounded-lg ps-3 pe-8 text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30 xl:w-[140px]" style={inputStyle}>
               <option value="all">{t("admin.purchaseOrders.list.paymentAll")}</option>{PAY_STATUSES.map((s) => <option key={s} value={s}>{t(`admin.purchaseOrders.status.${s}`)}</option>)}
-            </select>
-            <button onClick={() => { const r = { search: "", status: "all", vendor: "all", range: "all", payment: "all" }; setDraft(r); setApplied(r); setPage(1); }} className="h-10 px-4 rounded-2xl text-[13px] font-extrabold transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98]" style={{ background: "#fff", border: "1.5px solid #e2e8f0", color: "#64748b" }}>{t("admin.purchaseOrders.list.reset")}</button>
-            <button onClick={() => { setApplied(draft); setPage(1); }} className="h-10 px-5 rounded-2xl text-[13px] font-extrabold transition-all duration-200 hover:scale-[1.03] hover:shadow-xl active:scale-[0.98] shadow-lg" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "#fff", boxShadow: "0 4px 14px rgba(37,99,235,0.35)" }}>{t("admin.purchaseOrders.list.search")}</button>
+            </select><ChevronDown size={14} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }} /></div>
+            </div>
           </div>
 
           {selected.length > 0 && (
@@ -306,33 +295,44 @@ export default function PurchaseOrdersPage() {
             </div>
           )}
 
+          <div className="overflow-hidden rounded-lg" style={{ ...cardStyle, boxShadow: "var(--shadow-sm)" }}>
           {isLoading ? <p className="p-6 text-sm text-center" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.list.loading")}</p> : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+            <div className="w-full min-w-0 overflow-x-auto">
+              <table className="w-full min-w-[1050px] table-fixed text-[13px] xl:min-w-0">
+                <colgroup><col className="w-[4%]"/><col className="w-[10%]"/><col className="w-[14%]"/><col className="w-[9%]"/><col className="w-[13%]"/><col className="w-[12%]"/><col className="w-[13%]"/><col className="w-[10%]"/><col className="w-[8%]"/><col className="w-[7%]"/></colgroup>
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
-                    <th className="px-4 py-3 w-10"><input type="checkbox" checked={allOnPage} onChange={() => setSelected(allOnPage ? selected.filter((id) => !rows.some((r) => r._id === id)) : [...new Set([...selected, ...rows.map((r) => r._id)])])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    {[["admin.purchaseOrders.list.poNumber"], ["admin.purchaseOrders.list.vendor"], ["admin.purchaseOrders.list.status"], ["admin.purchaseOrders.list.paymentStatus"], ["admin.purchaseOrders.list.totalAmount"], ["admin.purchaseOrders.list.received"], ["admin.purchaseOrders.list.expectedDate"], ["admin.purchaseOrders.list.createdAt"]].map(([key]) => (
-                      <th key={key} className="px-4 py-3 text-left text-[12px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{t(key)}</th>
-                    ))}
-                    <th className="px-4 py-3 text-right text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.page.actions")}</th>
+                    <th className="px-2 py-3 text-center"><input type="checkbox" checked={allOnPage} onChange={() => setSelected(allOnPage ? selected.filter((id) => !rows.some((r) => r._id === id)) : [...new Set([...selected, ...rows.map((r) => r._id)])])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
+                    {/* ✅ Sortable headers — sorting server par hoti hai (brands ka pattern).
+                        "Received" column item qty se compute hota hai — sortable nahi. */}
+                    <SortHeader label={t("admin.purchaseOrders.list.poNumber")} sortKey="po_number" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("admin.purchaseOrders.list.vendor")} sortKey="vendor" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("admin.purchaseOrders.list.status")} sortKey="status" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("admin.purchaseOrders.list.paymentStatus")} sortKey="payment" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("admin.purchaseOrders.list.totalAmount")} sortKey="total" sortConfig={sortConfig} onSort={handleSort} />
+                    <th className="px-2 py-3 text-start text-[12px] font-semibold uppercase tracking-wide leading-tight whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.list.received")}</th>
+                    <SortHeader label={t("admin.purchaseOrders.list.expectedDate")} sortKey="expected" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("admin.purchaseOrders.list.createdAt")} sortKey="created" sortConfig={sortConfig} onSort={handleSort} />
+                    <th className="whitespace-nowrap px-2 py-3 text-end text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.page.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((p) => {
                     const r = receivedOf(p);
+                    const vendor = p.vendor_id && typeof p.vendor_id === "object" ? p.vendor_id : vendorById.get(String(p.vendor_id));
+                    const vendorName = vendor?.name || p.vendor_snapshot?.name || "";
                     return (
-                      <tr key={p._id} onClick={() => router.push(`/admin/purchase-orders/${p._id}`)} className="transition cursor-pointer" style={{ borderBottom: "1px solid var(--border-color)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.includes(p._id)} onChange={() => toggleOne(p._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
-                        <td className="px-4 py-2.5 font-mono text-[12px] whitespace-nowrap" style={{ color: "var(--accent)" }}>{p.po_number}</td>
-                        <td className="px-4 py-2.5"><div className="font-medium">{localizedStrictField(vendorById.get(String(p.vendor_id?._id || p.vendor_id))?.name || p.vendor_snapshot?.name || p.vendor_id?.name, vendorById.get(String(p.vendor_id?._id || p.vendor_id))?.translations?.name || p.vendor_id?.translations?.name, locale)}</div><div className="font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{p.vendor_id?.vendor_code || ""}</div></td>
-                        <td className="px-4 py-2.5"><Pill tone={statusTone(p.status)}>{t(`admin.purchaseOrders.status.${p.status}`)}</Pill></td>
-                        <td className="px-4 py-2.5"><Pill tone={statusTone(p.payment_status)}>{t(`admin.purchaseOrders.status.${p.payment_status}`)}</Pill></td>
-                        <td className="px-4 py-2.5 font-semibold whitespace-nowrap">{money(p.total, locale)}</td>
-                        <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{new Intl.NumberFormat(intlLocale(locale)).format(r.pct)}% ({new Intl.NumberFormat(intlLocale(locale)).format(r.received)}/{new Intl.NumberFormat(intlLocale(locale)).format(r.ordered)})</td>
-                        <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.expected_date, locale)}</td>
-                        <td className="px-4 py-2.5 whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.created_at, locale)}</td>
-                        <td className="px-4 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <tr key={p._id} onClick={() => router.push(`/admin/purchase-orders/${p._id}`)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}>
+                        <td className="px-2 py-2.5 text-center align-middle" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.includes(p._id)} onChange={() => toggleOne(p._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
+                        <td className="px-2 py-2.5 text-start align-middle font-mono text-[12px] break-words" style={{ color: "var(--accent)" }}>{p.po_number}</td>
+                        <td className="px-2 py-2.5 text-start align-middle"><div className="font-medium break-words">{showPOVendorTranslationSkeletons && vendorName.trim() && !vendor?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(vendorName, vendor?.translations?.name || p.vendor_id?.translations?.name, locale)}</div><div className="font-mono text-[11px] break-words" style={{ color: "var(--text-muted)" }}>{vendor?.vendor_code || ""}</div></td>
+                        <td className="px-2 py-2.5 text-start align-middle"><Pill tone={statusTone(p.status)}>{t(`admin.purchaseOrders.status.${p.status}`)}</Pill></td>
+                        <td className="px-2 py-2.5 text-start align-middle"><Pill tone={statusTone(p.payment_status)}>{t(`admin.purchaseOrders.status.${p.payment_status}`)}</Pill></td>
+                        <td className="px-2 py-2.5 text-start align-middle font-semibold">{money(p.total, locale)}</td>
+                        <td className="px-2 py-2.5 text-start align-middle break-words" style={{ color: "var(--text-secondary)" }}>{new Intl.NumberFormat(intlLocale(locale)).format(r.pct)}% ({new Intl.NumberFormat(intlLocale(locale)).format(r.received)}/{new Intl.NumberFormat(intlLocale(locale)).format(r.ordered)})</td>
+                        <td className="px-2 py-2.5 text-start align-middle" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.expected_date, locale)}</td>
+                        <td className="px-2 py-2.5 text-start align-middle" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.created_at, locale)}</td>
+                        <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <PORowMenu
                             p={p}
                             onView={() => router.push(`/admin/purchase-orders/${p._id}`)}
@@ -352,19 +352,52 @@ export default function PurchaseOrdersPage() {
               </table>
             </div>
           )}
+          </div>
 
-          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 px-4 py-3 text-[13px] text-slate-500">
-            <span>{t("admin.purchaseOrders.list.showing", { from: new Intl.NumberFormat(intlLocale(locale)).format(filtered.length ? (safePage - 1) * PAGE_SIZE + 1 : 0), to: new Intl.NumberFormat(intlLocale(locale)).format((safePage - 1) * PAGE_SIZE + rows.length), total: new Intl.NumberFormat(intlLocale(locale)).format(filtered.length) })}</span>
-            <div className="flex items-center gap-1">
-              <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronLeft size={14} /></button>
-              {Array.from({ length: pages }, (_, i) => i + 1).slice(Math.max(0, safePage - 3), safePage + 2).map((pg) => (
-                <button key={pg} onClick={() => setPage(pg)} className="h-8 w-8 rounded-md text-[13px] font-bold transition" style={pg === safePage ? accentBtn : cardStyle}>{pg}</button>
-              ))}
-              <button disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronRight size={14} /></button>
-            </div>
-          </footer>}
-        </div>
-
+          {/* ===== Server-side pagination — brands admin list ka exact pattern ===== */}
+          {total > 10 && (
+            <footer className="flex flex-col xl:flex-row items-center justify-between gap-3 rounded-lg px-4 py-3 text-[13px]" style={{ ...cardStyle, color: "var(--text-secondary)" }}>
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                <span>
+                  {t("admin.purchaseOrders.list.showing", { from: formatPageNumber(startIndex), to: formatPageNumber(endIndex), total: formatPageNumber(total) })}
+                  {isFetching && !isLoading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}
+                </span>
+                <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                  <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(event) => { setItemsPerPage(Number(event.target.value)); setPage(1); setSelected([]); }}
+                    className="h-8 w-[100px] rounded-lg px-2 text-[13px] outline-none cursor-pointer"
+                    style={inputStyle}
+                  >
+                    {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => goToPage(displayedPage - 1)} disabled={displayedPage <= 1 || isFetching} aria-label={t("admin.shared.pagination.prev")} title={t("admin.shared.pagination.prev")} className="h-8 w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={cardStyle}><ChevronLeft size={14} /></button>
+                <span className="hidden sm:inline-flex items-center gap-1">
+                  {renderPageNumbers().map((pg, index) => (
+                    <Fragment key={index}>
+                      {pg === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
+                        <button onClick={() => goToPage(pg)} disabled={isFetching && displayedPage !== pg} aria-label={t("admin.brands.ui.goToPage", { page: formatPageNumber(pg) })} aria-current={displayedPage === pg ? "page" : undefined} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-bold transition hover:opacity-80" style={{ backgroundColor: displayedPage === pg ? "var(--accent)" : "var(--bg-card)", color: displayedPage === pg ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${displayedPage === pg ? "var(--accent)" : "var(--border-color)"}` }}>{formatPageNumber(pg)}</button>
+                      )}
+                    </Fragment>
+                  ))}
+                </span>
+                <span className="sm:hidden text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                  {t("admin.shared.pagination.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}
+                </span>
+                <button onClick={() => goToPage(displayedPage + 1)} disabled={displayedPage >= totalPages || isFetching} aria-label={t("admin.shared.pagination.next")} title={t("admin.shared.pagination.next")} className="h-8 w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={cardStyle}><ChevronRight size={14} /></button>
+              </div>
+            </footer>
+          )}
+          {rows.length > 0 && total <= 10 && (
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              {t("admin.shared.pagination.showingCount", { count: formatPageNumber(rows.length), total: formatPageNumber(total) })}
+              {isFetching && !isLoading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}
+            </p>
+          )}
       </div>
     </div>
   );

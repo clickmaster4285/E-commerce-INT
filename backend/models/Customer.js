@@ -26,6 +26,18 @@ const customerSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    translations: {
+      name: { type: Map, of: String, default: () => ({}) },
+      address: { type: Map, of: String, default: () => ({}) },
+    },
+    translation_source: {
+      name: { type: String, default: "" },
+      address: { type: String, default: "" },
+    },
+    translation_status: {
+      name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+      address: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    },
     notes: {
       type: String,
       default: "",

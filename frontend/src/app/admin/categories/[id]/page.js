@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import AttributeFormModal from "@/components/admin/AttributeFormModal";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* =========================================================
    ICONS
@@ -68,6 +69,22 @@ function getId(value) {
   }
   return "";
 }
+
+const getAttributeOptionText = (entry, locale = "en", depth = 0) => {
+  if (typeof entry === "string" || typeof entry === "number") {
+    const text = String(entry).trim();
+    return /^\[object object\]$/i.test(text) ? "" : text;
+  }
+  if (!entry || typeof entry !== "object" || depth > 4) return "";
+  for (const candidate of [
+    entry.label_translations?.[locale], entry.label_translations?.en,
+    entry[locale], entry.en, entry.label, entry.value, entry.name,
+  ]) {
+    const text = getAttributeOptionText(candidate, locale, depth + 1);
+    if (text) return text;
+  }
+  return "";
+};
 
 /* =========================================================
    PARENT CATEGORY RESTRICTION HELPERS
@@ -515,6 +532,8 @@ export default function CategoryDetailPage() {
   const backPath = "/admin/categories";
 
   const [tab, setTab] = useState("attributes");
+  const [attributePage, setAttributePage] = useState(1);
+  const [attributePageSize, setAttributePageSize] = useState(10);
   const [showDelete, setShowDelete] = useState(false);
   
   // ✅ NEW: Edit Modal States
@@ -532,33 +551,88 @@ export default function CategoryDetailPage() {
   // ✅ NEW: Action Menu & Side Panel States
   const [activeMenuId, setActiveMenuId] = useState(null); // ID of attribute with open menu
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuAnchorRef = useRef(null);
   const [viewPanelAttr, setViewPanelAttr] = useState(null); // Attribute object for side panel
 
   useAttributeSocketSync();
 
   // Queries
   const { data: allCategories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: categoryApi.getAll,
+    queryKey: ["admin-categories", "options", locale],
+    queryFn: () => categoryApi.getOptions(locale),
+    enabled: showEditModal,
+    staleTime: 60_000,
   });
 
   const { data: category, isLoading: loading } = useQuery({
-    queryKey: ["category", categoryId],
-    queryFn: () => categoryApi.getById(categoryId),
+    queryKey: ["category", categoryId, locale],
+    queryFn: () => categoryApi.getById(categoryId, locale),
     enabled: !!categoryId,
     retry: false,
   });
 
-  const { data: categoryAttributes = [] } = useQuery({
-    queryKey: ["category-attributes", categoryId],
-    queryFn: () => categoryApi.getAttributes(categoryId),
+  const { data: categoryAttributesData, isFetching: categoryAttributesFetching } = useQuery({
+    queryKey: ["category-attributes", categoryId, locale, attributePage, attributePageSize],
+    queryFn: () => categoryApi.getAttributesPaginated(categoryId, { page: attributePage, limit: attributePageSize, locale }),
     enabled: !!categoryId,
   });
+  const categoryAttributes = categoryAttributesData?.items || [];
+  const attributePagination = categoryAttributesData?.pagination || { total: 0, page: attributePage, limit: attributePageSize, pages: 1, variantAttributes: 0 };
+  const displayedAttributePage = attributePagination.page || attributePage;
+  const formatPageNumber = (value) => new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
+  const parentTranslationRecord = useMemo(() => (
+    category?.parent_category_id && typeof category.parent_category_id === "object"
+      ? category.parent_category_id
+      : null
+  ), [category]);
+  const categoryTranslationRecords = useMemo(() => (
+    category ? [category, ...(parentTranslationRecord ? [parentTranslationRecord] : [])] : []
+  ), [category, parentTranslationRecord]);
+  const categoryTranslationsReady = usePageTranslations({
+    model: "Category",
+    records: categoryTranslationRecords,
+    locale,
+    ready: !loading && !!category,
+    queryKey: ["category", categoryId, locale],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || !!(
+      category?.translations?.name?.[locale]?.trim() &&
+      (!category.description || category.translations?.description?.[locale]?.trim()) &&
+      (!parentTranslationRecord || parentTranslationRecord.translations?.name?.[locale]?.trim())
+    ),
+  });
+  const attributeTranslationsReady = usePageTranslations({
+    model: "Attribute",
+    records: categoryAttributes,
+    locale,
+    ready: !categoryAttributesFetching && !!categoryAttributesData,
+    queryKey: ["category-attributes", categoryId, locale, attributePage, attributePageSize],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || (categoryAttributes.length > 0 && categoryAttributes.every((attribute) =>
+      attribute.translations?.name?.[locale]?.trim()
+    )),
+  });
+  const categoryTranslationFieldCount = categoryTranslationRecords.reduce((count, record) =>
+    count + Number(Boolean(record.name)) + Number(Boolean(record.description?.trim())), 0
+  );
+  const translatedCategoryFieldCount = categoryTranslationRecords.reduce((count, record) =>
+    count + Number(Boolean(record.translations?.name?.[locale]?.trim())) +
+      Number(Boolean(record.description?.trim() && record.translations?.description?.[locale]?.trim())), 0
+  );
+  const categoryMostlyUntranslated = locale !== "en" && categoryTranslationFieldCount > 0 && translatedCategoryFieldCount / categoryTranslationFieldCount <= 0.2;
+  const translatedAttributeCount = categoryAttributes.filter((attribute) => attribute.translations?.name?.[locale]?.trim()).length;
+  const attributesMostlyUntranslated = locale !== "en" && categoryAttributes.length > 0 && translatedAttributeCount / categoryAttributes.length <= 0.2;
+  const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle";
+  const categoryNameIsTranslated = locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || Boolean(category?.translations?.name?.[locale]?.trim());
+  const categoryDescriptionIsTranslated = locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || !category?.description || Boolean(category?.translations?.description?.[locale]?.trim());
+  const parentNameIsTranslated = !parentTranslationRecord || locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || Boolean(parentTranslationRecord.translations?.name?.[locale]?.trim());
 
   // Derived data
   const variantAttributes = useMemo(() => {
-    return categoryAttributes.filter((attr) => attr.category_config?.is_variant_option);
-  }, [categoryAttributes]);
+    return attributePagination.variantAttributes || 0;
+  }, [attributePagination.variantAttributes]);
 
   // Parent ka poora doc chahiye — `nameOf()` translations map ke saath kaam
   // karta hai (plain `.name` sirf English deta hai). Populated parent ya
@@ -573,7 +647,12 @@ export default function CategoryDetailPage() {
     return allCategories.find((item) => String(item._id) === String(parentId)) || null;
   }, [category, allCategories]);
 
-  const parentCategoryName = parentCategoryDoc ? nameOf(parentCategoryDoc) : t("parent.none");
+  const categoryNameForDisplay = locale === "en" || category?.translations?.name?.[locale]?.trim()
+    ? nameOf(category)
+    : "—";
+  const parentCategoryName = parentCategoryDoc
+    ? (locale === "en" || parentCategoryDoc.translations?.name?.[locale]?.trim() ? nameOf(parentCategoryDoc) : "—")
+    : t("parent.none");
 
   // Mutations
   const deleteMutation = useMutation({
@@ -621,13 +700,59 @@ export default function CategoryDetailPage() {
 
   // Click outside handler for menus
   useEffect(() => {
+    const closeMenu = () => {
+      menuAnchorRef.current = null;
+      setActiveMenuId(null);
+    };
     function handleClickOutside(event) {
       if (activeMenuId && !event.target.closest('.action-menu-container') && !event.target.closest('.dropdown-menu-portal')) {
-        setActiveMenuId(null);
+        closeMenu();
       }
     }
+    function handleKeyDown(event) {
+      if (event.key === "Escape") closeMenu();
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMenuId]);
+
+  // Use the trigger's measured position like the product detail action menu.
+  useEffect(() => {
+    if (!activeMenuId || !menuAnchorRef.current) return;
+    const rect = menuAnchorRef.current.getBoundingClientRect();
+    const menuW = 192;
+    const menuH = 160;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openAbove = spaceBelow < menuH && spaceAbove > spaceBelow;
+    const desiredTop = openAbove ? rect.top - menuH - gap : rect.bottom + gap;
+    const maxTop = Math.max(8, window.innerHeight - menuH - 8);
+    const left = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
+    setMenuPos({ top: Math.max(8, Math.min(desiredTop, maxTop)), left });
+  }, [activeMenuId]);
+
+  // Close the fixed action menu as soon as the page or any nested scroller moves.
+  useEffect(() => {
+    if (!activeMenuId) return;
+    const closeMenuOnScroll = () => {
+      menuAnchorRef.current = null;
+      setActiveMenuId(null);
+    };
+    const closeMenuOnResize = () => {
+      menuAnchorRef.current = null;
+      setActiveMenuId(null);
+    };
+    window.addEventListener("scroll", closeMenuOnScroll, true);
+    window.addEventListener("resize", closeMenuOnResize);
+    return () => {
+      window.removeEventListener("scroll", closeMenuOnScroll, true);
+      window.removeEventListener("resize", closeMenuOnResize);
+    };
   }, [activeMenuId]);
 
   // Loading state
@@ -682,12 +807,12 @@ export default function CategoryDetailPage() {
           <Ico d={D.chevron} className="w-3 h-3" />
           {parentCategoryDoc && (
             <>
-              <span className="max-w-[180px] truncate">{nameOf(parentCategoryDoc)}</span>
+              <span className="max-w-[180px] truncate">{parentNameIsTranslated && parentCategoryDoc ? nameOf(parentCategoryDoc) : parentCategoryDoc ? <span className={`${translationSkeleton} w-24`} aria-label={t("detail.loading")} /> : null}</span>
               <Ico d={D.chevron} className="w-3 h-3" />
             </>
           )}
           <span className="max-w-[240px] truncate font-medium text-[var(--text-primary)]">
-            {nameOf(category)}
+            {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
           </span>
         </nav>
 
@@ -729,7 +854,7 @@ export default function CategoryDetailPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-[16px] leading-tight font-bold text-[var(--text-primary)]">
-                  {nameOf(category)}
+                  {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-36`} aria-label={t("detail.loading")} />}
                 </h2>
                 <span
                   className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold"
@@ -749,7 +874,7 @@ export default function CategoryDetailPage() {
               )}
               {category.description && (
                 <p className="mt-2 max-w-md text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  {descriptionOf(category)}
+                  {categoryDescriptionIsTranslated ? descriptionOf(category) : <span className={`${translationSkeleton} w-48`} aria-label={t("detail.loading")} />}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -813,7 +938,7 @@ export default function CategoryDetailPage() {
                 {t("detail.categoryName")}
               </span>
               <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
-                {nameOf(category)}
+                {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
               </span>
             </div>
             <div className="flex items-center justify-between gap-8">
@@ -840,7 +965,7 @@ export default function CategoryDetailPage() {
                 {t("form.attributes")}
               </span>
               <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">
-                {categoryAttributes.length}
+                {formatPageNumber(attributePagination.total)}
               </span>
             </div>
           </div>
@@ -850,7 +975,7 @@ export default function CategoryDetailPage() {
       {/* TABS */}
       <div className="flex items-center gap-1 border-b" style={{ borderColor: "var(--border-color)" }}>
         {[
-          { id: "attributes", label: t("detail.attributesTab"), count: categoryAttributes.length, icon: D.box },
+          { id: "attributes", label: t("detail.attributesTab"), count: attributePagination.total, icon: D.box },
           { id: "history", label: t("detail.historyTab"), icon: D.clock },
         ].map((item) => {
           const active = tab === item.id;
@@ -892,14 +1017,14 @@ export default function CategoryDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h3 className="text-[15px] font-bold text-[var(--text-primary)]">
-                {t("detail.attributeCount", { count: categoryAttributes.length })}
+                {t("detail.attributeCount", { count: formatPageNumber(attributePagination.total) })}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                {t("detail.assignedTo", { name: nameOf(category) })}
+                {categoryNameIsTranslated ? t("detail.assignedTo", { name: nameOf(category) }) : <span className={`${translationSkeleton} w-40`} aria-label={t("detail.loading")} />}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {variantAttributes.length > 0 && (
+              {variantAttributes > 0 && (
                 <span
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold"
                   style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}
@@ -907,13 +1032,19 @@ export default function CategoryDetailPage() {
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                   </svg>
-                  {t("detail.variantAttributes", { count: variantAttributes.length })}
+                  {t("detail.variantAttributes", { count: formatPageNumber(variantAttributes) })}
                 </span>
               )}
             </div>
           </div>
 
-          {categoryAttributes.length === 0 ? (
+          {categoryAttributesFetching && !categoryAttributesData ? (
+            <div className="rounded-xl p-5 space-y-3" style={cardStyle} aria-label={t("common.loading")}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-10 rounded-lg animate-pulse" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+              ))}
+            </div>
+          ) : categoryAttributes.length === 0 ? (
             <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <Ico d={D.box} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
@@ -972,7 +1103,7 @@ export default function CategoryDetailPage() {
                           className="transition-colors hover:bg-[var(--bg-tertiary)]/20 relative group cursor-pointer"
                           style={{ borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none", opacity: isActive ? 1 : 0.5 }}
                         >
-                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{idx + 1}</td>
+                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{formatPageNumber((displayedAttributePage - 1) * attributePagination.limit + idx + 1)}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", border: "1px solid var(--purple-soft)" }}>
@@ -980,7 +1111,7 @@ export default function CategoryDetailPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p>
+                                  {(locale === "en" || attributeTranslationsReady || !attributesMostlyUntranslated || attr.translations?.name?.[locale]?.trim()) ? <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("detail.loading")} />}
                                   {isVariant && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
                                       {t("detail.variant")}
@@ -1048,13 +1179,16 @@ export default function CategoryDetailPage() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  const btnEl = e.currentTarget;
-                                  const rect = btnEl.getBoundingClientRect();
-                                  const menuW = 192;
-                                  const adjustedLeft = Math.max(8, Math.min(rect.right - menuW, window.innerWidth - menuW - 8));
-                                  setMenuPos({ top: rect.bottom + 4, left: adjustedLeft });
-                                  setActiveMenuId(isMenuOpen ? null : attrId);
+                                  if (isMenuOpen) {
+                                    menuAnchorRef.current = null;
+                                    setActiveMenuId(null);
+                                  } else {
+                                    menuAnchorRef.current = e.currentTarget;
+                                    setActiveMenuId(attrId);
+                                  }
                                 }}
+                                aria-haspopup="menu"
+                                aria-expanded={isMenuOpen}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                               >
                                 <Ico d={D.dots} className="w-4 h-4" />
@@ -1065,10 +1199,14 @@ export default function CategoryDetailPage() {
                                 const isTogglingThis = toggleStatusMutation.isPending && toggleStatusMutation.variables?.attrId === attrId;
                                 return createPortal(
                                   <div dir={dir} lang={locale}
-                                  className="fixed z-[9999] w-48 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal"
+                                  role="menu"
+                                  className="fixed z-[9999] w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal animate-in fade-in zoom-in-95"
                                   style={{
                                     top: menuPos.top,
                                     left: menuPos.left,
+                                    maxHeight: "calc(100vh - 16px)",
+                                    overflowY: "auto",
+                                    boxShadow: "0 8px 30px rgba(0,0,0,0.35)",
                                     pointerEvents: "auto",
                                   }}
                                   >
@@ -1142,6 +1280,25 @@ export default function CategoryDetailPage() {
                   </tbody>
                 </table>
               </div>
+              {attributePagination.total > attributePageSize && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3">
+                  <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+                    <span>{t("page.showingRange", { from: formatPageNumber((displayedAttributePage - 1) * attributePageSize + 1), to: formatPageNumber(Math.min(displayedAttributePage * attributePageSize, attributePagination.total)), total: formatPageNumber(attributePagination.total) })}</span>
+                    <label className="flex items-center gap-2">
+                      <span>{t("admin.categories.page.rowsPerPage")}</span>
+                      <select value={attributePageSize} onChange={(event) => { setAttributePageSize(Number(event.target.value)); setAttributePage(1); }} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[11px] text-[var(--text-primary)]">
+                        {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                      </select>
+                    </label>
+                    {categoryAttributesFetching && <span>{t("page.updating")}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setAttributePage(Math.max(1, displayedAttributePage - 1))} disabled={displayedAttributePage <= 1 || categoryAttributesFetching} title={t("page.prev")} aria-label={t("page.prev")} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40">{t("page.prev")}</button>
+                    <span className="text-[11px] text-[var(--text-muted)]">{t("page.pageOf", { page: formatPageNumber(displayedAttributePage), total: formatPageNumber(attributePagination.pages) })}</span>
+                    <button type="button" onClick={() => setAttributePage(Math.min(attributePagination.pages, displayedAttributePage + 1))} disabled={displayedAttributePage >= attributePagination.pages || categoryAttributesFetching} title={t("page.next")} aria-label={t("page.next")} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40">{t("page.next")}</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1155,19 +1312,17 @@ export default function CategoryDetailPage() {
         initialData={attrEditTarget ? {
           name: attrEditTarget.name || "",
           data_type: attrEditTarget.data_type || "multi_select",
-          values: (attrEditTarget.values || []).map((v) => {
-            // ✅ FIX ISSUE 2: Ensure we extract strings correctly when loading into form
-            if (typeof v === "string") return v;
-            if (typeof v === "object") return String(v.label || v.value || v.name || "");
-            return String(v);
-          }).filter(Boolean),
+          values: (attrEditTarget.values || [])
+            .map((v) => getAttributeOptionText(v, locale))
+            .filter(Boolean),
           value: (() => {
             if (attrEditTarget.data_type === "boolean") {
-              const vals = attrEditTarget.values || [];
-              const trueEntry = vals.find(
-                (v) => (v?.value || v)?.toString() === "true" || (v?.label || v)?.toString()?.toLowerCase() === "yes"
-              );
-              return !!trueEntry;
+              return (attrEditTarget.values || []).some((v) => {
+                const value = getAttributeOptionText(v?.value ?? v, locale).toLowerCase();
+                const label = getAttributeOptionText(v?.label_translations?.[locale], locale)
+                  || getAttributeOptionText(v?.label, locale);
+                return value === "true" || label.toLowerCase() === "yes";
+              });
             }
             return false;
           })(),
@@ -1265,7 +1420,7 @@ export default function CategoryDetailPage() {
                 <Ico d={D.trash} className="w-5 h-5" style={{ color: "var(--danger)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">{t("delete.titleOne", { name: nameOf(category) })}</h3>
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">{t("delete.titleOne", { name: categoryNameForDisplay })}</h3>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
                   {t("detail.deleteBody")}
                 </p>
@@ -1348,8 +1503,8 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   // ✅ NEW: Disabled parent option ka inline explanation (hover / focus / invalid attempt)
   const [parentRestrictionHint, setParentRestrictionHint] = useState("");
 
-  const { data: category, isLoading: categoryLoading } = useQuery({ queryKey: ["category", categoryId], queryFn: () => categoryApi.getById(categoryId), enabled: !!categoryId });
-  const { data: allCategories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
+  const { data: category, isLoading: categoryLoading } = useQuery({ queryKey: ["category", categoryId, locale, "edit"], queryFn: () => categoryApi.getById(categoryId, locale, true), enabled: !!categoryId });
+  const { data: allCategories = [] } = useQuery({ queryKey: ["admin-categories", "options", locale], queryFn: () => categoryApi.getOptions(locale), enabled: !!categoryId, staleTime: 60_000 });
   const { data: allAttributes = [] } = useQuery({ queryKey: ["all-attributes"], queryFn: () => attributeApi.getAll(), enabled: showAttrSelectModal || showCreateAttrModal });
 
   useEffect(() => {
@@ -1569,7 +1724,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                   )}
                   {editingHasChildren && (
                     <ModalParentLockNotice title={t("lock.alreadyUsedTitle")}>
-                      {t("lock.alreadyUsedBody", { name: nameOf(category) })}
+                      {t("lock.alreadyUsedBody", { name: categoryNameForDisplay })}
                     </ModalParentLockNotice>
                   )}
                 </div>

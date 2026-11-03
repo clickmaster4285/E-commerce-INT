@@ -34,6 +34,18 @@ const leadSchema = new mongoose.Schema({
   lead_number: { type: String, unique: true, index: true },
   lead_type: { type: String, enum: ["Individual", "Business"], required: true, default: "Individual" },
   name: { type: String, required: true, trim: true, maxlength: 160 },
+  translations: {
+    name: { type: Map, of: String, default: () => ({}) },
+    company_name: { type: Map, of: String, default: () => ({}) },
+  },
+  translation_source: {
+    name: { type: String, default: "" },
+    company_name: { type: String, default: "" },
+  },
+  translation_status: {
+    name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+    company_name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" },
+  },
   phone: { type: String, required: true, trim: true, maxlength: 15, match: /^\d{7,15}$/ },
   email: { type: String, trim: true, lowercase: true, default: "", maxlength: 254 },
   company_name: { type: String, trim: true, default: "", maxlength: 160 },

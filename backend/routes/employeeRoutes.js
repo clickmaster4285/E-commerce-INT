@@ -2,6 +2,7 @@ const router = require("express").Router();
 const {
   getAllEmployees,
   getEmployeeById,
+  getEmployeeActivities,
   createEmployee,
   updateEmployee,
   deleteEmployee,
@@ -15,6 +16,7 @@ router.use(authMiddleware);
 
 // GET — no permission check (allows auto-migration of legacy permissions)
 router.get("/", getAllEmployees);
+router.get("/:id/activities", getEmployeeActivities);
 router.get("/:id", getEmployeeById);
 
 // WRITE operations — employees permission required

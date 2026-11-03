@@ -24,6 +24,21 @@ const emitSocket = (event, data) => {
 const normalizeValues = (rawValues, existingValues = []) => {
   if (!Array.isArray(rawValues)) return [];
 
+  // Accept legacy/localized option objects without ever persisting the result
+  // of String(object) ("[object Object]").
+  const toOptionText = (candidate, depth = 0) => {
+    if (typeof candidate === "string" || typeof candidate === "number") {
+      const text = String(candidate).trim();
+      return /^\[object object\]$/i.test(text) ? "" : text;
+    }
+    if (!candidate || typeof candidate !== "object" || depth > 4) return "";
+    for (const key of ["en", "label", "value", "name"]) {
+      const text = toOptionText(candidate[key], depth + 1);
+      if (text) return text;
+    }
+    return "";
+  };
+
   const existingByValue = new Map();
   for (const prev of Array.isArray(existingValues) ? existingValues : []) {
     const key = String(prev?.value || "").trim().toLowerCase();
@@ -34,8 +49,15 @@ const normalizeValues = (rawValues, existingValues = []) => {
   const out = [];
   for (const v of rawValues) {
     if (!v) continue;
-    const label = String(v.label || v.value || "").trim();
-    const value = String(v.value || v.label || "").trim();
+    const label = toOptionText(v?.label_translations?.en)
+      || toOptionText(v?.label)
+      || toOptionText(v?.value)
+      || toOptionText(v?.name)
+      || toOptionText(v);
+    const value = toOptionText(v?.value)
+      || toOptionText(v?.label)
+      || toOptionText(v?.name)
+      || toOptionText(v);
     if (!value) continue;
     const key = value.toLowerCase();
     if (seen.has(key)) continue;
@@ -111,12 +133,31 @@ const sanitizePayload = (body, existingValues = []) => {
 
 const getAttributeById = async (req, res) => {
   try {
-    const attribute = await Attribute.findOne({
+    const isAdminDetail = String(req.query.admin_detail || "") === "1";
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+    let query = Attribute.findOne({
       _id: req.params.id,
       is_deleted: { $ne: true },
-    }).lean();
+    });
+    if (isAdminDetail) {
+      query = query.select("name code data_type category unit values variant_allowed is_active translations.name");
+    }
+    let attribute = await query.lean();
     if (!attribute) {
       return res.status(404).json({ success: false, message: "Attribute not found" });
+    }
+    if (isAdminDetail && locale !== "en") {
+      const valueForLocale = (map) => {
+        if (map && typeof map.get === "function") return map.get(locale);
+        return map?.[locale];
+      };
+      const nameTranslation = valueForLocale(attribute.translations?.name);
+      attribute.translations = { name: nameTranslation ? { [locale]: nameTranslation } : {} };
+      attribute.values = (attribute.values || []).map((value) => {
+        const labelTranslation = valueForLocale(value.label_translations);
+        return { ...value, label_translations: labelTranslation ? { [locale]: labelTranslation } : {} };
+      });
     }
     res.status(200).json({ success: true, data: attribute });
   } catch (error) {
@@ -127,12 +168,20 @@ const getAttributeById = async (req, res) => {
 
 const getAttributes = async (req, res) => {
   try {
-    const { search, category } = req.query;
+    const { search, category, status } = req.query;
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0; // 0 = legacy mode
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const adminList = String(req.query.admin_list || "") === "1";
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+    const requestedSort = String(req.query.sort || "");
+    const sortDirection = String(req.query.direction || "asc").toLowerCase() === "desc" ? -1 : 1;
 
     const filter = { is_deleted: { $ne: true } };
+
+    if (status === "active") filter.is_active = { $ne: false };
+    if (status === "inactive") filter.is_active = false;
 
     if (search) {
       filter.$or = [
@@ -154,11 +203,61 @@ const getAttributes = async (req, res) => {
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
-    const attributes = await Attribute.find(filter).sort({ created_at: -1 }).skip(skip).limit(limit).lean();
+    let attributes;
+    if (adminList) {
+      const sortField = requestedSort === "name" ? "name" : requestedSort === "type" ? "data_type" : requestedSort === "options" ? "options_count" : "created_at";
+      const pipeline = [{ $match: filter }];
+      if (sortField === "options_count") {
+        pipeline.push({ $addFields: { options_count: { $size: { $ifNull: ["$values", []] } } } });
+      }
+      pipeline.push(
+        { $sort: { [sortField]: requestedSort ? sortDirection : -1, _id: requestedSort ? 1 : -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            code: 1,
+            data_type: 1,
+            category: 1,
+            is_active: 1,
+            translations: { name: 1 },
+            options_count: sortField === "options_count" ? 1 : { $size: { $ifNull: ["$values", []] } },
+          },
+        },
+      );
+      attributes = await Attribute.aggregate(pipeline);
+    } else {
+      const sort = requestedSort === "name" ? { name: sortDirection, _id: 1 }
+        : requestedSort === "type" ? { data_type: sortDirection, _id: 1 }
+          : { created_at: -1, _id: -1 };
+      attributes = await Attribute.find(filter).sort(sort).skip(skip).limit(limit).lean();
+    }
     const enriched = await enrichAttributesWithCategories(attributes);
+    const rows = adminList ? enriched.map((attribute) => ({
+      _id: attribute._id,
+      name: attribute.name,
+      code: attribute.code,
+      data_type: attribute.data_type,
+      category: attribute.category || null,
+      category_id: attribute.category_id || null,
+      category_translations: locale !== "en" && (attribute.category_translations?.[locale] || attribute.category_translations?.get?.(locale))
+        ? { [locale]: attribute.category_translations?.[locale] || attribute.category_translations?.get?.(locale) }
+        : {},
+      is_active: attribute.is_active,
+      options_count: Number(attribute.options_count) || 0,
+      ...(locale !== "en" && {
+        translations: {
+          name: attribute.translations?.name?.[locale]
+            ? { [locale]: attribute.translations.name[locale] }
+            : {},
+        },
+      }),
+    })) : enriched;
     return res.status(200).json({
       success: true,
-      data: enriched,
+      data: rows,
       pagination: {
         total,
         page: safePage,
@@ -171,6 +270,25 @@ const getAttributes = async (req, res) => {
   } catch (error) {
     log.error("Error in getAttributes:", error);
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getAttributeStats = async (req, res) => {
+  try {
+    const filter = { is_deleted: { $ne: true } };
+    const [total, active, withOptions, rawTypes] = await Promise.all([
+      Attribute.countDocuments(filter),
+      Attribute.countDocuments({ ...filter, is_active: { $ne: false } }),
+      Attribute.countDocuments({ ...filter, "values.0": { $exists: true } }),
+      Attribute.distinct("data_type", filter),
+    ]);
+    const legacyTypeMap = { select: "multi_select", color: "multi_select", date: "text", datetime: "text", url: "text", measurement: "decimal" };
+    const supportedTypes = new Set(["multi_select", "boolean"]);
+    const dataTypes = new Set(rawTypes.map((type) => legacyTypeMap[type] || type).filter((type) => supportedTypes.has(type)));
+    return res.status(200).json({ success: true, stats: { total, active, withOptions, dataTypes: dataTypes.size } });
+  } catch (error) {
+    log.error("Error in getAttributeStats:", error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -197,6 +315,7 @@ const enrichAttributesWithCategories = async (attributes) => {
   // "Category" column hamesha English dikhata tha. Purana `category` string
   // field backward-compatibility ke liye waise hi rehta hai.
   const attrCategoryMap = {};
+  const attrCategoryIdMap = {};
   const attrCategoryTranslations = {};
   for (const cat of categories) {
     for (const ca of cat.attributes || []) {
@@ -205,6 +324,7 @@ const enrichAttributesWithCategories = async (attributes) => {
         // Use the first category found for each attribute
         if (!attrCategoryMap[aid]) {
           attrCategoryMap[aid] = cat.name;
+          attrCategoryIdMap[aid] = cat._id;
           attrCategoryTranslations[aid] = cat.translations?.name || null;
         }
       }
@@ -215,6 +335,7 @@ const enrichAttributesWithCategories = async (attributes) => {
   return attributes.map((attr) => ({
     ...attr,
     category: attrCategoryMap[String(attr._id)] || attr.category || null,
+    category_id: attrCategoryIdMap[String(attr._id)] || null,
     category_translations: attrCategoryTranslations[String(attr._id)] || null,
   }));
 };
@@ -437,4 +558,4 @@ const deleteAttribute = async (req, res) => {
   }
 };
 
-module.exports = { getAttributeById, getAttributes, createAttribute, updateAttribute, getAttributeCategories, updateAttributeCategories, deleteAttribute };
+module.exports = { getAttributeById, getAttributeStats, getAttributes, createAttribute, updateAttribute, getAttributeCategories, updateAttributeCategories, deleteAttribute };

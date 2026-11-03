@@ -276,7 +276,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
       >
         <div className="flex shrink-0 items-end gap-4">
           <Link
-            href="/filtering-product"
+            href="/filtering-product?allCategories=1"
             className="group inline-flex items-center gap-1 text-[13px] font-medium text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
           >
             {t("common.viewAll")}

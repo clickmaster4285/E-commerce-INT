@@ -2,6 +2,9 @@ const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const Product = require("../models/Product");
+const Category = require("../models/Category");
+const Brand = require("../models/brand");
 const { getIO } = require("../utils/socket");
 const log = require("../utils/logger");
 const { queueTranslationSync } = require("../utils/translationService");
@@ -335,6 +338,10 @@ exports.getDiscounts = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const search = String(req.query.search || "").trim();
     const status = String(req.query.status || "all").trim();
+    const applyTo = String(req.query.applyTo || "").trim();
+    const locale = /^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(String(req.query.locale || "en"))
+      ? String(req.query.locale).split("-")[0]
+      : "en";
 
     const filter = { is_deleted: false };
     const andClauses = [];
@@ -347,6 +354,15 @@ exports.getDiscounts = async (req, res) => {
         ],
       });
     }
+
+    const targetAliases = {
+      all_products: "all",
+      product: "specific_products",
+      category: "specific_categories",
+      brand: "specific_brands",
+    };
+    const normalizedTarget = targetAliases[applyTo] || applyTo;
+    if (normalizedTarget) andClauses.push({ applyTo: normalizedTarget });
 
     // ✅ Frontend sirf Active/Inactive model use karta hai (getDiscountStatus) —
     //    neeche wale clauses uski EXACT copy hain taake filter aur badge kabhi
@@ -415,15 +431,18 @@ exports.getDiscounts = async (req, res) => {
       Discount.countDocuments(baseQuery),
       Discount.countDocuments(withStatus("active")),
       Discount.countDocuments(withStatus("inactive")),
-      Discount.find(filter)
-        .populate("selectedProducts", "name translations sku selling_price")
-        .populate("selectedCategories", "name translations")
-        .populate("selectedBrands", "name translations")
-        .populate("createdBy", "name email")
-        .populate("updatedBy", "name email")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      (() => {
+        const query = Discount.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit);
+        if (req.query.admin_list === "1") {
+          return query.select(["name", "code", `translations.name.${locale}`, "applyTo", "type", "value", "isActive", "status", "endDate", "selectedProducts", "selectedCategories", "selectedBrands"].join(" ")).lean();
+        }
+        return query
+          .populate("selectedProducts", "name translations sku selling_price")
+          .populate("selectedCategories", "name translations")
+          .populate("selectedBrands", "name translations")
+          .populate("createdBy", "name email")
+          .populate("updatedBy", "name email");
+      })(),
     ]);
 
     return res.status(200).json({
@@ -489,6 +508,20 @@ const buildDiscountResponse = async (id) => {
 
 exports.getDiscountById = async (req, res) => {
   try {
+    if (req.query.admin_detail === "1") {
+      const locale = /^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(String(req.query.locale || "en"))
+        ? String(req.query.locale).split("-")[0]
+        : "en";
+      const discount = await Discount.findOne({ _id: req.params.id, is_deleted: false })
+        .select(["name", "code", "description", `translations.name.${locale}`, `translations.description.${locale}`, "applyTo", "type", "value", "minOrderValue", "minQuantity", "startDate", "endDate", "usageLimit", "perUserLimit", "status", "isActive", "selectedProducts", "selectedCategories", "selectedBrands", "createdBy", "updatedBy", "createdAt", "updatedAt"].join(" "))
+        .lean();
+      if (!discount) return res.status(404).json({ message: "Discount not found" });
+      const [createdBy, updatedBy] = await Promise.all([
+        resolveCreatorInfo(discount.createdBy),
+        resolveCreatorInfo(discount.updatedBy),
+      ]);
+      return res.status(200).json({ ...discount, createdBy, updatedBy });
+    }
     const obj = await buildDiscountResponse(req.params.id);
 
     if (!obj) {
@@ -498,6 +531,50 @@ exports.getDiscountById = async (req, res) => {
     return res.status(200).json(obj);
   } catch (error) {
     log.error("Get Discount By ID Error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+// Paginated, minimal target rows for the admin discount detail page.
+exports.getDiscountTargets = async (req, res) => {
+  try {
+    const discount = await Discount.findOne({ _id: req.params.id, is_deleted: false })
+      .select("applyTo selectedProducts selectedCategories selectedBrands")
+      .lean();
+    if (!discount) return res.status(404).json({ message: "Discount not found" });
+
+    const targetType = String(req.query.type || "");
+    const locale = /^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(String(req.query.locale || "en"))
+      ? String(req.query.locale).split("-")[0]
+      : "en";
+    const config = {
+      products: { key: "selectedProducts", Model: Product, fields: ["name", `translations.name.${locale}`, "sku"].join(" ") },
+      categories: { key: "selectedCategories", Model: Category, fields: ["name", `translations.name.${locale}`].join(" ") },
+      brands: { key: "selectedBrands", Model: Brand, fields: ["name", `translations.name.${locale}`].join(" ") },
+    }[targetType];
+    if (!config) return res.status(400).json({ message: "Invalid target type" });
+
+    const ids = Array.isArray(discount[config.key]) ? discount[config.key] : [];
+    const limitValue = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitValue) && limitValue > 0 ? Math.min(limitValue, 100) : 10;
+    const requestedPage = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const total = ids.length;
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+    const pageIds = ids.slice((page - 1) * limit, page * limit);
+    const records = pageIds.length
+      ? await config.Model.find({ _id: { $in: pageIds } }).select(config.fields).lean()
+      : [];
+    const byId = new Map(records.map((record) => [String(record._id), record]));
+    const data = pageIds.map((id) => byId.get(String(id))).filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      data,
+      pagination: { total, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
+    });
+  } catch (error) {
+    log.error("Get Discount Targets Error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };

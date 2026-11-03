@@ -16,6 +16,34 @@ const enumValues = {
   status: ["New", "Contacted", "Qualified", "Customer", "Converted", "Lost"],
 };
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ==========================================
+// 🌐 LOCALE + SLIM HELPERS — admin leads (brands/banner/vendors/po ka pattern)
+//    Leads me translations map nahi hai, isliye locale sirf API consistency ke
+//    liye accept kiya jata hai. Paginated rows/detail me sirf front-facing
+//    fields jate hain — createdby/updatedby/is_deleted/deleted_at aur bade
+//    embedded arrays (activities/history) list rows se bahar.
+// ==========================================
+const parseLeadLocale = (value) => {
+  const requestedLocale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+};
+
+// ✅ Populated refs sirf {_id, name} — detail/list dono par yehi chahiye hai
+const slimLeadRef = (doc) => (doc && typeof doc === "object" && doc._id ? { _id: doc._id, name: doc.name } : doc);
+
+// ✅ Server-side sorting whitelist — sort key -> DB field
+const LEAD_SORT_FIELDS = {
+  lead_number: "lead_number",
+  name: "name",
+  phone: "phone",
+  source: "source",
+  status: "status",
+  assigned: "assigned_employee_id",
+  value: "estimated_deal_value",
+  followUp: "next_follow_up_date",
+  created: "created_at",
+};
 const nextLeadNumber = async () => {
   const existing = await Lead.find({ lead_number: /^LD-\d+$/ }).select("lead_number").lean();
   const max = existing.reduce((highest, lead) => Math.max(highest, Number(String(lead.lead_number).slice(3)) || 0), 0);
@@ -141,6 +169,7 @@ exports.listLeads = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const locale = parseLeadLocale(req.query.locale);
     const filter = { is_deleted: { $ne: true } };
     const search = String(req.query.search || "").trim();
     if (search) {
@@ -159,24 +188,58 @@ exports.listLeads = async (req, res) => {
       if (req.query.from && !Number.isNaN(Date.parse(req.query.from))) filter.created_at.$gte = new Date(req.query.from);
       if (req.query.to && !Number.isNaN(Date.parse(req.query.to))) { const to = new Date(req.query.to); to.setHours(23, 59, 59, 999); filter.created_at.$lte = to; }
     }
+
+    // ✅ Sorting bhi server par hoti hai (whitelist ke ilawa koi custom field nahi).
+    //    Default: created_at desc (legacy jaisa) — ties par _id stable order.
+    const sortKeyRaw = String(req.query.sort || "").trim();
+    const hasSort = Boolean(LEAD_SORT_FIELDS[sortKeyRaw]);
+    const sortField = hasSort ? LEAD_SORT_FIELDS[sortKeyRaw] : "created_at";
+    const sortOrder = hasSort ? (String(req.query.order || "").trim().toLowerCase() === "asc" ? 1 : -1) : -1;
+
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const activeLeads = { is_deleted: { $ne: true } };
     const [items, total, allLeads, newThisMonth, qualified, followUpsDue] = await Promise.all([
-      Lead.find(filter).populate("assigned_employee_id", "name email").populate("category_id", "name").sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Lead.find(filter)
+        .populate("assigned_employee_id", "name")
+        .populate("category_id", "name")
+        .sort({ [sortField]: sortOrder, _id: 1 })
+        .skip((page - 1) * limit).limit(limit).lean(),
       Lead.countDocuments(filter),
       Lead.countDocuments(activeLeads),
       Lead.countDocuments({ ...activeLeads, created_at: { $gte: monthStart } }),
       Lead.countDocuments({ ...activeLeads, status: "Qualified" }),
       Lead.countDocuments({ ...activeLeads, next_follow_up_date: { $ne: null, $lte: now } }),
     ]);
-    res.json({ success: true, data: items.map((item) => item.status === "Converted" ? { ...item, status: "Customer" } : item), stats: { total: allLeads, newThisMonth, qualified, followUpsDue }, pagination: { total, page, limit, pages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrev: page > 1 } });
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages);
+
+    // ✅ Har row me sirf front-facing fields — activities/history bade embedded
+    //    arrays hain jo sirf detail page par chahiye, list row se bahar.
+    const rows = items.map((item) => {
+      const lead = item.status === "Converted" ? { ...item, status: "Customer" } : item;
+      const { activities, history, createdby, updatedby, is_deleted, deleted_at, ...frontOnly } = lead;
+      void activities; void history; void createdby; void updatedby; void is_deleted; void deleted_at;
+      return {
+        ...frontOnly,
+        assigned_employee_id: slimLeadRef(lead.assigned_employee_id),
+        category_id: slimLeadRef(lead.category_id),
+      };
+    });
+
+    res.json({
+      success: true,
+      data: rows,
+      stats: { total: allLeads, newThisMonth, qualified, followUpsDue },
+      pagination: { total, page: safePage, limit, pages, totalPages: pages, hasNext: safePage < pages, hasPrev: safePage > 1 },
+    });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to load leads" }); }
 };
 
 exports.getLead = async (req, res) => {
   try {
     if (!validId(req.params.id)) return idError(res, "lead");
+    const locale = parseLeadLocale(req.query.locale);
     let lead = await Lead.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
       .populate("assigned_employee_id", "name email phone").populate("category_id", "name").populate("activities.employee_id", "name email")
       .populate("history.employee_id", "name email")
@@ -192,16 +255,26 @@ exports.getLead = async (req, res) => {
           .populate("products.product_id", "name has_variants").populate("products.variant_id", "title sku selling_price").lean();
       }
     }
+    // ✅ Internals aur bade non-front fields bahar — activities/history detail
+    //    page ke timeline ke liye rakhe gaye hain.
+    const { createdby, updatedby, is_deleted, deleted_at, ...cleanLead } = lead;
+    void createdby; void updatedby; void is_deleted; void deleted_at;
+    const responseLead = {
+      ...cleanLead,
+      assigned_employee_id: cleanLead.assigned_employee_id ? slimLeadRef(cleanLead.assigned_employee_id) : null,
+      category_id: cleanLead.category_id ? slimLeadRef(cleanLead.category_id) : null,
+    };
+
     let customerHistory = { pos: [], quotes: [], invoices: [] };
-    if ((lead.status === "Customer" || lead.status === "Converted") && lead.customer_id) {
+    if ((responseLead.status === "Customer" || responseLead.status === "Converted") && responseLead.customer_id) {
       const [pos, quotes, invoices] = await Promise.all([
-        PosSale.find({ customer_id: lead.customer_id }).sort({ created_at: -1 }).lean(),
-        Quote.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
-        Invoice.find({ customer_id: lead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
+        PosSale.find({ customer_id: responseLead.customer_id }).sort({ created_at: -1 }).lean(),
+        Quote.find({ customer_id: responseLead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
+        Invoice.find({ customer_id: responseLead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
       ]);
       customerHistory = { pos, quotes, invoices };
     }
-    res.json({ success: true, data: { ...lead, customer_history: customerHistory } });
+    res.json({ success: true, data: { ...responseLead, customer_history: customerHistory } });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to load lead" }); }
 };
 

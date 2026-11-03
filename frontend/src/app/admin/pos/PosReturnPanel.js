@@ -25,13 +25,17 @@ const getLineRefund = (sale, item, quantity) => {
   return Math.round(Math.max(0, lineGross - allocatedDiscount) / itemQuantity * quantity);
 };
 
-function SalePicker({ sales, value, onChange }) {
+function SalePicker({ sales, value, onChange, onSearchSales, selectedSale }) {
   const { t, locale } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const wrapperRef = useRef(null);
   const searchRef = useRef(null);
-  const selectedSale = sales.find((sale) => sale._id === value);
+  const selectedListSale = selectedSale || sales.find((sale) => sale._id === value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => onSearchSales?.(search), 250);
+    return () => window.clearTimeout(timer);
+  }, [search, onSearchSales]);
   const filteredSales = sales.filter((sale) => {
     const haystack = [sale.sale_number, sale.customer_snapshot?.name, sale.customer_snapshot?.phone, sale.payment?.method, sale.total, sale.created_at && new Date(sale.created_at).toLocaleDateString(locale)].filter(Boolean).join(" ").toLowerCase();
     return haystack.includes(search.trim().toLowerCase());
@@ -55,8 +59,8 @@ function SalePicker({ sales, value, onChange }) {
       <label className="mb-2 block text-xs font-semibold text-slate-700">{t("admin.pos.ui.originalSale")}</label>
       <div className={`flex h-12 w-full items-center gap-2 rounded-xl border bg-white px-3 transition ${open ? "border-blue-400 ring-2 ring-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
         <Search size={16} className="shrink-0 text-slate-400" />
-        <input ref={searchRef} role="combobox" aria-label={t("admin.pos.ui.searchAndSelectOriginalSale")} aria-haspopup="listbox" aria-expanded={open} aria-controls="pos-return-sale-options" value={open ? search : selectedSale ? `${selectedSale.sale_number} · ${selectedSale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}` : ""} onFocus={() => { if (!open) { setSearch(""); setOpen(true); } }} onClick={() => { if (!open) { setSearch(""); setOpen(true); } }} onChange={(event) => { setSearch(event.target.value); if (!open) setOpen(true); }} onKeyDown={(event) => { if (event.key === "ArrowDown" && !open) { setSearch(""); setOpen(true); } }} placeholder={t("admin.pos.ui.searchSaleNumberCustomerPhoneDateOrAmount")} className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400" />
-        {selectedSale && <button type="button" aria-label="Clear selected sale" title="Clear selected sale" onClick={() => { onChange(""); setSearch(""); setOpen(false); }} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><X size={15}/></button>}
+        <input ref={searchRef} role="combobox" aria-label={t("admin.pos.ui.searchAndSelectOriginalSale")} aria-haspopup="listbox" aria-expanded={open} aria-controls="pos-return-sale-options" value={open ? search : selectedListSale ? `${selectedListSale.sale_number} · ${selectedListSale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}` : ""} onFocus={() => { if (!open) { setSearch(""); setOpen(true); } }} onClick={() => { if (!open) { setSearch(""); setOpen(true); } }} onChange={(event) => { setSearch(event.target.value); if (!open) setOpen(true); }} onKeyDown={(event) => { if (event.key === "ArrowDown" && !open) { setSearch(""); setOpen(true); } }} placeholder={t("admin.pos.ui.searchSaleNumberCustomerPhoneDateOrAmount")} className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400" />
+        {selectedListSale && <button type="button" aria-label="Clear selected sale" title="Clear selected sale" onClick={() => { onChange(""); setSearch(""); onSearchSales?.(""); setOpen(false); }} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><X size={15}/></button>}
         <button type="button" aria-label={t("admin.pos.ui.searchAndSelectOriginalSale")} aria-haspopup="listbox" aria-expanded={open} onClick={() => { if (open) setOpen(false); else { setSearch(""); setOpen(true); } searchRef.current?.focus(); }} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`}/></button>
       </div>
       {open && <div className="absolute start-0 end-0 z-[90] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15 ring-1 ring-black/5">
@@ -76,7 +80,7 @@ function SalePicker({ sales, value, onChange }) {
   );
 }
 
-export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setReturnSaleId, returnQuantities, setReturnQuantities, returnNote, setReturnNote, returnMutation, historySales, historyLoading, historyError }) {
+export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setReturnSaleId, returnQuantities, setReturnQuantities, returnNote, setReturnNote, returnMutation, historySales, historyLoading, historyError, onSearchSales }) {
   const { t, locale } = useTranslation();
   const [reasonError, setReasonError] = useState(false);
   const reasonInputRef = useRef(null);
@@ -104,7 +108,7 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
       </header>
 
       <div className="space-y-4">
-        <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); setReasonError(false); }}/>
+        <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); setReasonError(false); }} onSearchSales={onSearchSales} selectedSale={selectedSale}/>
         {!selectedSale ? <PosReturnHistoryPanel sales={historySales || []} isLoading={historyLoading} isError={historyError} /> : <div className="space-y-4 bg-white dark:bg-[var(--bg-card)]">
           <div className="grid gap-x-8 gap-y-4 border-b border-slate-200 px-4 pb-4 pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
             ["receipt", selectedSale.sale_number, ClipboardList],
@@ -123,8 +127,8 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
           </section>
 
 
-          <div className={`grid items-start gap-x-4 gap-y-3 border-t border-slate-200 px-4 pt-4 transition-[grid-template-columns] duration-200 ease-out ${reasonError ? "md:grid-cols-[minmax(0,1fr)_minmax(160px,220px)]" : "md:grid-cols-[minmax(0,1.2fr)_minmax(220px,0.9fr)_minmax(138px,auto)]"}`}>
-            <label className={`min-w-0 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-all duration-200 ${reasonError ? "md:col-span-2" : ""}`}>{t("admin.pos.ui.reason2")} <span className="text-rose-500">*</span><input ref={reasonInputRef} required maxLength={300} aria-invalid={reasonError} aria-describedby={reasonError ? "pos-return-reason-error" : undefined} value={returnNote} onChange={(event) => { setReturnNote(event.target.value); if (event.target.value.trim()) setReasonError(false); }} placeholder={t("admin.pos.ui.eGDamagedItemWrongSize")} className={`mt-1.5 h-11 w-full rounded-xl border bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none placeholder:text-slate-400 focus:ring-4 ${reasonError ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:border-blue-400 focus:ring-blue-50"}`}/>{reasonError ? <span id="pos-return-reason-error" role="alert" className="mt-1 block text-[10px] font-medium normal-case tracking-normal text-rose-600">{t("admin.pos.validation.returnReasonRequired")}</span> : <span className="mt-1 block text-[9px] font-normal normal-case tracking-normal text-slate-400">{returnNote.trim().length}{t("admin.pos.ui.300Characters")}</span>}</label>
+          <div className="grid items-start gap-x-4 gap-y-3 border-t border-slate-200 px-4 pt-4 md:grid-cols-[minmax(0,1fr)_minmax(138px,auto)]">
+            <label className="min-w-0 text-[10px] font-bold uppercase tracking-wider text-slate-500 md:col-span-2">{t("admin.pos.ui.reason2")} <span className="text-rose-500">*</span><input ref={reasonInputRef} required maxLength={300} aria-invalid={reasonError} aria-describedby={reasonError ? "pos-return-reason-error" : undefined} value={returnNote} onChange={(event) => { setReturnNote(event.target.value); if (event.target.value.trim()) setReasonError(false); }} placeholder={t("admin.pos.ui.eGDamagedItemWrongSize")} className={`mt-1.5 h-11 w-full rounded-xl border bg-white px-3 text-xs font-medium normal-case tracking-normal text-slate-700 outline-none placeholder:text-slate-400 focus:ring-4 ${reasonError ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : "border-slate-200 focus:border-blue-400 focus:ring-blue-50"}`}/>{reasonError ? <span id="pos-return-reason-error" role="alert" className="mt-1 block text-[10px] font-medium normal-case tracking-normal text-rose-600">{t("admin.pos.validation.returnReasonRequired")}</span> : <span className="mt-1 block text-[9px] font-normal normal-case tracking-normal text-slate-400">{returnNote.trim().length}{t("admin.pos.ui.300Characters")}</span>}</label>
             <div className="min-w-0"><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">{t("admin.pos.ui.refundSummary")}</span><div className="flex h-11 items-center justify-between gap-2 border-b border-slate-200 px-1"><span className="min-w-0 truncate text-[10px] font-semibold text-emerald-800">{t("admin.pos.ui.selectedItemCount", { count: selectedCount })}<span className="mx-1 text-emerald-300">·</span>{t("admin.pos.ui.prev")} {money(previousRefund, locale)}</span><strong className="shrink-0 text-base font-black tabular-nums tracking-tight text-emerald-800">{money(refundTotal, locale)}</strong></div></div>
             <div><span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wide text-transparent" aria-hidden="true">{t("admin.pos.ui.action")}</span><button type="button" disabled={!selectedSale || selectedCount === 0 || refundTotal <= 0 || returnMutation.isPending} onClick={() => { if (!returnNote.trim()) { setReasonError(true); reasonInputRef.current?.focus(); return; } setReasonError(false); returnMutation.mutate(); }} className="flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-3 text-xs font-extrabold text-white shadow-md shadow-blue-600/15 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-45">{returnMutation.isPending ? <><RotateCcw size={14} className="animate-spin"/>{t("admin.pos.ui.recording")}</> : <><RotateCcw size={14}/>{t("admin.pos.ui.confirmReturn")}</>}</button></div>
           </div>

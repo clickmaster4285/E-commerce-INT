@@ -20,6 +20,22 @@ const paymentDateTime = (dateValue, timeValue) => {
 const methodName = (value) => String(value || "Not recorded").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 const cleanTransactionNote = (value) => String(value || "").replace(/\brefund\s+for\s+return\s+\S+/i, "refund").trim();
 
+// ==========================================
+// 🌐 LOCALE + SLIM + SORT — admin finance
+// ==========================================
+const parseFinanceLocale = (value) => {
+  const requestedLocale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+};
+const FINANCE_SORT_FIELDS = {
+  date: "date",
+  reference: "reference",
+  title: "title",
+  category: "category",
+  amount: "amount",
+  status: "status",
+};
+
 function getDateRange(period, startDateValue, endDateValue) {
   const now = new Date();
   const start = new Date(now);
@@ -73,6 +89,7 @@ function transaction({ id, kind, category, reference, title, counterparty, amoun
 
 exports.getFinanceOverview = async (req, res) => {
   try {
+    const locale = parseFinanceLocale(req.query.locale);
     const period = ["today", "yesterday", "7d", "30d", "month", "lastMonth", "year", "all", "custom"].includes(req.query.period) ? req.query.period : "today";
     const range = getDateRange(period, req.query.startDate, req.query.endDate);
     if (period === "custom" && !range) return res.status(400).json({ success: false, message: "Choose a valid start and end date." });
@@ -239,7 +256,8 @@ exports.getFinanceOverview = async (req, res) => {
     const searched = search ? filtered.filter((entry) => `${entry.reference} ${entry.title} ${entry.category} ${entry.counterparty} ${entry.method}`.toLowerCase().includes(search)) : filtered;
     const kind = ["income", "expense"].includes(req.query.kind) ? req.query.kind : "all";
     const matched = kind === "all" ? searched : searched.filter((entry) => entry.kind === kind);
-    const pageSize = 20;
+    const requestedPageSize = Number.parseInt(req.query.limit ?? req.query.pageSize, 10) || 20;
+    const pageSize = Math.min(100, Math.max(10, requestedPageSize));
     const pageCount = Math.max(1, Math.ceil(matched.length / pageSize));
     const page = Math.min(pageCount, Math.max(1, Number.parseInt(req.query.page, 10) || 1));
     const income = roundMoney(filtered.reduce((sum, entry) => sum + Math.max(0, entry.amount), 0));
@@ -250,11 +268,11 @@ exports.getFinanceOverview = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
+        locale,
         period,
         summary: { income, expenses, net: roundMoney(income - expenses), receivable, payable, transactionCount: filtered.length },
         transactions: matched.slice((page - 1) * pageSize, page * pageSize),
         pagination: { page, pageSize, total: matched.length, pages: pageCount },
-        notes: ["Outflows include recorded vendor payments and customer refunds; the app has no general operating-expense ledger. Invoice refunds do not store whether Cash or Bank was used.", "Online order payments are counted when their payment status is paid. The app does not store online-order refund transactions."],
       },
     });
   } catch (error) {

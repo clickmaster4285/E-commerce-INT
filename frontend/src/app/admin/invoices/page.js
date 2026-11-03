@@ -1,6 +1,6 @@
 "use client";import { useTranslation } from "@/i18n/LanguageProvider";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -14,8 +14,9 @@ import { downloadInvoicePdf } from "@/lib/invoicePdf";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
 import { renderRichHtml } from "@/lib/termsContent";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 10;
 const currentTime = () => new Date().toTimeString().slice(0, 5);
 const statuses = ["Unpaid", "Partially Paid", "Paid", "Overdue"];
 const statusStyle = {
@@ -28,7 +29,6 @@ const statusStyle = {
 const date = (value) => value && !Number.isNaN(new Date(value).getTime()) ?
 new Date(value).toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" }) :
 "—";
-const dateKey = (value) => value && !Number.isNaN(new Date(value).getTime()) ? new Date(value).toISOString().slice(0, 10) : "";
 const money = (value) => new Intl.NumberFormat("en-PK", { style: "currency", currency: "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
 const getStatus = (invoice) => {
   const status = invoice.status === "Draft" || !invoice.status ? "Unpaid" : invoice.status;
@@ -84,47 +84,65 @@ function InvoiceRowMenu({ invoice, onView, onPrint, onPayment, onReturnRefund, o
   return <><button ref={buttonRef} type="button" onClick={(event) => { event.stopPropagation(); open ? setOpen(false) : showMenu(); }} aria-label={`Actions for ${invoice.invoice_number}`} aria-expanded={open} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-tertiary)] hover:text-blue-600"><MoreVertical size={18}/></button>{open && createPortal(<div ref={menuRef} style={{ top: position.top, left: position.left, backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }} className="fixed z-[12000] w-[205px] overflow-hidden rounded-xl border py-1 shadow-xl"><button className={item} onClick={action(onView)}><Eye size={14}/> View Details</button><button className={item} onClick={action(onPrint)}><Printer size={14}/> {t("admin.pos.ui.print")}</button>{!invoice.sent_at && <button className={item} onClick={action(onSend)} disabled={isSending}><Send size={14}/>{isSending ? "Sending..." : "Send to Customer"}</button>}{Number(invoice.remaining_balance ?? invoice.total) > 0 && <button className={item} onClick={action(onPayment)}><CircleDollarSign size={14}/> Add Payment</button>}{invoice.sent_at && <button className={item} onClick={action(onReturnRefund)}><RotateCcw size={14}/> Return &amp; Refund</button>}<button className={item} onClick={action(onDownload)}><Download size={14}/> Download PDF</button></div>, document.body)}</>;
 }
 
-export default function InvoicesPage() {const { t } = useTranslation();
+export default function InvoicesPage() {const { t, locale } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [returnInvoiceId, setReturnInvoiceId] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });
-  const { data: rawInvoices, isLoading, isError, refetch } = useQuery({ queryKey: ["invoices-admin"], queryFn: invoiceApi.list });
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  const invoiceQueryKey = ["invoices-admin", "paginated", locale, page, pageSize, debouncedSearch, status, dateFrom, dateTo];
+  const { data: invoicesResponse, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: invoiceQueryKey,
+    queryFn: () => invoiceApi.listPaginated({ page, limit: pageSize, search: debouncedSearch, status, dateFrom, dateTo, locale }),
+    retry: false,
+  });
+  const invoices = Array.isArray(invoicesResponse?.data) ? invoicesResponse.data : [];
+  const pageAlreadyTranslated = locale === "en" || (invoices.length > 0 && invoices.every((invoice) => !invoice.customer_name?.trim() || Boolean(invoice.translations?.customer_name?.[locale]?.trim())));
+  const pageTranslationsReady = usePageTranslations({ model: "Invoice", records: invoices, locale, ready: !isLoading && !isFetching, queryKey: invoiceQueryKey, queryClient, alreadyTranslated: pageAlreadyTranslated, fallbackAfterRetries: true });
+  const translatedInvoiceCount = invoices.filter((invoice) => Boolean(invoice.translations?.customer_name?.[locale]?.trim())).length;
+  const invoicePageMostlyUntranslated = locale !== "en" && invoices.length > 0 && translatedInvoiceCount / invoices.length <= 0.2;
+  const hasInvoiceNameTranslation = (invoice) => locale === "en" || pageTranslationsReady || !invoicePageMostlyUntranslated || Boolean(invoice.translations?.customer_name?.[locale]?.trim());
   const { data: returnInvoice, isLoading: isReturnInvoiceLoading, isError: isReturnInvoiceError } = useQuery({
     queryKey: ["invoice-admin", returnInvoiceId],
     queryFn: () => invoiceApi.getById(returnInvoiceId),
     enabled: Boolean(returnInvoiceId),
   });
-  const invoices = useMemo(() => Array.isArray(rawInvoices) ? rawInvoices : rawInvoices?.invoices || [], [rawInvoices]);
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return invoices.filter((invoice) => {
-      const matchesStatus = status === "all" || getStatus(invoice) === status;
-      const haystack = [invoice.invoice_number, invoice.customer_name, invoice.customer_email, invoice.customer_phone].filter(Boolean).join(" ").toLowerCase();
-      const invoiceDate = dateKey(invoice.invoice_date || invoice.created_at);
-      return matchesStatus && (!term || haystack.includes(term)) && (!dateFrom || invoiceDate >= dateFrom) && (!dateTo || invoiceDate <= dateTo);
-    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }, [invoices, search, status, dateFrom, dateTo]);
 
-  const stats = useMemo(() => [
-  { label: "Total Invoices", value: invoices.length, note: "All invoices", icon: Receipt, tint: "bg-blue-100 dark:bg-blue-950/60", color: "text-blue-600 dark:text-blue-300" },
-  { label: "Paid", value: invoices.filter((invoice) => invoice.status === "Paid").length, note: "Payment received", icon: CheckCircle2, tint: "bg-emerald-100 dark:bg-emerald-950/60", color: "text-emerald-600 dark:text-emerald-300" },
-  { label: "Unpaid", value: invoices.filter((invoice) => invoice.status === "Unpaid" && getStatus(invoice) !== "Overdue").length, note: "Awaiting payment", icon: CircleDollarSign, tint: "bg-orange-100 dark:bg-orange-950/60", color: "text-orange-500 dark:text-orange-300" },
-  { label: "Overdue", value: invoices.filter((invoice) => getStatus(invoice) === "Overdue").length, note: "Past due date", icon: CalendarDays, tint: "bg-rose-100 dark:bg-rose-950/60", color: "text-rose-600 dark:text-rose-300" }],
-  [invoices]);
+  const rows = invoices;
+  const pagination = invoicesResponse?.pagination || { total: 0, page, limit: pageSize, pages: 1 };
+  const currentPage = pagination.page || page;
+  const pages = Math.max(1, pagination.pages || 1);
+  const startIndex = pagination.total > 0 ? (currentPage - 1) * pagination.limit + 1 : 0;
+  const endIndex = Math.min(currentPage * pagination.limit, pagination.total);
+  const summary = invoicesResponse?.stats || { total: 0, paid: 0, unpaid: 0, overdue: 0 };
+  const stats = [
+    { label: "Total Invoices", value: summary.total },
+    { label: "Paid", value: summary.paid, valueColor: "var(--success-text)" },
+    { label: "Unpaid", value: summary.unpaid, valueColor: "var(--warning-text)" },
+    { label: "Overdue", value: summary.overdue, valueColor: "var(--danger-text)" },
+  ];
+  const pageNumbers = pages <= 5
+    ? Array.from({ length: pages }, (_, index) => index + 1)
+    : currentPage <= 3 ? [1, 2, 3, 4, "...", pages]
+      : currentPage >= pages - 2 ? [1, "...", pages - 3, pages - 2, pages - 1, pages]
+        : [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", pages];
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pages);
-  const rows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const pageStart = Math.max(1, Math.min(currentPage - 1, pages - 3));
-  const pageNumbers = Array.from({ length: Math.min(4, pages) }, (_, index) => pageStart + index);
+  useEffect(() => {
+    if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) setPage(pagination.page);
+  }, [pagination.page, page]);
 
   const paymentMutation = useMutation({
     mutationFn: ({ id, payment }) => invoiceApi.recordPayment(id, payment),
@@ -150,19 +168,12 @@ export default function InvoicesPage() {const { t } = useTranslation();
   const sendMutation = useMutation({
     mutationFn: (id) => invoiceApi.send(id),
     onSuccess: (updated) => {
-      queryClient.setQueryData(["invoices-admin"], (current) => {
-        const list = Array.isArray(current) ? current : current?.invoices;
-        if (!Array.isArray(list)) return current;
-        const updatedInvoices = list.map((invoice) => invoice._id === updated._id ? updated : invoice);
-        return Array.isArray(current) ? updatedInvoices : { ...current, invoices: updatedInvoices };
-      });
       queryClient.invalidateQueries({ queryKey: ["invoices-admin"] });
       queryClient.setQueryData(["invoice-admin", updated._id], updated);
       toast.success("Invoice marked as sent to customer");
     },
     onError: (error) => toast.error(error?.response?.data?.message || "Could not send invoice")
   });
-  const resetFilters = () => {setSearch("");setStatus("all");setDateFrom("");setDateTo("");setPage(1);};
   const download = async (invoice) => {
     try {
       const completeInvoice = invoice?._id ? await invoiceApi.getById(invoice._id) : invoice;
@@ -173,36 +184,49 @@ export default function InvoicesPage() {const { t } = useTranslation();
   };
 
   return <div className="space-y-4 pb-6 text-[var(--text-primary)]">
-    <header className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">{t("admin.quoteInvoice.ui.invoices_35f8f37b")}</h1><p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.create_track_and_manage_customer_invoices_2ac27c0e")}</p></div>
-      <button type="button" onClick={() => router.push("/admin/invoices/new")} className="inline-flex h-10 items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 px-5 text-[13px] font-extrabold text-white shadow-lg shadow-blue-600/30 transition-all duration-200 hover:scale-[1.03] hover:shadow-xl active:scale-[0.98]"><Plus size={16} strokeWidth={2.5} /> {t("admin.quoteInvoice.ui.create_invoice_32815b0b")}</button>
+    <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div><h1 className="text-[24px] font-bold leading-7 tracking-tight text-[var(--text-primary)]">{t("admin.quoteInvoice.ui.invoices_35f8f37b")}</h1><p className="mt-1 text-[13px] text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.create_track_and_manage_customer_invoices_2ac27c0e")}</p></div>
+      <button type="button" onClick={() => router.push("/admin/invoices/new")} className="inline-flex h-9 items-center gap-2 self-start rounded-lg px-4 text-[13px] font-semibold text-white transition hover:opacity-90 md:self-auto" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}><Plus size={15} /> {t("admin.quoteInvoice.ui.create_invoice_32815b0b")}</button>
     </header>
 
-    <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label={t("admin.quoteInvoice.ui.invoice_status_summary_bd8f524d")}>
-      {stats.map(({ label, value, note, icon: Icon, tint, color }) => <article key={label} className="group flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl"><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm transition-transform duration-200 group-hover:scale-105 ${tint} ${color}`}><Icon size={20} /></span><div className="min-w-0"><p className="truncate text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{label}</p><p className="mt-0.5 text-xl font-extrabold leading-tight text-[var(--text-primary)]">{value}</p><p className="mt-1 truncate text-[10px] font-medium text-[var(--text-muted)]">{note}</p></div></article>)}
+    <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4" aria-label={t("admin.quoteInvoice.ui.invoice_status_summary_bd8f524d")}>
+      {stats.map(({ label, value, valueColor }) => <article key={label} className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3 sm:p-4"><p className="truncate text-[11px] font-medium text-[var(--text-muted)] sm:text-xs">{label}</p><p className="mt-1 truncate text-lg font-bold leading-tight sm:text-xl" style={{ color: valueColor || "var(--text-primary)" }}>{value}</p></article>)}
     </section>
 
-    <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-lg shadow-slate-900/5">
-      <div className="grid min-w-0 grid-cols-1 gap-2 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(220px,1fr)_150px_160px_160px_auto]">
-        <label className="relative"><Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" /><input value={search} onChange={(event) => {setSearch(event.target.value);setPage(1);}} placeholder={t("admin.quoteInvoice.ui.search_invoice_customer_or_email_40065e80")} aria-label={t("admin.quoteInvoice.ui.search_invoices_0e6f44a5")} className="h-10 w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] pl-10 pr-4 text-sm font-medium text-[var(--text-primary)] outline-none shadow-sm transition-all duration-200 placeholder:text-[var(--text-muted)] hover:shadow-md focus:shadow-lg focus:ring-2 focus:ring-blue-500/20" /></label>
-        <select value={status} onChange={(event) => {setStatus(event.target.value);setPage(1);}} aria-label={t("admin.quoteInvoice.ui.filter_by_invoice_status_21095705")} className="h-10 min-w-0 w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-500/20"><option value="all">{t("admin.quoteInvoice.ui.all_status_6b308de7")}</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select>
-        <label className="relative block min-w-0"><input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => {setDateFrom(event.target.value);setPage(1);}} aria-label={t("admin.quoteInvoice.ui.start_date_ff99f5b5")} className="h-10 min-w-0 w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-500/20" /></label>
-        <label className="relative block min-w-0"><input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => {setDateTo(event.target.value);setPage(1);}} aria-label={t("admin.quoteInvoice.ui.end_date_89d10cd6")} className="h-10 min-w-0 w-full rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-primary)] outline-none shadow-sm transition-all hover:shadow-md focus:ring-2 focus:ring-blue-500/20" /></label>
-        <button type="button" onClick={resetFilters} className="h-10 whitespace-nowrap rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] px-4 text-[13px] font-extrabold text-[var(--text-secondary)] transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-[0.98]">{t("admin.quoteInvoice.ui.reset_44c57abd")}</button>
+    <div className="flex min-w-0 flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+      <label className="relative block w-full min-w-0 md:w-[400px]"><Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" /><input value={search} onChange={(event) => {setSearch(event.target.value);setPage(1);}} placeholder={t("admin.quoteInvoice.ui.search_invoice_customer_or_email_40065e80")} aria-label={t("admin.quoteInvoice.ui.search_invoices_0e6f44a5")} className="h-9 w-full min-w-0 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] ps-9 pe-3 text-[13px] text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-1 focus:ring-[var(--accent)]/40" /></label>
+      <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:gap-3">
+        <select value={status} onChange={(event) => {setStatus(event.target.value);setPage(1);}} aria-label={t("admin.quoteInvoice.ui.filter_by_invoice_status_21095705")} className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent)]/40 md:w-[140px] md:flex-none"><option value="all">{t("admin.quoteInvoice.ui.all_status_6b308de7")}</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select>
+        <label className="relative block min-w-0 flex-1 md:w-[150px] md:flex-none"><input type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => {setDateFrom(event.target.value);setPage(1);}} aria-label={t("admin.quoteInvoice.ui.start_date_ff99f5b5")} className="h-9 w-full min-w-0 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent)]/40" /></label>
+        <label className="relative block min-w-0 flex-1 md:w-[150px] md:flex-none"><input type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => {setDateTo(event.target.value);setPage(1);}} aria-label={t("admin.quoteInvoice.ui.end_date_89d10cd6")} className="h-9 w-full min-w-0 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[13px] text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent)]/40" /></label>
       </div>
+    </div>
 
+    <section className="overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1050px] text-left text-[13px]">
-          <thead className="border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]"><tr><th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.invoice_51d86044")}</th><th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.customer_0e85749a")}</th><th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.invoice_date_844828da")}</th><th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.due_date_a1b308ec")}</th><th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.total_b25928c6")}</th><th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.payment_status_584e9778")}</th><th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.actions_c3cd636a")}</th></tr></thead>
+        <table className="w-full min-w-[1050px] table-fixed text-start text-[13px]">
+          <colgroup><col className="w-[14%]"/><col className="w-[20%]"/><col className="w-[15%]"/><col className="w-[15%]"/><col className="w-[14%]"/><col className="w-[13%]"/><col className="w-[9%]"/></colgroup>
+          <thead className="border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]"><tr><th className="whitespace-nowrap px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.invoice_51d86044")}</th><th className="px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.customer_0e85749a")}</th><th className="whitespace-nowrap px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.invoice_date_844828da")}</th><th className="whitespace-nowrap px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.due_date_a1b308ec")}</th><th className="whitespace-nowrap px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.total_b25928c6")}</th><th className="px-4 py-3 text-start text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.payment_status_584e9778")}</th><th className="min-w-20 whitespace-nowrap px-2 py-3 text-end text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.actions_c3cd636a")}</th></tr></thead>
           <tbody className="divide-y divide-[var(--border-color)]">
             {isLoading ? <tr><td colSpan={7} className="px-3 py-10 text-center text-xs text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.loading_invoices_de149b79")}</td></tr> :
             isError ? <tr><td colSpan={7} className="px-3 py-10 text-center text-xs text-[var(--danger-text)]">{t("admin.quoteInvoice.ui.could_not_load_invoices_2b4083bc")} <button type="button" onClick={() => refetch()} className="font-semibold underline">{t("admin.quoteInvoice.ui.retry_9f5cd8a2")}</button></td></tr> :
             !rows.length ? <tr><td colSpan={7} className="px-3 py-12 text-center"><span className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Receipt size={17} /></span><p className="text-xs font-semibold">{search || status !== "all" || dateFrom || dateTo ? "No matching invoices" : "No invoices yet"}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search || status !== "all" || dateFrom || dateTo ? "Try changing your search or filters." : "Create your first invoice to track customer payments."}</p>{!search && status === "all" && !dateFrom && !dateTo && <button type="button" onClick={() => router.push("/admin/invoices/new")} className="mt-3 inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-semibold text-[var(--accent)]"><Plus size={12} /> {t("admin.quoteInvoice.ui.create_invoice_32815b0b")}</button>}</td></tr> :
-            rows.map((invoice) => {const displayStatus = getStatus(invoice);return <tr key={invoice._id} onClick={() => router.push(`/admin/invoices/${invoice._id}`)} className="cursor-pointer border-b border-[var(--border-color)] transition-colors duration-150 hover:bg-[var(--bg-row-hover)]"><td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-semibold text-blue-600">{invoice.invoice_number}</td><td className="max-w-56 px-4 py-2.5"><p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{invoice.customer_name}</p>{invoice.customer_phone && <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{invoice.customer_phone}</p>}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-secondary)]">{date(invoice.invoice_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-secondary)]">{date(invoice.due_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-[13px] font-bold text-[var(--text-primary)]">{money(invoice.total)}</td><td className="px-4 py-2.5"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${statusStyle[displayStatus] || statusStyle.Unpaid}`}>{displayStatus}</span></td><td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-end"><InvoiceRowMenu invoice={invoice} onView={() => router.push(`/admin/invoices/${invoice._id}`)} onPrint={() => router.push(`/admin/invoices/${invoice._id}?print=1`)} onPayment={() => {setSelectedInvoice(invoice);setPaymentForm({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });setPaymentOpen(true);}} onReturnRefund={() => router.push(`/admin/invoices/${invoice._id}?returnRefund=1`)} onDownload={() => download(invoice)} onSend={() => sendMutation.mutate(invoice._id)} isSending={sendMutation.isPending && sendMutation.variables === invoice._id} /></div></td></tr>;})}
+            rows.map((invoice) => {const displayStatus = getStatus(invoice);return <tr key={invoice._id} onClick={() => router.push(`/admin/invoices/${invoice._id}`)} className="cursor-pointer border-b border-[var(--border-color)] bg-[var(--bg-card)] transition-colors duration-150 hover:bg-[var(--bg-row-hover)]"><td className="whitespace-nowrap px-4 py-2.5 text-start font-mono text-xs font-semibold text-blue-600">{invoice.invoice_number}</td><td className="max-w-56 px-4 py-2.5 text-start"><p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{hasInvoiceNameTranslation(invoice) ? (invoice.translations?.customer_name?.[locale] || invoice.customer_name) : <span className="inline-block h-3.5 w-28 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-label={t("common.loading")} />}</p>{invoice.customer_phone && <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{invoice.customer_phone}</p>}</td><td className="whitespace-nowrap px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]">{date(invoice.invoice_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]">{date(invoice.due_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-start text-[13px] font-bold text-[var(--text-primary)]">{money(invoice.total)}</td><td className="px-4 py-2.5 text-start"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${statusStyle[displayStatus] || statusStyle.Unpaid}`}>{displayStatus}</span></td><td className="min-w-20 whitespace-nowrap px-2 py-2.5 text-end" onClick={(event) => event.stopPropagation()}><div className="flex items-center justify-end"><InvoiceRowMenu invoice={invoice} onView={() => router.push(`/admin/invoices/${invoice._id}`)} onPrint={() => router.push(`/admin/invoices/${invoice._id}?print=1`)} onPayment={() => {setSelectedInvoice(invoice);setPaymentForm({ amount: "", payment_date: today(), payment_time: currentTime(), payment_method: "Cash", note: "" });setPaymentOpen(true);}} onReturnRefund={() => router.push(`/admin/invoices/${invoice._id}?returnRefund=1`)} onDownload={() => download(invoice)} onSend={() => sendMutation.mutate(invoice._id)} isSending={sendMutation.isPending && sendMutation.variables === invoice._id} /></div></td></tr>;})}
           </tbody>
         </table>
       </div>
-      {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-[13px] text-[var(--text-muted)]"><span>{t("admin.quoteInvoice.ui.showing_163d8174")} {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0} {t("admin.quoteInvoice.ui.to_4374aaee")} {Math.min(currentPage * PAGE_SIZE, filtered.length)} {t("admin.quoteInvoice.ui.of_de04fa0e")} {filtered.length} {t("admin.quoteInvoice.ui.invoices_c3e815af")}</span><nav aria-label={t("admin.quoteInvoice.ui.invoices_pagination_02a19d81")} className="flex items-center gap-1"><button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.previous_page_81f54719")}><ChevronLeft size={14} /></button>{pageNumbers.map((pageNumber) => <button key={pageNumber} type="button" aria-current={currentPage === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)} className={`h-8 min-w-8 rounded-md border px-2 text-[13px] font-bold transition ${currentPage === pageNumber ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-blue-300 hover:text-blue-600"}`}>{pageNumber}</button>)}<button type="button" disabled={currentPage >= pages} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.next_page_4bfc194b")}><ChevronRight size={14} /></button></nav></footer>}
+      {pagination.total > 10 && <footer className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3 xl:flex-row">
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+          <span className="text-[12px] text-[var(--text-muted)]">{t("admin.shared.pagination.showingRange", { from: startIndex.toLocaleString(locale), to: endIndex.toLocaleString(locale), total: pagination.total.toLocaleString(locale) })}{isFetching && !isLoading ? <span className="ms-2 text-[var(--accent)]">{t("admin.brands.ui.updating")}</span> : null}</span>
+          <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-9 w-[100px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[13px] text-[var(--text-primary)] outline-none"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
+        </div>
+        <nav aria-label={t("admin.quoteInvoice.ui.invoices_pagination_02a19d81")} className="flex items-center gap-1.5">
+          <button type="button" disabled={currentPage <= 1 || isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.previous_page_81f54719")}><ChevronLeft size={14} /></button>
+          {pageNumbers.map((pageNumber, index) => pageNumber === "..." ? <span key={`ellipsis-${index}`} className="px-1 text-sm text-[var(--text-muted)]">…</span> : <button key={pageNumber} type="button" disabled={isFetching && currentPage !== pageNumber} aria-current={currentPage === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)} className="flex h-8 min-w-[32px] items-center justify-center rounded-md border px-2 text-[13px] font-medium disabled:opacity-50" style={{ backgroundColor: currentPage === pageNumber ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === pageNumber ? "var(--accent-text)" : "var(--text-primary)", borderColor: currentPage === pageNumber ? "var(--accent)" : "var(--border-color)" }}>{pageNumber}</button>)}
+          <span className="text-xs text-[var(--text-secondary)] sm:hidden">{t("admin.shared.pagination.pageOf", { page: currentPage.toLocaleString(locale), total: pages.toLocaleString(locale) })}</span>
+          <button type="button" disabled={currentPage >= pages || isFetching} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.next_page_4bfc194b")}><ChevronRight size={14} /></button>
+        </nav>
+      </footer>}
     </section>
 
     {selectedInvoice && !paymentOpen && <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm sm:p-5" onMouseDown={(event) => {if (event.target === event.currentTarget) setSelectedInvoice(null);}}>

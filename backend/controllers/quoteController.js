@@ -104,8 +104,58 @@ const buildQuote = (body = {}) => {
 
 exports.listQuotes = async (req, res) => {
   try {
-    const quotes = await Quote.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean();
-    res.json({ success: true, data: quotes });
+    const filter = { is_deleted: false };
+    const search = String(req.query.search || "").trim();
+    if (search) {
+      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [
+        { quote_number: regex },
+        { customer_name: regex },
+        { customer_email: regex },
+        { customer_phone: regex },
+      ];
+    }
+    if (req.query.status && req.query.status !== "all") filter.status = req.query.status;
+    if (req.query.customerType && req.query.customerType !== "all") filter.customer_type = req.query.customerType;
+    if (req.query.dateFrom || req.query.dateTo) {
+      filter.quote_date = {};
+      if (req.query.dateFrom) filter.quote_date.$gte = new Date(`${req.query.dateFrom}T00:00:00.000Z`);
+      if (req.query.dateTo) filter.quote_date.$lte = new Date(`${req.query.dateTo}T23:59:59.999Z`);
+    }
+
+    // Keep the unpaginated shape for callers outside the Quotes list.
+    if (req.query.page === undefined) {
+      const quotes = await Quote.find(filter)
+        .select("_id quote_number customer_type customer_name customer_email customer_phone quote_date expiry_date total status created_at updated_at translations")
+        .sort({ created_at: -1, _id: -1 })
+        .lean();
+      return res.json({ success: true, data: quotes });
+    }
+
+    const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 20;
+    const filteredTotal = await Quote.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(filteredTotal / limit));
+    const page = Math.min(requestedPage, pages);
+    const [quotes, total, sent, accepted, rejected] = await Promise.all([
+      Quote.find(filter)
+        .select("_id quote_number customer_type customer_name customer_email customer_phone quote_date expiry_date total status created_at updated_at translations")
+        .sort({ created_at: -1, _id: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Quote.countDocuments({ is_deleted: false }),
+      Quote.countDocuments({ is_deleted: false, status: "Sent" }),
+      Quote.countDocuments({ is_deleted: false, status: "Accepted" }),
+      Quote.countDocuments({ is_deleted: false, status: "Rejected" }),
+    ]);
+    return res.json({
+      success: true,
+      data: quotes,
+      stats: { total, sent, accepted, rejected },
+      pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
+    });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
@@ -190,11 +240,14 @@ exports.updateQuote = async (req, res) => {
 
 exports.updateQuoteStatus = async (req, res) => {
   try {
-    if (!["Accepted", "Rejected"].includes(req.body.status)) return res.status(400).json({ success: false, message: "Quote status can only be accepted or rejected here" });
+    if (!["Sent", "Accepted", "Rejected"].includes(req.body.status)) return res.status(400).json({ success: false, message: "Invalid quote status" });
     const quote = await Quote.findOne({ _id: req.params.id, is_deleted: false });
     if (!quote) return res.status(404).json({ success: false, message: "Quote not found" });
     const previousStatus = quote.status;
     if (previousStatus === req.body.status) return res.json({ success: true, data: quote });
+    if (req.body.status === "Sent" && !["Pending", "Draft"].includes(previousStatus)) {
+      return res.status(409).json({ success: false, message: "Only pending or draft quotes can be marked as sent" });
+    }
     quote.status = req.body.status;
     quote.updatedby = req.user?._id || null;
     quote.activity.push(auditEvent(req, "status", [{ field: "Status", before: previousStatus || "Pending", after: req.body.status }]));

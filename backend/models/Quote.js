@@ -24,6 +24,11 @@ const quoteSchema = new mongoose.Schema({
   customer_id: { type: mongoose.Schema.Types.ObjectId, default: null },
   lead_id: { type: mongoose.Schema.Types.ObjectId, ref: "Lead", default: null },
   customer_name: { type: String, required: true, trim: true, maxlength: 160 },
+  translations: {
+    customer_name: { type: Map, of: String, default: () => ({}) },
+  },
+  translation_source: { customer_name: { type: String, default: "" } },
+  translation_status: { customer_name: { type: String, enum: ["pending", "done", "failed", "skipped"], default: "pending" } },
   customer_email: { type: String, trim: true, lowercase: true, default: "", maxlength: 254 },
   customer_phone: { type: String, trim: true, default: "", maxlength: 30 },
   customer_address: { type: String, trim: true, default: "", maxlength: 1000 },

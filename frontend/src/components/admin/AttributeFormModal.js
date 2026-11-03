@@ -33,25 +33,48 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
     if (open) {
       if (isEdit && initialData) {
         const dataType = initialData.data_type || "multi_select";
-        let booleanValue = false;
+        let booleanValue = typeof initialData.value === "boolean" ? initialData.value : false;
         if (dataType === "boolean") {
           const vals = initialData.values || [];
-          const trueEntry = vals.find(
-            (v) =>
-              (v?.value || v)?.toString() === "true" ||
-              (v?.label || v)?.toString()?.toLowerCase() === "yes"
-          );
-          if (trueEntry) booleanValue = true;
+          const optionText = (entry, depth = 0) => {
+            if (typeof entry === "string" || typeof entry === "number") {
+              const text = String(entry).trim();
+              return /^\[object object\]$/i.test(text) ? "" : text;
+            }
+            if (!entry || typeof entry !== "object" || depth > 4) return "";
+            for (const key of ["en", locale, "label", "value", "name"]) {
+              const text = optionText(entry[key], depth + 1);
+              if (text) return text;
+            }
+            return "";
+          };
+          if (typeof initialData.value !== "boolean") {
+            booleanValue = vals.some((entry) => {
+              const value = optionText(entry?.value ?? entry).toLowerCase();
+              const label = optionText(entry?.label_translations?.[locale])
+                || optionText(entry?.label)
+                || optionText(entry?.name);
+              return value === "true" || label.toLowerCase() === "yes";
+            });
+          }
         }
         const getOptionText = (entry, depth = 0) => {
-          if (typeof entry === "string" || typeof entry === "number") return String(entry).trim();
+          if (typeof entry === "string" || typeof entry === "number") {
+            const text = String(entry).trim();
+            return /^\[object object\]$/i.test(text) ? "" : text;
+          }
           if (!entry || typeof entry !== "object" || depth > 3) return "";
           const nested = entry[locale] || entry.en || entry.label || entry.value || entry.name;
           return nested && nested !== entry ? getOptionText(nested, depth + 1) : "";
         };
-        const values = (initialData.values || [])
-          .map((entry) => getOptionText(entry.label_translations?.[locale]) || getOptionText(entry.label) || getOptionText(entry.value) || getOptionText(entry.name) || getOptionText(entry))
-          .filter(Boolean);
+        // A Boolean attribute stores its selected default as one Yes/No value.
+        // That value is not a Multi Select option, so don't seed it into the
+        // options list when switching the saved attribute back to Multi Select.
+        const values = dataType === "multi_select"
+          ? (initialData.values || [])
+              .map((entry) => getOptionText(entry?.label_translations?.[locale]) || getOptionText(entry?.label) || getOptionText(entry?.value) || getOptionText(entry?.name) || getOptionText(entry))
+              .filter(Boolean)
+          : [];
         setForm({
           name: (typeof initialData.name === "object" && initialData.name) ? String(initialData.name.en || initialData.name.name || initialData.name.label || Object.values(initialData.name)[0] || "") : (initialData.name || ""),
           data_type: dataType,

@@ -45,13 +45,14 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
       <SectionHeading
         title={t("header.topBrands")}
         subtitle={t("admin.brands.page.title")}
-        href="/filtering-product"
+        href="/brands"
         linkLabel={t("common.all")}
       />
 
       <div
         ref={stripRef}
         className={`scroll-fade-track flex gap-2.5 overflow-x-auto scrollbar-hide ${fadeClassName}`}
+        style={{ paddingInline: 0 }}
       >
         {list.map((brand) => {
           const logo = imageUrl(brand.logo);

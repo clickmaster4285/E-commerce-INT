@@ -159,6 +159,13 @@ const posSaleSchema = new mongoose.Schema(
       min: 0,
     },
 
+    additional_tax_rate: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+
     total: {
       type: Number,
       required: true,

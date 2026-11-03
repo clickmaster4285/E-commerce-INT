@@ -20,7 +20,7 @@ export const adminProductApi = {
   //   sort: "newest" (default) | "featured-recent" (Featured page) | "price-asc" | "price-desc"
   // Response: { products: [...], stats: {...}, pagination: { total, page, limit, pages, hasNext, hasPrev } }
   // Note: limit bina legacy full-array response milta hai (getAll wala behavior).
-  getPaginated: ({ page = 1, limit = 20, search = "", category_id = "", brand_id = "", status = "", featured = "", sort = "" } = {}) => {
+  getPaginated: ({ page = 1, limit = 20, search = "", category_id = "", brand_id = "", status = "", featured = "", sort = "", locale = "", admin_list = false, admin_inventory = false, admin_context = "" } = {}) => {
     const params = { page, limit };
     if (search) params.search = search;
     if (category_id && category_id !== "all") params.category_id = category_id;
@@ -29,6 +29,10 @@ export const adminProductApi = {
     if (featured === true || featured === "true" || featured === "1") params.featured = "true";
     // "newest" backend ka default hai → bhejne ki zaroorat nahi
     if (sort && sort !== "newest") params.sort = sort;
+    if (locale) params.locale = locale;
+    if (admin_list) params.admin_list = "1";
+    if (admin_inventory) params.admin_inventory = "1";
+    if (admin_context) params.admin_context = admin_context;
     return adminHttp.get("/products", { params }).then((res) => res.data);
   },
 
@@ -46,11 +50,11 @@ export const adminProductApi = {
       .then((res) => (res.data?.stats ? res.data.stats : (res.data?.data || res.data || {})));
   },
 
-  getByBrand: (brandId) =>
-    adminHttp.get("/products", { params: { brand_id: brandId } }).then(list),
+  getByBrand: (brandId, locale = "en") =>
+    adminHttp.get("/products", { params: { brand_id: brandId, brand_detail: 1, locale } }).then(list),
 
-  getById: (id) =>
-    adminHttp.get(`/products/${id}`).then((res) => res.data?.data || res.data),
+  getById: (id, locale = "") =>
+    adminHttp.get(`/products/${id}`, locale ? { params: { locale } } : undefined).then((res) => res.data?.data || res.data),
 
   getDocumentHistory: (id) =>
     adminHttp.get(`/products/admin/${id}/history`).then((res) => res.data?.data || res.data || {}),

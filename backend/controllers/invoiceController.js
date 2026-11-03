@@ -120,11 +120,18 @@ const buildInvoice = (body = {}) => {
     const quantity = Number(item.quantity);
     const unitPrice = Number(item.unit_price);
     const gross = quantity * unitPrice;
-    const discountRate = Math.max(0, Math.min(100, Number(item.discount_rate) || 0));
-    const taxRate = Math.max(0, Math.min(100, Number(item.tax_rate) || 0));
-    if (!mongoose.isValidObjectId(item.product_id) || !String(item.name || "").trim() || !Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(unitPrice) || unitPrice < 0) {
-      throw new Error("Check product names, quantities, prices, and discounts");
-    }
+    const name = String(item.name || "").trim();
+    const itemLabel = name ? ` for "${name}"` : " for an invoice item";
+    const rawDiscountRate = item.discount_rate == null || item.discount_rate === "" ? 0 : Number(item.discount_rate);
+    const rawTaxRate = item.tax_rate == null || item.tax_rate === "" ? 0 : Number(item.tax_rate);
+    if (!mongoose.isValidObjectId(item.product_id)) throw new Error(`Select a valid product${itemLabel}.`);
+    if (!name) throw new Error("Enter a product name for every invoice item.");
+    if (!Number.isInteger(quantity) || quantity < 1) throw new Error(`Quantity${itemLabel} must be a whole number greater than zero.`);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error(`Unit price${itemLabel} must be a valid non-negative amount.`);
+    if (!Number.isFinite(rawDiscountRate) || rawDiscountRate < 0 || rawDiscountRate > 100) throw new Error(`Discount${itemLabel} must be between 0% and 100%.`);
+    if (!Number.isFinite(rawTaxRate) || rawTaxRate < 0 || rawTaxRate > 100) throw new Error(`Tax${itemLabel} must be between 0% and 100%.`);
+    const discountRate = rawDiscountRate;
+    const taxRate = rawTaxRate;
     const discount = round(gross * discountRate / 100);
     const tax = round((gross - discount) * taxRate / 100);
     return {
@@ -181,11 +188,75 @@ const buildInvoice = (body = {}) => {
   };
 };
 
-exports.listInvoices = async (_req, res) => {
+exports.listInvoices = async (req, res) => {
   try {
-    const invoices = (await Invoice.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean())
-      .map((invoice) => ({ ...invoice, original_total: getOriginalInvoiceTotal(invoice) }));
-    res.json({ success: true, data: invoices });
+    const filter = { is_deleted: false };
+    const search = String(req.query.search || "").trim();
+    if (search) {
+      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [
+        { invoice_number: regex },
+        { customer_name: regex },
+        { customer_email: regex },
+        { customer_phone: regex },
+      ];
+    }
+    if (req.query.status && req.query.status !== "all") {
+      if (req.query.status === "Overdue") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        filter.status = { $in: ["Unpaid", "Partially Paid"] };
+        filter.due_date = { $lt: today };
+      } else {
+        filter.status = req.query.status;
+        if (req.query.status === "Unpaid") {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          filter.due_date = { $gte: today };
+        }
+      }
+    }
+    if (req.query.dateFrom || req.query.dateTo) {
+      filter.invoice_date = {};
+      if (req.query.dateFrom) filter.invoice_date.$gte = new Date(`${req.query.dateFrom}T00:00:00.000Z`);
+      if (req.query.dateTo) filter.invoice_date.$lte = new Date(`${req.query.dateTo}T23:59:59.999Z`);
+    }
+
+    const listFields = "_id invoice_number customer_name customer_phone invoice_date due_date total status sent_at amount_paid remaining_balance translations translation_source translation_status";
+    // Keep legacy full-list behavior for any non-paginated callers.
+    if (req.query.page === undefined) {
+      const invoices = (await Invoice.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean())
+        .map((invoice) => ({ ...invoice, original_total: getOriginalInvoiceTotal(invoice) }));
+      return res.json({ success: true, data: invoices });
+    }
+
+    const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 10;
+    const filteredTotal = await Invoice.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(filteredTotal / limit));
+    const page = Math.min(requestedPage, pages);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [invoices, total, paid, unpaid, overdue] = await Promise.all([
+      Invoice.find(filter).select(listFields).sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Invoice.countDocuments({ is_deleted: false }),
+      Invoice.countDocuments({ is_deleted: false, status: "Paid" }),
+      Invoice.countDocuments({ is_deleted: false, status: "Unpaid", due_date: { $gte: today } }),
+      Invoice.countDocuments({ is_deleted: false, status: { $in: ["Unpaid", "Partially Paid"] }, due_date: { $lt: today } }),
+    ]);
+    const locale = String(req.query.locale || "en").toLowerCase();
+    const localizedInvoices = invoices.map((invoice) => {
+      const values = invoice.translations?.customer_name;
+      const translated = values instanceof Map ? values.get(locale) : values?.[locale];
+      return { ...invoice, translations: { customer_name: translated ? { [locale]: translated } : {} } };
+    });
+    return res.json({
+      success: true,
+      data: localizedInvoices,
+      stats: { total, paid, unpaid, overdue },
+      pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
+    });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 

@@ -8,6 +8,7 @@ import { useProductSocketSync } from "../../../../hooks/admin/useProductSocketSy
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import {
   Package, Layers3, Box, Clock, Pencil, Check,
   ChevronDown, ChevronRight, Copy, Plus, Trash2, Upload, X,
@@ -1075,6 +1076,8 @@ export default function ProductDetailPage() {
     const validTabs = ["overview", "variants", "tags", "category", "brand", "activity"];
     return validTabs.includes(tabParam) ? tabParam : "overview";
   });
+  const [variantPage, setVariantPage] = useState(1);
+  const [variantPageSize, setVariantPageSize] = useState(10);
 
   useEffect(() => {
     const tabParam = searchParams?.get("tab");
@@ -1140,8 +1143,27 @@ export default function ProductDetailPage() {
   }, [socket, isConnected, id, router, t]);
 
   const { data: product, isLoading, isError, refetch: refetchProduct } = useQuery({
-    queryKey: ["product", id], queryFn: () => productApi.getById(id), enabled: !!id,
+    queryKey: ["product", id, locale], queryFn: () => productApi.getById(id, locale), enabled: !!id,
   });
+  const productTranslationsReady = usePageTranslations({
+    model: "Product",
+    records: product ? [product] : [],
+    locale,
+    ready: !isLoading && !!product,
+    queryKey: ["product", id, locale],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || !!(
+      product?.translations?.name?.[locale]?.trim() &&
+      (!product.description || product.translations?.description?.[locale]?.trim())
+    ),
+  });
+  const productTranslationFieldCount = Number(Boolean(product?.name)) + Number(Boolean(product?.description?.trim()));
+  const translatedProductFieldCount = Number(Boolean(product?.translations?.name?.[locale]?.trim())) +
+    Number(Boolean(product?.description?.trim() && product?.translations?.description?.[locale]?.trim()));
+  const productMostlyUntranslated = locale !== "en" && productTranslationFieldCount > 0 && translatedProductFieldCount / productTranslationFieldCount <= 0.2;
+  const isProductNameReady = locale === "en" || productTranslationsReady || !productMostlyUntranslated || !!product?.translations?.name?.[locale]?.trim();
+  const isProductDescriptionReady = locale === "en" || !product?.description || productTranslationsReady || !productMostlyUntranslated || !!product?.translations?.description?.[locale]?.trim();
   const { data: productDocumentHistory } = useQuery({
     queryKey: ["product-document-history", id],
     queryFn: () => productApi.getDocumentHistory(id),
@@ -1228,7 +1250,7 @@ export default function ProductDetailPage() {
     onSuccess: async (_res, vars) => {
       toast.success(vars?.successMsg || t("admin.productDetail.tagsUpdated"));
       await refetchProduct();
-      queryClient.invalidateQueries({ queryKey: ["product", id] });
+      queryClient.invalidateQueries({ queryKey: ["product", id, locale] });
       refetchTags();
     },
     onError: (error, vars) => { toast.error(errorToastMessage(error, vars?.errorMsg || t("admin.productDetail.tagsUpdateFailed"))); },
@@ -1239,13 +1261,13 @@ export default function ProductDetailPage() {
     onSuccess: async () => {
       toast.success(t("admin.productDetail.productUpdated"));
       await refetchProduct();
-      queryClient.invalidateQueries({ queryKey: ["product", id] });
+      queryClient.invalidateQueries({ queryKey: ["product", id, locale] });
       // Re-fetch global tags so newly created variant tag docs (with their
       // Created By) appear in the Tags tab without a page refresh.
       refetchTags();
       if (showVariantTagsModal && editingVariantForTags) {
         setTimeout(() => {
-          const freshProduct = queryClient.getQueryData(["product", id]);
+          const freshProduct = queryClient.getQueryData(["product", id, locale]);
           if (freshProduct) {
             const updatedVariant = freshProduct.variants?.find(v => String(v._id) === String(editingVariantForTags._id));
             if (updatedVariant) setEditingVariantForTags({ ...updatedVariant, tags: updatedVariant.tags || [] });
@@ -1262,7 +1284,7 @@ export default function ProductDetailPage() {
     onSuccess: async () => {
       toast.success(t("admin.productDetail.variantDeleted"));
       await refetchProduct();
-      queryClient.invalidateQueries({ queryKey: ["product", id] });
+      queryClient.invalidateQueries({ queryKey: ["product", id, locale] });
     },
     onError: (error) => { toast.error(errorToastMessage(error, t("admin.productDetail.variantDeleteFailed"))); },
   });
@@ -1273,9 +1295,9 @@ export default function ProductDetailPage() {
   const variantStatusMutation = useMutation({
     mutationFn: ({ variantId, status }) => variantApi.update(variantId, { status }),
     onMutate: async ({ variantId, status }) => {
-      await queryClient.cancelQueries({ queryKey: ["product", id] });
-      const previous = queryClient.getQueryData(["product", id]);
-      queryClient.setQueryData(["product", id], (old) => {
+      await queryClient.cancelQueries({ queryKey: ["product", id, locale] });
+      const previous = queryClient.getQueryData(["product", id, locale]);
+      queryClient.setQueryData(["product", id, locale], (old) => {
         if (!old?.variants) return old;
         return {
           ...old,
@@ -1292,7 +1314,7 @@ export default function ProductDetailPage() {
       refetchProduct();
     },
     onError: (error, _vars, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["product", id], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(["product", id, locale], ctx.previous);
       toast.error(errorToastMessage(error, t("admin.productDetail.variantStatusFailed")));
     },
   });
@@ -1707,6 +1729,11 @@ export default function ProductDetailPage() {
   );
 
   const variants = product.variants || [];
+  const totalVariantPages = Math.max(1, Math.ceil(variants.length / variantPageSize));
+  const activeVariantPage = Math.min(variantPage, totalVariantPages);
+  const visibleVariants = variants.slice((activeVariantPage - 1) * variantPageSize, activeVariantPage * variantPageSize);
+  const variantRangeStart = variants.length ? (activeVariantPage - 1) * variantPageSize + 1 : 0;
+  const variantRangeEnd = Math.min(activeVariantPage * variantPageSize, variants.length);
   const totalStock = variants.reduce((t, v) => t + Number(v.quantity || 0), 0);
   const totalVariants = variants.length;
   // Detail drawer ke liye live variant — refetch / tag update ke baad bhi fresh data
@@ -2091,11 +2118,12 @@ export default function ProductDetailPage() {
             </tr>
           </thead>
           <tbody>
-            {variants.map((variant, index) => {
+            {visibleVariants.map((variant, index) => {
+              const absoluteIndex = (variantPage - 1) * variantPageSize + index;
               const isLowStock = Number(variant.quantity) <= 5;
               const isActive = variant.status === "active" || !variant.status;
               return (
-                <tr key={variant._id || index} onClick={() => setVariantDetailsTarget(variant)} className="cursor-pointer transition-colors hover:bg-[var(--bg-row-hover)]" style={{ borderBottom: index < variants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                <tr key={variant._id || absoluteIndex} onClick={() => setVariantDetailsTarget(variant)} className="cursor-pointer transition-colors hover:bg-[var(--bg-row-hover)]" style={{ borderBottom: index < visibleVariants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
                   <td className="px-4 py-2.5">
                     {variant.images?.length > 0 ? (
                       <button onClick={(e) => { e.stopPropagation(); openGallery(0); }} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
@@ -2178,6 +2206,27 @@ export default function ProductDetailPage() {
             })}
           </tbody>
         </table>
+        {variants.length > 0 && (
+          <div className="flex flex-col gap-3 border-t border-[var(--border-color)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[var(--text-muted)]">
+              <span>{t("admin.shared.pagination.showingRange", { from: variantRangeStart.toLocaleString(locale), to: variantRangeEnd.toLocaleString(locale), total: variants.length.toLocaleString(locale) })}</span>
+              <span>{t("admin.shared.pagination.pageOf", { page: activeVariantPage.toLocaleString(locale), total: totalVariantPages.toLocaleString(locale) })}</span>
+              <label className="flex items-center gap-2">
+                <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+                <select value={variantPageSize} onChange={(event) => { setVariantPageSize(Number(event.target.value)); setVariantPage(1); }} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[12px] text-[var(--text-primary)] outline-none">
+                  {[10, 20, 50].map((size) => <option key={size} value={size}>{size.toLocaleString(locale)}</option>)}
+                </select>
+              </label>
+            </div>
+            {totalVariantPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setVariantPage(Math.max(1, activeVariantPage - 1))} disabled={activeVariantPage === 1} aria-label={t("admin.shared.pagination.prev")} className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 text-xs text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />{t("admin.products.pagination.prevShort")}</button>
+                <span className="min-w-12 text-center text-xs font-medium text-[var(--text-secondary)]">{activeVariantPage.toLocaleString(locale)} / {totalVariantPages.toLocaleString(locale)}</span>
+                <button type="button" onClick={() => setVariantPage(Math.min(totalVariantPages, activeVariantPage + 1))} disabled={activeVariantPage >= totalVariantPages} aria-label={t("admin.shared.pagination.next")} className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 text-xs text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.products.pagination.nextShort")}<ChevronRight className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )}
   </div>
@@ -2250,9 +2299,9 @@ export default function ProductDetailPage() {
                 <ChevronRight className="w-3 h-3 shrink-0" />
               </>
             )}
-            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</span>
+            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("admin.productDetail.page.loading")} />}</span>
           </nav>
-          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</h1>
+          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-6 w-2/3 rounded" aria-label={t("admin.productDetail.page.loading")} />}</h1>
           <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -2276,14 +2325,14 @@ export default function ProductDetailPage() {
               <div className="flex w-full max-w-md items-start gap-3">
                 {/* Main Clickable Image */}
                 <button 
+                  type="button"
                   onClick={() => openGallery(0)}
-                  className="block w-full relative overflow-hidden rounded-xl shadow-lg group-hover:shadow-2xl transition-all duration-300"
+                  className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl bg-[var(--bg-secondary)] shadow-lg transition-shadow duration-300 group-hover:shadow-2xl"
                 >
                   <FallbackImage
                     src={getImageUrl(firstVariant.images[0].img_url)}
-                    alt={productNameOf(product)}
-                    className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-500"
-                    style={{ maxHeight: 300 }}
+                    alt={isProductNameReady ? productNameOf(product) : ""}
+                    className="h-full w-full object-contain"
                   />
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
@@ -2327,10 +2376,10 @@ export default function ProductDetailPage() {
 
           {/* Info Area */}
           <div className="p-4 md:p-5 flex flex-col justify-center gap-4">
-            <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</h2>
+            {isProductNameReady ? <h2 className="text-[20px] md:text-[22px] font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</h2> : <span className="skeleton inline-block h-6 w-2/3 rounded" aria-label={t("admin.productDetail.page.loading")} />}
             
             <p className="text-[13px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              {productDescriptionOf(product) ? productDescriptionOf(product).slice(0, 160) + (productDescriptionOf(product).length > 160 ? "..." : "") : t("admin.productDetail.page.noDescription")}
+              {isProductDescriptionReady ? (productDescriptionOf(product) ? productDescriptionOf(product).slice(0, 160) + (productDescriptionOf(product).length > 160 ? "..." : "") : t("admin.productDetail.page.noDescription")) : <span className="skeleton inline-block h-3 w-4/5 rounded" aria-label={t("admin.productDetail.page.loading")} />}
             </p>
             <div className="flex items-baseline gap-3">
               {/* ✅ Product price — sirf variant price data se:
@@ -2510,7 +2559,7 @@ export default function ProductDetailPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.productName")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{productNameOf(product)}</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("admin.productDetail.page.loading")} />}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.brand")}</p>

@@ -8,7 +8,6 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
-  Barcode,
   Check,
   ChevronLeft,
   ChevronDown,
@@ -18,8 +17,6 @@ import {
   ClipboardList,
   History,
   RotateCcw,
-  LayoutGrid,
-  List,
   SlidersHorizontal,
   Minus,
   MoreVertical,
@@ -39,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { customerApi } from "@/apis/admin/customerApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
@@ -71,13 +69,18 @@ const paymentLabel = (method, t) => {
   return key ? t(`admin.pos.payment.${key}`) : normalized.replaceAll("_", " ");
 };
 const variantLabel = (variant, t) => {
-  const attributes = Object.entries(variant?.attributes || {}).filter(([, value]) => (
-    value !== null && value !== undefined && String(value).trim() !== ""
-  ));
-  const size = attributes.find(([name]) => /size/i.test(name));
-  const value = size?.[1];
-  if (Array.isArray(value)) return value.join(", ");
-  return value ? String(value) : variant?.title || t("admin.pos.ui.defaultVariant");
+  const title = String(variant?.title || "").trim();
+  if (title && title.toLowerCase() !== "default") return title;
+
+  const readValue = (value) => {
+    if (Array.isArray(value)) return value.map(readValue).filter(Boolean).join(", ");
+    if (value && typeof value === "object") {
+      return readValue(value.label ?? value.value ?? value.name ?? value.title);
+    }
+    return value === null || value === undefined ? "" : String(value).trim();
+  };
+  const attributeValues = Object.values(variant?.attributes || {}).map(readValue).filter(Boolean);
+  return attributeValues.join(" / ") || title || t("admin.pos.ui.defaultVariant");
 };
 
 function PosDropdown({
@@ -238,6 +241,7 @@ export default function PosPage() {
   const [selectedStock, setSelectedStock] = useState("");
   const [selectedSort, setSelectedSort] = useState("recent");
   const [currentPage, setCurrentPage] = useState(1);
+  const [productPageSize, setProductPageSize] = useState(PAGE_SIZE);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -246,6 +250,7 @@ export default function PosPage() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
   const [discountAmount, setDiscountAmount] = useState("");
+  const [additionalTaxRate, setAdditionalTaxRate] = useState("0");
   const [notes, setNotes] = useState("");
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [cart, setCart] = useState([]);
@@ -253,7 +258,7 @@ export default function PosPage() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [rateEditorVariantId, setRateEditorVariantId] = useState(null);
   const [activeView, setActiveView] = useState("pos");
-  const [viewMode, setViewMode] = useState("grid");
+  const viewMode = "grid";
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [heldCarts, setHeldCarts] = useState([]);
   const heldCartsLoaded = useRef(false);
@@ -261,11 +266,13 @@ export default function PosPage() {
   const [historyPayment, setHistoryPayment] = useState("all");
   const [historyRange, setHistoryRange] = useState("all");
   const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(HISTORY_PAGE_SIZE);
   const [expandedSaleId, setExpandedSaleId] = useState(null);
   const [editingSaleId, setEditingSaleId] = useState(null);
   const [editingSaleNumber, setEditingSaleNumber] = useState("");
   const [editingOriginalQuantities, setEditingOriginalQuantities] = useState({});
   const [returnSaleId, setReturnSaleId] = useState("");
+  const [returnSearch, setReturnSearch] = useState("");
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnNote, setReturnNote] = useState("");
 
@@ -297,43 +304,30 @@ export default function PosPage() {
     window.localStorage.setItem("admin-pos-held-carts", JSON.stringify(heldCarts));
   }, [heldCarts]);
 
+  const historyDateFilters = useMemo(() => {
+    const now = new Date();
+    if (historyRange === "all") return {};
+    const from = new Date(now);
+    if (historyRange === "today") from.setHours(0, 0, 0, 0);
+    if (historyRange === "7days") from.setDate(from.getDate() - 7);
+    if (historyRange === "30days") from.setDate(from.getDate() - 30);
+    return { dateFrom: from.toISOString(), dateTo: now.toISOString() };
+  }, [historyRange]);
   const historyQuery = useQuery({
-    queryKey: ["pos-sales-history"],
-    queryFn: async () => {
-      const firstPage = await posApi.getSales({ page: 1, limit: 50 });
-      const allSales = Array.isArray(firstPage.data) ? [...firstPage.data] : [];
-      const pages = Math.max(1, Number(firstPage.pagination?.totalPages) || 1);
-      for (let page = 2; page <= pages; page += 1) {
-        const response = await posApi.getSales({ page, limit: 50 });
-        if (Array.isArray(response.data)) allSales.push(...response.data);
-      }
-      return allSales;
-    },
-    enabled: activeView === "history" || activeView === "returns",
+    queryKey: ["pos-sales-history", historySearch, historyPayment, historyRange, historyPage, historyPageSize, locale],
+    queryFn: () => posApi.getSales({
+      page: historyPage, limit: historyPageSize, search: historySearch.trim(),
+      paymentMethod: historyPayment === "all" ? "" : historyPayment, ...historyDateFilters, locale,
+    }),
+    enabled: activeView === "history",
+    placeholderData: (previousData) => previousData,
   });
   const salesOverviewQuery = useQuery({
-    queryKey: ["pos-sales-overview"],
+    queryKey: ["pos-sales-overview", locale],
     queryFn: async () => {
-      const firstPage = await posApi.getSales({ page: 1, limit: 50 });
+      const firstPage = await posApi.getSales({ page: 1, limit: 1, includeSummary: true, locale });
       const totalTransactions = Number(firstPage.pagination?.total) || 0;
-      const pageCount = Math.max(1, Number(firstPage.pagination?.totalPages) || 1);
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      let todayCount = 0;
-      let todayRevenue = 0;
-      let pageData = Array.isArray(firstPage.data) ? firstPage.data : [];
-      for (let page = 1; page <= pageCount && pageData.length; page += 1) {
-        for (const sale of pageData) {
-          if (new Date(sale.created_at) >= startOfToday) {
-            todayCount += 1;
-            todayRevenue += Number(sale.total) || 0;
-          }
-        }
-        if (page === pageCount || pageData.some((sale) => new Date(sale.created_at) < startOfToday)) break;
-        const nextPage = await posApi.getSales({ page: page + 1, limit: 50 });
-        pageData = Array.isArray(nextPage.data) ? nextPage.data : [];
-      }
-      return { totalTransactions, todayCount, todayRevenue };
+      return { totalTransactions, todayCount: Number(firstPage.summary?.todayCount) || 0, todayRevenue: Number(firstPage.summary?.todayRevenue) || 0 };
     },
     staleTime: 30_000,
   });
@@ -343,29 +337,28 @@ export default function PosPage() {
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
-  const historySales = useMemo(() => {
-    const query = historySearch.trim().toLowerCase();
-    const now = new Date();
-    const from = historyRange === "today" ? new Date(now) : historyRange === "7days" ? new Date(now) : historyRange === "30days" ? new Date(now) : null;
-    if (historyRange === "today") from.setHours(0, 0, 0, 0);
-    if (historyRange === "7days") from.setDate(from.getDate() - 7);
-    if (historyRange === "30days") from.setDate(from.getDate() - 30);
-    return (historyQuery.data || []).filter((sale) => {
-      const method = String(sale.payment?.method || "cash").toLowerCase();
-      const saleDate = new Date(sale.created_at);
-      const matchesSearch = !query || [sale.sale_number, sale.customer_snapshot?.name, sale.customer_snapshot?.phone, method].filter(Boolean).join(" ").toLowerCase().includes(query);
-      return matchesSearch && (historyPayment === "all" || method === historyPayment) && (!from || (saleDate >= from && saleDate <= now));
-    });
-  }, [historyQuery.data, historySearch, historyPayment, historyRange]);
-  const historyPageCount = Math.max(1, Math.ceil(historySales.length / HISTORY_PAGE_SIZE));
-  const visibleHistorySales = historySales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
-  const selectedReturnSale = (historyQuery.data || []).find((sale) => sale._id === returnSaleId) || null;
+  const historySales = Array.isArray(historyQuery.data?.data) ? historyQuery.data.data : [];
+  const historyTotal = Number(historyQuery.data?.pagination?.total) || 0;
+  const historyPageCount = Math.max(1, Number(historyQuery.data?.pagination?.totalPages) || 1);
+  const visibleHistorySales = historySales;
+  const selectedReturnQuery = useQuery({
+    queryKey: ["pos-sale-detail", returnSaleId, locale],
+    queryFn: () => posApi.getSale(returnSaleId, { locale }),
+    enabled: activeView === "returns" && Boolean(returnSaleId),
+  });
+  const selectedReturnSale = selectedReturnQuery.data || null;
+  const returnSalesQuery = useQuery({
+    queryKey: ["pos-return-sales", returnSearch, locale],
+    queryFn: () => posApi.getSales({ page: 1, limit: 20, search: returnSearch.trim(), status: "completed", locale }),
+    enabled: activeView === "returns",
+    placeholderData: (previousData) => previousData,
+  });
 
   const holdCart = () => {
     if (editingSaleId) { toast.error(t("admin.pos.toast.cannotHoldEditedSale")); return; }
     if (!cart.length) { toast.error(t("admin.pos.toast.addItemsBeforeHolding")); return; }
-    setHeldCarts((current) => [{ id: `${Date.now()}`, createdAt: new Date().toISOString(), cart, customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, notes, editingSaleId, editingSaleNumber, editingOriginalQuantities }, ...current]);
-    setCart([]); setSelectedCustomer(null); setDiscountAmount(""); setNotes("");
+    setHeldCarts((current) => [{ id: `${Date.now()}`, createdAt: new Date().toISOString(), cart, customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, additionalTaxRate, notes, editingSaleId, editingSaleNumber, editingOriginalQuantities }, ...current]);
+    setCart([]); setSelectedCustomer(null); setDiscountAmount(""); setAdditionalTaxRate("0"); setNotes("");
     setPaymentReference("");
     setEditingSaleId(null); setEditingSaleNumber(""); setEditingOriginalQuantities({});
     toast.success(t("admin.pos.toast.saleHeld"));
@@ -373,12 +366,12 @@ export default function PosPage() {
   const resumeHeldCart = (held, restoredAt) => {
     const currentDraft = cart.length ? {
       id: `current-${held.id}`, createdAt: restoredAt, cart,
-      customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, notes,
+      customer: selectedCustomer, paymentMethod, paymentReference, discountAmount, additionalTaxRate, notes,
       editingSaleId, editingSaleNumber, editingOriginalQuantities,
     } : null;
     setCart(held.cart || []); setSelectedCustomer(held.customer || null); setPaymentMethod(held.paymentMethod || "cash");
     setPaymentReference(held.paymentReference || "");
-    setDiscountAmount(held.discountAmount || ""); setNotes(held.notes || "");
+    setDiscountAmount(held.discountAmount || ""); setAdditionalTaxRate(held.additionalTaxRate ?? "0"); setNotes(held.notes || "");
     setEditingSaleId(held.editingSaleId || null); setEditingSaleNumber(held.editingSaleNumber || ""); setEditingOriginalQuantities(held.editingOriginalQuantities || {});
     setHeldCarts((current) => [...(currentDraft ? [currentDraft] : []), ...current.filter((item) => item.id !== held.id)]); setActiveView("pos");
     toast.success(t(currentDraft ? "admin.pos.toast.heldSaleRestoredWithDraft" : "admin.pos.toast.heldSaleRestored"));
@@ -401,27 +394,34 @@ export default function PosPage() {
       : sale.customer_id
         ? { _id: sale.customer_id, name: customerSnapshot.name, phone: customerSnapshot.phone }
         : null;
-    setCart(saleItems.map((item) => ({
-      variant_id: String(item.variant_id?._id || item.variant_id),
-      product_id: String(item.product_id?._id || item.product_id || ""),
-      product_name: productNameOf(item) || t("admin.pos.ui.product"),
-      variant_title: item.variant_title || t("admin.pos.ui.defaultVariant"),
-      sku: item.sku || "",
-      unit_price: Number(item.unit_price) || 0,
-      quantity: Number(item.quantity) || 1,
-      stock: Number.MAX_SAFE_INTEGER,
-      tax_rate: Number(item.tax_rate) || 0,
-      discount_rate: Number(item.discount_rate) || 0,
-      flat_discount: Number(item.flat_discount) || 0,
-      discount_type: Number(item.discount_rate) > 0 && Number(item.flat_discount) > 0
-        ? "combined"
-        : Number(item.flat_discount) > 0 ? "flat" : "percentage",
-      image: getProductImage({ variants: [{ images: item.product_image ? [{ img_url: item.product_image }] : [] }] }),
-    })));
+    setCart(saleItems.map((item) => {
+      const variantId = String(item.variant_id?._id || item.variant_id || "");
+      const saleCredit = Number(originalQuantities[variantId]) || 0;
+      return {
+        variant_id: variantId,
+        product_id: String(item.product_id?._id || item.product_id || ""),
+        product_name: productNameOf(item) || t("admin.pos.ui.product"),
+        variant_title: item.variant_title || t("admin.pos.ui.defaultVariant"),
+        sku: item.sku || "",
+        unit_price: Number(item.unit_price) || 0,
+        quantity: Number(item.quantity) || 1,
+        // The edited sale's old quantity is credited back by the server.
+        // Only that credit plus current on-hand stock is selectable here.
+        stock: Math.max(0, Number(item.available_stock) || 0) + saleCredit,
+        tax_rate: Number(item.tax_rate) || 0,
+        discount_rate: Number(item.discount_rate) || 0,
+        flat_discount: Number(item.flat_discount) || 0,
+        discount_type: Number(item.discount_rate) > 0 && Number(item.flat_discount) > 0
+          ? "combined"
+          : Number(item.flat_discount) > 0 ? "flat" : "percentage",
+        image: getProductImage({ variants: [{ images: item.product_image ? [{ img_url: item.product_image }] : [] }] }),
+      };
+    }));
     setSelectedCustomer(customer);
     setPaymentMethod(sale.payment?.method || "cash");
     setPaymentReference(sale.payment?.reference || "");
     setDiscountAmount(String(Math.max(0, (Number(sale.discount_amount) || 0) - itemDiscountTotal)));
+    setAdditionalTaxRate(String(Math.max(0, Number(sale.additional_tax_rate) || 0)));
     setNotes(sale.notes || "");
     setEditingSaleId(sale._id);
     setEditingSaleNumber(sale.sale_number || t("common.notProvided"));
@@ -434,6 +434,7 @@ export default function PosPage() {
     setCart([]);
     setSelectedCustomer(null);
     setDiscountAmount("");
+    setAdditionalTaxRate("0");
     setNotes("");
     setPaymentReference("");
     setEditingSaleId(null);
@@ -442,8 +443,8 @@ export default function PosPage() {
     toast.info(t("admin.pos.toast.saleEditCancelled"));
   };
 
-  const { data: productsPayload = {}, isLoading: productsLoading, isError: productsError } = useQuery({
-    queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage],
+  const { data: productsPayload = {}, isLoading: productsLoading, isError: productsError, isPlaceholderData: productsPlaceholder } = useQuery({
+    queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale],
     queryFn: () => posApi.getProducts({
       search: search.trim(),
       category: selectedCategory,
@@ -451,21 +452,36 @@ export default function PosPage() {
       stock: selectedStock,
       sort: selectedSort,
       page: currentPage,
-      limit: PAGE_SIZE,
+      limit: productPageSize,
+      locale,
     }),
     placeholderData: (previousData) => previousData,
   });
   const products = Array.isArray(productsPayload.data) ? productsPayload.data : [];
   const variantCards = products.flatMap((product) =>
     (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({ product, variant })),
-  ).slice(0, PAGE_SIZE);
+  );
+  const posTranslationsReady = usePageTranslations({ model: "Product", records: products, locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (products.length > 0 && products.every((product) => Boolean(product.translations?.name?.[locale]?.trim()))), fallbackAfterRetries: true });
+  const posVariantsTranslationsReady = usePageTranslations({ model: "Variant", records: variantCards.map(({ variant }) => variant), locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (variantCards.length > 0 && variantCards.every(({ variant }) => !variant.title?.trim() || variant.title === "Default" || Boolean(variant.translations?.title?.[locale]?.trim()))), fallbackAfterRetries: true });
+  const posTranslationFields = variantCards.flatMap(({ product, variant }) => [
+    { source: product.name, translated: product.translations?.name?.[locale] },
+    { source: variant.title === "Default" ? "" : variant.title, translated: variant.translations?.title?.[locale] },
+  ]).filter(({ source }) => Boolean(String(source || "").trim()));
+  const posTranslatedFieldCount = posTranslationFields.filter(({ translated }) => Boolean(String(translated || "").trim())).length;
+  const posPageMostlyUntranslated = locale !== "en" && posTranslationFields.length > 0 && posTranslatedFieldCount / posTranslationFields.length <= 0.2;
+  const hasPosTranslation = (source, translated, ready) => locale === "en" || ready || !posPageMostlyUntranslated || Boolean(translated?.trim());
   const categoryOptions = productsPayload.filters?.categories || [];
   const brandOptions = productsPayload.filters?.brands || [];
   const totalPages = Math.max(1, Number(productsPayload.pagination?.totalPages) || 1);
 
+  useEffect(() => {
+    const safePage = Number(productsPayload.pagination?.page);
+    if (!productsPlaceholder && safePage && safePage !== currentPage) setCurrentPage(safePage);
+  }, [productsPayload.pagination?.page, currentPage, productsPlaceholder]);
+
   const customerResults = useQuery({
     queryKey: ["pos-customer-picker", customerSearch],
-    queryFn: () => customerApi.getAll({ search: customerSearch.trim() }),
+    queryFn: () => customerApi.search(customerSearch.trim()),
     enabled: customerOpen,
   });
 
@@ -491,12 +507,13 @@ export default function PosPage() {
     () => cart.reduce((sum, item) => sum + itemDiscountTotal(item), 0),
     [cart],
   );
-  const tax = useMemo(
+  const itemTax = useMemo(
     () => cart.reduce((sum, item) => sum + itemNetTotal(item) * item.tax_rate / 100, 0),
     [cart],
   );
   const taxableSubtotal = cart.reduce((sum, item) => sum + itemNetTotal(item), 0);
-  const effectiveTaxRate = taxableSubtotal > 0 ? (tax / taxableSubtotal) * 100 : 0;
+  const additionalTax = taxableSubtotal * (Math.min(100, Math.max(0, Number(additionalTaxRate) || 0)) / 100);
+  const tax = itemTax + additionalTax;
   const overallDiscount = Math.min(Math.max(Number(discountAmount) || 0, 0), subtotal - itemDiscount + tax);
   const discount = itemDiscount + overallDiscount;
   const total = Math.max(0, Math.round(Math.round(subtotal) + Math.round(tax) - discount));
@@ -524,13 +541,13 @@ export default function PosPage() {
     setCart((currentCart) => {
       const existing = currentCart.find((item) => item.variant_id === variant._id);
       const currentQuantity = existing?.quantity || 0;
-      if (currentQuantity + quantityToAdd > (existing?.stock || availableStock)) {
-        toast.error(t("admin.pos.toast.moreAvailableForVariant", { count: Math.max((existing?.stock || availableStock) - currentQuantity, 0) }));
+      if (currentQuantity + quantityToAdd > availableStock) {
+        toast.error(t("admin.pos.toast.moreAvailableForVariant", { count: Math.max(availableStock - currentQuantity, 0) }));
         return currentCart;
       }
       if (existing) {
         return currentCart.map((item) => (
-          item.variant_id === variant._id ? { ...item, quantity: item.quantity + quantityToAdd, stock: Math.max(item.stock, availableStock) } : item
+          item.variant_id === variant._id ? { ...item, quantity: item.quantity + quantityToAdd, stock: availableStock } : item
         ));
       }
       const image = getProductImage({ ...product, variants: [variant] });
@@ -539,7 +556,7 @@ export default function PosPage() {
         product_id: product._id,
         product_name: product.name,
         translations: product.translations,
-        variant_title: variant.title || "Default",
+        variant_title: variantLabel(variant, t),
         sku: variant.sku || "",
         unit_price: Number(variant.selling_price) || 0,
         quantity: quantityToAdd,
@@ -607,6 +624,7 @@ export default function PosPage() {
         reference: paymentReference,
         amount_received: total,
         discount_amount: overallDiscount,
+        additional_tax_rate: Math.min(100, Math.max(0, Number(additionalTaxRate) || 0)),
         notes,
         items: cart.map((item) => ({
           variant_id: item.variant_id,
@@ -624,6 +642,7 @@ export default function PosPage() {
       setCart([]);
       setSelectedCustomer(null);
       setDiscountAmount("");
+      setAdditionalTaxRate("0");
       setNotes("");
       setPaymentReference("");
       setEditingSaleId(null);
@@ -641,7 +660,7 @@ export default function PosPage() {
 
   const returnMutation = useMutation({
     mutationFn: () => {
-      const sale = (historyQuery.data || []).find((item) => item._id === returnSaleId);
+      const sale = selectedReturnSale;
       if (!sale) throw new Error(t("admin.pos.validation.chooseSaleFirst"));
       if (!returnNote.trim()) throw new Error(t("admin.pos.validation.returnReasonRequired"));
       const items = (sale.items || []).map((item) => ({ variant_id: String(item.variant_id?._id || item.variant_id), quantity: Number(returnQuantities[String(item.variant_id?._id || item.variant_id)] || 0) })).filter((item) => item.quantity > 0);
@@ -651,6 +670,9 @@ export default function PosPage() {
       toast.success(t("admin.pos.toast.returnRecorded", { amount: formatMoney(result?.data?.refund_total || 0) }));
       setReturnQuantities({}); setReturnSaleId(""); setReturnNote("");
       queryClient.invalidateQueries({ queryKey: ["pos-sales-history"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-return-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-returns-history"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-sale-detail"] });
       queryClient.invalidateQueries({ queryKey: ["pos-products"] });
       queryClient.invalidateQueries({ queryKey: ["pos-sales-overview"] });
     },
@@ -785,9 +807,8 @@ export default function PosPage() {
                   setSearch("");
                   setCurrentPage(1);
                 }}
-                className="h-10 w-full rounded-lg border-0 bg-[#F3F4F6] ps-9 pe-11 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-900 sm:text-sm"
+                className="h-10 w-full rounded-lg border-0 bg-[#F3F4F6] ps-9 pe-3 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-900 sm:text-sm"
               />
-              <button type="button" onClick={() => searchInputRef.current?.focus()} className="absolute end-1 top-1 flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] transition hover:bg-[var(--bg-card)] hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={t("admin.pos.ui.focusTheSearchFieldToScanABarcode")} title={t("admin.pos.ui.useABarcodeScannerToTypeIntoTheSearchField")}><Barcode size={16} /></button>
             </div>
             <PosDropdown
               value={selectedSort}
@@ -799,15 +820,13 @@ export default function PosPage() {
               ]}
               onChange={(value) => { setSelectedSort(value); setCurrentPage(1); }}
               ariaLabel={t("admin.pos.ui.sortProducts")}
-              prefix={`${t("admin.pos.ui.sortPrefix")}: `}
-              className="w-28 shrink-0 sm:w-32"
+              prefix={`${t("admin.pos.ui.sortPrefix")} `}
+              className="w-36 shrink-0 sm:w-40"
               buttonClassName="h-9 justify-between rounded-lg border-0 bg-transparent px-2 text-[11px] font-medium shadow-none hover:bg-[var(--bg-tertiary)]"
               menuClassName="w-48"
             />
             <div ref={filtersPanelRef} className="relative flex shrink-0 items-center gap-1">
               <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedCategory || selectedBrand || selectedStock ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
-              <button type="button" onClick={() => setViewMode("grid")} aria-label={t("admin.pos.ui.gridView")} aria-pressed={viewMode === "grid"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "grid" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><LayoutGrid size={14}/></button>
-              <button type="button" onClick={() => setViewMode("list")} aria-label={t("admin.pos.ui.listView")} aria-pressed={viewMode === "list"} className={`hidden h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:flex ${viewMode === "list" ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"}`}><List size={14}/></button>
               {filtersOpen && <div className="absolute end-0 top-full z-30 mt-2 w-56 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-xl">
                 <div className="mb-2 text-xs font-bold text-[var(--text-primary)]">{t("admin.pos.ui.productFilters")}</div>
                 <PosDropdown fieldLabel={t("admin.pos.ui.category")} value={selectedCategory} options={[{ value: "", label: t("admin.pos.ui.allCategories") }, ...categoryOptions.map((category) => ({ value: category, label: category }))]} onChange={selectCategory} ariaLabel={t("admin.pos.ui.filterByCategory")} className="mb-2" buttonClassName="h-9 rounded-lg px-2" menuClassName="w-full" />
@@ -836,7 +855,8 @@ export default function PosPage() {
             <div className={viewMode === "list" ? "grid grid-cols-1 gap-2" : "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]"}>
               {variantCards.map(({ product, variant }) => {
                 const image = getProductImage({ ...product, variants: [variant] });
-                const variantName = variant.title && variant.title !== "Default" ? variant.title : variantLabel(variant, t);
+                const variantName = variantLabel(variant, t);
+                const productName = productNameOf(product);
                 const stockQuantity = Math.max(0, Number(variant.quantity) || 0);
                 const inStock = stockQuantity > 0;
                 const heldQuantity = heldCarts.reduce((total, held) => total + (held.cart || []).reduce(
@@ -851,12 +871,16 @@ export default function PosPage() {
                       <span className={`absolute start-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${!inStock ? "bg-rose-50/95 text-rose-700" : stockQuantity < 10 ? "bg-amber-50/95 text-amber-700" : "bg-emerald-50/95 text-emerald-700"}`}>
                         {inStock && <Check size={11} strokeWidth={3} />}{!inStock ? t("admin.pos.ui.outOfStock") : stockQuantity < 10 ? t("admin.pos.ui.lowStock") : t("admin.pos.ui.inStock")}
                       </span>
-                      {heldQuantity > 0 && <span className="absolute bottom-2 start-2 inline-flex items-center rounded-full bg-amber-50/95 px-2 py-1 text-[9px] font-bold text-amber-800">{t("admin.pos.ui.onHold")} {heldQuantity}</span>}
                       {inStock && <span aria-hidden="true" title={t("admin.pos.ui.addToCart")} className="absolute bottom-2 end-2 flex h-7 w-7 scale-95 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 transition group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"><Plus size={15} strokeWidth={2.5}/></span>}
                     </div>
                     <div className={`min-w-0 ${viewMode === "list" ? "" : "p-2 pt-1.5 sm:p-2.5 sm:pt-1.5"}`}>
-                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-medium leading-[18px] text-[var(--text-primary)]" title={productNameOf(product)}>{productNameOf(product)}</h3>
+                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-[var(--text-primary)]" title={variantName}>{hasPosTranslation(variant.title === "Default" ? "" : variant.title, variant.translations?.title?.[locale], posVariantsTranslationsReady) ? (variant.translations?.title?.[locale] || variantName) : <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-[var(--bg-tertiary)] align-middle" aria-label={t("common.loading")} />}</h3>
+                    <p className="truncate text-[10px] text-[var(--text-muted)]" title={productName}>{hasPosTranslation(product.name, product.translations?.name?.[locale], posTranslationsReady) ? (productNameOf(product)) : <span className="inline-block h-2.5 w-20 animate-pulse rounded bg-[var(--bg-tertiary)] align-middle" aria-label={t("common.loading")} />}</p>
                     <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[11px] text-[var(--text-muted)]"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-4">
+                      <span className={inStock ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-rose-700 dark:text-rose-400"}>{t("admin.pos.ui.availableStock", { count: stockQuantity })}</span>
+                      <span className="text-amber-700 dark:text-amber-400">{t("admin.pos.ui.onHold")} {heldQuantity}</span>
+                    </div>
                     <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{formatMoney(variant.selling_price)}</p>
                     </div>
                   </article>
@@ -865,9 +889,10 @@ export default function PosPage() {
             </div>
           )}
 
-          {totalPages > 1 && (
-            <nav className="mt-4 flex items-center justify-between border-t border-[var(--border-color)] pt-3" aria-label={t("admin.pos.ui.productPages")}>
-              <span className="text-xs text-[var(--text-muted)]">{t("admin.pos.ui.page")} {currentPage} {t("admin.pos.ui.of")} {totalPages}</span>
+          {Number(productsPayload.pagination?.total) > 0 && (
+            <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] pt-3" aria-label={t("admin.pos.ui.productPages")}>
+              <span className="text-xs text-[var(--text-muted)]">{t("admin.pos.ui.showing")} {(currentPage - 1) * productPageSize + 1}-{Math.min(currentPage * productPageSize, Number(productsPayload.pagination?.total) || 0)} {t("admin.pos.ui.of")} {Number(productsPayload.pagination?.total) || 0}</span>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={productPageSize} onChange={(event) => { setProductPageSize(Number(event.target.value)); setCurrentPage(1); }} className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option><option value={50}>50</option></select></label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -885,6 +910,11 @@ export default function PosPage() {
                 >
                   {t("admin.pos.ui.next")}
                 </button>
+                <div className="flex items-center gap-1">{Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
+                  const first = Math.min(Math.max(1, currentPage - 2), Math.max(1, totalPages - 4));
+                  const page = first + index;
+                  return <button key={page} type="button" aria-current={page === currentPage ? "page" : undefined} onClick={() => setCurrentPage(page)} className={`h-8 min-w-8 rounded-md px-2 text-xs font-semibold ${page === currentPage ? "bg-blue-600 text-white" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{page}</button>;
+                })}</div>
               </div>
             </nav>
           )}
@@ -935,8 +965,9 @@ export default function PosPage() {
               </table>
             </div>
 
-            {historyPageCount > 1 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-slate-500">
-              <span>{t("admin.pos.ui.showing")} <strong className="font-semibold text-slate-700">{historySales.length ? (historyPage - 1) * HISTORY_PAGE_SIZE + 1 : 0}-{Math.min(historyPage * HISTORY_PAGE_SIZE, historySales.length)}</strong> {t("admin.pos.ui.of")} <strong className="font-semibold text-slate-700">{historySales.length}</strong> {t("admin.pos.ui.sales")}</span>
+            {historyTotal > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-slate-500">
+              <span>{t("admin.pos.ui.showing")} <strong className="font-semibold text-slate-700">{(historyPage - 1) * historyPageSize + 1}-{Math.min(historyPage * historyPageSize, historyTotal)}</strong> {t("admin.pos.ui.of")} <strong className="font-semibold text-slate-700">{historyTotal}</strong> {t("admin.pos.ui.sales")}</span>
+              <label className="flex items-center gap-2"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={historyPageSize} onChange={(event) => { setHistoryPageSize(Number(event.target.value)); setHistoryPage(1); }} className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-slate-700"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></label>
               <div className="flex items-center gap-1">
                 <button type="button" aria-label={t("admin.pos.ui.previousSalesPage")} disabled={historyPage <= 1} onClick={() => setHistoryPage((page) => page - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={15}/></button>
                 {Array.from({ length: historyPageCount }, (_, index) => index + 1).slice(Math.max(0, historyPage - 3), historyPage + 2).map((page) => <button key={page} type="button" aria-current={page === historyPage ? "page" : undefined} onClick={() => setHistoryPage(page)} className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition ${page === historyPage ? "bg-blue-600 text-white shadow-sm" : "border border-transparent text-slate-600 hover:border-slate-200 hover:bg-white"}`}>{page}</button>)}
@@ -944,7 +975,7 @@ export default function PosPage() {
               </div>
             </div>}
           </div> : activeView === "returns" ?
-            <PosReturnPanel sales={(historyQuery.data || []).filter((sale) => sale.status === "completed")} historySales={historyQuery.data || []} historyLoading={historyQuery.isLoading} historyError={historyQuery.isError} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={(id) => { setReturnSaleId(id); if (!id) setReturnQuantities({}); }} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
+            <PosReturnPanel sales={returnSalesQuery.data?.data || []} onSearchSales={setReturnSearch} historySales={returnSalesQuery.data?.data || []} historyLoading={returnSalesQuery.isLoading} historyError={returnSalesQuery.isError} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={(id) => { setReturnSaleId(id); if (!id) setReturnQuantities({}); }} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
           : <div>
             <div className="mb-4"><h2 className="text-lg font-extrabold text-slate-900">{t("admin.pos.ui.heldSales")}</h2><p className="mt-1 text-xs text-slate-500">{t("admin.pos.ui.savedCartsStayAvailableInThisBrowserUntilResumedOrRemoved")}</p></div>
             {heldCarts.length ? <div className="space-y-2">{heldCarts.map((held) => <article key={held.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Bookmark size={17}/></span><div className="min-w-0"><div className="truncate text-sm font-bold text-slate-900">{held.customer?.name || t("admin.pos.ui.walkInCustomer")} · {held.cart.length} {t("admin.pos.ui.items")}</div>{held.editingSaleNumber && <div className="mt-0.5 text-[10px] font-semibold text-blue-700">{t("admin.pos.ui.editDraftFor")} {held.editingSaleNumber} {t("admin.pos.ui.originalSaleUnchanged")}</div>}<div className="mt-1 text-xs text-slate-500">{new Date(held.createdAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })} · {formatMoney(held.cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0))}</div></div></div><div className="flex gap-2"><button type="button" onClick={() => resumeHeldCart(held, new Date().toISOString())} className="h-9 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">{t("admin.pos.ui.resumeSale")}</button><button type="button" onClick={() => setHeldCarts((current) => current.filter((item) => item.id !== held.id))} aria-label={t("admin.pos.ui.deleteHeldSale")} className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50"><Trash2 size={15}/></button></div></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center text-sm text-slate-500">{t("admin.pos.ui.noHeldSalesYetUseHoldInTheCartToSaveASaleForLater")}</div>}
@@ -959,7 +990,7 @@ export default function PosPage() {
               {itemCount > 0 && <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{itemCount}</span>}
             </h2>
             <div className="flex items-center gap-2">
-              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
+              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setAdditionalTaxRate("0"); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
               <button type="button" onClick={() => setCartDrawerOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] lg:hidden" aria-label={t("admin.pos.ui.closeCart")}><X size={18} /></button>
             </div>
           </div>
@@ -1006,9 +1037,9 @@ export default function PosPage() {
                     <FallbackImage nextImage src={item.image} alt={productNameOf(item) || item.product_name} fill unoptimized className="object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{productNameOf(item) || item.product_name}</p>
+                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{item.variant_title && item.variant_title !== "Default" ? item.variant_title : productNameOf(item) || item.product_name}</p>
                     <div className="flex min-w-0 items-center justify-between gap-1">
-                    <p className="min-w-0 truncate text-[10px] text-[var(--text-secondary)]">{item.variant_title}{item.sku ? ` · ${item.sku}` : ""}</p>
+                    <p className="min-w-0 truncate text-[10px] text-[var(--text-secondary)]">{productNameOf(item) || item.product_name}{item.sku ? ` · ${item.sku}` : ""}</p>
                     <div className="flex shrink-0 items-center gap-1">
                       <div className="flex h-6 items-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
                         <button type="button" onClick={() => changeQuantity(item.variant_id, -1)} className="flex h-full w-6 items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)]" aria-label={t("admin.pos.ui.decreaseQuantity")}><Minus size={12} /></button>
@@ -1084,12 +1115,16 @@ export default function PosPage() {
                 <span className="min-w-16 text-end font-medium">− {formatMoney(discount)}</span>
               </span>
             </label>
-            <div className="flex items-center justify-between px-1 py-1 text-xs">
-                <span className="text-[var(--text-secondary)]">
-                  {t("admin.pos.ui.tax2")}{Number(effectiveTaxRate.toFixed(2))}%)
+            <label className="flex items-center justify-between gap-2 px-1 py-1 text-xs">
+              <span className="shrink-0 text-[var(--text-secondary)]">{t("admin.pos.ui.tax2")}</span>
+              <span className="flex items-center gap-2">
+                <span className="relative block w-20">
+                  <input type="number" min="0" max="100" step="0.01" value={additionalTaxRate} onChange={(event) => setAdditionalTaxRate(event.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2 pe-6 text-end text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" aria-label={t("admin.pos.ui.tax2")} />
+                  <span className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-[10px] text-[var(--text-muted)]">%</span>
                 </span>
-              <span className="font-medium text-[var(--text-primary)]">{formatMoney(tax)}</span>
-            </div>
+                <span className="min-w-16 text-end font-medium text-[var(--text-primary)]">{formatMoney(tax)}</span>
+              </span>
+            </label>
             <div className="flex items-center justify-between border-t border-[var(--border-color)] px-1 pt-2 text-lg font-bold text-[var(--text-primary)]">
               <span>{t("admin.pos.ui.total")}</span>
               <span className="tabular-nums">{formatMoney(total)}</span>
