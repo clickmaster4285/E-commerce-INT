@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { brandApi } from "../../../../apis/admin/brandApi";
 import { productApi } from "../../../../apis/admin/productApi";
 import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { Country } from "country-state-city";
@@ -385,14 +386,32 @@ export default function BrandDetailPage() {
   const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
   const { data: brand, isLoading: loading } = useQuery({
-    queryKey: ["brand", brandId],
-    queryFn: () => brandApi.getById(brandId),
+    queryKey: ["brand", brandId, locale],
+    queryFn: () => brandApi.getById(brandId, locale),
     enabled: !!brandId,
   });
+  const brandTranslationsReady = usePageTranslations({
+    model: "Brand",
+    records: brand ? [brand] : [],
+    locale,
+    ready: !loading && !!brand,
+    queryKey: ["brand", brandId, locale],
+    queryClient,
+    fallbackAfterRetries: true,
+    alreadyTranslated: locale === "en" || !!(
+      brand?.translations?.name?.[locale]?.trim() &&
+      (!brand.description || brand.translations?.description?.[locale]?.trim())
+    ),
+  });
+  const brandNameIsReady = locale === "en" || brandTranslationsReady || Boolean(brand?.translations?.name?.[locale]?.trim());
+  const brandNameForDisplay = nameOf(brand);
+  const brandDescriptionForDisplay = locale === "en" || brandTranslationsReady || !brand?.description || brand?.translations?.description?.[locale]?.trim()
+    ? descriptionOf(brand)
+    : <span className="inline-block h-3 w-48 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-label={t("admin.brands.ui.loading")} />;
 
   const { data: brandProducts = [], isLoading: productsLoading } = useQuery({
-    queryKey: ["brand-products", brandId],
-    queryFn: () => productApi.getByBrand(brandId),
+    queryKey: ["brand-products", brandId, locale],
+    queryFn: () => productApi.getByBrand(brandId, locale),
     enabled: !!brandId,
   });
 
@@ -597,7 +616,7 @@ export default function BrandDetailPage() {
           <div className="flex min-w-0 items-start gap-3.5 xl:pr-5">
             {hasLogo ? (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
-                <FallbackImage src={logoSrc} alt={nameOf(brand)} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
+                <FallbackImage src={logoSrc} alt={brandNameIsReady ? brandNameForDisplay : ""} onError={() => setLogoFailed(true)} className="max-h-full max-w-full object-contain p-1.5" />
               </div>
             ) : (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px dashed var(--border-color)" }}>
@@ -606,13 +625,13 @@ export default function BrandDetailPage() {
             )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h2 className="text-[17px] leading-tight font-bold">{nameOf(brand)}</h2>
+                <h2 className="text-[17px] leading-tight font-bold">{brandNameIsReady ? brandNameForDisplay : <span className="inline-block h-4 w-32 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-hidden="true" />}</h2>
                 <StatusPill active={brand.is_active} t={t} />
               </div>
               <span className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>
                 {brand.brand_code || "—"}
               </span>
-              {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{descriptionOf(brand)}</p>}
+              {brand.description && <p className="mt-2 max-w-xl text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>{brandDescriptionForDisplay}</p>}
               <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
                 <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.country")}</span><strong style={{ ...dynamicTextStyle, color: "var(--text-primary)" }}>{localizedCountryName(brand.country) || "—"}</strong></span>
                 <span><span className="mr-1" style={dynamicTextStyle}>{t("admin.brands.detail.createdAt")}</span><strong style={{ ...ltrTextStyle, color: "var(--text-primary)" }}>{formatDateTime(brand.created_at, locale)}</strong></span>
@@ -715,7 +734,7 @@ export default function BrandDetailPage() {
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                   <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono dir="ltr" />
-                  <InfoRow label={t("admin.brands.detail.brandName")} value={nameOf(brand)} dir={isRtl ? "rtl" : "ltr"} />
+                  <InfoRow label={t("admin.brands.detail.brandName")} value={brandNameIsReady ? brandNameForDisplay : <span className="inline-block h-3 w-28 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-hidden="true" />} dir={isRtl ? "rtl" : "ltr"} />
                   <InfoRow label={t("admin.brands.detail.country")} value={localizedCountryName(brand.country) || "—"} dir={isRtl ? "rtl" : "ltr"} />
                   <InfoRow
                     label={t("admin.brands.detail.status")}
@@ -743,7 +762,7 @@ export default function BrandDetailPage() {
                       className="whitespace-pre-wrap break-words text-[12px] leading-5"
                       style={{ color: "var(--text-secondary)" }}
                     >
-                      {descriptionOf(brand)}
+                      {brandDescriptionForDisplay}
                     </p>
                   ) : (
                     <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
@@ -1033,7 +1052,7 @@ export default function BrandDetailPage() {
                       >
                         <FallbackImage
                           src={logoSrc}
-                          alt={nameOf(brand)}
+                          alt={brandNameIsReady ? brandNameForDisplay : ""}
                           onError={() => setLogoFailed(true)}
                           className="max-h-full max-w-full object-contain p-2"
                         />
@@ -1552,7 +1571,7 @@ export default function BrandDetailPage() {
                 <Ico d={D.warn} className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold">{t("admin.brands.ui.deleteOneTitle", { name: nameOf(brand) })}</h3>
+                <h3 className="text-[14px] font-semibold">{t("admin.brands.ui.deleteOneTitle", { name: brandNameIsReady ? brandNameForDisplay : "—" })}</h3>
                 <p className="mt-1 text-[11px] leading-5" style={{ color: "var(--text-muted)" }}>
                   {t("admin.brands.ui.deleteWarning")}
                 </p>

@@ -40,10 +40,42 @@ const ChevronDownIcon = ({ className = "w-4 h-4" }) => (
 const Spinner = ({ className = "w-4 h-4" }) => (
   <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
 );
+const BrandPageSkeleton = ({ count = 10, viewMode = "grid", loadingLabel }) => {
+  const cards = Array.from({ length: count }, (_, index) => (
+    <div key={index} className="animate-pulse rounded-lg border p-3 space-y-3" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+      <div className="flex items-center justify-between">
+        <div className="h-9 w-9 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+        <div className="h-5 w-14 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+      </div>
+      <div className="h-3 w-2/3 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+      <div className="h-3 w-1/3 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+      <div className="h-px" style={{ backgroundColor: "var(--border-color)" }} />
+      <div className="h-3 w-1/2 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} />
+    </div>
+  ));
+  return (
+    <div aria-busy="true" aria-label={loadingLabel}>
+      <span className="sr-only">{loadingLabel}</span>
+      {viewMode === "grid" ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2.5 sm:gap-3">{cards}</div>
+      ) : (
+        <>
+          <div className="hidden md:block rounded-lg border p-4 space-y-4" style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+            {Array.from({ length: count }, (_, index) => <div key={index} className="animate-pulse flex items-center gap-5"><div className="h-4 w-4 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} /><div className="h-4 w-24 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} /><div className="h-4 flex-1 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} /><div className="h-4 w-20 rounded" style={{ backgroundColor: "var(--bg-tertiary)" }} /></div>)}
+          </div>
+          <div className="md:hidden grid grid-cols-2 gap-2.5">{cards}</div>
+        </>
+      )}
+    </div>
+  );
+};
 const SortIndicator = ({ active, direction }) => (
   <svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
     {active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}
   </svg>
+);
+const BrandTextSkeleton = ({ className = "h-3 w-24" }) => (
+  <span aria-hidden="true" className={`inline-block animate-pulse rounded ${className}`} style={{ backgroundColor: "var(--bg-tertiary)" }} />
 );
 const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -83,11 +115,11 @@ const getLogoUrl = (brand) => {
   return "";
 };
 
-const Avatar = ({ brand, size = "w-8 h-8" }) => {
+const Avatar = ({ brand, size = "w-8 h-8", localizedNameReady = true }) => {
   const { nameOf } = useLocalized();
   const brandName = nameOf(brand);
   const logoUrl = getLogoUrl(brand);
-  return <FallbackImage src={logoUrl} alt={brandName} className={`${size} rounded-full object-contain shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
+  return <FallbackImage src={logoUrl} alt={localizedNameReady ? brandName : ""} className={`${size} rounded-full object-contain shrink-0`} style={{ border: "1px solid var(--border-color)" }} />;
 };
 
 const StatusBadge = ({ active }) => {
@@ -244,7 +276,12 @@ export default function BrandsPage() {
   const [editingBrand, setEditingBrand] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(locale, { useGrouping: false }),
+    [locale]
+  );
+  const formatPageNumber = (value) => numberFormatter.format(value);
 
   const [autoBrandCode, setAutoBrandCode] = useState("");
   const [loadingCode, setLoadingCode] = useState(false);
@@ -326,7 +363,7 @@ export default function BrandsPage() {
 
   const { data: paginatedBrandsData, isLoading: loading, isFetching, isError, error } = useQuery({
     // ✅ Server-side pagination — filters/search/sort/page sab backend par jate hain
-    queryKey: ["adminBrands", "paginated", currentPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction],
+    queryKey: ["adminBrands", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction],
     queryFn: () => adminBrandApi.getAllPaginated({
       page: currentPage,
       limit: itemsPerPage,
@@ -335,10 +372,9 @@ export default function BrandsPage() {
       country: filterCountry,
       sort: sortConfig.key || "",
       order: sortConfig.direction,
+      locale,
     }),
     retry: false,
-    // ✅ Page change par purana page visible rehta hai (flicker nahi)
-    placeholderData: (previousData) => previousData,
   });
 
   useEffect(() => {
@@ -413,7 +449,23 @@ export default function BrandsPage() {
   /* ---------- Derived data (server side paginated) ---------- */
   // ✅ Sirf current page ke brands aate hain backend se
   const brands = Array.isArray(paginatedBrandsData?.items) ? paginatedBrandsData.items : [];
-  usePageTranslations({ model: "Brand", records: brands, locale, ready: !isFetching && paginatedBrandsData?.pagination?.page === currentPage, queryKey: ["adminBrands", "paginated", currentPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction], queryClient });
+  const pageAlreadyTranslated = locale === "en" || (brands.length > 0 && brands.every((brand) => {
+    const selectedName = brand.translations?.name?.[locale];
+    const selectedDescription = brand.translations?.description?.[locale];
+    return typeof selectedName === "string" && selectedName.trim().length > 0 &&
+      (!brand.description?.trim() || (typeof selectedDescription === "string" && selectedDescription.trim().length > 0));
+  }));
+  const pageTranslationsReady = usePageTranslations({ model: "Brand", records: brands, locale, ready: !isFetching, queryKey: ["adminBrands", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction], queryClient, alreadyTranslated: pageAlreadyTranslated, fallbackAfterRetries: true });
+  const translatedBrandCount = brands.filter((brand) =>
+    typeof brand.translations?.name?.[locale] === "string" && brand.translations.name[locale].trim()
+  ).length;
+  // Keep skeletons only while at least 80% of the current page still lacks a
+  // complete translation. Once most entries are translating successfully,
+  // show the English source for the remaining entries instead of skeletons.
+  const pageMostlyUntranslated = locale !== "en" && brands.length > 0 && translatedBrandCount / brands.length <= 0.2;
+  const hasBrandNameTranslation = (brand) => locale === "en" || pageTranslationsReady || !pageMostlyUntranslated || (
+    typeof brand.translations?.name?.[locale] === "string" && brand.translations.name[locale].trim().length > 0
+  );
   const brandCounts = paginatedBrandsData?.counts || { total: 0, active: 0, inactive: 0, withLogo: 0 };
   const countries = Array.isArray(paginatedBrandsData?.countries) ? paginatedBrandsData.countries : [];
   const countryLabel = (name) => {
@@ -432,8 +484,9 @@ export default function BrandsPage() {
   const paginatedBrands = brands;                                  // current page (server se)
   const totalBrands = pagination.total || 0;                       // filtered total
   const totalPages = pagination.pages || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
+  const displayedPage = pagination.page || currentPage;
+  const startIndex = totalBrands > 0 ? (displayedPage - 1) * pagination.limit + 1 : 0;
+  const endIndex = Math.min(displayedPage * pagination.limit, totalBrands);
 
   // ✅ Search debounce (300ms) + page reset + selection clear
   // (setState setTimeout callback ke andar — effect body mein sync setState nahi)
@@ -512,7 +565,7 @@ export default function BrandsPage() {
     setSelectedIds([]);
   };
   const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages && page !== currentPage) {
+    if (page >= 1 && page <= totalPages && page !== displayedPage) {
       setCurrentPage(page);
       setSelectedIds([]); // ✅ cross-page selection clear
     }
@@ -793,9 +846,11 @@ export default function BrandsPage() {
 
         {/* ===== Loading / Empty / Table / Grid ===== */}
         {loading ? (
-          <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}>
-            <Spinner /> <span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.loading")}</span>
-          </div>
+          <BrandPageSkeleton
+            count={paginatedBrands.length || (loading ? itemsPerPage : Math.min(itemsPerPage, totalBrands)) || 1}
+            viewMode={viewMode}
+            loadingLabel={t("admin.brands.ui.loading")}
+          />
         ) : paginatedBrands.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" || filterCountry !== "all" ? t("admin.brands.ui.noMatch") : t("admin.brands.ui.noBrands")}</p>
@@ -822,14 +877,15 @@ export default function BrandsPage() {
                 <tbody>
                   {paginatedBrands.map((brand, index) => {
                     const isSelected = selectedIds.includes(brand._id);
+                    const localizedNameReady = hasBrandNameTranslation(brand);
                     return (
                       <tr key={brand._id} onClick={() => handleViewBrand(brand._id)} className="transition cursor-pointer" style={{ borderBottom: index < paginatedBrands.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "var(--bg-card)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = isSelected ? "var(--bg-tertiary)" : "var(--bg-card)")}>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => toggleSelect(brand._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5"><span className="text-[11px] sm:text-[13px] font-mono truncate max-w-[70px] sm:max-w-[100px] block" style={{ color: "var(--text-secondary)" }}>{brand.brand_code || "—"}</span></td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           <div className="flex items-center gap-2 sm:gap-2.5">
-                            <Avatar brand={brand} size="w-7 h-7 sm:w-8 sm:h-8" />
-                            <span className="font-medium text-[12px] sm:text-[13px] truncate max-w-[110px] sm:max-w-[140px]">{nameOf(brand)}</span>
+                            <Avatar brand={brand} size="w-7 h-7 sm:w-8 sm:h-8" localizedNameReady={localizedNameReady} />
+                            {localizedNameReady ? <span className="font-medium text-[12px] sm:text-[13px] truncate max-w-[110px] sm:max-w-[140px]">{nameOf(brand)}</span> : <BrandTextSkeleton className="h-3 w-28" />}
                           </div>
                         </td>
                         <td className="px-2 sm:px-4 py-2 sm:py-2.5 hidden lg:table-cell max-w-[200px]"><p className="truncate text-[13px]" style={{ color: "var(--text-muted)" }}>{descriptionOf(brand) || "—"}</p></td>
@@ -848,6 +904,7 @@ export default function BrandsPage() {
           <div className="md:hidden space-y-2.5">
             {paginatedBrands.map((brand) => {
               const isMobileSelected = selectedIds.includes(brand._id);
+              const localizedNameReady = hasBrandNameTranslation(brand);
               return (
                 <div
                   key={brand._id}
@@ -869,11 +926,9 @@ export default function BrandsPage() {
                       className="w-4 h-4 rounded cursor-pointer shrink-0"
                       style={{ accentColor: "var(--accent)" }}
                     />
-                    <Avatar brand={brand} />
+                    <Avatar brand={brand} localizedNameReady={localizedNameReady} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate leading-tight">
-                        {nameOf(brand)}
-                      </p>
+                      {localizedNameReady ? <p className="text-[13px] font-medium truncate leading-tight">{nameOf(brand)}</p> : <BrandTextSkeleton className="h-3 w-28" />}
                       <p
                         className="text-[11px] font-mono truncate mt-0.5"
                         style={{ color: "var(--text-secondary)" }}
@@ -905,14 +960,16 @@ export default function BrandsPage() {
           </>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
-            {paginatedBrands.map((brand) => (
+            {paginatedBrands.map((brand) => {
+              const localizedNameReady = hasBrandNameTranslation(brand);
+              return (
               <div key={brand._id} onClick={() => handleViewBrand(brand._id)} className="rounded-lg p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 transition hover:-translate-y-0.5 cursor-pointer" style={cardStyle}>
                 <div className="flex items-start justify-between gap-2">
-                  <Avatar brand={brand} size="w-9 h-9 sm:w-10 sm:h-10" />
+                  <Avatar brand={brand} size="w-9 h-9 sm:w-10 sm:h-10" localizedNameReady={localizedNameReady} />
                   <StatusBadge active={brand.is_active} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(brand)}</p>
+                  {localizedNameReady ? <p className="font-semibold text-[12px] sm:text-[13px] truncate">{nameOf(brand)}</p> : <BrandTextSkeleton className="h-3 w-28" />}
                   <p className="text-[10px] sm:text-[11px] font-mono mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>{brand.brand_code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-2 sm:pt-3 gap-1" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -920,35 +977,56 @@ export default function BrandsPage() {
                   <ActionButtons brand={brand} />
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        {/* ===== Pagination (server side) ===== */}
-        {totalBrands > 20 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
-              {t("admin.brands.ui.showingRange", { start: startIndex + 1, end: Math.min(endIndex, totalBrands), total: totalBrands })}
-              {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.brands.ui.updating")}</span> : null}
-            </p>
+        {/* ===== Server-side pagination ===== */}
+        {totalBrands > 10 && (
+          <div className="flex flex-col xl:flex-row items-center justify-between gap-3 rounded-lg p-4" style={cardStyle}>
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                {t("admin.brands.ui.showingRange", { start: formatPageNumber(startIndex), end: formatPageNumber(endIndex), total: formatPageNumber(totalBrands) })}
+                {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.brands.ui.updating")}</span> : null}
+              </p>
+              <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span>{t("admin.brands.ui.rowsPerPage")}</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(event) => {
+                    setItemsPerPage(Number(event.target.value));
+                    setCurrentPage(1);
+                    setSelectedIds([]);
+                  }}
+                  className="h-9 w-[100px] rounded-lg px-3 text-[13px] outline-none cursor-pointer"
+                  style={inputStyle}
+                >
+                  {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                </select>
+              </label>
+            </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.brands.ui.previousPage")}><ChevronLeftIcon className="w-4 h-4" /></button>
+              <button onClick={() => goToPage(displayedPage - 1)} disabled={displayedPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.brands.ui.previousPage")} aria-label={t("admin.brands.ui.previousPage")}><ChevronLeftIcon className="w-4 h-4" /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
-                      <button onClick={() => goToPage(page)} disabled={isFetching && currentPage !== page} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
+                      <button onClick={() => goToPage(page)} disabled={isFetching && displayedPage !== page} aria-label={t("admin.brands.ui.goToPage", { page: formatPageNumber(page) })} aria-current={displayedPage === page ? "page" : undefined} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: displayedPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: displayedPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${displayedPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{formatPageNumber(page)}</button>
                     )}
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.brands.ui.nextPage")}><ChevronRightIcon className="w-4 h-4" /></button>
+              <span className="sm:hidden text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                {t("admin.brands.ui.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}
+              </span>
+              <button onClick={() => goToPage(displayedPage + 1)} disabled={displayedPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.brands.ui.nextPage")} aria-label={t("admin.brands.ui.nextPage")}><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
         )}
-        {paginatedBrands.length > 0 && totalBrands <= 20 && (
+        {paginatedBrands.length > 0 && totalBrands <= 10 && (
           <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-            {t("admin.brands.ui.showingBrands", { count: paginatedBrands.length, total: totalBrands })}
+            {t("admin.brands.ui.showingBrands", { count: formatPageNumber(paginatedBrands.length), total: formatPageNumber(totalBrands) })}
             {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.brands.ui.updating")}</span> : null}
           </p>
         )}
@@ -1096,14 +1174,14 @@ export default function BrandsPage() {
                 <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: nameOf(deleteTarget.brands[0]) }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
+                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: hasBrandNameTranslation(deleteTarget.brands[0]) ? nameOf(deleteTarget.brands[0]) : "—" }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.deleteWarning")}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-4 p-2.5 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <Avatar brand={deleteTarget.brands[0]} size="w-8 h-8" />
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{nameOf(deleteTarget.brands[0])}</p>
+                <p className="text-sm font-medium truncate">{hasBrandNameTranslation(deleteTarget.brands[0]) ? nameOf(deleteTarget.brands[0]) : "—"}</p>
                 <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.brands.length === 1 ? deleteTarget.brands[0].brand_code || "—" : t("admin.brands.ui.moreCount", { count: deleteTarget.brands.length - 1 })}</p>
               </div>
             </div>

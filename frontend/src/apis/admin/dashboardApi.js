@@ -1,7 +1,7 @@
 import adminHttp from "../axiosInstance";
 export const dashboardApi = {
-  getStats: (range) =>
+  getStats: (params = {}) =>
     adminHttp
-      .get("/dashboard/stats", { params: { range } })
+      .get("/dashboard/stats", { params })
       .then((res) => res.data?.data || res.data),
 };

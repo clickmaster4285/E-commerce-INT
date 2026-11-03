@@ -8,6 +8,7 @@ const {
   createDiscount,
   getDiscounts,
   getDiscountById,
+  getDiscountTargets,
   updateDiscount,
   deleteDiscount,
   getPublicDiscounts,
@@ -31,6 +32,8 @@ router.get("/public", publicCache(60 * 1000), getPublicDiscounts);
 router.post("/", authMiddleware, dropDiscountsCache, createDiscount);
 
 router.get("/", authMiddleware, getDiscounts);
+
+router.get("/:id/targets", authMiddleware, getDiscountTargets);
 
 router.get("/:id", authMiddleware, getDiscountById);
 

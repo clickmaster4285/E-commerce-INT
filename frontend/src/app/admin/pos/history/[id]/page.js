@@ -105,7 +105,7 @@ export default function PosSaleDetailPage() {
   const { productNameOf } = useLocalized();
   const { data: sale, isLoading, isError } = useQuery({
     queryKey: ["pos-sale-detail", id],
-    queryFn: () => posApi.getSale(id),
+    queryFn: () => posApi.getSale(id, { locale }),
     enabled: Boolean(id),
   });
   const { data: storeInfo = {} } = useQuery({

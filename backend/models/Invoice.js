@@ -72,6 +72,9 @@ const invoiceSchema = new mongoose.Schema({
   
   // Snapshot Data (To keep invoice history safe even if customer details change later)
   customer_name: { type: String, required: true, trim: true },
+  translations: { customer_name: { type: Map, of: String, default: {} } },
+  translation_source: { customer_name: { type: String, default: "" } },
+  translation_status: { customer_name: { type: String, default: "pending" } },
   customer_email: { type: String, trim: true, lowercase: true, default: "" },
   customer_phone: { type: String, trim: true, default: "" },
   customer_address: { type: String, trim: true, default: "" },

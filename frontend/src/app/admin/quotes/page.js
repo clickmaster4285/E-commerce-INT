@@ -1,17 +1,19 @@
 "use client";import { useTranslation } from "@/i18n/LanguageProvider";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { quoteApi } from "@/apis/admin/quoteApi";
+import { localizedStrictField } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { toast } from "sonner";
 import {
   Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight,
   CircleX, Eye, FilePlus2, FileText, Home, MoreVertical, Pencil, Plus, Printer, Search, Send } from
 "lucide-react";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 10;
 const statuses = ["Pending", "Draft", "Sent", "Accepted", "Rejected"];
 const statusStyle = {
   Pending: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
@@ -34,50 +36,58 @@ export default function QuotesPage() {const { t, dir, locale } = useTranslation(
   const router = useRouter();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [customerType, setCustomerType] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selected, setSelected] = useState([]);
-  const { data: rawQuotes, isLoading, isError, refetch } = useQuery({ queryKey: ["quotes-admin"], queryFn: quoteApi.list });
-  const quotes = useMemo(() => Array.isArray(rawQuotes) ? rawQuotes : rawQuotes?.quotes || [], [rawQuotes]);
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return quotes.filter((quote) => {
-      const matchesStatus = status === "all" || quote.status === status;
-      const matchesType = customerType === "all" || quote.customer_type === customerType;
-      const haystack = [quote.quote_number, quote.customer_name, quote.customer_email, quote.customer_phone].filter(Boolean).join(" ").toLowerCase();
-      const matchesSearch = !term || haystack.includes(term);
-      const createdDate = new Date(quote.quote_date || quote.created_at).toISOString().slice(0, 10);
-      const matchesFrom = !dateFrom || createdDate >= dateFrom;
-      const matchesTo = !dateTo || createdDate <= dateTo;
-      return matchesStatus && matchesType && matchesSearch && matchesFrom && matchesTo;
-    }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }, [quotes, search, status, customerType, dateFrom, dateTo]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-  const statCards = useMemo(() => [
-  { label: "Total Quotes", value: quotes.length },
-  { label: "Sent", value: quotes.filter((quote) => quote.status === "Sent").length, valueColor: "var(--warning-text)" },
-  { label: "Accepted", value: quotes.filter((quote) => quote.status === "Accepted").length, valueColor: "var(--success-text)" },
-  { label: "Rejected", value: quotes.filter((quote) => quote.status === "Rejected").length, valueColor: "var(--danger-text)" }],
-  [quotes]);
+  const quoteQueryKey = ["quotes-admin", "paginated", locale, page, pageSize, debouncedSearch, status, customerType, dateFrom, dateTo];
+  const { data: quotesResponse, isLoading, isFetching, isError, refetch } = useQuery({
+    queryKey: quoteQueryKey,
+    queryFn: () => quoteApi.listPaginated({ page, limit: pageSize, search: debouncedSearch, status, customerType, dateFrom, dateTo, locale }),
+    retry: false,
+  });
+  const quotes = Array.isArray(quotesResponse?.data) ? quotesResponse.data : [];
+  const pagination = quotesResponse?.pagination || { total: 0, page, limit: pageSize, pages: 1 };
+  const currentPage = pagination.page || page;
+  const pages = Math.max(1, pagination.pages || 1);
+  const rows = quotes;
+  const quotesAlreadyTranslated = locale === "en" || (rows.length > 0 && rows.every((quote) => !quote.customer_name?.trim() || quote.translations?.customer_name?.[locale]?.trim()));
+  const quoteTranslationsReady = usePageTranslations({ model: "Quote", records: rows, locale, ready: !isFetching && pagination.page === page, queryKey: quoteQueryKey, queryClient: qc, alreadyTranslated: quotesAlreadyTranslated, fallbackAfterRetries: true });
+  const translatableQuoteCount = rows.filter((quote) => quote.customer_name?.trim()).length;
+  const untranslatedQuoteCount = rows.filter((quote) => quote.customer_name?.trim() && !quote.translations?.customer_name?.[locale]?.trim()).length;
+  const showQuoteTranslationSkeletons = locale !== "en" && translatableQuoteCount > 0 && untranslatedQuoteCount / translatableQuoteCount >= 0.8 && !quoteTranslationsReady;
+  const startIndex = pagination.total > 0 ? (currentPage - 1) * pagination.limit + 1 : 0;
+  const endIndex = Math.min(currentPage * pagination.limit, pagination.total);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pages);
-  const rows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => {
+    if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) setPage(pagination.page);
+  }, [pagination.page, page]);
+
+  const stats = quotesResponse?.stats || { total: 0, sent: 0, accepted: 0, rejected: 0 };
+  const statCards = [
+  { label: "Total Quotes", value: stats.total },
+  { label: "Sent", value: stats.sent, valueColor: "var(--warning-text)" },
+  { label: "Accepted", value: stats.accepted, valueColor: "var(--success-text)" },
+  { label: "Rejected", value: stats.rejected, valueColor: "var(--danger-text)" }];
+
   const allVisibleSelected = rows.length > 0 && rows.every((quote) => selected.includes(quote._id));
-  const pageStart = Math.max(1, Math.min(currentPage - 1, pages - 3));
-  const pageNumbers = Array.from({ length: Math.min(4, pages) }, (_, index) => pageStart + index);
+  const pageNumbers = pages <= 5
+    ? Array.from({ length: pages }, (_, index) => index + 1)
+    : currentPage <= 3 ? [1, 2, 3, 4, "...", pages]
+      : currentPage >= pages - 2 ? [1, "...", pages - 3, pages - 2, pages - 1, pages]
+        : [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", pages];
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, nextStatus }) => {
-      if (nextStatus === "Sent") {
-        const quote = quotes.find((item) => item._id === id);
-        return quoteApi.update(id, { ...quote, status: nextStatus });
-      }
-      return quoteApi.updateStatus(id, nextStatus);
-    },
+    mutationFn: ({ id, nextStatus }) => quoteApi.updateStatus(id, nextStatus),
     onSuccess: () => {toast.success("Quote status updated");qc.invalidateQueries({ queryKey: ["quotes-admin"] });},
     onError: (error) => toast.error(error?.response?.data?.message || "Could not update quote status")
   });
@@ -120,12 +130,22 @@ export default function QuotesPage() {const { t, dir, locale } = useTranslation(
             {isLoading ? <tr><td colSpan={9} className="px-3 py-10 text-center text-xs text-[var(--text-muted)]">{t("admin.quoteInvoice.ui.loading_quotes_1854d0c6")}</td></tr> :
             isError ? <tr><td colSpan={9} className="px-3 py-10 text-center text-xs text-[var(--danger-text)]">{t("admin.quoteInvoice.ui.could_not_load_quotes_67cc69a5")} <button type="button" onClick={retry} className="font-semibold underline">{t("admin.quoteInvoice.ui.retry_9f5cd8a2")}</button></td></tr> :
             !rows.length ? <tr><td colSpan={9} className="px-3 py-12 text-center"><span className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><FileText size={17} /></span><p className="text-xs font-semibold">{search || status !== "all" || customerType !== "all" || dateFrom || dateTo ? "No matching quotes" : "No quotes yet"}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search || status !== "all" || customerType !== "all" || dateFrom || dateTo ? "Try changing your search or filters." : "Create your first quote to share pricing with a customer."}</p>{!search && status === "all" && customerType === "all" && !dateFrom && !dateTo && <button type="button" onClick={() => router.push("/admin/quotes/new")} className="mt-3 inline-flex items-center gap-1 rounded-lg bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-semibold text-[var(--accent)]"><Plus size={12} /> {t("admin.quoteInvoice.ui.create_quote_b146a77e")}</button>}</td></tr> :
-            rows.map((quote) => <tr key={quote._id} onClick={() => router.push(`/admin/quotes/${quote._id}`)} className="cursor-pointer border-b border-[var(--border-color)] transition-colors duration-150 hover:bg-[var(--bg-row-hover)]"><td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.includes(quote._id)} onChange={() => setSelected((current) => current.includes(quote._id) ? current.filter((id) => id !== quote._id) : [...current, quote._id])} aria-label={`Select ${quote.quote_number}`} className="h-4 w-4 cursor-pointer rounded accent-blue-600" /></td><td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-semibold text-blue-600">{quote.quote_number}</td><td className="max-w-56 px-4 py-2.5"><p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{quote.customer_name}</p><p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{quote.customer_email || "No email"}</p><p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{quote.customer_phone || "No phone"}</p></td><td className="px-4 py-2.5"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${customerStyle[quote.customer_type] || customerStyle.Other}`}>{quote.customer_type || "Other"}</span></td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-secondary)]">{date(quote.quote_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-secondary)]">{date(quote.expiry_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)]">{money(quote.total)}</td><td className="px-4 py-2.5"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${statusStyle[quote.status] || statusStyle.Draft}`}>{quote.status}</span></td><td className="min-w-20 whitespace-nowrap px-2 py-2.5" onClick={(event) => event.stopPropagation()}><QuoteRowActions quote={quote} onView={() => router.push(`/admin/quotes/${quote._id}`)} onPrint={() => router.push(`/admin/quotes/${quote._id}?print=1`)} onEdit={() => router.push(`/admin/quotes/new?quote=${quote._id}`)} onConvert={() => router.push(`/admin/invoices/new?quote=${quote._id}`)} onSend={() => statusMutation.mutate({ id: quote._id, nextStatus: "Sent" })} onAccept={() => statusMutation.mutate({ id: quote._id, nextStatus: "Accepted" })} onReject={() => statusMutation.mutate({ id: quote._id, nextStatus: "Rejected" })} /></td></tr>)}
+            rows.map((quote) => <tr key={quote._id} onClick={() => router.push(`/admin/quotes/${quote._id}`)} className="cursor-pointer border-b border-[var(--border-color)] transition-colors duration-150 hover:bg-[var(--bg-row-hover)]"><td className="px-4 py-2.5" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected.includes(quote._id)} onChange={() => setSelected((current) => current.includes(quote._id) ? current.filter((id) => id !== quote._id) : [...current, quote._id])} aria-label={`Select ${quote.quote_number}`} className="h-4 w-4 cursor-pointer rounded accent-blue-600" /></td><td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs font-semibold text-blue-600">{quote.quote_number}</td><td className="max-w-56 px-4 py-2.5"><p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{showQuoteTranslationSkeletons && quote.customer_name?.trim() && !quote.translations?.customer_name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(quote.customer_name, quote.translations?.customer_name, locale)}</p><p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{quote.customer_email || "No email"}</p><p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">{quote.customer_phone || "No phone"}</p></td><td className="px-4 py-2.5"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${customerStyle[quote.customer_type] || customerStyle.Other}`}>{quote.customer_type || "Other"}</span></td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-secondary)]">{date(quote.quote_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-xs text-[var(--text-secondary)]">{date(quote.expiry_date)}</td><td className="whitespace-nowrap px-4 py-2.5 text-[13px] font-semibold text-[var(--text-primary)]">{money(quote.total)}</td><td className="px-4 py-2.5"><span className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${statusStyle[quote.status] || statusStyle.Draft}`}>{quote.status}</span></td><td className="min-w-20 whitespace-nowrap px-2 py-2.5" onClick={(event) => event.stopPropagation()}><QuoteRowActions quote={quote} onView={() => router.push(`/admin/quotes/${quote._id}`)} onPrint={() => router.push(`/admin/quotes/${quote._id}?print=1`)} onEdit={() => router.push(`/admin/quotes/new?quote=${quote._id}`)} onConvert={() => router.push(`/admin/invoices/new?quote=${quote._id}`)} onSend={() => statusMutation.mutate({ id: quote._id, nextStatus: "Sent" })} onAccept={() => statusMutation.mutate({ id: quote._id, nextStatus: "Accepted" })} onReject={() => statusMutation.mutate({ id: quote._id, nextStatus: "Rejected" })} /></td></tr>)}
           </tbody>
         </table>
       </div>
 
-      {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-[13px] text-[var(--text-muted)]"><span>{t("admin.quoteInvoice.ui.showing_163d8174")} {filtered.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0} {t("admin.quoteInvoice.ui.to_4374aaee")} {Math.min(currentPage * PAGE_SIZE, filtered.length)} {t("admin.quoteInvoice.ui.of_de04fa0e")} {filtered.length} {t("admin.quoteInvoice.ui.quotes_4d3ee087")}</span><nav aria-label={t("admin.quoteInvoice.ui.quotes_pagination_210ff1ec")} className="flex items-center gap-1"><button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.previous_page_81f54719")}><ChevronLeft size={14} /></button>{pageNumbers.map((pageNumber) => <button key={pageNumber} type="button" aria-current={currentPage === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)} className={`h-8 min-w-8 rounded-md border px-2 text-[13px] font-semibold transition ${currentPage === pageNumber ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/20" : "border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-blue-300 hover:text-blue-600"}`}>{pageNumber}</button>)}<button type="button" disabled={currentPage >= pages} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.next_page_4bfc194b")}><ChevronRight size={14} /></button></nav></footer>}
+      {pagination.total > 10 && <footer className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3 xl:flex-row">
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+          <span className="text-[12px] text-[var(--text-muted)]">{t("admin.shared.pagination.showingRange", { from: startIndex.toLocaleString(locale), to: endIndex.toLocaleString(locale), total: pagination.total.toLocaleString(locale) })}{isFetching && !isLoading ? <span className="ms-2 text-[var(--accent)]">{t("admin.brands.ui.updating")}</span> : null}</span>
+          <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); setSelected([]); }} className="h-9 w-[100px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[13px] text-[var(--text-primary)] outline-none"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
+        </div>
+        <nav aria-label={t("admin.quoteInvoice.ui.quotes_pagination_210ff1ec")} className="flex items-center gap-1.5">
+          <button type="button" disabled={currentPage <= 1 || isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.previous_page_81f54719")}><ChevronLeft size={14} /></button>
+          {pageNumbers.map((pageNumber, index) => pageNumber === "..." ? <span key={`ellipsis-${index}`} className="px-1 text-sm text-[var(--text-muted)]">…</span> : <button key={pageNumber} type="button" disabled={isFetching && currentPage !== pageNumber} aria-current={currentPage === pageNumber ? "page" : undefined} onClick={() => setPage(pageNumber)} className="flex h-8 min-w-[32px] items-center justify-center rounded-md border px-2 text-[13px] font-medium transition disabled:opacity-50" style={{ backgroundColor: currentPage === pageNumber ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === pageNumber ? "var(--accent-text)" : "var(--text-primary)", borderColor: currentPage === pageNumber ? "var(--accent)" : "var(--border-color)" }}>{pageNumber}</button>)}
+          <button type="button" disabled={currentPage >= pages || isFetching} onClick={() => setPage((value) => Math.min(pages, value + 1))} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40" aria-label={t("admin.quoteInvoice.ui.next_page_4bfc194b")}><ChevronRight size={14} /></button>
+        </nav>
+      </footer>}
     </section>
   </div>;
 }

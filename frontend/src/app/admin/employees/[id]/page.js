@@ -18,7 +18,9 @@ import {
   AlertCircle,
   User,
   Loader2,
+  ChevronLeft,
   ChevronDown,
+  ChevronRight,
   Pencil,
   X,
   Eye,
@@ -311,7 +313,6 @@ function EmployeeOverview({
   filteredPermissions,
   enabledCount,
   totalCount,
-  activities,
   canEditPermissions,
   setPermissionsData,
   setShowPermissionsModal,
@@ -369,15 +370,16 @@ function EmployeeOverview({
     totalCount ? Math.round((enabledCount / totalCount) * 100) : 0;
 
   const [activityFilter, setActivityFilter] = useState("all");
-
-  const activityCategories = Array.from(
-    new Set(activities.map((a) => a.category).filter(Boolean))
-  );
-
-  const visibleActivities =
-    activityFilter === "all"
-      ? activities
-      : activities.filter((a) => a.category === activityFilter);
+  const [activityPage, setActivityPage] = useState(1);
+  const [activityPageSize, setActivityPageSize] = useState(20);
+  const activityQuery = useQuery({
+    queryKey: ["employee-activities", employee?._id, activityFilter, activityPage, activityPageSize],
+    queryFn: () => employeeApi.getActivities(employee._id, { page: activityPage, limit: activityPageSize, category: activityFilter }),
+    enabled: Boolean(employee?._id),
+  });
+  const visibleActivities = activityQuery.data?.items || [];
+  const activityCategories = activityQuery.data?.categories || [];
+  const activityPagination = activityQuery.data?.pagination || { total: 0, page: 1, limit: activityPageSize, pages: 1 };
 
   return (
     <>
@@ -788,7 +790,7 @@ function EmployeeOverview({
                 className="text-[11px] font-semibold"
                 style={{ color: "var(--text-muted)" }}
               >
-                {t("admin.employees.detail.events", { count: activities.length })}
+                {t("admin.employees.detail.events", { count: activityPagination.total })}
               </span>
             </div>
           </div>
@@ -803,7 +805,7 @@ function EmployeeOverview({
                     <button
                       key={chip.value}
                       type="button"
-                      onClick={() => setActivityFilter(chip.value)}
+                      onClick={() => { setActivityFilter(chip.value); setActivityPage(1); }}
                       className="shrink-0 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-colors"
                       style={{
                         backgroundColor: activeChip ? "var(--accent-soft)" : "transparent",
@@ -823,7 +825,11 @@ function EmployeeOverview({
           )}
 
           <div className="custom-scrollbar max-h-[620px] min-h-[220px] flex-1 overflow-y-auto pr-1">
-            {visibleActivities.length ? (
+            {activityQuery.isLoading ? (
+              <div className="py-8 text-center text-xs" style={{ color: "var(--text-muted)" }}>{t("admin.employees.page.loading")}</div>
+            ) : activityQuery.isError ? (
+              <div className="py-8 text-center text-xs text-rose-600">{t("admin.employees.page.loadFailed")}</div>
+            ) : visibleActivities.length ? (
               visibleActivities.map((activity, index) => {
                 const colors = getActivityColor(activity.category);
                 const isLast = index === visibleActivities.length - 1;
@@ -910,6 +916,11 @@ function EmployeeOverview({
               </div>
             )}
           </div>
+          {activityPagination.total > activityPageSize && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs" style={{ borderColor: "var(--border-color)", color: "var(--text-muted)" }}>
+            <span>{new Intl.NumberFormat(employeeLocaleTag(locale)).format((activityPage - 1) * activityPageSize + 1)}–{new Intl.NumberFormat(employeeLocaleTag(locale)).format(Math.min(activityPage * activityPageSize, activityPagination.total))} / {new Intl.NumberFormat(employeeLocaleTag(locale)).format(activityPagination.total)}</span>
+            <label className="flex items-center gap-2"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={activityPageSize} onChange={(event) => { setActivityPageSize(Number(event.target.value)); setActivityPage(1); }} className="h-8 rounded-md border px-2" style={{ background: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
+            <div className="flex items-center gap-1"><button type="button" disabled={activityPage <= 1} onClick={() => setActivityPage((current) => current - 1)} className="flex h-8 w-8 items-center justify-center rounded-md border disabled:opacity-40" style={{ borderColor: "var(--border-color)" }} aria-label={t("admin.shared.pagination.prev")}><ChevronLeft className="h-4 w-4" /></button>{Array.from({ length: Math.min(activityPagination.pages, 5) }, (_, index) => Math.min(Math.max(1, activityPage - 2), Math.max(1, activityPagination.pages - 4)) + index).map((pageNumber) => <button key={pageNumber} type="button" aria-current={pageNumber === activityPage ? "page" : undefined} onClick={() => setActivityPage(pageNumber)} className="h-8 min-w-8 rounded-md border px-2" style={{ background: pageNumber === activityPage ? "var(--accent)" : "var(--bg-tertiary)", color: pageNumber === activityPage ? "var(--accent-text)" : "var(--text-primary)", borderColor: pageNumber === activityPage ? "var(--accent)" : "var(--border-color)" }}>{pageNumber}</button>)}<button type="button" disabled={activityPage >= activityPagination.pages} onClick={() => setActivityPage((current) => current + 1)} className="flex h-8 w-8 items-center justify-center rounded-md border disabled:opacity-40" style={{ borderColor: "var(--border-color)" }} aria-label={t("admin.shared.pagination.next")}><ChevronRight className="h-4 w-4" /></button></div>
+          </div>}
         </section>
       </div>
     </>
@@ -1184,6 +1195,7 @@ export default function EmployeeDetailPage() {
             queryKey: ["employees"],
           }
         );
+        await queryClient.invalidateQueries({ queryKey: ["employee-activities", employeeId] });
 
         toast.success(
           t("admin.employees.detail.updated")
@@ -1282,6 +1294,7 @@ export default function EmployeeDetailPage() {
             queryKey: ["employees"],
           }
         );
+        await queryClient.invalidateQueries({ queryKey: ["employee-activities", employeeId] });
 
         toast.success(
           t("admin.employees.detail.permissionsUpdated")
@@ -1589,10 +1602,6 @@ export default function EmployeeDetailPage() {
       employee.performanceRating ||
       0,
 
-    activities =
-      employee.activities ||
-      [],
-
     permissions =
       userData.permissions ||
       employee.permissions ||
@@ -1729,7 +1738,6 @@ export default function EmployeeDetailPage() {
         filteredPermissions={filteredPermissions}
         enabledCount={enabledCount}
         totalCount={totalCount}
-        activities={activities || []}
         canEditPermissions={canEditPermissions}
         setPermissionsData={setPermissionsData}
         setShowPermissionsModal={setShowPermissionsModal}

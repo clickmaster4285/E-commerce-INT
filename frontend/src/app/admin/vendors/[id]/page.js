@@ -90,8 +90,13 @@ export default function VendorDetailPage({ params }) {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyVendorForm);
 
-  const { data: detail, isLoading } = useQuery({ queryKey: ["vendor", id], queryFn: () => vendorApi.getWithPOs(id) });
-  usePageTranslations({ model: "Vendor", records: detail ? [detail] : [], locale, ready: !!detail && !isLoading, queryKey: ["vendor", id], queryClient: qc });
+  const { data: detail, isLoading } = useQuery({
+    // ✅ Locale query key me — slim detail response selected locale translations
+    // ke saath aata hai (brands/banner/orders detail ka pattern)
+    queryKey: ["vendor", id, locale],
+    queryFn: () => vendorApi.getWithPOs(id, locale),
+  });
+  usePageTranslations({ model: "Vendor", records: detail ? [detail] : [], locale, ready: !!detail && !isLoading, queryKey: ["vendor", id, locale], queryClient: qc });
   const vendorText = (field) => localizedStrictField(detail?.[field], detail?.translations?.[field], locale);
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["vendor", id] }); qc.invalidateQueries({ queryKey: ["vendors"] }); };
 
@@ -211,7 +216,7 @@ export default function VendorDetailPage({ params }) {
                         <tr key={p._id} style={{ borderBottom: "1px solid var(--border-color)" }}>
                           <td className="px-3 py-2"><Link href={`/admin/purchase-orders/${p._id}`} className="font-mono underline" style={{ color: "var(--accent)" }}>{p.po_number}</Link></td>
                           <td className="px-3 py-2" style={{ color: "var(--text-secondary)" }}>{fmtDate(p.created_at, locale)}</td>
-                          <td className="px-3 py-2">{p.items?.length || 0}</td>
+                          <td className="px-3 py-2">{p.items_count ?? p.items?.length ?? 0}</td>
                           <td className="px-3 py-2 font-semibold">{money(p.total, locale)}</td>
                           <td className="px-3 py-2">{money(p.paid_amount, locale)}</td>
                           <td className="px-3 py-2"><Pill tone={statusTone(p.status)}>{STATUS_LABEL[p.status] || p.status}</Pill></td>

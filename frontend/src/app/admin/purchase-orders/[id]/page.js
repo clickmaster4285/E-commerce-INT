@@ -90,21 +90,26 @@ export default function PODetailPage({ params }) {
   const [payAmount, setPayAmount] = useState("");
   const [cancelReason, setCancelReason] = useState("");
   const [showAllItems, setShowAllItems] = useState(false);
-  const { data: res, isLoading, isError, refetch } = useQuery({ queryKey: ["po", id], queryFn: () => purchaseOrderApi.getById(id) });
+  const { data: res, isLoading, isError, refetch } = useQuery({
+    // ✅ Locale query key me — slim detail response selected locale translations
+    // ke saath aata hai (brands/banner/orders/vendors detail ka pattern)
+    queryKey: ["po", id, locale],
+    queryFn: () => purchaseOrderApi.getById(id, locale),
+  });
   const po = res?.data || null;
-  usePageTranslations({ model: "PurchaseOrder", records: po ? [po] : [], locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  usePageTranslations({ model: "PurchaseOrder", records: po ? [po] : [], locale, ready: !!po && !isLoading, queryKey: ["po", id, locale], queryClient: qc });
   const poVendor = po?.vendor_id && typeof po.vendor_id === "object" ? po.vendor_id : null;
-  usePageTranslations({ model: "Vendor", records: poVendor?._id ? [poVendor] : [], locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  usePageTranslations({ model: "Vendor", records: poVendor?._id ? [poVendor] : [], locale, ready: !!po && !isLoading, queryKey: ["po", id, locale], queryClient: qc });
   const vendorText = (field) => localizedStrictField(poVendor?.[field] || po?.vendor_snapshot?.[field], poVendor?.translations?.[field], locale);
   const poProducts = useMemo(() => (po?.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id), [po]);
-  usePageTranslations({ model: "Product", records: poProducts, locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  usePageTranslations({ model: "Product", records: poProducts, locale, ready: !!po && !isLoading, queryKey: ["po", id, locale], queryClient: qc });
   const poVariants = useMemo(() => (po?.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id), [po]);
-  usePageTranslations({ model: "Variant", records: poVariants, locale, ready: !!po && !isLoading, queryKey: ["po", id], queryClient: qc });
+  usePageTranslations({ model: "Variant", records: poVariants, locale, ready: !!po && !isLoading, queryKey: ["po", id, locale], queryClient: qc });
   const taxBase = po ? Math.max(0, Number(po.subtotal || 0) - Number(po.discount || 0)) : 0;
   const overallTaxPercent = po?.overall_tax_rate != null
     ? Number(po.overall_tax_rate)
     : taxBase > 0 ? Number(po?.overall_tax || 0) / taxBase * 100 : 0;
-  const refresh = () => qc.invalidateQueries({ queryKey: ["po", id] });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["po", id, locale] });
   const useActionMutation = (fn, ok) => useMutation({ mutationFn: fn, onSuccess: () => { toast.success(ok); refresh(); }, onError: () => toast.error(t("admin.purchaseOrders.toast.updateFailed")) });
   const confirmM = useActionMutation(() => purchaseOrderApi.confirm(id), t("admin.purchaseOrders.toast.confirmed"));
   const cancelM = useActionMutation(() => purchaseOrderApi.cancel(id, cancelReason), t("admin.purchaseOrders.toast.cancelled"));

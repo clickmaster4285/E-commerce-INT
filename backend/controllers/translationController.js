@@ -12,11 +12,16 @@ const Order = require("../models/Order");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const Vendor = require("../models/Vendor");
 const ShippingMethod = require("../models/ShippingMethod");
+const Customer = require("../models/Customer");
+const Lead = require("../models/Lead");
+const Quote = require("../models/Quote");
+const Invoice = require("../models/Invoice");
+const Employee = require("../models/Employee");
 const { TARGET_LOCALES } = require("../utils/libreTranslate");
 const { syncDocumentTranslations } = require("../utils/translationService");
 
-const MODELS = { Brand, Category, Product, Discount, Deal, Attribute, Review, Banner, Variant, StockHistory, Order, PurchaseOrder, Vendor, ShippingMethod };
-const PERMISSIONS = { Brand: "brands", Category: "categories", Product: "products", Discount: "discounts", Deal: "deals", Attribute: "attribute", Review: "reviews", Banner: "banners", Variant: "manageStock", StockHistory: "manageStock", Order: "order", PurchaseOrder: "purchaseOrders", Vendor: "vendors", ShippingMethod: "shipping" };
+const MODELS = { Brand, Category, Product, Discount, Deal, Attribute, Review, Banner, Variant, StockHistory, Order, PurchaseOrder, Vendor, ShippingMethod, Customer, Lead, Quote, Invoice, Employee };
+const PERMISSIONS = { Brand: "brands", Category: "categories", Product: "products", Discount: "discounts", Deal: "deals", Attribute: "attribute", Review: "reviews", Banner: "banners", Variant: "manageStock", StockHistory: "manageStock", Order: "order", PurchaseOrder: "purchaseOrders", Vendor: "vendors", ShippingMethod: "shipping", Customer: "customers", Lead: "leads", Quote: "quotes", Invoice: "invoices", Employee: "employees" };
 
 async function translatePage(req, res) {
   const { model, ids, locale } = req.body || {};
@@ -34,7 +39,7 @@ async function translatePage(req, res) {
   try {
     const Model = MODELS[model];
     const docs = await Model.find({ _id: { $in: [...new Set(ids)] }, is_deleted: { $ne: true } })
-      .select("_id name description brand_id title comment storeResponse.message values translations translation_source translation_status eyebrow heading altText primaryButton.text secondaryButton.text notes cancel_reason product_name variant_title reason explanation company_name address city state country")
+      .select("_id name description department brand_id title comment storeResponse.message values translations translation_source translation_status eyebrow heading altText primaryButton.text secondaryButton.text notes cancel_reason product_name variant_title reason explanation company_name address city state country customer_name")
       .lean();
     let translated = 0;
     let failed = 0;

@@ -1,24 +1,31 @@
 import adminHttp from "../axiosInstance";
+// Server-side pagination must include pagination metadata; never fall back to
+// rendering an unbounded legacy response in the admin banner list.
+// (adminBrandApi.getAllPaginated ka exact pattern)
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
-  if (Array.isArray(d)) {
-    return {
-      items: d,
-      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
-    };
+  if (!Array.isArray(d?.data) || !d?.pagination) {
+    throw new Error("Banner list API did not return server-side pagination data.");
   }
   return {
-    items: Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [],
-    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+    items: d.data,
+    counts: d?.counts || { total: 0, active: 0, inactive: 0, scheduled: 0, expired: 0, draft: 0 },
+    bannerTypes: Array.isArray(d?.bannerTypes) ? d.bannerTypes : [],
+    positions: Array.isArray(d?.positions) ? d.positions : [],
+    pagination: d.pagination,
   };
 };
 
 export const bannerAPI = {
-  getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all", bannerType = "all" } = {}) => {
-    const params = { page, limit };
+  getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all", bannerType = "all", sort = "", order = "", locale = "en" } = {}) => {
+    const params = { page, limit, locale };
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (bannerType && bannerType !== "all") params.bannerType = bannerType;
+    if (sort) {
+      params.sort = sort;
+      params.order = order || "asc";
+    }
     return adminHttp.get("/banners", { params }).then((res) => paginated(res, limit));
   },
 
@@ -30,8 +37,8 @@ export const bannerAPI = {
       params: { page },
     }),
 
-  get: (id) =>
-    adminHttp.get(`/banners/${id}`),
+  get: (id, locale = "en") =>
+    adminHttp.get(`/banners/${id}`, { params: { locale } }),
 
   create: (data) =>
     adminHttp.post("/banners", data),

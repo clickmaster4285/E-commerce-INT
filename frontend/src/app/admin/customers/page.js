@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,8 @@ import { customerApi } from "@/apis/admin/customerApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { localizedStrictField } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { toast } from "sonner";
 import {
   CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, ContactRound, Eye, FilePlus2, Mail, MoreVertical, Pencil, Phone, Plus, Search,
@@ -23,31 +25,58 @@ export default function CustomersPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState("newest");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
 
-  const { data: customers = [], isLoading, isError, error } = useQuery({
-    queryKey: ["customers-admin", search],
-    queryFn: () => customerApi.getAll({ search }),
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  const customerQueryKey = ["customers-admin", "paginated", locale, page, pageSize, debouncedSearch, filter, sort];
+  const { data: customersResponse, isLoading, isFetching, isError, error } = useQuery({
+    queryKey: customerQueryKey,
+    queryFn: () => customerApi.getAllPaginated({ page, limit: pageSize, search: debouncedSearch, filter, sort, locale }),
+    retry: false,
   });
-  const customerList = useMemo(() => {
-    const filtered = (customers || []).filter((customer) => {
-      if (filter === "phone") return Boolean(customer.phone?.trim());
-      if (filter === "email") return Boolean(customer.email?.trim());
-      return true;
-    });
-    return [...filtered].sort((a, b) => {
-      const direction = sort === "oldest" ? 1 : -1;
-      return direction * (new Date(a.created_at || 0) - new Date(b.created_at || 0));
-    });
-  }, [customers, filter, sort]);
-  const pageSize = 20;
-  const pageCount = Math.max(1, Math.ceil(customerList.length / pageSize));
-  const pageCustomers = customerList.slice((page - 1) * pageSize, page * pageSize);
+  const customers = Array.isArray(customersResponse?.data) ? customersResponse.data : [];
+  const pageCustomers = customers;
+  const pagination = customersResponse?.pagination || { total: 0, page, limit: pageSize, pages: 1, hasNext: false, hasPrev: false };
+  const customersAlreadyTranslated = locale === "en" || (pageCustomers.length > 0 && pageCustomers.every((customer) => ["name", "address"].every((field) => !customer[field]?.trim() || customer.translations?.[field]?.[locale]?.trim())));
+  const customerTranslationsReady = usePageTranslations({ model: "Customer", records: pageCustomers, locale, ready: !isFetching && pagination.page === page, queryKey: customerQueryKey, queryClient: qc, alreadyTranslated: customersAlreadyTranslated, fallbackAfterRetries: true });
+  const customerTranslationFields = pageCustomers.flatMap((customer) => ["name", "address"].filter((field) => customer[field]?.trim()).map((field) => Boolean(customer.translations?.[field]?.[locale]?.trim())));
+  const untranslatedCustomerFieldCount = customerTranslationFields.filter((translated) => !translated).length;
+  const showCustomerTranslationSkeletons = locale !== "en" && customerTranslationFields.length > 0 && untranslatedCustomerFieldCount / customerTranslationFields.length >= 0.8 && !customerTranslationsReady;
+  const stats = customersResponse?.stats || { total: 0, newThisMonth: 0, withPhone: 0, withEmail: 0 };
+  const pageCount = pagination.pages || 1;
+  const displayedPage = pagination.page || page;
+  const startIndex = pagination.total > 0 ? (displayedPage - 1) * pagination.limit + 1 : 0;
+  const endIndex = Math.min(displayedPage * pagination.limit, pagination.total);
+
+  useEffect(() => {
+    if (Number.isInteger(pagination.page) && pagination.page > 0 && pagination.page !== page) {
+      setPage(pagination.page);
+    }
+  }, [pagination.page, page]);
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    if (pageCount <= 5) {
+      for (let number = 1; number <= pageCount; number += 1) pages.push(number);
+    } else if (displayedPage <= 3) pages.push(1, 2, 3, 4, "...", pageCount);
+    else if (displayedPage >= pageCount - 2) pages.push(1, "...", pageCount - 3, pageCount - 2, pageCount - 1, pageCount);
+    else pages.push(1, "...", displayedPage - 1, displayedPage, displayedPage + 1, "...", pageCount);
+    return pages;
+  };
 
   const saveMutation = useMutation({
     mutationFn: (payload) => editingId ? customerApi.update(editingId, payload) : customerApi.create(payload),
@@ -73,14 +102,6 @@ export default function CustomersPage() {
     onError: (error) => toast.error(error?.response?.data?.message || t("admin.customers.toast.deleteFailed")),
   });
 
-  const thisMonthCount = customers.filter((customer) => {
-    const created = new Date(customer.created_at);
-    const now = new Date();
-    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
-  }).length;
-  const phoneCount = customers.filter((customer) => customer.phone?.trim()).length;
-  const emailCount = customers.filter((customer) => customer.email?.trim()).length;
-
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -97,10 +118,10 @@ export default function CustomersPage() {
   };
 
   const statCards = [
-    { title: t("admin.customers.stats.total"), value: customers.length },
-    { title: t("admin.customers.stats.newThisMonth"), value: thisMonthCount, valueColor: "var(--success-text)" },
-    { title: t("admin.customers.stats.withPhone"), value: phoneCount, valueColor: "var(--accent)" },
-    { title: t("admin.customers.stats.withEmail"), value: emailCount, valueClass: "text-purple-500 dark:text-purple-300" },
+    { title: t("admin.customers.stats.total"), value: stats.total },
+    { title: t("admin.customers.stats.newThisMonth"), value: stats.newThisMonth, valueColor: "var(--success-text)" },
+    { title: t("admin.customers.stats.withPhone"), value: stats.withPhone, valueColor: "var(--accent)" },
+    { title: t("admin.customers.stats.withEmail"), value: stats.withEmail, valueClass: "text-purple-500 dark:text-purple-300" },
   ];
 
   return (
@@ -142,13 +163,13 @@ export default function CustomersPage() {
               <tbody>
                 {isLoading ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--text-muted)]">{t("admin.customers.loading")}</td></tr>
                   : isError ? <tr><td colSpan={6} className="px-3 py-9 text-center text-sm text-[var(--danger-text)]">{error?.response?.data?.message || t("admin.customers.loadFailed")} <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ["customers-admin"] })} className="ms-2 underline">{t("common.retry")}</button></td></tr>
-                  : customerList.length === 0 ? <tr><td colSpan={6} className="px-3 py-7"><div className="flex flex-col items-center justify-center text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={18} /></span><p className="text-xs font-semibold text-[var(--text-primary)]">{search ? t("admin.customers.empty.searchTitle") : t("admin.customers.empty.title")}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search ? t("admin.customers.empty.searchDescription") : t("admin.customers.empty.description")}</p><button type="button" onClick={() => search ? (setPage(1), setSearch("")) : openCreate()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[10px] font-semibold text-[var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">{search ? <><X size={12} /> {t("admin.customers.search.clear")}</> : <><Plus size={12} /> {t("admin.customers.add")}</>}</button></div></td></tr>
+                  : pagination.total === 0 ? <tr><td colSpan={6} className="px-3 py-7"><div className="flex flex-col items-center justify-center text-center"><span className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Users size={18} /></span><p className="text-xs font-semibold text-[var(--text-primary)]">{search ? t("admin.customers.empty.searchTitle") : t("admin.customers.empty.title")}</p><p className="mt-1 text-[10px] text-[var(--text-muted)]">{search ? t("admin.customers.empty.searchDescription") : t("admin.customers.empty.description")}</p><button type="button" onClick={() => search ? (setPage(1), setSearch("")) : openCreate()} className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-3 text-[10px] font-semibold text-[var(--accent)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">{search ? <><X size={12} /> {t("admin.customers.search.clear")}</> : <><Plus size={12} /> {t("admin.customers.add")}</>}</button></div></td></tr>
                     : pageCustomers.map((customer) => (
                       <tr key={customer._id} onClick={() => router.push(`/admin/customers/${customer._id}`)} className="cursor-pointer border-b border-[var(--border-color)] transition-colors duration-150 hover:bg-[var(--bg-row-hover)]">
-                        <td className="px-4 py-2.5 text-start"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]">{initials(customer.name)}</span><div className="min-w-0"><p className="max-w-40 truncate text-[13px] font-semibold text-[var(--text-primary)]">{customer.name}</p></div></div></td>
+                        <td className="px-4 py-2.5 text-start"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[10px] font-bold text-[var(--accent)]">{initials(localizedStrictField(customer.name, customer.translations?.name, locale))}</span><div className="min-w-0">{showCustomerTranslationSkeletons && customer.name?.trim() && !customer.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : <p className="max-w-40 truncate text-[13px] font-semibold text-[var(--text-primary)]">{localizedStrictField(customer.name, customer.translations?.name, locale)}</p>}</div></div></td>
                         <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]">{customer.phone || "—"}</td>
                         <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]"><span className="block max-w-48 truncate">{customer.email || "—"}</span></td>
-                        <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]"><span className="block max-w-40 truncate">{customer.address || "—"}</span></td>
+                        <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]"><span className="block max-w-40 truncate">{showCustomerTranslationSkeletons && customer.address?.trim() && !customer.translations?.address?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(customer.address, customer.translations?.address, locale) || "—"}</span></td>
                         <td className="px-4 py-2.5 text-start text-xs text-[var(--text-secondary)]">{dateTime(customer.created_at, locale, t)}</td>
                         <td className="px-2 py-2.5"><div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
                           <CustomerRowMenu dir={dir} customer={customer} onView={(record) => router.push(`/admin/customers/${record._id}`)} onEdit={openEdit} onDelete={(record) => { if (window.confirm(`Delete ${record.name}?`)) deleteMutation.mutate(record._id); }} onCreateQuote={(record) => router.push(`/admin/quotes/new?customer=${record._id}`)} onCreateInvoice={(record) => router.push(`/admin/invoices/new?customer=${record._id}`)} />
@@ -158,9 +179,17 @@ export default function CustomersPage() {
               </tbody>
             </table>
           </div>
-          {customerList.length > pageSize && <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)] px-4 py-3 text-[13px] text-[var(--text-muted)]">
-            <span>Showing {customerList.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, customerList.length)} of {customerList.length} customers</span>
-            <div className="flex items-center gap-1"><button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label="Previous page"><ChevronLeft size={13} /></button>{Array.from({ length: pageCount }, (_, index) => index + 1).slice(Math.max(0, page - 3), page + 2).map((pageNumber) => <button key={pageNumber} type="button" onClick={() => setPage(pageNumber)} className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${pageNumber === page ? "bg-[var(--accent)] text-[var(--accent-text)]" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{pageNumber}</button>)}<button type="button" disabled={page >= pageCount} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-[var(--border-color)] p-1.5 text-[var(--text-muted)] disabled:opacity-40" aria-label="Next page"><ChevronRight size={13} /></button></div>
+          {pagination.total > 10 && <footer className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3 xl:flex-row">
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+              <span className="text-[12px] text-[var(--text-muted)]">{t("admin.shared.pagination.showingRange", { from: startIndex.toLocaleString(locale), to: endIndex.toLocaleString(locale), total: pagination.total.toLocaleString(locale) })}{isFetching && !isLoading ? <span className="ms-2 text-[var(--accent)]">{t("admin.brands.ui.updating")}</span> : null}</span>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-9 w-[100px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[13px] text-[var(--text-primary)] outline-none"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={displayedPage === 1 || isFetching} onClick={() => setPage(displayedPage - 1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] text-[var(--text-primary)] transition disabled:cursor-not-allowed disabled:opacity-30" aria-label={t("admin.brands.ui.previousPage")}><ChevronLeft size={16} /></button>
+              <span className="hidden items-center gap-1 sm:inline-flex">{renderPageNumbers().map((pageNumber, index) => pageNumber === "..." ? <span key={`ellipsis-${index}`} className="px-2 text-sm text-[var(--text-muted)]">…</span> : <button key={pageNumber} type="button" disabled={isFetching && displayedPage !== pageNumber} onClick={() => setPage(pageNumber)} aria-current={displayedPage === pageNumber ? "page" : undefined} className="h-8 min-w-[32px] rounded-md border px-2 text-[13px] font-medium transition disabled:opacity-50" style={{ backgroundColor: displayedPage === pageNumber ? "var(--accent)" : "var(--bg-tertiary)", color: displayedPage === pageNumber ? "var(--accent-text)" : "var(--text-primary)", borderColor: displayedPage === pageNumber ? "var(--accent)" : "var(--border-color)" }}>{pageNumber}</button>)}</span>
+              <span className="text-xs text-[var(--text-secondary)] sm:hidden">{t("admin.shared.pagination.pageOf", { page: displayedPage.toLocaleString(locale), total: pageCount.toLocaleString(locale) })}</span>
+              <button type="button" disabled={displayedPage === pageCount || isFetching} onClick={() => setPage(displayedPage + 1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] text-[var(--text-primary)] transition disabled:cursor-not-allowed disabled:opacity-30" aria-label={t("admin.brands.ui.nextPage")}><ChevronRight size={16} /></button>
+            </div>
           </footer>}
         </section>
 

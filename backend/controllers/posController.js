@@ -7,6 +7,21 @@ const StockHistory = require("../models/StockHistory");
 
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const supportedLocales = new Set(["en", "ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"]);
+const getLocale = (value) => supportedLocales.has(String(value || "").toLowerCase()) ? String(value).toLowerCase() : "en";
+const getLocalizedName = (translations, locale) => {
+  const names = translations?.name;
+  return names instanceof Map ? names.get(locale) : names?.[locale];
+};
+const localizeProduct = (product, locale) => {
+  if (!product || typeof product !== "object") return product;
+  const translatedName = getLocalizedName(product.translations, locale);
+  return {
+    ...product,
+    ...(translatedName ? { translations: { name: { [locale]: translatedName } } } : { translations: undefined }),
+  };
+};
+
 const normalizeMoney = (value) => Math.max(0, Number(value) || 0);
 
 const generateNextSaleNumber = async () => {
@@ -22,13 +37,14 @@ const generateNextSaleNumber = async () => {
 
 const getPosProducts = async (req, res) => {
   try {
+    const locale = getLocale(req.query.locale);
     const search = String(req.query.search || "").trim();
     const category = String(req.query.category || "").trim();
     const brand = String(req.query.brand || "").trim();
     const stock = String(req.query.stock || "").trim();
     const sort = String(req.query.sort || "recent").trim();
     const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(30, Math.max(1, Number(req.query.limit) || 30));
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
     const productQuery = { is_deleted: { $ne: true }, status: "active" };
     const products = await Product.find(productQuery)
       .populate("category_id", "name")
@@ -77,7 +93,9 @@ const getPosProducts = async (req, res) => {
     }
 
     const total = matchingVariants.length;
-    const startIndex = (page - 1) * limit;
+    const totalPages = Math.max(1, Math.ceil(matchingVariants.length / limit));
+    const safePage = Math.min(page, totalPages);
+    const startIndex = (safePage - 1) * limit;
     const pageVariants = matchingVariants.slice(startIndex, startIndex + limit);
     const productsByPage = new Map();
     for (const variant of pageVariants) {
@@ -87,7 +105,7 @@ const getPosProducts = async (req, res) => {
         productsByPage.set(productKey, {
           _id: product._id,
           name: product.name,
-          translations: product.translations,
+          ...(locale === "en" ? {} : { translations: { name: getLocalizedName(product.translations, locale) ? { [locale]: getLocalizedName(product.translations, locale) } : {} } }),
           status: product.status,
           tax: Number(product.tax) || 0,
           category_name: product?.category_id?.name || "",
@@ -101,6 +119,7 @@ const getPosProducts = async (req, res) => {
         product_id: product._id,
         sku: variant.sku || "",
         title: variant.title || "Default",
+        ...(locale === "en" ? {} : { translations: { title: getLocalizedName({ name: variant.translations?.title }, locale) ? { [locale]: getLocalizedName({ name: variant.translations?.title }, locale) } : {} } }),
         selling_price: Number(variant.selling_price) || 0,
         quantity: Number(variant.quantity) || 0,
         status: variant.status || "active",
@@ -115,7 +134,7 @@ const getPosProducts = async (req, res) => {
       data: output,
       pagination: {
         total,
-        page,
+        page: safePage,
         limit,
         totalPages: Math.max(1, Math.ceil(total / limit) || 1),
       },
@@ -128,33 +147,70 @@ const getPosProducts = async (req, res) => {
 
 const getPosSales = async (req, res) => {
   try {
+    const locale = getLocale(req.query.locale);
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const search = String(req.query.search || "").trim();
+    const paymentMethod = String(req.query.paymentMethod || "").trim().toLowerCase();
+    const status = String(req.query.status || "").trim().toLowerCase();
+    const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom) : null;
+    const dateTo = req.query.dateTo ? new Date(req.query.dateTo) : null;
 
     const filter = {};
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
       filter.$or = [{ sale_number: regex }, { "customer_snapshot.name": regex }, { "customer_snapshot.phone": regex }];
+      const numericSearch = Number(search.replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(numericSearch) && numericSearch > 0) filter.$or.push({ total: numericSearch });
+      const dateSearch = new Date(search);
+      if (!Number.isNaN(dateSearch.getTime())) {
+        const start = new Date(dateSearch);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 1);
+        filter.$or.push({ created_at: { $gte: start, $lt: end } });
+      }
+    }
+    if (["cash", "card", "mobile_wallet", "bank_transfer"].includes(paymentMethod)) filter["payment.method"] = paymentMethod;
+    if (["completed", "cancelled"].includes(status)) filter.status = status;
+    if ((dateFrom && !Number.isNaN(dateFrom.getTime())) || (dateTo && !Number.isNaN(dateTo.getTime()))) {
+      filter.created_at = {};
+      if (dateFrom && !Number.isNaN(dateFrom.getTime())) filter.created_at.$gte = dateFrom;
+      if (dateTo && !Number.isNaN(dateTo.getTime())) filter.created_at.$lte = dateTo;
     }
 
     const total = await PosSale.countDocuments(filter);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let todayCount = 0;
+    let todayRevenue = 0;
+    if (req.query.includeSummary === "true") {
+      [todayCount, todayRevenue] = await Promise.all([
+        PosSale.countDocuments({ created_at: { $gte: today } }),
+        PosSale.aggregate([{ $match: { created_at: { $gte: today } } }, { $group: { _id: null, revenue: { $sum: "$total" } } }]).then((rows) => rows[0]?.revenue || 0),
+      ]);
+    }
     const sales = await PosSale.find(filter)
+      .select("sale_number customer_id customer_snapshot cashier_id cashier_name created_by_name items subtotal discount_amount tax_amount additional_tax_rate total payment status created_at edit_history notes")
       .populate("customer_id", "name phone email")
       .populate("cashier_id", "name email")
       .populate("items.product_id", "name translations")
       .populate("items.variant_id", "images quantity")
       .sort({ created_at: -1 })
-      .skip((page - 1) * limit)
+      .skip((safePage - 1) * limit)
       .limit(limit)
       .lean();
 
     const data = sales.map((sale) => ({
       ...sale,
+      edit_history: (sale.edit_history || []).slice(-1),
       items: (sale.items || []).map((item) => {
         const variant = item.variant_id && typeof item.variant_id === "object" ? item.variant_id : null;
         return {
           ...item,
+          product_id: localizeProduct(item.product_id, locale),
           product_image: item.product_image || variant?.images?.[0]?.img_url || "",
           available_stock: variant ? Number(variant.quantity) || 0 : 0,
           variant_id: variant?._id || item.variant_id,
@@ -162,7 +218,7 @@ const getPosSales = async (req, res) => {
       }),
     }));
 
-    res.status(200).json({ success: true, data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 } });
+    res.status(200).json({ success: true, data, pagination: { total, page: safePage, limit, totalPages }, summary: { todayCount, todayRevenue } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -170,6 +226,7 @@ const getPosSales = async (req, res) => {
 
 const getPosSaleById = async (req, res) => {
   try {
+    const locale = getLocale(req.query.locale);
     const sale = await PosSale.findById(req.params.id)
       .populate("customer_id", "name phone email address notes")
       .populate("cashier_id", "name email")
@@ -177,7 +234,59 @@ const getPosSaleById = async (req, res) => {
       .populate("items.variant_id", "images")
       .lean();
     if (!sale) return res.status(404).json({ success: false, message: "Sale not found" });
+    sale.items = (sale.items || []).map((item) => ({ ...item, product_id: localizeProduct(item.product_id, locale) }));
     res.status(200).json({ success: true, data: sale });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const getPosReturns = async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const search = String(req.query.search || "").trim();
+    const dateFrom = req.query.dateFrom ? new Date(req.query.dateFrom) : null;
+    const dateTo = req.query.dateTo ? new Date(req.query.dateTo) : null;
+    const match = {};
+    if (search) {
+      const regex = new RegExp(escapeRegex(search), "i");
+      match.$or = [
+        { sale_number: regex }, { "customer_snapshot.name": regex }, { "customer_snapshot.phone": regex },
+        { "returns.reason": regex }, { "returns.returned_by_name": regex },
+        { "returns.items.product_name": regex }, { "returns.items.sku": regex }, { "returns.items.variant_title": regex },
+      ];
+      const amount = Number(search.replace(/[^\d.-]/g, ""));
+      if (Number.isFinite(amount) && amount > 0) match.$or.push({ "returns.refund_total": amount });
+    }
+    const returnDate = {};
+    if (dateFrom && !Number.isNaN(dateFrom.getTime())) returnDate.$gte = dateFrom;
+    if (dateTo && !Number.isNaN(dateTo.getTime())) returnDate.$lte = dateTo;
+    const pipeline = [
+      { $unwind: "$returns" },
+      ...(Object.keys(match).length ? [{ $match: match }] : []),
+      ...(Object.keys(returnDate).length ? [{ $match: { "returns.returned_at": returnDate } }] : []),
+    ];
+    const [countRows, summaryRows] = await Promise.all([
+      PosSale.aggregate([...pipeline, { $count: "total" }]),
+      PosSale.aggregate([...pipeline, { $group: { _id: null, totalRefunded: { $sum: "$returns.refund_total" } } }]),
+    ]);
+    const total = countRows[0]?.total || 0;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const rows = await PosSale.aggregate([
+      ...pipeline,
+      { $sort: { "returns.returned_at": -1 } },
+      { $skip: (safePage - 1) * limit },
+      { $limit: limit },
+      { $project: {
+        _id: "$returns._id", returned_at: "$returns.returned_at", returned_by_name: "$returns.returned_by_name",
+        reason: "$returns.reason", refund_method: "$returns.refund_method", refund_total: "$returns.refund_total", items: "$returns.items",
+        _saleId: "$_id", _saleNumber: "$sale_number", _saleTotal: "$total", _salePayment: "$payment.method",
+        _customer: "$customer_snapshot", _cashier: { $ifNull: ["$returns.returned_by_name", "$cashier_name"] },
+      } },
+    ]);
+    res.status(200).json({ success: true, data: rows, pagination: { total, page: safePage, limit, totalPages }, summary: { totalRefunded: summaryRows[0]?.totalRefunded || 0 } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -591,6 +700,7 @@ module.exports = {
   getPosProducts,
   getPosSales,
   getPosSaleById,
+  getPosReturns,
   returnPosSaleItems,
   createPosSale,
   updatePosSale,

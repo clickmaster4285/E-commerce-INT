@@ -25,13 +25,17 @@ const getLineRefund = (sale, item, quantity) => {
   return Math.round(Math.max(0, lineGross - allocatedDiscount) / itemQuantity * quantity);
 };
 
-function SalePicker({ sales, value, onChange }) {
+function SalePicker({ sales, value, onChange, onSearchSales, selectedSale }) {
   const { t, locale } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const wrapperRef = useRef(null);
   const searchRef = useRef(null);
-  const selectedSale = sales.find((sale) => sale._id === value);
+  const selectedListSale = selectedSale || sales.find((sale) => sale._id === value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => onSearchSales?.(search), 250);
+    return () => window.clearTimeout(timer);
+  }, [search, onSearchSales]);
   const filteredSales = sales.filter((sale) => {
     const haystack = [sale.sale_number, sale.customer_snapshot?.name, sale.customer_snapshot?.phone, sale.payment?.method, sale.total, sale.created_at && new Date(sale.created_at).toLocaleDateString(locale)].filter(Boolean).join(" ").toLowerCase();
     return haystack.includes(search.trim().toLowerCase());
@@ -55,8 +59,8 @@ function SalePicker({ sales, value, onChange }) {
       <label className="mb-2 block text-xs font-semibold text-slate-700">{t("admin.pos.ui.originalSale")}</label>
       <div className={`flex h-12 w-full items-center gap-2 rounded-xl border bg-white px-3 transition ${open ? "border-blue-400 ring-2 ring-blue-50" : "border-slate-200 hover:border-blue-300"}`}>
         <Search size={16} className="shrink-0 text-slate-400" />
-        <input ref={searchRef} role="combobox" aria-label={t("admin.pos.ui.searchAndSelectOriginalSale")} aria-haspopup="listbox" aria-expanded={open} aria-controls="pos-return-sale-options" value={open ? search : selectedSale ? `${selectedSale.sale_number} · ${selectedSale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}` : ""} onFocus={() => { if (!open) { setSearch(""); setOpen(true); } }} onClick={() => { if (!open) { setSearch(""); setOpen(true); } }} onChange={(event) => { setSearch(event.target.value); if (!open) setOpen(true); }} onKeyDown={(event) => { if (event.key === "ArrowDown" && !open) { setSearch(""); setOpen(true); } }} placeholder={t("admin.pos.ui.searchSaleNumberCustomerPhoneDateOrAmount")} className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400" />
-        {selectedSale && <button type="button" aria-label="Clear selected sale" title="Clear selected sale" onClick={() => { onChange(""); setSearch(""); setOpen(false); }} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><X size={15}/></button>}
+        <input ref={searchRef} role="combobox" aria-label={t("admin.pos.ui.searchAndSelectOriginalSale")} aria-haspopup="listbox" aria-expanded={open} aria-controls="pos-return-sale-options" value={open ? search : selectedListSale ? `${selectedListSale.sale_number} · ${selectedListSale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}` : ""} onFocus={() => { if (!open) { setSearch(""); setOpen(true); } }} onClick={() => { if (!open) { setSearch(""); setOpen(true); } }} onChange={(event) => { setSearch(event.target.value); if (!open) setOpen(true); }} onKeyDown={(event) => { if (event.key === "ArrowDown" && !open) { setSearch(""); setOpen(true); } }} placeholder={t("admin.pos.ui.searchSaleNumberCustomerPhoneDateOrAmount")} className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:font-normal placeholder:text-slate-400" />
+        {selectedListSale && <button type="button" aria-label="Clear selected sale" title="Clear selected sale" onClick={() => { onChange(""); setSearch(""); onSearchSales?.(""); setOpen(false); }} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><X size={15}/></button>}
         <button type="button" aria-label={t("admin.pos.ui.searchAndSelectOriginalSale")} aria-haspopup="listbox" aria-expanded={open} onClick={() => { if (open) setOpen(false); else { setSearch(""); setOpen(true); } searchRef.current?.focus(); }} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`}/></button>
       </div>
       {open && <div className="absolute start-0 end-0 z-[90] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15 ring-1 ring-black/5">
@@ -76,7 +80,7 @@ function SalePicker({ sales, value, onChange }) {
   );
 }
 
-export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setReturnSaleId, returnQuantities, setReturnQuantities, returnNote, setReturnNote, returnMutation, historySales, historyLoading, historyError }) {
+export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setReturnSaleId, returnQuantities, setReturnQuantities, returnNote, setReturnNote, returnMutation, historySales, historyLoading, historyError, onSearchSales }) {
   const { t, locale } = useTranslation();
   const [reasonError, setReasonError] = useState(false);
   const reasonInputRef = useRef(null);
@@ -104,7 +108,7 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
       </header>
 
       <div className="space-y-4">
-        <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); setReasonError(false); }}/>
+        <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); setReasonError(false); }} onSearchSales={onSearchSales} selectedSale={selectedSale}/>
         {!selectedSale ? <PosReturnHistoryPanel sales={historySales || []} isLoading={historyLoading} isError={historyError} /> : <div className="space-y-4 bg-white dark:bg-[var(--bg-card)]">
           <div className="grid gap-x-8 gap-y-4 border-b border-slate-200 px-4 pb-4 pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
             ["receipt", selectedSale.sale_number, ClipboardList],

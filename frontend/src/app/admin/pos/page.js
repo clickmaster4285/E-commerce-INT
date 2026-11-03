@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { customerApi } from "@/apis/admin/customerApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import CustomerFormModal from "@/components/admin/CustomerFormModal";
@@ -240,6 +241,7 @@ export default function PosPage() {
   const [selectedStock, setSelectedStock] = useState("");
   const [selectedSort, setSelectedSort] = useState("recent");
   const [currentPage, setCurrentPage] = useState(1);
+  const [productPageSize, setProductPageSize] = useState(PAGE_SIZE);
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -264,11 +266,13 @@ export default function PosPage() {
   const [historyPayment, setHistoryPayment] = useState("all");
   const [historyRange, setHistoryRange] = useState("all");
   const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(HISTORY_PAGE_SIZE);
   const [expandedSaleId, setExpandedSaleId] = useState(null);
   const [editingSaleId, setEditingSaleId] = useState(null);
   const [editingSaleNumber, setEditingSaleNumber] = useState("");
   const [editingOriginalQuantities, setEditingOriginalQuantities] = useState({});
   const [returnSaleId, setReturnSaleId] = useState("");
+  const [returnSearch, setReturnSearch] = useState("");
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnNote, setReturnNote] = useState("");
 
@@ -300,43 +304,30 @@ export default function PosPage() {
     window.localStorage.setItem("admin-pos-held-carts", JSON.stringify(heldCarts));
   }, [heldCarts]);
 
+  const historyDateFilters = useMemo(() => {
+    const now = new Date();
+    if (historyRange === "all") return {};
+    const from = new Date(now);
+    if (historyRange === "today") from.setHours(0, 0, 0, 0);
+    if (historyRange === "7days") from.setDate(from.getDate() - 7);
+    if (historyRange === "30days") from.setDate(from.getDate() - 30);
+    return { dateFrom: from.toISOString(), dateTo: now.toISOString() };
+  }, [historyRange]);
   const historyQuery = useQuery({
-    queryKey: ["pos-sales-history"],
-    queryFn: async () => {
-      const firstPage = await posApi.getSales({ page: 1, limit: 50 });
-      const allSales = Array.isArray(firstPage.data) ? [...firstPage.data] : [];
-      const pages = Math.max(1, Number(firstPage.pagination?.totalPages) || 1);
-      for (let page = 2; page <= pages; page += 1) {
-        const response = await posApi.getSales({ page, limit: 50 });
-        if (Array.isArray(response.data)) allSales.push(...response.data);
-      }
-      return allSales;
-    },
-    enabled: activeView === "history" || activeView === "returns",
+    queryKey: ["pos-sales-history", historySearch, historyPayment, historyRange, historyPage, historyPageSize, locale],
+    queryFn: () => posApi.getSales({
+      page: historyPage, limit: historyPageSize, search: historySearch.trim(),
+      paymentMethod: historyPayment === "all" ? "" : historyPayment, ...historyDateFilters, locale,
+    }),
+    enabled: activeView === "history",
+    placeholderData: (previousData) => previousData,
   });
   const salesOverviewQuery = useQuery({
-    queryKey: ["pos-sales-overview"],
+    queryKey: ["pos-sales-overview", locale],
     queryFn: async () => {
-      const firstPage = await posApi.getSales({ page: 1, limit: 50 });
+      const firstPage = await posApi.getSales({ page: 1, limit: 1, includeSummary: true, locale });
       const totalTransactions = Number(firstPage.pagination?.total) || 0;
-      const pageCount = Math.max(1, Number(firstPage.pagination?.totalPages) || 1);
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      let todayCount = 0;
-      let todayRevenue = 0;
-      let pageData = Array.isArray(firstPage.data) ? firstPage.data : [];
-      for (let page = 1; page <= pageCount && pageData.length; page += 1) {
-        for (const sale of pageData) {
-          if (new Date(sale.created_at) >= startOfToday) {
-            todayCount += 1;
-            todayRevenue += Number(sale.total) || 0;
-          }
-        }
-        if (page === pageCount || pageData.some((sale) => new Date(sale.created_at) < startOfToday)) break;
-        const nextPage = await posApi.getSales({ page: page + 1, limit: 50 });
-        pageData = Array.isArray(nextPage.data) ? nextPage.data : [];
-      }
-      return { totalTransactions, todayCount, todayRevenue };
+      return { totalTransactions, todayCount: Number(firstPage.summary?.todayCount) || 0, todayRevenue: Number(firstPage.summary?.todayRevenue) || 0 };
     },
     staleTime: 30_000,
   });
@@ -346,23 +337,22 @@ export default function PosPage() {
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
-  const historySales = useMemo(() => {
-    const query = historySearch.trim().toLowerCase();
-    const now = new Date();
-    const from = historyRange === "today" ? new Date(now) : historyRange === "7days" ? new Date(now) : historyRange === "30days" ? new Date(now) : null;
-    if (historyRange === "today") from.setHours(0, 0, 0, 0);
-    if (historyRange === "7days") from.setDate(from.getDate() - 7);
-    if (historyRange === "30days") from.setDate(from.getDate() - 30);
-    return (historyQuery.data || []).filter((sale) => {
-      const method = String(sale.payment?.method || "cash").toLowerCase();
-      const saleDate = new Date(sale.created_at);
-      const matchesSearch = !query || [sale.sale_number, sale.customer_snapshot?.name, sale.customer_snapshot?.phone, method].filter(Boolean).join(" ").toLowerCase().includes(query);
-      return matchesSearch && (historyPayment === "all" || method === historyPayment) && (!from || (saleDate >= from && saleDate <= now));
-    });
-  }, [historyQuery.data, historySearch, historyPayment, historyRange]);
-  const historyPageCount = Math.max(1, Math.ceil(historySales.length / HISTORY_PAGE_SIZE));
-  const visibleHistorySales = historySales.slice((historyPage - 1) * HISTORY_PAGE_SIZE, historyPage * HISTORY_PAGE_SIZE);
-  const selectedReturnSale = (historyQuery.data || []).find((sale) => sale._id === returnSaleId) || null;
+  const historySales = Array.isArray(historyQuery.data?.data) ? historyQuery.data.data : [];
+  const historyTotal = Number(historyQuery.data?.pagination?.total) || 0;
+  const historyPageCount = Math.max(1, Number(historyQuery.data?.pagination?.totalPages) || 1);
+  const visibleHistorySales = historySales;
+  const selectedReturnQuery = useQuery({
+    queryKey: ["pos-sale-detail", returnSaleId, locale],
+    queryFn: () => posApi.getSale(returnSaleId, { locale }),
+    enabled: activeView === "returns" && Boolean(returnSaleId),
+  });
+  const selectedReturnSale = selectedReturnQuery.data || null;
+  const returnSalesQuery = useQuery({
+    queryKey: ["pos-return-sales", returnSearch, locale],
+    queryFn: () => posApi.getSales({ page: 1, limit: 20, search: returnSearch.trim(), status: "completed", locale }),
+    enabled: activeView === "returns",
+    placeholderData: (previousData) => previousData,
+  });
 
   const holdCart = () => {
     if (editingSaleId) { toast.error(t("admin.pos.toast.cannotHoldEditedSale")); return; }
@@ -453,8 +443,8 @@ export default function PosPage() {
     toast.info(t("admin.pos.toast.saleEditCancelled"));
   };
 
-  const { data: productsPayload = {}, isLoading: productsLoading, isError: productsError } = useQuery({
-    queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage],
+  const { data: productsPayload = {}, isLoading: productsLoading, isError: productsError, isPlaceholderData: productsPlaceholder } = useQuery({
+    queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale],
     queryFn: () => posApi.getProducts({
       search: search.trim(),
       category: selectedCategory,
@@ -462,21 +452,36 @@ export default function PosPage() {
       stock: selectedStock,
       sort: selectedSort,
       page: currentPage,
-      limit: PAGE_SIZE,
+      limit: productPageSize,
+      locale,
     }),
     placeholderData: (previousData) => previousData,
   });
   const products = Array.isArray(productsPayload.data) ? productsPayload.data : [];
   const variantCards = products.flatMap((product) =>
     (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({ product, variant })),
-  ).slice(0, PAGE_SIZE);
+  );
+  const posTranslationsReady = usePageTranslations({ model: "Product", records: products, locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (products.length > 0 && products.every((product) => Boolean(product.translations?.name?.[locale]?.trim()))), fallbackAfterRetries: true });
+  const posVariantsTranslationsReady = usePageTranslations({ model: "Variant", records: variantCards.map(({ variant }) => variant), locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (variantCards.length > 0 && variantCards.every(({ variant }) => !variant.title?.trim() || variant.title === "Default" || Boolean(variant.translations?.title?.[locale]?.trim()))), fallbackAfterRetries: true });
+  const posTranslationFields = variantCards.flatMap(({ product, variant }) => [
+    { source: product.name, translated: product.translations?.name?.[locale] },
+    { source: variant.title === "Default" ? "" : variant.title, translated: variant.translations?.title?.[locale] },
+  ]).filter(({ source }) => Boolean(String(source || "").trim()));
+  const posTranslatedFieldCount = posTranslationFields.filter(({ translated }) => Boolean(String(translated || "").trim())).length;
+  const posPageMostlyUntranslated = locale !== "en" && posTranslationFields.length > 0 && posTranslatedFieldCount / posTranslationFields.length <= 0.2;
+  const hasPosTranslation = (source, translated, ready) => locale === "en" || ready || !posPageMostlyUntranslated || Boolean(translated?.trim());
   const categoryOptions = productsPayload.filters?.categories || [];
   const brandOptions = productsPayload.filters?.brands || [];
   const totalPages = Math.max(1, Number(productsPayload.pagination?.totalPages) || 1);
 
+  useEffect(() => {
+    const safePage = Number(productsPayload.pagination?.page);
+    if (!productsPlaceholder && safePage && safePage !== currentPage) setCurrentPage(safePage);
+  }, [productsPayload.pagination?.page, currentPage, productsPlaceholder]);
+
   const customerResults = useQuery({
     queryKey: ["pos-customer-picker", customerSearch],
-    queryFn: () => customerApi.getAll({ search: customerSearch.trim() }),
+    queryFn: () => customerApi.search(customerSearch.trim()),
     enabled: customerOpen,
   });
 
@@ -655,7 +660,7 @@ export default function PosPage() {
 
   const returnMutation = useMutation({
     mutationFn: () => {
-      const sale = (historyQuery.data || []).find((item) => item._id === returnSaleId);
+      const sale = selectedReturnSale;
       if (!sale) throw new Error(t("admin.pos.validation.chooseSaleFirst"));
       if (!returnNote.trim()) throw new Error(t("admin.pos.validation.returnReasonRequired"));
       const items = (sale.items || []).map((item) => ({ variant_id: String(item.variant_id?._id || item.variant_id), quantity: Number(returnQuantities[String(item.variant_id?._id || item.variant_id)] || 0) })).filter((item) => item.quantity > 0);
@@ -665,6 +670,9 @@ export default function PosPage() {
       toast.success(t("admin.pos.toast.returnRecorded", { amount: formatMoney(result?.data?.refund_total || 0) }));
       setReturnQuantities({}); setReturnSaleId(""); setReturnNote("");
       queryClient.invalidateQueries({ queryKey: ["pos-sales-history"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-return-sales"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-returns-history"] });
+      queryClient.invalidateQueries({ queryKey: ["pos-sale-detail"] });
       queryClient.invalidateQueries({ queryKey: ["pos-products"] });
       queryClient.invalidateQueries({ queryKey: ["pos-sales-overview"] });
     },
@@ -866,8 +874,8 @@ export default function PosPage() {
                       {inStock && <span aria-hidden="true" title={t("admin.pos.ui.addToCart")} className="absolute bottom-2 end-2 flex h-7 w-7 scale-95 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 transition group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"><Plus size={15} strokeWidth={2.5}/></span>}
                     </div>
                     <div className={`min-w-0 ${viewMode === "list" ? "" : "p-2 pt-1.5 sm:p-2.5 sm:pt-1.5"}`}>
-                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-[var(--text-primary)]" title={variantName}>{variantName}</h3>
-                    <p className="truncate text-[10px] text-[var(--text-muted)]" title={productName}>{productName}</p>
+                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-[var(--text-primary)]" title={variantName}>{hasPosTranslation(variant.title === "Default" ? "" : variant.title, variant.translations?.title?.[locale], posVariantsTranslationsReady) ? (variant.translations?.title?.[locale] || variantName) : <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-[var(--bg-tertiary)] align-middle" aria-label={t("common.loading")} />}</h3>
+                    <p className="truncate text-[10px] text-[var(--text-muted)]" title={productName}>{hasPosTranslation(product.name, product.translations?.name?.[locale], posTranslationsReady) ? (productNameOf(product)) : <span className="inline-block h-2.5 w-20 animate-pulse rounded bg-[var(--bg-tertiary)] align-middle" aria-label={t("common.loading")} />}</p>
                     <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[11px] text-[var(--text-muted)]"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-4">
                       <span className={inStock ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-rose-700 dark:text-rose-400"}>{t("admin.pos.ui.availableStock", { count: stockQuantity })}</span>
@@ -881,9 +889,10 @@ export default function PosPage() {
             </div>
           )}
 
-          {totalPages > 1 && (
-            <nav className="mt-4 flex items-center justify-between border-t border-[var(--border-color)] pt-3" aria-label={t("admin.pos.ui.productPages")}>
-              <span className="text-xs text-[var(--text-muted)]">{t("admin.pos.ui.page")} {currentPage} {t("admin.pos.ui.of")} {totalPages}</span>
+          {Number(productsPayload.pagination?.total) > 0 && (
+            <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] pt-3" aria-label={t("admin.pos.ui.productPages")}>
+              <span className="text-xs text-[var(--text-muted)]">{t("admin.pos.ui.showing")} {(currentPage - 1) * productPageSize + 1}-{Math.min(currentPage * productPageSize, Number(productsPayload.pagination?.total) || 0)} {t("admin.pos.ui.of")} {Number(productsPayload.pagination?.total) || 0}</span>
+              <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={productPageSize} onChange={(event) => { setProductPageSize(Number(event.target.value)); setCurrentPage(1); }} className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option><option value={50}>50</option></select></label>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -901,6 +910,11 @@ export default function PosPage() {
                 >
                   {t("admin.pos.ui.next")}
                 </button>
+                <div className="flex items-center gap-1">{Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
+                  const first = Math.min(Math.max(1, currentPage - 2), Math.max(1, totalPages - 4));
+                  const page = first + index;
+                  return <button key={page} type="button" aria-current={page === currentPage ? "page" : undefined} onClick={() => setCurrentPage(page)} className={`h-8 min-w-8 rounded-md px-2 text-xs font-semibold ${page === currentPage ? "bg-blue-600 text-white" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{page}</button>;
+                })}</div>
               </div>
             </nav>
           )}
@@ -951,8 +965,9 @@ export default function PosPage() {
               </table>
             </div>
 
-            {historyPageCount > 1 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-slate-500">
-              <span>{t("admin.pos.ui.showing")} <strong className="font-semibold text-slate-700">{historySales.length ? (historyPage - 1) * HISTORY_PAGE_SIZE + 1 : 0}-{Math.min(historyPage * HISTORY_PAGE_SIZE, historySales.length)}</strong> {t("admin.pos.ui.of")} <strong className="font-semibold text-slate-700">{historySales.length}</strong> {t("admin.pos.ui.sales")}</span>
+            {historyTotal > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-slate-500">
+              <span>{t("admin.pos.ui.showing")} <strong className="font-semibold text-slate-700">{(historyPage - 1) * historyPageSize + 1}-{Math.min(historyPage * historyPageSize, historyTotal)}</strong> {t("admin.pos.ui.of")} <strong className="font-semibold text-slate-700">{historyTotal}</strong> {t("admin.pos.ui.sales")}</span>
+              <label className="flex items-center gap-2"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={historyPageSize} onChange={(event) => { setHistoryPageSize(Number(event.target.value)); setHistoryPage(1); }} className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-slate-700"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></label>
               <div className="flex items-center gap-1">
                 <button type="button" aria-label={t("admin.pos.ui.previousSalesPage")} disabled={historyPage <= 1} onClick={() => setHistoryPage((page) => page - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={15}/></button>
                 {Array.from({ length: historyPageCount }, (_, index) => index + 1).slice(Math.max(0, historyPage - 3), historyPage + 2).map((page) => <button key={page} type="button" aria-current={page === historyPage ? "page" : undefined} onClick={() => setHistoryPage(page)} className={`h-8 min-w-8 rounded-lg px-2 text-xs font-bold transition ${page === historyPage ? "bg-blue-600 text-white shadow-sm" : "border border-transparent text-slate-600 hover:border-slate-200 hover:bg-white"}`}>{page}</button>)}
@@ -960,7 +975,7 @@ export default function PosPage() {
               </div>
             </div>}
           </div> : activeView === "returns" ?
-            <PosReturnPanel sales={(historyQuery.data || []).filter((sale) => sale.status === "completed")} historySales={historyQuery.data || []} historyLoading={historyQuery.isLoading} historyError={historyQuery.isError} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={(id) => { setReturnSaleId(id); if (!id) setReturnQuantities({}); }} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
+            <PosReturnPanel sales={returnSalesQuery.data?.data || []} onSearchSales={setReturnSearch} historySales={returnSalesQuery.data?.data || []} historyLoading={returnSalesQuery.isLoading} historyError={returnSalesQuery.isError} selectedSale={selectedReturnSale} returnSaleId={returnSaleId} setReturnSaleId={(id) => { setReturnSaleId(id); if (!id) setReturnQuantities({}); }} returnQuantities={returnQuantities} setReturnQuantities={setReturnQuantities} returnNote={returnNote} setReturnNote={setReturnNote} returnMutation={returnMutation} />
           : <div>
             <div className="mb-4"><h2 className="text-lg font-extrabold text-slate-900">{t("admin.pos.ui.heldSales")}</h2><p className="mt-1 text-xs text-slate-500">{t("admin.pos.ui.savedCartsStayAvailableInThisBrowserUntilResumedOrRemoved")}</p></div>
             {heldCarts.length ? <div className="space-y-2">{heldCarts.map((held) => <article key={held.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Bookmark size={17}/></span><div className="min-w-0"><div className="truncate text-sm font-bold text-slate-900">{held.customer?.name || t("admin.pos.ui.walkInCustomer")} · {held.cart.length} {t("admin.pos.ui.items")}</div>{held.editingSaleNumber && <div className="mt-0.5 text-[10px] font-semibold text-blue-700">{t("admin.pos.ui.editDraftFor")} {held.editingSaleNumber} {t("admin.pos.ui.originalSaleUnchanged")}</div>}<div className="mt-1 text-xs text-slate-500">{new Date(held.createdAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })} · {formatMoney(held.cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0))}</div></div></div><div className="flex gap-2"><button type="button" onClick={() => resumeHeldCart(held, new Date().toISOString())} className="h-9 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">{t("admin.pos.ui.resumeSale")}</button><button type="button" onClick={() => setHeldCarts((current) => current.filter((item) => item.id !== held.id))} aria-label={t("admin.pos.ui.deleteHeldSale")} className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 text-red-500 hover:bg-red-50"><Trash2 size={15}/></button></div></article>)}</div> : <div className="rounded-xl border border-dashed border-slate-200 py-14 text-center text-sm text-slate-500">{t("admin.pos.ui.noHeldSalesYetUseHoldInTheCartToSaveASaleForLater")}</div>}

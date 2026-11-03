@@ -188,11 +188,75 @@ const buildInvoice = (body = {}) => {
   };
 };
 
-exports.listInvoices = async (_req, res) => {
+exports.listInvoices = async (req, res) => {
   try {
-    const invoices = (await Invoice.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean())
-      .map((invoice) => ({ ...invoice, original_total: getOriginalInvoiceTotal(invoice) }));
-    res.json({ success: true, data: invoices });
+    const filter = { is_deleted: false };
+    const search = String(req.query.search || "").trim();
+    if (search) {
+      const regex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [
+        { invoice_number: regex },
+        { customer_name: regex },
+        { customer_email: regex },
+        { customer_phone: regex },
+      ];
+    }
+    if (req.query.status && req.query.status !== "all") {
+      if (req.query.status === "Overdue") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        filter.status = { $in: ["Unpaid", "Partially Paid"] };
+        filter.due_date = { $lt: today };
+      } else {
+        filter.status = req.query.status;
+        if (req.query.status === "Unpaid") {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          filter.due_date = { $gte: today };
+        }
+      }
+    }
+    if (req.query.dateFrom || req.query.dateTo) {
+      filter.invoice_date = {};
+      if (req.query.dateFrom) filter.invoice_date.$gte = new Date(`${req.query.dateFrom}T00:00:00.000Z`);
+      if (req.query.dateTo) filter.invoice_date.$lte = new Date(`${req.query.dateTo}T23:59:59.999Z`);
+    }
+
+    const listFields = "_id invoice_number customer_name customer_phone invoice_date due_date total status sent_at amount_paid remaining_balance translations translation_source translation_status";
+    // Keep legacy full-list behavior for any non-paginated callers.
+    if (req.query.page === undefined) {
+      const invoices = (await Invoice.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean())
+        .map((invoice) => ({ ...invoice, original_total: getOriginalInvoiceTotal(invoice) }));
+      return res.json({ success: true, data: invoices });
+    }
+
+    const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 10;
+    const filteredTotal = await Invoice.countDocuments(filter);
+    const pages = Math.max(1, Math.ceil(filteredTotal / limit));
+    const page = Math.min(requestedPage, pages);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [invoices, total, paid, unpaid, overdue] = await Promise.all([
+      Invoice.find(filter).select(listFields).sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Invoice.countDocuments({ is_deleted: false }),
+      Invoice.countDocuments({ is_deleted: false, status: "Paid" }),
+      Invoice.countDocuments({ is_deleted: false, status: "Unpaid", due_date: { $gte: today } }),
+      Invoice.countDocuments({ is_deleted: false, status: { $in: ["Unpaid", "Partially Paid"] }, due_date: { $lt: today } }),
+    ]);
+    const locale = String(req.query.locale || "en").toLowerCase();
+    const localizedInvoices = invoices.map((invoice) => {
+      const values = invoice.translations?.customer_name;
+      const translated = values instanceof Map ? values.get(locale) : values?.[locale];
+      return { ...invoice, translations: { customer_name: translated ? { [locale]: translated } : {} } };
+    });
+    return res.json({
+      success: true,
+      data: localizedInvoices,
+      stats: { total, paid, unpaid, overdue },
+      pagination: { total: filteredTotal, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 },
+    });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 

@@ -24,8 +24,14 @@ export const dealApi = {
       },
     })),
 
-  getById: (id) =>
-    adminHttp.get(`/deals/${id}`).then((res) => res.data?.data || res.data),
+  getTargets: (id, params = {}) =>
+    adminHttp.get(`/deals/${id}/targets`, { params }).then((res) => ({
+      items: Array.isArray(res.data?.data) ? res.data.data : [],
+      pagination: res.data?.pagination || { total: 0, page: 1, limit: params.limit || 10, pages: 1, hasNext: false, hasPrev: false },
+    })),
+
+  getById: (id, params = {}) =>
+    adminHttp.get(`/deals/${id}`, { params }).then((res) => res.data?.data || res.data),
 
   create: (data) =>
     adminHttp.post("/deals", data).then((res) => res.data?.data || res.data),
