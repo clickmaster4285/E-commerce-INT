@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Expand, Loader2, MessageCircle, X } from "lucide-react";
@@ -69,19 +69,27 @@ export default function SupportChatWidget() {
     } catch { return null; }
   }, [savedPosition]);
   const position = dragPosition || parsedPosition;
+  // Don't apply a saved absolute point until the browser viewport has been
+  // measured. The server snapshot starts without dimensions; using raw saved
+  // coordinates in that window can place the launcher off-screen on first load.
   const visiblePosition = position && viewport.width && viewport.height ? {
-    x: Math.min(position.x, Math.max(8, viewport.width - 160)),
-    y: Math.min(position.y, Math.max(8, viewport.height - 64)),
-  } : position;
+    x: Math.max(8, Math.min(position.x, Math.max(8, viewport.width - 160))),
+    y: Math.max(8, Math.min(position.y, Math.max(8, viewport.height - 64))),
+  } : null;
   const positionStyle = visiblePosition ? { left: `${visiblePosition.x}px`, top: `${visiblePosition.y}px` } : undefined;
-  const placePopupAbove = Boolean(visiblePosition && viewport.height && visiblePosition.y > viewport.height / 2);
+  const defaultPopupAnchor = viewport.width && viewport.height ? {
+    x: Math.max(8, viewport.width - (viewport.width < 640 ? 60 : 160)),
+    y: Math.max(8, viewport.height - (viewport.width < 640 ? 128 : 72)),
+  } : null;
+  const popupAnchor = visiblePosition || defaultPopupAnchor;
+  const placePopupAbove = Boolean(popupAnchor && popupAnchor.y > viewport.height / 2);
   const popupWidth = viewport.width ? Math.min(384, viewport.width - 24) : 384;
-  const alignPopupRight = Boolean(visiblePosition && viewport.width && visiblePosition.x > viewport.width - popupWidth - 150);
-  const popupMaxHeight = viewport.height && visiblePosition
-    ? Math.max(160, Math.min(608, placePopupAbove ? visiblePosition.y - 16 : viewport.height - visiblePosition.y - 76))
+  const alignPopupRight = Boolean(popupAnchor && viewport.width && popupAnchor.x > viewport.width - popupWidth - 150);
+  const popupMaxHeight = viewport.height && popupAnchor
+    ? Math.max(160, Math.min(608, placePopupAbove ? popupAnchor.y - 16 : viewport.height - popupAnchor.y - 76))
     : undefined;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateViewport = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
     updateViewport();
     window.addEventListener("resize", updateViewport);
@@ -167,6 +175,7 @@ export default function SupportChatWidget() {
   const customerConversations = useMemo(() => customerChatsQuery.data || [], [customerChatsQuery.data]);
   const customerConversation = customerConversations.find((item) => String(item._id) === String(activeCustomerId)) || customerConversations.find((item) => item.status === "open") || customerConversations[0] || null;
   const activeConversation = user ? customerConversation : (guestConversation || guestConversationQuery.data?.conversation || null);
+  const isGuestSetup = !user && !guestToken && !activeConversation;
   const roomConversation = guestConversation || guestConversationQuery.data?.conversation;
   const unread = user
     ? customerConversations.reduce((count, item) => count + (Number(item.unread_customer_count) || 0), 0)
@@ -322,8 +331,8 @@ export default function SupportChatWidget() {
   const triggerOpen = () => { setOpen((value) => !value); setError(""); };
 
   return (
-    <div ref={widgetRef} style={positionStyle} className={`fixed z-50 ${position ? "" : "bottom-20 right-3 sm:bottom-6 sm:right-6"}`}>
-      {open && <section aria-label="Customer support chat" style={popupMaxHeight ? { maxHeight: `${popupMaxHeight}px` } : undefined} className={`absolute ${placePopupAbove ? "bottom-full mb-2" : "top-full mt-2"} ${alignPopupRight ? "right-0" : "left-0"} flex h-[min(40rem,calc(100dvh-2rem))] w-[min(24rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[0_18px_55px_rgba(0,0,0,0.28)]`}>
+    <div ref={widgetRef} style={positionStyle} className={`fixed z-50 ${visiblePosition ? "" : "bottom-20 right-3 sm:bottom-6 sm:right-6"}`}>
+      {open && <section aria-label="Customer support chat" style={popupMaxHeight ? { maxHeight: `${popupMaxHeight}px` } : undefined} className={`absolute ${placePopupAbove ? "bottom-full mb-2" : "top-full mt-2"} ${alignPopupRight ? "right-0" : "left-0"} flex ${isGuestSetup ? "h-auto max-h-[calc(100dvh-2rem)]" : "h-[min(40rem,calc(100dvh-2rem))]"} w-[min(24rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[0_18px_55px_rgba(0,0,0,0.28)]`}>
         <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/10 bg-[var(--user-accent)] px-4 text-[var(--user-accent-text)]">
           <div className="flex min-w-0 items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15"><MessageCircle size={18} /></span><span className="min-w-0"><span className="block text-sm font-semibold">Chat support</span><span className="block truncate text-[10px] opacity-80">{user ? user.name || "Your account" : "Guest support"}{activeConversation ? ` · ${activeConversation.status === "open" ? "Open" : "Closed"}` : ""}</span></span></div>
           <div className="flex shrink-0 items-center gap-1">
@@ -342,11 +351,11 @@ export default function SupportChatWidget() {
             : activeConversation ? <>
               <div className="min-h-0 flex-1"><ChatThread key={activeConversation._id} conversation={activeConversation} api={guestApi} socket={socket} compact guestToken={guestToken} cartItems={cartItems} allowOrder={false} onTopic={updateInquiry} onProducts={selectInquiryProducts} contextBusy={busy} /></div>
               {activeConversation.status === "closed" && <button onClick={reopenGuestChat} disabled={busy} className="m-3 inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-semibold text-[var(--user-accent-text)] disabled:opacity-60">Start a new chat</button>}
-            </> : <form onSubmit={startChat} className="flex min-h-0 flex-1 flex-col justify-center gap-3 overflow-y-auto p-4">
-              <div><h2 className="text-sm font-semibold text-[var(--user-text)]">Before you start</h2><p className="mt-1 text-xs leading-5 text-[var(--user-text-muted)]">Name and email are required so our support team can reply to you.</p></div>
-              <label className="text-xs font-medium text-[var(--user-text-secondary)]">Name<input required minLength={1} maxLength={80} autoComplete="name" value={guestName} onChange={(event) => setGuestName(event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-sm text-[var(--user-text)] outline-none focus:border-[var(--user-accent)]" placeholder="Your name" /></label>
-              <label className="text-xs font-medium text-[var(--user-text-secondary)]">Email<input required type="email" maxLength={254} autoComplete="email" value={guestEmail} onChange={(event) => setGuestEmail(event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-sm text-[var(--user-text)] outline-none focus:border-[var(--user-accent)]" placeholder="you@example.com" /></label>
-              <button type="submit" disabled={busy} className="mt-1 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-semibold text-[var(--user-accent-text)] disabled:opacity-60">{busy ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />}Continue to chat</button>
+            </> : <form onSubmit={startChat} className="flex flex-col gap-4 overflow-y-auto p-5">
+              <div><h2 className="text-base font-semibold text-[var(--user-text)]">Before you start</h2><p className="mt-1 text-xs leading-5 text-[var(--user-text-muted)]">Name and email are required so our support team can reply to you.</p></div>
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-[var(--user-text-secondary)]">Name<input required minLength={1} maxLength={80} autoComplete="name" value={guestName} onChange={(event) => setGuestName(event.target.value)} className="h-11 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-sm text-[var(--user-text)] outline-none transition focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15" placeholder="Your name" /></label>
+              <label className="flex flex-col gap-1.5 text-xs font-medium text-[var(--user-text-secondary)]">Email<input required type="email" maxLength={254} autoComplete="email" value={guestEmail} onChange={(event) => setGuestEmail(event.target.value)} className="h-11 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-sm text-[var(--user-text)] outline-none transition focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15" placeholder="you@example.com" /></label>
+              <button type="submit" disabled={busy} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-semibold text-[var(--user-accent-text)] shadow-sm transition hover:brightness-95 disabled:opacity-60">{busy ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />}Continue to chat</button>
             </form>}
 
         {error && <p role="alert" className="shrink-0 border-t border-[var(--user-danger)]/20 bg-[var(--user-danger)]/10 px-3 py-2 text-xs text-[var(--user-danger)]">{error}</p>}

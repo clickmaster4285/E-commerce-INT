@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Check, ChevronDown, Loader2, MessageCircle, Package, ShoppingCart, X } from "lucide-react";
 import { productApi } from "@/apis/user/productApi";
 import FallbackImage from "@/components/common/FallbackImage";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
 const getImageUrl = (url) => {
@@ -14,14 +15,10 @@ const getImageUrl = (url) => {
   return API_ORIGIN ? `${API_ORIGIN}${value.startsWith("/") ? value : `/${value}`}` : value;
 };
 
-const options = [
-  { value: "general", label: "General question" },
-  { value: "product", label: "A product" },
-  { value: "cart", label: "My cart" },
-  { value: "order", label: "An order" },
-];
+const options = ["general", "product", "cart", "order"];
 
 export default function InquiryTopicPicker({ conversation, orders = [], cartItems = [], allowOrder = true, busy = false, onTopic, onProducts, actions, fullPage = false, summary, menuMode = false, compact = false, maxMenuHeight, onDismiss, onSelectionChange, draftProducts = null, adminMode = false }) {
+  const { t } = useTranslation();
   const initial = adminMode ? "product" : conversation?.inquiry_type || (conversation?.order_id || conversation?.order?._id ? "order" : "general");
   const [pendingType, setPendingType] = useState(null);
   const [productSearch, setProductSearch] = useState("");
@@ -93,13 +90,13 @@ export default function InquiryTopicPicker({ conversation, orders = [], cartItem
       .filter((group) => group.variants.length && (!term || `${group.name} ${group.variants.map((variant) => `${variant.title} ${variant.sku}`).join(" ")}`.toLowerCase().includes(term)))
       .slice(0, 20);
   }, [cartItems, conversation?.order?.items, catalogQuery.data?.products, debouncedSearch]);
-  const visibleOptions = options.filter((option) => {
-    if (adminMode) return option.value === "product";
-    if (option.value === "order") return allowOrder && (orders.length > 0 || conversation?.order_id || conversation?.order?._id);
+  const visibleOptions = options.filter((value) => {
+    if (adminMode) return value === "product";
+    if (value === "order") return allowOrder && (orders.length > 0 || conversation?.order_id || conversation?.order?._id);
     if (option.value === "product") return true;
     return true;
   });
-  const menuOptions = visibleOptions.filter((option) => option.value !== "general");
+  const menuOptions = visibleOptions.filter((value) => value !== "general");
   useEffect(() => {
     if (type !== "product" || !productListOpen) return undefined;
     const closeOutside = (event) => { if (!pickerRef.current?.contains(event.target)) setProductListOpen(false); };
@@ -259,31 +256,31 @@ export default function InquiryTopicPicker({ conversation, orders = [], cartItem
     } : {}),
   };
 
-  if (menuMode) return <div ref={menuRef} role="dialog" aria-label="Choose message topic" style={menuStyle} className={`w-full max-h-[min(70dvh,30rem)] ${type === "product" ? "flex flex-col overflow-hidden" : "overflow-y-auto"} overscroll-contain border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3.5 shadow-[0_14px_38px_rgba(0,0,0,0.24)] sm:p-4`}>
-    {type === "product" && <div className="mb-1 flex shrink-0 items-center justify-end gap-1">{selectedProducts.length > 0 && <button type="button" onClick={commitProducts} disabled={busy} className="h-7 border border-[var(--user-accent)] bg-[var(--user-accent)] px-2.5 text-[10px] font-semibold text-[var(--user-accent-text)] transition hover:brightness-105 disabled:opacity-60">Done</button>}<button type="button" onClick={onDismiss} aria-label="Close product picker" className="flex h-7 w-7 items-center justify-center text-[var(--user-text-muted)] transition hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"><X size={16} /></button></div>}
+  if (menuMode) return <div ref={menuRef} role="dialog" aria-label={t("chat.ui.chooseTopic")} style={menuStyle} className={`w-full max-h-[min(70dvh,30rem)] ${type === "product" ? "flex flex-col overflow-hidden" : "overflow-y-auto"} overscroll-contain border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3.5 shadow-[0_14px_38px_rgba(0,0,0,0.24)] sm:p-4`}>
+    {type === "product" && <div className="mb-1 flex shrink-0 items-center justify-end gap-1">{selectedProducts.length > 0 && <button type="button" onClick={commitProducts} disabled={busy} className="h-7 border border-[var(--user-accent)] bg-[var(--user-accent)] px-2.5 text-[10px] font-semibold text-[var(--user-accent-text)] transition hover:brightness-105 disabled:opacity-60">{t("chat.picker.done")}</button>}<button type="button" onClick={onDismiss} aria-label={t("chat.ui.closeReferences")} className="flex h-7 w-7 items-center justify-center text-[var(--user-text-muted)] transition hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"><X size={16} /></button></div>}
     {type !== "product" && <div className="mb-3 flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0"><p className="text-sm font-semibold text-[var(--user-text)]">Add context</p><p className="mt-0.5 text-[11px] text-[var(--user-text-muted)]">Help support understand your question</p></div>
+        <div className="min-w-0"><p className="text-sm font-semibold text-[var(--user-text)]">{t("chat.picker.addContext")}</p><p className="mt-0.5 text-[11px] text-[var(--user-text-muted)]">{t("chat.picker.helper")}</p></div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button type="button" onClick={onDismiss} aria-label="Close context menu" className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--user-text-muted)] transition hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"><X size={16} /></button>
       </div>
     </div>}
     {type !== "product" && <div className={`grid gap-2.5 ${menuOptions.length > 2 ? "grid-cols-3" : "grid-cols-2"}`}>
-      {menuOptions.map((option) => {
-        const selected = type === option.value;
-        const Icon = option.value === "cart" ? ShoppingCart : Package;
-        const detail = option.value === "cart" ? "My cart" : option.value === "product" ? "Product" : "Order";
-        return <button key={option.value} type="button" aria-pressed={selected} onClick={() => chooseMenuTopic(option.value)} disabled={busy} className={`flex h-[4.5rem] min-w-0 flex-col items-center justify-center gap-1.5 border px-2 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--user-accent)] disabled:opacity-60 ${selected ? "border-[var(--user-accent)] bg-[var(--user-accent)]/10 text-[var(--user-accent)] shadow-sm" : "border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-bg-hover)]"}`}><span className={`flex h-7 w-7 items-center justify-center ${selected ? "bg-[var(--user-accent)] text-white" : "bg-[var(--user-accent)]/10 text-[var(--user-accent)]"}`}><Icon size={15} /></span><span className="text-xs font-semibold leading-none">{detail}</span></button>;
+      {menuOptions.map((value) => {
+        const selected = type === value;
+        const Icon = value === "cart" ? ShoppingCart : Package;
+        const detail = value === "cart" ? t("chat.picker.cart") : value === "product" ? t("chat.picker.product") : t("chat.picker.order");
+        return <button key={value} type="button" aria-pressed={selected} onClick={() => chooseMenuTopic(value)} disabled={busy} className={`flex h-[4.5rem] min-w-0 flex-col items-center justify-center gap-1.5 border px-2 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--user-accent)] disabled:opacity-60 ${selected ? "border-[var(--user-accent)] bg-[var(--user-accent)]/10 text-[var(--user-accent)] shadow-sm" : "border-[var(--user-border)] bg-[var(--user-bg-input)] text-[var(--user-text)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-bg-hover)]"}`}><span className={`flex h-7 w-7 items-center justify-center ${selected ? "bg-[var(--user-accent)] text-white" : "bg-[var(--user-accent)]/10 text-[var(--user-accent)]"}`}><Icon size={15} /></span><span className="text-xs font-semibold leading-none">{detail}</span></button>;
       })}
     </div>}
     {type === "product" && <div ref={pickerRef} className={`relative min-w-0 ${menuMode ? "flex min-h-0 flex-1 flex-col" : "mt-3"}`}>
-      <label className="block"><input aria-label="Search product variants" role="combobox" aria-expanded={productListOpen} aria-controls="chat-product-variant-options" aria-autocomplete="list" value={productListOpen ? productSearch : ""} onFocus={() => { setProductSearch(""); setProductListOpen(true); }} onChange={(event) => { setProductSearch(event.target.value); setProductListOpen(true); }} placeholder={selectedProducts.length ? "Search to add another variant" : "Search products or variants"} className="h-10 w-full min-w-0 border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-xs text-[var(--user-text)] outline-none placeholder:text-[var(--user-text-muted)] focus:border-[var(--user-accent)]" /></label>
+      <label className="block"><input aria-label={t("chat.picker.searchProducts")} role="combobox" aria-expanded={productListOpen} aria-controls="chat-product-variant-options" aria-autocomplete="list" value={productListOpen ? productSearch : ""} onFocus={() => { setProductSearch(""); setProductListOpen(true); }} onChange={(event) => { setProductSearch(event.target.value); setProductListOpen(true); }} placeholder={selectedProducts.length ? t("chat.picker.searchAnother") : t("chat.picker.searchProducts")} className="h-10 w-full min-w-0 border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-xs text-[var(--user-text)] outline-none placeholder:text-[var(--user-text-muted)] focus:border-[var(--user-accent)]" /></label>
       {selectedProducts.length > 0 && !menuMode && <div className={`mt-2 flex gap-1.5 ${fullPage ? "max-h-14 flex-wrap overflow-y-auto" : "flex-wrap"}`} aria-label="Selected product variants">{selectedProducts.map((item) => <span key={item.variantId} className="inline-flex max-w-full items-center gap-1 rounded-lg border border-[var(--user-accent)]/25 bg-[var(--user-accent)]/10 py-1 pl-2.5 pr-1.5 text-[10px] font-medium text-[var(--user-text)]"><span className="truncate">{item.productName} · {item.variantName}</span><button type="button" aria-label={`Remove ${item.productName} ${item.variantName}`} disabled={busy} onClick={() => removeProduct(item.variantId)} className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md text-[var(--user-text-muted)] hover:bg-[var(--user-bg-card)] hover:text-[var(--user-text)]"><X size={11} /></button></span>)}</div>}
       {productListOpen && <div id="chat-product-variant-options" role="listbox" aria-multiselectable="true" className={`${menuMode ? "relative mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain border border-[var(--user-border)] bg-[var(--user-bg-input)] p-1.5" : "absolute bottom-full left-0 right-0 z-[95] mb-1 max-h-56 overflow-y-auto overscroll-contain rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-1.5 shadow-xl"}`}>
-        {catalogQuery.isLoading && <div className="flex items-center gap-2 px-3 py-3 text-xs text-[var(--user-text-muted)]"><Loader2 size={14} className="animate-spin" />Searching products…</div>}
+        {catalogQuery.isLoading && <div className="flex items-center gap-2 px-3 py-3 text-xs text-[var(--user-text-muted)]"><Loader2 size={14} className="animate-spin" />{t("chat.picker.searching")}</div>}
         {catalogQuery.isError && <p role="alert" className="px-3 py-3 text-xs text-[var(--user-danger)]">Products could not be loaded. Please try searching again.</p>}
-        {!catalogQuery.isLoading && !catalogQuery.isError && productGroups.length === 0 && <p className="px-3 py-3 text-xs text-[var(--user-text-muted)]">No matching product variants found.</p>}
+        {!catalogQuery.isLoading && !catalogQuery.isError && productGroups.length === 0 && <p className="px-3 py-3 text-xs text-[var(--user-text-muted)]">{t("chat.picker.noMatches")}</p>}
         {productGroups.flatMap((product) => [...product.variants.values()].map((variant) => ({ product, variant }))).map(({ product, variant }) => {
           const selected = selectedProducts.some((item) => item.variantId === variant.id);
           return <button key={variant.id} type="button" role="option" aria-selected={selected} onClick={() => chooseProduct(product, variant)} disabled={busy || (!selected && selectedProducts.length >= 20)} className={`flex w-full items-center gap-3 border px-2 py-2 text-left transition disabled:opacity-50 ${selected ? "border-[var(--user-accent)] bg-[var(--user-accent)]/10" : "border-transparent hover:bg-[var(--user-bg-hover)]"}`}>

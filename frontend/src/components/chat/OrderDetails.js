@@ -1,13 +1,14 @@
 "use client";
 
 import { ChevronDown, Package2 } from "lucide-react";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString()}`;
 const humanize = (value) => String(value || "—").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-const dateLabel = (value) => {
-  if (!value) return "Date unavailable";
+const dateLabel = (value, locale = "en") => {
+  if (!value) return "";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 };
 const statusTone = (value) => {
   const status = String(value || "").toLowerCase();
@@ -19,6 +20,7 @@ const statusTone = (value) => {
 };
 
 export default function OrderDetails({ order, compact = false }) {
+  const { t, locale } = useTranslation();
   if (!order) return null;
   const address = order.address_snapshot || {};
   const addressLines = [
@@ -35,25 +37,25 @@ export default function OrderDetails({ order, compact = false }) {
       <summary className={`cursor-pointer list-none [&::-webkit-details-marker]:hidden ${compact ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2" : "flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5"}`}>
         <span className="flex min-w-0 items-center gap-2.5">
           <Package2 size={18} className="shrink-0 text-amber-700 dark:text-amber-400" />
-          <span className="min-w-0"><span className="block truncate text-[13px] font-bold text-slate-900 dark:text-slate-100">Order #{order.order_number || "—"}</span><span className="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400">{items.length} {items.length === 1 ? "item" : "items"} · {dateLabel(order.created_at)}</span></span>
+          <span className="min-w-0"><span className="block truncate text-[13px] font-bold text-slate-900 dark:text-slate-100">{t("chat.customer.orderNumber", { number: order.order_number || "—" })}</span><span className="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400">{items.length} {items.length === 1 ? t("chat.order.item") : t("chat.order.itemsPlural")} · {dateLabel(order.created_at, locale)}</span></span>
           {!compact && <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold capitalize ${statusTone(order.status)}`}>{humanize(order.status)}</span>}
         </span>
-        {compact ? <span className="flex flex-col items-end gap-1"><span className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{money(order.total)}</span><span className="flex items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold capitalize ${statusTone(order.status)}`}>{humanize(order.status)}</span><span className="flex items-center gap-0.5 text-[10px] font-medium text-blue-700 dark:text-sky-300">Details<ChevronDown size={13} className="transition-transform group-open:rotate-180" /></span></span></span> : <span className="flex items-center gap-3"><span className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{money(order.total)}</span><span className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-sky-300">Details<ChevronDown size={14} className="transition-transform group-open:rotate-180" /></span></span>}
+        {compact ? <span className="flex flex-col items-end gap-1"><span className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{money(order.total)}</span><span className="flex items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold capitalize ${statusTone(order.status)}`}>{humanize(order.status)}</span><span className="flex items-center gap-0.5 text-[10px] font-medium text-blue-700 dark:text-sky-300">{t("chat.order.details")}<ChevronDown size={13} className="transition-transform group-open:rotate-180" /></span></span></span> : <span className="flex items-center gap-3"><span className="text-[13px] font-bold text-slate-900 dark:text-slate-100">{money(order.total)}</span><span className="flex items-center gap-1 text-[11px] font-semibold text-blue-700 dark:text-sky-300">{t("chat.order.details")}<ChevronDown size={14} className="transition-transform group-open:rotate-180" /></span></span>}
       </summary>
 
       {compact ? <div className="space-y-2 px-3 pb-3">
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 border-b border-slate-200 pb-2 text-[10px] dark:border-slate-700">
-          <p className="truncate text-slate-500 dark:text-slate-400">Payment <span className="font-semibold text-slate-800 dark:text-slate-200">{paymentMethod}</span> · {humanize(order.payment?.status)}</p>
-          <p className="truncate text-slate-500 dark:text-slate-400">Delivery <span className="font-semibold text-slate-800 dark:text-slate-200">{humanize(order.shipping_method)}</span> · {money(order.shipping)}</p>
-          <p className="truncate text-slate-500 dark:text-slate-400">Subtotal <span className="font-semibold text-slate-800 dark:text-slate-200">{money(order.subtotal)}</span></p>
-          <p className="truncate text-slate-500 dark:text-slate-400">Tax <span className="font-semibold text-slate-800 dark:text-slate-200">{money(order.tax)}</span></p>
+          <p className="truncate text-slate-500 dark:text-slate-400">{t("chat.order.payment")} <span className="font-semibold text-slate-800 dark:text-slate-200">{paymentMethod}</span> · {humanize(order.payment?.status)}</p>
+          <p className="truncate text-slate-500 dark:text-slate-400">{t("chat.order.delivery")} <span className="font-semibold text-slate-800 dark:text-slate-200">{humanize(order.shipping_method)}</span> · {money(order.shipping)}</p>
+          <p className="truncate text-slate-500 dark:text-slate-400">{t("chat.order.subtotal")} <span className="font-semibold text-slate-800 dark:text-slate-200">{money(order.subtotal)}</span></p>
+          <p className="truncate text-slate-500 dark:text-slate-400">{t("chat.order.tax")} <span className="font-semibold text-slate-800 dark:text-slate-200">{money(order.tax)}</span></p>
         </div>
         <div>
-          <p className="mb-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">Items in this order</p>
-          {items.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{items.map((item, index) => <div key={`${item.product_id || item.name}-${index}`} className="flex min-w-0 items-center justify-between gap-3 py-1.5"><div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-800 dark:text-slate-200">{item.name || "Product"}</p><p className="truncate text-[10px] text-slate-500 dark:text-slate-400">{[item.brand, item.variantTitle].filter(Boolean).join(" · ") || "Item"}</p></div><div className="shrink-0 text-right"><p className="text-[10px] text-slate-500 dark:text-slate-400">{item.qty || 0} × {money(item.price)}</p><p className="text-[11px] font-semibold text-slate-900 dark:text-slate-100">{money(Number(item.qty || 0) * Number(item.price || 0))}</p></div></div>)}</div> : <p className="text-[11px] text-slate-500 dark:text-slate-400">No item details available.</p>}
+          <p className="mb-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">{t("chat.order.items")}</p>
+          {items.length ? <div className="divide-y divide-slate-200 dark:divide-slate-700">{items.map((item, index) => <div key={`${item.product_id || item.name}-${index}`} className="flex min-w-0 items-center justify-between gap-3 py-1.5"><div className="min-w-0"><p className="truncate text-[11px] font-semibold text-slate-800 dark:text-slate-200">{item.name || "Product"}</p><p className="truncate text-[10px] text-slate-500 dark:text-slate-400">{[item.brand, item.variantTitle].filter(Boolean).join(" · ") || t("chat.order.item")}</p></div><div className="shrink-0 text-right"><p className="text-[10px] text-slate-500 dark:text-slate-400">{item.qty || 0} × {money(item.price)}</p><p className="text-[11px] font-semibold text-slate-900 dark:text-slate-100">{money(Number(item.qty || 0) * Number(item.price || 0))}</p></div></div>)}</div> : <p className="text-[11px] text-slate-500 dark:text-slate-400">{t("chat.order.noItems")}</p>}
         </div>
         <details className="group/address border-t border-slate-200 pt-1.5 dark:border-slate-700">
-          <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-medium text-slate-600 dark:text-slate-300 [&::-webkit-details-marker]:hidden"><span>Delivery address · {address.full_name || "Unavailable"}</span><ChevronDown size={13} className="shrink-0 transition-transform group-open/address:rotate-180" /></summary>
+          <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-medium text-slate-600 dark:text-slate-300 [&::-webkit-details-marker]:hidden"><span>{t("chat.order.address")} · {address.full_name || t("chat.order.addressUnavailable")}</span><ChevronDown size={13} className="shrink-0 transition-transform group-open/address:rotate-180" /></summary>
           <div className="mt-1 space-y-0.5 text-[10px] text-slate-500 dark:text-slate-400">{addressLines.length ? addressLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>) : <p>Address details unavailable</p>}{address.phone && <p>{address.phone}</p>}</div>
         </details>
       </div> : <>
@@ -66,10 +68,10 @@ export default function OrderDetails({ order, compact = false }) {
 
       <div className="grid gap-3 px-4 pb-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.65fr)]">
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-[#16233b]">
-          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-700"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Order items</p><p className="text-[10px] text-slate-500 dark:text-slate-400">{items.length} {items.length === 1 ? "item" : "items"}</p></div>
-          {items.length ? <div className="max-h-36 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-700">{items.map((item, index) => <div key={`${item.product_id || item.name}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">{item.name || "Product"}</p><p className="mt-0.5 truncate text-[10px] text-slate-500 dark:text-slate-400">{[item.brand, item.variantTitle].filter(Boolean).join(" · ") || "Item"}</p></div><div className="shrink-0 text-right"><p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{item.qty || 0} × {money(item.price)}</p><p className="mt-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">{money(Number(item.qty || 0) * Number(item.price || 0))}</p></div></div>)}</div> : <p className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400">No item details available.</p>}
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-700"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("chat.order.items")}</p><p className="text-[10px] text-slate-500 dark:text-slate-400">{items.length} {items.length === 1 ? t("chat.order.item") : t("chat.order.itemsPlural")}</p></div>
+          {items.length ? <div className="max-h-36 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-700">{items.map((item, index) => <div key={`${item.product_id || item.name}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2"><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">{item.name || "Product"}</p><p className="mt-0.5 truncate text-[10px] text-slate-500 dark:text-slate-400">{[item.brand, item.variantTitle].filter(Boolean).join(" · ") || t("chat.order.item")}</p></div><div className="shrink-0 text-right"><p className="text-[11px] font-medium text-slate-600 dark:text-slate-300">{item.qty || 0} × {money(item.price)}</p><p className="mt-0.5 text-xs font-semibold text-slate-900 dark:text-slate-100">{money(Number(item.qty || 0) * Number(item.price || 0))}</p></div></div>)}</div> : <p className="px-3 py-3 text-xs text-slate-500 dark:text-slate-400">{t("chat.order.noItems")}</p>}
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-[#16233b]"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Delivery address</p><p className="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-200">{address.full_name || "Address unavailable"}</p><div className="mt-0.5 space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">{addressLines.length ? addressLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>) : <p>Address details unavailable</p>}{address.phone && <p>{address.phone}</p>}</div></div>
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-[#16233b]"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{t("chat.order.address")}</p><p className="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-200">{address.full_name || t("chat.order.addressUnavailable")}</p><div className="mt-0.5 space-y-0.5 text-[11px] text-slate-600 dark:text-slate-300">{addressLines.length ? addressLines.map((line, index) => <p key={`${line}-${index}`}>{line}</p>) : <p>{t("chat.order.addressUnavailable")}</p>}{address.phone && <p>{address.phone}</p>}</div></div>
       </div>
       </>}
     </details>
