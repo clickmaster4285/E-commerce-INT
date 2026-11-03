@@ -688,12 +688,111 @@ const buildAdminOrderFilter = ({
   return query;
 };
 
+// ==========================================
+// 🌐 LOCALE + SLIM HELPERS — admin orders (brand/banner admin lists ka pattern)
+//    Response me sirf FRONT data: populated product/variant ki sirf selected
+//    locale translation, aur internals (checkout_draft_id, address_id,
+//    translation_source/status, __v) payload se bahar.
+// ==========================================
+const parseOrderLocale = (value) => {
+  const requestedLocale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+};
+
+// ✅ Populated ref ki translations sirf selected locale tak trim karo
+const slimRefTranslations = (doc, field, locale) => {
+  if (!doc || locale === "en") return null;
+  const value = doc.translations?.[field]?.[locale];
+  if (typeof value !== "string" || !value.trim()) return null;
+  return { [field]: { [locale]: value } };
+};
+
+const slimOrderItem = (item, locale) => {
+  if (!item) return item;
+  return {
+    ...item,
+    ...(item.product_id && typeof item.product_id === "object"
+      ? {
+          product_id: {
+            _id: item.product_id._id,
+            name: item.product_id.name,
+            ...(slimRefTranslations(item.product_id, "name", locale) && {
+              translations: slimRefTranslations(item.product_id, "name", locale),
+            }),
+          },
+        }
+      : {}),
+    ...(item.variant_id && typeof item.variant_id === "object"
+      ? {
+          variant_id: {
+            _id: item.variant_id._id,
+            title: item.variant_id.title,
+            ...(slimRefTranslations(item.variant_id, "title", locale) && {
+              translations: slimRefTranslations(item.variant_id, "title", locale),
+            }),
+          },
+        }
+      : {}),
+  };
+};
+
+// ✅ Order ki notes/cancel_reason translations sirf selected locale ki
+const slimOrderTranslations = (order, locale) => {
+  if (locale === "en" || !order.translations) return null;
+  const out = {};
+  ["notes", "cancel_reason"].forEach((field) => {
+    const value = order.translations?.[field]?.[locale];
+    if (typeof value === "string" && value.trim()) out[field] = { [locale]: value };
+  });
+  return Object.keys(out).length ? out : {};
+};
+
+// ✅ List/detail rows me sirf wahi fields jate hain jo front par dikhte hain
+//    (table + mobile card + expand preview + detail page). createdby jaise
+//    internals + translation metadata response me leak nahi hoti.
+const mapFrontOrder = (order, locale) => ({
+  _id: order._id,
+  order_number: order.order_number,
+  user_id: order.user_id && typeof order.user_id === "object"
+    ? { _id: order.user_id._id, name: order.user_id.name, email: order.user_id.email, phone: order.user_id.phone }
+    : order.user_id ?? null,
+  items: (order.items || []).map((item) => slimOrderItem(item, locale)),
+  address_snapshot: order.address_snapshot,
+  shipping_method: order.shipping_method,
+  payment: { method: order.payment?.method, status: order.payment?.status },
+  subtotal: order.subtotal,
+  shipping: order.shipping,
+  tax: order.tax,
+  total: order.total,
+  status: order.status,
+  notes: order.notes ?? "",
+  cancel_reason: order.cancel_reason ?? "",
+  deal_ids: order.deal_ids,
+  bundle_ids: order.bundle_ids,
+  total_deal_savings: order.total_deal_savings,
+  total_bundle_savings: order.total_bundle_savings,
+  created_at: order.created_at,
+  updated_at: order.updated_at,
+  ...(slimOrderTranslations(order, locale) && { translations: slimOrderTranslations(order, locale) }),
+});
+
+// ✅ Server-side sorting whitelist — frontend sort key -> DB field
+const ORDER_SORT_FIELDS = {
+  order_number: "order_number",
+  customer: "address_snapshot.full_name",
+  total: "total",
+  payment: "payment.method",
+  status: "status",
+  created_at: "created_at",
+};
+
 // GET /api/orders/admin/all — Get All Orders (Admin Only)
 // ==========================================
 const getAllOrders = async (req, res) => {
   try {
     const { page = 1, limit = 15 } = req.query;
     const query = buildAdminOrderFilter(req.query);
+    const locale = parseOrderLocale(req.query.locale);
 
     // ✅ Invalid productId -> koi crash nahi, empty result + explicit flag
     //    (frontend "No orders found for this product." empty state dikhata hai)
@@ -702,32 +801,65 @@ const getAllOrders = async (req, res) => {
         success: true,
         data: [],
         invalidProductId: true,
-        pagination: { total: 0, page: 1, limit: Number(limit), totalPages: 0 },
+        counts: { total: 0, pending: 0, shipped: 0, delivered: 0, cancelled: 0 },
+        pagination: { total: 0, page: 1, limit: Number(limit) || 15, pages: 1, totalPages: 1, hasNext: false, hasPrev: false },
       });
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 15));
 
-    const [orders, total] = await Promise.all([
-      Order.find(query)
-        .populate("user_id", "name email phone")
-        .populate("items.product_id", "name translations")
-        .populate("items.variant_id", "title translations")
-        .sort({ created_at: -1 })
-        .skip(skip)
-        .limit(Number(limit))
-        .lean(),
-      Order.countDocuments(query)
-    ]);
+    // ✅ Sorting bhi server par hoti hai (whitelist ke ilawa koi custom field nahi).
+    //    Default: created_at desc (legacy jaisa) — ties par _id stable order.
+    const sortKeyRaw = String(req.query.sort || "").trim();
+    const hasSort = Boolean(ORDER_SORT_FIELDS[sortKeyRaw]);
+    const sortField = hasSort ? ORDER_SORT_FIELDS[sortKeyRaw] : "created_at";
+    const rawOrder = String(req.query.order || "").trim().toLowerCase();
+    const sortOrder = hasSort ? (rawOrder === "asc" ? 1 : -1) : -1;
+
+    const total = await Order.countDocuments(query);
+    const pages = Math.max(1, Math.ceil(total / limitNum));
+    const safePage = Math.min(pageNum, pages);
+
+    // ✅ Stat card counts — pehle 5 alag count queries jaisa behaviour:
+    //    sirf status + product filter, baaki filters counts me nahi lagte
+    const countsQuery = buildAdminOrderFilter({ productId: req.query.productId });
+
+    const [orders, totalOrders, pendingOrders, shippedOrders, deliveredOrders, cancelledOrders] =
+      await Promise.all([
+        Order.find(query)
+          .populate("user_id", "name email phone")
+          .populate("items.product_id", "name translations")
+          .populate("items.variant_id", "title translations")
+          .sort({ [sortField]: sortOrder, _id: 1 })
+          .skip((safePage - 1) * limitNum)
+          .limit(limitNum)
+          .lean(),
+        Order.countDocuments(countsQuery),
+        Order.countDocuments({ ...countsQuery, status: "pending" }),
+        Order.countDocuments({ ...countsQuery, status: "shipped" }),
+        Order.countDocuments({ ...countsQuery, status: "delivered" }),
+        Order.countDocuments({ ...countsQuery, status: "cancelled" }),
+      ]);
 
     res.status(200).json({
       success: true,
-      data: orders,
+      data: orders.map((order) => mapFrontOrder(order, locale)),
+      counts: {
+        total: totalOrders,
+        pending: pendingOrders,
+        shipped: shippedOrders,
+        delivered: deliveredOrders,
+        cancelled: cancelledOrders,
+      },
       pagination: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
+        page: safePage,
+        limit: limitNum,
+        pages,
+        totalPages: pages, // backward-compatible key
+        hasNext: safePage < pages,
+        hasPrev: safePage > 1,
       }
     });
   } catch (error) {
@@ -1076,9 +1208,12 @@ const deleteOrder = async (req, res) => {
 
 // ==========================================
 // GET /api/orders/admin/:id — Admin single order
+// getBanner/detail ka pattern: populate sirf display info ke liye, response me
+// sirf front + audit fields, aur translations sirf selected locale ki.
 // ==========================================
 const getOrderByIdAdmin = async (req, res) => {
   try {
+    const locale = parseOrderLocale(req.query.locale);
     const order = await Order.findById(req.params.id)
       .populate("user_id", "name email phone")
       .populate("items.product_id", "name translations")
@@ -1089,7 +1224,9 @@ const getOrderByIdAdmin = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    res.status(200).json({ success: true, data: order });
+    // ✅ mapFrontOrder sirf front-visible fields rakhta hai — checkout_draft_id,
+    //    address_id, translation_source/status, __v response me nahi jate.
+    res.status(200).json({ success: true, data: mapFrontOrder(order, locale) });
   } catch (error) {
     log.error("❌ [getOrderByIdAdmin] Error:", error);
     res.status(500).json({ success: false, message: error.message });

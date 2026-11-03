@@ -58,6 +58,13 @@ const buildBuckets = (start, end, bucket) => {
 const getDashboardStats = async (req, res) => {
   try {
     const rangeKey = RANGES[req.query.range] ? req.query.range : "7d";
+    const locale = /^[a-z]{2,3}$/i.test(String(req.query.locale || "en")) ? String(req.query.locale || "en").toLowerCase() : "en";
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 10));
+    const makePage = (total, requested) => {
+      const pages = Math.max(1, Math.ceil(total / limit));
+      const page = Math.min(pages, Math.max(1, Number.parseInt(requested, 10) || 1));
+      return { page, limit, total, pages, skip: (page - 1) * limit };
+    };
     const { days, format, bucket } = RANGES[rangeKey];
 
     const now = new Date();
@@ -172,9 +179,9 @@ const getDashboardStats = async (req, res) => {
     const [curItems, prevItems] = await Promise.all([itemAgg(baseMatch), itemAgg(prevMatch)]);
 
     const prevSoldMap = new Map(prevItems.map((r) => [String(r._id), r.sold]));
-    const topProductRows = curItems
-      .sort((a, b) => b.sold - a.sold)
-      .slice(0, 5);
+    const sortedTopProductRows = curItems.sort((a, b) => b.sold - a.sold);
+    const topProductsPagination = makePage(sortedTopProductRows.length, req.query.topProductsPage);
+    const topProductRows = sortedTopProductRows.slice(topProductsPagination.skip, topProductsPagination.skip + limit);
     const topProductCatalog = topProductRows.length
       ? await Product.find({ _id: { $in: topProductRows.map((row) => row._id).filter(Boolean) } })
           .select("name translations.name")
@@ -186,9 +193,10 @@ const getDashboardStats = async (req, res) => {
         return [String(product._id), {
           name: product.name,
           translations: {
-            name: nameTranslations instanceof Map
-              ? Object.fromEntries(nameTranslations)
-              : nameTranslations?.toObject?.() || nameTranslations || {},
+            name: (() => {
+              const values = nameTranslations instanceof Map ? Object.fromEntries(nameTranslations) : nameTranslations?.toObject?.() || nameTranslations || {};
+              return locale !== "en" && values[locale] ? { [locale]: values[locale] } : {};
+            })(),
           },
         }];
       })
@@ -240,9 +248,12 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---- Recent orders ----
+    const recentOrdersTotal = await Order.countDocuments({});
+    const recentOrdersPagination = makePage(recentOrdersTotal, req.query.recentOrdersPage);
     const recentOrdersRaw = await Order.find({})
       .sort({ created_at: -1 })
-      .limit(6)
+      .skip(recentOrdersPagination.skip)
+      .limit(limit)
       .populate("user_id", "name email")
       .lean();
     const recentOrders = recentOrdersRaw.map((o) => ({
@@ -258,10 +269,10 @@ const getDashboardStats = async (req, res) => {
 
     // ---- Recent activity — synthesized from real collection changes ----
     const [actOrders, actProducts, actDiscounts, actBrands] = await Promise.all([
-      Order.find({}).sort({ created_at: -1 }).limit(4).select("order_number address_snapshot created_at").lean(),
-      Product.find({}).sort({ created_at: -1 }).limit(3).select("name created_at").lean(),
-      Discount.find({}).sort({ createdAt: -1 }).limit(3).select("name createdAt").lean(),
-      Brand.find({}).sort({ created_at: -1 }).limit(3).select("name created_at").lean(),
+      Order.find({}).sort({ created_at: -1 }).select("order_number address_snapshot created_at").lean(),
+      Product.find({}).sort({ created_at: -1 }).select("name created_at").lean(),
+      Discount.find({}).sort({ createdAt: -1 }).select("name createdAt").lean(),
+      Brand.find({}).sort({ created_at: -1 }).select("name created_at").lean(),
     ]);
     const activities = [
       ...actOrders.map((o) => ({
@@ -293,8 +304,9 @@ const getDashboardStats = async (req, res) => {
         timestamp: b.created_at,
       })),
     ]
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 6);
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const activitiesPagination = makePage(activities.length, req.query.activitiesPage);
+    const visibleActivities = activities.slice(activitiesPagination.skip, activitiesPagination.skip + limit);
 
     // ---- Response ----
     res.status(200).json({
@@ -314,8 +326,11 @@ const getDashboardStats = async (req, res) => {
         },
         distribution,
         topProducts,
+        topProductsPagination: (({ skip, ...pagination }) => pagination)(topProductsPagination),
         recentOrders,
-        activities,
+        recentOrdersPagination: (({ skip, ...pagination }) => pagination)(recentOrdersPagination),
+        activities: visibleActivities,
+        activitiesPagination: (({ skip, ...pagination }) => pagination)(activitiesPagination),
       },
     });
 

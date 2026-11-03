@@ -29,13 +29,14 @@ export default function LeadDetailPage({ params }) {
   const [lostReasonOpen, setLostReasonOpen] = useState(false);
   const [lostReason, setLostReason] = useState("");
   const { data: lead, isLoading, isError, error } = useQuery({
-    queryKey: ["lead-detail", id],
-    queryFn: () => leadApi.getById(id),
+    // ✅ Locale query key me — slim detail response (brands/banner/orders/vendors/po detail ka pattern)
+    queryKey: ["lead", id, locale],
+    queryFn: () => leadApi.getById(id, locale),
   });
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["lead-detail", id] });
-    qc.invalidateQueries({ queryKey: ["leads-admin"] });
+    qc.invalidateQueries({ queryKey: ["lead", id, locale] });
+    qc.invalidateQueries({ queryKey: ["leads"] });
     qc.invalidateQueries({ queryKey: ["customers-admin"] });
   };
   const statusMutation = useMutation({

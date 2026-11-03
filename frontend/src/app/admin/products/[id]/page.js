@@ -1158,8 +1158,12 @@ export default function ProductDetailPage() {
       (!product.description || product.translations?.description?.[locale]?.trim())
     ),
   });
-  const isProductNameReady = locale === "en" || productTranslationsReady || !!product?.translations?.name?.[locale]?.trim();
-  const isProductDescriptionReady = locale === "en" || !product?.description || productTranslationsReady || !!product?.translations?.description?.[locale]?.trim();
+  const productTranslationFieldCount = Number(Boolean(product?.name)) + Number(Boolean(product?.description?.trim()));
+  const translatedProductFieldCount = Number(Boolean(product?.translations?.name?.[locale]?.trim())) +
+    Number(Boolean(product?.description?.trim() && product?.translations?.description?.[locale]?.trim()));
+  const productMostlyUntranslated = locale !== "en" && productTranslationFieldCount > 0 && translatedProductFieldCount / productTranslationFieldCount <= 0.2;
+  const isProductNameReady = locale === "en" || productTranslationsReady || !productMostlyUntranslated || !!product?.translations?.name?.[locale]?.trim();
+  const isProductDescriptionReady = locale === "en" || !product?.description || productTranslationsReady || !productMostlyUntranslated || !!product?.translations?.description?.[locale]?.trim();
   const { data: productDocumentHistory } = useQuery({
     queryKey: ["product-document-history", id],
     queryFn: () => productApi.getDocumentHistory(id),
@@ -2295,9 +2299,9 @@ export default function ProductDetailPage() {
                 <ChevronRight className="w-3 h-3 shrink-0" />
               </>
             )}
-            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</span>
+            <span className="max-w-[240px] truncate font-semibold" style={{ color: "var(--text-primary)" }}>{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("admin.productDetail.page.loading")} />}</span>
           </nav>
-          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{productNameOf(product)}</h1>
+          <h1 className="mt-2 text-[22px] leading-7 font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-6 w-2/3 rounded" aria-label={t("admin.productDetail.page.loading")} />}</h1>
           <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -2555,7 +2559,7 @@ export default function ProductDetailPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.productName")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{productNameOf(product)}</p>
+                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("admin.productDetail.page.loading")} />}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.brand")}</p>

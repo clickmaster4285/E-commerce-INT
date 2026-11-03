@@ -69,13 +69,13 @@ const BrandPageSkeleton = ({ count = 10, viewMode = "grid", loadingLabel }) => {
     </div>
   );
 };
-const BrandTextSkeleton = ({ className = "h-3 w-24" }) => (
-  <span aria-hidden="true" className={`inline-block animate-pulse rounded ${className}`} style={{ backgroundColor: "var(--bg-tertiary)" }} />
-);
 const SortIndicator = ({ active, direction }) => (
   <svg className={`w-3 h-3 transition ${active ? "text-emerald-400" : "opacity-40"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
     {active && direction === "desc" ? <path d="M6 9l6 6 6-6" /> : <path d="M6 15l6-6 6 6" />}
   </svg>
+);
+const BrandTextSkeleton = ({ className = "h-3 w-24" }) => (
+  <span aria-hidden="true" className={`inline-block animate-pulse rounded ${className}`} style={{ backgroundColor: "var(--bg-tertiary)" }} />
 );
 const ChevronLeftIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -456,7 +456,14 @@ export default function BrandsPage() {
       (!brand.description?.trim() || (typeof selectedDescription === "string" && selectedDescription.trim().length > 0));
   }));
   const pageTranslationsReady = usePageTranslations({ model: "Brand", records: brands, locale, ready: !isFetching, queryKey: ["adminBrands", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterStatus, filterCountry, sortConfig.key, sortConfig.direction], queryClient, alreadyTranslated: pageAlreadyTranslated, fallbackAfterRetries: true });
-  const hasBrandNameTranslation = (brand) => locale === "en" || pageTranslationsReady || (
+  const translatedBrandCount = brands.filter((brand) =>
+    typeof brand.translations?.name?.[locale] === "string" && brand.translations.name[locale].trim()
+  ).length;
+  // Keep skeletons only while at least 80% of the current page still lacks a
+  // complete translation. Once most entries are translating successfully,
+  // show the English source for the remaining entries instead of skeletons.
+  const pageMostlyUntranslated = locale !== "en" && brands.length > 0 && translatedBrandCount / brands.length <= 0.2;
+  const hasBrandNameTranslation = (brand) => locale === "en" || pageTranslationsReady || !pageMostlyUntranslated || (
     typeof brand.translations?.name?.[locale] === "string" && brand.translations.name[locale].trim().length > 0
   );
   const brandCounts = paginatedBrandsData?.counts || { total: 0, active: 0, inactive: 0, withLogo: 0 };
@@ -1167,14 +1174,14 @@ export default function BrandsPage() {
                 <svg className="w-5 h-5" style={{ color: "var(--danger)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: nameOf(deleteTarget.brands[0]) }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
+                <h3 className="text-sm font-semibold">{deleteTarget.brands.length === 1 ? t("admin.brands.ui.deleteOneTitle", { name: hasBrandNameTranslation(deleteTarget.brands[0]) ? nameOf(deleteTarget.brands[0]) : "—" }) : t("admin.brands.ui.deleteManyTitle", { count: deleteTarget.brands.length })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.brands.ui.deleteWarning")}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-4 p-2.5 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
               <Avatar brand={deleteTarget.brands[0]} size="w-8 h-8" />
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{nameOf(deleteTarget.brands[0])}</p>
+                <p className="text-sm font-medium truncate">{hasBrandNameTranslation(deleteTarget.brands[0]) ? nameOf(deleteTarget.brands[0]) : "—"}</p>
                 <p className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{deleteTarget.brands.length === 1 ? deleteTarget.brands[0].brand_code || "—" : t("admin.brands.ui.moreCount", { count: deleteTarget.brands.length - 1 })}</p>
               </div>
             </div>

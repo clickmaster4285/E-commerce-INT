@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowDownLeft, ArrowUpRight, Banknote, CalendarDays, CheckCircle2,
+  ArrowDownLeft, ArrowUpRight, Banknote, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
   Clock3, CreditCard, DollarSign, FileText, HandCoins, History,
   LoaderCircle, Package, Search, ShoppingBag, TrendingDown, TrendingUp, X,
 } from "lucide-react";
@@ -155,18 +155,36 @@ function SummaryCard({ title, value, note, icon: Icon, tone = "blue" }) {
   );
 }
 
+function DrawerPagination({ total, page, pageSize, setPage, setPageSize, t }) {
+  if (total <= pageSize) return null;
+  const pages = Math.ceil(total / pageSize);
+  return <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)] pt-3 text-xs text-[var(--text-muted)]">
+    <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}</span>
+    <label className="flex items-center gap-2"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></label>
+    <div className="flex items-center gap-1"><button type="button" aria-label={t("admin.finance.previous")} disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-color)] disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>{Array.from({ length: Math.min(pages, 5) }, (_, index) => Math.min(Math.max(1, page - 2), Math.max(1, pages - 4)) + index).map((number) => <button key={number} type="button" aria-current={number === page ? "page" : undefined} onClick={() => setPage(number)} className={`h-8 min-w-8 rounded-lg px-2 font-semibold ${number === page ? "bg-[var(--accent)] text-white" : "border border-[var(--border-color)] text-[var(--text-secondary)]"}`}>{number}</button>)}<button type="button" aria-label={t("admin.finance.next")} disabled={page >= pages} onClick={() => setPage((current) => current + 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-color)] disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
+  </div>;
+}
+
 function FinanceDrawer({ transaction, onClose, locale, t }) {
+  const [itemsPage, setItemsPage] = useState(1);
+  const [itemsPageSize, setItemsPageSize] = useState(10);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
   useEffect(() => {
     if (!transaction) return undefined;
     const onKeyDown = (event) => { if (event.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [transaction, onClose]);
+  useEffect(() => { setItemsPage(1); setHistoryPage(1); }, [transaction?.id]);
   if (!transaction) return null;
   const Icon = categoryIcons[transaction.category] || Banknote;
   const isIncome = transaction.amount >= 0;
   const source = transaction.source || {};
   const history = transaction.history || [];
+  const items = transaction.items || [];
+  const visibleItems = items.slice((itemsPage - 1) * itemsPageSize, itemsPage * itemsPageSize);
+  const visibleHistory = history.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
   const description = String(transaction.description || "").trim();
   const showDescription = description && !/^\d+$/.test(description);
   return (
@@ -217,18 +235,19 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
           {!!transaction.items?.length && <section>
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><ShoppingBag className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.itemsOnRecord")}</h3>
             <div className="overflow-hidden rounded-xl border border-[var(--border-color)]">
-              {transaction.items.map((item, index) => { const label = financeItemLabel(item, t); return <div key={`${item._id || item.product_id || item.name || item.product_name || index}-${index}`} className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-3.5 py-3 last:border-0">
+              {visibleItems.map((item, index) => { const label = financeItemLabel(item, t); return <div key={`${item._id || item.product_id || item.name || item.product_name || index}-${(itemsPage - 1) * itemsPageSize + index}`} className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-3.5 py-3 last:border-0">
                 <div className="min-w-0 flex-1"><p className="break-words text-sm leading-5 text-[var(--text-primary)]">{label.title}</p><p className="mt-1 flex flex-wrap gap-x-1.5 text-xs leading-4 text-[var(--text-muted)]">{label.metadata.length ? label.metadata.map((value, metadataIndex) => <span key={`${value}-${metadataIndex}`}>{metadataIndex > 0 && <span className="me-1.5">·</span>}{value}</span>) : t("admin.finance.noSku")}</p></div>
                 <p className="shrink-0 text-sm text-[var(--text-secondary)]">×{item.quantity || item.qty || item.qty_ordered || 1}</p>
               </div>; })}
             </div>
+            <DrawerPagination total={items.length} page={itemsPage} pageSize={itemsPageSize} setPage={setItemsPage} setPageSize={setItemsPageSize} t={t} />
           </section>}
 
           <section>
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><History className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.history")}</h3>
             {history.length ? <ol className="space-y-0">
-              {history.map((event, index) => <li key={`${event.type}-${event.at}-${index}`} className="relative flex gap-3 pb-4 last:pb-0">
-                {index < history.length - 1 && <span className="absolute start-[9px] top-5 h-[calc(100%-8px)] w-px bg-[var(--border-color)]" />}
+              {visibleHistory.map((event, index) => <li key={`${event.type}-${event.at}-${(historyPage - 1) * historyPageSize + index}`} className="relative flex gap-3 pb-4 last:pb-0">
+                {index < visibleHistory.length - 1 && <span className="absolute start-[9px] top-5 h-[calc(100%-8px)] w-px bg-[var(--border-color)]" />}
                 <span className={`relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${event.type === "payment" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : event.type === "return" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}><CheckCircle2 className="h-3 w-3" /></span>
                 <div className="min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3.5 text-start">
                   <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-sm font-medium leading-5 text-[var(--text-primary)]">{translated(t, historyTitleKeys, event.title)}</p><time className="text-xs leading-5 text-[var(--text-muted)]">{formatDateTime(event.at, locale, t)}</time></div>
@@ -237,6 +256,7 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
                 </div>
               </li>)}
             </ol> : <div className="rounded-xl border border-dashed border-[var(--border-color)] px-4 py-5 text-center text-sm text-[var(--text-muted)]"><Clock3 className="mx-auto mb-2 h-5 w-5" />{t("admin.finance.noDetailedActivity")}</div>}
+            <DrawerPagination total={history.length} page={historyPage} pageSize={historyPageSize} setPage={setHistoryPage} setPageSize={setHistoryPageSize} t={t} />
           </section>
         </div>
       </aside>
@@ -252,10 +272,11 @@ export default function FinancePage() {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState(null);
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["admin-finance-overview", period, startDate, endDate, search, kind, page],
-    queryFn: () => financeApi.getOverview({ period, startDate, endDate, search, kind, page }),
+    queryKey: ["admin-finance-overview", period, startDate, endDate, search, kind, page, pageSize, locale],
+    queryFn: () => financeApi.getOverview({ period, startDate, endDate, search, kind, page, limit: pageSize, locale }),
     staleTime: 30_000,
   });
   const summary = data?.summary || {};
@@ -313,7 +334,7 @@ export default function FinancePage() {
               </tbody>
             </table>
           </div>
-          {!isLoading && pagination.total > pagination.pageSize && <div className="flex flex-col gap-3 border-t border-[var(--border-color)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-[var(--text-muted)]">{t("admin.finance.showingTransactions", { from: (pagination.page - 1) * pagination.pageSize + 1, to: Math.min(pagination.page * pagination.pageSize, pagination.total), total: pagination.total })}</p><div className="flex items-center justify-end gap-2"><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage(1)} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.first")}</button><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.previous")}</button><span className="min-w-[76px] text-center text-xs font-semibold text-[var(--text-primary)]">{t("admin.finance.pageOf", { page: pagination.page, pages: pagination.pages })}</span><button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.next")}</button><button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage(pagination.pages)} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.last")}</button></div></div>}
+          {!isLoading && pagination.total > pagination.pageSize && <div className="flex flex-col gap-3 border-t border-[var(--border-color)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-[var(--text-muted)]">{t("admin.finance.showingTransactions", { from: (pagination.page - 1) * pagination.pageSize + 1, to: Math.min(pagination.page * pagination.pageSize, pagination.total), total: pagination.total })}</p><div className="flex flex-wrap items-center justify-end gap-2"><label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-9 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage(1)} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.first")}</button><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.previous")}</button><span className="min-w-[76px] text-center text-xs font-semibold text-[var(--text-primary)]">{t("admin.finance.pageOf", { page: pagination.page, pages: pagination.pages })}</span>{Array.from({ length: Math.min(pagination.pages, 5) }, (_, index) => Math.min(Math.max(1, pagination.page - 2), Math.max(1, pagination.pages - 4)) + index).map((pageNumber) => <button key={pageNumber} type="button" aria-current={pageNumber === pagination.page ? "page" : undefined} disabled={isFetching} onClick={() => setPage(pageNumber)} className={`h-9 min-w-9 rounded-lg border px-2 text-xs font-semibold disabled:opacity-40 ${pageNumber === pagination.page ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border-color)] text-[var(--text-secondary)]"}`}>{pageNumber}</button>)}<button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.next")}</button><button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage(pagination.pages)} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.last")}</button></div></div>}
           {isFetching && !isLoading && <div className="h-0.5 w-full overflow-hidden bg-[var(--bg-secondary)]"><div className="h-full w-1/3 animate-pulse bg-[var(--accent)]" /></div>}
         </section>
       </>}

@@ -75,6 +75,15 @@ const Spinner = ({ className = "w-4 h-4" }) => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
   </svg>
 );
+const StockRowsSkeleton = ({ rows = 10, columns = 6, cardStyle }) => (
+  <div className="rounded-lg overflow-hidden" style={cardStyle} aria-label="Loading stock data">
+    {Array.from({ length: rows }, (_, row) => (
+      <div key={row} className="grid gap-4 px-4 py-4" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, borderBottom: row < rows - 1 ? "1px solid var(--border-color)" : "none" }}>
+        {Array.from({ length: columns }, (_, column) => <span key={column} className="h-3 rounded animate-pulse" style={{ backgroundColor: "var(--bg-tertiary)", width: column === 0 ? "78%" : "58%" }} />)}
+      </div>
+    ))}
+  </div>
+);
 const ChevronDownIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -159,6 +168,7 @@ const formatDateTime = (date, locale = "en") => {
 };
 
 const formatNumber = (value, locale) => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale === "en" ? "en-US" : locale).format(Number(value) || 0);
+const hasLocalizedText = (value) => typeof value === "string" && value.trim().length > 0;
 
 /* ================= Small Components ================= */
 const ProductThumbnail = ({ item, size = "h-10 w-10" }) => {
@@ -234,6 +244,10 @@ export default function ManageStockPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
+  const [detailsHistoryPage, setDetailsHistoryPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState(10);
+  const [detailsHistoryItemsPerPage, setDetailsHistoryItemsPerPage] = useState(10);
   const [adjustTarget, setAdjustTarget] = useState(null);
 
   const [adjustForm, setAdjustForm] = useState({
@@ -246,7 +260,6 @@ export default function ManageStockPage() {
   const [adjustError, setAdjustError] = useState("");
   const [adjustErrors, setAdjustErrors] = useState({});
   const [detailsTarget, setDetailsTarget] = useState(null);
-  const itemsPerPage = 20;
 
   const dropdownRef = useRef(null);
   const [isReasonOpen, setIsReasonOpen] = useState(false);
@@ -269,32 +282,59 @@ export default function ManageStockPage() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  const stockQueryKey = ["stock", "paginated", currentPage, debouncedSearch, statusFilter];
+  const stockQueryKey = ["stock", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, statusFilter];
   const { data: paginatedStockData, isLoading: loading, isFetching: stockFetching, isError, error } = useQuery({
     queryKey: stockQueryKey,
-    queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch, status: statusFilter }),
+    queryFn: () => stockApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch, status: statusFilter, locale }),
     retry: false,
   });
+  useEffect(() => {
+    const serverPage = paginatedStockData?.pagination?.page;
+    if (Number.isInteger(serverPage) && serverPage > 0 && serverPage !== currentPage) {
+      setCurrentPage(serverPage);
+    }
+  }, [paginatedStockData?.pagination?.page, currentPage]);
   const stockItems = useMemo(() => Array.isArray(paginatedStockData?.items)
     ? paginatedStockData.items
     : Array.isArray(paginatedStockData)
       ? paginatedStockData
       : [], [paginatedStockData]);
   const stockPagination = paginatedStockData?.pagination || { total: stockItems.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
-  usePageTranslations({ model: "Variant", records: stockItems, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+  const stockVariantsTranslated = locale === "en" || (stockItems.length > 0 && stockItems.every((item) => !item.title?.trim() || hasLocalizedText(item.translations?.title?.[locale])));
+  const variantTranslationsReady = usePageTranslations({ model: "Variant", records: stockItems, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient, alreadyTranslated: stockVariantsTranslated, fallbackAfterRetries: true });
   const stockProducts = useMemo(() => stockItems
     .filter((item) => item.product_id && item.product_name)
-    .map((item) => ({ _id: String(item.product_id), name: item.product_name })), [stockItems]);
-  usePageTranslations({ model: "Product", records: stockProducts, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+    .map((item) => ({ _id: String(item.product_id), name: item.product_name, translations: { name: item.product_translations?.name } })), [stockItems]);
+  const productsTranslated = locale === "en" || (stockProducts.length > 0 && stockProducts.every((item) => !item.name?.trim() || hasLocalizedText(item.translations?.name?.[locale])));
+  const productTranslationsReady = usePageTranslations({ model: "Product", records: stockProducts, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient, alreadyTranslated: productsTranslated, fallbackAfterRetries: true });
   const stockBrands = useMemo(() => stockItems
     .filter((item) => item.brand_id && item.brand_name)
-    .map((item) => ({ _id: String(item.brand_id), name: item.brand_name })), [stockItems]);
-  usePageTranslations({ model: "Brand", records: stockBrands, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient });
+    .map((item) => ({ _id: String(item.brand_id), name: item.brand_name, translations: { name: item.brand_translations?.name } })), [stockItems]);
+  const brandsTranslated = locale === "en" || (stockBrands.length > 0 && stockBrands.every((item) => !item.name?.trim() || hasLocalizedText(item.translations?.name?.[locale])));
+  const brandTranslationsReady = usePageTranslations({ model: "Brand", records: stockBrands, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient, alreadyTranslated: brandsTranslated, fallbackAfterRetries: true });
+  const stockCategories = useMemo(() => stockItems
+    .filter((item) => item.category_id && item.category_name)
+    .map((item) => ({ _id: String(item.category_id), name: item.category_name, translations: { name: item.category_translations?.name } })), [stockItems]);
+  const categoriesTranslated = locale === "en" || (stockCategories.length > 0 && stockCategories.every((item) => !item.name?.trim() || hasLocalizedText(item.translations?.name?.[locale])));
+  const categoryTranslationsReady = usePageTranslations({ model: "Category", records: stockCategories, locale, ready: !stockFetching && stockPagination.page === currentPage, queryKey: stockQueryKey, queryClient, alreadyTranslated: categoriesTranslated, fallbackAfterRetries: true });
+  const stockTranslationsReady = variantTranslationsReady && productTranslationsReady && brandTranslationsReady && categoryTranslationsReady;
+  const stockTranslationFields = stockItems.flatMap((item) => [
+    [item.title, item.translations?.title?.[locale]],
+    [item.product_name, item.product_translations?.name?.[locale]],
+    [item.brand_name, item.brand_translations?.[locale]],
+    [item.category_name, item.category_translations?.[locale]],
+  ].filter(([source]) => source?.trim()));
+  const untranslatedStockFieldCount = stockTranslationFields.filter(([, translated]) => !hasLocalizedText(translated)).length;
+  const showStockTranslationSkeletons = locale !== "en" && stockTranslationFields.length > 0 && untranslatedStockFieldCount / stockTranslationFields.length >= 0.8;
+  const isMissingTranslation = (source, translation) => locale !== "en" && Boolean(source?.trim()) && !hasLocalizedText(translation);
+  const translatedValueOrSkeleton = (source, translation, value, translationReady, width = "w-24") => showStockTranslationSkeletons && !translationReady && isMissingTranslation(source, translation)
+    ? <span className={`inline-block h-3 ${width} rounded bg-[var(--bg-tertiary)] animate-pulse align-middle`} aria-busy="true" />
+    : value;
 
-  const historyQueryKey = ["stock-history", "paginated", historyPage];
+  const historyQueryKey = ["stock-history", "paginated", locale, historyPage, historyItemsPerPage];
   const { data: paginatedHistoryData, isLoading: historyLoading, isFetching: historyFetching } = useQuery({
     queryKey: historyQueryKey,
-    queryFn: () => stockApi.getHistoryPaginated({ page: historyPage, limit: itemsPerPage }),
+    queryFn: () => stockApi.getHistoryPaginated({ page: historyPage, limit: historyItemsPerPage, locale }),
     enabled: tab === "history",
   });
   const historyItems = Array.isArray(paginatedHistoryData?.items)
@@ -302,8 +342,21 @@ export default function ManageStockPage() {
     : Array.isArray(paginatedHistoryData)
       ? paginatedHistoryData
       : [];
-  const historyPagination = paginatedHistoryData?.pagination || { total: historyItems.length, page: historyPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
-  usePageTranslations({ model: "StockHistory", records: historyItems, locale, ready: tab === "history" && !historyFetching && historyPagination.page === historyPage, queryKey: historyQueryKey, queryClient });
+  const historyPagination = paginatedHistoryData?.pagination || { total: historyItems.length, page: historyPage, limit: historyItemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  const historyAlreadyTranslated = locale === "en" || (historyItems.length > 0 && historyItems.every((item) =>
+    (!item.product_name?.trim() || hasLocalizedText(item.translations?.product_name?.[locale])) &&
+    (!item.variant_title?.trim() || hasLocalizedText(item.translations?.variant_title?.[locale])) &&
+    (!item.reason?.trim() || hasLocalizedText(item.translations?.reason?.[locale])) &&
+    (!item.explanation?.trim() || hasLocalizedText(item.translations?.explanation?.[locale]))
+  ));
+  const historyTranslationsReady = usePageTranslations({ model: "StockHistory", records: historyItems, locale, ready: tab === "history" && !historyFetching && historyPagination.page === historyPage, queryKey: historyQueryKey, queryClient, alreadyTranslated: historyAlreadyTranslated, fallbackAfterRetries: true });
+  const historyTranslationFields = historyItems.flatMap((item) => [
+    [item.product_name, item.translations?.product_name?.[locale]],
+    [item.variant_title, item.translations?.variant_title?.[locale]],
+    [item.reason, item.translations?.reason?.[locale]],
+  ].filter(([source]) => source?.trim()));
+  const untranslatedHistoryFieldCount = historyTranslationFields.filter(([, translated]) => !hasLocalizedText(translated)).length;
+  const showHistoryTranslationSkeletons = locale !== "en" && historyTranslationFields.length > 0 && untranslatedHistoryFieldCount / historyTranslationFields.length >= 0.8 && !historyTranslationsReady;
 
   const adjustMutation = useMutation({
     mutationFn: async (data) => {
@@ -332,10 +385,10 @@ export default function ManageStockPage() {
   });
 
   // ===== Stock Details Drawer: variant-specific history (existing API reuse) =====
-  const detailsHistoryQueryKey = ["stock-history", "variant", detailsTarget?._id];
+  const detailsHistoryQueryKey = ["stock-history", "variant", locale, detailsTarget?._id, detailsHistoryPage, detailsHistoryItemsPerPage];
   const { data: detailsHistoryData, isLoading: detailsHistoryLoading, isFetching: detailsHistoryFetching, isError: detailsHistoryError } = useQuery({
     queryKey: detailsHistoryQueryKey,
-    queryFn: () => stockApi.getHistoryPaginated({ page: 1, limit: 50, variantId: detailsTarget._id }),
+    queryFn: () => stockApi.getHistoryPaginated({ page: detailsHistoryPage, limit: detailsHistoryItemsPerPage, variantId: detailsTarget._id, locale }),
     enabled: !!detailsTarget?._id,
   });
   const detailsHistory = Array.isArray(detailsHistoryData?.items)
@@ -343,9 +396,28 @@ export default function ManageStockPage() {
     : Array.isArray(detailsHistoryData)
       ? detailsHistoryData
       : [];
-  usePageTranslations({ model: "StockHistory", records: detailsHistory, locale, ready: !!detailsTarget?._id && !detailsHistoryFetching, queryKey: detailsHistoryQueryKey, queryClient });
+  const detailsHistoryPagination = detailsHistoryData?.pagination || { total: detailsHistory.length, pages: 1 };
+  const detailsHistoryAlreadyTranslated = locale === "en" || (detailsHistory.length > 0 && detailsHistory.every((item) =>
+    (!item.product_name?.trim() || hasLocalizedText(item.translations?.product_name?.[locale])) &&
+    (!item.variant_title?.trim() || hasLocalizedText(item.translations?.variant_title?.[locale])) &&
+    (!item.reason?.trim() || hasLocalizedText(item.translations?.reason?.[locale])) &&
+    (!item.explanation?.trim() || hasLocalizedText(item.translations?.explanation?.[locale]))
+  ));
+  const detailsHistoryTranslationsReady = usePageTranslations({ model: "StockHistory", records: detailsHistory, locale, ready: !!detailsTarget?._id && !detailsHistoryFetching, queryKey: detailsHistoryQueryKey, queryClient, alreadyTranslated: detailsHistoryAlreadyTranslated, fallbackAfterRetries: true });
+  const detailsHistoryTranslationFields = detailsHistory.flatMap((item) => [
+    [item.reason, item.translations?.reason?.[locale]],
+    [item.explanation, item.translations?.explanation?.[locale]],
+  ].filter(([source]) => source?.trim()));
+  const untranslatedDetailsHistoryFieldCount = detailsHistoryTranslationFields.filter(([, translated]) => !hasLocalizedText(translated)).length;
+  const showDetailsHistoryTranslationSkeletons = locale !== "en" && detailsHistoryTranslationFields.length > 0 && untranslatedDetailsHistoryFieldCount / detailsHistoryTranslationFields.length >= 0.8 && !detailsHistoryTranslationsReady;
+  const detailsLatestKey = ["stock-history", "variant-latest", locale, detailsTarget?._id];
+  const { data: detailsLatestData } = useQuery({
+    queryKey: detailsLatestKey,
+    queryFn: () => stockApi.getHistoryPaginated({ page: 1, limit: 1, variantId: detailsTarget._id, locale }),
+    enabled: !!detailsTarget?._id && detailsHistoryPage > 1,
+  });
 
-  const openDetails = (item) => setDetailsTarget(item);
+  const openDetails = (item) => { setDetailsHistoryPage(1); setDetailsTarget(item); };
   const closeDetails = () => setDetailsTarget(null);
 
   const summary = paginatedStockData?.summary || {
@@ -381,9 +453,10 @@ export default function ManageStockPage() {
   // Pagination variables (use server pagination data)
   const stockTotalPages = stockPagination?.pages || 1;
   const historyTotalPages = historyPagination?.pages || 1;
-
-  const paginationStart = (currentPage - 1) * itemsPerPage + 1;
-  const paginationEnd = Math.min(currentPage * itemsPerPage, stockPagination?.total || stockItems.length);
+  const displayedStockPage = stockPagination?.page || currentPage;
+  const paginationTotal = stockPagination?.total || 0;
+  const paginationStart = paginationTotal > 0 ? (displayedStockPage - 1) * itemsPerPage + 1 : 0;
+  const paginationEnd = Math.min(displayedStockPage * itemsPerPage, paginationTotal);
 
   const handleSearchChange = (value) => { setSearch(value); setCurrentPage(1); };
   const handleStatusFilterChange = (value) => { setStatusFilter(value); setCurrentPage(1); };
@@ -467,7 +540,7 @@ export default function ManageStockPage() {
     });
   };
 
-  const renderPageNumbers = (page, totalPagesCount, goToPage) => {
+  const renderPageNumbers = (page, totalPagesCount, goToPage, disabled = false) => {
     const pages = [];
     const maxVisiblePages = 5;
     if (totalPagesCount <= maxVisiblePages) {
@@ -482,7 +555,7 @@ export default function ManageStockPage() {
         {p === "..." ? (
           <span className="px-2 text-sm hidden sm:inline" style={{ color: "var(--text-muted)" }}>...</span>
         ) : (
-          <button onClick={() => goToPage(p)} className="h-9 w-9 sm:h-8 sm:min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: page === p ? "var(--accent)" : "var(--bg-tertiary)", color: page === p ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${page === p ? "var(--accent)" : "var(--border-color)"}` }}>
+          <button onClick={() => goToPage(p)} disabled={disabled} className="h-9 w-9 sm:h-8 sm:min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-40" style={{ backgroundColor: page === p ? "var(--accent)" : "var(--bg-tertiary)", color: page === p ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${page === p ? "var(--accent)" : "var(--border-color)"}` }}>
             {p}
           </button>
         )}
@@ -557,7 +630,7 @@ export default function ManageStockPage() {
             </div>
 
             {loading ? (
-              <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.loading")}</span></div>
+              <StockRowsSkeleton rows={itemsPerPage} columns={6} cardStyle={cardStyle} />
             ) : isError ? (
               <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><AlertTriangleIcon /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.loadingError")}</p></div>
             ) : filteredItems.length === 0 ? (
@@ -583,16 +656,21 @@ export default function ManageStockPage() {
                           const status = getStockStatus(item);
                           // ✅ Category/brand assign nahi hai to ye line bilkul render nahi hoti
                           //    (backend ab "Uncategorized"/"No brand" jaisa fake text nahi bhejta).
-                          const metaLine = [localizedField(item.category_name, item.category_translations, locale), nameOf({ name: item.brand_name, translations: { name: item.brand_translations }, brand_code: true })].filter(Boolean).join(" · ");
+                          const categoryMissing = isMissingTranslation(item.category_name, item.category_translations?.[locale]);
+                          const brandMissing = isMissingTranslation(item.brand_name, item.brand_translations?.[locale]);
+                          const metaLine = [
+                            item.category_name?.trim() && (showStockTranslationSkeletons && !categoryTranslationsReady && categoryMissing ? <span key="category" className="inline-block h-2.5 w-16 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedField(item.category_name, item.category_translations, locale)),
+                            item.brand_name?.trim() && (showStockTranslationSkeletons && !brandTranslationsReady && brandMissing ? <span key="brand" className="inline-block h-2.5 w-16 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : nameOf({ name: item.brand_name, translations: { name: item.brand_translations }, brand_code: true })),
+                          ].filter(Boolean);
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
 <td className="px-4 py-2.5">
   <div className="flex items-center gap-2.5">
     <ProductThumbnail item={item} />
     <div className="flex items-center gap-1.5 min-w-0">
-      <span className="font-medium text-[13px] truncate max-w-[160px] block">{stockProductNameOf(item, locale)}</span>
-        {metaLine && (
-          <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{metaLine}</span>
+      <span className="font-medium text-[13px] truncate max-w-[160px] block">{translatedValueOrSkeleton(item.product_name, item.product_translations?.name?.[locale], stockProductNameOf(item, locale), productTranslationsReady, "w-28")}</span>
+        {metaLine.length > 0 && (
+          <span className="text-[10px] truncate block mt-0.5" style={{ color: "var(--text-muted)" }}>{metaLine.map((value, partIndex) => <React.Fragment key={partIndex}>{partIndex > 0 ? " · " : ""}{value}</React.Fragment>)}</span>
         )}
       {item.product_is_deleted && (
                                   <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
@@ -603,7 +681,7 @@ export default function ManageStockPage() {
   </div>
 </td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[120px] block" style={{ color: "var(--text-secondary)" }}>{item.sku}</span></td>
-                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(item.title, item.translations?.title, locale)}</span></td>
+                              <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{translatedValueOrSkeleton(item.title, item.translations?.title?.[locale], localizedField(item.title, item.translations?.title, locale), variantTranslationsReady, "w-20")}</span></td>
                               <td className="px-4 py-2.5"><span className="text-[13px] font-semibold" style={{ color: status === "out" ? "var(--danger)" : status === "low" ? "var(--warning)" : "var(--text-primary)" }}>{formatNumber(item.quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                               <td className="px-4 py-2.5"><StatusPill status={status} /></td>
                               <td className="px-4 py-2.5 whitespace-nowrap text-end">
@@ -640,7 +718,7 @@ export default function ManageStockPage() {
                           </div>
                                                <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                            <p className="text-[13px] font-medium truncate leading-tight">{stockProductNameOf(item, locale)}</p>
+                            <p className="text-[13px] font-medium truncate leading-tight">{translatedValueOrSkeleton(item.product_name, item.product_translations?.name?.[locale], stockProductNameOf(item, locale), productTranslationsReady, "w-28")}</p>
                               {item.product_is_deleted && (
                                 <span className="inline-flex items-center text-[8px] font-bold uppercase tracking-wide px-1 py-0.5 rounded shrink-0" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)" }}>
                                   {t("admin.manageStock.page.deleted")}
@@ -680,16 +758,19 @@ export default function ManageStockPage() {
               </>
             )}
 
-            {!loading && !isError && (stockPagination?.total || 0) > itemsPerPage && (
+            {!loading && !isError && (stockPagination?.total || 0) > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingItemsRange", { from: formatNumber(paginationStart, locale), to: formatNumber(paginationEnd, locale), total: formatNumber(stockPagination?.total || stockItems.length, locale) })}</p>
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                  <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingItemsRange", { from: formatNumber(paginationStart, locale), to: formatNumber(paginationEnd, locale), total: formatNumber(paginationTotal, locale) })}</p>
+                  <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={itemsPerPage} onChange={(event) => { setItemsPerPage(Number(event.target.value)); setCurrentPage(1); }} className="h-9 rounded-lg px-3 text-[13px] outline-none cursor-pointer" style={inputStyle}>{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatNumber(size, locale)}</option>)}</select></label>
+                </div>
                 <div className="flex items-center gap-2">
-                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(currentPage, locale), pages: formatNumber(stockTotalPages, locale) })}</span>
-                  <button onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
+                  <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(displayedStockPage, locale), pages: formatNumber(stockTotalPages, locale) })}</span>
+                  <button onClick={() => displayedStockPage > 1 && setCurrentPage(displayedStockPage - 1)} disabled={displayedStockPage === 1 || stockFetching} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                   <span className="hidden sm:inline-flex items-center gap-1">
-                    {renderPageNumbers(currentPage, stockTotalPages, setCurrentPage)}
+                    {renderPageNumbers(displayedStockPage, stockTotalPages, setCurrentPage, stockFetching)}
                   </span>
-                  <button onClick={() => currentPage < stockTotalPages && setCurrentPage(currentPage + 1)} disabled={currentPage === stockTotalPages} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
+                  <button onClick={() => displayedStockPage < stockTotalPages && setCurrentPage(displayedStockPage + 1)} disabled={displayedStockPage === stockTotalPages || stockFetching} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                 </div>
               </div>
             )}
@@ -700,7 +781,7 @@ export default function ManageStockPage() {
         {tab === "history" && (
           <>
             {historyLoading ? (
-              <div className="rounded-lg py-14 flex items-center justify-center gap-2" style={cardStyle}><Spinner /><span className="text-sm" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.loadingHistory")}</span></div>
+              <StockRowsSkeleton rows={historyItemsPerPage} columns={9} cardStyle={cardStyle} />
             ) : historyItems.length === 0 ? (
               <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}><ClockIcon className="w-8 h-8" /><p className="text-sm text-center px-4" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.noHistory")}</p></div>
             ) : (
@@ -726,13 +807,13 @@ export default function ManageStockPage() {
                         const isSet = h.adjustment_type === "set";
                         return (
                           <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistoryItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
-                          <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)}</span></div></td>
+                          <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{showHistoryTranslationSkeletons && isMissingTranslation(h.product_name, h.translations?.product_name?.[locale]) ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-busy="true" /> : stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)}</span></div></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
-                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{localizedField(h.variant_title, h.translations?.variant_title, locale)}</span></td>
+                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{showHistoryTranslationSkeletons && isMissingTranslation(h.variant_title, h.translations?.variant_title?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-busy="true" /> : localizedField(h.variant_title, h.translations?.variant_title, locale)}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{formatNumber(h.previous_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "var(--warning)" : change > 0 ? "var(--success-text)" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{formatNumber(h.new_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
-                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{localizedField(h.reason, h.translations?.reason, locale) || "—"}</span></td>
+                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{showHistoryTranslationSkeletons && isMissingTranslation(h.reason, h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-card)] animate-pulse" aria-busy="true" /> : localizedField(h.reason, h.translations?.reason, locale) || "—"}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[12px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDateTime(h.created_at, locale)}</span></td>
                           </tr>
@@ -744,16 +825,19 @@ export default function ManageStockPage() {
               </div>
             )}
 
-            {!historyLoading && (historyPagination?.total || 0) > itemsPerPage && (
+            {!historyLoading && (historyPagination?.total || 0) > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-                <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingRecordsRange", { from: formatNumber((historyPage - 1) * itemsPerPage + 1, locale), to: formatNumber(Math.min(historyPage * itemsPerPage, historyPagination?.total || historyItems.length), locale), total: formatNumber(historyPagination?.total || historyItems.length, locale) })}</p>
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                  <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.showingRecordsRange", { from: formatNumber((historyPage - 1) * historyItemsPerPage + 1, locale), to: formatNumber(Math.min(historyPage * historyItemsPerPage, historyPagination?.total || historyItems.length), locale), total: formatNumber(historyPagination?.total || historyItems.length, locale) })}</p>
+                  <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={historyItemsPerPage} onChange={(event) => { setHistoryItemsPerPage(Number(event.target.value)); setHistoryPage(1); }} className="h-9 rounded-lg px-3 text-[13px] outline-none cursor-pointer" style={inputStyle}>{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatNumber(size, locale)}</option>)}</select></label>
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(historyPage, locale), pages: formatNumber(historyPagination?.pages || 1, locale) })}</span>
-                  <button onClick={() => historyPage > 1 && setHistoryPage(historyPage - 1)} disabled={historyPage === 1} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
+                  <button onClick={() => historyPage > 1 && setHistoryPage(historyPage - 1)} disabled={historyPage === 1 || historyFetching} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                   <span className="hidden sm:inline-flex items-center gap-1">
-                    {renderPageNumbers(historyPage, historyPagination?.pages || 1, setHistoryPage)}
+                    {renderPageNumbers(historyPage, historyPagination?.pages || 1, setHistoryPage, historyFetching)}
                   </span>
-                  <button onClick={() => historyPage < (historyPagination?.pages || 1) && setHistoryPage(historyPage + 1)} disabled={historyPage === (historyPagination?.pages || 1)} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
+                  <button onClick={() => historyPage < (historyPagination?.pages || 1) && setHistoryPage(historyPage + 1)} disabled={historyPage === (historyPagination?.pages || 1) || historyFetching} className="h-9 w-9 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon className="w-4 h-4 sm:w-3.5 sm:h-3.5" /></button>
                 </div>
               </div>
             )}
@@ -765,7 +849,7 @@ export default function ManageStockPage() {
       {detailsTarget && (() => {
         const status = getStockStatus(detailsTarget);
         const qty = Number(detailsTarget.quantity ?? 0);
-        const latest = detailsHistory[0] || null;
+        const latest = detailsHistoryPage === 1 ? detailsHistory[0] || null : detailsLatestData?.items?.[0] || null;
         const changeColor = (c) => (c > 0 ? "var(--success-text)" : c < 0 ? "var(--danger)" : "var(--warning)");
 
         return (
@@ -844,7 +928,7 @@ export default function ManageStockPage() {
                 <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-color)" }}>
                   <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
                     <h4 className="text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.stockHistory")}</h4>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{t("admin.manageStock.page.recordsCount", { count: formatNumber(detailsHistory.length, locale) })}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border-color)" }}>{t("admin.manageStock.page.recordsCount", { count: formatNumber(detailsHistoryPagination.total || 0, locale) })}</span>
                   </div>
                   <div className="p-4">
                     {detailsHistoryLoading ? (
@@ -870,7 +954,7 @@ export default function ManageStockPage() {
                                 <span className="text-[13px] font-bold" style={{ color: changeColor(change) }}>
                                   {change > 0 ? `+${formatNumber(change, locale)}` : formatNumber(change, locale)} {t("admin.manageStock.page.units")}
                                 </span>
-                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{localizedField(h.reason, h.translations?.reason, locale) || h.adjustment_type || "—"}</span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{showDetailsHistoryTranslationSkeletons && isMissingTranslation(h.reason, h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-busy="true" /> : localizedField(h.reason, h.translations?.reason, locale) || h.adjustment_type || "—"}</span>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
                                 <span style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.previousStock")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatNumber(h.previous_quantity, locale)}</span></span>
@@ -881,11 +965,29 @@ export default function ManageStockPage() {
                               {/* ✅ Explanation — adjust form ka notes (full text, wrap ke sath) */}
                               <div className="mt-2.5 pt-2" style={{ borderTop: "1px dashed var(--border-color)" }}>
                                 <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.explanation")}</span>
-                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{contentOf(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation : h.translations?.reason)}</p>
+                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{showDetailsHistoryTranslationSkeletons && isMissingTranslation(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation?.[locale] : h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-32 rounded bg-[var(--bg-card)] animate-pulse" aria-busy="true" /> : contentOf(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation : h.translations?.reason)}</p>
                               </div>
                             </div>
                           );
                         })}
+                      </div>
+                    )}
+                    {!detailsHistoryLoading && detailsHistoryPagination.total > 0 && (
+                      <div className="mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border-color)" }}>
+                        <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                          {formatNumber((detailsHistoryPage - 1) * detailsHistoryItemsPerPage + 1, locale)}–{formatNumber(Math.min(detailsHistoryPage * detailsHistoryItemsPerPage, detailsHistoryPagination.total), locale)} / {formatNumber(detailsHistoryPagination.total, locale)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                            <span>{t("admin.brands.ui.rowsPerPage")}</span>
+                            <select value={detailsHistoryItemsPerPage} onChange={(event) => { setDetailsHistoryItemsPerPage(Number(event.target.value)); setDetailsHistoryPage(1); }} className="h-8 rounded-md px-2 text-xs" style={inputStyle}>
+                              {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatNumber(size, locale)}</option>)}
+                            </select>
+                          </label>
+                          <button type="button" onClick={() => setDetailsHistoryPage((page) => Math.max(1, page - 1))} disabled={detailsHistoryPage <= 1 || detailsHistoryFetching} className="h-8 rounded-md border px-2 text-xs disabled:opacity-40" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>{t("admin.brands.ui.previousPage")}</button>
+                          <span className="text-[11px] whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{t("admin.manageStock.page.pageOf", { page: formatNumber(detailsHistoryPage, locale), pages: formatNumber(detailsHistoryPagination.pages || 1, locale) })}</span>
+                          <button type="button" onClick={() => setDetailsHistoryPage((page) => Math.min(detailsHistoryPagination.pages || 1, page + 1))} disabled={detailsHistoryPage >= (detailsHistoryPagination.pages || 1) || detailsHistoryFetching} className="h-8 rounded-md border px-2 text-xs disabled:opacity-40" style={{ borderColor: "var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>{t("admin.brands.ui.nextPage")}</button>
+                        </div>
                       </div>
                     )}
                   </div>

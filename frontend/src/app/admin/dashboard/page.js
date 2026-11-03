@@ -16,6 +16,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Cog,
   FolderOpen,
@@ -169,6 +170,24 @@ function SectionEmpty({ icon: Icon = Package, children }) {
         <Icon size={20} />
       </span>
       <p className="text-[12.5px] text-[var(--text-muted)]">{children}</p>
+    </div>
+  );
+}
+
+function DashboardPagination({ pagination, page, setPage, pageSize, setPageSize, rowsLabel, previousLabel, nextLabel }) {
+  const total = Number(pagination?.total) || 0;
+  const pages = Math.max(1, Number(pagination?.pages) || 1);
+  if (total <= pageSize) return null;
+  const firstPage = Math.min(Math.max(1, page - 2), Math.max(1, pages - 4));
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-card)] pt-3 text-[11px] text-[var(--text-muted)]">
+      <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}</span>
+      <label className="flex items-center gap-2"><span>{rowsLabel}</span><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="h-8 rounded-lg border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-[var(--text-primary)]">{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+      <div className="flex items-center gap-1">
+        <button type="button" aria-label={previousLabel} disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-card)] disabled:opacity-40"><ChevronLeft size={15} /></button>
+        {Array.from({ length: Math.min(pages, 5) }, (_, index) => firstPage + index).map((number) => <button key={number} type="button" aria-current={number === page ? "page" : undefined} onClick={() => setPage(number)} className={`h-8 min-w-8 rounded-lg px-2 font-semibold ${number === page ? "bg-[var(--accent)] text-white" : "border border-[var(--border-card)] text-[var(--text-secondary)]"}`}>{number}</button>)}
+        <button type="button" aria-label={nextLabel} disabled={page >= pages} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-card)] disabled:opacity-40"><ChevronRight size={15} /></button>
+      </div>
     </div>
   );
 }
@@ -649,7 +668,7 @@ function SalesDistribution({ data }) {
 }
 
 /* ==================== RECENT ACTIVITY ==================== */
-function RecentActivity({ data }) {
+function RecentActivity({ data, page, setPage, pageSize, setPageSize }) {
   const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.dashboard." + k, p);
   const items = data?.activities || [];
@@ -722,12 +741,13 @@ function RecentActivity({ data }) {
           })}
         </ul>
       )}
+      <DashboardPagination pagination={data?.activitiesPagination} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} rowsLabel={__t("admin.shared.pagination.rowsPerPage")} previousLabel={__t("admin.finance.previous")} nextLabel={__t("admin.finance.next")} />
     </div>
   );
 }
 
 /* ==================== RECENT ORDERS ==================== */
-function RecentOrders({ data }) {
+function RecentOrders({ data, page, setPage, pageSize, setPageSize }) {
   const { t: __t, locale } = useTranslation();
   const t = (k, p) => __t("admin.dashboard." + k, p);
   const orders = data?.recentOrders || [];
@@ -801,6 +821,7 @@ function RecentOrders({ data }) {
           ))}
         </ul>
       )}
+      <DashboardPagination pagination={data?.recentOrdersPagination} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} rowsLabel={__t("admin.shared.pagination.rowsPerPage")} previousLabel={__t("admin.finance.previous")} nextLabel={__t("admin.finance.next")} />
     </div>
   );
 }
@@ -812,7 +833,7 @@ const RANK_STYLES = [
   "bg-orange-500/15 text-orange-600 dark:text-orange-400",
 ];
 
-function TopProducts({ data }) {
+function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
   const { t: __t } = useTranslation();
   const { productNameOf } = useLocalized();
   const t = (k, p) => __t("admin.dashboard." + k, p);
@@ -882,7 +903,7 @@ function TopProducts({ data }) {
                           RANK_STYLES[i] || "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
                         }`}
                       >
-                        {i + 1}
+                        {(page - 1) * pageSize + i + 1}
                       </span>
                     </td>
 
@@ -926,6 +947,7 @@ function TopProducts({ data }) {
           </table>
         </div>
       )}
+      <DashboardPagination pagination={data?.topProductsPagination} page={page} setPage={setPage} pageSize={pageSize} setPageSize={setPageSize} rowsLabel={__t("admin.shared.pagination.rowsPerPage")} previousLabel={__t("admin.finance.previous")} nextLabel={__t("admin.finance.next")} />
     </div>
   );
 }
@@ -1011,21 +1033,31 @@ function GrowBanner() {
 
 /* ==================== PAGE ==================== */
 export default function Dashboard() {
-  const { t: __t } = useTranslation();
+  const { t: __t, locale = "en" } = useTranslation();
   const t = (k, p) => __t("admin.dashboard." + k, p);
 
   useStoreSocketSync();
 
   const [range, setRange] = useState("7d");
   const [rangeOpen, setRangeOpen] = useState(false);
+  const [listPageSize, setListPageSize] = useState(10);
+  const [topProductsPage, setTopProductsPage] = useState(1);
+  const [recentOrdersPage, setRecentOrdersPage] = useState(1);
+  const [activitiesPage, setActivitiesPage] = useState(1);
   const queryClient = useQueryClient();
   const { socket } = useAdminSocket();
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-    queryKey: ["dashboard-stats", range],
-    queryFn: () => dashboardApi.getStats(range),
+    queryKey: ["dashboard-stats", range, locale, listPageSize, topProductsPage, recentOrdersPage, activitiesPage],
+    queryFn: () => dashboardApi.getStats({ range, locale, limit: listPageSize, topProductsPage, recentOrdersPage, activitiesPage }),
     staleTime: 30000,
   });
+
+  useEffect(() => {
+    if (data?.topProductsPagination?.page && data.topProductsPagination.page !== topProductsPage) setTopProductsPage(data.topProductsPagination.page);
+    if (data?.recentOrdersPagination?.page && data.recentOrdersPagination.page !== recentOrdersPage) setRecentOrdersPage(data.recentOrdersPagination.page);
+    if (data?.activitiesPagination?.page && data.activitiesPagination.page !== activitiesPage) setActivitiesPage(data.activitiesPagination.page);
+  }, [data?.topProductsPagination?.page, data?.recentOrdersPagination?.page, data?.activitiesPagination?.page, topProductsPage, recentOrdersPage, activitiesPage]);
 
   // Realtime refresh via socket
   useEffect(() => {
@@ -1115,6 +1147,9 @@ export default function Dashboard() {
                       type="button"
                       onClick={() => {
                         setRange(r.key);
+                        setTopProductsPage(1);
+                        setRecentOrdersPage(1);
+                        setActivitiesPage(1);
                         setRangeOpen(false);
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -1193,15 +1228,15 @@ export default function Dashboard() {
             </div>
 
             <div className="xl:col-span-7">
-              <TopProducts data={data} />
+              <TopProducts data={data} page={topProductsPage} setPage={setTopProductsPage} pageSize={listPageSize} setPageSize={(size) => { setListPageSize(size); setTopProductsPage(1); setRecentOrdersPage(1); setActivitiesPage(1); }} />
             </div>
 
             <div className="flex flex-col gap-3 xl:col-span-5">
-              <RecentOrders data={data} />
+              <RecentOrders data={data} page={recentOrdersPage} setPage={setRecentOrdersPage} pageSize={listPageSize} setPageSize={(size) => { setListPageSize(size); setTopProductsPage(1); setRecentOrdersPage(1); setActivitiesPage(1); }} />
             </div>
 
             <div className="xl:col-span-7">
-              <RecentActivity data={data} />
+              <RecentActivity data={data} page={activitiesPage} setPage={setActivitiesPage} pageSize={listPageSize} setPageSize={(size) => { setListPageSize(size); setTopProductsPage(1); setRecentOrdersPage(1); setActivitiesPage(1); }} />
             </div>
 
             <div className="flex flex-col gap-3 xl:col-span-5">

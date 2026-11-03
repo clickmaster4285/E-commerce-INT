@@ -48,6 +48,20 @@ const getImageUrl = (path) => {
 const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
 const inputStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
 
+const uniqueRecords = (records) => Array.from(new Map(records.filter((record) => record?._id).map((record) => [String(record._id), record])).values());
+const translationPageState = (records, field, locale) => {
+  const translatable = records.filter((record) => String(record?.[field] || "").trim().length >= 3);
+  const translatedCount = translatable.filter((record) => record?.translations?.[field]?.[locale]?.trim()).length;
+  return {
+    mostlyUntranslated: locale !== "en" && translatable.length > 0 && translatedCount / translatable.length <= 0.2,
+    hasTranslation: (record) => Boolean(record?.translations?.[field]?.[locale]?.trim()),
+  };
+};
+
+function TranslationSkeleton({ className = "h-3 w-28" }) {
+  return <span aria-hidden="true" className={`inline-block animate-pulse rounded bg-[var(--bg-tertiary)] ${className}`} />;
+}
+
 const localeTag = (locale) =>
   locale === "ur" ? "ur-PK" : locale === "en" ? "en-US" : locale;
 const fmt = (n, locale = "en") => new Intl.NumberFormat(localeTag(locale)).format(Number(n || 0));
@@ -141,7 +155,7 @@ function GridSkeleton({ cards = 8 }) {
 /* ==========================================================
    FEATURED ROW — list view table row (same cells as Products page)
    ========================================================== */
-function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
+function FeaturedRow({ product, isRemoving, onOpen, onRemove, productNameReady = true, categoryNameReady = true, brandNameReady = true }) {
   const { t, locale } = useTranslation();
   const { nameOf, productNameOf } = useLocalized();
   const variant = product?.variants?.[0];
@@ -160,9 +174,9 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
     >
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          <FallbackImage src={getImageUrl(img)} alt={productName} className="h-8 w-8 shrink-0 rounded object-cover" />
+          <FallbackImage src={getImageUrl(img)} alt={productNameReady ? productName : ""} className="h-8 w-8 shrink-0 rounded object-cover" />
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold">{productName}</p>
+            <p className="truncate text-[13px] font-semibold">{productNameReady ? productName : <TranslationSkeleton />}</p>
             <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{variant?.sku || "—"}</p>
           </div>
           <span
@@ -175,8 +189,8 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
           </span>
         </div>
       </td>
-      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{nameOf(product?.category_id) || "—"}</td>
-      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{nameOf(product?.brand_id) || "—"}</td>
+      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{categoryNameReady ? (nameOf(product?.category_id) || "—") : <TranslationSkeleton className="h-3 w-20" />}</td>
+      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{brandNameReady ? (nameOf(product?.brand_id) || "—") : <TranslationSkeleton className="h-3 w-20" />}</td>
       <td className="px-4 py-2.5">
         <div className="flex items-baseline gap-1.5">
           <span className="font-semibold tabular-nums">{fmtCurrency(price, locale)}</span>
@@ -221,7 +235,7 @@ function FeaturedRow({ product, isRemoving, onOpen, onRemove }) {
 /* ==========================================================
    FEATURED GRID CARD — same card layout as Products grid view
    ========================================================== */
-function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
+function FeaturedGridCard({ product, isRemoving, onOpen, onRemove, productNameReady = true, categoryNameReady = true, brandNameReady = true }) {
   const { t, locale } = useTranslation();
   const { nameOf, productNameOf } = useLocalized();
   const variant = product?.variants?.[0];
@@ -236,7 +250,7 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
       style={cardStyle}
     >
       <div className="flex items-start justify-between">
-        <FallbackImage src={getImageUrl(img)} alt={productName} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+        <FallbackImage src={getImageUrl(img)} alt={productNameReady ? productName : ""} className="h-10 w-10 shrink-0 rounded-full object-cover" />
         <div className="flex items-center gap-1.5">
           <span
             className="inline-flex items-center rounded-md px-1.5 py-1"
@@ -251,10 +265,10 @@ function FeaturedGridCard({ product, isRemoving, onOpen, onRemove }) {
       </div>
 
       <div className="min-w-0">
-        <p className="truncate text-[13px] font-semibold">{productName}</p>
+        <p className="truncate text-[13px] font-semibold">{productNameReady ? productName : <TranslationSkeleton />}</p>
         {variant?.sku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{variant.sku}</p>}
         <p className="mt-0.5 text-[11px]" style={{ color: "var(--text-muted)" }}>
-          {[nameOf(product?.category_id), nameOf(product?.brand_id)].filter(Boolean).join(" · ") || "—"}
+          {categoryNameReady && brandNameReady ? ([nameOf(product?.category_id), nameOf(product?.brand_id)].filter(Boolean).join(" · ") || "—") : <TranslationSkeleton className="h-3 w-32" />}
         </p>
         <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>
           {fmtCurrency(price, locale)} · {t("admin.featuredProducts.ui.stock")}: {fmt(variant?.quantity, locale)}
@@ -364,32 +378,41 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
   const pagination = data?.pagination || {};
   const totalPages = Math.max(1, Number(pagination.pages) || 1);
   const totalRecords = Number(pagination.total) || 0;
-  const categories = useMemo(() => products.map((product) => product?.category_id).filter((item) => item?._id), [products]);
-  const brands = useMemo(() => products.map((product) => product?.brand_id).filter((item) => item?._id), [products]);
-  usePageTranslations({
+  const categories = useMemo(() => uniqueRecords(products.map((product) => product?.category_id).filter((item) => item?._id)), [products]);
+  const brands = useMemo(() => uniqueRecords(products.map((product) => product?.brand_id).filter((item) => item?._id)), [products]);
+  const productTranslationsReady = usePageTranslations({
     model: "Product",
     records: products,
     locale,
     ready: open && !isFetching && Number(pagination.page || page) === page,
     queryKey: ["manage-featured", page, debounced, locale],
     queryClient,
+    fallbackAfterRetries: true,
   });
-  usePageTranslations({
+  const categoryTranslationsReady = usePageTranslations({
     model: "Category",
     records: categories,
     locale,
     ready: open && !isFetching && Number(pagination.page || page) === page,
     queryKey: ["manage-featured", page, debounced, locale],
     queryClient,
+    fallbackAfterRetries: true,
   });
-  usePageTranslations({
+  const brandTranslationsReady = usePageTranslations({
     model: "Brand",
     records: brands,
     locale,
     ready: open && !isFetching && Number(pagination.page || page) === page,
     queryKey: ["manage-featured", page, debounced, locale],
     queryClient,
+    fallbackAfterRetries: true,
   });
+  const productNameState = translationPageState(products, "name", locale);
+  const categoryNameState = translationPageState(categories, "name", locale);
+  const brandNameState = translationPageState(brands, "name", locale);
+  const isProductNameReady = (product) => locale === "en" || productTranslationsReady || !productNameState.mostlyUntranslated || productNameState.hasTranslation(product);
+  const isCategoryNameReady = (category) => locale === "en" || categoryTranslationsReady || !categoryNameState.mostlyUntranslated || categoryNameState.hasTranslation(category);
+  const isBrandNameReady = (brand) => locale === "en" || brandTranslationsReady || !brandNameState.mostlyUntranslated || brandNameState.hasTranslation(brand);
 
   // Naye loaded products ke original state capture karo (draft ko touch na karo)
   useEffect(() => {
@@ -597,12 +620,12 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
                       {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
                     </span>
 
-                    <FallbackImage src={getImageUrl(img)} alt={productNameOf(p)} className="h-9 w-9 shrink-0 rounded object-cover" />
+                    <FallbackImage src={getImageUrl(img)} alt={isProductNameReady(p) ? productNameOf(p) : ""} className="h-9 w-9 shrink-0 rounded object-cover" />
 
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p>
+                      <p className="truncate text-[13px] font-semibold">{isProductNameReady(p) ? productNameOf(p) : <TranslationSkeleton />}</p>
                       <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        {variant?.sku || "—"} · {nameOf(p?.category_id) || "—"} · {nameOf(p?.brand_id) || "—"}
+                        {variant?.sku || "—"} · {isCategoryNameReady(p?.category_id) ? (nameOf(p?.category_id) || "—") : <TranslationSkeleton className="h-3 w-16" />} · {isBrandNameReady(p?.brand_id) ? (nameOf(p?.brand_id) || "—") : <TranslationSkeleton className="h-3 w-16" />}
                       </p>
                     </div>
 
@@ -723,32 +746,41 @@ export default function FeaturedProductsPage() {
 
   const products = useMemo(() => data?.products || [], [data]);
   const pagination = data?.pagination || { total: 0, pages: 1, limit: DEFAULT_PER_PAGE };
-  const categories = useMemo(() => products.map((product) => product?.category_id).filter((item) => item?._id), [products]);
-  const brands = useMemo(() => products.map((product) => product?.brand_id).filter((item) => item?._id), [products]);
-  usePageTranslations({
+  const categories = useMemo(() => uniqueRecords(products.map((product) => product?.category_id).filter((item) => item?._id)), [products]);
+  const brands = useMemo(() => uniqueRecords(products.map((product) => product?.brand_id).filter((item) => item?._id)), [products]);
+  const productTranslationsReady = usePageTranslations({
     model: "Product",
     records: products,
     locale,
     ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
     queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryClient,
+    fallbackAfterRetries: true,
   });
-  usePageTranslations({
+  const categoryTranslationsReady = usePageTranslations({
     model: "Category",
     records: categories,
     locale,
     ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
     queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryClient,
+    fallbackAfterRetries: true,
   });
-  usePageTranslations({
+  const brandTranslationsReady = usePageTranslations({
     model: "Brand",
     records: brands,
     locale,
     ready: !isFetching && Number(pagination.page || currentPage) === currentPage,
     queryKey: ["featured-products", currentPage, search, productsPerPage, locale],
     queryClient,
+    fallbackAfterRetries: true,
   });
+  const productNameState = translationPageState(products, "name", locale);
+  const categoryNameState = translationPageState(categories, "name", locale);
+  const brandNameState = translationPageState(brands, "name", locale);
+  const isProductNameReady = (product) => locale === "en" || productTranslationsReady || !productNameState.mostlyUntranslated || productNameState.hasTranslation(product);
+  const isCategoryNameReady = (category) => locale === "en" || categoryTranslationsReady || !categoryNameState.mostlyUntranslated || categoryNameState.hasTranslation(category);
+  const isBrandNameReady = (brand) => locale === "en" || brandTranslationsReady || !brandNameState.mostlyUntranslated || brandNameState.hasTranslation(brand);
   const totalRecords = Number(pagination.total) || 0;
   const totalPages = Math.max(1, Number(pagination.pages) || 1);
   const pageLimit = Number(pagination.limit) || productsPerPage;
@@ -913,6 +945,9 @@ export default function FeaturedProductsPage() {
                       <FeaturedRow
                         key={p._id}
                         product={p}
+                        productNameReady={isProductNameReady(p)}
+                        categoryNameReady={isCategoryNameReady(p?.category_id)}
+                        brandNameReady={isBrandNameReady(p?.brand_id)}
                         isRemoving={featuredMutation.isPending}
                         onOpen={() => router.push(`/admin/products/${p._id}`)}
                         onRemove={() => featuredMutation.mutate(p._id)}
@@ -959,6 +994,9 @@ export default function FeaturedProductsPage() {
               <FeaturedGridCard
                 key={p._id}
                 product={p}
+                productNameReady={isProductNameReady(p)}
+                categoryNameReady={isCategoryNameReady(p?.category_id)}
+                brandNameReady={isBrandNameReady(p?.brand_id)}
                 isRemoving={featuredMutation.isPending}
                 onOpen={() => router.push(`/admin/products/${p._id}`)}
                 onRemove={() => featuredMutation.mutate(p._id)}

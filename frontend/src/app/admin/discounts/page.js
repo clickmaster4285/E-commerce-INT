@@ -550,6 +550,8 @@ export default function DiscountsPage() {
     typeof discount.translations?.name?.[locale] === "string" && discount.translations.name[locale].trim().length > 0
   ));
   const pageTranslationsReady = usePageTranslations({ model: "Discount", records: discounts, locale, ready: !isFetching && !!paginatedDiscountsData?.pagination, queryKey: ["discounts", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, statusFilter, targetFilter], queryClient, alreadyTranslated: discountsAlreadyTranslated, fallbackAfterRetries: true });
+  const untranslatedDiscountNameCount = discounts.filter((discount) => !discount?.translations?.name?.[locale]?.trim()).length;
+  const showDiscountTranslationSkeletons = locale !== "en" && discounts.length > 0 && untranslatedDiscountNameCount / discounts.length >= 0.8 && !pageTranslationsReady;
   const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
   const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
@@ -1105,7 +1107,7 @@ export default function DiscountsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              {locale === "en" || pageTranslationsReady || discount?.translations?.name?.[locale]?.trim()
+                              {!showDiscountTranslationSkeletons || pageTranslationsReady || discount?.translations?.name?.[locale]?.trim()
                                 ? <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                                 : <span className={`${translationSkeleton} w-28 align-middle`} aria-label={t("admin.categories.page.updating")} />}
                             </div>
@@ -1131,7 +1133,7 @@ export default function DiscountsPage() {
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
-                  {locale === "en" || pageTranslationsReady || discount?.translations?.name?.[locale]?.trim()
+                  {!showDiscountTranslationSkeletons || pageTranslationsReady || discount?.translations?.name?.[locale]?.trim()
                     ? <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
                     : <span className={`${translationSkeleton} w-28`} aria-label={t("admin.categories.page.updating")} />}
                 </div>

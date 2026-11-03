@@ -4,25 +4,6 @@ const dotenv = require("dotenv");
 const backendEnvPath = path.join(__dirname, ".env");
 dotenv.config({ path: backendEnvPath, quiet: true });
 
-// Argos configuration has one source of truth: backend/.env. dotenv normally
-// preserves shell/service variables, so apply every Argos/translation key from
-// the file (and clear missing ones) before importing the translation client.
-const argosEnv = fs.existsSync(backendEnvPath)
-  ? dotenv.parse(fs.readFileSync(backendEnvPath))
-  : {};
-const argosEnvPrefixes = ["ARGOS_", "LIBRETRANSLATE_", "TRANSLATE_", "TRANSLATION_"];
-const argosEnvKeys = new Set([
-  ...Object.keys(argosEnv),
-  ...Object.keys(process.env),
-].filter((key) => argosEnvPrefixes.some((prefix) => key.startsWith(prefix))));
-for (const key of argosEnvKeys) {
-  if (Object.prototype.hasOwnProperty.call(argosEnv, key)) {
-    process.env[key] = argosEnv[key];
-  } else {
-    delete process.env[key];
-  }
-}
-
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
@@ -31,7 +12,6 @@ const bcrypt = require("bcryptjs");
 const os = require("os");
 const cookieParser = require("cookie-parser");
 
-const spawn = require("child_process").spawn;
 
 const connectDB = require("./config/db");
 const log = require("./utils/logger");
@@ -339,151 +319,6 @@ const seedDefaultData = async () => {
 };
 
 // ==========================================
-// 🔤 ARGOS / LOCAL TRANSLATION SERVER (dev companion)
-// Backend start hote hi local translation bridge (scripts/argosTranslateServer.py —
-// LibreTranslate-compatible; utils/libreTranslate.js aur routes/translationRoutes
-// isi ko call karte hain) saath chalu ho jaye. Design:
-//   • Sirf jab LIBRETRANSLATE_URL env configured ho — dev aur production dono
-//     me, same env URL ko health-check/reuse aur bridge bind ke liye use karein.
-//   • agar configured URL par bridge pehle se zinda hai to REUSE hota hai —
-//     duplicate process start nahi hota (server restart par bhi; loading bridge
-//     ke bind hone tak chhota sa grace wait bhi hota hai).
-//   • Start command backend/package.json ke existing script se aati hai
-//     (hardcode nahi) aur port LIBRETRANSLATE_URL se derive hota hai —
-//     libreTranslate.js ka client isi URL par call karta hai.
-//   • Ye background me hota hai — Express server kabhi block nahi hota
-//     (pehli baar model download/load me minutes lag sakte hain).
-// ==========================================
-const TRANSLATION_API_URL = String(process.env.LIBRETRANSLATE_URL || "").replace(/\/+$/, "");
-const TRANSLATION_READY_TIMEOUT_MS = Number(process.env.TRANSLATE_READY_TIMEOUT_MS);
-const TRANSLATION_REUSE_GRACE_MS = Number(process.env.TRANSLATE_REUSE_GRACE_MS);
-const TRANSLATION_HEALTHCHECK_TIMEOUT_MS = Number(process.env.TRANSLATE_HEALTHCHECK_TIMEOUT_MS);
-const TRANSLATION_READY_POLL_INTERVAL_MS = Number(process.env.TRANSLATE_READY_POLL_INTERVAL_MS);
-const TRANSLATION_REUSE_POLL_INTERVAL_MS = Number(process.env.TRANSLATE_REUSE_POLL_INTERVAL_MS);
-const ARGOS_SLEEP = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-let argosProcess = null;
-const isTranslationServiceUp = async () => {
-  try {
-    const response = await fetch(`${TRANSLATION_API_URL}/healthz`, {
-      signal: AbortSignal.timeout(TRANSLATION_HEALTHCHECK_TIMEOUT_MS),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-};
-
-const waitTranslationServiceReady = async () => {
-  const deadline = Date.now() + TRANSLATION_READY_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (await isTranslationServiceUp()) return true;
-    await ARGOS_SLEEP(TRANSLATION_READY_POLL_INTERVAL_MS);
-  }
-  return false;
-};
-
-/** package.json me se wahi script dhoondo jo argosTranslateServer.py chalati hai. */
-const findArgosScript = () => {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
-    for (const [name, command] of Object.entries(pkg.scripts || {})) {
-      if (String(command).includes("argosTranslateServer.py")) return { name, command };
-    }
-  } catch { /* package.json na mile to niche clear error dikhega */ }
-  return null;
-};
-
-const startArgosServer = async () => {
-  if (!TRANSLATION_API_URL) {
-    startupLog.error("Argos translation bridge configure nahi hai — backend/.env me LIBRETRANSLATE_URL set karein");
-    return;
-  }
-
-  // Duplicate guard: python bridge apna port model load/prewarm ke BAAD bind
-  // karta hai. Restart par purana bridge abhi "loading" me ho sakta hai —
-  // spawn ke faislay se pehle thodi der tak reuse ka wait karo, warna do
-  // processes aa jate hain (doosra baad me port bind karne par crash hota hai).
-  let serviceUp = await isTranslationServiceUp();
-  if (!serviceUp) {
-    const graceDeadline = Date.now() + TRANSLATION_REUSE_GRACE_MS;
-    while (!serviceUp && Date.now() < graceDeadline) {
-      await ARGOS_SLEEP(TRANSLATION_REUSE_POLL_INTERVAL_MS);
-      serviceUp = await isTranslationServiceUp();
-    }
-  }
-  if (serviceUp) {
-    startupLog.info(`Argos Translator running at ${TRANSLATION_API_URL} (existing service)`);
-    return;
-  }
-
-  const script = findArgosScript();
-  if (!script) {
-    startupLog.error(`Argos translation bridge nahi start hua — package.json me "argosTranslateServer.py" wala script nahi mila`);
-    return;
-  }
-
-  // Node client jis port par call karega, python bridge usi par sunna chahiye.
-  // ARGOS_PORT backend/.env se hi liya jata hai; URL port fallback bhi wahi source hai.
-  const targetPort = (() => {
-    try { return Number(new URL(TRANSLATION_API_URL).port) || 80; } catch { return null; }
-  })();
-  const childEnv = { ...process.env };
-  if (!childEnv.ARGOS_PORT && targetPort) {
-    childEnv.ARGOS_PORT = String(targetPort);
-  }
-
-  try {
-    argosProcess = spawn(script.command, {
-      shell: true,
-      cwd: __dirname, // script ka "scripts/argosTranslateServer.py" relative path isi se resolve hota hai
-      env: childEnv,
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-  } catch (error) {
-    argosProcess = null;
-    startupLog.error(`Argos translation bridge spawn failed: ${error.message}`);
-    return;
-  }
-
-  // Bridge startup/download failures were previously hidden, making Linux
-  // deployments look like a generic connection refusal. Forward its output.
-  const forwardArgosOutput = (stream, level) => {
-    stream?.on("data", (chunk) => {
-      for (const line of chunk.toString("utf8").split(/\r?\n/).filter(Boolean)) {
-        startupLog[level](`[argos] ${line}`);
-      }
-    });
-  };
-  forwardArgosOutput(argosProcess.stdout, "info");
-  forwardArgosOutput(argosProcess.stderr, "error");
-
-  argosProcess.once("error", (error) => {
-    const message = error.code === "ENOENT"
-      ? `"uv" executable is process ke PATH me nahi mila (uv installed hai to PATH check karein)`
-      : error.message;
-    startupLog.error(`Argos translation bridge start nahi ho saka: ${message}`);
-  });
-
-  argosProcess.once("exit", (code, signal) => {
-    if (signal === "SIGTERM") return; // graceful shutdown — error nahi
-    startupLog.error(`Argos translation bridge exit ho gaya (code: ${code ?? signal ?? "unknown"})`);
-  });
-
-  // Blocking nahi — sirf status report.
-  waitTranslationServiceReady()
-    .then((ready) => {
-      if (ready) {
-        startupLog.info(`Argos Translator running at ${TRANSLATION_API_URL}`);
-      } else {
-        startupLog.error(`Translation bridge ${(TRANSLATION_READY_TIMEOUT_MS / 60000).toFixed(0)} min me ready nahi hua (network/model download slow ho sakta hai). Manual: cd backend && npm run ${script.name}`);
-      }
-    })
-    .catch(() => {});
-};
-
-// ==========================================
 // SERVER STARTUP
 // ==========================================
 const startServer = async () => {
@@ -530,7 +365,6 @@ const startServer = async () => {
       }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
     });
-    if (TRANSLATION_API_URL) startArgosServer();
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi
     startupLog.error(`Server start failed: ${error.message}`);

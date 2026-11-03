@@ -769,10 +769,21 @@ const [viewMode, setViewMode] = useState(() => {
     (!category.description || (typeof category.translations?.description?.[locale] === "string" && category.translations.description[locale].trim().length > 0))
   ));
   const categoryPageTranslationsReady = usePageTranslations({ model: "Category", records: categories, locale, ready: !categoriesFetching && !!paginatedCategoriesData?.pagination, queryKey: ["admin-categories", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterParent, sortConfig.key, sortConfig.direction], queryClient, alreadyTranslated: pageAlreadyTranslated, fallbackAfterRetries: true });
-  const localizedNameReady = (category) => locale === "en" || categoryPageTranslationsReady || Boolean(
+  const translatedCategoryNameCount = categories.filter((category) =>
+    typeof category.translations?.name?.[locale] === "string" && category.translations.name[locale].trim()
+  ).length;
+  const categoriesWithDescription = categories.filter((category) => category.description?.trim());
+  const translatedCategoryDescriptionCount = categoriesWithDescription.filter((category) =>
+    typeof category.translations?.description?.[locale] === "string" && category.translations.description[locale].trim()
+  ).length;
+  // Keep skeletons only while at least 80% of this page still lacks a complete
+  // translation; otherwise missing values fall back to their English source.
+  const pageNameMostlyUntranslated = locale !== "en" && categories.length > 0 && translatedCategoryNameCount / categories.length <= 0.2;
+  const pageDescriptionMostlyUntranslated = locale !== "en" && categoriesWithDescription.length > 0 && translatedCategoryDescriptionCount / categoriesWithDescription.length <= 0.2;
+  const localizedNameReady = (category) => locale === "en" || categoryPageTranslationsReady || !pageNameMostlyUntranslated || Boolean(
     category?.translations?.name?.[locale]?.trim()
   );
-  const localizedDescriptionReady = (category) => locale === "en" || categoryPageTranslationsReady || !category?.description || Boolean(
+  const localizedDescriptionReady = (category) => locale === "en" || categoryPageTranslationsReady || !pageDescriptionMostlyUntranslated || !category?.description || Boolean(
     category?.translations?.description?.[locale]?.trim()
   );
   const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse";

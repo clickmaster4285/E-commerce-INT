@@ -30,6 +30,25 @@ const emitSocketEvent = (event, data) => {
 const escapeRegExp = (value) =>
   String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const getRequestedLocale = (value) => {
+  const locale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(locale) ? locale : "en";
+};
+
+// Keep only the active language in stock API payloads. English is the source
+// value and is returned through the regular name/title fields.
+const onlyLocaleTranslations = (translations, locale) => {
+  if (locale === "en" || !translations || typeof translations !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(translations).flatMap(([field, values]) => {
+      const selected = values?.[locale];
+      return typeof selected === "string" && selected.trim()
+        ? [[field, { [locale]: selected }]]
+        : [];
+    })
+  );
+};
+
 const getStockStatusExpression = (status) => {
   if (status === "out") return { $eq: ["$quantity", 0] };
   if (status === "low") {
@@ -41,7 +60,7 @@ const getStockStatusExpression = (status) => {
   return null;
 };
 
-const toStockItem = (variant) => {
+const toStockItem = (variant, locale = "en") => {
   const product = variant.product_id && typeof variant.product_id === "object"
     ? variant.product_id
     : null;
@@ -55,18 +74,18 @@ const toStockItem = (variant) => {
     max_qnt: variant.max_qnt ?? 0,
     image: variant.images?.[0]?.img_url || "",
     product_id: product?._id || variant.product_id || null,
-    translations: variant.translations || {},
+    translations: onlyLocaleTranslations(variant.translations, locale),
     product_name: product?.name || "Unknown Product",
-    product_translations: product?.translations || {},
+    product_translations: onlyLocaleTranslations(product?.translations, locale),
     product_is_deleted: Boolean(product?.is_deleted),
     category_id: product?.category_id?._id || product?.category_id || null,
     // ✅ Fake labels ("Uncategorized" / "No brand") hataye — jab category/brand
     //    assign nahi hai to khaali bhejte hain aur frontend wo line chhupa deta hai.
     category_name: product?.category_id?.name || "",
-    category_translations: product?.category_id?.translations || {},
+    category_translations: onlyLocaleTranslations(product?.category_id?.translations, locale),
     brand_id: product?.brand_id?._id || product?.brand_id || null,
     brand_name: product?.brand_id?.name || "",
-    brand_translations: product?.brand_id?.translations || {},
+    brand_translations: onlyLocaleTranslations(product?.brand_id?.translations, locale),
     brand_logo: product?.brand_id?.logo?.img_url || "",
   };
 };
@@ -78,6 +97,7 @@ const toStockItem = (variant) => {
 
 const getStockOverview = async (req, res) => {
   try {
+    const locale = getRequestedLocale(req.query.locale);
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 0;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -121,44 +141,37 @@ const getStockOverview = async (req, res) => {
     const countForStatus = (filter, status) =>
       Variant.countDocuments(withStatus(filter, status));
 
-    // Dashboard cards describe the entire inventory, not only the current page.
+    // Summary cards and status counts stay scoped to the current search, while
+    // the row list below is additionally scoped to the selected status/page.
     const [
-      globalTotalVariants,
-      globalInStock,
-      globalLowStock,
-      globalOutOfStock,
-      globalProductIds,
-      unitsResult,
-      searchTotal,
+      searchTotalVariants,
       searchInStock,
       searchLowStock,
       searchOutOfStock,
+      searchProductIds,
+      unitsResult,
     ] = await Promise.all([
-      Variant.countDocuments(inventoryBaseFilter),
-      countForStatus(inventoryBaseFilter, "in"),
-      countForStatus(inventoryBaseFilter, "low"),
-      countForStatus(inventoryBaseFilter, "out"),
-      Variant.distinct("product_id", inventoryBaseFilter),
-      Variant.aggregate([
-        { $match: inventoryBaseFilter },
-        { $group: { _id: null, total: { $sum: { $ifNull: ["$quantity", 0] } } } },
-      ]),
       Variant.countDocuments(baseFilter),
       countForStatus(baseFilter, "in"),
       countForStatus(baseFilter, "low"),
       countForStatus(baseFilter, "out"),
+      Variant.distinct("product_id", baseFilter),
+      Variant.aggregate([
+        { $match: baseFilter },
+        { $group: { _id: null, total: { $sum: { $ifNull: ["$quantity", 0] } } } },
+      ]),
     ]);
 
     const summary = {
-      totalVariants: globalTotalVariants,
-      totalProducts: globalProductIds.length,
+      totalVariants: searchTotalVariants,
+      totalProducts: searchProductIds.length,
       totalUnits: unitsResult[0]?.total || 0,
-      inStock: globalInStock,
-      lowStock: globalLowStock,
-      outOfStock: globalOutOfStock,
+      inStock: searchInStock,
+      lowStock: searchLowStock,
+      outOfStock: searchOutOfStock,
     };
     const counts = {
-      all: searchTotal,
+      all: searchTotalVariants,
       in: searchInStock,
       low: searchLowStock,
       out: searchOutOfStock,
@@ -179,12 +192,12 @@ const getStockOverview = async (req, res) => {
       const variants = await Variant.find(listFilter)
         .populate(populateProduct)
         .select(variantSelect)
-        .sort({ created_at: -1 })
+        .sort({ created_at: -1, _id: -1 })
         .lean();
 
       return res.status(200).json({
         success: true,
-        data: variants.map(toStockItem),
+        data: variants.map((variant) => toStockItem(variant, locale)),
         summary,
         counts,
       });
@@ -199,14 +212,14 @@ const getStockOverview = async (req, res) => {
     const variants = await Variant.find(listFilter)
       .populate(populateProduct)
       .select(variantSelect)
-      .sort({ created_at: -1 })
+      .sort({ created_at: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
     return res.status(200).json({
       success: true,
-      data: variants.map(toStockItem),
+      data: variants.map((variant) => toStockItem(variant, locale)),
       summary,
       counts,
       pagination: {
@@ -494,6 +507,7 @@ const adjustStock = async (req, res) => {
 
 const getStockHistory = async (req, res) => {
   try {
+    const locale = getRequestedLocale(req.query.locale);
     const filter = {};
     if (req.query.variant_id) {
       filter.variant_id = req.query.variant_id;
@@ -507,10 +521,13 @@ const getStockHistory = async (req, res) => {
     if (!limit) {
       const history = await StockHistory.find(filter)
         .select("-__v")
-        .sort({ created_at: -1 })
+        .sort({ created_at: -1, _id: -1 })
         .limit(500)
         .lean();
-      return res.status(200).json(history);
+      return res.status(200).json(history.map((entry) => ({
+        ...entry,
+        translations: onlyLocaleTranslations(entry.translations, locale),
+      })));
     }
 
     // ---- PAGINATED MODE ----
@@ -521,14 +538,17 @@ const getStockHistory = async (req, res) => {
 
     const history = await StockHistory.find(filter)
       .select("-__v")
-      .sort({ created_at: -1 })
+      .sort({ created_at: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
     return res.status(200).json({
       success: true,
-      data: history,
+      data: history.map((entry) => ({
+        ...entry,
+        translations: onlyLocaleTranslations(entry.translations, locale),
+      })),
       pagination: {
         total,
         page: safePage,

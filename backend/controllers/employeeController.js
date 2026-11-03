@@ -228,8 +228,7 @@ exports.getAllEmployees = async (req, res) => {
     // ---- LEGACY MODE (no limit) -> exact old behavior ----
     if (!limit) {
       const employees = await Employee.find(filter)
-        .populate("createdby", "name email")
-        .populate("updatedby", "name email")
+        .select("name username email phone status department avatar role")
         .sort({
           created_at: -1,
         })
@@ -240,13 +239,6 @@ exports.getAllEmployees = async (req, res) => {
         (employee) => employee !== null
       );
 
-      for (const employee of validEmployees) {
-        // Fix permissions directly on employee record
-        employee.permissions = fixPermissions(
-          employee.permissions || {}
-        );
-      }
-
       return res.json({
         success: true,
         data: validEmployees,
@@ -255,32 +247,34 @@ exports.getAllEmployees = async (req, res) => {
 
     // ---- PAGINATED MODE ----
     const total = await Employee.countDocuments(filter);
+    const [activeCount, inactiveCount] = await Promise.all([
+      Employee.countDocuments({ is_deleted: false, role: { $ne: "admin" }, status: "active" }),
+      Employee.countDocuments({ is_deleted: false, role: { $ne: "admin" }, status: "inactive" }),
+    ]);
     const pages = Math.max(1, Math.ceil(total / limit));
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
     const employees = await Employee.find(filter)
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
+      .select("name username email phone status department avatar translations translation_source translation_status")
       .sort({ created_at: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    // All employees valid — no userId dependency
     const validEmployees = employees.filter(
       (employee) => employee !== null
     );
-
-    for (const employee of validEmployees) {
-      employee.permissions = fixPermissions(
-        employee.permissions || {}
-      );
-    }
+    const locale = String(req.query.locale || "en").toLowerCase();
+    const localizedEmployees = validEmployees.map((employee) => {
+      const values = employee.translations?.name;
+      const translated = values instanceof Map ? values.get(locale) : values?.[locale];
+      return { ...employee, translations: { name: translated ? { [locale]: translated } : {} } };
+    });
 
     return res.json({
       success: true,
-      data: validEmployees,
+      data: localizedEmployees,
       pagination: {
         total,
         page: safePage,
@@ -289,6 +283,7 @@ exports.getAllEmployees = async (req, res) => {
         hasNext: safePage < pages,
         hasPrev: safePage > 1,
       },
+      summary: { total: activeCount + inactiveCount, active: activeCount, inactive: inactiveCount },
     });
   } catch (error) {
     log.error(
@@ -312,6 +307,7 @@ exports.getEmployeeById = async (req, res) => {
     const employee = await Employee.findById(
       req.params.id
     )
+      .select("-activities -password")
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();
@@ -331,13 +327,6 @@ exports.getEmployeeById = async (req, res) => {
       employee.permissions || {}
     );
 
-    if (!Array.isArray(employee.activities)) {
-      employee.activities = [];
-    }
-
-    // ✅ Legacy rows ka placeholder performer naam (jaise "User") asli naam se badlo
-    employee.activities = await healActivityPerformers(employee.activities);
-
     return res.json({
       success: true,
       data: employee,
@@ -352,6 +341,34 @@ exports.getEmployeeById = async (req, res) => {
       success: false,
       message: error.message,
     });
+  }
+};
+
+exports.getEmployeeActivities = async (req, res) => {
+  try {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+    const category = String(req.query.category || "all").trim();
+    const employee = await Employee.findOne({ _id: req.params.id, is_deleted: false }).select("activities").lean();
+    if (!employee) return res.status(404).json({ success: false, message: "Employee not found" });
+    const activities = Array.isArray(employee.activities) ? employee.activities : [];
+    const categories = [...new Set(activities.map((activity) => activity.category).filter(Boolean))].sort();
+    const matching = activities
+      .filter((activity) => !category || category === "all" || activity.category === category)
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    const total = matching.length;
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages);
+    const pageActivities = await healActivityPerformers(matching.slice((safePage - 1) * limit, safePage * limit));
+    return res.json({
+      success: true,
+      data: pageActivities,
+      categories,
+      pagination: { total, page: safePage, limit, pages, hasNext: safePage < pages, hasPrev: safePage > 1 },
+    });
+  } catch (error) {
+    log.error("getEmployeeActivities error:", error.message);
+    return res.status(500).json({ success: false, message: "Unable to load employee activity" });
   }
 };
 

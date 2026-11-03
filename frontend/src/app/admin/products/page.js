@@ -306,7 +306,13 @@ const [viewMode, setViewMode] = useState(() => {
     (!product.description || product.translations?.description?.[locale]?.trim())
   ));
   const productTranslationsReady = usePageTranslations({ model: "Product", records: products, locale, ready: !isFetching && productsData?.pagination?.page === currentPage, queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, productsPerPage, locale], queryClient, alreadyTranslated: productsAlreadyTranslated, fallbackAfterRetries: true });
-  const isProductTextReady = (product) => locale === "en" || productTranslationsReady || Boolean(product.translations?.name?.[locale]?.trim());
+  const translatedProductNameCount = products.filter((product) => product.translations?.name?.[locale]?.trim()).length;
+  const productNamesMostlyUntranslated = locale !== "en" && products.length > 0 && translatedProductNameCount / products.length <= 0.2;
+  const productsWithDescription = products.filter((product) => product.description?.trim());
+  const translatedProductDescriptionCount = productsWithDescription.filter((product) => product.translations?.description?.[locale]?.trim()).length;
+  const productDescriptionsMostlyUntranslated = locale !== "en" && productsWithDescription.length > 0 && translatedProductDescriptionCount / productsWithDescription.length <= 0.2;
+  const isProductTextReady = (product) => locale === "en" || productTranslationsReady || !productNamesMostlyUntranslated || Boolean(product.translations?.name?.[locale]?.trim());
+  const isProductDescriptionReady = (product) => locale === "en" || productTranslationsReady || !productDescriptionsMostlyUntranslated || !product.description?.trim() || Boolean(product.translations?.description?.[locale]?.trim());
 
   // ✅ NAVIGATION FIX (footer stable rehna chahiye):
   //    Page number click karne par naye page ki query ka apna key hota hai, is liye
@@ -1042,7 +1048,7 @@ const [viewMode, setViewMode] = useState(() => {
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        <span className="inline-block max-w-[220px] truncate align-middle">{productDescriptionOf(p) ? productDescriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                        <span className="inline-block max-w-[220px] truncate align-middle">{isProductDescriptionReady(p) ? (productDescriptionOf(p) ? productDescriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>) : <span className="skeleton inline-block h-3 w-32 rounded" aria-label={t("table.loading")} />}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]">
                         <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? t("table.variant") : t("table.variantsUnit")}</span>
@@ -1086,7 +1092,7 @@ const [viewMode, setViewMode] = useState(() => {
                 <div className="min-w-0">
                   {isProductTextReady(p) ? <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p> : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("table.loading")} />}
                   {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
-                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{productDescriptionOf(p) ? (productDescriptionOf(p).length > 60 ? productDescriptionOf(p).slice(0, 60) + "..." : productDescriptionOf(p)) : "—"}</p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{isProductDescriptionReady(p) ? (productDescriptionOf(p) ? (productDescriptionOf(p).length > 60 ? productDescriptionOf(p).slice(0, 60) + "..." : productDescriptionOf(p)) : "—") : <span className="skeleton inline-block h-3 w-32 rounded" aria-label={t("table.loading")} />}</p>
                   <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{t("card.variantsLabel")} {variantCount}</p>
                   <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("card.taxLabel")} {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>

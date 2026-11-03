@@ -15,7 +15,7 @@ export function usePageTranslations({ model, records, locale, ready, queryKey, q
   const stableRecords = useMemo(
     () => (Array.isArray(records) ? records : []).map((doc) => ({
       id: String(doc?._id || ""),
-      content: [doc?.name, doc?.description, doc?.title, doc?.comment, doc?.notes,
+      content: [doc?.name, doc?.description, doc?.customer_name, doc?.department, doc?.title, doc?.comment, doc?.notes,
         doc?.cancel_reason, doc?.product_name, doc?.variant_title, doc?.reason, doc?.explanation,
         doc?.company_name, doc?.address, doc?.city, doc?.state, doc?.country,
         doc?.storeResponse?.message, doc?.eyebrow, doc?.heading, doc?.altText,

@@ -19,6 +19,10 @@ const unwrap = (response) => {
 
 export const quoteApi = {
   list: () => adminHttp.get("/quotes").then(unwrap),
+  listPaginated: (params = {}) => adminHttp.get("/quotes", { params }).then((response) => ({
+    ...response.data,
+    data: Array.isArray(response.data?.data) ? response.data.data.map(normalizeQuote) : [],
+  })),
   reserveNumber: (token) => adminHttp.post("/quotes/reserve-number", { token }).then(unwrap),
   getById: (id) => adminHttp.get(`/quotes/${id}`).then(unwrap),
   create: (payload) => adminHttp.post("/quotes", payload).then(unwrap),

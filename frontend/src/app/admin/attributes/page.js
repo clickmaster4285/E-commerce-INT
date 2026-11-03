@@ -165,7 +165,7 @@ const needsLocaleTranslation = (value) => {
 };
 
 // ==================== RIGHT SIDE DETAIL PANEL ====================
-function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isAddingOption = false }) {
+function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isAddingOption = false, nameReady = true, optionReady = () => true }) {
   // DB-sourced values (attribute name + option labels) — locale ke hisaab se.
   const { nameOf, optionLabelOf } = useLocalized();
   // Static UI labels — `t()` se.
@@ -238,7 +238,8 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
   const getOptionLabel = (v) => getAttributeOptionText(optionLabelOf(v), locale)
     || getAttributeOptionText(v, locale);
 
-  const options = (attr.values || []).map(getOptionLabel).filter(Boolean);
+  const optionEntries = (attr.values || []).map((source, index) => ({ source, index, label: getOptionLabel(source) })).filter((entry) => entry.label);
+  const options = optionEntries.map((entry) => entry.label);
   const isActive = attr.is_active !== false;
   const isBoolean = attr.data_type === "boolean";
   // ✅ Sirf multi_select ke paas options hote hain (existing form modal ke mutabiq)
@@ -292,7 +293,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
             <SlidersIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{nameOf(attr)}</h4>
+            <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{nameReady ? nameOf(attr) : <span className="skeleton inline-block h-4 w-32 rounded" aria-label={t("common.loading")} />}</h4>
             <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 mt-1">
               {t(getDataTypeLabel(attr.data_type))}
             </span>
@@ -352,16 +353,16 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
 
             <div className="space-y-2">
               {options.length > 0 ? (
-                options.map((opt, idx) => (
+                optionEntries.map(({ source, index, label: opt }, idx) => (
                   <div
-                    key={`${opt}-${idx}`}
+                    key={`${opt}-${index}`}
                     className="flex items-start justify-between p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] group hover:border-[var(--accent)]/30 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors shrink-0">
                         {idx + 1}
                       </span>
-                      <span className="min-w-0 flex-1 break-words text-end text-sm font-medium text-[var(--text-primary)] leading-[2] py-1">{opt}</span>
+                      <span className="min-w-0 flex-1 break-words text-end text-sm font-medium text-[var(--text-primary)] leading-[2] py-1">{optionReady(source) ? opt : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("common.loading")} />}</span>
                     </div>
                     {isBoolean && (
                        <span className={`w-2 h-2 rounded-full shrink-0 ${opt.toLowerCase() === 'yes' || opt.toLowerCase() === 'true' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
@@ -529,7 +530,7 @@ export default function AttributesPage() {
     : paginatedAttrsData?.pagination || { total: 0, page: 1, limit: attributesPerPage, pages: 1 };
 
   const attributesAlreadyTranslated = locale === "en" || (attributesRaw.length > 0 && attributesRaw.every((attr) => attr.translations?.name?.[locale]?.trim()));
-  usePageTranslations({
+  const attributeTranslationsReady = usePageTranslations({
     model: "Attribute",
     records: attributesRaw,
     locale,
@@ -537,6 +538,7 @@ export default function AttributesPage() {
     queryKey: ["attributes", "paginated", attributePage, attributesPerPage, search, statusFilter, sortConfig.key, sortConfig.direction, locale],
     queryClient,
     alreadyTranslated: attributesAlreadyTranslated,
+    fallbackAfterRetries: true,
   });
 
   const categoryRecords = attributesRaw
@@ -546,16 +548,40 @@ export default function AttributesPage() {
       name: attribute.category,
       translations: { name: attribute.category_translations || {} },
     }));
-  const categoriesAlreadyTranslated = locale === "en" || (categoryRecords.length > 0 && categoryRecords.every((category) => category.translations.name?.[locale]?.trim()));
-  usePageTranslations({
+  const uniqueCategoryRecords = Array.from(new Map(categoryRecords.map((record) => [record._id, record])).values());
+  const categoriesAlreadyTranslated = locale === "en" || (uniqueCategoryRecords.length > 0 && uniqueCategoryRecords.every((category) => category.translations.name?.[locale]?.trim()));
+  const categoryTranslationsReady = usePageTranslations({
     model: "Category",
-    records: categoryRecords,
+    records: uniqueCategoryRecords,
     locale,
     ready: !isFetching && pagination.page === attributePage,
     queryKey: ["attributes", "paginated", attributePage, attributesPerPage, search, statusFilter, sortConfig.key, sortConfig.direction, locale],
     queryClient,
     alreadyTranslated: categoriesAlreadyTranslated,
+    fallbackAfterRetries: true,
   });
+
+  const translatableAttributes = attributesRaw.filter((attribute) => needsLocaleTranslation(attribute.name));
+  const translatedAttributeCount = translatableAttributes.filter((attribute) =>
+    hasStrictLocaleText(attribute.name, nameOf(attribute), locale)
+  ).length;
+  const attributesMostlyUntranslated = locale !== "en" && translatableAttributes.length > 0 && translatedAttributeCount / translatableAttributes.length <= 0.2;
+  const translatableCategories = uniqueCategoryRecords.filter((category) => needsLocaleTranslation(category.name));
+  const translatedCategoryCount = translatableCategories.filter((category) =>
+    hasStrictLocaleText(category.name, text(category.name, category.translations.name), locale)
+  ).length;
+  const categoriesMostlyUntranslated = locale !== "en" && translatableCategories.length > 0 && translatedCategoryCount / translatableCategories.length <= 0.2;
+  const translatableOptionLabels = attributesRaw.flatMap((attribute) => (attribute.values || []).map((option) => ({
+    option,
+    source: typeof option === "object" ? option?.label || option?.name || "" : "",
+  })).filter((entry) => needsLocaleTranslation(entry.source)));
+  const translatedOptionLabelCount = translatableOptionLabels.filter(({ option }) => option?.label_translations?.[locale]?.trim()).length;
+  const optionsMostlyUntranslated = locale !== "en" && translatableOptionLabels.length > 0 && translatedOptionLabelCount / translatableOptionLabels.length <= 0.2;
+  const isAttributeTextReady = (attribute) => locale === "en" || !needsLocaleTranslation(attribute?.name) || attributeTranslationsReady || !attributesMostlyUntranslated || hasStrictLocaleText(attribute?.name, nameOf(attribute), locale);
+  const isAttributeOptionReady = (option) => {
+    const source = typeof option === "object" ? option?.label || option?.name || "" : "";
+    return locale === "en" || !needsLocaleTranslation(source) || attributeTranslationsReady || !optionsMostlyUntranslated || Boolean(option?.label_translations?.[locale]?.trim());
+  };
 
   // Client-side sort within the current page (server handles search + paging)
   const sortedAttributes = useMemo(() => {
@@ -916,6 +942,8 @@ export default function AttributesPage() {
       {detailAttr && (
         <AttributeOptionsPanel
           attr={detailAttr}
+          nameReady={isAttributeTextReady(detailAttr)}
+          optionReady={isAttributeOptionReady}
           onClose={() => setDetailAttr(null)}
           onAddAttribute={() => setShowAttributeModal(true)}
           onAddOption={handleAddOption}
@@ -1034,8 +1062,8 @@ export default function AttributesPage() {
                     // still missing the currently selected locale.
                     const localizedAttributeName = nameOf(attr);
                     const localizedCategoryName = text(attr.category, attr.category_translations);
-                    const attributeTextReady = locale === "en" || !needsLocaleTranslation(attr.name) || hasStrictLocaleText(attr.name, localizedAttributeName, locale);
-                    const categoryTextReady = locale === "en" || !attr.category_id || !needsLocaleTranslation(attr.category) || hasStrictLocaleText(attr.category, localizedCategoryName, locale);
+                    const attributeTextReady = isAttributeTextReady(attr);
+                    const categoryTextReady = locale === "en" || !attr.category_id || !needsLocaleTranslation(attr.category) || categoryTranslationsReady || !categoriesMostlyUntranslated || hasStrictLocaleText(attr.category, localizedCategoryName, locale);
                     return (
                       <tr
                         key={attr._id}

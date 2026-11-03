@@ -614,7 +614,20 @@ export default function CategoryDetailPage() {
       attribute.translations?.name?.[locale]?.trim()
     )),
   });
+  const categoryTranslationFieldCount = categoryTranslationRecords.reduce((count, record) =>
+    count + Number(Boolean(record.name)) + Number(Boolean(record.description?.trim())), 0
+  );
+  const translatedCategoryFieldCount = categoryTranslationRecords.reduce((count, record) =>
+    count + Number(Boolean(record.translations?.name?.[locale]?.trim())) +
+      Number(Boolean(record.description?.trim() && record.translations?.description?.[locale]?.trim())), 0
+  );
+  const categoryMostlyUntranslated = locale !== "en" && categoryTranslationFieldCount > 0 && translatedCategoryFieldCount / categoryTranslationFieldCount <= 0.2;
+  const translatedAttributeCount = categoryAttributes.filter((attribute) => attribute.translations?.name?.[locale]?.trim()).length;
+  const attributesMostlyUntranslated = locale !== "en" && categoryAttributes.length > 0 && translatedAttributeCount / categoryAttributes.length <= 0.2;
   const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle";
+  const categoryNameIsTranslated = locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || Boolean(category?.translations?.name?.[locale]?.trim());
+  const categoryDescriptionIsTranslated = locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || !category?.description || Boolean(category?.translations?.description?.[locale]?.trim());
+  const parentNameIsTranslated = !parentTranslationRecord || locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || Boolean(parentTranslationRecord.translations?.name?.[locale]?.trim());
 
   // Derived data
   const variantAttributes = useMemo(() => {
@@ -634,7 +647,12 @@ export default function CategoryDetailPage() {
     return allCategories.find((item) => String(item._id) === String(parentId)) || null;
   }, [category, allCategories]);
 
-  const parentCategoryName = parentCategoryDoc ? nameOf(parentCategoryDoc) : t("parent.none");
+  const categoryNameForDisplay = locale === "en" || category?.translations?.name?.[locale]?.trim()
+    ? nameOf(category)
+    : "—";
+  const parentCategoryName = parentCategoryDoc
+    ? (locale === "en" || parentCategoryDoc.translations?.name?.[locale]?.trim() ? nameOf(parentCategoryDoc) : "—")
+    : t("parent.none");
 
   // Mutations
   const deleteMutation = useMutation({
@@ -789,12 +807,12 @@ export default function CategoryDetailPage() {
           <Ico d={D.chevron} className="w-3 h-3" />
           {parentCategoryDoc && (
             <>
-              <span className="max-w-[180px] truncate">{categoryTranslationsReady ? nameOf(parentCategoryDoc) : <span className={`${translationSkeleton} w-24`} aria-label={t("detail.loading")} />}</span>
+              <span className="max-w-[180px] truncate">{parentNameIsTranslated && parentCategoryDoc ? nameOf(parentCategoryDoc) : parentCategoryDoc ? <span className={`${translationSkeleton} w-24`} aria-label={t("detail.loading")} /> : null}</span>
               <Ico d={D.chevron} className="w-3 h-3" />
             </>
           )}
           <span className="max-w-[240px] truncate font-medium text-[var(--text-primary)]">
-            {categoryTranslationsReady ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
+            {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
           </span>
         </nav>
 
@@ -836,7 +854,7 @@ export default function CategoryDetailPage() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-[16px] leading-tight font-bold text-[var(--text-primary)]">
-                  {categoryTranslationsReady ? nameOf(category) : <span className={`${translationSkeleton} w-36`} aria-label={t("detail.loading")} />}
+                  {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-36`} aria-label={t("detail.loading")} />}
                 </h2>
                 <span
                   className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-mono font-semibold"
@@ -856,7 +874,7 @@ export default function CategoryDetailPage() {
               )}
               {category.description && (
                 <p className="mt-2 max-w-md text-[12px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  {categoryTranslationsReady ? descriptionOf(category) : <span className={`${translationSkeleton} w-48`} aria-label={t("detail.loading")} />}
+                  {categoryDescriptionIsTranslated ? descriptionOf(category) : <span className={`${translationSkeleton} w-48`} aria-label={t("detail.loading")} />}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -920,7 +938,7 @@ export default function CategoryDetailPage() {
                 {t("detail.categoryName")}
               </span>
               <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
-                {categoryTranslationsReady ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
+                {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
               </span>
             </div>
             <div className="flex items-center justify-between gap-8">
@@ -1002,7 +1020,7 @@ export default function CategoryDetailPage() {
                 {t("detail.attributeCount", { count: formatPageNumber(attributePagination.total) })}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                {categoryTranslationsReady ? t("detail.assignedTo", { name: nameOf(category) }) : <span className={`${translationSkeleton} w-40`} aria-label={t("detail.loading")} />}
+                {categoryNameIsTranslated ? t("detail.assignedTo", { name: nameOf(category) }) : <span className={`${translationSkeleton} w-40`} aria-label={t("detail.loading")} />}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1093,7 +1111,7 @@ export default function CategoryDetailPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  {attributeTranslationsReady ? <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("detail.loading")} />}
+                                  {(locale === "en" || attributeTranslationsReady || !attributesMostlyUntranslated || attr.translations?.name?.[locale]?.trim()) ? <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("detail.loading")} />}
                                   {isVariant && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
                                       {t("detail.variant")}
@@ -1402,7 +1420,7 @@ export default function CategoryDetailPage() {
                 <Ico d={D.trash} className="w-5 h-5" style={{ color: "var(--danger)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">{t("delete.titleOne", { name: nameOf(category) })}</h3>
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">{t("delete.titleOne", { name: categoryNameForDisplay })}</h3>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
                   {t("detail.deleteBody")}
                 </p>
@@ -1706,7 +1724,7 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                   )}
                   {editingHasChildren && (
                     <ModalParentLockNotice title={t("lock.alreadyUsedTitle")}>
-                      {t("lock.alreadyUsedBody", { name: nameOf(category) })}
+                      {t("lock.alreadyUsedBody", { name: categoryNameForDisplay })}
                     </ModalParentLockNotice>
                   )}
                 </div>

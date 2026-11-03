@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { quoteApi } from "@/apis/admin/quoteApi";
 import { localizedVariantTitleOf, useLocalized } from "@/i18n/localize";
-import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import QuoteTemplateDesigner, { getSavedQuotePdfDesign, QUOTE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
 import ActivityTimeline from "@/components/admin/ActivityTimeline";
@@ -13,7 +12,7 @@ import { renderRichHtml } from "@/lib/termsContent";
 import { downloadQuotePdf, getDocumentPageSpec, printQuotePdf } from "@/lib/invoicePdf";
 import { toast } from "sonner";
 import {
-  ArrowLeft, ChevronRight, Check, Download, Printer, FilePlus2, Pencil, ReceiptText, X,
+  ArrowLeft, ChevronLeft, ChevronRight, Check, Download, Printer, FilePlus2, Pencil, ReceiptText, X,
   Send, Eye, UserRound, CalendarDays, PackageCheck, Wallet, FileText } from
 "lucide-react";
 
@@ -57,27 +56,36 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
   const [previewOpen, setPreviewOpen] = useState(false);
   const [downloadQueued, setDownloadQueued] = useState(false);
   const [printQueued, setPrintQueued] = useState(false);
+  const [itemsPage, setItemsPage] = useState(1);
+  const [itemsPageSize, setItemsPageSize] = useState(10);
   const printHandled = useRef(false);
   const downloadPreviewRef = useRef(null);
   const quotePreviewRef = useRef(null);
   const { data: quote, isLoading, isError, error } = useQuery({ queryKey: ["quote-admin", id], queryFn: () => quoteApi.getById(id) });
   const { data: store = null, isLoading: isStoreLoading } = useQuery({ queryKey: ["store-public"], queryFn: () => storeApi.getPublic(), staleTime: 5 * 60 * 1000 });
-  const { data: variants = [], isLoading: isVariantsLoading } = useQuery({ queryKey: ["quote-all-variants"], queryFn: () => variantApi.getAll(), staleTime: 5 * 60 * 1000 });
-  const variantsById = useMemo(() => new Map(variants.map((variant) => [String(variant._id), variant])), [variants]);
   const quoteWithVariantNames = useMemo(() => quote ? {
     ...quote,
     items: (quote.items || []).map((item) => {
-      const variant = variantsById.get(String(item.variant_id?._id || item.variant_id || ""));
       return {
         ...item,
         name: productNameOf(item.product_id || item.variant_id?.product_id) || item.name,
         variant_name:
           localizedVariantTitleOf(item.variant_id, locale) ||
-          localizedVariantTitleOf(variant, locale) ||
           item.variant_name || "",
       };
     }),
-  } : null, [quote, variantsById, productNameOf, locale]);
+  } : null, [quote, productNameOf, locale]);
+  const quoteItems = quoteWithVariantNames?.items || [];
+  const itemsPages = Math.max(1, Math.ceil(quoteItems.length / itemsPageSize));
+  const displayedItemsPage = Math.min(itemsPage, itemsPages);
+  const visibleQuoteItems = quoteItems.slice((displayedItemsPage - 1) * itemsPageSize, displayedItemsPage * itemsPageSize);
+  const itemsStart = quoteItems.length ? (displayedItemsPage - 1) * itemsPageSize + 1 : 0;
+  const itemsEnd = Math.min(displayedItemsPage * itemsPageSize, quoteItems.length);
+  const itemPageNumbers = itemsPages <= 5
+    ? Array.from({ length: itemsPages }, (_, index) => index + 1)
+    : displayedItemsPage <= 3 ? [1, 2, 3, 4, "...", itemsPages]
+      : displayedItemsPage >= itemsPages - 2 ? [1, "...", itemsPages - 3, itemsPages - 2, itemsPages - 1, itemsPages]
+        : [1, "...", displayedItemsPage - 1, displayedItemsPage, displayedItemsPage + 1, "...", itemsPages];
   const itemDiscountTotal = Math.round((quoteWithVariantNames?.items || []).reduce((sum, item) => sum + (Number(item.discount) || 0), 0) * 100) / 100;
   const additionalQuoteDiscount = Number(quote?.overall_discount) || 0;
   const taxableAmount = Math.round(Math.max(0, (Number(quote?.subtotal) || 0) - itemDiscountTotal - additionalQuoteDiscount) * 100) / 100;
@@ -101,14 +109,14 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
   }, [quote, quoteWithVariantNames]);
   const sentAt = quote?.sent_at || getStatusEventDate(quote, "Sent") || (quote?.status === "Sent" ? quote.updated_at : null);
   useEffect(() => {
-    if (searchParams.get("print") !== "1" || !quote || isLoading || isStoreLoading || isVariantsLoading || printHandled.current) return undefined;
+    if (searchParams.get("print") !== "1" || !quote || isLoading || isStoreLoading || printHandled.current) return undefined;
     printHandled.current = true;
     const timer = window.setTimeout(() => {
       setIsGeneratingPdf(true);
       setPrintQueued(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [isLoading, isStoreLoading, isVariantsLoading, quote, searchParams]);
+  }, [isLoading, isStoreLoading, quote, searchParams]);
   useEffect(() => {
     if (!downloadQueued || !downloadPreviewRef.current) return undefined;
     let cancelled = false;
@@ -185,12 +193,12 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
     onError: (e) => toast.error(e?.response?.data?.message || "Could not send quote")
   });
   const downloadPdf = async () => {
-    if (isGeneratingPdf || isStoreLoading || isVariantsLoading) return;
+    if (isGeneratingPdf || isStoreLoading) return;
     setIsGeneratingPdf(true);
     setDownloadQueued(true);
   };
   const printQuote = async () => {
-    if (isGeneratingPdf || isStoreLoading || isVariantsLoading) return;
+    if (isGeneratingPdf || isStoreLoading) return;
     setIsGeneratingPdf(true);
     setPrintQueued(true);
   };
@@ -208,8 +216,8 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <button type="button" onClick={() => setPreviewOpen(true)} className="quote-no-print inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"><Eye size={14} /> Preview</button>
-          <button type="button" disabled={isGeneratingPdf || isStoreLoading || isVariantsLoading} onClick={printQuote} className="quote-no-print inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"><Printer size={14} /> {isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
-          <button type="button" disabled={isGeneratingPdf || isStoreLoading || isVariantsLoading} onClick={downloadPdf} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-950"><Download size={14} /> {isGeneratingPdf || isStoreLoading || isVariantsLoading ? "Preparing PDF..." : "Download PDF"}</button>
+          <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={printQuote} className="quote-no-print inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"><Printer size={14} /> {isGeneratingPdf ? "Preparing..." : t("admin.pos.ui.print")}</button>
+          <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={downloadPdf} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-950"><Download size={14} /> {isGeneratingPdf || isStoreLoading ? "Preparing PDF..." : "Download PDF"}</button>
           {quote.status === "Accepted" && <button type="button" onClick={() => router.push(`/admin/invoices/new?quote=${quote._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 text-xs font-bold text-white shadow-sm transition hover:shadow-md"><FilePlus2 size={14} /> {t("admin.quoteInvoice.ui.convert_to_invoice_ff42ae9b")}</button>}
           {["Pending", "Draft"].includes(quote.status) && <><button type="button" onClick={() => router.push(`/admin/quotes/new?quote=${quote._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-blue-300 hover:text-blue-700"><Pencil size={13} /> {t("admin.quoteInvoice.ui.edit_quote_540f4206")}</button><button type="button" disabled={sendMutation.isPending} onClick={() => sendMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3.5 text-xs font-bold text-white shadow-sm transition hover:shadow-md disabled:cursor-wait disabled:opacity-60"><Send size={13} /> {sendMutation.isPending ? "Updating..." : "Mark as Sent"}</button></>}
           {quote.status === "Sent" && <><button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("Accepted")} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"><Check size={14} /> {t("admin.quoteInvoice.ui.accept_bb54db51")}</button><button type="button" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("Rejected")} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-[var(--bg-card)] px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"><X size={14} /> {t("admin.quoteInvoice.ui.reject_2b03b592")}</button></>}
@@ -247,7 +255,8 @@ export default function QuoteDetailPage({ params }) {const { t, locale } = useTr
           </Panel>
         </div>
         <Panel title={t("admin.documentDetail.panel.productsItems")} icon={PackageCheck} trailing={<span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{quoteWithVariantNames.items.length} {t("admin.documentDetail.field.items")}</span>}>
-          <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[30%]"/><col className="w-[8%]"/><col className="w-[8%]"/><col className="w-[12%]"/><col className="w-[12%]"/><col className="w-[12%]"/><col className="w-[14%]"/></colgroup><thead className="bg-[var(--bg-card-alt)] text-[var(--text-secondary)]"><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading, index) => <th key={heading} dir="auto" className={`whitespace-nowrap px-2.5 py-2.5 font-semibold ${index >= 3 ? "text-end" : "text-start"}`}>{heading}</th>)}</tr></thead><tbody>{quoteWithVariantNames.items.map((item, index) => <tr key={item._id || index} className="border-t border-[var(--border-color)]"><td className="px-2.5 py-2.5 text-[var(--text-muted)]"><bdi dir="ltr">{index + 1}</bdi></td><td className="min-w-0 px-2.5 py-2.5 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5">{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4 text-[var(--text-muted)]">{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-2.5 py-2.5 font-mono text-[var(--text-muted)]"><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-2.5 py-2.5 text-end"><bdi dir="ltr" className="tabular-nums">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end"><bdi dir="ltr" className="tabular-nums">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end"><bdi dir="ltr" className="block tabular-nums text-rose-600">− {money(item.discount, locale)}</bdi><span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.discount_rate) || 0}%</bdi></span></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end"><bdi dir="ltr" className="block tabular-nums">{money(item.tax, locale)}</bdi><span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.tax_rate) || 0}%</bdi></span></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end font-semibold"><bdi dir="ltr" className="tabular-nums">{money(item.total ?? item.line_total ?? ((Number(item.quantity ?? item.qty) || 0) * (Number(item.unit_price) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0)), locale)}</bdi></td></tr>)}{!quoteWithVariantNames.items.length && <tr><td colSpan={8} className="p-8 text-center text-sm text-[var(--text-muted)]">{t("admin.documentDetail.empty.noQuoteItems")}</td></tr>}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] table-fixed text-start text-xs"><colgroup><col className="w-[4%]"/><col className="w-[30%]"/><col className="w-[8%]"/><col className="w-[8%]"/><col className="w-[12%]"/><col className="w-[12%]"/><col className="w-[12%]"/><col className="w-[14%]"/></colgroup><thead className="bg-[var(--bg-card-alt)] text-[var(--text-secondary)]"><tr>{["#", t("admin.invoiceDetail.column.product"), t("admin.invoiceDetail.column.sku"), t("admin.documentDetail.field.quantity"), t("admin.documentDetail.field.unitPrice"), t("admin.documentDetail.field.discount"), t("admin.documentDetail.field.tax"), t("admin.documentDetail.field.total")].map((heading, index) => <th key={heading} dir="auto" className={`whitespace-nowrap px-2.5 py-2.5 font-semibold ${index >= 3 ? "text-end" : "text-start"}`}>{heading}</th>)}</tr></thead><tbody>{visibleQuoteItems.map((item, index) => <tr key={item._id || index} className="border-t border-[var(--border-color)]"><td className="px-2.5 py-2.5 text-[var(--text-muted)]"><bdi dir="ltr">{(displayedItemsPage - 1) * itemsPageSize + index + 1}</bdi></td><td className="min-w-0 px-2.5 py-2.5 align-top"><bdi dir="auto" className="block whitespace-normal break-words font-semibold leading-5">{item.name || "—"}</bdi><bdi dir="auto" className="mt-0.5 block whitespace-normal break-words text-[10px] leading-4 text-[var(--text-muted)]">{item.variant_name || ""}</bdi></td><td className="whitespace-nowrap px-2.5 py-2.5 font-mono text-[var(--text-muted)]"><bdi dir="ltr">{item.sku || "—"}</bdi></td><td className="px-2.5 py-2.5 text-end"><bdi dir="ltr" className="tabular-nums">{item.quantity ?? item.qty ?? 0}</bdi></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end"><bdi dir="ltr" className="tabular-nums">{money(item.unit_price, locale)}</bdi></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end"><bdi dir="ltr" className="block tabular-nums text-rose-600">− {money(item.discount, locale)}</bdi><span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.discount_rate) || 0}%</bdi></span></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end"><bdi dir="ltr" className="block tabular-nums">{money(item.tax, locale)}</bdi><span className="mt-0.5 block text-[10px] text-[var(--text-muted)]"><bdi dir="ltr">{Number(item.tax_rate) || 0}%</bdi></span></td><td className="whitespace-nowrap px-2.5 py-2.5 text-end font-semibold"><bdi dir="ltr" className="tabular-nums">{money(item.total ?? item.line_total ?? ((Number(item.quantity ?? item.qty) || 0) * (Number(item.unit_price) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0)), locale)}</bdi></td></tr>)}{!quoteWithVariantNames.items.length && <tr><td colSpan={8} className="p-8 text-center text-sm text-[var(--text-muted)]">{t("admin.documentDetail.empty.noQuoteItems")}</td></tr>}</tbody></table></div>
+          {quoteItems.length > 10 && <div className="flex flex-col items-center justify-between gap-3 border-t border-[var(--border-color)] px-3 py-3 xl:flex-row"><div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4"><span className="text-xs text-[var(--text-muted)]">{t("admin.shared.pagination.showingRange", { from: itemsStart.toLocaleString(locale), to: itemsEnd.toLocaleString(locale), total: quoteItems.length.toLocaleString(locale) })}</span><label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={itemsPageSize} onChange={(event) => { setItemsPageSize(Number(event.target.value)); setItemsPage(1); }} className="h-8 w-[90px] rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-xs"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label></div><div className="flex items-center gap-1.5"><button type="button" disabled={displayedItemsPage <= 1} onClick={() => setItemsPage(displayedItemsPage - 1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] disabled:opacity-30" aria-label={t("admin.brands.ui.previousPage")}><ChevronLeft size={16}/></button>{itemPageNumbers.map((pageNumber, index) => pageNumber === "..." ? <span key={`ellipsis-${index}`} className="px-1 text-sm text-[var(--text-muted)]">…</span> : <button key={pageNumber} type="button" onClick={() => setItemsPage(pageNumber)} aria-current={displayedItemsPage === pageNumber ? "page" : undefined} className="h-8 min-w-[32px] rounded-md border px-2 text-[13px] font-medium" style={{ backgroundColor: displayedItemsPage === pageNumber ? "var(--accent)" : "var(--bg-tertiary)", color: displayedItemsPage === pageNumber ? "var(--accent-text)" : "var(--text-primary)", borderColor: displayedItemsPage === pageNumber ? "var(--accent)" : "var(--border-color)" }}>{pageNumber}</button>)}<button type="button" disabled={displayedItemsPage >= itemsPages} onClick={() => setItemsPage(displayedItemsPage + 1)} className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-color)] disabled:opacity-30" aria-label={t("admin.brands.ui.nextPage")}><ChevronRight size={16}/></button></div></div>}
         </Panel>
         {(quote.notes || quote.terms) && <Panel title={t("admin.documentDetail.panel.notesTerms")} icon={FileText}><div className="space-y-2.5 p-3 text-xs leading-5 text-[var(--text-secondary)] sm:p-4">{quote.notes && <p className="whitespace-pre-wrap">{quote.notes}</p>}{quote.terms && (/<[a-z][\s\S]*>/i.test(quote.terms) ? <div className="quote-rich-terms break-words [&_ol]:list-decimal [&_ol]:ps-5 [&_ul]:list-disc [&_ul]:ps-5 [&_li]:my-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-bold [&_a]:text-blue-700 [&_a]:underline" dangerouslySetInnerHTML={{ __html: renderRichHtml(quote.terms) }} /> : <p className="whitespace-pre-wrap">{quote.terms}</p>)}</div></Panel>}
       </main>

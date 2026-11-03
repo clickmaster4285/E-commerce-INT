@@ -18,10 +18,10 @@ const getCustomersAdmin = async (req, res) => {
     for (const lead of convertedLeads) await syncLeadCustomer(lead, req.user?._id || null);
 
     const search = String(req.query.search || "").trim();
-    const q = { is_deleted: { $ne: true } };
+    const baseFilter = { is_deleted: { $ne: true } };
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
-      q.$or = [
+      baseFilter.$or = [
         { name: regex },
         { phone: regex },
         { email: regex },
@@ -29,8 +29,56 @@ const getCustomersAdmin = async (req, res) => {
       ];
     }
 
-    const customers = await Customer.find(q).select("-activity").sort({ created_at: -1 }).lean();
-    res.status(200).json({ success: true, data: customers });
+    const listFilter = { ...baseFilter };
+    const contactFilter = String(req.query.filter || "all");
+    if (contactFilter === "phone") listFilter.phone = { $nin: ["", null] };
+    else if (contactFilter === "email") listFilter.email = { $nin: ["", null] };
+
+    // Calls without `page` retain the full-list response for POS/invoice flows.
+    if (req.query.page === undefined) {
+      const customers = await Customer.find(listFilter)
+        .select("_id name phone email address created_at translations")
+        .sort({ created_at: -1, _id: -1 })
+        .lean();
+      return res.status(200).json({ success: true, data: customers });
+    }
+
+    const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limitRaw = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 10;
+    const sortOrder = String(req.query.sort || "newest") === "oldest" ? 1 : -1;
+    const total = await Customer.countDocuments(listFilter);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const [customers, totalCustomers, newThisMonth, withPhone, withEmail] = await Promise.all([
+      Customer.find(listFilter)
+        .select("_id name phone email address created_at translations")
+        .sort({ created_at: sortOrder, _id: sortOrder })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Customer.countDocuments({ is_deleted: { $ne: true } }),
+      Customer.countDocuments({ is_deleted: { $ne: true }, created_at: { $gte: monthStart } }),
+      Customer.countDocuments({ is_deleted: { $ne: true }, phone: { $nin: ["", null] } }),
+      Customer.countDocuments({ is_deleted: { $ne: true }, email: { $nin: ["", null] } }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: customers,
+      stats: { total: totalCustomers, newThisMonth, withPhone, withEmail },
+      pagination: {
+        total,
+        page,
+        limit,
+        pages,
+        hasNext: page < pages,
+        hasPrev: page > 1,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/i18n/LanguageProvider";
@@ -103,6 +103,19 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete, onCreatePurchase
   );
 }
 
+// ✅ Sortable column header — brands/banner page ka SortHeader ka pattern
+// (module level — render ke andar component define karne se state reset hoti hai)
+function SortHeader({ label, sortKey, sortConfig, onSort }) {
+  return (
+    <th className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wide whitespace-nowrap">
+      <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 transition hover:opacity-80" style={{ color: sortConfig.key === sortKey ? "var(--text-primary)" : "var(--text-muted)" }}>
+        {label}
+        <ChevronDown size={12} className={`transition-transform ${sortConfig.key === sortKey && sortConfig.direction === "asc" ? "rotate-180" : ""}`} style={{ opacity: sortConfig.key === sortKey ? 0.7 : 0.35 }} />
+      </button>
+    </th>
+  );
+}
+
 export default function VendorsPage() {
   const qc = useQueryClient();
   const router = useRouter();
@@ -111,48 +124,107 @@ export default function VendorsPage() {
   const tToast = (k, p) => __t("admin.vendors.toast." + k, p);
   const tShared = (k, p) => __t("admin.shared." + k, p);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [city, setCity] = useState("all");
+  const [sortConfig, setSortConfig] = useState({ key: "created", direction: "desc" });
   const [page, setPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [selected, setSelected] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyVendorForm);
-  const PAGE_SIZE = 20;
 
-  const { data: vendorsRaw, isLoading } = useQuery({ queryKey: ["vendors"], queryFn: () => vendorApi.getAll() });
-  const vendors = useMemo(() => {
-    const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
-    return arr.filter((v) => !v.is_deleted);
-  }, [vendorsRaw]);
-  usePageTranslations({ model: "Vendor", records: vendors, locale, ready: !isLoading, queryKey: ["vendors"], queryClient: qc });
+  // ✅ Server-side pagination — search/filter/sort/page sab backend par jate hain
+  // (brands/page bhai ka exact pattern)
+  const vendorsQueryKey = ["vendors", "paginated", locale, page, itemsPerPage, debouncedSearch, status, city, sortConfig.key, sortConfig.direction];
+  const { data: vendorsData, isLoading, isFetching } = useQuery({
+    queryKey: vendorsQueryKey,
+    queryFn: () => vendorApi.getAllPaginated({
+      page,
+      limit: itemsPerPage,
+      search: debouncedSearch,
+      status,
+      city,
+      sort: sortConfig.key || "",
+      order: sortConfig.direction,
+      locale,
+    }),
+    retry: false,
+  });
 
-  const monthStart = useMemo(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; }, []);
-  const stats = useMemo(() => {
-    const total = vendors.length;
-    const active = vendors.filter((v) => v.is_active).length;
-    const fresh = vendors.filter((v) => v.created_at && new Date(v.created_at) >= monthStart).length;
-    const freshActive = vendors.filter((v) => v.is_active && v.created_at && new Date(v.created_at) >= monthStart).length;
-    const purchase = vendors.reduce((s, v) => s + (Number(v.total_purchased) || 0), 0);
-    return { total, active, inactive: total - active, fresh, freshActive, purchase };
-  }, [vendors, monthStart]);
+  // ✅ Sirf current page ke vendors backend se aate hain (server paginated)
+  const rows = Array.isArray(vendorsData?.data) ? vendorsData.data : [];
+  const vendorCounts = vendorsData?.counts || { total: 0, active: 0, inactive: 0, purchaseTotal: 0 };
+  const serverCities = Array.isArray(vendorsData?.cities) ? vendorsData.cities : [];
+  const pagination = vendorsData?.pagination || { total: 0, page, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  const vendorsAlreadyTranslated = locale === "en" || (rows.length > 0 && rows.every((vendor) => ["name", "company_name", "city"].every((field) => !vendor[field]?.trim() || vendor.translations?.[field]?.[locale]?.trim())));
+  const vendorTranslationsReady = usePageTranslations({ model: "Vendor", records: rows, locale, ready: !isFetching && pagination.page === page, queryKey: vendorsQueryKey, queryClient: qc, alreadyTranslated: vendorsAlreadyTranslated, fallbackAfterRetries: true });
+  const vendorTranslationFields = rows.flatMap((vendor) => ["name", "company_name", "city"].filter((field) => vendor[field]?.trim()).map((field) => ({ translated: Boolean(vendor.translations?.[field]?.[locale]?.trim()) })));
+  const untranslatedVendorFieldCount = vendorTranslationFields.filter((field) => !field.translated).length;
+  const showVendorTranslationSkeletons = locale !== "en" && vendorTranslationFields.length > 0 && untranslatedVendorFieldCount / vendorTranslationFields.length >= 0.8 && !vendorTranslationsReady;
 
-  const cities = useMemo(() => [...new Set(vendors.map((v) => v.city).filter(Boolean))].sort(), [vendors]);
+  // ✅ Stats server counts se (poore collection ke — current page ke nahi)
+  const stats = {
+    total: vendorCounts.total,
+    active: vendorCounts.active,
+    inactive: vendorCounts.inactive,
+    purchase: vendorCounts.purchaseTotal,
+  };
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return vendors.filter((v) => {
-      if (status === "active" && !v.is_active) return false;
-      if (status === "inactive" && v.is_active) return false;
-      if (city !== "all" && v.city !== city) return false;
-      if (q && ![v.name, v.vendor_code, v.company_name].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [vendors, search, status, city]);
+  // ✅ Brand pagination jaisa number formatting (locale-aware, no grouping)
+  const pageFormatter = useMemo(() => new Intl.NumberFormat(locale === "ur" ? "ur-PK" : locale === "ar" ? "ar" : locale === "hi" ? "hi-IN" : locale, { useGrouping: false }), [locale]);
+  const formatPageNumber = (value) => pageFormatter.format(value);
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pages);
-  const rows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const total = pagination.total || 0;                                  // filtered total
+  const totalPages = pagination.pages || 1;
+  const displayedPage = pagination.page || page;
+  const rowLimit = pagination.limit || itemsPerPage;
+  const startIndex = total > 0 ? (displayedPage - 1) * rowLimit + 1 : 0;
+  const endIndex = Math.min(displayedPage * rowLimit, total);
+
+  const renderPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 5) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
+    else {
+      if (displayedPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
+      else if (displayedPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      else pages.push(1, "...", displayedPage - 1, displayedPage, displayedPage + 1, "...", totalPages);
+    }
+    return pages;
+  };
+
+  const searchTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+  // ✅ Search debounce (300ms) + page/selection reset — search ab server-side hai
+  useEffect(() => {
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+      setSelected([]);
+    }, 300);
+    return () => clearTimeout(searchTimerRef.current);
+  }, [search]);
+
+  // ✅ Filters — page reset + cross-page selection clear (brands ka pattern)
+  const changeStatus = (value) => { setStatus(value); setPage(1); setSelected([]); };
+  const changeCity = (value) => { setCity(value); setPage(1); setSelected([]); };
+
+  const handleSort = (key) => {
+    // ✅ Server side sorting — sort badalne par pehle page par wapas (brands ka pattern)
+    setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    setPage(1);
+    setSelected([]);
+  };
+
+  const goToPage = (target) => {
+    const n = Number(target);
+    // ✅ Cross-page selection clear (brands ka pattern)
+    if (Number.isFinite(n) && n >= 1 && n <= pagination.pages && n !== pagination.page) {
+      setPage(n);
+      setSelected([]);
+    }
+  };
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ["vendors"] }); };
 
@@ -185,9 +257,9 @@ export default function VendorsPage() {
       </button>} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
-        <StatCard label={t("totalVendors")} value={new Intl.NumberFormat(locale).format(stats.total)} />
-        <StatCard label={t("activeVendors")} value={new Intl.NumberFormat(locale).format(stats.active)} valueColor="var(--success-text)" />
-        <StatCard label={t("inactiveVendors")} value={new Intl.NumberFormat(locale).format(stats.inactive)} valueColor="var(--warning-text)" />
+        <StatCard label={t("totalVendors")} value={formatPageNumber(stats.total)} />
+        <StatCard label={t("activeVendors")} value={formatPageNumber(stats.active)} valueColor="var(--success-text)" />
+        <StatCard label={t("inactiveVendors")} value={formatPageNumber(stats.inactive)} valueColor="var(--warning-text)" />
         <StatCard label={t("totalPurchaseValue")} value={money(stats.purchase, locale)} valueColor="var(--accent)" />
       </div>
 
@@ -199,14 +271,14 @@ export default function VendorsPage() {
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative min-w-0 flex-1 sm:flex-none">
-              <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
+              <select value={status} onChange={(e) => changeStatus(e.target.value)} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
                 <option value="all">{t("statusAll")}</option><option value="active">{tShared("status.active")}</option><option value="inactive">{tShared("status.inactive")}</option>
               </select>
               <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><ChevronDown size={14} /></span>
             </div>
             <div className="relative min-w-0 flex-1 sm:flex-none">
-              <select value={city} onChange={(e) => { setCity(e.target.value); setPage(1); }} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
-                <option value="all">{t("cityAll")}</option>{cities.map((c) => <option key={c} value={c}>{c}</option>)}
+              <select value={city} onChange={(e) => changeCity(e.target.value)} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
+                <option value="all">{t("cityAll")}</option>{serverCities.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><ChevronDown size={14} /></span>
             </div>
@@ -226,10 +298,15 @@ export default function VendorsPage() {
               <table className="w-full text-[13px]">
                 <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                   <tr>
+                    {/* ✅ Sortable headers — sorting server par hoti hai (brands ka pattern) */}
                     <th className="px-4 py-3 w-10"><input type="checkbox" checked={allOnPage} onChange={() => setSelected(allOnPage ? selected.filter((id) => !rows.some((r) => r._id === id)) : [...new Set([...selected, ...rows.map((r) => r._id)])])} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></th>
-                    {[t("table.vendorCode"), t("table.name"), t("table.company"), t("table.city"), t("table.rating"), t("table.balancePayable"), t("table.status")].map((h) => (
-                      <th key={h} className="px-4 py-3 text-start text-[12px] font-semibold uppercase tracking-wide whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
-                    ))}
+                    <SortHeader label={t("table.vendorCode")} sortKey="vendor_code" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("table.name")} sortKey="name" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("table.company")} sortKey="company" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("table.city")} sortKey="city" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("table.rating")} sortKey="rating" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("table.balancePayable")} sortKey="balance" sortConfig={sortConfig} onSort={handleSort} />
+                    <SortHeader label={t("table.status")} sortKey="status" sortConfig={sortConfig} onSort={handleSort} />
                     <th className="min-w-20 whitespace-nowrap px-2 py-3 text-end text-[12px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{tShared("label.actions")}</th>
                   </tr>
                 </thead>
@@ -238,9 +315,9 @@ export default function VendorsPage() {
                     <tr key={v._id} onClick={() => router.push(`/admin/vendors/${v._id}`)} className="transition cursor-pointer" style={{ borderBottom: "1px solid var(--border-color)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
                       <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.includes(v._id)} onChange={() => toggleOne(v._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                       <td className="px-4 py-2.5 font-mono text-[12px]" style={{ color: "var(--text-secondary)" }}>{v.vendor_code}</td>
-                      <td className="px-4 py-2.5 font-medium">{localizedStrictField(v.name, v.translations?.name, locale)}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{localizedStrictField(v.company_name, v.translations?.company_name, locale) || "—"}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{localizedStrictField(v.city, v.translations?.city, locale) || "—"}</td>
+                      <td className="px-4 py-2.5 font-medium">{showVendorTranslationSkeletons && v.name?.trim() && !v.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.name, v.translations?.name, locale)}</td>
+                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{showVendorTranslationSkeletons && v.company_name?.trim() && !v.translations?.company_name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.company_name, v.translations?.company_name, locale) || "—"}</td>
+                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{showVendorTranslationSkeletons && v.city?.trim() && !v.translations?.city?.[locale]?.trim() ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.city, v.translations?.city, locale) || "—"}</td>
                       <td className="px-4 py-2.5 whitespace-nowrap"><span className="inline-flex items-center gap-1"><Star size={12} style={{ color: "#f59e0b" }} />{(Number(v.rating) || 0).toFixed(1)}</span></td>
                       <td className="px-4 py-2.5 font-semibold">{money(v.balance_payable, locale)}</td>
                       <td className="px-4 py-2.5"><Pill tone={v.is_active ? "active" : "inactive"}>{v.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill></td>
@@ -263,16 +340,50 @@ export default function VendorsPage() {
           )}
           </div>
 
-          {filtered.length > PAGE_SIZE && <footer className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-4 py-3 text-[13px]" style={{ ...cardStyle, color: "var(--text-secondary)" }}>
-            <span>{t("showingRange", { from: (safePage - 1) * PAGE_SIZE + (rows.length ? 1 : 0), to: (safePage - 1) * PAGE_SIZE + rows.length, total: filtered.length })}</span>
-            <div className="flex items-center gap-1">
-              <button disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronLeft size={14} /></button>
-              {Array.from({ length: pages }, (_, i) => i + 1).slice(Math.max(0, safePage - 2), safePage + 1).map((p) => (
-                <button key={p} onClick={() => setPage(p)} className="h-8 w-8 rounded-md text-[13px] font-bold transition" style={p === safePage ? accentBtn : cardStyle}>{p}</button>
-              ))}
-              <button disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-40" style={cardStyle}><ChevronRight size={14} /></button>
-            </div>
-          </footer>}
+          {/* ===== Server-side pagination — brands admin list ka exact pattern ===== */}
+          {total > 10 && (
+            <footer className="flex flex-col xl:flex-row items-center justify-between gap-3 rounded-lg px-4 py-3 text-[13px]" style={{ ...cardStyle, color: "var(--text-secondary)" }}>
+              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                <span>
+                  {t("showingRange", { from: formatPageNumber(startIndex), to: formatPageNumber(endIndex), total: formatPageNumber(total) })}
+                  {isFetching && !isLoading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{__t("admin.categories.page.updating")}</span> : null}
+                </span>
+                <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                  <span>{__t("admin.shared.pagination.rowsPerPage")}</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(event) => { setItemsPerPage(Number(event.target.value)); setPage(1); setSelected([]); }}
+                    className="h-8 w-[100px] rounded-lg px-2 text-[13px] outline-none cursor-pointer"
+                    style={inputStyle}
+                  >
+                    {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => goToPage(displayedPage - 1)} disabled={displayedPage <= 1 || isFetching} aria-label={__t("admin.shared.pagination.prev")} title={__t("admin.shared.pagination.prev")} className="h-8 w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={cardStyle}><ChevronLeft size={14} /></button>
+                <span className="hidden sm:inline-flex items-center gap-1">
+                  {renderPageNumbers().map((p, index) => (
+                    <Fragment key={index}>
+                      {p === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
+                        <button onClick={() => goToPage(p)} disabled={isFetching && displayedPage !== p} aria-label={__t("admin.brands.ui.goToPage", { page: formatPageNumber(p) })} aria-current={displayedPage === p ? "page" : undefined} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-bold transition hover:opacity-80" style={{ backgroundColor: displayedPage === p ? "var(--accent)" : "var(--bg-card)", color: displayedPage === p ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${displayedPage === p ? "var(--accent)" : "var(--border-color)"}` }}>{formatPageNumber(p)}</button>
+                      )}
+                    </Fragment>
+                  ))}
+                </span>
+                <span className="sm:hidden text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                  {__t("admin.shared.pagination.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}
+                </span>
+                <button onClick={() => goToPage(displayedPage + 1)} disabled={displayedPage >= totalPages || isFetching} aria-label={__t("admin.shared.pagination.next")} title={__t("admin.shared.pagination.next")} className="h-8 w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={cardStyle}><ChevronRight size={14} /></button>
+              </div>
+            </footer>
+          )}
+          {rows.length > 0 && total <= 10 && (
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              {__t("admin.shared.pagination.showingCount", { count: formatPageNumber(rows.length), total: formatPageNumber(total) })}
+              {isFetching && !isLoading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{__t("admin.categories.page.updating")}</span> : null}
+            </p>
+          )}
         </div>
 
 

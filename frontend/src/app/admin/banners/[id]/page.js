@@ -333,15 +333,15 @@ export default function BannerDetailPage() {
   const queryClient = useQueryClient();
 
   const { data: banner, isLoading, isError, error } = useQuery({
-    queryKey: ["banner", bannerId],
+    queryKey: ["banner", bannerId, locale],
     queryFn: async () => {
-      const response = await bannerAPI.get(bannerId);
+      const response = await bannerAPI.get(bannerId, locale);
       return response?.data?.data || response?.data || null;
     },
     enabled: !!bannerId,
     retry: false,
   });
-  usePageTranslations({ model: "Banner", records: banner ? [banner] : [], locale, ready: !!banner && !isLoading, queryKey: ["banner", bannerId], queryClient });
+  usePageTranslations({ model: "Banner", records: banner ? [banner] : [], locale, ready: !!banner && !isLoading, queryKey: ["banner", bannerId, locale], queryClient });
 
   const deleteMutation = useMutation({
     mutationFn: () => bannerAPI.delete(bannerId),

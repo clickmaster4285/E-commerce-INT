@@ -17,32 +17,130 @@ const deleteFile = (filePath) => {
   if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
 };
 
-// ✅ FIXED: Yeh function pehle missing tha, ab add kar diya gaya hai
+// ==========================================
+// 🌐 LOCALE + TRANSLATION HELPERS
+// getBrandById / getBrandsAdmin ka exact pattern: sirf selected locale ki
+// translation return karo, poori translations map nahi.
+// ==========================================
+const parseLocale = (value) => {
+  const requestedLocale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+};
+
+// ✅ Selected locale ki slim translation object (brand paginated response jaisa).
+const slimBannerTranslations = (banner, locale) => {
+  if (locale === "en" || !banner.translations) return null;
+  const out = {};
+  ["title", "eyebrow", "heading", "description", "altText"].forEach((field) => {
+    const value = banner.translations?.[field]?.[locale];
+    if (typeof value === "string" && value.trim()) out[field] = { [locale]: value };
+  });
+  const primaryText = banner.translations?.primaryButton?.[locale];
+  if (typeof primaryText === "string" && primaryText.trim()) {
+    out.primaryButton = { text: { [locale]: primaryText } };
+  }
+  const secondaryText = banner.translations?.secondaryButton?.[locale];
+  if (typeof secondaryText === "string" && secondaryText.trim()) {
+    out.secondaryButton = { text: { [locale]: secondaryText } };
+  }
+  return Object.keys(out).length ? out : {};
+};
+
+// ✅ List/detail rows me sirf wahi fields jate hain jo front par dikhti/edit hoti
+// hain (table + grid + edit modal). createdby/updatedby/createdAt/updatedAt/__v/
+// storeId/translation_source/translation_status list payload se bahar — bilkul
+// brand admin list jaisa "no extra data" response.
+const frontBannerFields = (banner) => ({
+  _id: banner._id,
+  title: banner.title,
+  bannerType: banner.bannerType,
+  status: banner.status,
+  position: banner.position,
+  startDate: banner.startDate || null,
+  endDate: banner.endDate || null,
+  desktopImage: banner.desktopImage || null,
+  ...(banner.tabletImage && { tabletImage: banner.tabletImage }),
+  ...(banner.mobileImage && { mobileImage: banner.mobileImage }),
+  ...(banner.altText && { altText: banner.altText }),
+  ...(banner.backgroundColor && { backgroundColor: banner.backgroundColor }),
+  ...(banner.eyebrow && { eyebrow: banner.eyebrow }),
+  ...(banner.heading && { heading: banner.heading }),
+  ...(banner.description && { description: banner.description }),
+  ...(banner.primaryButton && Object.keys(banner.primaryButton).length > 0 && { primaryButton: banner.primaryButton }),
+  ...(banner.secondaryButton?.text && { secondaryButton: banner.secondaryButton }),
+  ...(Array.isArray(banner.displayRules) && banner.displayRules.length > 0 && { displayRules: banner.displayRules }),
+  ...(banner.autoPublish !== undefined && { autoPublish: banner.autoPublish }),
+  ...(banner.linkedDealId && { linkedDealId: banner.linkedDealId }),
+});
+
+// ==========================================
+// 🛡️ GET BANNER BY ID — ADMIN (slim, locale-aware)
+// getBrandById ka pattern: populate sirf display/audit info ke liye, response me
+// sirf front + audit fields, aur translations sirf selected locale ki.
+// ==========================================
 exports.getBanner = async (req, res) => {
   try {
+    const locale = parseLocale(req.query.locale);
     const banner = await Banner.findById(req.params.id)
-      .populate("primaryButton.dealId", "name translations isActive startDate endDate");
+      .select("title translations bannerType status position startDate endDate eyebrow heading description altText backgroundColor primaryButton secondaryButton displayRules autoPublish linkedDealId desktopImage tabletImage mobileImage createdAt updatedAt createdby updatedby")
+      .populate("createdby", "name email")
+      .populate("updatedby", "name email")
+      .lean();
     if (!banner) return res.status(404).json({ success: false, message: "Banner not found" });
-    res.json({ success: true, data: banner });
+
+    const responseBanner = {
+      ...frontBannerFields(banner),
+      createdAt: banner.createdAt,
+      createdby: banner.createdby ? { _id: banner.createdby._id, name: banner.createdby.name, email: banner.createdby.email } : null,
+      updatedAt: banner.updatedAt,
+      updatedby: banner.updatedby ? { _id: banner.updatedby._id, name: banner.updatedby.name, email: banner.updatedby.email } : null,
+    };
+    const translations = slimBannerTranslations(banner, locale);
+    if (translations) responseBanner.translations = translations;
+
+    res.status(200).json({ success: true, data: responseBanner });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
+// ✅ Server-side sorting whitelist — frontend sort key -> DB field
+// (brandController.BRAND_SORT_FIELDS ka exact pattern)
+const BANNER_SORT_FIELDS = {
+  title: "title",
+  bannerType: "bannerType",
+  status: "status",
+  position: "position",
+  created: "createdAt",
+};
+
+// ✅ Search string ko safe regex banane ke liye (special chars se crash na ho)
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// ==========================================
+// 🛡️ GET ALL BANNERS — ADMIN / STOREFRONT
+// getBrandsAdmin ka exact pattern:
+// - page + limit => SERVER SIDE PAGINATION: counts + bannerTypes meta ke saath,
+//   aur har item sirf FRONT fields rakhta hai (createdby/updatedby/timestamps/
+//   __v/translation_* list payload me leak nahi hote).
+// - limit na ho (0) => legacy full-list response (storefront GUI isi par depend).
+// ==========================================
 exports.getAllBanners = async (req, res) => {
   try {
     const { status, bannerType, page = 1, limit = 0, search } = req.query; // 0 = legacy mode
-    const filter = {};
-    if (status) filter.status = status;
-    if (bannerType) filter.bannerType = bannerType;
-    if (search) filter.title = { $regex: search, $options: "i" };
+    const limitRaw = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Number(limit) : 0;
 
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Number.isFinite(Number(limit)) && Number(limit) > 0 ? Math.min(Number(limit), 100) : 0;
+    const buildFilter = () => {
+      const filter = {};
+      if (status) filter.status = status;
+      if (bannerType) filter.bannerType = bannerType;
+      if (search) filter.title = { $regex: escapeRegex(String(search).trim()), $options: "i" };
+      return filter;
+    };
 
     // ---- LEGACY MODE (no limit) -> exact old behavior ----
-    if (!limitNum) {
-      const banners = await Banner.find(filter)
+    if (!limitRaw) {
+      const banners = await Banner.find(buildFilter())
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
         .sort({ position: 1, createdAt: -1 })
@@ -50,23 +148,70 @@ exports.getAllBanners = async (req, res) => {
       return res.status(200).json({ success: true, data: banners });
     }
 
-    // ---- PAGINATED MODE ----
-    const total = await Banner.countDocuments(filter);
-    const safePage = Math.min(pageNum, Math.max(1, Math.ceil(total / limitNum)));
-    const pages = Math.max(1, Math.ceil(total / limitNum));
-    const skip = (safePage - 1) * limitNum;
+    // ---- SERVER SIDE PAGINATION (brand admin list ka exact pattern) ----
+    const requestedPage = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, limitRaw));
 
-    const banners = await Banner.find(filter)
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
-      .sort({ position: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
+    const locale = parseLocale(req.query.locale);
+
+    // ✅ Sorting bhi server par hoti hai (whitelist ke ilawa koi custom field nahi)
+    const sortKeyRaw = String(req.query.sort || "").trim();
+    const hasSort = Boolean(BANNER_SORT_FIELDS[sortKeyRaw]);
+    const sortField = hasSort ? BANNER_SORT_FIELDS[sortKeyRaw] : "position";
+    const rawOrder = String(req.query.order || "").trim().toLowerCase();
+    // Default: position asc (banner preset / storefront ordering — legacy jaisa)
+    const sortOrder = hasSort ? (rawOrder === "desc" ? -1 : 1) : 1;
+
+    const total = await Banner.countDocuments(buildFilter());
+    const pages = Math.max(1, Math.ceil(total / limitNum));
+    const safePage = Math.min(requestedPage, pages);
+
+    const [banners, totalBanners, activeBanners, inactiveBanners, scheduledBanners, expiredBanners, draftBanners, typeList, positionList] =
+      await Promise.all([
+        Banner.find(buildFilter())
+          .sort({ [sortField]: sortOrder, _id: 1 })
+          .skip((safePage - 1) * limitNum)
+          .limit(limitNum)
+          .lean(),
+        Banner.countDocuments({}),
+        Banner.countDocuments({ status: "active" }),
+        Banner.countDocuments({ status: "inactive" }),
+        Banner.countDocuments({ status: "scheduled" }),
+        Banner.countDocuments({ status: "expired" }),
+        Banner.countDocuments({ status: "draft" }),
+        Banner.distinct("bannerType"),
+        Banner.distinct("position"),
+      ]);
+
+    // Har row sirf front-visible fields — edit modal ki form fields + list columns
+    // (bilkul wahi shape jo brand paginated response rakhta hai).
+    const pageBanners = banners.map((banner) => {
+      const item = frontBannerFields(banner);
+      const translations = slimBannerTranslations(banner, locale);
+      if (translations) item.translations = translations;
+      return item;
+    });
 
     res.status(200).json({
       success: true,
-      data: banners,
+      data: pageBanners,
+      counts: {
+        total: totalBanners,
+        active: activeBanners,
+        inactive: inactiveBanners,
+        scheduled: scheduledBanners,
+        expired: expiredBanners,
+        draft: draftBanners,
+      },
+      bannerTypes: (typeList || [])
+        .filter(Boolean)
+        .map((b) => String(b))
+        .sort((a, b) => a.localeCompare(b)),
+      // ✅ Used positions (poori collection ki) — duplicate position check aur
+      // "next free position" sirf current page par depend na kare
+      positions: (positionList || [])
+        .filter((p) => Number.isFinite(p))
+        .sort((a, b) => a - b),
       pagination: {
         total,
         page: safePage,

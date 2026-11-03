@@ -200,6 +200,21 @@ function DataRow({ icon: Icon, label, value, highlight = false, mono = false }) 
   );
 }
 
+function DealTargetPagination({ pagination, page, setPage, pageSize, setPageSize, isFetching, t }) {
+  if (!pagination?.total) return null;
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: "var(--border-color)" }}>
+      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")} {(page - 1) * pageSize + 1}-{Math.min(page * pageSize, pagination.total)} {t("admin.featuredProducts.ui.of")} {pagination.total}</span>
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-secondary)" }}><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-8 rounded-lg px-2" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+        <button type="button" disabled={!pagination.hasPrev || isFetching} onClick={() => setPage((value) => Math.max(1, value - 1))} className="h-8 rounded-lg border px-3 text-xs disabled:opacity-40" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)" }}>{t("admin.brands.ui.previousPage")}</button>
+        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{page}/{pagination.pages || 1}</span>
+        <button type="button" disabled={!pagination.hasNext || isFetching} onClick={() => setPage((value) => value + 1)} className="h-8 rounded-lg border px-3 text-xs disabled:opacity-40" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)" }}>{t("admin.brands.ui.nextPage")}</button>
+      </div>
+    </div>
+  );
+}
+
 /* =========================================================
    SKELETON LOADING UI — existing `.skeleton` shimmer utility (globals.css) reuse
    ✅ Real page ka same shell (header card + overview cards) render hota hai, sirf
@@ -316,17 +331,34 @@ export default function DealDetailPage() {
   const [editingDeal, setEditingDeal] = useState(null);
   const [selector, setSelector] = useState({ open: false, type: null });
   const [activeFormType, setActiveFormType] = useState(null);
+  const [targetPage, setTargetPage] = useState(1);
+  const [targetPageSize, setTargetPageSize] = useState(10);
 
   const { data: deal, isLoading: loading } = useQuery({
-    queryKey: ["deal", dealId],
-    queryFn: () => dealApi.getById(dealId),
+    queryKey: ["deal", dealId, locale],
+    queryFn: () => dealApi.getById(dealId, { admin_detail: 1, locale }),
     enabled: !!dealId,
     retry: false,
   });
 
-  const { data: allProducts = [] } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: !!dealId });
-  const { data: allCategories = [] } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: !!dealId });
-  const { data: allBrands = [] } = useQuery({ queryKey: ["deal-brands"], queryFn: brandApi.getAll, staleTime: 60000, enabled: !!dealId });
+  const { data: allProductsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: allCategoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: allBrandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: brandApi.getAll, staleTime: 60000, enabled: showModal });
+  const allProducts = Array.isArray(allProductsResponse) ? allProductsResponse : Array.isArray(allProductsResponse?.data) ? allProductsResponse.data : [];
+  const allCategories = Array.isArray(allCategoriesResponse) ? allCategoriesResponse : Array.isArray(allCategoriesResponse?.data) ? allCategoriesResponse.data : [];
+  const allBrands = Array.isArray(allBrandsResponse) ? allBrandsResponse : Array.isArray(allBrandsResponse?.data) ? allBrandsResponse.data : [];
+
+  const targetType = deal?.applyTo === "product" ? "products" : deal?.applyTo === "category" ? "categories" : deal?.applyTo === "brand" ? "brands" : "";
+  const targetModel = targetType === "products" ? "Product" : targetType === "categories" ? "Category" : "Brand";
+  const targetQueryKey = ["deal", dealId, "targets", targetType, locale, targetPage, targetPageSize];
+  const { data: targetResponse, isFetching: targetsFetching } = useQuery({
+    queryKey: targetQueryKey,
+    queryFn: () => dealApi.getTargets(dealId, { type: targetType, locale, page: targetPage, limit: targetPageSize }),
+    enabled: !!dealId && !!targetType,
+    retry: false,
+  });
+  const targetRecords = targetResponse?.items || [];
+  const targetPagination = targetResponse?.pagination || { total: targetType === "products" ? deal?.productIds?.length || 0 : targetType === "categories" ? deal?.categoryIds?.length || 0 : deal?.brandIds?.length || 0, page: targetPage, limit: targetPageSize, pages: 1, hasNext: false, hasPrev: false };
 
   const cardStyle = { backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" };
   const inputStyle = { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" };
@@ -337,6 +369,7 @@ export default function DealDetailPage() {
     onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["deals"] });
       queryClient.invalidateQueries({ queryKey: ["deal"] });
+      queryClient.invalidateQueries({ queryKey: ["deal", dealId, "targets"] });
       toast.success(variables.id ? t("admin.deals.toast.updated") : t("admin.deals.toast.created"));
       setShowModal(false);
       resetForm();
@@ -491,28 +524,20 @@ export default function DealDetailPage() {
     (deal.updated_at || deal.updatedAt) !== (deal.created_at || deal.createdAt)
   );
 
-  const selectedProducts = useMemo(() => {
-    if (deal?.applyTo !== "product" || !deal?.productIds?.length) return [];
-    return allProducts.filter((p) => deal.productIds.some((id) => getId(id) === getId(p)));
-  }, [allProducts, deal]);
-
-  const selectedCategories = useMemo(() => {
-    if (deal?.applyTo !== "category" || !deal?.categoryIds?.length) return [];
-    return allCategories.filter((c) => deal.categoryIds.some((id) => getId(id) === getId(c)));
-  }, [allCategories, deal]);
-
-  const selectedBrands = useMemo(() => {
-    if (deal?.applyTo !== "brand" || !deal?.brandIds?.length) return [];
-    return allBrands.filter((b) => deal.brandIds.some((id) => getId(id) === getId(b)));
-  }, [allBrands, deal]);
-  usePageTranslations({ model: "Deal", records: deal ? [deal] : [], locale, ready: !!deal && !loading, queryKey: ["deal", dealId], queryClient });
-  usePageTranslations({ model: "Product", records: selectedProducts, locale, ready: !!deal && !loading, queryKey: ["deal-products"], queryClient });
-  usePageTranslations({ model: "Category", records: selectedCategories, locale, ready: !!deal && !loading, queryKey: ["deal-categories"], queryClient });
-  usePageTranslations({ model: "Brand", records: selectedBrands, locale, ready: !!deal && !loading, queryKey: ["deal-brands"], queryClient });
+  const selectedProducts = targetType === "products" ? targetRecords : [];
+  const selectedCategories = targetType === "categories" ? targetRecords : [];
+  const selectedBrands = targetType === "brands" ? targetRecords : [];
+  const dealAlreadyTranslated = locale === "en" || (
+    typeof deal?.translations?.name?.[locale] === "string" && deal.translations.name[locale].trim() &&
+    (!deal.description?.trim() || (typeof deal.translations?.description?.[locale] === "string" && deal.translations.description[locale].trim()))
+  );
+  const dealTranslationsReady = usePageTranslations({ model: "Deal", records: deal ? [deal] : [], locale, ready: !!deal && !loading, queryKey: ["deal", dealId, locale], queryClient, alreadyTranslated: dealAlreadyTranslated, fallbackAfterRetries: true });
+  const targetAlreadyTranslated = locale === "en" || (targetRecords.length > 0 && targetRecords.every((record) => typeof record.translations?.name?.[locale] === "string" && record.translations.name[locale].trim()));
+  const targetsTranslationsReady = usePageTranslations({ model: targetModel, records: targetRecords, locale, ready: !!deal && !loading && !targetsFetching, queryKey: targetQueryKey, queryClient, alreadyTranslated: targetAlreadyTranslated, fallbackAfterRetries: true });
 
   // ✅ Loading — spinner ki jagah skeleton (real shell: header card + overview cards),
   //    is liye data aane par layout shift nahi hota.
-  if (loading) {
+  if (loading || (locale !== "en" && !dealTranslationsReady)) {
     return <DealDetailSkeleton />;
   }
 
@@ -632,22 +657,22 @@ export default function DealDetailPage() {
                   {deal.applyTo === "product" && selectedProducts.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
                       <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{productNameOf(selectedProducts[0]) || t("common.product")}</span>
-                      {selectedProducts.length > 1 && (
-                        <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{selectedProducts.length - 1}</span>
+                      {targetPagination.total > 1 && (
+                        <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{targetPagination.total - 1}</span>
                       )}
                     </span>
                   ) : deal.applyTo === "category" && selectedCategories.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
                       <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{nameOf(selectedCategories[0]) || t("common.category")}</span>
-                      {selectedCategories.length > 1 && (
-                        <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{selectedCategories.length - 1}</span>
+                      {targetPagination.total > 1 && (
+                        <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{targetPagination.total - 1}</span>
                       )}
                     </span>
                   ) : deal.applyTo === "brand" && selectedBrands.length > 0 ? (
                     <span className="flex flex-wrap gap-1.5">
                       <span className="inline-flex px-2.5 py-1 rounded-lg text-[10px] font-semibold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>{nameOf(selectedBrands[0]) || t("common.brand")}</span>
-                      {selectedBrands.length > 1 && (
-                        <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{selectedBrands.length - 1}</span>
+                      {targetPagination.total > 1 && (
+                        <span className="inline-flex px-2 py-1 rounded-lg text-[10px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>+{targetPagination.total - 1}</span>
                       )}
                     </span>
                   ) : deal.applyTo === "all" ? "All Products" : "—"}
@@ -766,14 +791,16 @@ export default function DealDetailPage() {
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4" style={{ color: "var(--accent)" }} />
                   <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.07966f2a36ac")}</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{selectedProducts.length}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{targetPagination.total}</span>
                 </div>
               </div>
               <div className="p-5">
-                {selectedProducts.length > 0 ? (
+                {targetsFetching || (locale !== "en" && !targetsTranslationsReady) ? (
+                  <div className="flex flex-wrap gap-3" aria-busy="true">{Array.from({ length: Math.min(targetPageSize, targetPagination.total || targetPageSize) }).map((_, i) => <span key={`target-product-skeleton-${i}`} className="skeleton h-[92px] w-[68px] rounded-lg" />)}</div>
+                ) : selectedProducts.length > 0 ? (
                   <>
                     <div className="flex flex-wrap gap-3">
-                      {selectedProducts.slice(0, 8).map((p) => {
+                      {selectedProducts.map((p) => {
                         const img = getProductImage(p);
                         return (
                           <div key={p._id || p.id} className="w-[68px]">
@@ -785,13 +812,11 @@ export default function DealDetailPage() {
                         );
                       })}
                     </div>
-                    {selectedProducts.length > 8 && (
-                      <p className="text-[10px] font-semibold mt-2" style={{ color: "var(--accent)" }}>+{selectedProducts.length - 8}{" "}{t("admin.promotions.ui.generated.e7c95b4c2824")}</p>
-                    )}
                   </>
                 ) : (
                   <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.70ada614a1b6")}</p>
                 )}
+                <DealTargetPagination pagination={targetPagination} page={targetPage} setPage={setTargetPage} pageSize={targetPageSize} setPageSize={setTargetPageSize} isFetching={targetsFetching} t={t} />
               </div>
             </div>
           ) : deal.applyTo === "category" ? (
@@ -800,25 +825,25 @@ export default function DealDetailPage() {
                 <div className="flex items-center gap-2">
                   <Layers className="w-4 h-4" style={{ color: "var(--accent)" }} />
                   <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.8798c94d30b6")}</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{selectedCategories.length}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{targetPagination.total}</span>
                 </div>
               </div>
               <div className="p-5 space-y-2">
-                {selectedCategories.length > 0 ? (
+                {targetsFetching || (locale !== "en" && !targetsTranslationsReady) ? (
+                  <div className="space-y-2" aria-busy="true">{Array.from({ length: Math.min(targetPageSize, targetPagination.total || targetPageSize) }).map((_, i) => <span key={`target-category-skeleton-${i}`} className="skeleton block h-10 w-full rounded-lg" />)}</div>
+                ) : selectedCategories.length > 0 ? (
                   <>
-                    {selectedCategories.slice(0, 8).map((c) => (
+                    {selectedCategories.map((c) => (
                       <div key={c._id || c.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
                         <Layers className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--accent)" }} />
                         <span className="text-[12px] font-semibold truncate" style={{ color: "var(--text-primary)" }}>{nameOf(c) || t("common.category")}</span>
                       </div>
                     ))}
-                    {selectedCategories.length > 8 && (
-                      <p className="text-[10px] font-semibold pt-1" style={{ color: "var(--accent)" }}>+{selectedCategories.length - 8}{" "}{t("admin.promotions.ui.generated.e7c95b4c2824")}</p>
-                    )}
                   </>
                 ) : (
                   <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.6218eb48312a")}</p>
                 )}
+                <DealTargetPagination pagination={targetPagination} page={targetPage} setPage={setTargetPage} pageSize={targetPageSize} setPageSize={setTargetPageSize} isFetching={targetsFetching} t={t} />
               </div>
             </div>
           ) : deal.applyTo === "brand" ? (
@@ -827,13 +852,15 @@ export default function DealDetailPage() {
                 <div className="flex items-center gap-2">
                   <Award className="w-4 h-4" style={{ color: "var(--accent)" }} />
                   <span className="text-[12px] font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.promotions.ui.generated.00347db82ed6")}</span>
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{selectedBrands.length}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{targetPagination.total}</span>
                 </div>
               </div>
               <div className="p-5 space-y-2">
-                {selectedBrands.length > 0 ? (
+                {targetsFetching || (locale !== "en" && !targetsTranslationsReady) ? (
+                  <div className="space-y-2" aria-busy="true">{Array.from({ length: Math.min(targetPageSize, targetPagination.total || targetPageSize) }).map((_, i) => <span key={`target-brand-skeleton-${i}`} className="skeleton block h-10 w-full rounded-lg" />)}</div>
+                ) : selectedBrands.length > 0 ? (
                   <>
-                    {selectedBrands.slice(0, 8).map((b) => {
+                    {selectedBrands.map((b) => {
                       const logo = getBrandLogo(b);
                       return (
                         <div key={b._id || b.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)" }}>
@@ -842,13 +869,11 @@ export default function DealDetailPage() {
                         </div>
                       );
                     })}
-                    {selectedBrands.length > 8 && (
-                      <p className="text-[10px] font-semibold pt-1" style={{ color: "var(--accent)" }}>+{selectedBrands.length - 8}{" "}{t("admin.promotions.ui.generated.e7c95b4c2824")}</p>
-                    )}
                   </>
                 ) : (
                   <p className="text-[11px] py-4 text-center" style={{ color: "var(--text-muted)" }}>{t("admin.promotions.ui.generated.818a8e89ab5f")}</p>
                 )}
+                <DealTargetPagination pagination={targetPagination} page={targetPage} setPage={setTargetPage} pageSize={targetPageSize} setPageSize={setTargetPageSize} isFetching={targetsFetching} t={t} />
               </div>
             </div>
           ) : (
