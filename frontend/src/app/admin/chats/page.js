@@ -6,13 +6,9 @@ import { Loader2, MessageSquareText, Search } from "lucide-react";
 import { adminChatApi } from "@/apis/chatApi";
 import { getAdminSocket } from "@/hooks/admin/useAdminSocket";
 import ChatThread from "@/components/chat/ChatThread";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "unread", label: "Unread" },
-  { key: "open", label: "Open" },
-  { key: "closed", label: "Closed" },
-];
+const FILTER_KEYS = ["all", "unread", "open", "closed"];
 
 function initials(name = "Customer") {
   return String(name).trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "C";
@@ -34,6 +30,8 @@ export default function AdminChatsPage() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState(null);
+  const { t } = useTranslation();
+  const FILTERS = FILTER_KEYS.map((key) => ({ key, label: t(`chat.admin.${key}`) }));
   const queryClient = useQueryClient();
   const socket = getAdminSocket();
 
@@ -89,11 +87,11 @@ export default function AdminChatsPage() {
           <div className="shrink-0 border-b border-slate-100 px-3.5 pb-3.5 pt-3 dark:border-slate-700">
             <div className="mb-3 flex items-center gap-2.5">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white"><MessageSquareText size={18} strokeWidth={2.2} /></span>
-              <div className="min-w-0"><h1 className="text-base font-bold leading-tight text-slate-900 dark:text-slate-100">Chats</h1><p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Customer support inbox</p></div>
+              <div className="min-w-0"><h1 className="text-base font-bold leading-tight text-slate-900 dark:text-slate-100">{t("chat.admin.title")}</h1><p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{t("chat.admin.inbox")}</p></div>
             </div>
             <label className="flex h-10 items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 text-slate-400 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 dark:border-slate-700 dark:bg-[#16233b] dark:focus-within:ring-blue-900">
               <Search size={17} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by customer, order or message..." className="min-w-0 flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("chat.admin.search")} className="min-w-0 flex-1 bg-transparent text-[13px] text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500" />
             </label>
             <div className="mt-2.5 grid grid-cols-4 gap-1.5">
               {FILTERS.map((item) => {
@@ -108,8 +106,8 @@ export default function AdminChatsPage() {
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {conversationsQuery.isLoading ? <div className="flex justify-center py-12 text-slate-400"><Loader2 className="h-5 w-5 animate-spin" /></div>
-              : conversationsQuery.isError ? <p className="px-4 py-10 text-center text-sm text-red-600 dark:text-rose-300">Could not load conversations. Try refreshing.</p>
-                : conversations.length === 0 ? <p className="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400">No conversations found.</p>
+              : conversationsQuery.isError ? <p className="px-4 py-10 text-center text-sm text-red-600 dark:text-rose-300">{t("chat.admin.loadError")}</p>
+                : conversations.length === 0 ? <p className="px-4 py-12 text-center text-sm text-slate-500 dark:text-slate-400">{t("chat.admin.none")}</p>
                   : conversations.map((item) => {
                     const name = item.guest_name || item.customer?.name || item.guest_email || item.customer?.email || "Customer";
                     const active = String(activeId) === String(item._id);
@@ -140,7 +138,7 @@ export default function AdminChatsPage() {
         <div className="h-full min-h-0 min-w-0 overflow-hidden">
           {activeConversation
             ? <ChatThread key={activeConversation._id} conversation={activeConversation} api={adminChatApi} socket={socket || getAdminSocket()} isAdmin />
-            : <div className="flex h-full min-h-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#101b2e] dark:text-slate-400">Select a conversation to read and reply.</div>}
+            : <div className="flex h-full min-h-0 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#101b2e] dark:text-slate-400">{t("chat.customer.selectConversation")}</div>}
         </div>
       </div>
     </main>

@@ -86,7 +86,7 @@ export default function CustomerChatsPage({ initialConversationId = null }) {
         </div>
         <div className="flex items-center gap-3">
           {unreadCount > 0 && <span className="rounded-full bg-[var(--user-accent)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--user-accent)]">{t("chat.customer.unread", { count: unreadCount })}</span>}
-          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3.5 py-2 text-xs font-semibold text-[var(--user-text)]"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span><span><span className="block">Online Support</span><span className="block text-[10px] font-normal text-[var(--user-text-muted)]">We’re here to help!</span></span></span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3.5 py-2 text-xs font-semibold text-[var(--user-text)]"><span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-50" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span><span><span className="block">{t("chat.ui.onlineSupport")}</span><span className="block text-[10px] font-normal text-[var(--user-text-muted)]">{t("chat.ui.hereToHelp")}</span></span></span>
         </div>
       </header>
 

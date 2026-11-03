@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCheck, Loader2, Package, Plus, X } from "lucide-react";
 import OrderDetails from "@/components/chat/OrderDetails";
 import InquiryTopicPicker from "@/components/chat/InquiryTopicPicker";
 import FallbackImage from "@/components/common/FallbackImage";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
-const QUICK_REPLIES = ["Where is my order?", "I have a payment issue", "I have a delivery question", "I want to return an item"];
+const QUICK_REPLY_KEYS = ["chat.quick.order", "chat.quick.payment", "chat.quick.delivery", "chat.quick.return"];
 const dateLabel = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -24,6 +25,7 @@ const chatImageUrl = (source) => {
 };
 
 function ProductVariantThumbnail({ item, compact = false, interactive = true, showTooltip = true, isAdmin = false }) {
+  const { t } = useTranslation();
   const [tooltipPosition, setTooltipPosition] = useState(null);
   const productName = item.productName || item.product_name || "Product";
   const variantName = item.variantName || item.variant_name || item.variant || "Variant";
@@ -55,12 +57,13 @@ function ProductVariantThumbnail({ item, compact = false, interactive = true, sh
       <p className="mt-1 truncate text-xs text-slate-600 dark:text-slate-300">{variantName}</p>
       {sku && <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">SKU {sku}</p>}
       {price != null && <p className="mt-2 border-t border-slate-100 pt-2 text-xs font-semibold text-slate-900 dark:border-slate-700 dark:text-slate-100">{contextMoney(price)}</p>}
-      {item.qty != null && <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Quantity: {item.qty}</p>}
+      {item.qty != null && <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{t("chat.ui.quantity")}: {item.qty}</p>}
     </div>}
   </div>;
 }
 
 function OrderMessageLink({ message, className, children, isAdmin = false }) {
+  const { t } = useTranslation();
   const [tooltipPosition, setTooltipPosition] = useState(null);
   const context = message.context_snapshot || {};
   const orderId = context.order_id?._id || context.order_id;
@@ -74,7 +77,7 @@ function OrderMessageLink({ message, className, children, isAdmin = false }) {
   const details = orderId && <Link href={orderHref} role="tooltip" aria-label={`View order ${context.order_number || orderId} details`} style={tooltipPosition || undefined} className={`fixed z-[200] w-[min(18rem,calc(100vw-1rem))] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-xl transition hover:border-blue-400 dark:border-slate-600 dark:bg-[#16233b] ${tooltipPosition ? "hidden group-hover:block group-focus-within:block" : "invisible"}`}>
     <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">Order #{context.order_number || orderId || "Order"}</p>{context.order_status && <p className="mt-0.5 text-[10px] capitalize text-slate-500 dark:text-slate-400">{context.order_status}</p>}</div>{context.total != null && <span className="shrink-0 text-xs font-bold text-slate-900 dark:text-slate-100">{contextMoney(context.total)}</span>}</div>
     {items.length > 0 && <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2 dark:border-slate-700">{items.slice(0, 6).map((item, index) => <div key={`${item.variant_id || item.product_id || index}`} className="flex items-start justify-between gap-3 text-[10px]"><div className="min-w-0"><p className="truncate font-semibold text-slate-800 dark:text-slate-200">{item.product_name || "Product"}</p><p className="truncate text-slate-500 dark:text-slate-400">{item.variant_name || "Variant"}{item.qty != null ? ` · Qty ${item.qty}` : ""}</p></div><span className="shrink-0 font-semibold text-slate-700 dark:text-slate-300">{contextMoney(item.line_total ?? item.unit_price)}</span></div>)}</div>}
-    <p className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-medium text-blue-700 dark:border-slate-700 dark:text-blue-300">Click to view order details</p>
+    <p className="mt-2 border-t border-slate-100 pt-2 text-[10px] font-medium text-blue-700 dark:border-slate-700 dark:text-blue-300">{t("chat.ui.clickOrderDetails")}</p>
   </Link>;
   if (!orderId) return <div className={className}>{children}</div>;
   return <div className="group relative inline-flex max-w-[88%] flex-col sm:max-w-[72%]">
@@ -86,6 +89,7 @@ function OrderMessageLink({ message, className, children, isAdmin = false }) {
 }
 
 function ProductReferencePreview({ items, onClear, label, canClear = true, isAdmin = false }) {
+  const { t } = useTranslation();
   return <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-[#101b2e]">
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
       {label && <p className="truncate text-[10px] font-semibold text-slate-500 dark:text-slate-400">{label}</p>}
@@ -93,11 +97,12 @@ function ProductReferencePreview({ items, onClear, label, canClear = true, isAdm
         {items.map((item, index) => <ProductVariantThumbnail key={item.variantId || item.variant_id || index} item={item} isAdmin={isAdmin} />)}
       </div>
     </div>
-    {canClear && <button type="button" onClick={onClear} aria-label="Remove reference" title="Remove reference" className="flex h-7 w-7 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"><X size={14} /></button>}
+    {canClear && <button type="button" onClick={onClear} aria-label={t("chat.ui.removeReference")} title={t("chat.ui.removeReference")} className="flex h-7 w-7 shrink-0 items-center justify-center text-slate-500 transition hover:bg-slate-200 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"><X size={14} /></button>}
   </div>;
 }
 
 function MessageContextDetails({ context }) {
+  const { t } = useTranslation();
   if (!context || ["product", "cart", "order"].includes(context.kind)) return null;
   const count = Number(context.item_count) || context.items?.length || 0;
   const title = context.kind === "cart" ? `Cart details · ${count} ${count === 1 ? "item" : "items"}` : context.kind === "product" ? "Product details" : `Order details · #${context.order_number || ""}`;
@@ -125,6 +130,7 @@ function MessageContextDetails({ context }) {
 }
 
 export default function ChatThread({ conversation: initialConversation, api, socket, isAdmin = false, compact = false, guestToken = "", cartItems = [], orders = [], allowOrder = true, onTopic, onProducts, contextBusy = false }) {
+  const { t } = useTranslation();
   const id = initialConversation?._id;
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
@@ -141,6 +147,7 @@ export default function ChatThread({ conversation: initialConversation, api, soc
   const bottomRef = useRef(null);
   const messageListRef = useRef(null);
   const composerRef = useRef(null);
+  const textareaRef = useRef(null);
   const preserveScrollRef = useRef(null);
   const localTypingTimerRef = useRef(null);
   const remoteTypingTimerRef = useRef(null);
@@ -191,6 +198,16 @@ export default function ChatThread({ conversation: initialConversation, api, soc
   const contactEmail = conversation.customer?.email || conversation.guest_email || "";
   const messagesQuery = useQuery({ queryKey: ["chat-messages", id], queryFn: () => api.messages(id), enabled: Boolean(id), refetchOnWindowFocus: true, retry: false });
   const messages = useMemo(() => messagesQuery.data?.items || [], [messagesQuery.data]);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const maxHeight = 184;
+    textarea.style.height = "44px";
+    const contentHeight = textarea.scrollHeight;
+    textarea.style.height = `${Math.min(contentHeight, maxHeight)}px`;
+    textarea.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+  }, [draft]);
 
   useEffect(() => {
     if (!id || !socket) return undefined;
@@ -384,25 +401,25 @@ export default function ChatThread({ conversation: initialConversation, api, soc
     } finally { setLoadingOlder(false); }
   };
 
-  if (!id) return <div className="flex h-full items-center justify-center text-sm text-slate-500">Select a conversation to view messages.</div>;
+  if (!id) return <div className="flex h-full items-center justify-center text-sm text-slate-500">{t("chat.customer.selectConversation")}</div>;
 
   return (
     <section className={`user-chat-thread flex h-full min-h-0 flex-col overflow-hidden bg-white dark:bg-[#101b2e] ${compact || isAdmin ? "rounded-none border border-slate-200 shadow-none dark:border-slate-700" : "rounded-xl border border-slate-200 shadow-sm dark:border-slate-700"}`}>
       {!(compact && !isAdmin) && <header className={`flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-[#101b2e] ${compact ? "px-3 py-2" : "px-4 py-3.5 sm:px-5"}`}>
         <div className="flex min-w-0 items-center gap-3">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-[15px] font-bold text-slate-900 dark:text-slate-100">{isAdmin ? contactName : "Order support"}</h2><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${conversation.status === "open" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>{conversation.status === "open" ? "Open" : "Closed"}</span></div>
+            <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-[15px] font-bold text-slate-900 dark:text-slate-100">{isAdmin ? contactName : t("chat.ui.orderSupport")}</h2><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${conversation.status === "open" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>{conversation.status === "open" ? t("chat.ui.open") : t("chat.ui.closed")}</span></div>
             <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{conversation.order ? `Order #${conversation.order.order_number || conversation.order_id}` : conversation.inquiry_context?.label || INQUIRY_LABELS[conversation.inquiry_type] || "General support"}{isAdmin && contactEmail ? ` · ${contactEmail}` : ""}</p>
           </div>
         </div>
-        {!isAdmin && <span className="text-xs text-slate-500 dark:text-slate-400">{socketReady ? "Live" : "Connecting…"}</span>}
+        {!isAdmin && <span className="text-xs text-slate-500 dark:text-slate-400">{socketReady ? t("chat.ui.live") : t("chat.ui.connecting")}</span>}
       </header>}
       <OrderDetails order={conversation.order} compact={compact} />
       <div ref={messageListRef} style={isAdmin ? { backgroundImage: "radial-gradient(circle at 1px 1px, rgba(100,116,139,0.11) 1px, transparent 1.5px), radial-gradient(circle at 15px 15px, rgba(100,116,139,0.06) 1px, transparent 1.5px)", backgroundSize: "32px 32px" } : undefined} className={`min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain ${isAdmin ? "bg-slate-50 dark:bg-[#0e1626]" : "bg-white dark:bg-[#0e1626]"} ${compact ? "px-3 py-3" : "px-4 py-4 sm:px-5 sm:py-5"}`}>
-        {messagesQuery.data?.hasMore && <div className="text-center"><button onClick={loadOlder} disabled={loadingOlder} className="rounded-md px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950">{loadingOlder ? "Loading…" : "Load older messages"}</button></div>}
-        {messagesQuery.isLoading ? <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading conversation…</div>
-          : messagesQuery.isError ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">Messages could not be loaded. Refresh to try again.</div>
-          : messages.length === 0 ? <div className="flex min-h-48 items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">No messages yet. Send a message to start the conversation.</div>
+        {messagesQuery.data?.hasMore && <div className="text-center"><button onClick={loadOlder} disabled={loadingOlder} className="rounded-md px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-300 dark:hover:bg-blue-950">{loadingOlder ? t("chat.ui.loadingOlder") : t("chat.ui.loadOlder")}</button></div>}
+        {messagesQuery.isLoading ? <div className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t("chat.ui.loading")}</div>
+          : messagesQuery.isError ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">{t("chat.ui.loadMessagesError")}</div>
+          : messages.length === 0 ? <div className="flex min-h-48 items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">{t("chat.ui.emptyMessages")}</div>
           : messages.map((message) => {
             const own = message.sender_type === (isAdmin ? "admin" : "customer");
             const isOrderMessage = message.context_snapshot?.kind === "order";
@@ -412,10 +429,10 @@ export default function ChatThread({ conversation: initialConversation, api, soc
               {isOrderMessage ? <OrderMessageLink message={message} className={bubbleClass} isAdmin={isAdmin}>{bubbleContent}</OrderMessageLink> : <div className={`max-w-[88%] sm:max-w-[72%] ${bubbleClass}`}>{bubbleContent}</div>}
             </div>;
           })}
-        {typingSender && <div role="status" aria-label="Someone is typing" className="flex justify-start"><div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2.5 text-slate-500 dark:bg-[#1c2941] dark:text-slate-300"><span className="text-xs">Typing</span><span className="flex items-center gap-1" aria-hidden="true"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" /></span></div></div>}
+        {typingSender && <div role="status" aria-label={t("chat.ui.typing")} className="flex justify-start"><div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2.5 text-slate-500 dark:bg-[#1c2941] dark:text-slate-300"><span className="text-xs">{t("chat.ui.typing")}</span><span className="flex items-center gap-1" aria-hidden="true"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" /></span></div></div>}
         <div ref={bottomRef} />
       </div>
-      {!isAdmin && conversation.status === "open" && messages.length === 0 && <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-700 dark:bg-[#101b2e]">{QUICK_REPLIES.map((reply) => <button key={reply} onClick={() => send(reply)} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-slate-600 dark:bg-[#16233b] dark:text-slate-300">{reply}</button>)}</div>}
+      {!isAdmin && conversation.status === "open" && messages.length === 0 && <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-3 dark:border-slate-700 dark:bg-[#101b2e]">{QUICK_REPLY_KEYS.map((key) => { const reply = t(key); return <button key={key} onClick={() => send(reply)} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-slate-600 dark:bg-[#16233b] dark:text-slate-300">{reply}</button>; })}</div>}
       {sendError && <p role="alert" className="border-t border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-200">{sendError}{rateLimitSeconds > 0 && !/\b\d+\s+seconds?\b/i.test(sendError) && ` Try again in ${rateLimitSeconds} second${rateLimitSeconds === 1 ? "" : "s"}.`}</p>}
       {conversation.status === "open" ? <div className="shrink-0">
         {!referenceCleared && (isAdmin || !["cart", "order"].includes(conversation.inquiry_type)) && productReferenceItems.length > 0 && <ProductReferencePreview items={productReferenceItems} onClear={isAdmin ? () => setProductSelectionDraft([]) : clearInquiryReference} canClear isAdmin={isAdmin} />}
@@ -423,13 +440,13 @@ export default function ChatThread({ conversation: initialConversation, api, soc
         {!referenceCleared && conversation.inquiry_type === "order" && orderReferenceItems.length > 0 && <ProductReferencePreview items={orderReferenceItems} label={`${orderReferenceLabel} · ${conversation.inquiry_context?.order_status || conversation.order?.status || ""} · ${orderReferenceItems.length} ${orderReferenceItems.length === 1 ? "item" : "items"} · ${contextMoney(conversation.inquiry_context?.total ?? conversation.order?.total)}`} onClear={clearInquiryReference} canClear={!isAdmin} isAdmin={isAdmin} />}
         {!referenceCleared && conversation.inquiry_type === "order" && orderReferenceItems.length === 0 && <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-[#101b2e]"><div className="flex min-w-0 items-center gap-2.5"><Package size={15} className="shrink-0 text-blue-600 dark:text-blue-300" /><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-700 dark:text-slate-200">{orderReferenceLabel}</p><p className="text-[10px] text-slate-500 dark:text-slate-400">Loading order items…</p></div></div>{!isAdmin && <button type="button" onClick={clearInquiryReference} disabled={contextBusy || sending} aria-label="Remove order reference" title="Remove reference" className="flex h-7 w-7 shrink-0 items-center justify-center text-slate-500 hover:text-slate-800 disabled:opacity-50 dark:text-slate-400 dark:hover:text-white"><X size={14} /></button>}</div>}
         <div ref={composerRef} className="relative">
-        {contextMenuOpen ? <InquiryTopicPicker menuMode compact={compact} maxMenuHeight={contextMenuMaxHeight} conversation={conversation} orders={orders} cartItems={cartItems} allowOrder={allowOrder} adminMode={isAdmin} busy={contextBusy || sending} onTopic={applyInquiryTopic} onProducts={onProducts} draftProducts={isAdmin ? productSelectionDraft || [] : productSelectionDraft} onSelectionChange={(products) => { if (products !== null) setClearedReferenceKey(null); setProductSelectionDraft(products); }} onDismiss={() => setContextMenuOpen(false)} /> : <form className={`shrink-0 border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-[#101b2e] ${compact ? "flex items-center gap-2 p-3" : "flex items-center gap-2.5 p-3.5 sm:gap-3 sm:p-4"}`} onSubmit={(event) => { event.preventDefault(); send(); }}>
+        {contextMenuOpen ? <InquiryTopicPicker menuMode compact={compact} maxMenuHeight={contextMenuMaxHeight} conversation={conversation} orders={orders} cartItems={cartItems} allowOrder={allowOrder} adminMode={isAdmin} busy={contextBusy || sending} onTopic={applyInquiryTopic} onProducts={onProducts} draftProducts={isAdmin ? productSelectionDraft || [] : productSelectionDraft} onSelectionChange={(products) => { if (products !== null) setClearedReferenceKey(null); setProductSelectionDraft(products); }} onDismiss={() => setContextMenuOpen(false)} /> : <form className={`shrink-0 border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-[#101b2e] ${compact ? "flex items-end gap-2 p-3" : "flex items-end gap-2.5 p-3.5 sm:gap-3 sm:p-4"}`} onSubmit={(event) => { event.preventDefault(); send(); }}>
 
         <div className="relative min-w-0 flex-1">
-          <textarea value={draft} onChange={(event) => handleDraftChange(event.target.value)} onBlur={stopTyping} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} maxLength={4000} rows={1} placeholder={isAdmin ? "Type your reply..." : "Write your message..."} className={`h-11 min-h-11 w-full border border-slate-200 bg-white text-[13px] leading-5 text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-[#16233b] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-blue-900 ${!isAdmin ? "rounded-full" : "rounded-xl"} pl-4 pr-12 ${compact ? "max-h-28 resize-none overflow-y-auto py-2.5" : "max-h-32 resize-none overflow-y-auto py-2.5"}`} />
-          <button type="button" data-chat-context-trigger aria-label={contextMenuOpen ? "Close product references" : isAdmin ? "Add product references" : "Choose message topic"} title={contextMenuOpen ? "Close product references" : isAdmin ? "Add product references" : "Add a topic"} aria-expanded={contextMenuOpen} onClick={() => { setContextMenuOpen((value) => !value); }} className={`absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full transition ${contextMenuOpen ? "bg-blue-600 text-white" : "text-slate-500 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-blue-300"}`}><Plus size={18} className={`transition-transform ${contextMenuOpen ? "rotate-45" : ""}`} /></button>
+          <textarea ref={textareaRef} value={draft} onChange={(event) => handleDraftChange(event.target.value)} onBlur={stopTyping} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} maxLength={4000} rows={1} placeholder={isAdmin ? t("chat.ui.typeReply") : t("chat.ui.writeMessage")} className={`block min-h-11 max-h-[11.5rem] w-full border border-slate-200 bg-white text-[13px] leading-5 text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-[#16233b] dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-blue-900 ${!isAdmin ? "rounded-full" : "rounded-xl"} pl-4 pr-12 ${compact ? "resize-none overflow-y-hidden py-2.5" : "resize-none overflow-y-hidden py-2.5"}`} />
+          <button type="button" data-chat-context-trigger aria-label={contextMenuOpen ? t("chat.ui.closeReferences") : isAdmin ? t("chat.ui.addReferences") : t("chat.ui.chooseTopic")} title={contextMenuOpen ? t("chat.ui.closeReferences") : isAdmin ? t("chat.ui.addReferences") : t("chat.ui.chooseTopic")} aria-expanded={contextMenuOpen} onClick={() => { setContextMenuOpen((value) => !value); }} className={`absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full transition ${contextMenuOpen ? "bg-blue-600 text-white" : "text-slate-500 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-blue-300"}`}><Plus size={18} className={`transition-transform ${contextMenuOpen ? "rotate-45" : ""}`} /></button>
         </div>
-        <button type="submit" aria-label="Send message" title={rateLimitSeconds > 0 ? `Try again in ${rateLimitSeconds} second${rateLimitSeconds === 1 ? "" : "s"}` : "Send message"} disabled={!draft.trim() || sending || rateLimitSeconds > 0} className={`inline-flex h-11 shrink-0 self-center items-center justify-center bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700 disabled:opacity-100 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-200 ${!isAdmin ? "rounded-full px-5" : "rounded-xl"} ${compact ? "w-11 min-w-11 px-0" : "gap-2 px-4 text-[13px] font-semibold"}`}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 min-h-5 min-w-5 shrink-0"><path d="M22 2 11 13" /><path d="m22 2-7 20-4-9-9-4 20-7Z" /></svg>{!compact && <span>Send</span>}</button>
+        <button type="submit" aria-label={t("chat.ui.sendMessage")} title={t("chat.ui.sendMessage")} disabled={!draft.trim() || sending || rateLimitSeconds > 0} className={`inline-flex h-11 shrink-0 items-center justify-center bg-blue-600 text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700 disabled:opacity-100 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-200 ${!isAdmin ? "rounded-full px-5" : "rounded-xl"} ${compact ? "w-11 min-w-11 px-0" : "gap-2 px-4 text-[13px] font-semibold"}`}><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 min-h-5 min-w-5 shrink-0"><path d="M22 2 11 13" /><path d="m22 2-7 20-4-9-9-4 20-7Z" /></svg>{!compact && <span>{t("chat.ui.send")}</span>}</button>
         </form>}
         </div>
       </div> : <div className="shrink-0 border-t border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-[#16233b] dark:text-slate-300">This conversation is closed. {!isAdmin && "Contact support if you need more help."}</div>}
