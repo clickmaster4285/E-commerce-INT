@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Expand, Loader2, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Expand, Loader2, MessageCircle, X } from "lucide-react";
 import { userHttp } from "@/apis/axiosInstance";
-import { customerChatApi, guestChatApi } from "@/apis/chatApi";
+import { adminChatApi, customerChatApi, guestChatApi } from "@/apis/chatApi";
 import { orderApi } from "@/apis/user/orderApi";
 import { useCart } from "@/components/user/CartContext";
 import { useUserSocket } from "@/hooks/user/useUserSocket";
+import { getAdminSocket } from "@/hooks/admin/useAdminSocket";
 import ChatThread from "@/components/chat/ChatThread";
 
 const GUEST_TOKEN_KEY = "support-chat-guest-token";
@@ -56,6 +57,7 @@ export default function SupportChatWidget() {
   const [guestEmail, setGuestEmail] = useState("");
   const [guestConversation, setGuestConversation] = useState(null);
   const [activeCustomerId, setActiveCustomerId] = useState(null);
+  const [activeAdminId, setActiveAdminId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
@@ -156,11 +158,22 @@ export default function SupportChatWidget() {
     staleTime: 5 * 60 * 1000,
   });
   const user = userQuery.data || null;
-  const ordersQuery = useQuery({ queryKey: ["myOrders"], queryFn: orderApi.myOrders, enabled: Boolean(user), staleTime: 60_000, retry: false });
+  const userRole = String(user?.role || "").toLowerCase();
+  const adminMode = ["admin", "manager", "staff"].includes(userRole);
+  const customerMode = Boolean(user && !adminMode);
+  const adminSocket = adminMode ? getAdminSocket() : null;
+  const ordersQuery = useQuery({ queryKey: ["myOrders"], queryFn: orderApi.myOrders, enabled: customerMode, staleTime: 60_000, retry: false });
   const customerChatsQuery = useQuery({
     queryKey: ["customer-chat-conversations"],
     queryFn: customerChatApi.listMine,
-    enabled: Boolean(user),
+    enabled: customerMode,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const adminChatsQuery = useQuery({
+    queryKey: ["chat-conversations", "all", ""],
+    queryFn: () => adminChatApi.list({ status: "all", limit: 50 }),
+    enabled: adminMode,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -175,10 +188,14 @@ export default function SupportChatWidget() {
   const orders = useMemo(() => Array.isArray(ordersQuery.data) ? ordersQuery.data : [], [ordersQuery.data]);
   const customerConversations = useMemo(() => customerChatsQuery.data || [], [customerChatsQuery.data]);
   const customerConversation = customerConversations.find((item) => String(item._id) === String(activeCustomerId)) || customerConversations.find((item) => item.status === "open") || customerConversations[0] || null;
-  const activeConversation = user ? customerConversation : (guestConversation || guestConversationQuery.data?.conversation || null);
+  const adminConversations = useMemo(() => Array.isArray(adminChatsQuery.data?.data) ? adminChatsQuery.data.data : [], [adminChatsQuery.data]);
+  const activeAdminConversation = adminConversations.find((item) => String(item._id) === String(activeAdminId)) || null;
+  const activeConversation = adminMode ? activeAdminConversation : customerMode ? customerConversation : (guestConversation || guestConversationQuery.data?.conversation || null);
   const isGuestSetup = !user && !guestToken && !activeConversation;
   const roomConversation = guestConversation || guestConversationQuery.data?.conversation;
-  const unread = user
+  const unread = adminMode
+    ? adminConversations.reduce((count, item) => count + (Number(item.unread_admin_count) || 0), 0)
+    : customerMode
     ? customerConversations.reduce((count, item) => count + (Number(item.unread_customer_count) || 0), 0)
     : Number(activeConversation?.unread_customer_count) || 0;
 
@@ -248,7 +265,7 @@ export default function SupportChatWidget() {
       const orderId = event.detail?.orderId;
       if (orderId) {
         pendingOrderRef.current = String(orderId);
-        if (userRef.current) {
+        if (userRef.current && !["admin", "manager", "staff"].includes(String(userRef.current.role || "").toLowerCase())) {
           openingOrderChatRef.current = true;
           openCustomerChat(String(orderId)).finally(() => { pendingOrderRef.current = ""; openingOrderChatRef.current = false; });
         }
@@ -261,24 +278,24 @@ export default function SupportChatWidget() {
   useEffect(() => { userRef.current = user; }, [user]);
 
   useEffect(() => {
-    if (!open || !user || !pendingOrderRef.current) return;
+    if (!open || !customerMode || !pendingOrderRef.current) return;
     const orderId = pendingOrderRef.current;
     pendingOrderRef.current = "";
     openingOrderChatRef.current = true;
     queueMicrotask(() => openCustomerChat(orderId).finally(() => { pendingOrderRef.current = ""; openingOrderChatRef.current = false; }));
-  }, [open, user, openCustomerChat]);
+  }, [open, customerMode, openCustomerChat]);
 
   useEffect(() => {
     const hasOpenConversation = customerConversations.some((conversation) => conversation.status === "open");
-    if (!open || !user || pendingOrderRef.current || openingOrderChatRef.current || customerChatsQuery.isLoading || activeCustomerId || hasOpenConversation || creatingDefaultChatRef.current) return;
+    if (!open || !customerMode || pendingOrderRef.current || openingOrderChatRef.current || customerChatsQuery.isLoading || activeCustomerId || hasOpenConversation || creatingDefaultChatRef.current) return;
     creatingDefaultChatRef.current = true;
     queueMicrotask(() => openCustomerChat().finally(() => { creatingDefaultChatRef.current = false; }));
-  }, [open, user, customerChatsQuery.isLoading, customerConversations, activeCustomerId, openCustomerChat]);
+  }, [open, customerMode, customerChatsQuery.isLoading, customerConversations, activeCustomerId, openCustomerChat]);
 
   useEffect(() => {
     if (!socket) return undefined;
     const refresh = () => {
-      if (user && !customerChatsQuery.isError) queryClient.invalidateQueries({ queryKey: ["customer-chat-conversations"] });
+      if (customerMode && !customerChatsQuery.isError) queryClient.invalidateQueries({ queryKey: ["customer-chat-conversations"] });
       if (guestToken) queryClient.invalidateQueries({ queryKey: ["guest-chat-conversation", guestToken] });
     };
     socket.on("chat:conversation-created", refresh);
@@ -287,7 +304,7 @@ export default function SupportChatWidget() {
       socket.off("chat:conversation-created", refresh);
       socket.off("chat:conversation-updated", refresh);
     };
-  }, [socket, queryClient, guestToken, user, customerChatsQuery.isError]);
+  }, [socket, queryClient, guestToken, customerMode, customerChatsQuery.isError]);
 
   useEffect(() => {
     if (!socket || !guestToken || !roomConversation?._id) return undefined;
@@ -329,21 +346,54 @@ export default function SupportChatWidget() {
     } finally { setBusy(false); }
   };
 
+  const reopenAdminChat = async () => {
+    if (!activeAdminConversation?._id) return;
+    setBusy(true);
+    setError("");
+    try {
+      await adminChatApi.setStatus(activeAdminConversation._id, "open");
+      await queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Could not reopen this conversation.");
+    } finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    if (!adminMode || !adminSocket) return undefined;
+    const joinInbox = () => adminSocket.emit("chat:inbox:join");
+    const refresh = () => queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+    adminSocket.on("connect", joinInbox);
+    adminSocket.on("chat:conversation-created", refresh);
+    adminSocket.on("chat:conversation-updated", refresh);
+    adminSocket.on("chat:unread-count", refresh);
+    if (adminSocket.connected) joinInbox();
+    return () => {
+      adminSocket.off("connect", joinInbox);
+      adminSocket.off("chat:conversation-created", refresh);
+      adminSocket.off("chat:conversation-updated", refresh);
+      adminSocket.off("chat:unread-count", refresh);
+    };
+  }, [adminMode, adminSocket, queryClient]);
+
   const triggerOpen = () => { setOpen((value) => !value); setError(""); };
 
   return (
     <div ref={widgetRef} style={positionStyle} className={`fixed z-50 ${visiblePosition ? "" : "bottom-20 right-3 sm:bottom-6 sm:right-6"}`}>
       {open && <section aria-label="Customer support chat" style={popupMaxHeight ? { maxHeight: `${popupMaxHeight}px` } : undefined} className={`absolute ${placePopupAbove ? "bottom-full mb-2" : "top-full mt-2"} ${alignPopupRight ? "right-0" : "left-0"} flex ${isGuestSetup ? "h-auto max-h-[calc(100dvh-2rem)]" : "h-[min(40rem,calc(100dvh-2rem))]"} w-[min(24rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[0_18px_55px_rgba(0,0,0,0.28)]`}>
         <header className="flex h-[60px] shrink-0 items-center justify-between border-b border-white/10 bg-[var(--user-accent)] px-4 text-[var(--user-accent-text)]">
-          <div className="flex min-w-0 items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15"><MessageCircle size={18} /></span><span className="min-w-0"><span className="block text-sm font-semibold">Chat support</span><span className="block truncate text-[10px] opacity-80">{user ? user.name || "Your account" : "Guest support"}{activeConversation ? ` · ${activeConversation.status === "open" ? "Open" : "Closed"}` : ""}</span></span></div>
+          <div className="flex min-w-0 items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15"><MessageCircle size={18} /></span><span className="min-w-0"><span className="block text-sm font-semibold">Chat support</span><span className="block truncate text-[10px] opacity-80">{adminMode ? "Admin inbox" : user ? user.name || "Your account" : "Guest support"}{activeConversation ? ` · ${activeConversation.status === "open" ? "Open" : "Closed"}` : ""}</span></span></div>
           <div className="flex shrink-0 items-center gap-1">
-            {activeConversation && <Link href={user ? `/chats/${encodeURIComponent(activeConversation._id)}` : "/chats/guest"} onClick={() => setOpen(false)} title="View full page" aria-label="View full chat page" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold transition hover:bg-white/15"><Expand size={14} /><span>Full page</span></Link>}
+            {adminMode ? <Link href="/admin/chats" onClick={() => setOpen(false)} title="Open admin inbox" aria-label="Open admin inbox" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold transition hover:bg-white/15"><Expand size={14} /><span>Inbox</span></Link> : activeConversation && <Link href={customerMode ? `/chats/${encodeURIComponent(activeConversation._id)}` : "/chats/guest"} onClick={() => setOpen(false)} title="View full page" aria-label="View full chat page" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold transition hover:bg-white/15"><Expand size={14} /><span>Full page</span></Link>}
             <button onClick={() => setOpen(false)} aria-label="Close chat" className="flex h-9 w-9 items-center justify-center rounded-lg transition hover:bg-white/15"><X size={18} /></button>
           </div>
         </header>
 
         {userQuery.isLoading ? <div className="flex flex-1 items-center justify-center gap-2 text-sm text-[var(--user-text-muted)]"><Loader2 size={18} className="animate-spin" />Loading support…</div>
-          : user ? <>
+          : adminMode ? adminChatsQuery.isLoading && !activeAdminConversation ? <div className="flex flex-1 items-center justify-center gap-2 text-sm text-[var(--user-text-muted)]"><Loader2 size={18} className="animate-spin" />Loading conversations…</div>
+            : activeAdminConversation ? <><button type="button" onClick={() => setActiveAdminId(null)} className="inline-flex h-10 shrink-0 items-center gap-2 border-b border-[var(--user-border)] px-4 text-xs font-semibold text-[var(--user-text-secondary)] hover:text-[var(--user-accent)]"><ArrowLeft size={15} />All conversations</button><div className="min-h-0 flex-1"><ChatThread key={activeAdminConversation._id} conversation={activeAdminConversation} api={adminChatApi} socket={adminSocket} isAdmin compact /></div>{activeAdminConversation.status === "closed" && <button onClick={reopenAdminChat} disabled={busy} className="m-3 inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-semibold text-[var(--user-accent-text)] disabled:opacity-60">{busy ? <Loader2 size={15} className="animate-spin" /> : null}Reopen conversation</button>}</>
+            : adminChatsQuery.isError ? <div className="flex flex-1 flex-col items-center justify-center gap-3 p-5 text-center"><p className="text-sm text-[var(--user-text-muted)]">{adminChatsQuery.error?.response?.data?.message || "Could not load the support inbox."}</p><Link href="/admin/chats" onClick={() => setOpen(false)} className="rounded-lg bg-[var(--user-accent)] px-3 py-2 text-xs font-semibold text-[var(--user-accent-text)]">Open admin inbox</Link></div>
+            : <div className="min-h-0 flex-1 overflow-y-auto p-3">{adminConversations.length ? <div className="space-y-2">{adminConversations.map((conversation) => { const customerName = conversation.customer?.name || conversation.customer_id?.name || conversation.guest_name || "Customer"; const subtitle = conversation.order?.order_number ? `Order #${conversation.order.order_number}` : conversation.inquiry_context?.label || "General support"; return <button key={conversation._id} type="button" onClick={() => setActiveAdminId(conversation._id)} className="flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 text-left transition hover:border-[var(--user-accent)]/50 hover:bg-[var(--user-accent)]/5"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-[var(--user-text)]">{customerName}</span><span className="mt-0.5 block truncate text-xs text-[var(--user-text-muted)]">{subtitle}</span><span className="mt-1 block truncate text-xs text-[var(--user-text-secondary)]">{conversation.last_message?.text || conversation.last_message || "No messages yet"}</span></span><span className="flex shrink-0 flex-col items-end gap-1"><span className={`rounded-full px-2 py-0.5 text-[10px] ${conversation.status === "open" ? "bg-emerald-500/10 text-emerald-700" : "bg-slate-500/10 text-slate-500"}`}>{conversation.status === "open" ? "Open" : "Closed"}</span>{Number(conversation.unread_admin_count) > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--user-accent)] px-1 text-[10px] font-bold text-white">{conversation.unread_admin_count}</span>}</span></button>; })}</div> : <div className="flex h-full flex-col items-center justify-center gap-2 p-5 text-center"><MessageCircle size={24} className="text-[var(--user-text-muted)]" /><p className="text-sm font-medium text-[var(--user-text)]">No support conversations yet</p><p className="text-xs text-[var(--user-text-muted)]">Customer messages will appear here.</p></div>}</div>
+          : customerMode ? <>
             {customerChatsQuery.isLoading && !activeConversation ? <div className="flex flex-1 items-center justify-center gap-2 text-sm text-[var(--user-text-muted)]"><Loader2 size={18} className="animate-spin" />Loading your chats…</div> : activeConversation ? <>
               <div className="min-h-0 flex-1"><ChatThread key={activeConversation._id} conversation={activeConversation} api={customerChatApi} socket={socket} compact orders={orders} cartItems={cartItems} onTopic={updateInquiry} onProducts={selectInquiryProducts} contextBusy={busy} /></div>
               {ordersQuery.isError && <p className="shrink-0 px-3 py-1.5 text-[10px] text-[var(--user-danger)]">Orders could not be loaded. General support is still available.</p>}

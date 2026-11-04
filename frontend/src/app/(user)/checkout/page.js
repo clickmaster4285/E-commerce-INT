@@ -9,7 +9,18 @@ import { userHttp } from "@/apis/axiosInstance";
 import { addressApi } from "@/apis/user/addressApi";
 import dynamic from "next/dynamic";
 // ✅ country-state-city wala form alag chunk me (home bundle se bahar) — behavior same
-const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
+let addressFormModulePromise;
+const preloadAddressForm = () => {
+  if (!addressFormModulePromise) {
+    addressFormModulePromise = import("@/components/user/AddressForm").catch((error) => {
+      addressFormModulePromise = null;
+      throw error;
+    });
+  }
+  return addressFormModulePromise;
+};
+const warmAddressForm = () => preloadAddressForm().catch(() => {});
+const AddressForm = dynamic(() => preloadAddressForm(), {
   loading: () => null,
 });
 import { orderApi } from "@/apis/user/orderApi";
@@ -32,10 +43,10 @@ import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
 import {
-  ArrowLeft, ArrowRight, Check, Lock, MapPin, Phone, CreditCard,
+  ArrowLeft, ArrowRight, Check, Lock, Map, MapPin, Phone, CreditCard,
   Banknote, Landmark, Package, PackageCheck, Plus, Minus, ShieldCheck,
   Truck, Loader2, ChevronDown, Zap, ShoppingBag, X, Pencil, Trash2, Tag,
-  TrendingUp, Gift, BadgePercent,
+  TrendingUp, Gift, BadgePercent, Sparkles,
 } from "lucide-react";
 
 function PrimaryButton({
@@ -375,16 +386,18 @@ function CheckoutContent() {
   const [draftReady, setDraftReady] = useState(false);
   const draftRestored = useRef(false);
   const saveTimer = useRef(null);
-  const mobileAddressForm = false;
   const [draftItems, setDraftItems] = useState([]);
   const [selectedKeys, setSelectedKeys] = useState(null);
   const [selectedAddressId, setSelectedAddressId] = useState(null);
-  const [showAddressModal, setShowAddressModal] = useState(false);
+  const addressSelectionLocked = useRef(false);
+  const [addressFormView, setAddressFormView] = useState(null);
   const [mobileAddressSheet, setMobileAddressSheet] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [shippingMethod, setShippingMethod] = useState(() => getDefaultShippingMethod(null));
   const [userSelectedShipping, setUserSelectedShipping] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("cod");
+  const bankDetailsDesktopRef = useRef(null);
+  const bankDetailsMobileRef = useRef(null);
   const [cardForm, setCardForm] = useState({ number: "", name: "", expiry: "" });
   const [cardFormErrors, setCardFormErrors] = useState({ number: "", name: "", expiry: "" });
   const [bankForm, setBankForm] = useState({ senderName: "", transactionRef: "" });
@@ -401,6 +414,27 @@ function CheckoutContent() {
   const phoneValidationError = getPhoneValidationError(phone, t);
   const phoneError = phoneTouched || phoneSubmitted ? phoneValidationError : "";
   const phoneIsValid = !phoneValidationError;
+
+  const selectPaymentMethod = (method) => {
+    setPaymentMethod(method);
+    if (method !== "bank") return;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const bankDetails = [bankDetailsDesktopRef.current, bankDetailsMobileRef.current]
+          .find((element) => element?.getClientRects().length);
+        if (!bankDetails) return;
+        const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+        bankDetails.scrollIntoView({ behavior, block: "start" });
+      });
+    });
+  };
+
+  // Warm the address form chunk in the background so opening it never waits on
+  // the large country/state/city data dependency.
+  useEffect(() => {
+    warmAddressForm();
+  }, []);
 
   const { data: user = null, isLoading: userLoading } = useQuery({
     queryKey: ["userProfile"],
@@ -455,6 +489,7 @@ function CheckoutContent() {
 
   useEffect(() => {
     if (!draftReady) return;
+    if (addressSelectionLocked.current) return;
     if (!selectedAddressId && addresses.length) {
       const def = addresses.find((a) => a.is_default) || addresses[0];
       setSelectedAddressId(def._id);
@@ -574,6 +609,12 @@ function CheckoutContent() {
       draftCreateInFlight.current = false;
     }
     setStep(2);
+  };
+
+  const removeCheckoutItem = (itemKey) => {
+    const originalItem = cart.find((cartItem) => cartItem.key === itemKey);
+    removeItems([itemKey]);
+    toast.success("Item deleted", { action: { label: "Undo", onClick: () => originalItem && restoreItems([originalItem]) } });
   };
 
   const backToStep1 = async () => {
@@ -787,6 +828,7 @@ function CheckoutContent() {
   }, [selectedKeys, selectedAddressId, shippingMethod, paymentMethod, user, step, draftItems, currentDraftId, placing, draftSubtotal, shipping, tax, draftDiscount, draftEstimatedTotal]);
 
   const selectedAddress = addresses.find((a) => a._id === selectedAddressId);
+  const deliveryAddress = selectedAddress || null;
   const needsPhone = !!user && !user.phone;
 
   const savePhone = async () => {
@@ -808,19 +850,41 @@ function CheckoutContent() {
     finally { savingPhoneRef.current = false; setSavingPhone(false); }
   };
 
-  const openAddressModal = () => {
-    setEditingAddressId(null);
-    setShowAddressModal(true);
+  const openAddressForm = (view, address = null) => {
+    if (!address) addressSelectionLocked.current = true;
+    setEditingAddressId(address?._id || null);
+    setAddressFormView(view);
+    setMobileAddressSheet(false);
   };
 
-  const openEditModal = (a) => {
-    setEditingAddressId(a._id);
-    setShowAddressModal(true);
+  const closeAddressForm = () => {
+    setAddressFormView(null);
+    setEditingAddressId(null);
+  };
+
+  const handleAddressFormSuccess = (saved) => {
+    const isNewAddress = !editingAddressId;
+    closeAddressForm();
+    if (saved?._id) {
+      if (isNewAddress) {
+        addressSelectionLocked.current = true;
+        setSelectedAddressId(saved._id);
+      }
+      queryClient.setQueryData(["addresses"], (current = []) => {
+        const remaining = current.filter((address) => address._id !== saved._id);
+        const preservedDefaults = saved.is_default
+          ? remaining.map((address) => ({ ...address, is_default: false }))
+          : remaining;
+        return [...preservedDefaults, saved];
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["addresses"] });
   };
 
   const deleteAddress = async (id) => {
     try {
       await addressApi.remove(id);
+      queryClient.setQueryData(["addresses"], (current = []) => current.filter((address) => address._id !== id));
       queryClient.invalidateQueries({ queryKey: ["addresses"] });
       if (selectedAddressId === id) setSelectedAddressId(null);
       toast.success(t("checkout.address.deleted"));
@@ -931,40 +995,16 @@ function CheckoutContent() {
   // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)
   const ghostBtn = "border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
 
-  const StepIndicator = () => (
-    <div className="flex items-start justify-center mb-8 sm:mb-10">
-      {["items", "delivery", "payment"].map((label, i) => {
-        const n = i + 1;
-        const active = step === n;
-        const done = step > n;
-        return (
-          <div key={label} className="flex items-start">
-            <button
-              type="button"
-              onClick={() => done && goToStep(n)}
-              disabled={!done}
-              aria-current={active ? "step" : undefined}
-              className={`checkout-step flex flex-col items-center gap-1.5 w-20 sm:w-24 ${done ? "cursor-pointer" : "cursor-default"}`}
-            >
-              <span className={`checkout-step-marker ${done ? "is-complete" : active ? "is-active" : "is-upcoming"}`}>
-                {done ? <Check size={15} /> : n}
-              </span>
-              <span className={`checkout-step-label ${active ? "is-active" : done ? "is-complete" : "is-upcoming"}`}>{t(`checkout.step.${label}`)}</span>
-            </button>
-            {n < 3 && (
-              <div className={`checkout-step-connector h-0.5 w-16 sm:w-28 lg:w-36 mt-4 rounded-full ${done ? "is-complete" : ""}`} />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+  const SummaryPanel = ({ footer, showItems = true, review = false }) => (
+    <div className={`checkout-summary-panel ${showItems ? "checkout-summary-panel-with-items" : ""} ${review ? "checkout-summary-panel-review" : ""} h-auto w-full min-w-0 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5 lg:sticky lg:top-[4.5rem]`}>
+      <div className={`checkout-summary-header flex shrink-0 items-center gap-3 ${review ? "mb-3 border-b border-[var(--user-border)] pb-3" : "mb-4"}`}>
+        <span className={`checkout-summary-icon flex shrink-0 items-center justify-center border text-[var(--user-accent)] ${review ? "h-9 w-9 rounded-lg" : "h-10 w-10 rounded-xl"}`}>
+          <ShoppingBag size={review ? 16 : 17} />
+        </span>
+        <h2 className={`${review ? "text-sm" : "text-base"} font-semibold text-[var(--user-text)]`}>{t("checkout.summary.title")}</h2>
+      </div>
 
-  const SummaryPanel = ({ footer }) => (
-    <div className={`${cardCls} p-5 sm:p-6 lg:sticky lg:top-24`}>
-      <h2 className="text-lg font-black text-[var(--user-text)] mb-4">{t("checkout.summary.title")}</h2>
-
-      <div className="space-y-3 mt-4 mb-0 max-h-[17.5rem] sm:max-h-[20rem] overflow-y-auto pr-1 custom-scrollbar">
+      {showItems && <div className="checkout-summary-products mt-4 mb-0 space-y-2 pr-1">
         {itemsWithDiscounts.map((i) => (
           <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
@@ -986,11 +1026,11 @@ function CheckoutContent() {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
-      <div className="space-y-2.5 pt-3 border-t border-[var(--user-border)] text-[0.8125rem]">
+      <div className={`checkout-summary-totals shrink-0 space-y-2 ${review ? "text-xs" : "text-sm"} ${showItems ? "pt-3 border-t border-[var(--user-border)]" : ""}`}>
         <div className="flex justify-between">
-          <span className="text-[var(--user-text)] font-medium">{t("cart.subtotal")}</span>
+          <span className="text-[var(--user-text)] font-medium">{t("cart.subtotal")} ({t("cart.itemsCount", { count: itemsWithDiscounts.reduce((count, item) => count + item.qty, 0) })})</span>
           <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
         </div>
         {totalSavings > 0 && (
@@ -1009,23 +1049,24 @@ function CheckoutContent() {
             <span className="text-[var(--user-text)] font-bold">Rs. {tax.toLocaleString()}</span>
           </div>
         )}
-        <div className="flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
-          <span className="text-base font-black text-[var(--user-text)]">{t("cart.total")}</span>
-          <p className="text-2xl font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</p>
+        <div className="checkout-summary-total-row flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
+          <span className={`${review ? "text-sm" : "text-base"} font-black text-[var(--user-text)]`}>{t("cart.total")}</span>
+          <p className={`${review ? "text-lg" : "text-xl"} checkout-summary-total-value font-black text-[var(--user-accent)]`}>Rs. {grandTotal.toLocaleString()}</p>
         </div>
       </div>
-      <div className="mt-5">{footer}</div>
+      <div className="checkout-summary-footer mt-4 shrink-0">{footer}</div>
     </div>
   );
 
   const shippingMethods = [
-    { id: "standard", titleKey: "checkout.shipping.standard", time: t("checkout.shipping.days", { min: cfg.standard.min_days, max: cfg.standard.max_days }), icon: Truck, badge: t("checkout.shipping.popular") },
-    { id: "express", titleKey: "checkout.shipping.express", time: t("checkout.shipping.days", { min: cfg.express.min_days, max: cfg.express.max_days }), icon: Zap, badge: t("checkout.shipping.fast") },
+    { id: "standard", titleKey: "checkout.shipping.standard", time: t("checkout.shipping.days", { min: cfg.standard.min_days, max: cfg.standard.max_days }), rateDescriptionKey: "checkout.shipping.standardRate", icon: Truck, badge: t("checkout.shipping.popular") },
+    { id: "express", titleKey: "checkout.shipping.express", time: t("checkout.shipping.days", { min: cfg.express.min_days, max: cfg.express.max_days }), rateDescriptionKey: "checkout.shipping.expressRate", icon: Zap, badge: t("checkout.shipping.fast") },
     // ✅ Admin ke custom shipping methods (Add New se bane hue)
     ...(customShippingMethods || []).map((m) => ({
       id: m.code,
       title: text(m.name, m.translations?.name),
       time: t("checkout.shipping.days", { min: m.min_days, max: m.max_days }),
+      rateDescriptionKey: "checkout.shipping.deliveryRate",
       icon: Package,
       custom: true,
       fee: Number(m.fee ?? 0),
@@ -1038,9 +1079,9 @@ function CheckoutContent() {
 
   return (
     <>
-    {/* ============= DESKTOP — UNCHANGED ============= */}
+    {/* ============= DESKTOP CHECKOUT ============= */}
     <div className="checkout-premium hidden lg:block">
-    <main className="max-w-[80rem] mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-8 lg:py-12 pb-24 sm:pb-28 md:pb-10">
+    <main className="checkout-main w-full min-w-0 max-w-none mx-auto px-3 sm:px-4 lg:px-7 py-5 sm:py-6 lg:py-8 pb-24 sm:pb-28 md:pb-10">
       <style>{`
         @keyframes modalUp { from { opacity: 0; transform: translateY(30px) scale(.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1048,17 +1089,6 @@ function CheckoutContent() {
         .custom-scrollbar::-webkit-scrollbar-track { background: var(--user-bg-hover); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--user-accent); border-radius: 10px; }
       `}</style>
-
-      <div className="flex items-center justify-between mb-6 sm:mb-8">
-        <button onClick={() => router.push("/")} className="flex items-center gap-2 text-xs sm:text-sm text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition group">
-          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="font-semibold">{t("cart.continueShopping")}</span>
-        </button>
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20">
-          <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-          <span className="text-xs font-black text-[var(--user-accent)]">{t("checkout.secureCheckout")}</span>
-        </div>
-      </div>
 
       {needsPhone ? (
         <div className="max-w-[31.25rem] mx-auto mt-8 sm:mt-12">
@@ -1108,76 +1138,80 @@ function CheckoutContent() {
         </div>
       ) : (
         <>
-          <StepIndicator />
-
                    {/* ============ STEP 1 — Cart (right card tak height, phir scroll) ============ */}
           {step === 1 && (
-            <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6">
+            <div className="grid items-start lg:grid-cols-[minmax(0,1fr)_19rem] gap-4 sm:gap-5">
               {/* LEFT: Your Cart */}
-              <div className="relative">
-                <div className={`${cardCls} overflow-hidden flex flex-col lg:absolute lg:inset-0`}>
-                  <div className="flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                        <ShoppingBag size={18} className="text-[var(--user-accent-text)]" />
-                      </div>
-                      <div>
-                        <h2 className="text-sm font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.cart.title")}</h2>
-                        <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.cart.selectedSummary", { selected: selectedCartItems.length, total: cart.length })}</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => router.push("/cart")} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">{t("checkout.cart.edit")}</button>
+              <div className="min-w-0">
+                <div className={`${cardCls} overflow-hidden`}>
+                  <div className="flex items-end justify-between gap-3 px-5 sm:px-6 py-5 border-b border-[var(--user-border)]">
+                    <h2 className="text-3xl font-normal text-[var(--user-text)]">{t("cart.title")}</h2>
+                    <span className="text-xs text-[var(--user-text-muted)]">{t("common.price")}</span>
                   </div>
 
                   {/* ✅ LIST — shows ONLY selected items (selection managed on /cart page) */}
-                  <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 overflow-y-auto max-h-[26.25rem] sm:max-h-[32.5rem] lg:max-h-none lg:flex-1 lg:min-h-0 custom-scrollbar">
-                    {itemsWithDiscounts.map((item) => {
-                      const isSelected = selectedItems.some((selectedItem) => selectedItem.key === item.key)
-                        || draftItems.some((draftItem) => draftItem.key === item.key);
-                      return (
-                        <div key={item.key} className={`checkout-cart-item flex items-start gap-4 p-4 rounded-xl border ${isSelected ? "is-selected" : ""}`}>
+                  <div className="divide-y divide-[var(--user-border)]">
+                    {itemsWithDiscounts.map((item) => (
+                        <div key={item.key} className="checkout-cart-item flex items-center gap-5 sm:gap-6 px-4 sm:px-6 py-5 sm:py-6">
                           <div className="checkout-item-thumb relative shrink-0">
-                            <ItemThumb item={item} size="w-16 h-16" />
-                            {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
+                            <ItemThumb item={item} size="w-36 h-36 sm:w-40 sm:h-40" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-[var(--user-text)] line-clamp-2">{text(item.name, item.translations?.name)}</p>
-                            {item.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{text(item.variantTitle, item.variantTranslations?.title)}</p>}
+                          <div className="flex-1 min-w-0 self-center flex flex-col items-start py-1">
+                            <p className="text-lg font-normal text-[var(--user-text)] line-clamp-2">{text(item.name, item.translations?.name)}</p>
+                            {item.brand && <p className="checkout-item-brand mt-1 text-[0.6875rem] uppercase tracking-wide">{text(item.brand, item.brandTranslations?.name)}</p>}
+                            {item.variantTitle && <p className="checkout-item-variant mt-0.5 text-xs">{text(item.variantTitle, item.variantTranslations?.title)}</p>}
+                            <p className="checkout-item-stock mt-1 text-xs">{t("product.inStock")}</p>
+                            {item.freeItems > 0 ? (
+                              <p className="checkout-item-savings mt-1 text-xs">{t("checkout.item.freeQuantitySummary", { paid: item.payableItems, free: item.freeItems })}</p>
+                            ) : item.savings + item.dealSavings > 0 ? (
+                              <p className="checkout-item-savings mt-1 text-xs">{t("checkout.summary.youSave")}: Rs. {(item.savings * item.qty + item.dealSavings).toLocaleString()}</p>
+                            ) : null}
                             {item.dealId && (
-                              <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1.5">
+                              <span className="checkout-item-deal inline-flex items-center gap-1 text-[0.625rem] mt-1.5">
                                 <Tag size={10} /> {t("checkout.item.deal")}
                               </span>
                             )}
-                          </div>
-                          <div className="shrink-0 flex flex-col items-end gap-2.5">
-                            <p className="text-sm font-black text-[var(--user-text)]">Rs. {item.lineTotal.toLocaleString()}</p>
-                            <div className="flex items-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]">
-                              <button type="button" aria-label={t("checkout.item.decreaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (item.qty > 1) updateQty(item.key, item.qty - 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
-                                <Minus size={12} />
-                              </button>
-                              <span className="text-xs font-black text-[var(--user-text)] w-8 text-center">{item.qty}</span>
-                              <button type="button" aria-label={t("checkout.item.increaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="p-2 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition">
-                                <Plus size={12} />
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                              <div className="flex items-center rounded-full border-2 border-[var(--user-border)] bg-[var(--user-bg-card)]">
+                                <button
+                                  type="button"
+                                  aria-label={item.qty === 1 ? t("cart.remove") : t("checkout.item.decreaseQuantity")}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (item.qty === 1) removeCheckoutItem(item.key);
+                                    else updateQty(item.key, item.qty - 1);
+                                  }}
+                                  className="px-3 py-1.5 text-sm text-[var(--user-text)] hover:text-[var(--user-accent)] transition"
+                                >
+                                  {item.qty === 1 ? <Trash2 size={14} /> : <Minus size={14} />}
+                                </button>
+                                <span className="text-sm font-semibold text-[var(--user-text)] w-8 text-center">{item.qty}</span>
+                                <button type="button" aria-label={t("checkout.item.increaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="px-3 py-1.5 text-sm text-[var(--user-text)] hover:text-[var(--user-accent)] transition">
+                                  <Plus size={14} />
+                                </button>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeCheckoutItem(item.key)}
+                                className="checkout-delete-link inline-flex items-center border-l border-[var(--user-border)] pl-3 text-xs hover:underline"
+                              >
+                                {t("common.delete")}
                               </button>
                             </div>
                           </div>
+                          <div className="shrink-0 self-start flex flex-col items-end gap-1 min-w-24">
+                            {item.hasDiscount && item.originalPrice * item.qty > item.lineTotal && <p className="text-xs text-[var(--user-text-subtle)] line-through">Rs. {(item.originalPrice * item.qty).toLocaleString()}</p>}
+                            <p className="text-base font-semibold text-[var(--user-text)]">Rs. {item.lineTotal.toLocaleString()}</p>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Slim footer */}
-                  <div className="px-5 py-3.5 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-hover)]/40 flex items-center justify-between">
-                    <p className="text-xs text-[var(--user-text-muted)] font-semibold">
-                      {t("checkout.cart.selected")}: <span className="font-black text-[var(--user-text)]">{selectedCartItems.length}</span> / {cart.length}
-                    </p>
-                    <p className="text-lg font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
+                      ))}
                   </div>
                 </div>
               </div>
 
               {/* RIGHT: Summary with Proceed button */}
-              <SummaryPanel footer={
+              <SummaryPanel showItems={false} footer={
                 <div className="space-y-3">
                   <PrimaryButton
                     onClick={proceedToStep2}
@@ -1217,75 +1251,85 @@ function CheckoutContent() {
 
           {/* ============ STEP 2 ============ */}
           {step === 2 && (
-            <div className="grid lg:grid-cols-[1fr_400px] gap-4 sm:gap-6 items-start">
+            <div className="checkout-step-two-grid grid w-full min-w-0 grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,72fr)_minmax(0,28fr)]">
               <div className="space-y-4 sm:space-y-5">
-                <div className={`${cardCls} p-5 sm:p-6`}>
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                      <MapPin size={18} className="text-[var(--user-accent-text)]" />
+                <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3 border-b border-[var(--user-border)] pb-4">
+                    <div className="checkout-address-section-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border">
+                      <MapPin size={18} className="text-[var(--user-accent)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.address.title")}</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.address.subtitle")}</p>
+                      <h2 className="text-base font-semibold leading-5 text-[var(--user-text)]">{t("checkout.address.title")}</h2>
+                      <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.address.subtitle")}</p>
                     </div>
                   </div>
-                  {addresses.length > 0 ? (
-                    <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                      {addresses.map((a) => {
-                        const sel = selectedAddressId === a._id;
-                        return (
-                        <div key={a._id} onClick={() => setSelectedAddressId(a._id)} className={`checkout-selection-card text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer ${sel ? "is-selected" : ""}`}>
+                  {addressFormView === "desktop" ? (
+                    <AddressForm
+                      inline
+                      fresh={!editingAddressId}
+                      initialAddress={editingAddressId ? addresses.find((a) => a._id === editingAddressId) : null}
+                      onSuccess={handleAddressFormSuccess}
+                      onCancel={closeAddressForm}
+                    />
+                  ) : addressFormView ? null : (
+                    <div className="grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                      {addresses.length ? addresses.map((address) => {
+                        const isSelected = selectedAddressId === address._id;
+                        return <div key={address._id} onClick={() => setSelectedAddressId(address._id)} className={`checkout-selection-card flex h-full min-h-[10rem] w-full min-w-0 flex-col text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer ${isSelected ? "is-selected" : ""}`}>
                           <div className="flex items-start gap-3">
-                            <span className={`checkout-address-indicator mt-0.5 shrink-0 ${sel ? "is-selected" : ""}`}>
-                              {sel && <span className="checkout-address-indicator-dot" />}
+                            <span className={`checkout-address-indicator mt-0.5 shrink-0 ${isSelected ? "is-selected" : ""}`}>
+                              {isSelected && <span className="checkout-address-indicator-dot" />}
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-bold text-[var(--user-text)] truncate">{a.full_name}</p>
-                                {a.is_default && <span className="text-[0.625rem] font-bold text-[var(--user-accent)] border border-[var(--user-accent)]/40 px-1.5 py-0.5 rounded">{t("checkout.address.default")}</span>}
+                                <p className="text-sm font-bold text-[var(--user-text)] truncate">{address.full_name}</p>
                               </div>
                               <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
-                                {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
+                                {address.street_address1}{address.street_address2 ? `, ${address.street_address2}` : ""}, {address.city}, {address.state}
                               </p>
-                              <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-1">{a.phone}</p>
+                              <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-1">{address.phone}</p>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} aria-label={t("checkout.address.edit")} className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); openAddressForm("desktop", address); }} aria-label={t("checkout.address.edit")} className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
                               <Pencil size={15} />
                             </button>
                           </div>
-                          <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
-                            <button onClick={(e) => { e.stopPropagation(); openEditModal(a); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-xs font-semibold">
+                          <div className="mt-auto flex items-center gap-2 pt-2 border-t border-[var(--user-border)]">
+                            <button onClick={(e) => { e.stopPropagation(); openAddressForm("desktop", address); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-xs font-semibold">
                               <Pencil size={11} /> {t("checkout.address.edit")}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); deleteAddress(a._id); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition text-xs font-semibold">
+                            <button onClick={(e) => { e.stopPropagation(); deleteAddress(address._id); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition text-xs font-semibold">
                               <Trash2 size={11} /> {t("common.delete")}
                             </button>
                           </div>
+                        </div>;
+                      }) : (
+                        <div className="checkout-address-empty-state col-span-full flex min-h-[13.5rem] flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-6 text-center">
+                          <span className="checkout-address-empty-illustration relative mb-0 flex h-24 w-28 items-center justify-center">
+                            <Map className="checkout-address-empty-map absolute bottom-0 left-1/2 h-14 w-[5.5rem] -translate-x-1/2" preserveAspectRatio="none" strokeWidth={1.1} />
+                            <MapPin size={44} strokeWidth={1.25} className="checkout-address-empty-pin absolute left-1/2 top-5 -translate-x-1/2" />
+                            <Sparkles size={14} strokeWidth={1.4} className="checkout-address-empty-sparkle absolute left-1 top-8" />
+                            <Sparkles size={14} strokeWidth={1.4} className="checkout-address-empty-sparkle absolute right-1 top-7" />
+                          </span>
+                          <p className="text-sm font-semibold text-[var(--user-text)]">{t("checkout.address.noneSaved")}</p>
+                          <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.address.addToContinue")}</p>
                         </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 mb-4">
-                      <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
-                        <MapPin size={28} className="text-[var(--user-text-subtle)]" />
-                      </div>
-                      <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.address.noneSaved")}</p>
+                      )}
+                      <button onPointerEnter={warmAddressForm} onFocus={warmAddressForm} onPointerDown={warmAddressForm} onClick={() => openAddressForm("desktop")} className="checkout-address-add-button col-span-full flex h-12 min-h-0 w-full items-center justify-center gap-2 rounded-xl border bg-[var(--user-bg-card)] px-4 text-sm font-semibold transition active:scale-[0.99]">
+                        <Plus size={16} strokeWidth={2} /> {t("checkout.address.add")}
+                      </button>
                     </div>
                   )}
-                  <button onClick={openAddressModal} className="w-full h-12 rounded-xl border-2 border-dashed border-[var(--user-border)] text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-accent)]/5 transition flex items-center justify-center gap-2">
-                    <Plus size={16} /> {t("checkout.address.add")}
-                  </button>
                 </div>
 
-                <div className={`${cardCls} p-5 sm:p-6`}>
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                      <Truck size={18} className="text-[var(--user-accent-text)]" />
+                <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-2">
+                <div className="min-w-0 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3 border-b border-[var(--user-border)] pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
+                      <Truck size={18} className="text-[var(--user-accent)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.shipping.title")}</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.shipping.subtitle")}</p>
+                      <h2 className="text-base font-semibold leading-5 text-[var(--user-text)]">{t("checkout.shipping.title")}</h2>
+                      <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.shipping.subtitle")}</p>
                     </div>
                   </div>
                   {cfg.free_shipping_over > 0 && (
@@ -1293,7 +1337,7 @@ function CheckoutContent() {
                       <p className="text-xs text-[var(--user-success)] font-bold flex items-center gap-2"><Gift size={14} /> {t("checkout.shipping.freeOver", { amount: `Rs. ${cfg.free_shipping_over.toLocaleString()}` })}</p>
                     </div>
                   )}
-                  <div className="space-y-3">
+                  <div className="grid auto-rows-fr grid-cols-1 gap-3">
                     {shippingMethods.map((m) => {
                       const active = shippingMethod === m.id;
                       const IconComp = m.icon;
@@ -1306,62 +1350,71 @@ function CheckoutContent() {
                       //    non-selected methods, show their normal base fee.
                       const displayFee = active ? shipping : baseFee;
                       const isFree = active ? (isFreeForCurrentMethod || shipping === 0) : isFreeForThisMethod;
+                      const rateDescription = t(m.rateDescriptionKey || "checkout.shipping.deliveryRate");
+                      const showRateDescription = !(active && shippingReason && rateDescription.trim().toLocaleLowerCase() === shippingReason.trim().toLocaleLowerCase());
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${active ? "is-selected" : ""}`}>
+                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`checkout-selection-card flex h-full min-h-[5.75rem] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-[var(--user-accent)]/40 sm:gap-4 sm:p-4 ${active ? "is-selected" : ""}`}>
                           <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
                             {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                           </span>
-                          <IconComp size={20} className={active ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
+                            <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                          </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
-                            <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{m.time}</p>
-                            {active && shippingReason && <p className="text-[0.625rem] text-[var(--user-success)] mt-1 font-semibold">{shippingReason}</p>}
+                            <p className="text-sm font-semibold leading-5 text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
+                            <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{m.time}</p>
+                            {showRateDescription && <p className="text-[0.625rem] leading-4 text-[var(--user-text-muted)]">{rateDescription}</p>}
+                            <div className="mt-1 min-h-4">
+                              {active && shippingReason && <p className="text-[0.625rem] leading-4 text-[var(--user-success)] font-medium">{shippingReason}</p>}
                             {/* ✅ Non-covered method hint (only when a deal exists AND it's not covering this method) */}
                             {showNotApplicableHint && (
-                              <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-1 font-semibold italic">
+                              <p className="text-[0.625rem] leading-4 text-[var(--user-text-muted)] font-medium italic">
                                 {t("checkout.shipping.freeNotApplicable")}
                               </p>
                             )}
+                            </div>
                           </div>
-                          <span className={`text-sm font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}</span>
+                          <span className={`min-w-[5.5rem] shrink-0 text-right text-sm font-semibold ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div className={`${cardCls} p-5 sm:p-6`}>
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                      <CreditCard size={18} className="text-[var(--user-accent-text)]" />
+                <div className="min-w-0 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3 border-b border-[var(--user-border)] pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
+                      <CreditCard size={18} className="text-[var(--user-accent)]" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.payment.title")}</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.payment.subtitle")}</p>
+                      <h2 className="text-base font-semibold leading-5 text-[var(--user-text)]">{t("checkout.payment.title")}</h2>
+                      <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.payment.subtitle")}</p>
                     </div>
                   </div>
-                  <div className="space-y-3">
+                  <div className="grid auto-rows-fr grid-cols-1 gap-3">
                     {[
                       { id: "cod", icon: Banknote, titleKey: "checkout.payment.cod", subKey: "checkout.payment.codDescription" },
                       { id: "bank", icon: Landmark, titleKey: "checkout.payment.bank", subKey: "checkout.payment.bankDescription" },
                       { id: "card", icon: CreditCard, titleKey: "checkout.payment.card", subKey: "checkout.payment.cardDescription" },
                     ].map((m) => (
-                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => setPaymentMethod(m.id)} className={`checkout-selection-card w-full flex items-center gap-3 rounded-xl border p-4 text-left transition-colors duration-150 ${paymentMethod === m.id ? "is-selected" : ""}`}>
+                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => selectPaymentMethod(m.id)} className={`checkout-selection-card flex h-full min-h-[4.75rem] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-[var(--user-accent)]/40 sm:gap-4 sm:p-4 ${paymentMethod === m.id ? "is-selected" : ""}`}>
                         <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
                           {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-[var(--user-text)]">{t(m.titleKey)}</p>
-                          <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{t(m.subKey)}</p>
+                          <p className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t(m.titleKey)}</p>
+                          <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t(m.subKey)}</p>
                         </div>
-                        <m.icon size={20} className={paymentMethod === m.id ? "text-[var(--user-accent)] shrink-0" : "text-[var(--user-text-muted)] shrink-0"} />
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
+                          <m.icon size={18} className={paymentMethod === m.id ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                        </span>
                       </button>
                     ))}
                   </div>
                                    {paymentMethod === "bank" && (
-                    <div className="mt-4 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4 space-y-3">
+                    <div ref={bankDetailsDesktopRef} className="checkout-bank-details mt-4 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4 space-y-3">
                       <p className="text-xs font-bold text-[var(--user-text)]">{t("checkout.bank.details")}</p>
                       <div className="space-y-1 text-xs text-[var(--user-text-muted)]">
                         <p>{t("checkout.bank.account")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.title}</span></p>
@@ -1420,6 +1473,7 @@ function CheckoutContent() {
                     </div>
                   )}
                 </div>
+                </div>
               </div>
 
               <SummaryPanel footer={
@@ -1453,38 +1507,38 @@ function CheckoutContent() {
                       <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.review.subtitle")}</p>
                     </div>
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-4 mb-5">
-                    <div className="rounded-xl border-2 border-[var(--user-border)] p-4 bg-[var(--user-bg-hover)]/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.address.title")}</p>
-                        <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
+                  <div className="mb-4 grid items-stretch gap-3 sm:grid-cols-2 sm:gap-4 sm:mb-5">
+                    <div className="flex h-full flex-col rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3 sm:p-3.5">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--user-text)]">{t("checkout.address.title")}</p>
+                        <button onClick={() => goToStep(2)} className="shrink-0 text-xs font-semibold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
                       </div>
                       {selectedAddress && (
-                        <div className="space-y-1.5">
-                          <p className="text-sm font-bold text-[var(--user-text)]">{selectedAddress.full_name}</p>
-                          <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold leading-5 text-[var(--user-text)]">{selectedAddress.full_name}</p>
+                          <p className="text-[13px] leading-5 text-[var(--user-text-muted)]">
                             {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}<br />
                             {selectedAddress.city}, {selectedAddress.state}, {selectedAddress.country}
                           </p>
-                          <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-2 flex items-center gap-1"><Phone size={10} /> {selectedAddress.phone}</p>
+                          <p className="mt-1 flex items-center gap-1.5 text-[13px] font-medium text-[var(--user-text-secondary)]"><Phone size={12} /> {selectedAddress.phone}</p>
                         </div>
                       )}
                     </div>
-                    <div className="rounded-xl border-2 border-[var(--user-border)] p-4 bg-[var(--user-bg-hover)]/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.shippingPayment")}</p>
-                        <button onClick={() => goToStep(2)} className="text-xs font-bold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
+                    <div className="flex h-full flex-col rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3 sm:p-3.5">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--user-text)]">{t("checkout.shippingPayment")}</p>
+                        <button onClick={() => goToStep(2)} className="shrink-0 text-xs font-semibold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
                       </div>
-                      <div className="space-y-2 text-xs text-[var(--user-text-muted)]">
+                      <div className="space-y-1.5 text-[13px] text-[var(--user-text-muted)]">
                         <div className="flex items-center gap-2">
-                          <Truck size={12} className="text-[var(--user-accent)]" />
-                          <span className="font-semibold text-[var(--user-text)]">{shippingMethodName(shippingMethod)}</span>
+                          <Truck size={14} className="shrink-0 text-[var(--user-accent)]" />
+                          <span className="font-medium text-[var(--user-text)]">{shippingMethodName(shippingMethod)}</span>
                         </div>
-                        <p className="text-[0.625rem]">{shippingMethods.find((m) => m.id === shippingMethod)?.time}</p>
-                        {shippingReason && <p className="text-[var(--user-success)] font-semibold">{shippingReason}</p>}
-                        <div className="flex items-center gap-2 pt-2 border-t border-[var(--user-border)]">
-                          {paymentMethod === "cod" ? <Banknote size={12} className="text-[var(--user-accent)]" /> : paymentMethod === "bank" ? <Landmark size={12} className="text-[var(--user-accent)]" /> : <CreditCard size={12} className="text-[var(--user-accent)]" />}
-                          <span className="font-semibold text-[var(--user-text)]">
+                        <p className="pl-[22px] text-xs leading-4">{shippingMethods.find((m) => m.id === shippingMethod)?.time}</p>
+                        {shippingReason && <p className="pl-[22px] text-xs font-medium text-[var(--user-success)]">{shippingReason}</p>}
+                        <div className="mt-1 flex items-center gap-2 border-t border-[var(--user-border)] pt-2">
+                          {paymentMethod === "cod" ? <Banknote size={14} className="shrink-0 text-[var(--user-accent)]" /> : paymentMethod === "bank" ? <Landmark size={14} className="shrink-0 text-[var(--user-accent)]" /> : <CreditCard size={14} className="shrink-0 text-[var(--user-accent)]" />}
+                          <span className="font-medium text-[var(--user-text)]">
                             {paymentMethod === "cod" ? t("checkout.payment.cod") : paymentMethod === "bank" ? t("checkout.payment.bank") : t("checkout.payment.debitCreditCard")}
                           </span>
                         </div>
@@ -1517,7 +1571,7 @@ function CheckoutContent() {
                 </div>
               </div>
 
-              <SummaryPanel footer={
+              <SummaryPanel showItems={false} review footer={
                 <div className="space-y-3">
                   <PrimaryButton
                     onClick={placeOrder}
@@ -1544,22 +1598,6 @@ function CheckoutContent() {
 
       </main>
     </div>
-
-    {/* ✅ AddressForm modal — fragment root pe (mobile + desktop DONO pe render ho) */}
-    {showAddressModal && (
-      <AddressForm
-        initialAddress={editingAddressId ? addresses.find(a => a._id === editingAddressId) : null}
-        onSuccess={(saved) => {
-          setShowAddressModal(false);
-          setEditingAddressId(null);
-          if (saved?._id) setSelectedAddressId(saved._id);
-        }}
-        onCancel={() => {
-          setShowAddressModal(false);
-          setEditingAddressId(null);
-        }}
-      />
-    )}
 
     {/* ============= MOBILE (Daraz-style single-scroll) — lg:hidden ============= */}
     {(() => {
@@ -1669,13 +1707,14 @@ function CheckoutContent() {
 
       // ✅ Main mobile checkout: single-scroll, all cards visible at once.
       const shippingMethodsMob = [
-        { id: "standard", titleKey: "checkout.shipping.standard", time: t("checkout.shipping.days", { min: cfg.standard.min_days, max: cfg.standard.max_days }), icon: Truck },
-        { id: "express", titleKey: "checkout.shipping.express", time: t("checkout.shipping.days", { min: cfg.express.min_days, max: cfg.express.max_days }), icon: Zap },
+        { id: "standard", titleKey: "checkout.shipping.standard", time: t("checkout.shipping.days", { min: cfg.standard.min_days, max: cfg.standard.max_days }), rateDescriptionKey: "checkout.shipping.standardRate", icon: Truck },
+        { id: "express", titleKey: "checkout.shipping.express", time: t("checkout.shipping.days", { min: cfg.express.min_days, max: cfg.express.max_days }), rateDescriptionKey: "checkout.shipping.expressRate", icon: Zap },
         // ✅ Admin ke custom shipping methods (Add New se bane hue)
         ...(customShippingMethods || []).map((m) => ({
           id: m.code,
           title: text(m.name, m.translations?.name),
           time: t("checkout.shipping.days", { min: m.min_days, max: m.max_days }),
+          rateDescriptionKey: "checkout.shipping.deliveryRate",
           icon: Package,
           custom: true,
           fee: Number(m.fee ?? 0),
@@ -1699,37 +1738,65 @@ function CheckoutContent() {
 
           <div className="px-3 pt-3 pb-28 space-y-3">
             {/* Card 1: Shipping Address — standalone card with header (tappable) */}
-            <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] overflow-hidden">
-              <p className="px-3 pt-2.5 pb-1.5 text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <MapPin size={13} /> {t("checkout.address.shippingAddress")}
-              </p>
-              <button
-                type="button"
-                onClick={() => { setEditingAddressId(null); setMobileAddressSheet(true); }}
-                aria-label={t("checkout.address.changeDelivery")}
-                className="w-full text-left px-3 pb-3 pt-1 flex items-center gap-3 active:scale-[0.99] transition"
-              >
-                <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-                  <MapPin size={18} className="text-[var(--user-accent)]" />
+            <div className="overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm">
+              <div className="flex items-center gap-3 px-3 pb-2 pt-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
+                  <MapPin size={17} className="text-[var(--user-accent)]" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  {selectedAddress ? (
-                    <>
-                      <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate">
-                        {selectedAddress.full_name} <span className="text-[var(--user-text-muted)] font-semibold">· {selectedAddress.phone}</span>
-                      </p>
-                      <p className="text-[0.6875rem] text-[var(--user-text-muted)] line-clamp-2 mt-0.5">
-                        {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}, {selectedAddress.city}, {selectedAddress.state}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[0.75rem] text-[var(--user-text-muted)]">{t("checkout.address.tapToSelect")}</p>
-                  )}
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t("checkout.address.title")}</h2>
+                  <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.address.subtitle")}</p>
                 </div>
-                <span className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] shrink-0">
-                  <ChevronDown size={18} />
-                </span>
-              </button>
+              </div>
+              {addressFormView === "mobile" ? (
+                <div className="px-3 pb-3">
+                  <AddressForm
+                    inline
+                    fresh={!editingAddressId}
+                    initialAddress={editingAddressId ? addresses.find((a) => a._id === editingAddressId) : null}
+                    onSuccess={handleAddressFormSuccess}
+                    onCancel={closeAddressForm}
+                  />
+                </div>
+              ) : (
+                <div className="px-3 pb-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingAddressId(null); setMobileAddressSheet(true); }}
+                    aria-label={t("checkout.address.changeDelivery")}
+                    className="flex w-full touch-manipulation items-center gap-3 text-left transition active:scale-[0.99]"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--user-accent)]/10">
+                      <MapPin size={18} className="text-[var(--user-accent)]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {deliveryAddress ? (
+                        <>
+                          <p className="truncate text-[0.8125rem] font-black text-[var(--user-text)]">
+                            {deliveryAddress.full_name} <span className="font-semibold text-[var(--user-text-muted)]">· {deliveryAddress.phone}</span>
+                          </p>
+                          <p className="mt-0.5 line-clamp-2 text-[0.6875rem] text-[var(--user-text-muted)]">
+                            {deliveryAddress.street_address1}{deliveryAddress.street_address2 ? `, ${deliveryAddress.street_address2}` : ""}, {deliveryAddress.city}, {deliveryAddress.state}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[0.75rem] text-[var(--user-text-muted)]">{t("checkout.address.tapToSelect")}</p>
+                      )}
+                    </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--user-text-muted)]">
+                      <ChevronDown size={18} />
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onPointerDown={warmAddressForm}
+                    onClick={() => openAddressForm("mobile")}
+                    className="mt-2 flex h-10 w-full touch-manipulation items-center justify-center gap-2 rounded-lg border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5 px-3 text-xs font-semibold text-[var(--user-accent)] transition hover:bg-[var(--user-accent)]/10"
+                  >
+                    <Plus size={15} /> {t("checkout.address.add")}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Card 2: Items (only) */}
@@ -1739,15 +1806,11 @@ function CheckoutContent() {
               </p>
 
               {/* Compact item rows */}
-              <div className="space-y-2 max-h-[16.25rem] overflow-y-auto pr-1 custom-scrollbar">
-                {itemsWithDiscounts.map((i) => {
-                  const isSelected = selectedItems.some((selectedItem) => selectedItem.key === i.key)
-                    || draftItems.some((draftItem) => draftItem.key === i.key);
-                  return (
-                  <div key={i.key} className={`checkout-cart-item checkout-cart-item-mobile flex items-center gap-2.5 rounded-lg border p-1.5 ${isSelected ? "is-selected" : ""}`}>
+              <div className="space-y-2 pr-1">
+                {itemsWithDiscounts.map((i) => (
+                  <div key={i.key} className="checkout-cart-item checkout-cart-item-mobile flex items-center gap-2.5 rounded-lg p-1.5">
                     <div className="checkout-item-thumb relative shrink-0">
                       <ItemThumb item={i} size="w-12 h-12" />
-                      {isSelected && <span className="checkout-item-selection" aria-hidden="true"><Check size={10} strokeWidth={3} /></span>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{text(i.name, i.translations?.name)}</p>
@@ -1758,8 +1821,7 @@ function CheckoutContent() {
                     </div>
                     <p className="text-[0.75rem] font-black text-[var(--user-text)] shrink-0">Rs. {i.lineTotal.toLocaleString()}</p>
                   </div>
-                  );
-                })}
+                ))}
               </div>
 
               {/* Free shipping threshold banner (matches desktop) */}
@@ -1771,22 +1833,29 @@ function CheckoutContent() {
             </div>
 
             {/* Card 3: Delivery Method (standalone) */}
-            <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-2">
-              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <Truck size={13} /> {t("checkout.shipping.title")}
-              </p>
-              <div className="space-y-1.5">
+            <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-3 border-b border-[var(--user-border)] pb-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
+                  <Truck size={17} className="text-[var(--user-accent)]" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t("checkout.shipping.title")}</h2>
+                  <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.shipping.subtitle")}</p>
+                </div>
+              </div>
+              <div className="grid auto-rows-fr grid-cols-1 gap-2">
                   {shippingMethodsMob.map((m) => {
                   const active = shippingMethod === m.id;
                   const IconComp = m.icon;
                   // ✅ Custom method => uska apna fee; warna standard/express config fee
                   const baseFee = m.custom ? m.fee : (m.id === "express" ? cfg.express.fee : cfg.standard.fee);
+                  const displayFee = active ? shipping : baseFee;
                   const isFreeForThisMethod = freeShippingByActiveItems && freeShippingDealsForMethod(m.id);
                   const isFree = active ? (isFreeForCurrentMethod || shipping === 0) : isFreeForThisMethod;
                   return (
                     <label
                       key={m.id}
-                      className={`checkout-selection-card flex items-center gap-3 rounded-lg border-2 p-2.5 cursor-pointer transition-colors duration-150 ${active ? "is-selected" : ""}`}
+                      className={`checkout-selection-card flex h-full min-h-[4.5rem] items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all duration-150 hover:border-[var(--user-accent)]/40 ${active ? "is-selected" : ""}`}
                     >
                       <input
                         type="radio"
@@ -1798,13 +1867,16 @@ function CheckoutContent() {
                       <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
                         {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                       </span>
-                      <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
+                        <IconComp size={17} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.75rem] font-bold text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">{m.time}</p>
+                        <p className="text-[0.8125rem] font-semibold leading-5 text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
+                        <p className="text-xs leading-4 text-[var(--user-text-muted)]">{m.time}</p>
+                        <p className="text-[0.625rem] leading-4 text-[var(--user-text-muted)]">{t(m.rateDescriptionKey || "checkout.shipping.deliveryRate")}</p>
                       </div>
-                      <span className={`text-[0.75rem] font-black shrink-0 ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
-                        {isFree ? t("checkout.summary.free") : `Rs. ${baseFee.toLocaleString()}`}
+                      <span className={`min-w-[4.75rem] shrink-0 text-right text-xs font-semibold ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+                        {isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}
                       </span>
                     </label>
                   );
@@ -1813,32 +1885,43 @@ function CheckoutContent() {
             </div>
 
             {/* Card 4: Payment (compact icon chips — equal-width grid) */}
-            <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-2">
-              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
-                <CreditCard size={13} /> Payment
-              </p>
-              <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-3 border-b border-[var(--user-border)] pb-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
+                  <CreditCard size={17} className="text-[var(--user-accent)]" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t("checkout.payment.title")}</h2>
+                  <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.payment.subtitle")}</p>
+                </div>
+              </div>
+              <div className="grid auto-rows-fr grid-cols-1 gap-2">
                 {[
-                  { id: "cod", icon: Truck, labelKey: "checkout.payment.codShort" },
-                  { id: "bank", icon: Landmark, labelKey: "checkout.payment.bankShort" },
-                  { id: "card", icon: CreditCard, labelKey: "checkout.payment.card" },
+                  { id: "cod", icon: Banknote, titleKey: "checkout.payment.cod", subKey: "checkout.payment.codDescription" },
+                  { id: "bank", icon: Landmark, titleKey: "checkout.payment.bank", subKey: "checkout.payment.bankDescription" },
+                  { id: "card", icon: CreditCard, titleKey: "checkout.payment.card", subKey: "checkout.payment.cardDescription" },
                 ].map((m) => {
                   const active = paymentMethod === m.id;
                   return (
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => setPaymentMethod(m.id)}
+                      onClick={() => selectPaymentMethod(m.id)}
                       aria-pressed={active}
-                      className={`checkout-selection-card w-full flex flex-col items-center justify-center px-2 py-2 rounded-xl border-2 transition-colors duration-150 ${
+                      className={`checkout-selection-card flex h-full min-h-[4.5rem] w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:border-[var(--user-accent)]/40 ${
                         active ? "is-selected" : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
                       }`}
                     >
                       <span className={`checkout-option-indicator checkout-option-indicator--compact ${active ? "is-selected" : ""}`}>
                         {active && <Check size={10} strokeWidth={2.5} aria-hidden="true" />}
                       </span>
-                      <m.icon size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
-                      <span className="text-[0.625rem] font-black uppercase tracking-wider mt-1">{t(m.labelKey)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[0.8125rem] font-semibold leading-5 text-[var(--user-text)]">{t(m.titleKey)}</p>
+                        <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t(m.subKey)}</p>
+                      </div>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
+                        <m.icon size={17} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                      </span>
                     </button>
                   );
                              })}
@@ -1846,7 +1929,7 @@ function CheckoutContent() {
 
               {/* ✅ Mobile: Bank transfer info + fillable fields */}
               {paymentMethod === "bank" && (
-                <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
+                <div ref={bankDetailsMobileRef} className="checkout-bank-details rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
                   <p className="text-[0.6875rem] font-bold text-[var(--user-text)]">{t("checkout.bank.details")}</p>
                   <div className="space-y-1 text-[0.6875rem] text-[var(--user-text-muted)]">
                     <p>{t("checkout.bank.account")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.title}</span></p>
@@ -2024,18 +2107,17 @@ function CheckoutContent() {
                   </button>
                 </div>
 
-                {/* List of addresses */}
-                {!mobileAddressForm && (
-                  <div className="p-3 space-y-2">
+                {/* Current address and address actions */}
+                <div className="p-3 space-y-2">
                     {addresses.length === 0 && (
-                      <div className="text-center py-8">
-                        <div className="w-14 h-14 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
-                          <MapPin size={24} className="text-[var(--user-text-muted)]" />
+                      <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)]">
+                          <MapPin size={22} />
                         </div>
-                        <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.address.noneSaved")}</p>
+                        <p className="text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.address.noneSaved")}</p>
                       </div>
                     )}
-                    {addresses.map((a) => {
+                  {addresses.map((a) => {
                       const isSel = selectedAddressId === a._id;
                       return (
                         <div
@@ -2050,7 +2132,6 @@ function CheckoutContent() {
                             <div className="flex items-center gap-2 mb-1">
                               <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate">{a.full_name}</p>
                               <span className="text-[0.6875rem] text-[var(--user-text-muted)] font-semibold">· {a.phone}</span>
-                              {a.is_default && <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">{t("checkout.address.default")}</span>}
                               {isSel && <Check size={14} className="checkout-selection-check ml-auto shrink-0" />}
                             </div>
                             <p className="text-[0.6875rem] text-[var(--user-text-muted)] line-clamp-2 leading-snug">
@@ -2060,7 +2141,7 @@ function CheckoutContent() {
                           <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
                             <button
                               type="button"
-                              onClick={() => { setEditingAddressId(a._id); setMobileAddressSheet(false); setShowAddressModal(true); }}
+                              onClick={() => openAddressForm("mobile", a)}
                               className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-[0.6875rem] font-semibold"
                             >
                               <Pencil size={11} /> {t("checkout.address.edit")}
@@ -2078,13 +2159,15 @@ function CheckoutContent() {
                     })}
                     <button
                       type="button"
-                      onClick={() => { setEditingAddressId(null); setMobileAddressSheet(false); setShowAddressModal(true); }}
-                      className="w-full h-11 rounded-xl border-2 border-dashed border-[var(--user-border)] text-[0.75rem] font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:border-[var(--user-accent)]/60 hover:bg-[var(--user-accent)]/5 transition flex items-center justify-center gap-2 mt-2"
+                      onPointerEnter={warmAddressForm}
+                      onFocus={warmAddressForm}
+                      onPointerDown={warmAddressForm}
+                      onClick={() => openAddressForm("mobile")}
+                      className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--user-accent)] bg-[var(--user-accent)] px-4 text-[0.75rem] font-semibold text-[var(--user-accent-text)] transition hover:opacity-90 active:scale-[0.99]"
                     >
                       <Plus size={14} /> {t("checkout.address.add")}
                     </button>
-                  </div>
-                )}
+                </div>
 
                 {/* Summary */}
                 <div className="px-4 py-3 border-t border-[var(--user-border)] space-y-2 text-[0.75rem]">

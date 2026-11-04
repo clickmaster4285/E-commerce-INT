@@ -504,15 +504,6 @@ export default function Header() {
                 )}
               </Link>
 
-              <Link
-                href="/chats"
-                title={t("header.orderSupport")}
-                aria-label={t("header.orderSupport")}
-                className={`${iconBtn} hidden sm:flex`}
-              >
-                <MessageCircle size={18} strokeWidth={1.7} />
-              </Link>
-
               <button
                 onClick={() =>
                   isMobile ? router.push("/cart") : setIsCartOpen(true)
