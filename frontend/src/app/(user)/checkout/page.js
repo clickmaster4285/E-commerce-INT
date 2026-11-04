@@ -969,12 +969,12 @@ function CheckoutContent() {
 
   if (step === 1 && cart.length === 0 && !placing) {
     return (
-      <div className="max-w-[37.5rem] mx-auto px-4 py-20 text-center">
-        <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
+      <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-[37.5rem] flex-col items-center justify-center px-4 py-10 text-center">
+        <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-6">
           <Package size={34} className="text-[var(--user-accent)]" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-2">{t("cart.empty")}</h1>
-        <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mb-7 max-w-md mx-auto">{t("checkout.empty.message")}</p>
+        <h1 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-3">{t("cart.empty")}</h1>
+        <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mb-8 max-w-md mx-auto">{t("checkout.empty.message")}</p>
         <button onClick={() => router.push("/")} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-7 py-3 rounded-xl text-sm font-black hover:opacity-90 active:scale-[0.98] transition">
           <ShoppingBag size={17} /> {t("checkout.startShopping")}
         </button>
@@ -1632,7 +1632,7 @@ function CheckoutContent() {
                 <Package size={36} className="text-[var(--user-accent)]" />
               </div>
               <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">{t("cart.empty")}</h2>
-              <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[17.5rem]">{t("checkout.empty.mobileMessage")}</p>
+              <p className="text-xs text-[var(--user-text-muted)] mb-10 max-w-[17.5rem]">{t("checkout.empty.mobileMessage")}</p>
               <button onClick={() => router.push("/")} className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
                 <ShoppingBag size={16} /> {t("checkout.startShopping")}
               </button>
