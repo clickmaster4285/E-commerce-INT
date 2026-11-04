@@ -8,7 +8,7 @@
      New Arrivals → sort=newest
      Best Offers  → sab se bari discount % (sort=discount-desc)
 
-   Har tab me 20 products ke server-side pages aur Load More button.
+   Har tab me 24 products ke server-side pages aur Load More button.
    ========================================================== */
 
 import { useEffect, useRef, useState } from "react";
@@ -28,7 +28,8 @@ const TABS = [
   { id: "offers", labelKey: "storefront.navigation.bestOffers", icon: Flame },
 ];
 
-const PER_PAGE = 20;
+// Keep the common 6-column desktop grid filled with complete rows.
+const PER_PAGE = 24;
 
 const TAB_PARAMS = {
   all: { sort: "newest" },
@@ -114,13 +115,7 @@ function TabGrid({ tab }) {
       </div>
 
       {currentPage < totalPages ? (
-        <div className="mt-8 flex flex-col items-center gap-3 border-t border-[var(--user-border)] pt-6">
-          <p className="text-[0.6875rem] font-medium text-[var(--user-text-muted)]">
-            {t("storefront.featured.showingCount", {
-              shown: displayedProducts.length.toLocaleString(),
-              total: total.toLocaleString(),
-            })}
-          </p>
+        <div className="mt-8 flex flex-col items-center gap-3 pt-6">
           <button
             type="button"
             onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
