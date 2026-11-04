@@ -316,7 +316,7 @@ export default function CartPage() {
 
   const handleRemove = (row) => {
     removeFromCart(row.key);
-    toast.success("Item removed", { action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
+    toast.success("Item deleted", { action: { label: "Undo", onClick: () => restoreItems([row.raw]) } });
   };
 
   const ItemRow = ({ row, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect }) => {
@@ -791,7 +791,10 @@ export default function CartPage() {
         <div className="flex items-center gap-2 px-3 h-12">
           <button
             type="button"
-            onClick={() => router.push("/")}
+            onClick={() => {
+              if (window.history.length > 1) router.back();
+              else router.push("/");
+            }}
             aria-label="Back"
             className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition active:scale-90"
           >

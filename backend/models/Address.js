@@ -16,6 +16,7 @@ const addressSchema = new mongoose.Schema(
     state: { type: String, required: true, trim: true },
     zip_code: { type: String, default: "", trim: true },
     phone: { type: String, required: true, trim: true },
+    delivery_instructions: { type: String, default: "", trim: true },
     is_default: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
