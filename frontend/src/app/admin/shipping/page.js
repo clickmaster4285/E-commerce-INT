@@ -436,12 +436,16 @@ export default function ShippingManagementPage() {
   });
 
   // ✅ Custom shipping methods (admin "Add New" wale)
-  const { data: methods = [] } = useQuery({
+  const { data: methods = [], isLoading: methodsLoading } = useQuery({
     queryKey: ["adminShippingMethods"],
     queryFn: shippingApi.getMethods,
     retry: false,
   });
-  usePageTranslations({ model: "ShippingMethod", records: methods, locale, ready: !isLoading, queryKey: ["adminShippingMethods"], queryClient });
+  const methodsAlreadyTranslated = locale === "en" || (methods.length > 0 && methods.every((method) => !method.name?.trim() || method.translations?.name?.[locale]?.trim()));
+  const methodTranslationsReady = usePageTranslations({ model: "ShippingMethod", records: methods, locale, ready: !methodsLoading, queryKey: ["adminShippingMethods"], queryClient, alreadyTranslated: methodsAlreadyTranslated, fallbackAfterRetries: true });
+  const translatableMethodCount = methods.filter((method) => method.name?.trim()).length;
+  const untranslatedMethodCount = methods.filter((method) => method.name?.trim() && !method.translations?.name?.[locale]?.trim()).length;
+  const showMethodTranslationSkeletons = locale !== "en" && translatableMethodCount > 0 && untranslatedMethodCount / translatableMethodCount >= 0.8 && !methodTranslationsReady;
   const shippingMethodName = (method) => localizedStrictField(method?.name, method?.translations?.name, locale);
 
   const configMutation = useMutation({
@@ -717,7 +721,7 @@ export default function ShippingManagementPage() {
                           <BoxIcon className="w-4 h-4" />
                         </div>
                         <span className="font-medium text-[13px]" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
-                          {shippingMethodName(m)}
+                          {showMethodTranslationSkeletons && m.name?.trim() && !m.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : shippingMethodName(m)}
                           {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                         </span>
                       </div>
@@ -822,7 +826,7 @@ export default function ShippingManagementPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate leading-tight" style={{ color: m.is_active ? "var(--text-primary)" : "var(--text-muted)" }}>
-                    {shippingMethodName(m)}
+                    {showMethodTranslationSkeletons && m.name?.trim() && !m.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : shippingMethodName(m)}
                     {!m.is_active && <span className="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-muted)" }}>{t("admin.shipping.page.inactive")}</span>}
                   </p>
                   <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{formatNumber(m.min_days)}-{formatNumber(m.max_days)} {t("admin.shipping.page.days")}</p>

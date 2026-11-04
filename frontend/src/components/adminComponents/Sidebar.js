@@ -17,6 +17,7 @@ import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
 import { slugKey } from "@/utils/slugKey";
 import { useTranslation } from "../../i18n/LanguageProvider";
+import adminHttp from "@/apis/axiosInstance";
 
 import {
   FolderOpen,
@@ -39,6 +40,7 @@ import {
   Star, // Added for Featured Products
   SlidersHorizontal, // Added for Attributes
   MessageSquareText, // Reviews
+  MessageCircle,
   ContactRound,
   FileText,
   Receipt,
@@ -111,7 +113,7 @@ const sidebarSections = [
   },
   {
     title: "OPERATIONS",
-    items: ["Manage Stock", "Orders", "Shipping"],
+    items: ["Manage Stock", "Orders", "Chats", "Shipping"],
   },
   {
     title: "PURCHASING",
@@ -161,6 +163,7 @@ const allMenuItems = [
   { name: "Banners", icon: ImageIcon, path: "/admin/banners", permissionKey: "banners" },
   { name: "Manage Stock", icon: Boxes, path: "/admin/manage-stock", permissionKey: "manageStock" },
   { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "order" },
+  { name: "Chats", icon: MessageCircle, path: "/admin/chats", permissionKey: "order" },
   { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
   { name: "Vendors", icon: Users, path: "/admin/vendors", permissionKey: "vendors" },
   { name: "Purchase Orders", icon: Package, path: "/admin/purchase-orders", permissionKey: "purchaseOrders" },
@@ -272,6 +275,7 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [unreadChats, setUnreadChats] = useState(0);
 
   // ============================================================
   // DESKTOP COLLAPSE STATE (persisted in localStorage)
@@ -464,6 +468,21 @@ export default function Sidebar({ onNavigate, userData }) {
       socket.off("authPermissionsUpdated", handlePermissionsUpdated);
     };
   }, [handleConnect, handleProfileData, handleProfileUpdated, handlePermissionsUpdated]);
+
+  useEffect(() => {
+    const role = String(socketRole || "").toLowerCase();
+    if (!(["admin", "manager", "staff"].includes(role)) || (role !== "admin" && socketPermissions?.order === false)) return undefined;
+    const socket = getSidebarSocket();
+    const refresh = () => {
+      adminHttp.get("/chats/admin/unread-count").then((response) => setUnreadChats(Number(response.data?.data?.count) || 0)).catch(() => {});
+      socket.emit("chat:inbox:join", (response) => { if (response?.success) setUnreadChats(Number(response.data?.count) || 0); });
+    };
+    const onCount = (payload) => setUnreadChats(Number(payload?.count) || 0);
+    socket.on("connect", refresh);
+    socket.on("chat:unread-count", onCount);
+    if (socket.connected) refresh();
+    return () => { socket.off("connect", refresh); socket.off("chat:unread-count", onCount); };
+  }, [socketRole, socketPermissions]);
 
   // ============================================================
   // I18N (admin only)
@@ -819,7 +838,12 @@ export default function Sidebar({ onNavigate, userData }) {
                               : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"
                           }`}
                         />
-                        {!iconOnly && <span className="truncate">{navLabel("item", item.name)}</span>}
+                        {!iconOnly && <span className="min-w-0 flex-1 truncate">{navLabel("item", item.name)}</span>}
+                        {item.name === "Chats" && ["admin", "manager", "staff"].includes(String(socketRole || "").toLowerCase()) && (String(socketRole || "").toLowerCase() === "admin" || socketPermissions?.order !== false) && unreadChats > 0 && (
+                          <span className={`flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ${iconOnly ? "absolute -right-0.5 -top-0.5" : "ml-auto"}`}>
+                            {unreadChats > 99 ? "99+" : unreadChats}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}

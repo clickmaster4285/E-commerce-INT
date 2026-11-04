@@ -9,6 +9,7 @@ const {
   getDeals,
   getActiveDeals,
   getDealById,
+  getDealTargets,
   getActiveDealById, // ✅ NEW
   updateDeal,
   deleteDeal,
@@ -38,6 +39,7 @@ router.post(
 );
 
 router.get("/", authMiddleware, checkPermission("deals"), getDeals);
+router.get("/:id/targets", authMiddleware, checkPermission("deals"), getDealTargets);
 router.get("/:id", authMiddleware, checkPermission("deals"), getDealById);
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
 const dropDealsCache = (req, res, next) => { invalidate("deals"); next(); };
@@ -50,4 +52,4 @@ router.use((req, res) => {
   res.status(404).json({ success: false, message: `Deal API endpoint not found: ${req.method} ${req.originalUrl}` });
 });
 
-module.exports = router;  
+module.exports = router;

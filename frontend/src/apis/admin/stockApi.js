@@ -34,15 +34,17 @@ export const stockApi = {
   // Variant-level stock items (quantity/min_qnt/max_qnt reuse)
   getAll: () => adminHttp.get("/stock").then(list),
 
-  getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all" } = {}) => {
+  getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all", locale } = {}) => {
     const params = { page, limit };
+    if (locale) params.locale = locale;
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     return adminHttp.get("/stock", { params }).then((res) => paginated(res, limit));
   },
 
-  getHistoryPaginated: ({ page = 1, limit = 20, variantId = "" } = {}) => {
+  getHistoryPaginated: ({ page = 1, limit = 20, variantId = "", locale } = {}) => {
     const params = { page, limit };
+    if (locale) params.locale = locale;
     if (variantId) params.variant_id = variantId;
     return adminHttp.get("/stock/history", { params }).then((res) => paginated(res, limit));
   },

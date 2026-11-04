@@ -1,5 +1,5 @@
 const express = require("express");
-const { getPosProducts, getPosSales, getPosSaleById, createPosSale, updatePosSale, getCustomerPosHistory, returnPosSaleItems } = require("../controllers/posController");
+const { getPosProducts, getPosSales, getPosSaleById, getPosReturns, createPosSale, updatePosSale, getCustomerPosHistory, returnPosSaleItems } = require("../controllers/posController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
 
@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.get("/products", authMiddleware, checkPermission("pos"), getPosProducts);
 router.get("/sales", authMiddleware, checkPermission("pos"), getPosSales);
+router.get("/returns", authMiddleware, checkPermission("pos"), getPosReturns);
 router.get("/sales/:id", authMiddleware, checkPermission("pos"), getPosSaleById);
 router.get("/customers/:customerId/history", authMiddleware, checkPermission("pos"), getCustomerPosHistory);
 router.post("/sales", authMiddleware, checkPermission("pos"), createPosSale);

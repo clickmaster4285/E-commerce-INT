@@ -12,12 +12,14 @@ import {
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { employeeDepartmentLabel, employeeLocaleTag } from "@/i18n/localize";
+import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { localizedStrictField } from "@/i18n/localize";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
 import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
 
-const ITEMS_PER_PAGE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];
 
 // ==========================================
@@ -220,6 +222,7 @@ export default function EmployeesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
   const [selectedIds, setSelectedIds] = useState([]);
   const [actionMenu, setActionMenu] = useState(null); 
@@ -290,20 +293,19 @@ export default function EmployeesPage() {
 
   // ✅ Server-side pagination for employees
   const { data: paginatedEmployeesData, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["employees", "paginated", currentPage, debouncedSearch, filterStatus],
-    queryFn: () => employeeApi.getAllPaginated({ page: currentPage, limit: ITEMS_PER_PAGE, search: debouncedSearch, status: filterStatus === "all" ? "" : filterStatus, department: "" }),
+    queryKey: ["employees", "paginated", locale, currentPage, pageSize, debouncedSearch, filterStatus],
+    queryFn: () => employeeApi.getAllPaginated({ page: currentPage, limit: pageSize, search: debouncedSearch, status: filterStatus === "all" ? "" : filterStatus, department: "", locale }),
     staleTime: 60 * 1000,
     retry: 2,
   });
   const employees = paginatedEmployeesData?.items || paginatedEmployeesData || normalizeArrayResponse(paginatedEmployeesData);
-  const pagination = paginatedEmployeesData?.pagination || { total: employees.length, page: currentPage, limit: ITEMS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
-
-  const staffEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      const role = emp.userId?.role || emp.role;
-      return role === "staff" || !emp.userId;
-    });
-  }, [employees]);
+  const pageAlreadyTranslated = locale === "en" || (employees.length > 0 && employees.every((emp) => !emp.name?.trim() || Boolean(emp.translations?.name?.[locale]?.trim())));
+  const employeeTranslationsReady = usePageTranslations({ model: "Employee", records: employees, locale, ready: !isLoading, queryKey: ["employees", "paginated", locale, currentPage, pageSize, debouncedSearch, filterStatus], queryClient, alreadyTranslated: pageAlreadyTranslated, fallbackAfterRetries: true });
+  const translatedEmployeeCount = employees.filter((emp) => Boolean(emp.translations?.name?.[locale]?.trim())).length;
+  const employeePageMostlyUntranslated = locale !== "en" && employees.length > 0 && translatedEmployeeCount / employees.length <= 0.2;
+  const hasEmployeeNameTranslation = (emp) => locale === "en" || employeeTranslationsReady || !employeePageMostlyUntranslated || Boolean(emp.translations?.name?.[locale]?.trim());
+  const pagination = paginatedEmployeesData?.pagination || { total: employees.length, page: currentPage, limit: pageSize, pages: 1, hasNext: false, hasPrev: false };
+  const employeeSummary = paginatedEmployeesData?.summary || { total: pagination.total, active: 0, inactive: 0 };
 
   const createMutation = useMutation({
     mutationFn: employeeSocketApi.create,
@@ -760,9 +762,9 @@ export default function EmployeesPage() {
       {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {[
-          { label: t("admin.employees.page.total"), value: staffEmployees.length, color: "var(--text-primary)" },
-          { label: t("admin.employees.page.active"), value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "active").length, color: "var(--success-text)" },
-          { label: t("admin.employees.page.inactive"), value: staffEmployees.filter((e) => (e.userId?.status || e.status) === "inactive").length, color: "var(--danger-text)" },
+          { label: t("admin.employees.page.total"), value: employeeSummary.total, color: "var(--text-primary)" },
+          { label: t("admin.employees.page.active"), value: employeeSummary.active, color: "var(--success-text)" },
+          { label: t("admin.employees.page.inactive"), value: employeeSummary.inactive, color: "var(--danger-text)" },
         ].map((stat, idx) => (
           <div key={idx} className="rounded-lg px-4 py-3" style={cardStyle}>
             <p className="text-[11px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
@@ -965,16 +967,17 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {pagination.total > ITEMS_PER_PAGE && (
+      {pagination.total > pageSize && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
           <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
             {t("admin.employees.page.showingRange", {
-              from: new Intl.NumberFormat(employeeLocaleTag(locale)).format((currentPage - 1) * ITEMS_PER_PAGE + 1),
-              to: new Intl.NumberFormat(employeeLocaleTag(locale)).format(Math.min(currentPage * ITEMS_PER_PAGE, pagination.total || employees.length)),
+              from: new Intl.NumberFormat(employeeLocaleTag(locale)).format((currentPage - 1) * pageSize + 1),
+              to: new Intl.NumberFormat(employeeLocaleTag(locale)).format(Math.min(currentPage * pageSize, pagination.total || employees.length)),
               total: new Intl.NumberFormat(employeeLocaleTag(locale)).format(pagination.total || employees.length),
             })}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setCurrentPage(1); }} className="h-9 rounded-lg border px-2 text-sm" style={{ background: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label>
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -989,6 +992,7 @@ export default function EmployeesPage() {
                 total: new Intl.NumberFormat(employeeLocaleTag(locale)).format(totalPages),
               })}
             </span>
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => Math.min(Math.max(1, currentPage - 2), Math.max(1, totalPages - 4)) + index).map((pageNumber) => <button key={pageNumber} type="button" aria-current={pageNumber === currentPage ? "page" : undefined} onClick={() => setCurrentPage(pageNumber)} className="h-9 min-w-9 rounded-md border px-2 text-sm font-medium" style={{ background: pageNumber === currentPage ? "var(--accent)" : "var(--bg-tertiary)", color: pageNumber === currentPage ? "var(--accent-text)" : "var(--text-primary)", borderColor: pageNumber === currentPage ? "var(--accent)" : "var(--border-color)" }}>{pageNumber}</button>)}
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}

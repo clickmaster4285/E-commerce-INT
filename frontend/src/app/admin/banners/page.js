@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import adminHttp from "../../../apis/axiosInstance";
 import useBannerSocketSync from "../../../hooks/admin/useBannerSocket";
+import bannerAPI from "../../../apis/admin/bannerApi";
 import { dealApi } from "../../../apis/admin/dealApi";
 import { DealFormModal, SelectionModal } from "../deals/_components/dealModals";
 import { productApi } from "../../../apis/admin/productApi";
@@ -41,17 +42,20 @@ const normalizeArrayResponse = (response) => {
   return [];
 };
 
+// ✅ Server-side pagination must include pagination metadata; never fall back to
+// rendering an unbounded legacy response in the admin banner list.
+// (adminBrandApi.getAllPaginated ka exact pattern)
 const paginated = (res, fallbackLimit) => {
   const d = res?.data;
-  if (Array.isArray(d)) {
-    return {
-      items: d,
-      pagination: { total: d.length, page: 1, limit: d.length || 1, pages: 1, hasNext: false, hasPrev: false },
-    };
+  if (!Array.isArray(d?.data) || !d?.pagination) {
+    throw new Error("Banner list API did not return server-side pagination data.");
   }
   return {
-    items: Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : [],
-    pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+    items: d.data,
+    counts: d?.counts || { total: 0, active: 0, inactive: 0, scheduled: 0, expired: 0, draft: 0 },
+    bannerTypes: Array.isArray(d?.bannerTypes) ? d.bannerTypes : [],
+    positions: Array.isArray(d?.positions) ? d.positions : [],
+    pagination: d.pagination,
   };
 };
 
@@ -61,13 +65,17 @@ const adminBannerApi = {
     return res.data.data || [];
   },
 
-  getAllPaginated: async ({ page = 1, limit = 20, search = "", status = "all", bannerType = "all" } = {}) => {
-    const params = { page, limit };
+  // ✅ Server side pagination — page/limit/search/status/bannerType + sorting + locale
+  getAllPaginated: ({ page = 1, limit = 20, search = "", status = "all", bannerType = "all", sort = "", order = "", locale = "en" } = {}) => {
+    const params = { page, limit, locale };
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (bannerType && bannerType !== "all") params.bannerType = bannerType;
-    const res = await adminHttp.get("/banners", { params });
-    return paginated(res, limit);
+    if (sort) {
+      params.sort = sort;
+      params.order = order || "asc";
+    }
+    return adminHttp.get("/banners", { params }).then((res) => paginated(res, limit));
   },
   create: async (data) => {
     const res = await adminHttp.post("/banners", data, {
@@ -487,6 +495,7 @@ export default function BannersPage() {
   const { markSelfAction } = useBannerSocketSync();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [viewMode, setViewMode] = useState(() => {
@@ -502,8 +511,13 @@ export default function BannersPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [actionMenu, setActionMenu] = useState(null); // { id, top, left }
   const [currentPage, setCurrentPage] = useState(1);
-  
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  // ✅ Brand pagination jaisa number formatting (locale-aware, no grouping)
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat(locale, { useGrouping: false }),
+    [locale]
+  );
+  const formatPageNumber = (value) => numberFormatter.format(value);
 
   const defaultForm = {
     title: "", bannerType: "homepage_hero", position: 1,
@@ -518,23 +532,53 @@ export default function BannersPage() {
   const [positionDuplicate, setPositionDuplicate] = useState("");
 
   // --- React Query ---
-  const bannersQueryKey = ["adminBanners", "paginated", currentPage, search, filterStatus, filterType];
-  const { data: paginatedBannersData, isLoading: loading, isFetching } = useQuery({
+  // ✅ Server-side pagination — search/filter/sort/page sab backend par jate hain
+  // (brands page ka exact pattern)
+  const bannersQueryKey = ["adminBanners", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, filterStatus, filterType, sortConfig.key, sortConfig.direction];
+  const { data: paginatedBannersData, isLoading: loading, isFetching, isError, error } = useQuery({
     queryKey: bannersQueryKey,
-    queryFn: () => adminBannerApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search, status: filterStatus === "all" ? "" : filterStatus, bannerType: filterType === "all" ? "" : filterType }),
+    queryFn: () => adminBannerApi.getAllPaginated({
+      page: currentPage,
+      limit: itemsPerPage,
+      search: debouncedSearch,
+      status: filterStatus,
+      bannerType: filterType,
+      sort: sortConfig.key || "",
+      order: sortConfig.direction,
+      locale,
+    }),
     retry: false,
   });
-  const banners = paginatedBannersData?.items || paginatedBannersData || normalizeArrayResponse(paginatedBannersData);
-  const pagination = paginatedBannersData?.pagination || { total: banners.length, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
-  usePageTranslations({ model: "Banner", records: banners, locale, ready: !isFetching && pagination.page === currentPage, queryKey: bannersQueryKey, queryClient });
+  useEffect(() => {
+    if (isError && error) {
+      const msg = error.message || "";
+      const isPermission = msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied") || msg.toLowerCase().includes("403");
+      toast.error(isPermission ? msg : t("admin.shared.state.error"), { duration: 6000 });
+    }
+  }, [isError, error, t]);
 
-  // Smallest available positive position (must be after banners is defined)
+  // ✅ Sirf current page ke banners aate hain backend se (server paginated)
+  const banners = Array.isArray(paginatedBannersData?.items) ? paginatedBannersData.items : [];
+  const bannerCounts = paginatedBannersData?.counts || { total: 0, active: 0, inactive: 0, scheduled: 0, expired: 0, draft: 0 };
+  const bannerTypes = Array.isArray(paginatedBannersData?.bannerTypes) ? paginatedBannersData.bannerTypes : [];
+  const usedPositions = Array.isArray(paginatedBannersData?.positions) ? paginatedBannersData.positions : [];
+  const pagination = paginatedBannersData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
+  const bannersAlreadyTranslated = locale === "en" || (banners.length > 0 && banners.every((banner) => typeof banner.translations?.title?.[locale] === "string" && banner.translations.title[locale].trim()));
+  const bannerTranslationsReady = usePageTranslations({ model: "Banner", records: banners, locale, ready: !isFetching && pagination.page === currentPage, queryKey: bannersQueryKey, queryClient, alreadyTranslated: bannersAlreadyTranslated, fallbackAfterRetries: true });
+  const untranslatedBannerTitleCount = banners.filter((banner) => !banner?.translations?.title?.[locale]?.trim()).length;
+  const showBannerTranslationSkeletons = locale !== "en" && banners.length > 0 && untranslatedBannerTitleCount / banners.length >= 0.8 && !bannerTranslationsReady;
+
+  // ✅ Server di hui poori-collection positions list (paginated page ka current
+  // page par depend karne ke bajaye) — pos duplicate check aur next-free-pos
+  // ab hamesha complete hoga (brand ke server-side "countries" meta ka pattern)
+  const positionSet = useMemo(() => new Set(usedPositions), [usedPositions]);
+
+  // Smallest available positive position (must be after positions is defined)
   const getNextPosition = useCallback(() => {
-    const used = new Set(banners.map((b) => b.position).filter((p) => Number.isInteger(p) && p >= 1));
     let pos = 1;
-    while (used.has(pos)) pos++;
+    while (positionSet.has(pos)) pos++;
     return pos;
-  }, [banners]);
+  }, [positionSet]);
 
   const resetForm = () => {
     setForm({ ...defaultForm, position: getNextPosition() });
@@ -549,13 +593,18 @@ export default function BannersPage() {
       setPositionDuplicate(n < 1 && n !== "" ? "Position must be 1 or greater" : "");
       return;
     }
-    const match = banners.find((b) => b.position === n && b._id !== excludeId);
-    if (match) {
-      setPositionDuplicate(`Position ${n} is already used by "${match.title}". Please choose another position.`);
+    const onPageMatch = banners.find((b) => b.position === n && b._id !== excludeId);
+    // Edit hone wala banner current page par na ho to uski apni stored position
+    // exclude karo (warna apni hi position ko duplicate samajh leta)
+    const isOwnStoredPosition = excludeId != null && Number(editingBanner?.position) === n;
+    if (onPageMatch) {
+      setPositionDuplicate(`Position ${n} is already used by "${onPageMatch.title}". Please choose another position.`);
+    } else if (positionSet.has(n) && !isOwnStoredPosition) {
+      setPositionDuplicate(`Position ${n} is already in use. Please choose another position.`);
     } else {
       setPositionDuplicate("");
     }
-  }, [banners]);
+  }, [banners, positionSet, editingBanner]);
 
   const { data: deals = [] } = useQuery({
     queryKey: ["banner-deal-options"],
@@ -606,35 +655,33 @@ export default function BannersPage() {
     onError: (error) => toast.error(error.response?.data?.message || error.message || t("admin.banners.toast.statusFailed")),
   });
 
-  // --- Derived Data ---
-  const filteredBanners = useMemo(() => {
-    return banners.filter((b) => {
-      const matchSearch = b.title?.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = filterStatus === "all" || b.status === filterStatus;
-      const matchType = filterType === "all" || b.bannerType === filterType;
-      return matchSearch && matchStatus && matchType;
-    });
-  }, [banners, search, filterStatus, filterType]);
+  // ✅ Type filter — server se aaye distinct bannerTypes (brand ka countries pattern)
+  const bannerTypeLabels = {
+    homepage_hero: t("admin.promotions.ui.generated.59b57435cfd9"),
+    promotional: t("admin.promotions.ui.generated.6cde26a45732"),
+    product: t("common.product"),
+    collection: t("admin.promotions.ui.generated.2037de437c80"),
+    popup: t("admin.promotions.ui.generated.3b6fb9033a83"),
+  };
 
-  const sortedBanners = useMemo(() => {
-    const arr = [...filteredBanners];
-    if (!sortConfig.key) return arr;
-    arr.sort((a, b) => {
-      let va = a[sortConfig.key], vb = b[sortConfig.key];
-      if (typeof va === "string") { va = va.toLowerCase(); vb = vb.toLowerCase(); }
-      if (va < vb) return sortConfig.direction === "asc" ? -1 : 1;
-      if (va > vb) return sortConfig.direction === "asc" ? 1 : -1;
-      return 0;
-    });
-    return arr;
-  }, [filteredBanners, sortConfig]);
-
-  const paginatedBanners = banners; // server paginated; no client .slice()
+  // --- Derived Data (server side paginated — no client filter/sort) ---
+  const paginatedBanners = banners;                                  // current page (server se)
+  const totalBanners = pagination.total || 0;                        // filtered total
   const totalPages = pagination.pages || 1;
-  const totalBanners = pagination.total || banners.length;
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const displayedPage = pagination.page || currentPage;
+  const startIndex = totalBanners > 0 ? (displayedPage - 1) * pagination.limit + 1 : 0;
+  const endIndex = Math.min(displayedPage * pagination.limit, totalBanners);
 
-  useEffect(() => { setCurrentPage(1); }, [search, filterStatus, filterType]);
+  // ✅ Search debounce (300ms) + page reset + selection clear
+  // (brands page ka exact pattern)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+      setSelectedIds([]);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   useEffect(() => {
     if (!actionMenu) return;
     const close = () => setActionMenu(null);
@@ -815,13 +862,13 @@ export default function BannersPage() {
   const { data: brandsResponse = [] } = useQuery({ queryKey: ["admin-brands-list"], queryFn: brandApi.getAll, staleTime: 60000 });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
-  const stats = useMemo(() => ({
-    total: banners.length,
-    active: banners.filter(b => b.status === "active").length,
-    scheduled: banners.filter(b => b.status === "scheduled").length,
-    expired: banners.filter(b => b.status === "expired").length,
-    draft: banners.filter(b => b.status === "draft").length,
-  }), [banners]);
+  // ✅ Stats server counts se (poore filtered collection ke — sirf current page
+  // ke nahi) — getBrandsAdmin.counts ka exact pattern
+  const allBanners = bannerCounts.total || 0;
+  const activeBanners = bannerCounts.active || 0;
+  const scheduledBanners = bannerCounts.scheduled || 0;
+  const expiredBanners = bannerCounts.expired || 0;
+  const draftBanners = bannerCounts.draft || 0;
 
   const allSelected = paginatedBanners.length > 0 && paginatedBanners.every((b) => selectedIds.includes(b._id));
   const toggleSelectAll = () => setSelectedIds(allSelected ? [] : paginatedBanners.map((b) => b._id));
@@ -985,17 +1032,28 @@ export default function BannersPage() {
   const handleOpenAdd = () => { resetForm(); setShowModal(true); };
 
   // ✅ Deep-link support: /admin/banners?edit=<id> opens the existing edit modal
-  // (navigated from the Banner Details page "Edit" action)
+  // (navigated from the Banner Details page "Edit" action).
+  // Server-side pagination ke baad target banner current page par ho hi sakta hai —
+  // is liye record ko by-id fetch karte hain (slim detail response me edit form
+  // fields maujood hain).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const editId = new URLSearchParams(window.location.search).get("edit");
-    if (!editId || !Array.isArray(banners) || banners.length === 0) return;
-    const target = banners.find((b) => b?._id === editId);
-    if (!target) return;
-    handleEdit(target);
-    window.history.replaceState({}, "", "/admin/banners");
+    if (!editId) return;
+    let cancelled = false;
+    bannerAPI.get(editId, locale)
+      .then((res) => {
+        if (cancelled) return;
+        const target = res?.data?.data || res?.data || null;
+        if (target?._id) {
+          handleEdit(target);
+          window.history.replaceState({}, "", "/admin/banners");
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [banners]);
+  }, []);
 
   const handleToggleStatus = (banner) => {
     const id = banner?._id;
@@ -1010,7 +1068,17 @@ export default function BannersPage() {
   };
   
   const handleSort = (key) => {
+    // ✅ Server side sorting — sort badalne par pehle page par wapas (brands ka pattern)
     setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    setCurrentPage(1);
+    setSelectedIds([]);
+  };
+
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages && page !== displayedPage) {
+      setCurrentPage(page);
+      setSelectedIds([]); // ✅ cross-page selection clear
+    }
   };
 
   const updateForm = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
@@ -1137,9 +1205,9 @@ export default function BannersPage() {
     const pages = [];
     if (totalPages <= 5) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
     else {
-      if (currentPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
-      else if (currentPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-      else pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      if (displayedPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
+      else if (displayedPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      else pages.push(1, "...", displayedPage - 1, displayedPage, displayedPage + 1, "...", totalPages);
     }
     return pages;
   };
@@ -1167,11 +1235,11 @@ export default function BannersPage() {
         {/* ===== Stat Cards ===== */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
-            { label: t("admin.promotions.ui.generated.299c3da20015"), value: stats.total, color: "var(--text-primary)" },
-            { label: t("admin.banners.page.active"), value: stats.active, color: "var(--success-text)" },
-            { label: t("admin.promotions.ui.generated.e891e3709fb4"), value: stats.scheduled, color: "var(--info-text)" },
-            { label: t("admin.shared.status.expired"), value: stats.expired, color: "var(--text-muted)" },
-            { label: t("admin.shared.status.draft"), value: stats.draft, color: "var(--warning-text)" },
+            { label: t("admin.promotions.ui.generated.299c3da20015"), value: allBanners, color: "var(--text-primary)" },
+            { label: t("admin.banners.page.active"), value: activeBanners, color: "var(--success-text)" },
+            { label: t("admin.promotions.ui.generated.e891e3709fb4"), value: scheduledBanners, color: "var(--info-text)" },
+            { label: t("admin.shared.status.expired"), value: expiredBanners, color: "var(--text-muted)" },
+            { label: t("admin.shared.status.draft"), value: draftBanners, color: "var(--warning-text)" },
           ].map((stat, i) => (
             <div key={i} className="rounded-lg p-4" style={cardStyle}>
               <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{stat.label}</p>
@@ -1200,18 +1268,17 @@ export default function BannersPage() {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <SelectFilter value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <SelectFilter value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
               <option value="all">{t("admin.attributes.filter.allStatus")}</option>
               <option value="active">{t("admin.banners.page.active")}</option>
               <option value="inactive">{t("common.inactive")}</option>
               <option value="expired">{t("admin.shared.status.expired")}</option>
             </SelectFilter>
-            <SelectFilter value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <SelectFilter value={filterType} onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); setSelectedIds([]); }}>
               <option value="all">{t("admin.promotions.ui.generated.5afd80c9916f")}</option>
-              <option value="homepage_hero">{t("admin.promotions.ui.generated.59b57435cfd9")}</option>
-              <option value="promotional">{t("admin.promotions.ui.generated.6cde26a45732")}</option>
-              <option value="product">{t("common.product")}</option>
-              <option value="collection">{t("admin.promotions.ui.generated.2037de437c80")}</option>
+              {bannerTypes.map((type) => (
+                <option key={type} value={type}>{bannerTypeLabels[type] || type.replace("_", " ")}</option>
+              ))}
             </SelectFilter>
           </div>
         </div>
@@ -1258,8 +1325,8 @@ export default function BannersPage() {
           )
         ) : paginatedBanners.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center gap-3" style={cardStyle}>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" ? t("admin.banners.page.noMatch") : t("admin.banners.page.noBannerYet")}</p>
-            {!search && filterStatus === "all" && (
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>{search || filterStatus !== "all" || filterType !== "all" ? t("admin.banners.page.noMatch") : t("admin.banners.page.noBannerYet")}</p>
+            {!search && filterStatus === "all" && filterType === "all" && (
               <button onClick={handleOpenAdd} className="h-9 px-4 rounded-lg text-sm font-semibold transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>+ {t("admin.banners.page.addFirst")}</button>
             )}
           </div>
@@ -1295,7 +1362,7 @@ export default function BannersPage() {
                         <td className="px-4 py-2.5">
                           <FallbackImage src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-[13px]">{contentOf(banner.title, banner.translations?.title)}</td>
+                        <td className="px-4 py-2.5 font-medium text-[13px]">{showBannerTranslationSkeletons && !banner?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} /> : contentOf(banner.title, banner.translations?.title)}</td>
                         <td className="px-4 py-2.5 capitalize text-[13px]" style={{ color: "var(--text-secondary)" }}>{banner.bannerType.replace("_", " ")}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={banner.status} /></td>
                         <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>
@@ -1319,7 +1386,7 @@ export default function BannersPage() {
                 <FallbackImage src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
                 <div className="flex items-start justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[13px] truncate">{contentOf(banner.title, banner.translations?.title)}</p>
+                    <p className="font-semibold text-[13px] truncate">{showBannerTranslationSkeletons && !banner?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} /> : contentOf(banner.title, banner.translations?.title)}</p>
                     <p className="text-[11px] capitalize mt-0.5" style={{ color: "var(--text-muted)" }}>{banner.bannerType.replace("_", " ")}</p>
                   </div>
                   <StatusBadge status={banner.status} />
@@ -1333,24 +1400,53 @@ export default function BannersPage() {
           </div>
         )}
 
-        {/* ===== Pagination ===== */}
-        {totalBanners > itemsPerPage && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{startIndex + 1}-{Math.min(startIndex + itemsPerPage, totalBanners)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{totalBanners}{" "}{t("admin.nav.item.banners")}</p>
+        {/* ===== Server-side pagination — brands admin list ka exact pattern ===== */}
+        {totalBanners > 10 && (
+          <div className="flex flex-col xl:flex-row items-center justify-between gap-3 rounded-lg p-4" style={cardStyle}>
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>
+                {t("admin.shared.pagination.showingRange", { from: formatPageNumber(startIndex), to: formatPageNumber(endIndex), total: formatPageNumber(totalBanners) })}
+                {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}
+              </p>
+              <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(event) => {
+                    setItemsPerPage(Number(event.target.value));
+                    setCurrentPage(1);
+                    setSelectedIds([]);
+                  }}
+                  className="h-9 w-[100px] rounded-lg px-3 text-[13px] outline-none cursor-pointer"
+                  style={inputStyle}
+                >
+                  {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                </select>
+              </label>
+            </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon className="w-4 h-4" /></button>
-              <div className="flex items-center gap-1">
+              <button onClick={() => goToPage(displayedPage - 1)} disabled={displayedPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.prev")} aria-label={t("admin.shared.pagination.prev")}><ChevronLeftIcon className="w-4 h-4" /></button>
+              <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
-                      <button onClick={() => setCurrentPage(page)} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
+                      <button onClick={() => goToPage(page)} disabled={isFetching && displayedPage !== page} aria-label={t("admin.brands.ui.goToPage", { page: formatPageNumber(page) })} aria-current={displayedPage === page ? "page" : undefined} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: displayedPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: displayedPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${displayedPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{formatPageNumber(page)}</button>
                     )}
                   </React.Fragment>
                 ))}
-              </div>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon className="w-4 h-4" /></button>
+              </span>
+              <span className="sm:hidden text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                {t("admin.shared.pagination.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}
+              </span>
+              <button onClick={() => goToPage(displayedPage + 1)} disabled={displayedPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.shared.pagination.next")} aria-label={t("admin.shared.pagination.next")}><ChevronRightIcon className="w-4 h-4" /></button>
             </div>
           </div>
+        )}
+        {paginatedBanners.length > 0 && totalBanners <= 10 && (
+          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            {t("admin.shared.pagination.showingCount", { count: formatPageNumber(paginatedBanners.length), total: formatPageNumber(totalBanners) })}
+            {isFetching && !loading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}
+          </p>
         )}
 
         {/* ===== PROFESSIONAL MODAL FORM ===== */}

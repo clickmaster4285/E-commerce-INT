@@ -63,8 +63,7 @@ router.get("/public", publicCache(60 * 1000), async (req, res) => {
 
 // ==========================================
 // ✅ FIX: /admin/all route — global mode (no tenant_id filter)
-// ✅ Server-side pagination: jab `page` / `limit` query param bheja jata hai to
-// sirf us page ke categories return hote hain (+ counts / options / pagination).
+// ✅ Server-side pagination: only the requested page of category rows is returned.
 // Bina param ke purana FULL list response hi milta hai, kyunke products page
 // aur categories [id] page isi par depend karte hain.
 // ==========================================
@@ -82,12 +81,82 @@ const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$
 // Inke bina projection ke category ka Urdu/Arabic text kabhi frontend tak
 // pohnchta hi nahi (silent fallback to English).
 const CATEGORY_LIST_SELECT =
-  "name category_code description parent_category_id category_type is_active attributes sort_order created_at translations translation_source translation_status";
+  "name category_code description parent_category_id category_type is_active sort_order translations";
 
 // Populated attribute ke liye bhi — attribute ka `name` translate hota hai,
 // aur options ke labels `values[].label_translations` me hote hain.
 const ATTRIBUTE_POPULATE_SELECT =
-  "name code description data_type values variant_allowed is_active translations translation_source translation_status";
+  "name code description data_type values variant_allowed is_active translations";
+
+const selectedLocale = (value) => {
+  const locale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(locale) ? locale : "en";
+};
+
+const categoryListItem = (category, locale) => {
+  const translatedName = locale === "en" ? "" : category.translations?.name?.[locale];
+  const translatedDescription = locale === "en" ? "" : category.translations?.description?.[locale];
+  const parentDoc = category.parent_category_id && typeof category.parent_category_id === "object"
+    ? category.parent_category_id
+    : null;
+  const parent = parentDoc ? {
+    _id: parentDoc._id,
+    name: parentDoc.name,
+    category_code: parentDoc.category_code,
+    ...(locale !== "en" && {
+      translations: {
+        name: parentDoc.translations?.name?.[locale]
+          ? { [locale]: parentDoc.translations.name[locale] }
+          : {},
+      },
+    }),
+  } : category.parent_category_id;
+  return {
+    _id: category._id,
+    name: category.name,
+    category_code: category.category_code,
+    description: category.description,
+    ...(locale !== "en" && {
+      translations: {
+        name: translatedName ? { [locale]: translatedName } : {},
+        description: translatedDescription ? { [locale]: translatedDescription } : {},
+      },
+    }),
+    parent_category_id: parent,
+    category_type: category.category_type,
+    is_active: category.is_active,
+    sort_order: category.sort_order,
+  };
+};
+
+// Parent selectors load this compact collection only when needed. It is never
+// repeated in every paginated category response.
+router.get("/admin/options", authMiddleware, checkPermission("products"), async (req, res) => {
+  try {
+    const locale = selectedLocale(req.query.locale);
+    const categories = await Category.find({ is_deleted: false })
+      .select("name category_code parent_category_id translations")
+      .sort({ sort_order: 1, name: 1 })
+      .lean();
+    const data = categories.map((category) => ({
+      _id: category._id,
+      name: category.name,
+      category_code: category.category_code,
+      parent_category_id: category.parent_category_id,
+      ...(locale !== "en" && {
+        translations: {
+          name: category.translations?.name?.[locale]
+            ? { [locale]: category.translations.name[locale] }
+            : {},
+        },
+      }),
+    }));
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    log.error("Error fetching category options:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch category options" });
+  }
+});
 
 router.get("/admin/all", authMiddleware, async (req, res) => {
   try {
@@ -110,8 +179,9 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
     }
 
     /* ---------- SERVER SIDE PAGINATION ---------- */
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const locale = selectedLocale(req.query.locale);
 
     const search = String(req.query.search || "").trim();
     const parent = String(req.query.parent || "all").trim().toLowerCase();
@@ -138,39 +208,33 @@ router.get("/admin/all", authMiddleware, async (req, res) => {
       : (rawOrder === "asc" ? 1 : -1);
 
     const activeFilter = { is_deleted: false };
-
-    const [total, items, totalCategories, rootCategories, withAttributes, options] =
-      await Promise.all([
-        Category.countDocuments(filter),
-        Category.find(filter)
-          .select(CATEGORY_LIST_SELECT)
-          .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
-          .sort({ [sortField]: sortOrder, _id: 1 })
-          .skip((page - 1) * limit)
-          .limit(limit)
-          .lean(),
-        Category.countDocuments(activeFilter),
-        Category.countDocuments({ ...activeFilter, parent_category_id: null }),
-        Category.countDocuments({ ...activeFilter, "attributes.0": { $exists: true } }),
-        // ✅ Parent dropdown / parent name resolution ke liye lightweight full list
-        Category.find(activeFilter)
-          .select("name category_code parent_category_id translations")
-          .sort({ sort_order: 1, name: 1 })
-          .lean(),
-      ]);
-
+    const total = await Category.countDocuments(filter);
     const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+
+    const [items, totalCategories, rootCategories, withAttributes] = await Promise.all([
+      Category.find(filter)
+        .select(CATEGORY_LIST_SELECT)
+        .populate("parent_category_id", "name category_code translations")
+        .sort({ [sortField]: sortOrder, _id: 1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Category.countDocuments(activeFilter),
+      Category.countDocuments({ ...activeFilter, parent_category_id: null }),
+      Category.countDocuments({ ...activeFilter, "attributes.0": { $exists: true } }),
+    ]);
+    const pageItems = items.map((item) => categoryListItem(item, locale));
 
     res.status(200).json({
       success: true,
-      data: items,
+      data: pageItems,
       counts: {
         total: totalCategories,
         root: rootCategories,
         child: Math.max(0, totalCategories - rootCategories),
         withAttributes,
       },
-      options,
       pagination: {
         total,
         page,

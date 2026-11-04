@@ -55,6 +55,11 @@ const TRANSLATABLE_FIELDS = {
   PurchaseOrder: ["notes", "cancel_reason"],
   Vendor: ["name", "company_name", "address", "city", "state", "country"],
   ShippingMethod: ["name"],
+  Customer: ["name", "address"],
+  Lead: ["name", "company_name"],
+  Quote: ["customer_name"],
+  Invoice: ["customer_name"],
+  Employee: ["name"],
 };
 
 // Ye sab translatable *content* fields hain. Jo is list me hain par
@@ -76,6 +81,11 @@ const CONTENT_FIELDS = {
   PurchaseOrder: ["notes", "cancel_reason"],
   Vendor: ["name", "company_name", "address", "city", "state", "country"],
   ShippingMethod: ["name"],
+  Customer: ["name", "address"],
+  Lead: ["name", "company_name"],
+  Quote: ["customer_name"],
+  Invoice: ["customer_name"],
+  Employee: ["name"],
 };
 
 // Translation writes update Mongo directly (outside the normal CRUD routes),

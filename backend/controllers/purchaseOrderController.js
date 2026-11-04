@@ -14,6 +14,77 @@ const emitPO = (event, data) => { try { const io = getIO(); if (io) io.emit(even
 const emitStock = (data) => emitPO("stockUpdated", data);
 const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// ==========================================
+// 🌐 LOCALE + SLIM HELPERS — admin purchase orders (brands/banner/vendors ka exact pattern)
+//    Paginated rows + detail response me sirf FRONT fields jate hain —
+//    internals (translation_source/status, deleted flags, __v) bahar.
+//    Translations sirf selected locale ki trim hoti hain.
+// ==========================================
+const parsePOLocale = (value) => {
+  const requestedLocale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+};
+
+// ✅ PO ki slim translation (notes/cancel_reason) — sirf requested locale
+const slimPOTranslations = (po, locale) => {
+  if (locale === "en" || !po.translations) return null;
+  const out = {};
+  ["notes", "cancel_reason"].forEach((field) => {
+    const value = po.translations?.[field]?.[locale];
+    if (typeof value === "string" && value.trim()) out[field] = { [locale]: value };
+  });
+  return Object.keys(out).length ? out : {};
+};
+
+// ✅ Populated docs (Vendor/Product/Variant) sirf unke front fields + selected
+//    locale ki slim translation (poora translations map payload me nahi jata)
+const slimPORef = (doc, locale) => {
+  if (!doc || typeof doc !== "object" || !doc._id) return doc; // ObjectId fallback
+  const out = { _id: doc._id };
+  ["name", "title"].forEach((field) => {
+    if (doc[field] !== undefined) out[field] = doc[field];
+  });
+  if (locale !== "en" && doc.translations && typeof doc.translations === "object") {
+    const t = {};
+    ["name", "title"].forEach((field) => {
+      const value = doc.translations?.[field]?.[locale];
+      if (typeof value === "string" && value.trim()) t[field] = { [locale]: value };
+    });
+    if (Object.keys(t).length) out.translations = t;
+  }
+  return out;
+};
+
+// ✅ PO row ka vendor ref — list sirf name/code, detail card snapshot fields ke saath
+const slimPOVendor = (vendor, locale) => {
+  if (!vendor || typeof vendor !== "object" || !vendor._id) return vendor; // ObjectId fallback
+  const out = { _id: vendor._id, name: vendor.name, vendor_code: vendor.vendor_code };
+  if (vendor.is_active !== undefined) out.is_active = vendor.is_active;
+  ["company_name", "phone", "email", "address", "city"].forEach((field) => {
+    if (vendor[field]) out[field] = vendor[field];
+  });
+  if (locale !== "en" && vendor.translations && typeof vendor.translations === "object") {
+    const t = {};
+    ["name", "company_name", "address", "city"].forEach((field) => {
+      const value = vendor.translations?.[field]?.[locale];
+      if (typeof value === "string" && value.trim()) t[field] = { [locale]: value };
+    });
+    if (Object.keys(t).length) out.translations = t;
+  }
+  return out;
+};
+
+// ✅ Server-side sorting whitelist — sort key -> DB field
+const PO_SORT_FIELDS = {
+  po_number: "po_number",
+  vendor: "vendor_snapshot.name",
+  status: "status",
+  payment: "payment_status",
+  total: "total",
+  expected: "expected_date",
+  created: "created_at",
+};
+
 const generateNextPONumber = async () => {
   const pos = await PurchaseOrder.find({ po_number: { $regex: /^PO-\d+$/ } }).select("po_number").lean();
   let max = 0;
@@ -108,23 +179,78 @@ const getAllPOs = async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 15));
-    const { status = "all", vendor = "all", payment_status = "all", search = "" } = req.query;
+    const locale = parsePOLocale(req.query.locale);
+    const status = String(req.query.status || "all");
+    const vendor = String(req.query.vendor || "all");
+    const payment_status = String(req.query.payment_status || "all");
+    const range = String(req.query.range || "all");
+    const search = String(req.query.search || "").trim();
     const q = { is_deleted: { $ne: true } };
     if (status !== "all") q.status = status;
     if (payment_status !== "all") q.payment_status = payment_status;
-    if (vendor !== "all" && mongoose.isValidObjectId(String(vendor))) q.vendor_id = vendor;
-    if (String(search).trim()) { const rx = new RegExp(escapeRegex(String(search).trim()), "i"); q.$or = [{ po_number: rx }, { "vendor_snapshot.name": rx }]; }
+    if (vendor !== "all" && mongoose.isValidObjectId(vendor)) q.vendor_id = vendor;
+    if (["7", "30", "90"].includes(range)) q.created_at = { $gte: new Date(Date.now() - Number(range) * 86400000) };
+    if (search) { const rx = new RegExp(escapeRegex(search), "i"); q.$or = [{ po_number: rx }, { "vendor_snapshot.name": rx }, { status: rx }]; }
+
+    // ✅ Sorting bhi server par hoti hai (whitelist ke ilawa koi custom field nahi).
+    //    Default: created_at desc (legacy jaisa) — ties par _id stable order.
+    const sortKeyRaw = String(req.query.sort || "").trim();
+    const hasSort = Boolean(PO_SORT_FIELDS[sortKeyRaw]);
+    const sortField = hasSort ? PO_SORT_FIELDS[sortKeyRaw] : "created_at";
+    const sortOrder = hasSort ? (String(req.query.order || "").trim().toLowerCase() === "asc" ? 1 : -1) : -1;
+
+    // ✅ Counts meta — stat cards poore collection ke (current page ke POs se nahi)
+    const statAgg = await PurchaseOrder.aggregate([
+      { $match: { is_deleted: { $ne: true } } },
+      { $group: { _id: "$status", count: { $sum: 1 }, value: { $sum: "$total" } } },
+    ]);
+    const counts = { total: 0, pending: 0, received: 0, cancelled: 0, value: 0 };
+    for (const row of statAgg) {
+      counts.total += row.count || 0;
+      counts.value += Number(row.value) || 0;
+      if (["pending", "confirmed"].includes(row._id)) counts.pending += row.count || 0;
+      else if (["delivered", "closed"].includes(row._id)) counts.received += row.count || 0;
+      else if (row._id === "cancelled") counts.cancelled += row.count || 0;
+    }
+
     const [pos, total] = await Promise.all([
-      PurchaseOrder.find(q).select("-activity").populate("vendor_id", "name vendor_code translations").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").sort({ created_at: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      PurchaseOrder.find(q).select("po_number vendor_id vendor_snapshot status payment_status total expected_date created_at items.qty_ordered items.received_qty")
+        .populate("vendor_id", "name vendor_code is_active company_name phone email address city translations")
+        .sort({ [sortField]: sortOrder, _id: 1 })
+        .skip((page - 1) * limit).limit(limit).lean(),
       PurchaseOrder.countDocuments(q),
     ]);
-    res.status(200).json({ success: true, data: pos, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages);
+
+    // ✅ Har row me sirf front-visible fields — receive % sirf qty counts se,
+    //    item details/populated products/variants list page me display nahi hote.
+    const rows = pos.map((po) => ({
+      _id: po._id,
+      po_number: po.po_number,
+      status: po.status,
+      payment_status: po.payment_status,
+      total: po.total,
+      expected_date: po.expected_date || null,
+      created_at: po.created_at,
+      vendor_id: slimPOVendor(po.vendor_id, locale),
+      vendor_snapshot: { name: po.vendor_snapshot?.name || "" },
+      items: (po.items || []).map((item) => ({ qty_ordered: Number(item.qty_ordered) || 0, received_qty: Number(item.received_qty) || 0 })),
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: rows,
+      counts,
+      pagination: { total, page: safePage, limit, pages, totalPages: pages, hasNext: safePage < pages, hasPrev: safePage > 1 },
+    });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
 const getPOByIdAdmin = async (req, res) => {
   try {
-    const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code phone email company_name address city state country translations translation_source translation_status").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").populate("createdby", "name").populate("updatedby", "name").lean();
+    const locale = parsePOLocale(req.query.locale);
+    const po = await PurchaseOrder.findById(req.params.id).populate("vendor_id", "name vendor_code company_name phone email address city is_active translations").populate("items.product_id", "name translations").populate("items.variant_id", "title translations").populate("createdby", "name").lean();
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
     const legacyVariantIds = (po.items || [])
       .filter((item) => item.sell_price == null)
@@ -134,13 +260,68 @@ const getPOByIdAdmin = async (req, res) => {
       legacyVariantIds.length ? Variant.find({ _id: { $in: legacyVariantIds } }).select("selling_price").lean() : [],
     ]);
     const currentSellPriceByVariant = new Map(legacyVariants.map((variant) => [String(variant._id), Number(variant.selling_price) || 0]));
+
+    // ✅ Items — detail page + edit form (new?edit=) ke saare snapshot fields,
+    //    batch_no/internals bahar; populated product/variant locale-slim.
     const items = (po.items || []).map((item) => ({
-      ...item,
+      product_id: slimPORef(item.product_id, locale),
+      variant_id: slimPORef(item.variant_id, locale),
+      name: item.name,
+      sku: item.sku || "",
+      variantTitle: item.variantTitle || "",
+      image: item.image || "",
+      cost_price: item.cost_price,
       sell_price: item.sell_price ?? currentSellPriceByVariant.get(String(item.variant_id)) ?? 0,
+      qty_ordered: item.qty_ordered,
+      received_qty: item.received_qty || 0,
+      line_total: item.line_total,
+      tax_rate: item.tax_rate || 0,
+      mfg_date: item.mfg_date || null,
+      expiry_date: item.expiry_date || null,
+      expiry_after_delivery: item.expiry_after_delivery || 0,
+      expiry_after_delivery_unit: item.expiry_after_delivery_unit || "days",
+      topup: Number(item.topup) || 0,
     }));
-    const safePayments = payments
-      .map((payment) => Object.fromEntries(Object.entries(payment).filter(([key]) => !["reference", "notes"].includes(key))));
-    res.status(200).json({ success: true, data: { ...po, items, payments: safePayments } });
+    // ✅ Payments — sirf front fields (reference/notes pehle se hi strip the)
+    const safePayments = payments.map((payment) => ({
+      _id: payment._id,
+      po_id: payment.po_id,
+      amount: payment.amount,
+      method: payment.method,
+      paid_at: payment.paid_at,
+      created_at: payment.created_at,
+    }));
+
+    const responsePO = {
+      _id: po._id,
+      po_number: po.po_number,
+      status: po.status,
+      payment_status: po.payment_status,
+      paid_amount: po.paid_amount,
+      due_amount: po.due_amount,
+      subtotal: po.subtotal,
+      tax: po.tax,
+      overall_tax: po.overall_tax,
+      overall_tax_rate: po.overall_tax_rate,
+      shipping: po.shipping,
+      discount: po.discount,
+      total: po.total,
+      expected_date: po.expected_date || null,
+      notes: po.notes || "",
+      cancel_reason: po.cancel_reason || "",
+      created_at: po.created_at,
+      vendor_id: slimPOVendor(po.vendor_id, locale),
+      vendor_snapshot: po.vendor_snapshot ? { ...po.vendor_snapshot } : {},
+      items,
+      payments: safePayments,
+      activity: po.activity || [],
+      createdby: po.createdby ? { _id: po.createdby._id, name: po.createdby.name } : null,
+    };
+    // ✅ Selected locale ki slim translation (notes/cancel_reason)
+    const poTranslations = slimPOTranslations(po, locale);
+    if (poTranslations) responsePO.translations = poTranslations;
+
+    res.status(200).json({ success: true, data: responsePO });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 

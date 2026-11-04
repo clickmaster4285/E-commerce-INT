@@ -15,6 +15,65 @@ const num = (value) => {
 const WINDOW_MINUTES = num(process.env.RATE_LIMIT_WINDOW_MINUTES);
 const WINDOW_MS = Math.max(1, WINDOW_MINUTES) * 60 * 1000;
 
+const positiveIntegerEnv = (name, fallback) => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  if (!/^\d+$/.test(String(raw).trim())) {
+    log.warn(`[rateLimit] Invalid ${name}; using fallback ${fallback}`);
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1 || value > 2147483647) {
+    log.warn(`[rateLimit] Invalid ${name}; using fallback ${fallback}`);
+    return fallback;
+  }
+  return value;
+};
+
+const CHAT_MESSAGE_RATE_LIMIT = positiveIntegerEnv("CHAT_MESSAGE_RATE_LIMIT", 30);
+const CHAT_MESSAGE_RATE_WINDOW_MS = positiveIntegerEnv("CHAT_MESSAGE_RATE_WINDOW_MS", 60000);
+const CHAT_MESSAGE_RATE_LIMITED_MESSAGE = "You are sending messages too quickly. Please try again later.";
+const CHAT_MESSAGE_RATE_LIMIT_SCRIPT = `
+  local count = redis.call('INCR', KEYS[1])
+  if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+  local ttl = redis.call('PTTL', KEYS[1])
+  if ttl < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]); ttl = tonumber(ARGV[1]) end
+  return { count, ttl }
+`;
+
+const createChatMessageRateLimiter = ({ limit = CHAT_MESSAGE_RATE_LIMIT, windowMs = CHAT_MESSAGE_RATE_WINDOW_MS, redisClientProvider = () => null, now = Date.now } = {}) => {
+  const counts = new Map();
+  let lastRedisWarning = 0;
+  return async (identity) => {
+    const key = String(identity || "anonymous");
+    const redis = redisClientProvider();
+    if (redis) {
+      try {
+        const [count, ttl] = await redis.eval(CHAT_MESSAGE_RATE_LIMIT_SCRIPT, 1, `chat:message:rate:${key}`, String(windowMs));
+        return { allowed: Number(count) <= limit, count: Number(count), retryAfterMs: Math.max(1, Number(ttl) || windowMs) };
+      } catch (error) {
+        if (now() - lastRedisWarning > 60000) {
+          log.error("[rateLimit] Chat Redis counter failed; using process memory:", error.message);
+          lastRedisWarning = now();
+        }
+      }
+    }
+    const time = now();
+    let entry = counts.get(key);
+    if (!entry || time - entry.startedAt >= windowMs) {
+      entry = { count: 0, startedAt: time };
+      counts.set(key, entry);
+    }
+    if (counts.size > 10000) {
+      for (const [entryKey, item] of counts) if (time - item.startedAt >= windowMs) counts.delete(entryKey);
+    }
+    if (entry.count >= limit) return { allowed: false, count: entry.count, retryAfterMs: Math.max(1, windowMs - (time - entry.startedAt)) };
+    entry.count += 1;
+    return { allowed: true, count: entry.count, retryAfterMs: Math.max(1, windowMs - (time - entry.startedAt)) };
+  };
+};
+const consumeChatMessageRateLimit = createChatMessageRateLimiter({ redisClientProvider: () => getRedisClient() });
+
 const USER_MULTIPLIER = num(process.env.RATE_LIMIT_USER_MULTIPLIER)
 const ADMIN_MULTIPLIER = num(process.env.RATE_LIMIT_ADMIN_MULTIPLIER);
 
@@ -264,10 +323,20 @@ const limiters = {
     max: num(process.env.RATE_LIMIT_REVIEW_CREATE_MAX),
     keyBy: "user",
   }),
+  chat: createRateLimiter({
+    name: "chat",
+    max: Number(process.env.RATE_LIMIT_CHAT_MAX) || 300,
+    keyBy: "ip",
+  }),
 };
 
 module.exports = {
   createRateLimiter,
+  createChatMessageRateLimiter,
+  consumeChatMessageRateLimit,
+  CHAT_MESSAGE_RATE_LIMIT,
+  CHAT_MESSAGE_RATE_WINDOW_MS,
+  CHAT_MESSAGE_RATE_LIMITED_MESSAGE,
   limiters,
   WINDOW_MS,
   WINDOW_MINUTES,

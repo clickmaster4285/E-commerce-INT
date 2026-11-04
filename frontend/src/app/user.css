@@ -67,6 +67,36 @@
   --user-transition:    0.2s ease;
 }
 
+.checkout-premium .address-form-location {
+  background-color: color-mix(in srgb, var(--user-accent) 8%, var(--user-bg-card)) !important;
+}
+
+/* Storefront chat surfaces follow the customer theme (Tailwind's `dark`
+   variant is reserved for the admin panel and does not use `user-dark`). */
+:root.user-dark .user-chat-thread {
+  border-color: var(--user-border) !important;
+  background-color: var(--user-bg-card) !important;
+  color: var(--user-text) !important;
+}
+:root.user-dark .user-chat-thread .bg-white { background-color: var(--user-bg-card) !important; }
+:root.user-dark .user-chat-thread > .flex-1 { background-color: var(--user-bg) !important; }
+:root.user-dark .user-chat-thread .bg-slate-50 { background-color: var(--user-bg-input) !important; }
+:root.user-dark .user-chat-thread .bg-slate-100 { background-color: var(--user-bg-hover) !important; }
+:root.user-dark .user-chat-thread .bg-blue-100 { background-color: #173456 !important; }
+:root.user-dark .user-chat-thread .text-slate-900,
+:root.user-dark .user-chat-thread .text-slate-800 { color: var(--user-text) !important; }
+:root.user-dark .user-chat-thread .text-slate-700,
+:root.user-dark .user-chat-thread .text-slate-600 { color: var(--user-text-secondary) !important; }
+:root.user-dark .user-chat-thread .text-slate-500,
+:root.user-dark .user-chat-thread .text-slate-400 { color: var(--user-text-muted) !important; }
+:root.user-dark .user-chat-thread .border-slate-100,
+:root.user-dark .user-chat-thread .border-slate-200 { border-color: var(--user-border) !important; }
+:root.user-dark .user-chat-thread .border-red-200 { border-color: #6d3337 !important; }
+:root.user-dark .user-chat-thread .bg-red-50 { background-color: #321b20 !important; }
+:root.user-dark .user-chat-thread .text-red-700 { color: #fda4af !important; }
+:root.user-dark .user-chat-thread .text-blue-700 { color: #93c5fd !important; }
+:root.user-dark .user-chat-thread .text-emerald-500 { color: #34d399 !important; }
+
 /* ==========================================
    USER THEME — LIGHT MODE (Default)
 ========================================== */
@@ -651,7 +681,7 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
 
 /* Preserve checkout's existing light palette (default theme) while dark mode inherits the storefront theme. */
 :root:not(.user-dark) .checkout-premium {
-  --user-bg: #f7f7f8;
+  --user-bg: #eaeded;
   --user-bg-elevated: #ffffff;
   --user-bg-card: #ffffff;
   --user-bg-hover: #f3f4f6;
@@ -1024,25 +1054,37 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
   background-color: transparent;
 }
 
-.checkout-premium .checkout-cart-item.is-selected {
-  border-color: var(--checkout-selection-border);
-  background-color: var(--checkout-selection-bg);
+.checkout-premium .checkout-item-brand {
+  color: #64748b;
+  font-weight: 400;
 }
 
-.checkout-premium .checkout-item-selection {
-  position: absolute;
-  top: -0.25rem;
-  left: -0.25rem;
-  display: inline-flex;
-  width: 1rem;
-  height: 1rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--checkout-selection-border);
-  border-radius: 9999px;
-  background-color: var(--checkout-selection-mark-bg);
-  color: var(--checkout-selection-mark);
+.checkout-premium .checkout-item-variant {
+  color: #2563a6;
+  font-weight: 400;
 }
+
+.checkout-premium .checkout-item-stock {
+  color: #067d62;
+  font-weight: 400;
+}
+
+.checkout-premium .checkout-item-savings,
+.checkout-premium .checkout-item-deal {
+  color: #c45500;
+  font-weight: 400;
+}
+
+.checkout-premium .checkout-delete-link {
+  color: #2164a5;
+}
+
+:root.user-dark .checkout-premium .checkout-item-brand { color: #cbd5e1; }
+:root.user-dark .checkout-premium .checkout-item-variant { color: #93c5fd; }
+:root.user-dark .checkout-premium .checkout-item-stock { color: #34d399; }
+:root.user-dark .checkout-premium .checkout-item-savings,
+:root.user-dark .checkout-premium .checkout-item-deal { color: #fdba74; }
+:root.user-dark .checkout-premium .checkout-delete-link { color: #93c5fd; }
 
 .checkout-premium .checkout-address-indicator {
   display: inline-flex;
@@ -1093,4 +1135,112 @@ html:has([lang="ar"])
   :is(h1, h2, h3, h4, h5, h6, p, span, a, label, button, li, td, th, dd, dt, strong, em) {
   letter-spacing: 0 !important;
   text-transform: none !important;
+}
+
+/* Checkout step two uses fixed, shrinkable tracks so the summary stays in view. */
+.checkout-premium .checkout-main {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+@media (min-width: 1024px) {
+  .checkout-premium .checkout-step-two-grid {
+    grid-template-columns: minmax(0, 72fr) minmax(0, 28fr);
+  }
+}
+
+.checkout-premium .checkout-summary-panel,
+.checkout-premium .checkout-step-two-grid > * {
+  min-width: 0;
+}
+
+.checkout-premium .checkout-summary-icon,
+.checkout-premium .checkout-address-section-icon {
+  border-color: color-mix(in srgb, var(--primary, #d96a24) 22%, var(--user-border));
+  background-color: color-mix(in srgb, var(--primary, #d96a24) 8%, var(--user-bg-card));
+  color: var(--primary, #d96a24);
+}
+
+.checkout-premium .checkout-summary-icon svg,
+.checkout-premium .checkout-address-section-icon svg {
+  color: var(--primary, #d96a24);
+}
+
+.checkout-premium .checkout-summary-panel-review .checkout-summary-total-value {
+  color: var(--primary, #d96a24) !important;
+}
+
+.checkout-premium .checkout-address-empty-illustration {
+  color: color-mix(in srgb, var(--primary, #d96a24) 34%, transparent);
+}
+
+.checkout-premium .checkout-address-empty-map {
+  color: inherit;
+}
+
+.checkout-premium .checkout-address-empty-pin {
+  color: var(--primary, #d96a24);
+}
+
+.checkout-premium .checkout-address-empty-sparkle {
+  color: color-mix(in srgb, var(--primary, #d96a24) 35%, transparent);
+}
+
+.checkout-premium .checkout-address-add-button {
+  border-color: color-mix(in srgb, var(--primary, #d96a24) 58%, var(--user-border));
+  color: var(--primary, #d96a24);
+}
+
+.checkout-premium .checkout-address-add-button:hover {
+  background-color: color-mix(in srgb, var(--primary, #d96a24) 5%, var(--user-bg-card));
+}
+
+.checkout-premium .checkout-bank-details {
+  scroll-margin-top: 6rem;
+}
+
+.checkout-premium .checkout-step-two-grid {
+  height: auto;
+  max-height: none;
+  overflow-y: visible;
+}
+
+.checkout-premium .checkout-summary-panel {
+  height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+@media (min-width: 1024px) {
+  .checkout-premium .checkout-summary-panel-with-items {
+    display: flex;
+    flex-direction: column;
+    max-height: 86vh !important;
+  }
+
+  .checkout-premium .checkout-summary-products {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--user-text-muted) 50%, transparent) transparent;
+  }
+
+  .checkout-premium .checkout-summary-products::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .checkout-premium .checkout-summary-products::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .checkout-premium .checkout-summary-products::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--user-text-muted) 45%, transparent);
+  }
+
+  .checkout-premium .checkout-summary-products::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--user-text-muted) 65%, transparent);
+  }
 }

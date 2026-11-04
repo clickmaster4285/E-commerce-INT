@@ -181,6 +181,9 @@ const getDeals = async (req, res) => {
       page = 1,
       limit = 20,
     } = req.query;
+    const adminList = String(req.query.admin_list || "") === "1";
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2,3}(?:-[a-z]{2})?$/.test(requestedLocale) ? requestedLocale.split("-")[0] : "en";
 
     const now = new Date();
     const searchTerm = String(search).trim();
@@ -252,13 +255,16 @@ const getDeals = async (req, res) => {
 
     const [deals, total, baseTotal, activeCount, inactiveCount, scheduledCount, expiredCount, disabledCount] =
       await Promise.all([
-        Deal.find(query)
+        (adminList
+          ? Deal.find(query).select(["name", "code", "translations.name." + locale, "type", "applyTo", "discountValue", "buyQuantity", "getQuantity", "getDiscountValue", "bundlePrice", "bundleRule.rewardType", "bundleRule.value", "bundleRule.buyQuantity", "bundleRule.freeQuantity", "bundleRule.freeProduct", "isActive", "startDate", "endDate", "isFeatured", "priority", "createdAt"].join(" "))
+            .populate("bundleRule.freeProduct", ["name", `translations.name.${locale}`, "sku"].join(" "))
+          : Deal.find(query)
           .populate("productIds", "name translations sku images selling_price")
           .populate("bundleRule.freeProduct", `${BUNDLE_FREE_PRODUCT_FIELDS} translations`)
           .populate("categoryIds", "name translations code")
           .populate("brandIds", "name translations logo")
           .populate("createdBy", "name email role")
-          .populate("updatedBy", "name email role")
+          .populate("updatedBy", "name email role"))
           .sort({
             priority: -1,
             createdAt: -1,
@@ -276,9 +282,28 @@ const getDeals = async (req, res) => {
         Deal.countDocuments(buildQuery(statusClauses.disabled)),
       ]);
 
+    const pageDeals = adminList ? deals.map((deal) => ({
+      _id: deal._id,
+      name: deal.name,
+      code: deal.code,
+      ...(locale !== "en" ? { translations: { name: deal.translations?.name?.[locale] ? { [locale]: deal.translations.name[locale] } : {} } } : {}),
+      type: deal.type,
+      applyTo: deal.applyTo,
+      discountValue: deal.discountValue,
+      buyQuantity: deal.buyQuantity,
+      getQuantity: deal.getQuantity,
+      getDiscountValue: deal.getDiscountValue,
+      bundlePrice: deal.bundlePrice,
+      bundleRule: deal.bundleRule,
+      isActive: deal.isActive,
+      startDate: deal.startDate,
+      endDate: deal.endDate,
+      isFeatured: deal.isFeatured,
+    })) : deals;
+
     res.status(200).json({
       success: true,
-      data: deals,
+      data: pageDeals,
       // ✅ Frontend ke stat cards ab inhi numbers par hain (page-size independent)
       stats: {
         total: baseTotal,
@@ -315,6 +340,29 @@ const getDealById = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (String(req.query.admin_detail || "") === "1") {
+      const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+      const locale = /^[a-z]{2,3}(?:-[a-z]{2})?$/.test(requestedLocale) ? requestedLocale.split("-")[0] : "en";
+      const deal = await Deal.findById(id)
+        .select(["name", "code", "description", `translations.name.${locale}`, `translations.description.${locale}`, "type", "applyTo", "productIds", "categoryIds", "brandIds", "discountValue", "minOrderValue", "buyQuantity", "getQuantity", "getDiscountValue", "bundlePrice", "bundleRule", "bundleProducts", "image", "startDate", "endDate", "minQuantity", "usageLimit", "usedCount", "perUserLimit", "customerType", "isActive", "isFeatured", "createdBy", "updatedBy", "createdAt", "updatedAt"].join(" "))
+        .populate("bundleRule.freeProduct", ["name", `translations.name.${locale}`].join(" "))
+        .lean();
+      if (!deal) return res.status(404).json({ success: false, message: "Deal not found" });
+      const actorIds = [deal.createdBy, deal.updatedBy];
+      const actors = await Promise.all(actorIds.map(resolveActor));
+      deal.createdBy = actors[0];
+      deal.updatedBy = actors[1];
+      if (locale !== "en") {
+        deal.translations = {
+          name: deal.translations?.name?.[locale] ? { [locale]: deal.translations.name[locale] } : {},
+          description: deal.translations?.description?.[locale] ? { [locale]: deal.translations.description[locale] } : {},
+        };
+      } else {
+        delete deal.translations;
+      }
+      return res.status(200).json({ success: true, data: deal });
+    }
+
     const deal = await Deal.findById(id)
       .populate("productIds", "name translations sku images selling_price cost_price")
       .populate("categoryIds", "name translations code")
@@ -344,6 +392,43 @@ const getDealById = async (req, res) => {
       success: false,
       message: error.message || "Failed to fetch deal",
     });
+  }
+};
+
+// Paginated assigned records for the admin deal detail page.
+const getDealTargets = async (req, res) => {
+  try {
+    const deal = await Deal.findById(req.params.id).select("applyTo productIds categoryIds brandIds").lean();
+    if (!deal) return res.status(404).json({ success: false, message: "Deal not found" });
+    const type = String(req.query.type || "");
+    const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
+    const locale = /^[a-z]{2,3}(?:-[a-z]{2})?$/.test(requestedLocale) ? requestedLocale.split("-")[0] : "en";
+    const config = {
+      products: { ids: deal.productIds, Model: require("../models/Product"), fields: ["name", `translations.name.${locale}`, "variants.images.img_url"].join(" ") },
+      categories: { ids: deal.categoryIds, Model: require("../models/Category"), fields: ["name", `translations.name.${locale}`].join(" ") },
+      brands: { ids: deal.brandIds, Model: require("../models/Brand"), fields: ["name", `translations.name.${locale}`, "logo.img_url"].join(" ") },
+    }[type];
+    if (!config || type !== `${deal.applyTo}s` && !(type === "products" && deal.applyTo === "product") && !(type === "categories" && deal.applyTo === "category") && !(type === "brands" && deal.applyTo === "brand")) {
+      return res.status(400).json({ success: false, message: "Invalid deal target type" });
+    }
+    const ids = Array.isArray(config.ids) ? config.ids : [];
+    const limitRaw = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 10;
+    const requestedPage = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const total = ids.length;
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+    const pageIds = ids.slice((page - 1) * limit, page * limit);
+    const records = pageIds.length ? await config.Model.find({ _id: { $in: pageIds } }).select(config.fields).lean() : [];
+    const byId = new Map(records.map((row) => [String(row._id), row]));
+    const data = pageIds.map((rowId) => byId.get(String(rowId))).filter(Boolean).map((row) => ({
+      ...row,
+      ...(locale !== "en" ? { translations: { name: row.translations?.name?.[locale] ? { [locale]: row.translations.name[locale] } : {} } } : {}),
+    }));
+    return res.status(200).json({ success: true, data, pagination: { total, page, limit, pages, hasNext: page < pages, hasPrev: page > 1 } });
+  } catch (error) {
+    log.error("Get Deal Targets Error:", error);
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch deal targets" });
   }
 };
 
@@ -708,6 +793,7 @@ module.exports = {
   getDeals,
   getActiveDeals,
   getDealById,
+  getDealTargets,
   getActiveDealById, // ✅ Yeh add karo
   updateDeal,
   deleteDeal,

@@ -80,7 +80,7 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
 
   const startRefresh = () => {
     if (!refreshPromise) {
-      refreshPromise = http.post(refreshUrl).finally(() => {
+      refreshPromise = http.post(refreshUrl, undefined, { timeout: 15000 }).finally(() => {
         refreshPromise = null;
       });
     }
@@ -120,7 +120,8 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
     async (error) => {
       const originalRequest = error.config;
 
-      if (error.response?.status === 429) {
+      const isChatRequest = originalRequest?.url?.includes("/chats/");
+      if (error.response?.status === 429 && error.response?.data?.code !== "CHAT_MESSAGE_RATE_LIMIT" && !isChatRequest) {
         const retryAfter = Number(error.response?.data?.retryAfter);
         toast.error(
           Number.isFinite(retryAfter) && retryAfter > 0

@@ -7,6 +7,11 @@ const employeeSchema = new mongoose.Schema(
 
     // --- Core Identity Fields (direct on Employee) ---
     name: { type: String, required: true, trim: true },
+    translations: {
+      name: { type: Map, of: String, default: {} },
+    },
+    translation_source: { name: { type: String, default: "" } },
+    translation_status: { name: { type: String, default: "pending" } },
     username: { type: String, required: true, unique: true, trim: true },
     email: {
       type: String,

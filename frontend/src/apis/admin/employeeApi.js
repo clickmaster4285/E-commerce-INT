@@ -25,6 +25,7 @@ const paginated = (res, fallbackLimit) => {
   return {
     items: Array.isArray(d?.data) ? d.data : [],
     pagination: d?.pagination || { total: 0, page: 1, limit: fallbackLimit, pages: 1, hasNext: false, hasPrev: false },
+    summary: d?.summary || { total: 0, active: 0, inactive: 0 },
   };
 };
 
@@ -43,8 +44,9 @@ export const employeeApi = {
     }
   },
 
-  getAllPaginated: async ({ page = 1, limit = 20, search = "", status = "all", department = "all" } = {}) => {
+  getAllPaginated: async ({ page = 1, limit = 20, search = "", status = "all", department = "all", locale = "en" } = {}) => {
     const params = { page, limit };
+    if (locale) params.locale = locale;
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
     if (department && department !== "all") params.department = department;
@@ -66,6 +68,16 @@ export const employeeApi = {
       if (error.code === 'ECONNABORTED') throw new Error("Request timed out. Backend respond nahi kar raha.");
       throw new Error(error.response?.data?.message || error.message || "Failed to fetch employee details");
     }
+  },
+
+  getActivities: async (id, params = {}) => {
+    const response = await adminHttp.get(`/employees/${id}/activities`, { params, timeout: 10000 });
+    const payload = response.data?.data || {};
+    return {
+      items: Array.isArray(payload) ? payload : [],
+      categories: response.data?.categories || [],
+      pagination: response.data?.pagination || { total: 0, page: 1, limit: params.limit || 20, pages: 1 },
+    };
   },
 
   // ==========================================================

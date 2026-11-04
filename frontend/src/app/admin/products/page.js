@@ -40,8 +40,7 @@ import { attributeApi } from "@/apis/admin/attributeApi";
 import CategoryFormModal from "@/components/admin/CategoryFormModal";
 import ProductFormModal from "@/components/admin/ProductFormModal";
 
-// ✅ Ek hi page size — footer me "rows per page" selector nahi (simple + predictable list)
-const PRODUCTS_PER_PAGE = 20;
+const DEFAULT_PRODUCTS_PER_PAGE = 10;
 
 /**
  * ✅ Pagination ka page-number list — simple + predictable:
@@ -254,6 +253,7 @@ const [viewMode, setViewMode] = useState(() => {
   return "list";
 });
   const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage, setProductsPerPage] = useState(DEFAULT_PRODUCTS_PER_PAGE);
 
 
   // Attribute Modal States
@@ -296,13 +296,23 @@ const [viewMode, setViewMode] = useState(() => {
   } = useQuery({
     // ⚠️ Page size key ke END me hai — status filter index 6 par hi rahe, warna
     //    patchProductStatusInCaches ka status-filter detection toot jayega.
-    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, PRODUCTS_PER_PAGE],
-    queryFn: () => productApi.getPaginated({ page: currentPage, limit: PRODUCTS_PER_PAGE, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus }),
+    queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, productsPerPage, locale],
+    queryFn: () => productApi.getPaginated({ page: currentPage, limit: productsPerPage, search: search || "", category_id: filterCategory, brand_id: filterBrand, status: filterStatus, locale, admin_list: true }),
     retry: false,
   });
-  console.log(productsData);
   const products = productsData?.products || [];
-  usePageTranslations({ model: "Product", records: products, locale, ready: !isFetching && productsData?.pagination?.page === currentPage, queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, PRODUCTS_PER_PAGE], queryClient });
+  const productsAlreadyTranslated = locale === "en" || (products.length > 0 && products.every((product) =>
+    product.translations?.name?.[locale]?.trim() &&
+    (!product.description || product.translations?.description?.[locale]?.trim())
+  ));
+  const productTranslationsReady = usePageTranslations({ model: "Product", records: products, locale, ready: !isFetching && productsData?.pagination?.page === currentPage, queryKey: ["products", "paginated", currentPage, search, filterCategory, filterBrand, filterStatus, productsPerPage, locale], queryClient, alreadyTranslated: productsAlreadyTranslated, fallbackAfterRetries: true });
+  const translatedProductNameCount = products.filter((product) => product.translations?.name?.[locale]?.trim()).length;
+  const productNamesMostlyUntranslated = locale !== "en" && products.length > 0 && translatedProductNameCount / products.length <= 0.2;
+  const productsWithDescription = products.filter((product) => product.description?.trim());
+  const translatedProductDescriptionCount = productsWithDescription.filter((product) => product.translations?.description?.[locale]?.trim()).length;
+  const productDescriptionsMostlyUntranslated = locale !== "en" && productsWithDescription.length > 0 && translatedProductDescriptionCount / productsWithDescription.length <= 0.2;
+  const isProductTextReady = (product) => locale === "en" || productTranslationsReady || !productNamesMostlyUntranslated || Boolean(product.translations?.name?.[locale]?.trim());
+  const isProductDescriptionReady = (product) => locale === "en" || productTranslationsReady || !productDescriptionsMostlyUntranslated || !product.description?.trim() || Boolean(product.translations?.description?.[locale]?.trim());
 
   // ✅ NAVIGATION FIX (footer stable rehna chahiye):
   //    Page number click karne par naye page ki query ka apna key hota hai, is liye
@@ -310,7 +320,7 @@ const [viewMode, setViewMode] = useState(() => {
   //    bar ghayab ho jati thi (layout jump + "navigation tooti hui" feel).
   //    Ab same filters ke liye last known pagination yaad rakhi jati hai, is liye
   //    "Showing 21–40 of 1,099" aur buttons turant update hote hain.
-  const paginationSignature = `${search}|${filterCategory}|${filterBrand}|${filterStatus}|${PRODUCTS_PER_PAGE}`;
+  const paginationSignature = `${search}|${filterCategory}|${filterBrand}|${filterStatus}|${productsPerPage}|${locale}`;
   const [paginationMemory, setPaginationMemory] = useState(null);
   useEffect(() => {
     if (productsData?.pagination) {
@@ -320,7 +330,7 @@ const [viewMode, setViewMode] = useState(() => {
   const rememberedPagination =
     paginationMemory?.signature === paginationSignature ? paginationMemory.pagination : null;
 
-  const pagination = productsData?.pagination || rememberedPagination || { total: 0, page: currentPage, limit: PRODUCTS_PER_PAGE, pages: 1, hasNext: false, hasPrev: false };
+  const pagination = productsData?.pagination || rememberedPagination || { total: 0, page: currentPage, limit: productsPerPage, pages: 1, hasNext: false, hasPrev: false };
 
   // ✅ SUMMARY CARDS ki API — products list se bilkul ALAG query.
   //    Backend optimization: stats ab list response ka hissa nahi (dedicated /products/stats endpoint),
@@ -513,6 +523,7 @@ const [viewMode, setViewMode] = useState(() => {
 
   /* Mutations */
   const [createLoading, setCreateLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   const deleteMutation = useMutation({ mutationFn: productApi.delete, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["products"] }); toast.success(t("toast.deleted")); setShowDeleteModal(false); setProductToDelete(null); }, onError: (e) => handlePermissionError(e, t("toast.deleteFailed"), t("entity.product"), t, locale) });
   // ✅ Activate/deactivate OPTIMISTIC: click karte hi row + summary cards foran
@@ -705,7 +716,19 @@ const [viewMode, setViewMode] = useState(() => {
     });
   };
 
-  const handleEdit = (product) => {
+  const handleEdit = async (product) => {
+    if (!product?._id) return;
+    setEditLoading(true);
+    try {
+      // Keep list rows compact; fetch the complete product only when editing.
+      const fullProduct = await productApi.getById(product._id);
+      product = fullProduct?.product || fullProduct;
+    } catch (error) {
+      toast.error(localizedErrorMessage(error, t("table.loadFailed"), locale));
+      return;
+    } finally {
+      setEditLoading(false);
+    }
     const currentTagNames = (product.tag_ids || []).map(t => typeof t === 'object' ? t.name : t).filter(Boolean);
     
     setFormData({
@@ -818,11 +841,11 @@ const [viewMode, setViewMode] = useState(() => {
 
   // ✅ Backend `limit` ko clamp karta hai (max 100) — is liye effective size wahi
   //    maante hain jo API ne maangi, warna "Showing 1-100" ho jab tak rows 20 hi aayein.
-  const effectivePageSize = Number(pagination.limit) || PRODUCTS_PER_PAGE;
+  const effectivePageSize = Number(pagination.limit) || productsPerPage;
   const totalRecords = Number(pagination.total) || 0;
   const firstRow = totalRecords === 0 ? 0 : (currentPage - 1) * effectivePageSize + 1;
   const lastRow = Math.min(currentPage * effectivePageSize, totalRecords);
-  const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+  const fmt = (n) => Number(n || 0).toLocaleString(locale, { useGrouping: false });
 
   const goToPage = (pg) => {
     setCurrentPage(Math.min(Math.max(1, pg), totalPages));
@@ -894,11 +917,11 @@ const [viewMode, setViewMode] = useState(() => {
 
   return (
     <>
-      {createLoading && (
+      {(createLoading || editLoading) && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.45)", backdropFilter: "blur(3px)" }}>
           <div className="rounded-xl px-8 py-6 flex flex-col items-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--text-muted)", borderTopColor: "transparent" }} />
-            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("state.redirecting")}</span>
+            <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>{editLoading ? t("table.loading") : t("state.redirecting")}</span>
           </div>
         </div>
       )}
@@ -994,7 +1017,7 @@ const [viewMode, setViewMode] = useState(() => {
               {/* ✅ Table loading = skeleton rows (blank table / spinner nahi).
                   Skeleton → error state → empty state → real rows (smooth fade-in). */}
               {isLoading ? (
-                <ProductTableSkeleton rows={PRODUCTS_PER_PAGE} />
+                <ProductTableSkeleton rows={productsPerPage} />
               ) : (
               <tbody style={{ animation: "fadeIn 0.22s ease" }}>
                 {productsError ? (
@@ -1010,14 +1033,14 @@ const [viewMode, setViewMode] = useState(() => {
                 ) : paginatedProducts.map((p) => {
                   const img = p?.variants?.[0]?.images?.[0]?.img_url;
                   const firstVariantSku = p?.variants?.[0]?.sku || "";
-                  const variantCount = Array.isArray(p?.variants) ? p.variants.length : Number(p?.variantCount) || 0;
+                  const variantCount = Number(p?.variantCount ?? p?.variants?.length) || 0;
                   return (
                     <tr key={p._id} onClick={() => openProductDetails(p)} className="cursor-pointer transition" style={{ borderBottom: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-row-hover)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--bg-card)"}>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
-                          <FallbackImage src={getImageUrl(img)} alt={productNameOf(p)} className="h-8 w-8 shrink-0 rounded-full object-cover" />
+                          <FallbackImage src={getImageUrl(img)} alt={isProductTextReady(p) ? productNameOf(p) : ""} className="h-8 w-8 shrink-0 rounded-full object-cover" />
                           <div className="min-w-0">
-                            <p className="max-w-[160px] truncate text-[13px] font-medium">{productNameOf(p)}</p>
+                            {isProductTextReady(p) ? <p className="max-w-[160px] truncate text-[13px] font-medium">{productNameOf(p)}</p> : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("table.loading")} />}
                             {firstVariantSku && <p className="max-w-[160px] truncate font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstVariantSku}</p>}
                           </div>
                         </div>
@@ -1025,7 +1048,7 @@ const [viewMode, setViewMode] = useState(() => {
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getCategoryName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>{getBrandName(p)}</td>
                       <td className="px-4 py-2.5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        <span className="inline-block max-w-[220px] truncate align-middle">{productDescriptionOf(p) ? productDescriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>}</span>
+                        <span className="inline-block max-w-[220px] truncate align-middle">{isProductDescriptionReady(p) ? (productDescriptionOf(p) ? productDescriptionOf(p) : <span style={{ color: "var(--text-muted)" }}>—</span>) : <span className="skeleton inline-block h-3 w-32 rounded" aria-label={t("table.loading")} />}</span>
                       </td>
                       <td className="px-4 py-2.5 text-[13px]">
                         <span className="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold" style={{ color: "var(--accent)", backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}>{variantCount} {variantCount === 1 ? t("table.variant") : t("table.variantsUnit")}</span>
@@ -1046,7 +1069,7 @@ const [viewMode, setViewMode] = useState(() => {
       {/* GRID VIEW — ✅ same independent loading state: skeleton cards replace blank grid */}
       {viewMode === "grid" && (
         isLoading ? (
-          <ProductGridSkeleton cards={8} />
+          <ProductGridSkeleton cards={productsPerPage} />
         ) : productsError ? (
           <div className="rounded-lg px-4 py-14 text-center" style={cardStyle}>
             <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-500 opacity-70" />
@@ -1059,17 +1082,17 @@ const [viewMode, setViewMode] = useState(() => {
             const v = p?.variants?.[0];
             const img = v?.images?.[0]?.img_url;
             const firstSku = v?.sku || "";
-            const variantCount = Array.isArray(p?.variants) ? p.variants.length : Number(p?.variantCount) || 0;
+            const variantCount = Number(p?.variantCount ?? p?.variants?.length) || 0;
             return (
               <div key={p._id} onClick={() => openProductDetails(p)} className="flex cursor-pointer flex-col gap-3 rounded-lg p-4 transition hover:-translate-y-0.5" style={cardStyle}>
                 <div className="flex items-start justify-between">
-                  <FallbackImage src={getImageUrl(img)} alt={productNameOf(p)} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                  <FallbackImage src={getImageUrl(img)} alt={isProductTextReady(p) ? productNameOf(p) : ""} className="h-10 w-10 shrink-0 rounded-full object-cover" />
                   <StatusBadge status={p.status} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p>
+                  {isProductTextReady(p) ? <p className="truncate text-[13px] font-semibold">{productNameOf(p)}</p> : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("table.loading")} />}
                   {firstSku && <p className="mt-0.5 font-mono text-[11px]" style={{ color: "var(--text-muted)" }}>{firstSku}</p>}
-                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{productDescriptionOf(p) ? (productDescriptionOf(p).length > 60 ? productDescriptionOf(p).slice(0, 60) + "..." : productDescriptionOf(p)) : "—"}</p>
+                  <p className="mt-0.5 truncate text-[11px]" style={{ color: "var(--text-muted)" }}>{isProductDescriptionReady(p) ? (productDescriptionOf(p) ? (productDescriptionOf(p).length > 60 ? productDescriptionOf(p).slice(0, 60) + "..." : productDescriptionOf(p)) : "—") : <span className="skeleton inline-block h-3 w-32 rounded" aria-label={t("table.loading")} />}</p>
                   <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--accent)" }}>{t("card.variantsLabel")} {variantCount}</p>
                   <p className="mt-1 text-[11px] font-medium" style={{ color: "var(--text-secondary)" }}>{t("card.taxLabel")} {p.tax !== undefined && p.tax !== null ? `${Number(p.tax)}%` : "—"}</p>
                 </div>
@@ -1086,7 +1109,7 @@ const [viewMode, setViewMode] = useState(() => {
       {/* PAGINATION — simple & professional:
           Left  : "Showing X–Y of Z products"
           Right : Prev/Next + page numbers.
-          Koi "rows per page" selector nahi — list hamesha 20 rows/page.
+          Current-page rows hi backend se load hoti hain; page size user choose kar sakta hai.
           ✅ Page switch ke doran bar MOUNTED rehti hai (sirf buttons disable hote hain). */}
       {!productsError && totalRecords > 0 && (
         <div className="flex flex-col gap-3 rounded-lg px-4 py-3 lg:flex-row lg:items-center lg:justify-between" style={cardStyle}>
@@ -1103,6 +1126,18 @@ const [viewMode, setViewMode] = useState(() => {
 
           {/* Right: controls */}
           <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <label className="me-2 flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+              <span>{t("pagination.rowsPerPage")}</span>
+              <select
+                value={productsPerPage}
+                onChange={(event) => { setProductsPerPage(Number(event.target.value)); setCurrentPage(1); }}
+                className="h-8 rounded-md px-2 text-[12px] outline-none"
+                style={{ backgroundColor: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border-color)" }}
+                aria-label={t("pagination.rowsPerPage")}
+              >
+                {[10, 20, 50].map((size) => <option key={size} value={size}>{fmt(size)}</option>)}
+              </select>
+            </label>
             <div className="flex items-center gap-1.5" role="navigation" aria-label={t("pagination.label")}>
               {/* Previous */}
               <button
@@ -1128,12 +1163,12 @@ const [viewMode, setViewMode] = useState(() => {
                     onClick={() => goToPage(pg)}
                     disabled={isFetching}
                     aria-current={pg === currentPage ? "page" : undefined}
-                    aria-label={t("pagination.pageLabel", { page: pg })}
+                    aria-label={t("pagination.pageLabel", { page: fmt(pg) })}
                     className="flex h-8 w-8 items-center justify-center rounded-md text-[13px] font-semibold tabular-nums transition hover:opacity-80"
                     style={pg === currentPage
                       ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" }
                       : { backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
-                  >{pg}</button>
+                  >{fmt(pg)}</button>
                 )
               )}
 
@@ -1852,7 +1887,7 @@ function SummaryCardSkeleton() {
   );
 }
 
-function ProductTableSkeleton({ rows = PRODUCTS_PER_PAGE }) {
+function ProductTableSkeleton({ rows = DEFAULT_PRODUCTS_PER_PAGE }) {
   const { t: __t } = useTranslation();
   const t = (k, p) => __t("admin.products." + k, p);
   return (

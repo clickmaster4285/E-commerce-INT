@@ -273,14 +273,17 @@ function OrdersView() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
 
-  const ordersQueryKey = ["admin-orders", page, pageSize, statusFilter, search, paymentFilter, shippingFilter, dateRange, productId];
+  const ordersQueryKey = ["admin-orders", "paginated", locale, page, pageSize, search, statusFilter, paymentFilter, shippingFilter, dateRange, productId, sortConfig.key, sortConfig.direction];
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ordersQueryKey,
-    // ✅ Saare filters backend pe jaate hain — pagination aur counts sahi rehte hain
+    // ✅ Saare filters + sorting backend pe jaate hain — pagination aur counts sahi rehte hain
     queryFn: () => orderApi.getAll({
       page, limit: pageSize, status: statusFilter, search,
       payment: paymentFilter, shipping: shippingFilter, dateRange,
       productId: productId || undefined,
+      sort: sortConfig.key || "",
+      order: sortConfig.direction === "asc" ? "asc" : "desc",
+      locale,
     }),
     retry: 1,
   });
@@ -300,20 +303,13 @@ if (lastProductId !== productId) {
   const handleSearchInput = (value) => {
     setSearchInput(value);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => { setSearch(value.trim()); setPage(1); }, 300);
+    // ✅ Debounce (300ms) + page reset + selection/preview clear (brands ka pattern)
+    debounceRef.current = setTimeout(() => { setSearch(value.trim()); setPage(1); setSelectedIds([]); setExpandedRows([]); }, 300);
   };
 
-  // ✅ productId bhi count queries me jata hai — stat cards filtered product ke orders dikhate hain
-  const buildCountQuery = (key, status) => ({
-    queryKey: ["admin-orders-count", key, productId],
-    queryFn: () => orderApi.getAll({ page: 1, limit: 1, status, productId: productId || undefined }),
-    staleTime: 60 * 1000, retry: false,
-  });
-  const { data: allCount } = useQuery(buildCountQuery("all", "all"));
-  const { data: pendingCount } = useQuery(buildCountQuery("pending", "pending"));
-  const { data: shippedCount } = useQuery(buildCountQuery("shipped", "shipped"));
-  const { data: deliveredCount } = useQuery(buildCountQuery("delivered", "delivered"));
-  const { data: cancelledCount } = useQuery(buildCountQuery("cancelled", "cancelled"));
+  // ✅ Stat card counts server se aate hain (poore set ke, har query alag na
+  //    banana pare) — brands/banner ka server "counts" meta ka exact pattern
+  const orderCounts = data?.counts || { total: 0, pending: 0, shipped: 0, delivered: 0, cancelled: 0 };
 
   // ✅ Product history summary — units/revenue/date range + status breakdown.
   //    NOTE: status filter yahan intentionally pass nahi kiya, warna status
@@ -338,7 +334,6 @@ if (lastProductId !== productId) {
     mutationFn: ({ id, status, notes }) => orderApi.updateStatus(id, { status, ...(notes ? { notes } : {}) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
     },
     onError: () => toast.error(t("admin.orders.toast.updateOrderFailed")),
   });
@@ -347,7 +342,6 @@ if (lastProductId !== productId) {
     mutationFn: ({ id }) => orderApi.updatePayment(id, { status: "paid" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
       toast.success(t("admin.orders.toast.paymentReceived"));
     },
     onError: () => toast.error(t("admin.orders.toast.paymentFailed")),
@@ -355,39 +349,36 @@ if (lastProductId !== productId) {
 
   const orders = useMemo(() => data?.data || [], [data]);
   const { data: shippingMethods = [], isLoading: shippingMethodsLoading } = useQuery({ queryKey: ["adminShippingMethods"], queryFn: shippingApi.getMethods, retry: false });
-  usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient });
-  usePageTranslations({ model: "Order", records: orders, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const shippingMethodsAlreadyTranslated = locale === "en" || (shippingMethods.length > 0 && shippingMethods.every((method) => !method.name?.trim() || method.translations?.name?.[locale]?.trim()));
+  const shippingMethodsTranslationsReady = usePageTranslations({ model: "ShippingMethod", records: shippingMethods, locale, ready: !shippingMethodsLoading, queryKey: ["adminShippingMethods"], queryClient, alreadyTranslated: shippingMethodsAlreadyTranslated, fallbackAfterRetries: true });
+  const translatableShippingMethodCount = shippingMethods.filter((method) => method.name?.trim()).length;
+  const untranslatedShippingMethodCount = shippingMethods.filter((method) => method.name?.trim() && !method.translations?.name?.[locale]?.trim()).length;
+  const showShippingMethodTranslationSkeletons = locale !== "en" && translatableShippingMethodCount > 0 && untranslatedShippingMethodCount / translatableShippingMethodCount >= 0.8 && !shippingMethodsTranslationsReady;
+  usePageTranslations({ model: "Order", records: orders, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient, fallbackAfterRetries: true });
   const orderProducts = useMemo(() => orders.flatMap((order) => (order.items || []).map((item) => item.product_id).filter((product) => product && typeof product === "object" && product._id)), [orders]);
-  usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const orderProductsAlreadyTranslated = locale === "en" || (orderProducts.length > 0 && orderProducts.every((product) => !product.name?.trim() || product.translations?.name?.[locale]?.trim()));
+  const orderProductsTranslationsReady = usePageTranslations({ model: "Product", records: orderProducts, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient, alreadyTranslated: orderProductsAlreadyTranslated, fallbackAfterRetries: true });
   const orderVariants = useMemo(() => orders.flatMap((order) => (order.items || []).map((item) => item.variant_id).filter((variant) => variant && typeof variant === "object" && variant._id)), [orders]);
-  usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient });
+  const orderVariantsAlreadyTranslated = locale === "en" || (orderVariants.length > 0 && orderVariants.every((variant) => !variant.title?.trim() || variant.translations?.title?.[locale]?.trim()));
+  const orderVariantsTranslationsReady = usePageTranslations({ model: "Variant", records: orderVariants, locale, ready: !isFetching, queryKey: ordersQueryKey, queryClient, alreadyTranslated: orderVariantsAlreadyTranslated, fallbackAfterRetries: true });
+  const orderTranslationValues = [...orderProducts.map((product) => ({ source: product.name, translation: product.translations?.name?.[locale] })), ...orderVariants.map((variant) => ({ source: variant.title, translation: variant.translations?.title?.[locale] }))].filter((field) => field.source?.trim());
+  const untranslatedOrderFieldCount = orderTranslationValues.filter((field) => !field.translation?.trim()).length;
+  const showOrderTranslationSkeletons = locale !== "en" && orderTranslationValues.length > 0 && untranslatedOrderFieldCount / orderTranslationValues.length >= 0.8;
   const pagination = data?.pagination || {};
   const total = pagination.total || 0;
-  const totalPages = pagination.totalPages || 1;
+  const totalPages = pagination.totalPages || pagination.pages || 1;
+  const displayedPage = pagination.page || page;
+  const rowLimit = pagination.limit || pageSize;
 
-  // ✅ Payment / shipping / date range / product filters ab BACKEND pe lagte hain
-  //    (is liye pagination + counts sahi hain). Yahan sirf sorting hai — wo backend nahi karta.
-  const filteredOrders = useMemo(() => {
-    const { key, direction } = sortConfig;
-    const val = (o) => {
-      switch (key) {
-        case "order_number": return o.order_number || "";
-        case "customer": return (o.address_snapshot?.full_name || o.user_id?.name || "").toLowerCase();
-        case "total": return Number(o.total || 0);
-        case "payment": return o.payment?.method || "";
-        case "status": return o.status || "";
-        case "created_at": default: return new Date(o.created_at || 0).getTime();
-      }
-    };
-    return [...orders].sort((a, b) => {
-      const va = val(a), vb = val(b);
-      if (va < vb) return direction === "asc" ? -1 : 1;
-      if (va > vb) return direction === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [orders, sortConfig]);
+  // ✅ Brand pagination jaisa number formatting (locale-aware, no grouping)
+  const pageFormatter = useMemo(() => new Intl.NumberFormat(intlLocale(locale), { useGrouping: false }), [locale]);
+  const formatPageNumber = (value) => pageFormatter.format(value);
 
-  const startIndex = ((pagination.page || 1) - 1) * pageSize;
+  // ✅ Sorting bhi server par ho chuki (ORDER_SORT_FIELDS whitelist) — yahan
+  //    sirf current-page rows aati hain; koi client-side sort/filter nahi
+  const filteredOrders = orders;
+
+  const startIndex = (displayedPage - 1) * rowLimit;
 
   const allSelected = filteredOrders.length > 0 && filteredOrders.every((o) => selectedIds.includes(o._id));
   const someSelected = filteredOrders.some((o) => selectedIds.includes(o._id));
@@ -402,7 +393,6 @@ if (lastProductId !== productId) {
     try {
       await Promise.all(targets.map((id) => orderApi.updateStatus(id, { status })));
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
       toast.success(t("admin.orders.toast.bulkStatus", { count: formatNumber(targets.length, locale), status: t(`admin.orders.status.${status}`) }));
       setSelectedIds([]);
       setBulkCancelConfirm(false);
@@ -421,22 +411,37 @@ if (lastProductId !== productId) {
     try {
       await Promise.all(cancelIds.map((id) => orderApi.updateStatus(id, { status: "cancelled", cancel_reason: cancelReason.trim() })));
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders-count"] });
       toast.success(t("admin.orders.toast.bulkCancelled", { count: formatNumber(cancelIds.length, locale) }));
       setSelectedIds([]); setBulkCancelConfirm(false); setCancelIds([]);
     } catch (error) {
       toast.error(t("admin.orders.toast.bulkCancelFailed"));
     } finally { setCancelBusy(false); }
   };
-  const handleSort = (key) => setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+  const handleSort = (key) => {
+    // ✅ Server side sorting — sort badalne par pehle page par wapas (brands ka pattern)
+    setSortConfig((prev) => ({ key, direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc" }));
+    setPage(1);
+    setSelectedIds([]);
+    setExpandedRows([]);
+  };
+
+  const goToPage = (target) => {
+    const n = Number(target);
+    // ✅ Cross-page selection + expanded preview clear (brands ka pattern)
+    if (Number.isFinite(n) && n >= 1 && n <= totalPages && n !== displayedPage) {
+      setPage(n);
+      setSelectedIds([]);
+      setExpandedRows([]);
+    }
+  };
 
   const renderPageNumbers = () => {
     const pages = [];
     if (totalPages <= 5) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
     else {
-      if (page <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
-      else if (page >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-      else pages.push(1, "...", page - 1, page, page + 1, "...", totalPages);
+      if (displayedPage <= 3) pages.push(1, 2, 3, 4, "...", totalPages);
+      else if (displayedPage >= totalPages - 2) pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      else pages.push(1, "...", displayedPage - 1, displayedPage, displayedPage + 1, "...", totalPages);
     }
     return pages;
   };
@@ -477,11 +482,11 @@ if (lastProductId !== productId) {
   };
 
   const statCards = [
-    { title: t("admin.orders.page.totalOrders"), value: allCount?.pagination?.total ?? "—", valueClass: "" },
-    { title: t("admin.orders.status.pending"), value: pendingCount?.pagination?.total ?? "—", valueClass: "text-amber-400" },
-    { title: t("admin.orders.status.shipped"), value: shippedCount?.pagination?.total ?? "—", valueClass: "text-indigo-400" },
-    { title: t("admin.orders.status.delivered"), value: deliveredCount?.pagination?.total ?? "—", valueClass: "text-emerald-400" },
-    { title: t("admin.orders.status.cancelled"), value: cancelledCount?.pagination?.total ?? "—", valueClass: "text-red-400" },
+    { title: t("admin.orders.page.totalOrders"), value: orderCounts.total, valueClass: "" },
+    { title: t("admin.orders.status.pending"), value: orderCounts.pending, valueClass: "text-amber-400" },
+    { title: t("admin.orders.status.shipped"), value: orderCounts.shipped, valueClass: "text-indigo-400" },
+    { title: t("admin.orders.status.delivered"), value: orderCounts.delivered, valueClass: "text-emerald-400" },
+    { title: t("admin.orders.status.cancelled"), value: orderCounts.cancelled, valueClass: "text-red-400" },
   ];
 
   const openDetailPage = (order) => router.push(`/admin/orders/${order._id}`);
@@ -556,13 +561,13 @@ if (lastProductId !== productId) {
 
           {/* Filters (Right Side) */}
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }}
+            <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); setSelectedIds([]); setExpandedRows([]); }}
               options={[["all", "All Status"], ["pending", "Pending"], ["confirmed", "Confirmed"], ["processing", "Processing"], ["shipped", "Shipped"], ["delivered", "Delivered"], ["cancelled", "Cancelled"]]} />
-            <FilterSelect width={130} value={paymentFilter} onChange={setPaymentFilter}
+            <FilterSelect width={130} value={paymentFilter} onChange={(v) => { setPaymentFilter(v); setPage(1); setSelectedIds([]); setExpandedRows([]); }}
               options={[["all", "All Payments"], ["paid", "Paid"], ["pending", "Unpaid"], ["failed", "Failed"]]} />
-            <FilterSelect width={140} value={shippingFilter} onChange={setShippingFilter}
+            <FilterSelect width={140} value={shippingFilter} onChange={(v) => { setShippingFilter(v); setPage(1); setSelectedIds([]); setExpandedRows([]); }}
               options={[["all", "All Shipping"], ["standard", "Standard"], ["express", "Express"]]} />
-            <FilterSelect width={130} value={dateRange} onChange={setDateRange}
+            <FilterSelect width={130} value={dateRange} onChange={(v) => { setDateRange(v); setPage(1); setSelectedIds([]); setExpandedRows([]); }}
               options={[["all", "All Time"], ["today", "Today"], ["yesterday", "Yesterday"], ["7d", "Last 7 days"], ["30d", "Last 30 days"]]} />
           </div>
         </div>
@@ -735,7 +740,7 @@ if (lastProductId !== productId) {
                                     boxShadow: "inset 2px 0 0 var(--accent)",
                                   } : undefined}>
                                   <OrderItemImage item={item} size={22} />
-                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{productNameOf(item.product_id) || item.name}</span>
+                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{showOrderTranslationSkeletons && !orderProductsTranslationsReady && item.product_id?.name?.trim() && !item.product_id?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : productNameOf(item.product_id) || item.name}</span>
                                   <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: isMatch ? "var(--accent)" : "var(--text-secondary)" }}>
                                     ×{item.qty}
                                   </span>
@@ -861,9 +866,9 @@ if (lastProductId !== productId) {
                                     }}>
                                     <OrderItemImage item={item} size={36} />
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-xs font-medium truncate" title={item.name}>{productNameOf(item.product_id) || item.name}</p>
+                                      <p className="text-xs font-medium truncate" title={item.name}>{showOrderTranslationSkeletons && !orderProductsTranslationsReady && item.product_id?.name?.trim() && !item.product_id?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : productNameOf(item.product_id) || item.name}</p>
                                       <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{(item.variant_id?.title || item.variantTitle) ? ` · ${contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title)}` : ""}
+                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{(item.variant_id?.title || item.variantTitle) ? <> · {showOrderTranslationSkeletons && !orderVariantsTranslationsReady && item.variant_id?.title?.trim() && !item.variant_id?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-2.5 w-16 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title)}</> : null}
                                       </p>
                                       {(dealLabel(item, t) || Number(item.free_items) > 0 || item.bundle_name) && (
                                         <p className="flex flex-wrap items-center gap-1 mt-1">
@@ -899,6 +904,7 @@ if (lastProductId !== productId) {
                     key={order._id}
                     order={order}
                     shippingMethods={shippingMethods}
+                    showShippingMethodTranslationSkeletons={showShippingMethodTranslationSkeletons}
                     isSelected={isSelected}
                     payStatus={payStatus}
                     menuOpen={actionMenuFor === order._id}
@@ -918,20 +924,21 @@ if (lastProductId !== productId) {
           </>
         )}
 
-        {/* Pagination - Mobile Optimized */}
-        {!isLoading && !isError && total > pageSize && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-3 sm:p-4" style={cardStyle}>
+        {/* ===== Server-side pagination — brands admin list ka exact pattern ===== */}
+        {!isLoading && !isError && total > 10 && (
+          <div className="flex flex-col xl:flex-row items-center justify-between gap-3 rounded-lg p-3 sm:p-4" style={cardStyle}>
             <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
               <p className="text-[12px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>
-                {t("admin.orders.page.showingRange", { from: new Intl.NumberFormat(intlLocale(locale)).format(filteredOrders.length > 0 ? startIndex + 1 : 0), to: new Intl.NumberFormat(intlLocale(locale)).format(Math.min(startIndex + pageSize, total)), total: new Intl.NumberFormat(intlLocale(locale)).format(total) })}
+                {t("admin.orders.page.showingRange", { from: formatPageNumber(filteredOrders.length > 0 ? startIndex + 1 : 0), to: formatPageNumber(Math.min(startIndex + rowLimit, total)), total: formatPageNumber(total) })}
+                {isFetching && !isLoading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}
               </p>
               <div className="flex items-center gap-2">
                 <label className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.rows")}</label>
-                <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); setSelectedIds([]); setExpandedRows([]); }}
                   aria-label={t("admin.orders.page.rowsPerPage")}
                   className="appearance-none h-9 sm:h-8 pl-2 pr-7 rounded-md text-[12px] outline-none cursor-pointer"
                   style={{ ...inputStyle, backgroundColor: "var(--bg-tertiary)" }}>
-                  {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                  {[15, 30, 50, 100].map((n) => <option key={n} value={n}>{formatPageNumber(n)}</option>)}
                 </select>
               </div>
               {totalPages > 1 && (
@@ -940,10 +947,7 @@ if (lastProductId !== productId) {
                   <input type="number" min="1" max={totalPages} value={jumpTo}
                     onChange={(e) => setJumpTo(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        const n = Number(jumpTo);
-                        if (n >= 1 && n <= totalPages) { setPage(n); setJumpTo(""); }
-                      }
+                      if (e.key === "Enter") { goToPage(jumpTo); setJumpTo(""); }
                     }}
                     aria-label={t("admin.orders.page.jumpToPage")}
                     className="w-16 sm:w-14 h-9 sm:h-8 rounded-md text-[12px] text-center outline-none"
@@ -952,36 +956,48 @@ if (lastProductId !== productId) {
               )}
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-end">
-              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+              <button type="button" onClick={() => goToPage(displayedPage - 1)} disabled={displayedPage === 1 || isFetching}
+                title={t("admin.shared.pagination.prev")} aria-label={t("admin.shared.pagination.prev")}
                 className="h-10 w-10 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <ChevronLeftIcon className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
-              <div className="flex items-center gap-1">
+              <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((pageNum, index) =>
                   pageNum === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2 text-sm hidden sm:inline" style={{ color: "var(--text-muted)" }}>...</span>
+                    <span key={`ellipsis-${index}`} className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span>
                   ) : (
-                    <button key={`page-${pageNum}`} type="button" onClick={() => setPage(pageNum)}
-                      aria-current={page === pageNum ? "page" : undefined}
-                      className="h-10 w-10 sm:h-8 sm:min-w-[32px] sm:px-2 rounded-md text-[13px] font-medium transition hover:opacity-80"
+                    <button key={`page-${pageNum}`} type="button" onClick={() => goToPage(pageNum)}
+                      aria-label={t("admin.brands.ui.goToPage", { page: formatPageNumber(pageNum) })}
+                      aria-current={displayedPage === pageNum ? "page" : undefined}
+                      className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80"
                       style={{
-                        backgroundColor: page === pageNum ? "var(--accent)" : "var(--bg-tertiary)",
-                        color: page === pageNum ? "var(--accent-text)" : "var(--text-primary)",
-                        border: `1px solid ${page === pageNum ? "var(--accent)" : "var(--border-color)"}`,
+                        backgroundColor: displayedPage === pageNum ? "var(--accent)" : "var(--bg-tertiary)",
+                        color: displayedPage === pageNum ? "var(--accent-text)" : "var(--text-primary)",
+                        border: `1px solid ${displayedPage === pageNum ? "var(--accent)" : "var(--border-color)"}`,
                       }}>
-                      {pageNum}
+                      {formatPageNumber(pageNum)}
                     </button>
                   )
                 )}
-              </div>
-              <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+              </span>
+              <span className="sm:hidden text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>
+                {t("admin.shared.pagination.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}
+              </span>
+              <button type="button" onClick={() => goToPage(displayedPage + 1)} disabled={displayedPage >= totalPages || isFetching}
+                title={t("admin.shared.pagination.next")} aria-label={t("admin.shared.pagination.next")}
                 className="h-10 w-10 sm:h-8 sm:w-8 rounded-md flex items-center justify-center transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
                 <ChevronRightIcon className="w-5 h-5 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
+        )}
+        {!isLoading && !isError && filteredOrders.length > 0 && total <= 10 && (
+          <p className="text-[11px] text-center sm:text-left" style={{ color: "var(--text-muted)" }}>
+            {t("admin.shared.pagination.showingCount", { count: formatPageNumber(filteredOrders.length), total: formatPageNumber(total) })}
+            {isFetching && !isLoading ? <span className="ms-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}
+          </p>
         )}
       </div>
 
@@ -1150,7 +1166,7 @@ function SortHeader({ label, sortKey, sortConfig, onSort, hidden = false, align 
 }
 
 // Mobile Order Card - Optimized for touch
-function OrderCard({ order, shippingMethods = [], isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
+function OrderCard({ order, shippingMethods = [], showShippingMethodTranslationSkeletons = false, isSelected, payStatus, menuOpen, cardStyle, onToggleSelect, onOpen, onToggleMenu, onCloseMenu, onViewDetails, onQuickStatus, onCancel, onMarkPayment }) {
   const { t, locale } = useTranslation();
   return (
     <div className="rounded-xl p-4 space-y-3 cursor-pointer transition box-border max-w-full"
@@ -1219,7 +1235,7 @@ function OrderCard({ order, shippingMethods = [], isSelected, payStatus, menuOpe
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
         <PaymentBadge status={payStatus} />
         <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-          {paymentMethodLabel(order.payment?.method, t)} • {shippingMethodLabel(order.shipping_method || "standard", t, shippingMethods, locale)}
+          {paymentMethodLabel(order.payment?.method, t)} • {showShippingMethodTranslationSkeletons && shippingMethods.some((method) => String(method._id) === String(order.shipping_method) && method.name?.trim() && !method.translations?.name?.[locale]?.trim()) ? <span className="inline-block h-2.5 w-20 rounded bg-[var(--bg-card)] animate-pulse align-middle" aria-busy="true" /> : shippingMethodLabel(order.shipping_method || "standard", t, shippingMethods, locale)}
         </span>
       </div>
 

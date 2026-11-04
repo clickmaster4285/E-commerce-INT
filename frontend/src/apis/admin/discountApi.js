@@ -29,23 +29,32 @@ export const discountApi = {
     }
   },
 
-  getAllPaginated: async ({ page = 1, limit = 15, search = "", status = "all" } = {}) => {
-    const params = { page, limit };
+  getAllPaginated: async ({ page = 1, limit = 15, search = "", status = "all", applyTo = "", locale = "en" } = {}) => {
+    const params = { page, limit, admin_list: 1, locale };
     if (search) params.search = search;
     if (status && status !== "all") params.status = status;
+    if (applyTo && applyTo !== "all") params.applyTo = applyTo;
     return adminHttp.get("/discounts", { params }).then((res) => paginated(res, limit));
   },
 
   // ✅ GET SINGLE DISCOUNT
-  getById: async (id) => {
+  getById: async (id, { compact = false, locale = "en" } = {}) => {
     try {
       if (!id) throw new Error("Discount ID is required");
-      const response = await adminHttp.get(`/discounts/${id}`);
+      const response = await adminHttp.get(`/discounts/${id}`, { params: compact ? { admin_detail: 1, locale } : undefined });
       return response.data;
     } catch (error) {
       console.error(`❌ Error fetching discount ${id}:`, error);
       throw error;
     }
+  },
+
+  getTargetsPaginated: async (id, { type, page = 1, limit = 10, locale = "en" } = {}) => {
+    const response = await adminHttp.get(`/discounts/${id}/targets`, { params: { type, page, limit, locale } });
+    return {
+      items: Array.isArray(response.data?.data) ? response.data.data : [],
+      pagination: response.data?.pagination || { total: 0, page, limit, pages: 1, hasNext: false, hasPrev: false },
+    };
   },
 
   // ✅ CREATE DISCOUNT

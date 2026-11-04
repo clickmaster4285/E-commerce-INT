@@ -507,6 +507,7 @@ export default function DiscountsPage() {
   const { markSelfAction } = useDiscountSocketSync();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all");
   const [viewMode, setViewMode] = useState(() => {
@@ -526,7 +527,7 @@ export default function DiscountsPage() {
   const typeMenuRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [formData, setFormData] = useState({
     name: "", code: "", description: "",
@@ -541,17 +542,22 @@ export default function DiscountsPage() {
   const [formErrors, setFormErrors] = useState({});
 
   const { data: paginatedDiscountsData, isLoading, isFetching } = useQuery({
-    queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter],
-    queryFn: () => discountApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: search || "", status: statusFilter === "all" ? "" : statusFilter, applyTo: targetFilter === "all" ? "" : targetFilter }),
+    queryKey: ["discounts", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, statusFilter, targetFilter],
+    queryFn: () => discountApi.getAllPaginated({ page: currentPage, limit: itemsPerPage, search: debouncedSearch || "", status: statusFilter, applyTo: targetFilter, locale }),
   });
   const discounts = paginatedDiscountsData?.items || paginatedDiscountsData || normalizeArrayResponse(paginatedDiscountsData);
-  usePageTranslations({ model: "Discount", records: discounts, locale, ready: !isFetching && paginatedDiscountsData?.pagination?.page === currentPage, queryKey: ["discounts", "paginated", currentPage, search, statusFilter, targetFilter], queryClient });
+  const discountsAlreadyTranslated = locale === "en" || (discounts.length > 0 && discounts.every((discount) =>
+    typeof discount.translations?.name?.[locale] === "string" && discount.translations.name[locale].trim().length > 0
+  ));
+  const pageTranslationsReady = usePageTranslations({ model: "Discount", records: discounts, locale, ready: !isFetching && !!paginatedDiscountsData?.pagination, queryKey: ["discounts", "paginated", locale, currentPage, itemsPerPage, debouncedSearch, statusFilter, targetFilter], queryClient, alreadyTranslated: discountsAlreadyTranslated, fallbackAfterRetries: true });
+  const untranslatedDiscountNameCount = discounts.filter((discount) => !discount?.translations?.name?.[locale]?.trim()).length;
+  const showDiscountTranslationSkeletons = locale !== "en" && discounts.length > 0 && untranslatedDiscountNameCount / discounts.length >= 0.8 && !pageTranslationsReady;
   const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
-  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
-  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: brandApi.getAll, staleTime: 60000, enabled: showModal });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
   useEffect(() => {
@@ -574,9 +580,13 @@ export default function DiscountsPage() {
   }, [isTypeMenuOpen]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setCurrentPage(1), 0);
-    return () => clearTimeout(timer);
-  }, [search, statusFilter, targetFilter]);
+    const timer = window.setTimeout(() => { setDebouncedSearch(search); setCurrentPage(1); setSelectedIds([]); }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { setCurrentPage(1); setSelectedIds([]); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [statusFilter, targetFilter]);
   useEffect(() => {
     if (!actionMenu) return;
     const close = () => setActionMenu(null);
@@ -652,23 +662,14 @@ export default function DiscountsPage() {
     onError: (error) => toast.error(error?.response?.data?.message || error?.message || t("admin.discounts.toast.statusFailed")),
   });
 
-  const filteredDiscounts = useMemo(() => {
-    const term = search.toLowerCase().trim();
-    return discounts.filter((d) => {
-      const name = String(d?.name || "").toLowerCase();
-      const code = String(d?.code || "").toLowerCase();
-      const matchSearch = !term || name.includes(term) || code.includes(term);
-      const status = getDiscountStatus(d);
-      const matchStatus = statusFilter === "all" || status === statusFilter;
-      const rawTarget = d?.target_type || d?.applyTo || "all_products";
-      const matchTarget = targetFilter === "all" || rawTarget === targetFilter || (targetFilter === "product" && rawTarget === "specific_products") || (targetFilter === "category" && rawTarget === "specific_categories");
-      return matchSearch && matchStatus && matchTarget;
-    });
-  }, [discounts, search, statusFilter, targetFilter]);
-
   const paginatedDiscounts = discounts; 
   const totalPages = pagination.pages || 1;
   const totalDiscounts = pagination.total || discounts.length;
+  const displayedPage = pagination.page || currentPage;
+  const startIndex = totalDiscounts ? (displayedPage - 1) * itemsPerPage : 0;
+  const endIndex = Math.min(startIndex + paginatedDiscounts.length, totalDiscounts);
+  const formatPageNumber = (value) => new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
+  const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse";
 
   // âœ… Stats server se aate hain (poora dataset — search respect, status se independent).
   //    Purana response (stats missing) ho to current page se fallback.
@@ -1106,7 +1107,9 @@ export default function DiscountsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><TagIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
+                              {!showDiscountTranslationSkeletons || pageTranslationsReady || discount?.translations?.name?.[locale]?.trim()
+                                ? <p className="font-semibold truncate max-w-[220px]">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
+                                : <span className={`${translationSkeleton} w-28 align-middle`} aria-label={t("admin.categories.page.updating")} />}
                             </div>
                           </div>
                         </td>
@@ -1130,7 +1133,9 @@ export default function DiscountsPage() {
                   <StatusBadge status={getDiscountStatus(discount)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
+                  {!showDiscountTranslationSkeletons || pageTranslationsReady || discount?.translations?.name?.[locale]?.trim()
+                    ? <p className="font-semibold text-[13px] truncate">{nameOf(discount) || t("admin.discounts.detail.discountCreated")}</p>
+                    : <span className={`${translationSkeleton} w-28`} aria-label={t("admin.categories.page.updating")} />}
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
                   <span className="text-[12px] font-bold" style={{ color: "var(--success-text)" }}>{formatValue(discount, t, locale)}</span>
@@ -1144,22 +1149,32 @@ export default function DiscountsPage() {
         {/* PAGINATION */}
         {totalDiscounts > itemsPerPage && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-lg p-4" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalDiscounts)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{totalDiscounts}{" "}{t("admin.nav.item.discounts")}</p>
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.showingRange", { from: formatPageNumber(startIndex + 1), to: formatPageNumber(endIndex), total: formatPageNumber(totalDiscounts) })}{isFetching && !isLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}</p>
+              <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span>{t("admin.shared.pagination.rowsPerPage")}</span>
+                <select value={itemsPerPage} onChange={(event) => { setItemsPerPage(Number(event.target.value)); setCurrentPage(1); setSelectedIds([]); }} className="h-9 w-[84px] rounded-lg px-3 text-[13px] outline-none cursor-pointer" style={inputStyle} aria-label={t("admin.shared.pagination.rowsPerPage")}>
+                  {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
+                </select>
+              </label>
+            </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronLeftIcon /></button>
+              <span className="sm:hidden text-[13px] font-medium whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{t("admin.categories.page.pageOf", { page: formatPageNumber(displayedPage), total: formatPageNumber(totalPages) })}</span>
+              <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={displayedPage === 1 || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.categories.page.prev")}><ChevronLeftIcon /></button>
               <span className="hidden sm:inline-flex items-center gap-1">
                 {renderPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
                     {page === "..." ? <span className="px-2 text-sm" style={{ color: "var(--text-muted)" }}>...</span> : (
-                      <button onClick={() => setCurrentPage(page)} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80" style={{ backgroundColor: currentPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: currentPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${currentPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{page}</button>
+                      <button onClick={() => setCurrentPage(page)} disabled={isFetching && displayedPage !== page} className="h-8 min-w-[32px] px-2 rounded-md text-[13px] font-medium transition hover:opacity-80 disabled:opacity-50" style={{ backgroundColor: displayedPage === page ? "var(--accent)" : "var(--bg-tertiary)", color: displayedPage === page ? "var(--accent-text)" : "var(--text-primary)", border: `1px solid ${displayedPage === page ? "var(--accent)" : "var(--border-color)"}` }}>{formatPageNumber(page)}</button>
                     )}
                   </React.Fragment>
                 ))}
               </span>
-              <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}><ChevronRightIcon /></button>
+              <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={displayedPage === totalPages || isFetching} className="h-8 w-8 rounded-md flex items-center justify-center transition disabled:opacity-30 disabled:cursor-not-allowed hover:opacity-80" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }} title={t("admin.categories.page.next")}><ChevronRightIcon /></button>
             </div>
           </div>
         )}
+        {paginatedDiscounts.length > 0 && totalDiscounts <= itemsPerPage && <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{t("admin.orders.page.showingRange", { from: formatPageNumber(startIndex + 1), to: formatPageNumber(endIndex), total: formatPageNumber(totalDiscounts) })}{isFetching && !isLoading ? <span className="ml-2" style={{ color: "var(--accent)" }}>{t("admin.categories.page.updating")}</span> : null}</p>}
       </div>
 
       {/* MODALS */}

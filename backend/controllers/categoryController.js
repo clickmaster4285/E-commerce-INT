@@ -13,7 +13,73 @@ const { queueTranslationSync } = require("../utils/translationService");
 // translate hota hai aur options ke labels `values[].label_translations` me
 // hote hain. Inke bina frontend hamesha English fallback dikha raha hota.
 const ATTRIBUTE_POPULATE_SELECT =
-  "name code description data_type values variant_allowed is_active translations translation_source translation_status";
+  "name code description data_type values variant_allowed is_active translations";
+
+const getRequestedLocale = (value) => {
+  const locale = String(value || "en").trim().toLowerCase();
+  return /^[a-z]{2}$/.test(locale) ? locale : "en";
+};
+
+const localizedMap = (map, locale) => {
+  if (locale === "en" || !map?.[locale]) return undefined;
+  return { [locale]: map[locale] };
+};
+
+const trimAttributeForLocale = (attribute, locale) => {
+  if (!attribute || typeof attribute !== "object") return attribute;
+  const result = Object.fromEntries([
+    "_id", "name", "code", "description", "data_type", "values", "variant_allowed",
+    "is_active", "translations", "parent_attribute_id", "sort_order",
+  ].filter((key) => attribute[key] !== undefined).map((key) => [key, attribute[key]]));
+  if (result.translations) {
+    result.translations = {
+      ...(localizedMap(result.translations.name, locale) && { name: localizedMap(result.translations.name, locale) }),
+      ...(localizedMap(result.translations.description, locale) && { description: localizedMap(result.translations.description, locale) }),
+    };
+  }
+  if (Array.isArray(result.values)) {
+    result.values = result.values.map((entry) => {
+      if (!entry || typeof entry !== "object") return entry;
+      const value = { ...entry };
+      if (value.label_translations) {
+        value.label_translations = localizedMap(value.label_translations, locale) || {};
+      }
+      return value;
+    });
+  }
+  return result;
+};
+
+const trimCategoryForLocale = (category, locale) => {
+  if (!category) return category;
+  const result = Object.fromEntries([
+    "_id", "name", "category_code", "description", "slug", "category_type", "is_active",
+    "parent_category_id", "attributes", "created_at", "updated_at", "createdby", "updatedby",
+    "translations",
+  ].filter((key) => category[key] !== undefined).map((key) => [key, category[key]]));
+  if (result.translations) {
+    result.translations = {
+      ...(localizedMap(result.translations.name, locale) && { name: localizedMap(result.translations.name, locale) }),
+      ...(localizedMap(result.translations.description, locale) && { description: localizedMap(result.translations.description, locale) }),
+    };
+  }
+  if (result.parent_category_id && typeof result.parent_category_id === "object") {
+    result.parent_category_id = trimCategoryForLocale(result.parent_category_id, locale);
+  }
+  if (Array.isArray(result.attributes)) {
+    result.attributes = result.attributes.map((config) => ({
+      is_required: config.is_required,
+      is_visible: config.is_visible,
+      is_filterable: config.is_filterable,
+      is_searchable: config.is_searchable,
+      is_variant_option: config.is_variant_option,
+      sort_order: config.sort_order,
+      value: config.value,
+      attribute_id: trimAttributeForLocale(config.attribute_id, locale),
+    }));
+  }
+  return result;
+};
 
 // createdby/updatedby creator User ya Employee dono ho sakta hai.
 // Model ref Employee hai, isliye populate fail hone par User se resolve karo.
@@ -269,16 +335,34 @@ const assertNameForcesRootParent = async ({ name, parentId, categoryId = null })
 
 // ✅ UPDATED: getCategoryAttributesList no longer checks tenant_id
 // ✅ UPDATED: Returns hierarchical structure (Main Attribute → Sub-Attribute → Values)
-const getCategoryAttributesList = async (categoryId) => {
+const getCategoryAttributesList = async (categoryId, paginationOptions = null) => {
   // ✅ FIX: Removed tenant_id filter
   const category = await Category.findOne({
     _id: categoryId,
     is_deleted: false,
-  }).lean();
+  }).select("attributes").lean();
 
   if (!category) return [];
 
-  const configs = (category.attributes || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const allConfigs = (category.attributes || []).slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  let configs = allConfigs;
+  let pagination = null;
+  if (paginationOptions) {
+    const limit = Math.min(100, Math.max(1, Number.parseInt(paginationOptions.limit, 10) || 10));
+    const requestedPage = Math.max(1, Number.parseInt(paginationOptions.page, 10) || 1);
+    const pages = Math.max(1, Math.ceil(allConfigs.length / limit));
+    const page = Math.min(requestedPage, pages);
+    configs = allConfigs.slice((page - 1) * limit, page * limit);
+    pagination = {
+      total: allConfigs.length,
+      page,
+      limit,
+      pages,
+      hasNext: page < pages,
+      hasPrev: page > 1,
+      variantAttributes: allConfigs.filter((config) => config.is_variant_option).length,
+    };
+  }
   const attributeIds = configs.map((c) => c.attribute_id);
 
   // ✅ FIX: Removed tenant_id filter
@@ -307,13 +391,14 @@ const getCategoryAttributesList = async (categoryId) => {
 
   // ✅ Return all assigned attributes (including sub-attributes) so the frontend
   // can use parent_attribute_id to render the proper Main → Sub → Values hierarchy.
-  return configs
+  const result = configs
     .map((config) => {
       const attribute = attributeMap.get(String(config.attribute_id));
       if (!attribute) return null;
       return decorate(config, attribute);
     })
     .filter(Boolean);
+  return pagination ? { data: result, pagination } : result;
 };
 
 // ✅ NEW: Returns hierarchical structure (Main → Sub-Attributes → Values) for a category
@@ -451,17 +536,20 @@ const getCategories = async (req, res) => {
 
 const getCategoryById = async (req, res) => {
   try {
+    const locale = getRequestedLocale(req.query.locale);
     // ✅ FIX: Find by ID globally — populate attribute_id so frontend gets full attribute data
-    const category = await Category.findOne({
+    let categoryQuery = Category.findOne({
       _id: req.params.id,
       is_deleted: false,
     })
-      .select("-__v")
+      .select(req.query.includeAttributes === "true" ? "-__v" : "-__v -attributes")
       .populate("parent_category_id", "name category_code translations")
-      .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
       .populate("createdby", "name email")
-      .populate("updatedby", "name email")
-      .lean();
+      .populate("updatedby", "name email");
+    if (req.query.includeAttributes === "true") {
+      categoryQuery = categoryQuery.populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT);
+    }
+    const category = await categoryQuery.lean();
 
     if (!category) {
       return res.status(404).json({ success: false, message: "Category not found" });
@@ -479,7 +567,7 @@ const getCategoryById = async (req, res) => {
       }
     }
 
-    return res.status(200).json({ success: true, data: category });
+    return res.status(200).json({ success: true, data: trimCategoryForLocale(category, locale) });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message });
   }
@@ -635,8 +723,18 @@ const getCategoryAttributes = async (req, res) => {
     // ❌ REMOVED: const tenantId = getTenantId(req);
     
     // ✅ FIX: Get attributes globally
-    const attributes = await getCategoryAttributesList(req.params.id);
-    return res.status(200).json({ success: true, data: attributes });
+    const locale = getRequestedLocale(req.query.locale);
+    const paginationRequested = req.query.page !== undefined || req.query.limit !== undefined;
+    const result = await getCategoryAttributesList(
+      req.params.id,
+      paginationRequested ? { page: req.query.page, limit: req.query.limit } : null
+    );
+    const attributes = Array.isArray(result) ? result : result.data;
+    return res.status(200).json({
+      success: true,
+      data: attributes.map((attribute) => trimAttributeForLocale(attribute, locale)),
+      ...(Array.isArray(result) ? {} : { pagination: result.pagination }),
+    });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ success: false, message: error.message });
   }
@@ -646,8 +744,13 @@ const getCategoryAttributes = async (req, res) => {
 // Used by the Product Variant form to render the proper hierarchical dropdowns.
 const getCategoryAttributesHierarchical = async (req, res) => {
   try {
+    const locale = getRequestedLocale(req.query.locale);
     const attributes = await getCategoryAttributesHierarchy(req.params.id);
-    return res.status(200).json({ success: true, data: attributes });
+    const trimTree = (attribute) => ({
+      ...trimAttributeForLocale(attribute, locale),
+      sub_attributes: (attribute.sub_attributes || []).map(trimTree),
+    });
+    return res.status(200).json({ success: true, data: attributes.map(trimTree) });
   } catch (error) {
     return res.status(error.statusCode || 400).json({ success: false, message: error.message });
   }

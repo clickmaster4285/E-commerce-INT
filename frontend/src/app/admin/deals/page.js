@@ -19,7 +19,7 @@ import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 /* ==================== CONSTANTS ==================== */
 // âœ… Server-side pagination — ek request par yehi deals aati hain
-const DEALS_PER_PAGE = 20;
+const DEFAULT_DEALS_PER_PAGE = 20;
 
 /* ==================== ICONS ==================== */
 const PlusIcon = ({ className = "w-4 h-4" }) => (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>);
@@ -253,6 +253,7 @@ export default function DealsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetFilter, setTargetFilter] = useState("all_targets");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_DEALS_PER_PAGE);
 
   // Typing ke dauran har keystroke par API hit na ho — 400ms debounce
   useEffect(() => {
@@ -303,35 +304,38 @@ export default function DealsPage() {
   });
 
   const { data: dealsResponse, isLoading, isFetching } = useQuery({
-    queryKey: ["deals", "paginated", currentPage, search, statusFilter, targetFilter],
+    queryKey: ["deals", "paginated", locale, currentPage, itemsPerPage, search, statusFilter, targetFilter],
     queryFn: () =>
       dealApi.getPaginated({
         page: currentPage,
-        limit: DEALS_PER_PAGE,
+        limit: itemsPerPage,
         search: search || "",
         status: statusFilter,
         applyTo: targetFilter === "all_targets" ? "all" : targetFilter,
+        locale,
+        admin_list: 1,
       }),
-    // Page/filter change par purani list retain hoti hai â†’ table blink nahi karta
-    placeholderData: (previousData) => previousData,
     retry: false,
   });
   // Backend sirf CURRENT PAGE ki deals bhejta hai â†’ { deals, stats, pagination }
   const deals = useMemo(() => normalizeArrayResponse(dealsResponse?.deals ?? dealsResponse), [dealsResponse]);
-  usePageTranslations({ model: "Deal", records: deals, locale, ready: !isFetching && dealsResponse?.pagination?.page === currentPage, queryKey: ["deals", "paginated", currentPage, search, statusFilter, targetFilter], queryClient });
+  const dealsAlreadyTranslated = locale === "en" || (deals.length > 0 && deals.every((deal) => typeof deal.translations?.name?.[locale] === "string" && deal.translations.name[locale].trim()));
+  const dealTranslationsReady = usePageTranslations({ model: "Deal", records: deals, locale, ready: !isFetching && dealsResponse?.pagination?.page === currentPage, queryKey: ["deals", "paginated", locale, currentPage, itemsPerPage, search, statusFilter, targetFilter], queryClient, alreadyTranslated: dealsAlreadyTranslated, fallbackAfterRetries: true });
+  const untranslatedDealNameCount = deals.filter((deal) => !deal?.translations?.name?.[locale]?.trim()).length;
+  const showDealTranslationSkeletons = locale !== "en" && deals.length > 0 && untranslatedDealNameCount / deals.length >= 0.8 && !dealTranslationsReady;
   const pagination = dealsResponse?.pagination || {
     total: 0,
     page: currentPage,
-    limit: DEALS_PER_PAGE,
+    limit: itemsPerPage,
     totalPages: 1,
     hasNextPage: false,
     hasPreviousPage: false,
   };
-  const { data: productsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const { data: productsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const { data: categoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
-  const { data: brandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: brandApi.getAll, staleTime: 60000 });
+  const { data: brandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: brandApi.getAll, staleTime: 60000, enabled: showModal });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);
 
   useEffect(() => {
@@ -828,12 +832,12 @@ export default function DealsPage() {
                       <th className="px-4 py-3 text-end" style={{ color: "var(--text-muted)" }}>{t("admin.deals.page.actions")}</th>
                     </tr>
                   </thead>
-                  <DealRowsSkeleton rows={DEALS_PER_PAGE} />
+                  <DealRowsSkeleton rows={itemsPerPage} />
                 </table>
               </div>
             </div>
           ) : (
-            <DealCardsSkeleton cards={8} cardStyle={cardStyle} />
+            <DealCardsSkeleton cards={itemsPerPage} cardStyle={cardStyle} />
           )
         ) : deals.length === 0 ? (
           <div className="rounded-lg py-14 flex flex-col items-center justify-center" style={cardStyle}>
@@ -865,7 +869,9 @@ export default function DealsPage() {
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
-                              <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
+                              {showDealTranslationSkeletons && !deal?.translations?.name?.[locale]?.trim()
+                                ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} />
+                                : <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>}
                               <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                             </div>
                           </div>
@@ -890,7 +896,9 @@ export default function DealsPage() {
                   <StatusBadge status={getDealStatus(deal)} />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-semibold text-[13px] truncate">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>
+                  {showDealTranslationSkeletons && !deal?.translations?.name?.[locale]?.trim()
+                    ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />
+                    : <p className="font-semibold text-[13px] truncate">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>}
                   <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                 </div>
                 <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--border-color)" }} onClick={(e) => e.stopPropagation()}>
@@ -903,10 +911,13 @@ export default function DealsPage() {
         )}
 
         {/* âœ… PAGINATION (server-side) */}
-        {totalPages > 1 && (
-          <div className="flex flex-col items-center justify-between gap-4 rounded-lg p-4 sm:flex-row" style={cardStyle}>
-            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{pagination.total === 0 ? 0 : (currentPage - 1) * DEALS_PER_PAGE + 1}-{Math.min(currentPage * DEALS_PER_PAGE, pagination.total)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{pagination.total}{" "}{t("admin.nav.item.deals")}{isFetching && !isLoading && <span className="ml-2 opacity-70">{t("admin.promotions.ui.generated.6542a6f2bacd")}</span>}
+        {pagination.total > 20 && (
+          <div className="flex flex-col items-center justify-between gap-3 rounded-lg p-4 xl:flex-row" style={cardStyle}>
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
+            <p className="text-[12px]" style={{ color: "var(--text-muted)" }}>{t("admin.featuredProducts.ui.showing")}{" "}{pagination.total === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, pagination.total)}{" "}{t("admin.featuredProducts.ui.of")}{" "}{pagination.total}{" "}{t("admin.nav.item.deals")}{isFetching && !isLoading && <span className="ml-2 opacity-70">{t("admin.promotions.ui.generated.6542a6f2bacd")}</span>}
             </p>
+            <label className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={itemsPerPage} onChange={(event) => { setItemsPerPage(Number(event.target.value)); setCurrentPage(1); }} className="h-9 w-[100px] rounded-lg px-3 text-[13px] outline-none cursor-pointer" style={inputStyle}>{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+            </div>
             <div className="flex items-center gap-2">
               <button type="button" disabled={currentPage === 1 || isFetching} onClick={() => setCurrentPage((pg) => Math.max(1, pg - 1))} className="flex h-8 w-8 items-center justify-center rounded-md transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-30" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }} aria-label={t("admin.reviews.ui.previousPage")}><ChevronLeftIcon className="h-4 w-4" /></button>
               {renderPageNumbers().map((pg, i) =>
@@ -963,7 +974,7 @@ export default function DealsPage() {
 // `.skeleton` (globals.css) apna border-radius deta hai, is liye pills ke liye inline radius
 const SKELETON_ROUND = { borderRadius: "9999px" };
 
-function DealRowsSkeleton({ rows = DEALS_PER_PAGE }) {
+function DealRowsSkeleton({ rows = DEFAULT_DEALS_PER_PAGE }) {
   const { t } = useTranslation();
   return (
     <tbody aria-busy="true" aria-label={t("admin.promotions.ui.generated.1b44fba50568")}>

@@ -2,6 +2,7 @@ import adminHttp from "../axiosInstance";
 
 export const customerApi = {
   getAll: (params = {}) => adminHttp.get("/customers/admin/all", { params }).then((res) => res.data?.data || res.data || []),
+  getAllPaginated: (params = {}) => adminHttp.get("/customers/admin/all", { params }).then((res) => res.data),
   search: (search = "") => adminHttp.get("/customers/search", { params: { search } }).then((res) => res.data?.data || res.data || []),
   getById: (id) => adminHttp.get(`/customers/${id}`).then((res) => res.data?.data || res.data),
   create: (data) => adminHttp.post("/customers", data).then((res) => res.data),

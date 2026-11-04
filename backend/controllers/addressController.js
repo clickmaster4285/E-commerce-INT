@@ -25,7 +25,7 @@ const getMyAddresses = async (req, res) => {
 // POST /api/addresses — nayi address
 const createAddress = async (req, res) => {
   try {
-    const { country, full_name, street_address1, street_address2, city, state, zip_code, phone, is_default } = req.body;
+    const { country, full_name, street_address1, street_address2, city, state, zip_code, phone, is_default, delivery_instructions } = req.body;
 
     const phoneError = phoneValidationMessage(phone);
     if (phoneError) return res.status(400).json({ success: false, message: phoneError });
@@ -33,12 +33,7 @@ const createAddress = async (req, res) => {
       return res.status(400).json({ success: false, message: "Required fields missing" });
     }
 
-    if (is_default) {
-      await Address.updateMany({ user_id: req.user._id }, { is_default: false });
-    }
-
-    const address = await Address.create({
-      user_id: req.user._id,
+    const addressFields = {
       country: country || "Pakistan",
       full_name,
       street_address1,
@@ -48,7 +43,16 @@ const createAddress = async (req, res) => {
       zip_code: zip_code || "",
       phone: normalizePhone(phone),
       is_default: !!is_default,
-    });
+      delivery_instructions: delivery_instructions || "",
+    };
+
+    const address = await Address.create({ user_id: req.user._id, ...addressFields });
+    if (address.is_default) {
+      await Address.updateMany(
+        { user_id: req.user._id, _id: { $ne: address._id } },
+        { $set: { is_default: false } },
+      );
+    }
 
     res.status(201).json({ success: true, data: address });
   } catch (error) {
@@ -66,17 +70,21 @@ const updateAddress = async (req, res) => {
       if (phoneError) return res.status(400).json({ success: false, message: phoneError });
     }
 
-    const fields = ["country", "full_name", "street_address1", "street_address2", "city", "state", "zip_code", "phone"];
+    const fields = ["country", "full_name", "street_address1", "street_address2", "city", "state", "zip_code", "phone", "delivery_instructions"];
     fields.forEach((f) => {
       if (req.body[f] !== undefined) address[f] = f === "phone" ? normalizePhone(req.body[f]) : req.body[f];
     });
 
-    if (req.body.is_default === true) {
-      await Address.updateMany({ user_id: req.user._id, _id: { $ne: address._id } }, { is_default: false });
-      address.is_default = true;
+    if (typeof req.body.is_default === "boolean") {
+      address.is_default = req.body.is_default;
     }
-
     await address.save();
+    if (req.body.is_default === true) {
+      await Address.updateMany(
+        { user_id: req.user._id, _id: { $ne: address._id } },
+        { $set: { is_default: false } },
+      );
+    }
     res.status(200).json({ success: true, data: address });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

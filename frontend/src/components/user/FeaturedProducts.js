@@ -2,35 +2,38 @@
 
 /* ==========================================================
    FEATURED PRODUCTS — home page ka main products grid
-   Tabs (server-side, har tab apni query) — teeno hamesha visible:
-     Featured     → default order (newest-first catalog order)
+   Tabs (server-side, har tab apni query) — sab hamesha visible:
+     All Products → complete catalog
+     Featured     → sirf is_featured products
      New Arrivals → sort=newest
      Best Offers  → sab se bari discount % (sort=discount-desc)
 
-   Har tab me numbered server pagination (PaginationBar, 20 per page).
+   Har tab me 24 products ke server-side pages aur Load More button.
    ========================================================== */
 
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Flame, PackageSearch, Sparkles, TrendingUp } from "lucide-react";
+import { ChevronDown, Flame, LayoutGrid, LoaderCircle, PackageSearch, Sparkles, TrendingUp } from "lucide-react";
 import ProductCard from "./ProductCard";
-import PaginationBar from "./PaginationBar";
 import SectionHeading from "./SectionHeading";
 import { idOf } from "@/utils/homeCatalog";
-import { useShopProducts, scrollToListTop } from "../../hooks/user/useShopProducts";
+import { useShopProducts } from "../../hooks/user/useShopProducts";
 import { FEATURED_TAB_EVENT } from "./HomeNav";
 import { useTranslation } from "@/i18n/LanguageProvider";
 
 const TABS = [
+  { id: "all", labelKey: "storefront.navigation.allProducts", icon: LayoutGrid },
   { id: "featured", labelKey: "admin.featuredProducts.ui.featuredAria", icon: Sparkles },
   { id: "new", labelKey: "storefront.navigation.newProducts", icon: TrendingUp },
   { id: "offers", labelKey: "storefront.navigation.bestOffers", icon: Flame },
 ];
 
-const PER_PAGE = 20;
+// Keep the common 6-column desktop grid filled with complete rows.
+const PER_PAGE = 24;
 
 const TAB_PARAMS = {
-  featured: { sort: "featured" },
+  all: { sort: "newest" },
+  featured: { sort: "featured", featured: true },
   new: { sort: "newest" },
   offers: { sort: "discount-desc", minDiscount: 1 },
 };
@@ -42,7 +45,7 @@ const GRID =
 function TabGrid({ tab }) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
-  const gridRef = useRef(null);
+  const [displayedProducts, setDisplayedProducts] = useState([]);
   const params = TAB_PARAMS[tab] || TAB_PARAMS.featured;
 
   const { products, total, pagination, isLoading, isFetching, isError, refetch } = useShopProducts({
@@ -50,17 +53,19 @@ function TabGrid({ tab }) {
     limit: PER_PAGE,
     sort: params.sort,
     minDiscount: params.minDiscount ?? null,
+    featured: params.featured ? "true" : "",
   });
 
   const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / PER_PAGE));
   const currentPage = pagination?.page || Math.min(page, totalPages);
-  // ✅ Badi list ka render defer — urgent updates (tab/page) pehle, logic same
-  const deferredProducts = useDeferredValue(products);
-
-  const goToPage = (next) => {
-    setPage(Math.min(Math.max(1, next), totalPages));
-    scrollToListTop(gridRef);
-  };
+  useEffect(() => {
+    if (!pagination || pagination.page !== page || !products.length) return;
+    setDisplayedProducts((current) => {
+      if (page === 1) return products;
+      const seen = new Set(current.map((product) => idOf(product._id)));
+      return [...current, ...products.filter((product) => !seen.has(idOf(product._id)))];
+    });
+  }, [page, pagination, products]);
 
   if (isLoading && !products.length) {
     return (
@@ -75,7 +80,7 @@ function TabGrid({ tab }) {
     );
   }
 
-  if (isError) {
+  if (isError && !displayedProducts.length) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
         <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
@@ -91,7 +96,7 @@ function TabGrid({ tab }) {
     );
   }
 
-  if (!products.length) {
+  if (!products.length && !displayedProducts.length) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
         <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
@@ -102,22 +107,26 @@ function TabGrid({ tab }) {
   }
 
   return (
-    <div ref={gridRef} className="scroll-mt-24">
+    <div className="scroll-mt-24">
       <div className={GRID}>
-        {deferredProducts.map((product, i) => (
+        {displayedProducts.map((product, i) => (
           <ProductCard key={idOf(product._id) || product.name} product={product} priority={i < 2} />
         ))}
       </div>
 
-      <PaginationBar
-        page={currentPage}
-        totalPages={totalPages}
-        total={total}
-        perPage={PER_PAGE}
-        onPageChange={goToPage}
-      />
-      {isFetching && products.length > 0 ? (
-        <p className="mt-2 text-center text-[0.6875rem] text-[var(--user-text-subtle)]">{t("common.loading")}</p>
+      {currentPage < totalPages ? (
+        <div className="mt-8 flex flex-col items-center gap-3 pt-6">
+          <button
+            type="button"
+            onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+            disabled={isFetching}
+            aria-busy={isFetching}
+            className="group inline-flex min-w-52 items-center justify-center gap-2 rounded-xl border border-[var(--user-accent)] bg-[var(--user-bg-card)] px-6 py-3 text-xs font-bold tracking-wide text-[var(--user-accent)] shadow-sm transition duration-200 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] disabled:cursor-wait disabled:opacity-70"
+          >
+            {isFetching ? <LoaderCircle size={15} className="animate-spin" /> : <ChevronDown size={15} className="transition-transform group-hover:translate-y-0.5" />}
+            {t(isFetching ? "storefront.featured.loadingMore" : "storefront.featured.loadMoreProducts")}
+          </button>
+        </div>
       ) : null}
     </div>
   );
@@ -130,9 +139,9 @@ export default function FeaturedProducts({ titleOverride = null }) {
   const searchParams = useSearchParams();
   const urlTab = searchParams?.get("tab");
   const normalizedUrlTab =
-    urlTab === "offers" || urlTab === "new" || urlTab === "featured" ? urlTab : null;
+    urlTab === "all" || urlTab === "offers" || urlTab === "new" || urlTab === "featured" ? urlTab : null;
 
-  const [manualTab, setManualTab] = useState(normalizedUrlTab || "featured");
+  const [manualTab, setManualTab] = useState(normalizedUrlTab || "all");
   const sectionRef = useRef(null);
 
   /* ?tab= URL param ho to wahi jeetta hai (nav / share / refresh),
@@ -143,7 +152,7 @@ export default function FeaturedProducts({ titleOverride = null }) {
   const syncUrlTab = (next) => {
     try {
       const sp = new URLSearchParams(searchParams?.toString() || "");
-      if (next === "featured") sp.delete("tab");
+      if (next === "all") sp.delete("tab");
       else sp.set("tab", next);
       const query = sp.toString();
       router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
@@ -153,7 +162,7 @@ export default function FeaturedProducts({ titleOverride = null }) {
   useEffect(() => {
     const onSelect = (event) => {
       const next = event?.detail;
-      if (next === "offers" || next === "new" || next === "featured") {
+      if (next === "all" || next === "offers" || next === "new" || next === "featured") {
         setManualTab(next);
         requestAnimationFrame(() => {
           try {
@@ -199,13 +208,17 @@ export default function FeaturedProducts({ titleOverride = null }) {
 
   const title =
     titleOverride ||
-    (safeTab === "new"
+    (safeTab === "all"
+      ? t("storefront.navigation.allProducts")
+      : safeTab === "new"
       ? t("storefront.navigation.newProducts")
       : safeTab === "offers"
         ? t("storefront.navigation.bestOffers")
         : t("admin.nav.item.featuredProducts"));
   const subtitle =
-    safeTab === "new"
+    safeTab === "all"
+      ? t("storefront.featured.allSubtitle")
+      : safeTab === "new"
       ? t("storefront.featured.newSubtitle")
       : safeTab === "offers"
         ? t("storefront.featured.offersSubtitle")
@@ -220,9 +233,10 @@ export default function FeaturedProducts({ titleOverride = null }) {
               key={id}
               type="button"
               onClick={() => selectTab(id)}
+              aria-pressed={safeTab === id}
               className={`${tabClass(safeTab === id)} flex items-center gap-1.5`}
             >
-              <Icon size={12} />
+              <Icon size={13} strokeWidth={2.2} />
               {t(labelKey)}
               <span
                 className={`absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--user-accent)] transition-opacity ${

@@ -4,6 +4,10 @@ const unwrap = (response) => response.data?.data ?? response.data;
 
 export const invoiceApi = {
   list: () => adminHttp.get("/invoices").then(unwrap),
+  listPaginated: (params = {}) => adminHttp.get("/invoices", { params }).then((response) => ({
+    ...response.data,
+    data: Array.isArray(response.data?.data) ? response.data.data : [],
+  })),
   getNextNumber: () => adminHttp.get("/invoices/next-number").then(unwrap),
   getById: (id) => adminHttp.get(`/invoices/${id}`).then(unwrap),
   create: (payload) => adminHttp.post("/invoices", payload).then(unwrap),
