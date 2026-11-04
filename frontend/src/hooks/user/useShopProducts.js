@@ -24,6 +24,7 @@ export function useShopProducts({
   dealIds = [],
   discountBands = [],
   minDiscount = null,
+  featured = "",
   enabled = true,
   staleTime = 60 * 1000,
 } = {}) {
@@ -40,6 +41,7 @@ export function useShopProducts({
     dealIds: (dealIds || []).map(String).filter(Boolean),
     discountBands: [...(discountBands || [])].map(Number).filter((n) => Number.isFinite(n)),
     minDiscount,
+    featured,
     // ✅ Storefront grids ko tags/createdby nahi chahiye (payload + DB kam)
     slim: 1,
   };
@@ -59,6 +61,7 @@ export function useShopProducts({
       [...params.dealIds].sort().join(","),
       [...params.discountBands].sort((a, b) => a - b).join(","),
       params.minDiscount,
+      params.featured,
     ],
     queryFn: () =>
       productApi.getAllPaginated({
@@ -74,6 +77,7 @@ export function useShopProducts({
         deal: params.dealIds,
         discount: params.discountBands,
         minDiscount: params.minDiscount,
+        featured: params.featured,
         slim: 1,
       }),
     enabled,
