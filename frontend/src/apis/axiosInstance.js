@@ -80,7 +80,7 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
 
   const startRefresh = () => {
     if (!refreshPromise) {
-      refreshPromise = http.post(refreshUrl).finally(() => {
+      refreshPromise = http.post(refreshUrl, undefined, { timeout: 15000 }).finally(() => {
         refreshPromise = null;
       });
     }

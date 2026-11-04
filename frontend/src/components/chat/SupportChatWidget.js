@@ -148,10 +148,11 @@ export default function SupportChatWidget() {
   const userQuery = useQuery({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const response = await userHttp.get("/users/profile");
+      const response = await userHttp.get("/users/profile", { timeout: 15000 });
       return response.data?.user || response.data;
     },
     retry: false,
+    refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
   });
   const user = userQuery.data || null;
@@ -160,7 +161,7 @@ export default function SupportChatWidget() {
     queryKey: ["customer-chat-conversations"],
     queryFn: customerChatApi.listMine,
     enabled: Boolean(user),
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 
@@ -277,7 +278,7 @@ export default function SupportChatWidget() {
   useEffect(() => {
     if (!socket) return undefined;
     const refresh = () => {
-      queryClient.invalidateQueries({ queryKey: ["customer-chat-conversations"] });
+      if (user && !customerChatsQuery.isError) queryClient.invalidateQueries({ queryKey: ["customer-chat-conversations"] });
       if (guestToken) queryClient.invalidateQueries({ queryKey: ["guest-chat-conversation", guestToken] });
     };
     socket.on("chat:conversation-created", refresh);
@@ -286,7 +287,7 @@ export default function SupportChatWidget() {
       socket.off("chat:conversation-created", refresh);
       socket.off("chat:conversation-updated", refresh);
     };
-  }, [socket, queryClient, guestToken]);
+  }, [socket, queryClient, guestToken, user, customerChatsQuery.isError]);
 
   useEffect(() => {
     if (!socket || !guestToken || !roomConversation?._id) return undefined;
