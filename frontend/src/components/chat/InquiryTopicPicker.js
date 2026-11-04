@@ -93,7 +93,7 @@ export default function InquiryTopicPicker({ conversation, orders = [], cartItem
   const visibleOptions = options.filter((value) => {
     if (adminMode) return value === "product";
     if (value === "order") return allowOrder && (orders.length > 0 || conversation?.order_id || conversation?.order?._id);
-    if (option.value === "product") return true;
+    if (value === "product") return true;
     return true;
   });
   const menuOptions = visibleOptions.filter((value) => value !== "general");
@@ -303,7 +303,7 @@ export default function InquiryTopicPicker({ conversation, orders = [], cartItem
     <div className={`flex min-w-0 items-center ${fullPage ? "gap-3 border-r border-[var(--user-border)] pr-4 max-lg:border-r-0 max-lg:pr-0" : "gap-2"}`}>
       {fullPage && <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)]"><MessageCircle size={18} /></span>}
       <label className="min-w-0 flex-1"><span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--user-text-muted)]">Ask about</span><select aria-label="What is your question about?" value={type} onChange={chooseType} disabled={busy} className="h-9 w-full min-w-0 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-3 text-xs font-medium text-[var(--user-text)] outline-none focus:border-[var(--user-accent)] disabled:opacity-60">
-        {visibleOptions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        {visibleOptions.map((value) => <option key={value} value={value}>{t(`chat.picker.${value}`)}</option>)}
       </select></label>
     </div>
     {type === "order" && <div ref={orderPickerRef} className="relative min-w-0">
