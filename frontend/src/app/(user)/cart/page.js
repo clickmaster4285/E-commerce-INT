@@ -333,12 +333,12 @@ export default function CartPage() {
     return (
     <div
       onClick={hasAvailableDeals ? () => setOpenDealCardKey((prev) => (prev === row.key ? null : row.key)) : undefined}
-      className={`relative ${hasAvailableDeals ? "cursor-pointer" : ""} group flex flex-col sm:flex-row sm:items-start gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${pickerOpen ? "min-h-[16.25rem] border-purple-500/40" : ""} ${
+      className={`relative ${hasAvailableDeals ? "cursor-pointer" : ""} group flex flex-col sm:flex-row sm:items-center gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${pickerOpen ? "min-h-[16.25rem] border-purple-500/40" : ""} ${
       !isSelected ? "opacity-60" : ""
     } ${
       isDeal
         ? "border-[var(--user-accent)]/20 bg-[var(--user-bg-card)] hover:border-[var(--user-accent)]/40 hover:shadow-md hover:shadow-[var(--user-accent)]/5"
-        : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-accent)]/30 hover:shadow-md hover:-translate-y-0.5"
+        : "border-[var(--user-border)] bg-[var(--user-bg-card)] hover:border-[var(--user-accent)]/30 hover:shadow-md"
     }`}>
       {/* ✅ Selection checkbox — 20px visible, 28px tap target, top-aligned to thumb */}
       <button
@@ -346,7 +346,7 @@ export default function CartPage() {
         onClick={(e) => { e.stopPropagation(); onToggleSelect?.(); }}
         aria-label={isSelected ? `Unselect ${displayName}` : `Select ${displayName}`}
         aria-pressed={isSelected}
-        className="shrink-0 p-1 mt-0.5 sm:mt-1 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+        className="shrink-0 p-1 mt-0.5 sm:mt-0 rounded-md hover:bg-[var(--user-bg-hover)] active:scale-95 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
       >
         <span
           className={`flex items-center justify-center w-5 h-5 rounded-full border-2 transition-[background,border-color,transform] duration-150 ${isSelected ? "bg-[var(--user-accent)] border-[var(--user-accent)]" : "bg-transparent border-[var(--user-border)] hover:border-[var(--user-accent)]/60"}`}
@@ -355,7 +355,7 @@ export default function CartPage() {
         </span>
       </button>
       {/* Image + Name */}
-      <div className="flex gap-4 flex-1 min-w-0">
+      <div className="flex items-center gap-4 flex-1 min-w-0">
         <Link href={`/product/${row.raw.productId || row.raw.id}`} className="shrink-0 group/img">
           <div className="relative">
             <FallbackImage
@@ -909,6 +909,7 @@ export default function CartPage() {
 // ✅ MOBILE cart card (Daraz-style) — reusable in mobile tree, uses passed-in handlers.
 function MobileCartCard({ row, onDec, onInc, onRemove, isDeal = false, dealBadge = null, isSelected = true, onToggleSelect, onApplyDeal, openDealPicker = false, onToggleDealPicker }) {
   const img = getImgUrl(row.image);
+  const { text } = useLocalized();
   const { getActiveDealsForProduct } = useDiscounts();
   // ✅ Deal button/picker sirf tab jab is product ke liye koi active deal ho
   const hasAvailableDeals = (getActiveDealsForProduct?.({
