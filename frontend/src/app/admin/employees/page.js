@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { employeeDepartmentLabel, employeeLocaleTag } from "@/i18n/localize";
 import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
+import { localizedStrictField } from "@/i18n/localize";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
