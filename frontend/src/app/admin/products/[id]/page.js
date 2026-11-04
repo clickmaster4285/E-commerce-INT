@@ -1077,7 +1077,7 @@ export default function ProductDetailPage() {
     return validTabs.includes(tabParam) ? tabParam : "overview";
   });
   const [variantPage, setVariantPage] = useState(1);
-  const [variantPageSize, setVariantPageSize] = useState(10);
+  const [variantPageSize] = useState(10);
 
   useEffect(() => {
     const tabParam = searchParams?.get("tab");
@@ -2211,12 +2211,6 @@ export default function ProductDetailPage() {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[var(--text-muted)]">
               <span>{t("admin.shared.pagination.showingRange", { from: variantRangeStart.toLocaleString(locale), to: variantRangeEnd.toLocaleString(locale), total: variants.length.toLocaleString(locale) })}</span>
               <span>{t("admin.shared.pagination.pageOf", { page: activeVariantPage.toLocaleString(locale), total: totalVariantPages.toLocaleString(locale) })}</span>
-              <label className="flex items-center gap-2">
-                <span>{t("admin.shared.pagination.rowsPerPage")}</span>
-                <select value={variantPageSize} onChange={(event) => { setVariantPageSize(Number(event.target.value)); setVariantPage(1); }} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[12px] text-[var(--text-primary)] outline-none">
-                  {[10, 20, 50].map((size) => <option key={size} value={size}>{size.toLocaleString(locale)}</option>)}
-                </select>
-              </label>
             </div>
             {totalVariantPages > 1 && (
               <div className="flex items-center gap-2">

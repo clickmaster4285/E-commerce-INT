@@ -96,7 +96,12 @@ const getProfile = async () => {
 
     return extractedUser;
   } catch (err) {
-    console.error('❌ getProfile failed:', err?.message || err, '| code:', err?.code || 'N/A');
+    // A missing/expired session is expected on protected routes and is handled
+    // by the login redirect below. Keep the console for unexpected failures.
+    const status = err?.response?.status;
+    if (status !== 401 && status !== 403) {
+      console.error('getProfile failed:', err?.message || err, '| code:', err?.code || 'N/A');
+    }
     throw err;
   }
 };
@@ -327,7 +332,10 @@ export default function AdminLayout({ children }) {
     if (!authResult.redirectTo) return;
 
     if (authResult.redirectMode === 'push') {
-      console.error('❌ Auth failed:', userQueryError?.message || 'Authentication failed');
+      const status = userQueryError?.response?.status;
+      if (status !== 401 && status !== 403) {
+        console.error('Admin auth check failed:', userQueryError?.message || 'Authentication failed');
+      }
 
       router.push(authResult.redirectTo);
 

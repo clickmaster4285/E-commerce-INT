@@ -5,7 +5,8 @@
 // ==========================================
 // Writes the shared `lang` cookie and switches the whole site instantly.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Languages, Check } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import LanguageTransition from "@/components/common/LanguageTransition";
@@ -13,14 +14,30 @@ import LanguageTransition from "@/components/common/LanguageTransition";
 export default function LanguageSwitcher({ className = "" }) {
   const { locale, locales, changeLocale, t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
   // Target locale while a switch is in flight — the curtain is mounted for it.
   const [switchingTo, setSwitchingTo] = useState(null);
   const ref = useRef(null);
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const width = 190;
+    const isRtl = trigger.closest("[dir='rtl']") || document.documentElement.dir === "rtl";
+    const alignedLeft = isRtl ? rect.left : rect.right - width;
+    setMenuPosition({
+      left: Math.max(8, Math.min(alignedLeft, window.innerWidth - width - 8)),
+      top: rect.bottom + 8,
+    });
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (!ref.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false);
     };
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
@@ -33,6 +50,17 @@ export default function LanguageSwitcher({ className = "" }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleViewportChange = () => updateMenuPosition();
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [open, updateMenuPosition]);
+
   const current = locales.find((l) => l.code === locale) || locales[0];
 
   return (
@@ -42,7 +70,12 @@ export default function LanguageSwitcher({ className = "" }) {
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={triggerRef}
+        onClick={() => {
+          const nextOpen = !open;
+          if (nextOpen) updateMenuPosition();
+          setOpen(nextOpen);
+        }}
         title={t("switcher.title")}
         aria-label={t("switcher.label")}
         aria-haspopup="listbox"
@@ -64,13 +97,15 @@ export default function LanguageSwitcher({ className = "" }) {
         </span>
       </button>
 
-      {open && (
+      {open && menuPosition && typeof document !== "undefined" && createPortal(
         <div
+          ref={menuRef}
           role="listbox"
-          className="absolute z-50 mt-2 min-w-[190px] overflow-hidden rounded-lg border py-1 shadow-xl"
+          className="fixed z-[10000] min-w-[190px] overflow-hidden rounded-lg border py-1 shadow-xl"
           style={{
-            top: "100%",
-            insetInlineEnd: 0,
+            left: menuPosition.left,
+            top: menuPosition.top,
+            maxHeight: `calc(100vh - ${menuPosition.top}px - 8px)`,
             backgroundColor: "var(--user-bg-elevated)",
             borderColor: "var(--user-border)",
           }}
@@ -112,7 +147,8 @@ export default function LanguageSwitcher({ className = "" }) {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body
       )}
 
       {switchingTo && (
