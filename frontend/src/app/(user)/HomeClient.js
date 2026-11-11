@@ -57,10 +57,6 @@ const PopularCategories = dynamic(() => import("@/components/user/PopularCategor
   ssr: true,
   loading: () => <div className="h-[12rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
 });
-const BrandStrip = dynamic(() => import("@/components/user/BrandStrip"), {
-  ssr: true,
-  loading: () => <div className="h-[7rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
-});
 const BrandShowcase = dynamic(() => import("@/components/user/BrandShowcase"), {
   ssr: true,
   loading: () => <div className="h-[26rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
@@ -344,12 +340,7 @@ function HomeContent({ initialBanners = null }) {
               <PopularCategories tiles={categoryTiles} isLoading={isLoading} />
             </ViewportSection>
 
-            {/* BRANDS */}
-            <ViewportSection minHeight={120}>
-              <BrandStrip brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
-            </ViewportSection>
-
-            {/* BRAND SPOTLIGHT (LAST) */}
+            {/* TOP BRANDS */}
             <ViewportSection minHeight={520}>
               <BrandShowcase brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
             </ViewportSection>
