@@ -5,7 +5,31 @@ const Store = require("../models/Store");
 const User = require("../models/User");
 const { signSession, cookieOptions, getCookieName } = require("../middleware/superAdminAuth");
 const { logActivity } = require("../utils/superAdminActivity");
+const {
+  sendApplicationApprovedEmail,
+  sendApplicationRejectedEmail,
+} = require("../services/emailService");
 const log = require("../utils/logger");
+
+// Best-effort seller notification — delivery failure must never reverse a decision
+const notifySeller = async (sendFn, payload, action, entityId) => {
+  try {
+    const result = await sendFn(payload);
+    if (!result?.delivered) {
+      console.error(`[super-admin] ${action} email not delivered:`, result?.reason || "unknown");
+      await logActivity({
+        action: `${action} email not delivered`,
+        entityType: "seller_application",
+        entityId: String(entityId || ""),
+        details: { to: payload?.email, reason: result?.reason || "unknown" },
+      }).catch(() => {});
+    }
+    return result;
+  } catch (error) {
+    console.error(`[super-admin] ${action} email failed:`, error?.message || error);
+    return { delivered: false, reason: "send_failed" };
+  }
+};
 
 /* ==========================================
    AUTH — separate from seller/customer auth
@@ -244,12 +268,18 @@ const approveRequest = async (req, res) => {
     }
 
     // Provision store + seller account exactly once (password from request)
-    const existingUser = await User.findOne({ email: application.email }).select("_id").lean();
+    const existingUser = await User.findOne({ email: application.email }).select("_id storeId").lean();
     if (existingUser) {
       // Already provisioned via a previous attempt — just link it
       await SellerApplication.updateOne(
         { _id: application._id },
         { store_id: existingUser.storeId || null, user_id: existingUser._id }
+      );
+      await notifySeller(
+        sendApplicationApprovedEmail,
+        { name: application.name, email: application.email, storeName: application.store_name },
+        "Approval",
+        application._id
       );
       return res.json({ success: true, message: "Application approved.", data: { storeProvisioned: false } });
     }
@@ -298,6 +328,13 @@ const approveRequest = async (req, res) => {
       details: { storeName: application.store_name, email: application.email },
     });
 
+    await notifySeller(
+      sendApplicationApprovedEmail,
+      { name: application.name, email: application.email, storeName: application.store_name },
+      "Approval",
+      application._id
+    );
+
     return res.json({
       success: true,
       message: "Seller approved and store provisioned.",
@@ -311,12 +348,15 @@ const approveRequest = async (req, res) => {
 
 const rejectRequest = async (req, res) => {
   try {
-    const { reason = "" } = req.body || {};
+    const reason = String(req.body?.reason || "").trim();
+    if (!reason) {
+      return res.status(400).json({ success: false, message: "A rejection reason is required." });
+    }
     const application = await SellerApplication.findOneAndUpdate(
       { _id: req.params.id, status: "pending" },
       {
         status: "rejected",
-        rejection_reason: String(reason).trim().slice(0, 500),
+        rejection_reason: reason.slice(0, 500),
         reviewed_by: req.superAdmin._id,
         reviewed_at: new Date(),
       },
@@ -328,13 +368,21 @@ const rejectRequest = async (req, res) => {
         .json({ success: false, message: "This application is not pending (already reviewed)." });
     }
 
+    const storedReason = reason.slice(0, 500);
     await logActivity({
-      action: `Seller rejected — ${application.name} (${reason ? `reason: ${reason.slice(0, 120)}` : "no reason"})`,
+      action: `Seller rejected — ${application.name} (reason: ${storedReason.slice(0, 120)})`,
       actor: req.superAdmin,
       entityType: "seller_application",
       entityId: String(application._id),
-      details: { storeName: application.store_name, reason },
+      details: { storeName: application.store_name, reason: storedReason },
     });
+
+    await notifySeller(
+      sendApplicationRejectedEmail,
+      { name: application.name, email: application.email, storeName: application.store_name, reason: storedReason },
+      "Rejection",
+      application._id
+    );
 
     return res.json({ success: true, message: "Application rejected." });
   } catch (error) {

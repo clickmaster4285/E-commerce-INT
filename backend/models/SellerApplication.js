@@ -28,7 +28,7 @@ const sellerApplicationSchema = new mongoose.Schema(
       index: true,
     },
     rejection_reason: { type: String, default: "", trim: true },
-    reviewed_by: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+    reviewed_by: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", default: null },
     reviewed_at: { type: Date, default: null },
     // Provisioned on approval (exactly once)
     store_id: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
@@ -38,5 +38,7 @@ const sellerApplicationSchema = new mongoose.Schema(
 );
 
 sellerApplicationSchema.index({ created_at: -1 });
+sellerApplicationSchema.index({ store_id: 1 });
+sellerApplicationSchema.index({ user_id: 1 });
 
 module.exports = mongoose.model("SellerApplication", sellerApplicationSchema);

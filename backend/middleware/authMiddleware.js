@@ -34,10 +34,18 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "User not found or deleted" });
     }
 
+    // "inactive" (admin deactivated) aur "blocked" (super-admin suspended)
+    // dono live sessions ko bhi block karte hain
     if (entity.status === "inactive") {
       return res.status(403).json({
         success: false,
         message: "Your account is inactive. Please contact admin.",
+      });
+    }
+    if (entity.status === "blocked") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is blocked. Please contact admin.",
       });
     }
 

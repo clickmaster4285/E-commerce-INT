@@ -38,7 +38,14 @@ export default function ApplicationDetailPage() {
   });
 
   const doApprove = () => { setActionError(""); approveMut.mutate(); };
-  const doReject = () => { setActionError(""); rejectMut.mutate(); };
+  const doReject = () => {
+    setActionError("");
+    if (!reason.trim()) {
+      setActionError("A rejection reason is required.");
+      return;
+    }
+    rejectMut.mutate();
+  };
 
   if (isLoading) {
     return <div className="card p-10 text-center text-sm text-[var(--text-muted)]">Loading application…</div>;
@@ -116,8 +123,8 @@ export default function ApplicationDetailPage() {
               <button type="button" onClick={() => setApproveOpen(true)} disabled={approveMut.isPending} className="btn-primary h-12">
                 <CheckCircle2 size={18} aria-hidden="true" /> Approve & provision seller
               </button>
-              <button type="button" onClick={() => setRejectOpen(true)} disabled={rejectMut.isPending} className="btn-danger h-12">
-                <XCircle size={18} aria-hidden="true" /> Reject application
+              <button type="button" onClick={() => { setRejectOpen((v) => !v); setActionError(""); }} disabled={rejectMut.isPending} className="btn-danger h-12">
+                <XCircle size={18} aria-hidden="true" /> {rejectOpen ? "Hide reject form" : "Reject application"}
               </button>
             </>
           ) : (
@@ -132,14 +139,48 @@ export default function ApplicationDetailPage() {
             <ol className="mt-1.5 list-decimal space-y-1 pl-4">
               <li>A tenant Store is created with the requested details.</li>
               <li>A seller account is created (customer login works immediately).</li>
-              <li>The store status becomes <strong>Open</strong>; the seller can sign in at <code>/login</code>.</li>
+              <li>The store status becomes <strong>Open</strong>; the seller signs in at <code>/login</code> and receives an approval email.</li>
             </ol>
           </div>
         </div>
       </div>
 
-      <ConfirmDialog open={approveOpen} title="Approve & provision store?" message="This will create the tenant store and seller account now. This cannot be undone from here." confirmLabel="Approve seller" confirmTone="success" loading={approveMut.isPending} onCancel={() => setApproveOpen(false)} onConfirm={doApprove} />
-      <ConfirmDialog open={rejectOpen} title="Reject application?" message="The seller will be notified by email (if SMTP is configured)." confirmLabel="Reject" confirmTone="danger" loading={rejectMut.isPending} onCancel={() => setRejectOpen(false)} onConfirm={doReject} />
+      {rejectOpen && item.status === "pending" && (
+        <div className="card space-y-3 p-5 sm:p-6">
+          <div>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Reject application</h2>
+            <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">
+              The applicant will receive this reason by email. It is required.
+            </p>
+          </div>
+          <textarea
+            autoFocus
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={4}
+            maxLength={500}
+            placeholder="Tell the applicant why their application was rejected…"
+            aria-label="Rejection reason"
+            className="input-field w-full"
+          />
+          <p className="text-[11px] tabular-nums text-[var(--text-muted)]">{reason.length}/500</p>
+          {actionError && (
+            <p role="alert" className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>
+              {actionError}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => { setRejectOpen(false); setReason(""); setActionError(""); }} className="btn-secondary h-11">
+              Cancel
+            </button>
+            <button type="button" onClick={doReject} disabled={!reason.trim() || rejectMut.isPending} className="btn-danger h-11">
+              {rejectMut.isPending ? "Rejecting…" : "Reject application"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog open={approveOpen} title="Approve & provision store?" message="This will create the tenant store and seller account now and email the applicant. This cannot be undone from here." confirmLabel="Approve seller" confirmTone="success" loading={approveMut.isPending} onCancel={() => setApproveOpen(false)} onConfirm={doApprove} />
     </div>
   );
 }

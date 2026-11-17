@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import PageHeader from "@/components/superadmin/PageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
+import StatCard from "@/components/superadmin/StatCard";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
-import { Search, ChevronLeft, ChevronRight, Filter, Inbox } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Filter, Inbox, ClipboardList, CheckCircle2, XCircle } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -33,15 +34,24 @@ export default function ApplicationsPage() {
     placeholderData: (prev) => prev,
   });
 
+  const { data: statsData } = useQuery({
+    queryKey: ["superadmin-stats"],
+    queryFn: superAdminApi.getDashboard,
+    retry: 1,
+    staleTime: 30000,
+  });
+
   const items = useMemo(() => data?.data?.items || [], [data]);
   const pages = useMemo(() => data?.data?.pages || 1, [data]);
   const total = useMemo(() => data?.data?.total || 0, [data]);
 
-  const summary = useMemo(() => {
-    const counts = { pending: 0, approved: 0, rejected: 0 };
-    items.forEach((i) => { const s = String(i.status || "").toLowerCase(); if (counts[s] !== undefined) counts[s] += 1; });
-    return counts;
-  }, [items]);
+  const totals = statsData?.data?.totals || {};
+  const statCards = [
+    { label: "Total", value: (totals.pendingApplications ?? 0) + (totals.approvedApplications ?? 0) + (totals.rejectedApplications ?? 0), icon: ClipboardList, tone: "accent" },
+    { label: "Pending", value: totals.pendingApplications ?? 0, icon: ClipboardList, tone: "warning" },
+    { label: "Approved", value: totals.approvedApplications ?? 0, icon: CheckCircle2, tone: "success" },
+    { label: "Rejected", value: totals.rejectedApplications ?? 0, icon: XCircle, tone: "danger" },
+  ];
 
   if (isLoading) return <div className="card p-10 text-center text-sm text-[var(--text-muted)]">Loading…</div>;
 
@@ -51,23 +61,13 @@ export default function ApplicationsPage() {
         title="Signup Requests"
         description="Approve seller applications to provision their store and account."
         breadcrumbs={[{ label: "Super Admin" }, { label: "Signup Requests" }]}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              <span className="h-2 w-2 rounded-full bg-[var(--warning)]" aria-hidden="true" />
-              Pending {summary.pending}
-            </span>
-            <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              <span className="h-2 w-2 rounded-full bg-[var(--success)]" aria-hidden="true" />
-              Approved {summary.approved}
-            </span>
-            <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              <span className="h-2 w-2 rounded-full bg-[var(--danger)]" aria-hidden="true" />
-              Rejected {summary.rejected}
-            </span>
-          </div>
-        }
       />
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {statCards.map((card) => (
+          <StatCard key={card.label} {...card} loading={!statsData} />
+        ))}
+      </div>
 
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-[220px] flex-1">
@@ -87,12 +87,13 @@ export default function ApplicationsPage() {
           <table className="admin-table min-w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--bg-tertiary)] text-left">
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Applicant</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Store</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Email</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Submitted</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Action</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Applicant</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Store</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Email</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Phone</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Submitted</th>
+                <th className="px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -105,6 +106,7 @@ export default function ApplicationsPage() {
                   <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">{item.name}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{item.store_name}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{item.email}</td>
+                  <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">{item.phone || "—"}</td>
                   <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(item.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3"><StatusBadge value={item.status} /></td>
                   <td className="px-4 py-3 text-right">

@@ -27,6 +27,16 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
+  // ✅ Seller dashboard — requires a session (approved sellers). The backend
+  // API (/api/seller/*) is the real guard; this is the UX layer.
+  // /seller/status stays public so pending applicants can check their status.
+  if (pathname === '/seller/dashboard') {
+    if (!hasSessionCookie) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    return NextResponse.next();
+  }
+
   // ✅ Baqi sab ADMIN pages — protected
   if (pathname.startsWith('/admin')) {
     // Let the admin layout's API auth interceptor refresh an expired/missing
