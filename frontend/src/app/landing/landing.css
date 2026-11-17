@@ -1,11 +1,8 @@
 /* ============================================================
-   CLICK MASTER STORE — /landing styles
-   NOTE: globals.css ko touch NAHI kiya gaya. Yeh file sirf
-   landing route ke liye hai. Theme colours var(--user-*) se aati hain
-   (user.css se), yahan koi brand colour hardcode NAHI hai — sirf
-   blurred blob gradients & gradient helpers accent var use karte hain.
-   RTL/Urdu: koi letter-spacing nahi; line-height Urdu ke liye globals
-   mein hai (user-theme ke andar auto-apply hoti hai).
+   CLICK MASTER STORE — /landing (business platform page)
+   NOTE: globals.css untouched. Theme colours come from user.css
+   (--user-*). Urdu/RTL handled globally (no letter-spacing).
+   No images anywhere — all visuals are CSS/SVG/canvas mocks.
    ============================================================ */
 
 .user-theme.landing-page {
@@ -18,7 +15,6 @@
 .landing-page h1,
 .landing-page h2,
 .landing-page h3,
-.landing-page h4,
 .landing-page .font-heading {
   font-family: var(--font-heading), "Plus Jakarta Sans", var(--font-body), Inter, sans-serif;
 }
@@ -64,7 +60,7 @@
   transform: scaleX(1);
 }
 
-/* ---------- Primary / ghost buttons with shine sweep ---------- */
+/* ---------- Buttons with shine sweep ---------- */
 .landing-btn {
   position: relative;
   display: inline-flex;
@@ -97,7 +93,6 @@
   box-shadow: 0 10px 28px color-mix(in srgb, var(--user-accent) 46%, transparent);
 }
 
-/* shine sweep */
 .landing-btn-primary::before {
   content: "";
   position: absolute;
@@ -137,14 +132,14 @@
     border-color 0.3s ease;
 }
 
-.landing-card-lift:hover {
-  transform: translateY(-6px);
-  border-color: color-mix(in srgb, var(--user-accent) 35%, var(--user-border));
-  box-shadow: 0 18px 44px rgba(10, 10, 10, 0.12),
-    0 0 0 1px color-mix(in srgb, var(--user-accent) 25%, transparent);
+/* ---------- Hero gradient mesh + dotted grid ---------- */
+.hero-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--user-text) 14%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
 }
 
-/* ---------- Hero gradient blobs ---------- */
 .blob {
   position: absolute;
   border-radius: 9999px;
@@ -196,131 +191,22 @@
   to { transform: translate(-40px, -60px) scale(1.18); }
 }
 
-/* Dotted grid backdrop for hero */
-.hero-grid {
-  background-image: radial-gradient(color-mix(in srgb, var(--user-text) 14%, transparent) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
-}
-
-/* ---------- Placeholder product art ---------- */
-.placeholder-art {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.placeholder-art::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.35), transparent 55%);
+/* ---------- Cursor glow (desktop) ---------- */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 65;
+  width: 420px;
+  height: 420px;
+  margin-left: -210px;
+  margin-top: -210px;
+  border-radius: 9999px;
   pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--user-accent) 9%, transparent) 0%, transparent 60%);
 }
 
-/* ---------- Marquee ---------- */
-@keyframes marquee-scroll {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-
-.marquee-track {
-  animation: marquee-scroll 32s linear infinite;
-  will-change: transform;
-}
-
-.marquee:hover .marquee-track,
-.marquee:focus-within .marquee-track {
-  animation-play-state: paused;
-}
-
-/* ---------- Flash deals scrollbar ---------- */
-.deals-scroll {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-snap-type: x proximity;
-}
-
-.deals-scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.deals-scroll > * {
-  scroll-snap-align: start;
-}
-
-/* ---------- Quick-action reveal on product hover ---------- */
-.quick-actions {
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  pointer-events: none;
-}
-
-.group-product:hover .quick-actions,
-.group-product:focus-within .quick-actions {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-@media (hover: none) {
-  .quick-actions {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-  }
-}
-
-/* ---------- Discount badge ---------- */
-.deal-badge {
-  background: var(--user-accent);
-  color: var(--user-accent-text);
-}
-
-/* ---------- Add-to-cart pop ---------- */
-@keyframes cart-pop {
-  0% { transform: scale(1); }
-  35% { transform: scale(1.35); }
-  100% { transform: scale(1); }
-}
-
-.cart-pop {
-  animation: cart-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ---------- Skeleton ---------- */
-@keyframes landing-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.landing-skeleton {
-  background: linear-gradient(
-    100deg,
-    var(--user-bg-hover) 20%,
-    color-mix(in srgb, var(--user-bg-hover) 55%, var(--user-bg-card)) 40%,
-    var(--user-bg-hover) 60%
-  );
-  background-size: 200% 100%;
-  animation: landing-shimmer 1.3s ease infinite;
-}
-
-/* ---------- Toast ---------- */
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.landing-toast {
-  animation: toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ---------- Promo banner gradient ---------- */
+/* ---------- Promo banner ---------- */
 .promo-banner {
   background: linear-gradient(
     135deg,
@@ -330,29 +216,10 @@
   );
 }
 
-/* ---------- Newsletter success ---------- */
-@keyframes success-pop {
-  0% { transform: scale(0.4); opacity: 0; }
-  60% { transform: scale(1.25); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-.success-pop {
-  animation: success-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
 /* ---------- Footer (dark always) ---------- */
 .landing-footer {
   background: #0b0f14;
   color: #a1aab6;
-}
-
-.landing-footer a {
-  transition: color 0.2s ease;
-}
-
-.landing-footer a:hover {
-  color: #f57224;
 }
 
 .pay-badge {
@@ -372,16 +239,13 @@
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   .blob,
-  .marquee-track,
-  .landing-btn-primary::before,
-  .landing-skeleton {
+  .landing-btn-primary::before {
     animation: none !important;
   }
 
   .landing-nav-link::after,
-  .landing-card,
-  .quick-actions,
-  .landing-btn {
+  .landing-btn,
+  .landing-card {
     transition: none !important;
   }
 }

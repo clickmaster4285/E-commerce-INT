@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useInView } from "framer-motion";
 
-/* Animated count-up. Respects reduced motion (jumps straight to final value). */
-export default function CountUp({ value, suffix = "", duration = 1.8, className = "" }) {
+/* Animated count-up. Honors prefers-reduced-motion. */
+export default function CountUp({ value, prefix = "", suffix = "", duration = 1.8, className = "" }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
   const [display, setDisplay] = useState(0);
@@ -34,6 +34,7 @@ export default function CountUp({ value, suffix = "", duration = 1.8, className 
 
   return (
     <span ref={ref} className={className}>
+      {prefix}
       {display.toLocaleString("en-PK")}
       {suffix}
     </span>

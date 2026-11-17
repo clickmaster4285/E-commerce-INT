@@ -1,20 +1,19 @@
 import "./landing.css";
 
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
-import LandingProvider from "@/components/landing/LandingContext";
+import CursorGlow from "@/components/landing/CursorGlow";
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
-import Marquee from "@/components/landing/Marquee";
-import Categories from "@/components/landing/Categories";
-import Deals from "@/components/landing/Deals";
-import FeaturedProducts from "@/components/landing/FeaturedProducts";
-import WhyChooseUs from "@/components/landing/WhyChooseUs";
-import PromoBanner from "@/components/landing/PromoBanner";
-import Testimonials from "@/components/landing/Testimonials";
+import TrustStrip from "@/components/landing/TrustStrip";
+import HowItWorks from "@/components/landing/HowItWorks";
+import PlatformFeatures from "@/components/landing/PlatformFeatures";
 import Stats from "@/components/landing/Stats";
-import Newsletter from "@/components/landing/Newsletter";
+import Testimonials from "@/components/landing/Testimonials";
+import Faq from "@/components/landing/Faq";
+import FinalCta from "@/components/landing/FinalCta";
 import Footer from "@/components/landing/Footer";
 import FloatingButtons from "@/components/landing/FloatingButtons";
+import { FAQS, SITE } from "@/components/landing/content";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,35 +27,33 @@ const plusJakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
 export const metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: "Click Master Store — Click. Order. Delivered.",
+  metadataBase: new URL(SITE.url),
+  title: "Click Master Store — Orders, Invoices, Shipping & Inventory in One Dashboard",
   description:
-    "Pakistan's trusted online store. 45,000+ original products, Flash Deals up to 70% off, Free Delivery, Cash on Delivery aur 7-day easy returns across 120+ cities.",
+    "The complete commerce operating system for Pakistan: ORD- orders, QT- quotes, INV- tax-ready invoices, shipping rules, real-time inventory, POS, CRM, finance reports and full Urdu support — in one MERN platform.",
   keywords: [
-    "online shopping Pakistan",
-    "Click Master Store",
-    "cash on delivery",
-    "flash deals Pakistan",
-    "ecommerce Lahore",
+    "commerce platform Pakistan",
+    "inventory management software",
+    "invoice software Urdu",
+    "POS Pakistan",
+    "COD ecommerce Pakistan",
   ],
   alternates: { canonical: "/landing" },
   openGraph: {
     type: "website",
     siteName: "Click Master Store",
-    title: "Click Master Store — Click. Order. Delivered.",
+    title: "Click Master Store — The Commerce Operating System for Pakistan",
     description:
-      "45,000+ products, Flash Deals, Free Delivery & Cash on Delivery — anywhere in Pakistan.",
+      "Orders, quotations, invoices, shipping rules, inventory, POS, CRM and finance — one dashboard. COD-friendly, full Urdu support.",
     url: "/landing",
     locale: "en_PK",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Click Master Store — Click. Order. Delivered.",
+    title: "Click Master Store — The Commerce Operating System for Pakistan",
     description:
-      "45,000+ products, Flash Deals, Free Delivery & Cash on Delivery — anywhere in Pakistan.",
+      "Orders, quotations, invoices, shipping rules, inventory, POS, CRM and finance — one dashboard.",
   },
   robots: { index: true, follow: true },
 };
@@ -65,20 +62,24 @@ const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Click Master Store",
-  url: SITE_URL,
-  logo: `${SITE_URL}/favicon.ico`,
+  url: SITE.url,
+  logo: `${SITE.url}/favicon.ico`,
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer support",
     areaServed: "PK",
-    telephone: "+92-300-1234567",
     availableLanguage: ["English", "Urdu"],
   },
-  sameAs: [
-    "https://www.facebook.com/clickmasterstore",
-    "https://www.instagram.com/clickmasterstore",
-    "https://www.youtube.com/@clickmasterstore",
-  ],
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQS.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
 };
 
 export default function LandingPage() {
@@ -88,24 +89,21 @@ export default function LandingPage() {
     >
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify([organizationJsonLd, faqJsonLd]) }}
       />
 
-      <LandingProvider>
-        <Navbar />
-        <Hero />
-        <Marquee />
-        <Categories />
-        <Deals />
-        <FeaturedProducts />
-        <WhyChooseUs />
-        <PromoBanner />
-        <Testimonials />
-        <Stats />
-        <Newsletter />
-        <Footer />
-        <FloatingButtons />
-      </LandingProvider>
+      <CursorGlow />
+      <Navbar />
+      <Hero />
+      <TrustStrip />
+      <HowItWorks />
+      <PlatformFeatures />
+      <Stats />
+      <Testimonials />
+      <Faq />
+      <FinalCta />
+      <Footer />
+      <FloatingButtons />
     </main>
   );
 }

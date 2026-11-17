@@ -3,41 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  ShoppingCart,
-  Search,
-  Menu,
-  X,
-  Moon,
-  Sun,
-  MousePointerClick,
-} from "lucide-react";
-import { useLanding } from "./LandingContext";
+import { MousePointerClick, Menu, X, Moon, Sun, ArrowRight } from "lucide-react";
+import { NAV_LINKS, HERO } from "./content";
 
-const LINKS = [
-  { label: "Home", href: "#home" },
-  { label: "Categories", href: "#categories" },
-  { label: "Deals", href: "#deals" },
-  { label: "About", href: "#why-us" },
-  { label: "Contact", href: "#footer-contact" },
-];
-
-function getStoredTheme() {
+function getInitialTheme() {
   if (typeof window === "undefined") return "light";
   return window.document.documentElement.classList.contains("user-dark") ? "dark" : "light";
 }
 
 export default function Navbar() {
-  const { cartCount } = useLanding();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [theme, setTheme] = useState("light");
-  const [cartBump, setCartBump] = useState(false);
 
   useEffect(() => {
-    const id = window.requestAnimationFrame(() => setTheme(getStoredTheme()));
+    const id = window.requestAnimationFrame(() => setTheme(getInitialTheme()));
     const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -46,19 +26,6 @@ export default function Navbar() {
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
-
-  // Cart badge bump — derived-state-during-render pattern (no setState-in-effect)
-  const [prevCartCount, setPrevCartCount] = useState(cartCount);
-  if (prevCartCount !== cartCount) {
-    setPrevCartCount(cartCount);
-    if (cartCount > 0) setCartBump(true);
-  }
-
-  useEffect(() => {
-    if (!cartBump) return;
-    const t = window.setTimeout(() => setCartBump(false), 450);
-    return () => window.clearTimeout(t);
-  }, [cartBump]);
 
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
@@ -78,44 +45,26 @@ export default function Navbar() {
         scrolled ? "shadow-[0_8px_30px_rgba(10,10,10,0.12)]" : ""
       }`}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-3 sm:gap-6 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <Link href="/landing" className="flex min-h-[44px] shrink-0 items-center gap-2" aria-label="Click Master Store — Home">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+        <Link href="/landing" className="flex min-h-[44px] shrink-0 items-center gap-2" aria-label="Click Master Store — home">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)]">
             <MousePointerClick size={20} strokeWidth={2.2} aria-hidden="true" />
           </span>
           <span className="font-heading leading-none">
-            <span className="block text-[15px] font-extrabold tracking-tight text-[var(--user-text)] sm:text-lg">
-              Click Master
-            </span>
-            <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--user-accent)]">
-              Store
-            </span>
+            <span className="block text-[15px] font-extrabold tracking-tight text-[var(--user-text)] sm:text-lg">Click Master</span>
+            <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--user-accent)]">Store</span>
           </span>
         </Link>
 
-        {/* Desktop links */}
         <nav className="ml-2 hidden items-center gap-6 lg:flex" aria-label="Primary">
-          {LINKS.map((l) => (
+          {NAV_LINKS.map((l) => (
             <a key={l.label} href={l.href} className="landing-nav-link">
               {l.label}
             </a>
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          {/* Search toggle */}
-          <button
-            type="button"
-            onClick={() => setSearchOpen((v) => !v)}
-            aria-label={searchOpen ? "Close search" : "Open search"}
-            aria-expanded={searchOpen}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
-          >
-            {searchOpen ? <X size={20} aria-hidden="true" /> : <Search size={20} aria-hidden="true" />}
-          </button>
-
-          {/* Dark mode toggle */}
+        <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             onClick={toggleTheme}
@@ -125,28 +74,11 @@ export default function Navbar() {
             {theme === "dark" ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
           </button>
 
-          {/* Cart */}
-          <a
-            href="/cart"
-            aria-label={`Cart, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
-            className="relative flex h-11 w-11 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
-          >
-            <ShoppingCart size={20} aria-hidden="true" />
-            {cartCount > 0 && (
-              <span
-                className={`absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--user-accent)] px-1 text-[10px] font-extrabold text-[var(--user-accent-text)] ${cartBump ? "cart-pop" : ""}`}
-              >
-                {cartCount > 99 ? "99+" : cartCount}
-              </span>
-            )}
+          <a href={HERO.secondaryCta.href} target="_blank" rel="noopener noreferrer" className="landing-btn landing-btn-primary hidden md:inline-flex">
+            Talk to Us
+            <ArrowRight size={17} aria-hidden="true" />
           </a>
 
-          {/* CTA */}
-          <a href="#deals" className="landing-btn landing-btn-primary hidden min-h-[44px] !px-5 text-sm md:inline-flex">
-            Shop Now
-          </a>
-
-          {/* Hamburger */}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -159,42 +91,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Expanding search bar */}
-      <AnimatePresence initial={false}>
-        {searchOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="overflow-hidden border-t border-[var(--user-border)]"
-          >
-            <form
-              className="mx-auto flex max-w-7xl items-center gap-2 px-3 py-3 sm:px-6 lg:px-8"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (query.trim()) window.location.href = `/search?q=${encodeURIComponent(query.trim())}`;
-              }}
-            >
-              <Search size={18} className="shrink-0 text-[var(--user-text-muted)]" aria-hidden="true" />
-              <input
-                autoFocus
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search products, brands and categories…"
-                aria-label="Search products"
-                className="h-11 w-full bg-transparent text-[var(--user-text)] outline-none placeholder:text-[var(--user-text-muted)]"
-              />
-              <button type="submit" className="landing-btn landing-btn-primary min-h-[44px] text-sm">
-                Search
-              </button>
-            </form>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Mobile drawer */}
       <AnimatePresence initial={false}>
         {open && (
           <>
@@ -216,7 +112,7 @@ export default function Navbar() {
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="fixed right-0 top-0 z-[59] flex h-full w-[82vw] max-w-xs flex-col gap-1 overflow-y-auto bg-[var(--user-bg-card)] p-5 pt-20 lg:hidden"
             >
-              {LINKS.map((l) => (
+              {NAV_LINKS.map((l) => (
                 <a
                   key={l.label}
                   href={l.href}
@@ -226,12 +122,9 @@ export default function Navbar() {
                   {l.label}
                 </a>
               ))}
-              <a
-                href="#deals"
-                onClick={() => setOpen(false)}
-                className="landing-btn landing-btn-primary mt-3 justify-center"
-              >
-                Shop Now
+              <a href={HERO.secondaryCta.href} target="_blank" rel="noopener noreferrer" className="landing-btn landing-btn-primary mt-3 justify-center">
+                Talk to Us
+                <ArrowRight size={17} aria-hidden="true" />
               </a>
             </motion.nav>
           </>

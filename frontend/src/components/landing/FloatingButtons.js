@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronUp, MessageCircle } from "lucide-react";
-import { WHATSAPP_NUMBER } from "./data";
+import { WHATSAPP_NUMBER } from "./content";
 
 export default function FloatingButtons() {
   const [showTop, setShowTop] = useState(false);

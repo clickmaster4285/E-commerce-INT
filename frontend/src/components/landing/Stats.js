@@ -1,10 +1,11 @@
 import CountUp from "./CountUp";
-import { STATS } from "./data";
+import { STATS } from "./content";
 
+/* DEMO VALUES — edit STATS in content.js */
 export default function Stats() {
   return (
     <section
-      aria-label="Click Master Store in numbers"
+      aria-label="Click Master Store by the numbers"
       className="border-y border-[var(--user-border)] bg-[var(--user-bg-card)]"
     >
       <dl className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-[var(--user-border)] px-2 sm:grid-cols-4 sm:px-6 lg:px-8">
