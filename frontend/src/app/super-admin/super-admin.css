@@ -20,7 +20,7 @@
   --text-muted: #64748b;
 
   color: var(--text-primary);
-  background: var(--bg-primary);
+  background-color: var(--bg-primary);
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 html.dark .super-admin-theme {
@@ -43,25 +43,23 @@ html.dark .super-admin-theme {
   border-radius: 0.75rem;
 }
 
-/* Sidebar active item — accent background, white text, left indicator */
+/* Sidebar active item — flat accent background, white text (no glow, like admin) */
 .super-admin-theme .super-nav-active {
-  position: relative;
-  background: var(--bg-sidebar-active);
+  background: var(--accent);
   color: #ffffff;
-  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
 }
 .super-admin-theme .super-nav-active svg {
   color: #ffffff;
 }
-.super-admin-theme .super-nav-active::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 5px;
-  top: 22%;
-  bottom: 22%;
-  width: 3px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.85);
+
+/* Page header entrance */
+.super-page-header {
+  animation: fadeIn 0.25s ease both;
+}
+
+/* Primary buttons in the panel get a soft accent glow on hover */
+.super-admin-theme .btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* ============================================================

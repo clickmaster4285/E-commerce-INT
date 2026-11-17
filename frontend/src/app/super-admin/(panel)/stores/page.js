@@ -6,7 +6,7 @@ import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { Search, ChevronLeft, ChevronRight, Store as StoreIcon, ExternalLink } from "lucide-react";
-import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
+import PageHeader from "@/components/superadmin/PageHeader";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -46,9 +46,10 @@ export default function StoresPage() {
 
   return (
     <div className="space-y-5">
-      <AdminPageHeader
+      <PageHeader
         title="Store Management"
-        subtitle="Activate, suspend and inspect tenant stores."
+        description="Activate, suspend and inspect tenant stores."
+        breadcrumbs={[{ label: "Super Admin" }, { label: "Store Management" }]}
       />
 
       <div className="card flex flex-wrap items-center gap-2 p-3">

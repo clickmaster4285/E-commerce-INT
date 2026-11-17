@@ -45,6 +45,21 @@ const nextConfig = {
         destination: '/filtering-product?category=:id',
         permanent: true,
       },
+      {
+        source: '/super-admin/settings',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/activity',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/activity-logs',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
     ];
   },
 };

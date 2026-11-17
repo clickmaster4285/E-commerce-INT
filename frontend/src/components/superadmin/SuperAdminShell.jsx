@@ -1,19 +1,10 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import Sidebar from "@/components/superadmin/Sidebar";
 import Topbar from "@/components/superadmin/Topbar";
-
-const BREADCRUMBS = {
-  "/super-admin/dashboard": "Dashboard",
-  "/super-admin/applications": "Signup Requests",
-  "/super-admin/stores": "Store Management",
-  "/super-admin/users": "User Management",
-  "/super-admin/activity": "Activity Logs",
-  "/super-admin/settings": "Settings",
-};
 
 const readThemeCookie = () => {
   try {
@@ -26,7 +17,6 @@ const readThemeCookie = () => {
 
 export default function SuperAdminShell({ children }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [state, setState] = useState({ status: "loading", admin: null });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -88,9 +78,6 @@ export default function SuperAdminShell({ children }) {
     );
   }
 
-  const base = pathname?.replace(/\/$/, "");
-  const breadcrumb = BREADCRUMBS[base] || "Super Admin";
-
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
       {/* Mobile scrim */}
@@ -112,15 +99,16 @@ export default function SuperAdminShell({ children }) {
         <Topbar
           onMenuClick={() => setSidebarOpen((v) => !v)}
           onLogout={handleLogout}
-          breadcrumb={breadcrumb}
           adminName={state.admin?.name || "Super Admin"}
           adminEmail={state.admin?.email || ""}
           theme={theme}
           onToggleTheme={toggleTheme}
           loggingOut={loggingOut}
         />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--bg-secondary)] px-3 py-4 sm:px-5 sm:py-6">
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--bg-secondary)]">
+          <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-5">
+            {children}
+          </div>
         </main>
       </div>
     </div>

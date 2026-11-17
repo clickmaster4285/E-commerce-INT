@@ -26,9 +26,4 @@ router.patch("/stores/:id/status", superAdminController.setStoreStatus);
 router.get("/users", superAdminController.listUsers);
 router.patch("/users/:id/status", superAdminController.setUserStatus);
 
-router.get("/activity", superAdminController.listActivity);
-
-router.get("/settings", superAdminController.getSettings);
-router.put("/settings/password", superAdminController.changeSuperAdminPassword);
-
 module.exports = router;

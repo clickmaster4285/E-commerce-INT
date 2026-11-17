@@ -51,13 +51,4 @@ export const superAdminApi = {
     superAdminHttp.get("/super-admin/users", { params }).then((r) => r.data),
   setUserStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
-
-  // Activity
-  listActivity: (params = {}) =>
-    superAdminHttp.get("/super-admin/activity", { params }).then((r) => r.data),
-
-  // Settings
-  getSettings: () => superAdminHttp.get("/super-admin/settings").then((r) => r.data),
-  changePassword: (payload) =>
-    superAdminHttp.put("/super-admin/settings/password", payload).then((r) => r.data),
 };

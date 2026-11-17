@@ -6,7 +6,7 @@ import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { Search, ChevronLeft, ChevronRight, Users as UsersIcon } from "lucide-react";
-import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
+import PageHeader from "@/components/superadmin/PageHeader";
 
 const FILTERS = [
   { value: "", label: "All users" },
@@ -50,9 +50,10 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-5">
-      <AdminPageHeader
+      <PageHeader
         title="User Management"
-        subtitle={`${total} registered accounts across the platform.`}
+        description={`${total} registered accounts across the platform.`}
+        breadcrumbs={[{ label: "Super Admin" }, { label: "User Management" }]}
       />
 
       <div className="card flex flex-wrap items-center gap-2 p-3">

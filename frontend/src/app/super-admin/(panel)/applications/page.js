@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
+import PageHeader from "@/components/superadmin/PageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { Search, ChevronLeft, ChevronRight, Filter, Inbox } from "lucide-react";
@@ -47,9 +47,10 @@ export default function ApplicationsPage() {
 
   return (
     <div className="space-y-5">
-      <AdminPageHeader
-        title="Signup requests"
-        subtitle="Sellers apply here. Approve to provision their store and account."
+      <PageHeader
+        title="Signup Requests"
+        description="Approve seller applications to provision their store and account."
+        breadcrumbs={[{ label: "Super Admin" }, { label: "Signup Requests" }]}
         actions={
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">

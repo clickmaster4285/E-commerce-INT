@@ -1,15 +1,11 @@
 const bcrypt = require("bcryptjs");
 const SuperAdmin = require("../models/SuperAdmin");
-const SuperAdminActivity = require("../models/SuperAdminActivity");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
-const { requireSuperAdmin, signSession, cookieOptions, getCookieName } = require("../middleware/superAdminAuth");
+const { signSession, cookieOptions, getCookieName } = require("../middleware/superAdminAuth");
 const { logActivity } = require("../utils/superAdminActivity");
-const { sendOtpEmail, isSmtpConfigured } = require("../utils/sendEmail");
 const log = require("../utils/logger");
-
-const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS);
 
 /* ==========================================
    AUTH — separate from seller/customer auth
@@ -108,7 +104,6 @@ const getDashboard = async (req, res) => {
       suspendedStores,
       recentRequests,
       recentUsers,
-      recentActivity,
     ] = await Promise.all([
       User.countDocuments({ is_deleted: { $ne: true }, role: "user" }),
       SellerApplication.countDocuments({ status: "approved" }),
@@ -127,7 +122,6 @@ const getDashboard = async (req, res) => {
         .limit(6)
         .select("name email username created_at storeId status")
         .lean(),
-      SuperAdminActivity.find().sort({ created_at: -1 }).limit(8).lean(),
     ]);
 
     // 7-day registration series (customers)
@@ -170,7 +164,6 @@ const getDashboard = async (req, res) => {
         },
         recentRequests,
         recentUsers,
-        recentActivity,
         registrationSeries,
         approvalSplit: {
           pending: pendingApplications,
@@ -518,90 +511,6 @@ const setUserStatus = async (req, res) => {
   }
 };
 
-/* ==========================================
-   ACTIVITY LOGS
-   ========================================== */
-
-const listActivity = async (req, res) => {
-  try {
-    const { entityType, page = 1, limit = 15 } = req.query;
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 15));
-    const filter = {};
-    if (entityType && ["seller_application", "store", "user", "auth", "settings", "system"].includes(String(entityType))) {
-      filter.entityType = String(entityType);
-    }
-    const [items, total] = await Promise.all([
-      SuperAdminActivity.find(filter)
-        .sort({ created_at: -1 })
-        .skip((pageNum - 1) * limitNum)
-        .limit(limitNum)
-        .lean(),
-      SuperAdminActivity.countDocuments(filter),
-    ]);
-    return res.json({
-      success: true,
-      data: { items, total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: "Failed to load activity logs." });
-  }
-};
-
-/* ==========================================
-   SETTINGS — profile + change password
-   ========================================== */
-
-const getSettings = (req, res) => {
-  const admin = req.superAdmin;
-  return res.json({
-    success: true,
-    data: {
-      profile: {
-        name: admin.name,
-        email: admin.email,
-        lastLoginAt: admin.lastLoginAt,
-      },
-      environment: {
-        nodeEnv: process.env.NODE_ENV || "development",
-        smtpConfigured: isSmtpConfigured(),
-        jwtSecretConfigured: !!process.env.SUPER_ADMIN_JWT_SECRET,
-        emailConfigured: !!process.env.SUPER_ADMIN_EMAIL,
-      },
-    },
-  });
-};
-
-const changeSuperAdminPassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body || {};
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: "Current and new password are required." });
-    }
-    if (String(newPassword).length < 8) {
-      return res.status(400).json({ success: false, message: "New password must be at least 8 characters." });
-    }
-    const admin = await SuperAdmin.findById(req.superAdmin._id);
-    if (!admin) return res.status(404).json({ success: false, message: "Account not found." });
-    const matches = await bcrypt.compare(String(currentPassword), admin.passwordHash);
-    if (!matches) return res.status(401).json({ success: false, message: "Current password is incorrect." });
-
-    admin.passwordHash = await bcrypt.hash(String(newPassword), SALT_ROUNDS);
-    await admin.save();
-
-    await logActivity({
-      action: "Super admin changed password",
-      actor: admin,
-      entityType: "settings",
-      entityId: String(admin._id),
-    });
-
-    return res.json({ success: true, message: "Password updated. Please sign in again next time." });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: "Failed to change password." });
-  }
-};
-
 module.exports = {
   // auth
   loginSuperAdmin,
@@ -620,12 +529,4 @@ module.exports = {
   // users
   listUsers,
   setUserStatus,
-  // activity
-  listActivity,
-  // settings
-  getSettings,
-  changeSuperAdminPassword,
 };
-
-// Re-export the guard so routes can import from one place if needed later
-module.exports.requireSuperAdmin = requireSuperAdmin;

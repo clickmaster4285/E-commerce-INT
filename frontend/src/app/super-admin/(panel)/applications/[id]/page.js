@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, XCircle, Shield, Mail, Phone, Store as StoreIcon, User } from "lucide-react";
-import Link from "next/link";
+import { CheckCircle2, XCircle, Shield, Mail, Phone, Store as StoreIcon, User } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import PageHeader from "@/components/superadmin/PageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
@@ -46,7 +46,10 @@ export default function ApplicationDetailPage() {
   if (isError || !item) {
     return (
       <div className="space-y-4">
-        <Link href="/super-admin/applications" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent)]"><ArrowLeft size={16}/> Back to requests</Link>
+        <PageHeader
+          title="Application"
+          breadcrumbs={[{ label: "Super Admin" }, { label: "Signup Requests", href: "/super-admin/applications" }, { label: "Not found" }]}
+        />
         <div className="card p-6 text-sm text-[var(--danger-text)]">{actionError || "Application not found."}</div>
       </div>
     );
@@ -54,16 +57,18 @@ export default function ApplicationDetailPage() {
 
   return (
     <div className="space-y-5">
-      <Link href="/super-admin/applications" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent)] hover:underline"><ArrowLeft size={16}/> Back to requests</Link>
+      <PageHeader
+        title={item.name}
+        description="Review the application and approve or reject it."
+        breadcrumbs={[{ label: "Super Admin" }, { label: "Signup Requests", href: "/super-admin/applications" }, { label: item.name }]}
+        badge={<StatusBadge value={item.status} />}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="card lg:col-span-7 p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] pb-4">
-            <div>
-              <h1 className="text-xl font-semibold text-[var(--text-primary)]">{item.name}</h1>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Applicant details</p>
-            </div>
-            <StatusBadge value={item.status} />
+          <div className="border-b border-[var(--border-color)] pb-4">
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Applicant details</h2>
+            <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">What the seller told us when applying.</p>
           </div>
 
           <dl className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
