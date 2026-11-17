@@ -46,7 +46,7 @@ export default function Navbar() {
         scrolled ? "shadow-[0_1px_0_0_var(--user-border),0_8px_30px_rgba(10,10,10,0.08)]" : ""
       }`}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/landing" className="flex min-h-[44px] shrink-0 items-center" aria-label="Click Master Store — home">
           <span className="flex h-11 items-center rounded-xl bg-white px-3 ring-1 ring-black/5">
             <Image
@@ -60,12 +60,15 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <nav className="ml-4 hidden items-center gap-7 lg:flex" aria-label="Primary">
+        <nav
+          className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-7 lg:flex"
+          aria-label="Primary"
+        >
           {NAV_LINKS.map((l) => (
             <a
               key={l.label}
               href={l.href}
-              className="text-sm font-semibold text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
+              className="landing-nav-link whitespace-nowrap text-sm font-semibold text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
             >
               {l.label}
             </a>

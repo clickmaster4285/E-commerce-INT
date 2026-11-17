@@ -1,22 +1,32 @@
+import { Rocket, Languages, Banknote, RotateCcw, FileCheck, KeyRound } from "lucide-react";
 import CountUp from "./CountUp";
-import { STATS } from "./content";
 
-/* DEMO VALUES — edit STATS in content.js */
+/* Honest product facts — no fake analytics. */
+const FACTS = [
+  { icon: Rocket, count: 15, suffix: " min", label: "Average setup", desc: "Go live the same day" },
+  { icon: Languages, text: "EN + اردو", label: "Full Urdu RTL", desc: "Nastaliq + RTL layout" },
+  { icon: Banknote, text: "COD · Bank · Card", label: "Payment methods", desc: "One reconciled ledger" },
+  { icon: RotateCcw, count: 7, suffix: " days", label: "Easy returns", desc: "Auto-restock on refund" },
+  { icon: FileCheck, text: "QT → INV", label: "Quote to invoice", desc: "One click, no re-typing" },
+  { icon: KeyRound, count: 28, prefix: "~", suffix: "", label: "Staff permissions", desc: "Granular roles, live changes" },
+];
+
 export default function Stats() {
   return (
-    <section
-      aria-label="Click Master Store by the numbers"
-      className="border-y border-[var(--user-border)] bg-[var(--user-bg-card)]"
-    >
-      <dl className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-[var(--user-border)] px-2 sm:grid-cols-4 sm:px-6 lg:px-8">
-        {STATS.map(({ value, suffix, label }) => (
-          <div key={label} className="flex flex-col items-center gap-1 px-2 py-8 text-center sm:py-10">
-            <dt className="order-2 mt-1 max-w-[10rem] text-[10px] font-bold uppercase tracking-wider text-[var(--user-text-muted)] sm:text-[11px]">
-              {label}
-            </dt>
-            <dd className="order-1 text-2xl font-extrabold tabular-nums text-[var(--user-accent)] sm:text-4xl">
-              <CountUp value={value} suffix={suffix} />
+    <section aria-label="Click Master Store at a glance" className="pf-stats">
+      <dl className="pf-stats-grid">
+        {FACTS.map(({ icon: Icon, count, prefix = "", text, suffix, label, desc }) => (
+          <div key={label} className="pf-stat-item">
+            <Icon size={16} className="pf-stat-icon" aria-hidden="true" />
+            <dd className={`pf-stat-num order-2 ${text ? "pf-stat-num-text" : ""}`}>
+              {typeof count === "number" ? (
+                <CountUp value={count} prefix={prefix} suffix={suffix} duration={1.2} />
+              ) : (
+                text
+              )}
             </dd>
+            <dt className="pf-stat-label order-3">{label}</dt>
+            <p className="pf-stat-desc order-4">{desc}</p>
           </div>
         ))}
       </dl>

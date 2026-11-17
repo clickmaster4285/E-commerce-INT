@@ -23,11 +23,11 @@ const userThemeScript = `(function(){try{if(location.pathname==="/admin"||locati
 export default function RootLayout({ children }) {
   return (
     <html lang="en" dir="ltr" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <body>
         {/* Arabic -> Noto Naskh Arabic, Urdu -> Noto Nastaliq Urdu. Loaded on demand
             via the media trick so English (LTR) never blocks on them. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap"
@@ -42,8 +42,6 @@ export default function RootLayout({ children }) {
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: userThemeScript }}
         />
-      </head>
-      <body>
         <Providers>
           <LanguageProvider>{children}</LanguageProvider>
         </Providers>
