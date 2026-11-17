@@ -132,65 +132,6 @@
     border-color 0.3s ease;
 }
 
-/* ---------- Hero gradient mesh + dotted grid ---------- */
-.hero-grid {
-  background-image: radial-gradient(color-mix(in srgb, var(--user-text) 14%, transparent) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
-}
-
-.blob {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(90px);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.blob-1 {
-  width: 420px;
-  height: 420px;
-  top: -120px;
-  right: -120px;
-  background: radial-gradient(circle at 40% 40%, var(--user-accent) 0%, transparent 70%);
-  opacity: 0.35;
-  animation: blob-drift-1 14s ease-in-out infinite alternate;
-}
-
-.blob-2 {
-  width: 360px;
-  height: 360px;
-  bottom: -140px;
-  left: -120px;
-  background: radial-gradient(circle at 60% 60%, var(--user-accent-hover) 0%, transparent 70%);
-  opacity: 0.3;
-  animation: blob-drift-2 17s ease-in-out infinite alternate;
-}
-
-.blob-3 {
-  width: 260px;
-  height: 260px;
-  top: 38%;
-  left: 42%;
-  background: radial-gradient(circle at 50% 50%, var(--user-accent) 0%, transparent 65%);
-  opacity: 0.22;
-  animation: blob-drift-3 11s ease-in-out infinite alternate;
-}
-
-@keyframes blob-drift-1 {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(-60px, 50px) scale(1.15); }
-}
-@keyframes blob-drift-2 {
-  from { transform: translate(0, 0) scale(1.05); }
-  to { transform: translate(70px, -45px) scale(0.92); }
-}
-@keyframes blob-drift-3 {
-  from { transform: translate(0, 0) scale(0.95); }
-  to { transform: translate(-40px, -60px) scale(1.18); }
-}
-
 /* ---------- Cursor glow (desktop) ---------- */
 .cursor-glow {
   position: fixed;
@@ -206,14 +147,68 @@
   background: radial-gradient(circle, color-mix(in srgb, var(--user-accent) 9%, transparent) 0%, transparent 60%);
 }
 
-/* ---------- Promo banner ---------- */
-.promo-banner {
-  background: linear-gradient(
-    135deg,
-    var(--user-accent) 0%,
-    var(--user-accent-hover) 55%,
-    color-mix(in srgb, var(--user-accent-hover) 70%, #7c2d12) 100%
-  );
+/* ---------- Final CTA — dark aurora panel ---------- */
+.final-cta {
+  position: relative;
+  background: #070a12;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.cta-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 90% 80% at 30% 40%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 80% at 30% 40%, black 30%, transparent 75%);
+}
+
+.cta-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+}
+
+.cta-orb-1 {
+  width: 480px;
+  height: 480px;
+  top: -160px;
+  left: -140px;
+  background: radial-gradient(circle, rgba(245, 114, 36, 0.34) 0%, transparent 68%);
+  animation: cta-drift-1 13s ease-in-out infinite alternate;
+}
+
+.cta-orb-2 {
+  width: 380px;
+  height: 380px;
+  bottom: -150px;
+  right: -110px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.2) 0%, transparent 68%);
+  animation: cta-drift-2 16s ease-in-out infinite alternate;
+}
+
+@keyframes cta-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(90px, 70px) scale(1.18); }
+}
+
+@keyframes cta-drift-2 {
+  from { transform: translate(0, 0) scale(1.1); }
+  to { transform: translate(-80px, -60px) scale(0.9); }
+}
+
+/* Glowing pulse ring on the primary CTA */
+@keyframes cta-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 114, 36, 0.45), 0 12px 38px rgba(245, 114, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(245, 114, 36, 0), 0 16px 46px rgba(245, 114, 36, 0.55);
+  }
+}
+
+.cta-pulse {
+  animation: cta-pulse 2.6s ease-in-out infinite;
 }
 
 /* ---------- Footer (dark always) ---------- */

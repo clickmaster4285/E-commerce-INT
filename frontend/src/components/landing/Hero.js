@@ -5,21 +5,18 @@ import {
   motion,
   useScroll,
   useTransform,
-  useSpring,
   useReducedMotion,
 } from "framer-motion";
 import {
   ArrowRight,
-  FileText,
-  PackageCheck,
-  Truck,
   Zap,
   CheckCircle2,
+  ChevronDown,
 } from "lucide-react";
 import { HERO } from "./content";
 
-/* Magnetic hover wrapper — small follow effect on desktop */
-function Magnetic({ children, strength = 18 }) {
+/* Magnetic hover wrapper — desktop only */
+function Magnetic({ children, strength = 16 }) {
   const ref = useRef(null);
   const reduce = useReducedMotion();
 
@@ -29,7 +26,7 @@ function Magnetic({ children, strength = 18 }) {
     ref.current.style.transform = `translate(${((e.clientX - (r.left + r.width / 2)) / r.width) * strength}px, ${((e.clientY - (r.top + r.height / 2)) / r.height) * strength}px)`;
   };
   const reset = () => {
-    if (ref.current) ref.current.style.transform = "translate(0,0)";
+    if (ref.current) ref.current.style.transform = "translate(0, 0)";
   };
 
   return (
@@ -52,69 +49,102 @@ export default function Hero() {
     target: sectionRef,
     offset: ["start start", "end start"],
   });
-  const meshY = useTransform(scrollYProgress, [0, 1], ["0%", reduceMotion ? "0%" : "40%"]);
-
-  // Mouse-move parallax for the floating UI cards
-  const mx = useSpring(0, { stiffness: 60, damping: 20, mass: 0.6 });
-  const my = useSpring(0, { stiffness: 60, damping: 20, mass: 0.6 });
-  const onMouseMove = (e) => {
-    if (reduceMotion) return;
-    const r = sectionRef.current.getBoundingClientRect();
-    mx.set(((e.clientX - (r.left + r.width / 2)) / r.width) * 2);
-    my.set(((e.clientY - (r.top + r.height / 2)) / r.height) * 2);
-  };
-  const card1X = useTransform(mx, (v) => v * -12);
-  const card1Y = useTransform(my, (v) => v * -9);
-  const card2X = useTransform(mx, (v) => v * 14);
-  const card2Y = useTransform(my, (v) => v * 11);
-  const card3X = useTransform(mx, (v) => v * -7);
-  const card3Y = useTransform(my, (v) => v * 13);
+  const contentY = useTransform(scrollYProgress, [0, 1], ["0%", reduceMotion ? "0%" : "18%"]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.75], [1, reduceMotion ? 1 : 0.15]);
 
   return (
     <section
       ref={sectionRef}
-      id="top"
-      onMouseMove={onMouseMove}
+      id="home"
       aria-label="Click Master Store — commerce platform"
-      className="relative overflow-hidden"
+      className="relative flex min-h-[94svh] flex-col justify-center overflow-hidden bg-[#05070b]"
     >
-      {/* Ambient gradient mesh */}
-      <div className="hero-grid absolute inset-0" aria-hidden="true" />
-      <motion.div style={{ y: meshY }} className="absolute inset-0" aria-hidden="true">
-        <div className="blob blob-1" />
-        <div className="blob blob-2" />
-        <div className="blob blob-3" />
-      </motion.div>
+      {/* ===== Video background (decorative) ===== */}
+      {reduceMotion ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,#1b2440_0%,#05070b_65%)]"
+        />
+      ) : (
+        <video
+          className="absolute inset-0 h-full w-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          disablePictureInPicture
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          <source src="/landing/hero-bg.mp4" type="video/mp4" />
+        </video>
+      )}
 
-      <div className="relative z-[1] mx-auto grid max-w-7xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-12 lg:gap-8 lg:px-8 lg:pb-24 lg:pt-20">
-        {/* Copy */}
-        <div className="lg:col-span-6">
+      {/* ===== Cinematic scrims ===== */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,7,12,0.92)_0%,rgba(4,7,12,0.72)_38%,rgba(4,7,12,0.18)_70%,rgba(4,7,12,0.32)_100%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(to_top,rgba(4,7,12,0.85)_0%,transparent_32%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="absolute -right-24 top-1/3 h-96 w-96 rounded-full bg-[var(--user-accent)] opacity-[0.14] blur-[130px]"
+      />
+
+      {/* ===== Content ===== */}
+      <motion.div
+        style={{ y: contentY, opacity: contentOpacity }}
+        className="relative z-[2] mx-auto w-full max-w-7xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8 lg:pb-24 lg:pt-28"
+      >
+        <div className="max-w-2xl">
           <motion.p
-            initial={{ opacity: 0, y: 14 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] py-1.5 pl-2 pr-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--user-accent)] shadow-sm"
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 py-1.5 pl-2 pr-4 text-[11px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur-md"
           >
-            <Zap size={13} aria-hidden="true" />
+            <Zap size={13} className="text-[var(--user-accent)]" aria-hidden="true" />
             {HERO.eyebrow}
           </motion.p>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.08 }}
-            className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight text-[var(--user-text)] sm:text-5xl xl:text-6xl"
+          <h1
+            aria-label={`${HERO.headlineA} ${HERO.headlineB}`}
+            className="mt-5 text-[2.65rem] font-extrabold leading-[1.04] tracking-tight text-white sm:text-6xl xl:text-[4.1rem]"
           >
-            {HERO.headlineA}
+            {HERO.headlineA.split(" ").map((word, i) => (
+              <motion.span
+                key={`a-${i}`}
+                initial={{ opacity: 0, y: 44, rotate: 4 }}
+                animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ duration: 0.55, delay: 0.12 + i * 0.075, ease: [0.16, 1, 0.3, 1] }}
+                className="mr-[0.28em] inline-block"
+              >
+                {word}
+              </motion.span>
+            ))}
             <br />
-            <span className="text-[var(--user-accent)]">{HERO.headlineB}</span>
-          </motion.h1>
+            {HERO.headlineB.split(" ").map((word, i) => (
+              <motion.span
+                key={`b-${i}`}
+                initial={{ opacity: 0, y: 44, rotate: 4 }}
+                animate={{ opacity: 1, y: 0, rotate: 0 }}
+                transition={{ duration: 0.55, delay: 0.45 + i * 0.075, ease: [0.16, 1, 0.3, 1] }}
+                className="mr-[0.28em] inline-block text-[var(--user-accent)]"
+              >
+                {word}
+              </motion.span>
+            ))}
+          </h1>
 
           <motion.p
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.18 }}
-            className="mt-5 max-w-md text-base leading-7 text-[var(--user-text-muted)] sm:text-lg"
+            transition={{ duration: 0.55, delay: 0.75 }}
+            className="mt-6 max-w-md text-base leading-7 text-white/80 sm:text-lg"
           >
             {HERO.sub}
           </motion.p>
@@ -122,133 +152,58 @@ export default function Hero() {
           <motion.div
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.28 }}
-            className="mt-7 flex flex-wrap items-center gap-3"
+            transition={{ duration: 0.55, delay: 0.9 }}
+            className="mt-8 flex flex-wrap items-center gap-3"
           >
             <Magnetic>
-              <a href={HERO.primaryCta.href} className="landing-btn landing-btn-primary">
+              <a
+                href={HERO.primaryCta.href}
+                className="inline-flex min-h-[52px] items-center gap-2 rounded-xl bg-[var(--user-accent)] px-7 text-base font-extrabold text-white shadow-[0_12px_38px_rgba(245,114,36,0.45)] transition-all duration-200 hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+              >
                 {HERO.primaryCta.label}
-                <ArrowRight size={18} aria-hidden="true" />
+                <ArrowRight size={19} aria-hidden="true" />
               </a>
             </Magnetic>
             <Magnetic>
-              <a href={HERO.secondaryCta.href} target="_blank" rel="noopener noreferrer" className="landing-btn landing-btn-ghost">
+              <a
+                href={HERO.secondaryCta.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-[52px] items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-7 text-base font-bold text-white backdrop-blur-md transition-all duration-200 hover:border-white/45 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
                 {HERO.secondaryCta.label}
               </a>
             </Magnetic>
           </motion.div>
 
-          {/* Micro proof points — real capabilities, not invented numbers */}
+          {/* Proof points */}
           <motion.ul
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.42 }}
-            className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-[var(--user-text-secondary)]"
+            transition={{ duration: 0.5, delay: 1.05 }}
+            className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-white/75"
           >
-            {["Orders ORD-… to INV-…", "COD + Bank Transfer", "Full Urdu (RTL)"].map((t) => (
+            {["ORD- to INV- numbering", "COD + Bank Transfer", "Full Urdu (RTL)"].map((t) => (
               <li key={t} className="flex items-center gap-1.5">
-                <CheckCircle2 size={14} className="text-emerald-500" aria-hidden="true" />
+                <CheckCircle2 size={14} className="text-emerald-400" aria-hidden="true" />
                 {t}
               </li>
             ))}
           </motion.ul>
         </div>
+      </motion.div>
 
-        {/* Right — floating code-built UI cards */}
-        <div className="relative mx-auto h-[400px] w-full max-w-md sm:h-[440px] lg:col-span-6 lg:h-[500px] lg:max-w-none" aria-hidden="true">
-          {/* Invoice card */}
-          <motion.div style={{ x: card1X, y: card1Y }} className="absolute left-1/2 top-6 z-[2] w-60 -translate-x-1/2 sm:w-72 lg:left-[44%]">
-            <motion.div
-              animate={reduceMotion ? {} : { y: [0, -12, 0] }}
-              transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-              className="landing-card p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--user-accent-soft)] text-[var(--user-accent)]">
-                    <FileText size={17} aria-hidden="true" />
-                  </span>
-                  <p className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--user-text-muted)]">Invoice</p>
-                </div>
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-extrabold text-amber-600">UNPAID</span>
-              </div>
-              <p className="mt-2 font-mono text-xs font-bold text-[var(--user-text)]">INV-000214</p>
-              <ul className="mt-2 space-y-1.5 border-t border-[var(--user-border)] pt-2 text-[11px]">
-                {[
-                  ["Stainless Cookware 12pc × 1", "Rs. 8,999"],
-                  ["Tax (GST)", "Rs. 1,530"],
-                ].map(([label, amount]) => (
-                  <li key={label} className="flex items-center justify-between gap-2">
-                    <span className="text-[var(--user-text-muted)]">{label}</span>
-                    <span className="font-bold tabular-nums text-[var(--user-text-secondary)]">{amount}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 flex items-center justify-between border-t border-[var(--user-border)] pt-2">
-                <span className="text-[11px] font-bold uppercase text-[var(--user-text-muted)]">Total</span>
-                <span className="text-base font-extrabold tabular-nums text-[var(--user-accent)]">Rs. 10,529</span>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          {/* Order status card */}
-          <motion.div style={{ x: card2X, y: card2Y }} className="absolute -left-1 top-40 z-[1] hidden w-52 sm:block lg:left-0 lg:top-52">
-            <motion.div
-              animate={reduceMotion ? {} : { y: [0, 12, 0] }}
-              transition={{ duration: 6.2, repeat: Infinity, ease: "easeInOut", delay: 0.7 }}
-              className="landing-card p-3"
-            >
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600">
-                  <PackageCheck size={17} aria-hidden="true" />
-                </span>
-                <div>
-                  <p className="font-mono text-[11px] font-extrabold text-[var(--user-text)]">#ORD-000142</p>
-                  <p className="text-[10px] font-semibold text-[var(--user-text-muted)]">COD · Lahore</p>
-                </div>
-              </div>
-              <div className="mt-2 flex items-center gap-1">
-                {["Pending", "Confirmed", "Shipped", "Delivered"].map((s, i, arr) => (
-                  <span
-                    key={s}
-                    className={`h-1.5 flex-1 rounded-full ${s === "Shipped" ? "bg-[var(--user-accent)]" : i < 2 ? "bg-emerald-500" : "bg-[var(--user-border)]"}`}
-                    title={s}
-                  />
-                ))}
-              </div>
-              <p className="mt-1.5 text-[10px] font-bold text-[var(--user-accent)]">Shipped — arriving in 2 days</p>
-            </motion.div>
-          </motion.div>
-
-          {/* Shipment tracker card */}
-          <motion.div style={{ x: card3X, y: card3Y }} className="absolute bottom-8 right-0 z-[1] w-60 sm:w-64 lg:bottom-16">
-            <motion.div
-              animate={reduceMotion ? {} : { y: [0, -9, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
-              className="landing-card p-3.5"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--user-text-muted)]">Shipment</p>
-                <span className="flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-extrabold text-sky-600">
-                  <Truck size={11} aria-hidden="true" /> ON ROUTE
-                </span>
-              </div>
-              <svg viewBox="0 0 220 46" className="mt-2 w-full" role="presentation">
-                <path id="hero-route" d="M8 34 C 60 34, 70 10, 120 12 S 190 12, 212 12" fill="none" stroke="var(--user-border)" strokeWidth="3" strokeDasharray="6 6" />
-                <circle cx="8" cy="34" r="5" fill="var(--user-border)" />
-                <circle cx="212" cy="12" r="5" fill="var(--user-accent)" />
-                <circle r="6" fill="var(--user-accent)" stroke="#fff" strokeWidth="2">
-                  {!reduceMotion && <animateMotion dur="4.5s" repeatCount="indefinite"><mpath href="#hero-route" /></animateMotion>}
-                </circle>
-              </svg>
-              <div className="mt-1.5 flex items-center justify-between text-[10px] font-bold text-[var(--user-text-muted)]">
-                <span>Lahore Hub</span>
-                <span>Karachi · ETA 2d</span>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </div>
+      {/* ===== Scroll indicator ===== */}
+      <a
+        href="#why"
+        aria-label="Scroll to learn more"
+        className="absolute bottom-5 left-1/2 z-[3] flex -translate-x-1/2 flex-col items-center gap-1.5 text-white/60 transition-colors hover:text-white"
+      >
+        <span className="text-[10px] font-bold uppercase tracking-[0.25em]">Scroll</span>
+        <motion.span animate={reduceMotion ? {} : { y: [0, 7, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}>
+          <ChevronDown size={20} aria-hidden="true" />
+        </motion.span>
+      </a>
     </section>
   );
 }
