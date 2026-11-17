@@ -1,0 +1,387 @@
+/* ============================================================
+   CLICK MASTER STORE — /landing styles
+   NOTE: globals.css ko touch NAHI kiya gaya. Yeh file sirf
+   landing route ke liye hai. Theme colours var(--user-*) se aati hain
+   (user.css se), yahan koi brand colour hardcode NAHI hai — sirf
+   blurred blob gradients & gradient helpers accent var use karte hain.
+   RTL/Urdu: koi letter-spacing nahi; line-height Urdu ke liye globals
+   mein hai (user-theme ke andar auto-apply hoti hai).
+   ============================================================ */
+
+.user-theme.landing-page {
+  background: var(--user-bg);
+  color: var(--user-text);
+  font-family: var(--font-body), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: clip;
+}
+
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.landing-page h4,
+.landing-page .font-heading {
+  font-family: var(--font-heading), "Plus Jakarta Sans", var(--font-body), Inter, sans-serif;
+}
+
+/* ---------- Glass navbar ---------- */
+.landing-nav {
+  background: color-mix(in srgb, var(--user-bg-card) 78%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--user-border);
+}
+
+.landing-nav-link {
+  position: relative;
+  padding: 6px 2px;
+  color: var(--user-text-secondary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+}
+
+.landing-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 3px;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--user-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.landing-nav-link:hover,
+.landing-nav-link:focus-visible {
+  color: var(--user-accent);
+}
+
+.landing-nav-link:hover::after,
+.landing-nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* ---------- Primary / ghost buttons with shine sweep ---------- */
+.landing-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  min-height: 44px;
+  padding: 0.75rem 1.5rem;
+  transition: transform 0.18s ease, background-color 0.2s ease, color 0.2s ease,
+    box-shadow 0.2s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.landing-btn:active {
+  transform: scale(0.97);
+}
+
+.landing-btn-primary {
+  background: var(--user-accent);
+  color: var(--user-accent-text);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--user-accent) 38%, transparent);
+}
+
+.landing-btn-primary:hover {
+  background: var(--user-accent-hover);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--user-accent) 46%, transparent);
+}
+
+/* shine sweep */
+.landing-btn-primary::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  animation: landing-shine 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes landing-shine {
+  0%, 60% { left: -80%; }
+  100% { left: 130%; }
+}
+
+.landing-btn-ghost {
+  background: var(--user-bg-hover);
+  color: var(--user-text);
+  border: 1px solid var(--user-border);
+}
+
+.landing-btn-ghost:hover {
+  border-color: var(--user-accent);
+  color: var(--user-accent);
+}
+
+/* ---------- Cards ---------- */
+.landing-card {
+  background: var(--user-bg-card);
+  border: 1px solid var(--user-border);
+  border-radius: 16px;
+  box-shadow: var(--user-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.06));
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.landing-card-lift:hover {
+  transform: translateY(-6px);
+  border-color: color-mix(in srgb, var(--user-accent) 35%, var(--user-border));
+  box-shadow: 0 18px 44px rgba(10, 10, 10, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--user-accent) 25%, transparent);
+}
+
+/* ---------- Hero gradient blobs ---------- */
+.blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.blob-1 {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  right: -120px;
+  background: radial-gradient(circle at 40% 40%, var(--user-accent) 0%, transparent 70%);
+  opacity: 0.35;
+  animation: blob-drift-1 14s ease-in-out infinite alternate;
+}
+
+.blob-2 {
+  width: 360px;
+  height: 360px;
+  bottom: -140px;
+  left: -120px;
+  background: radial-gradient(circle at 60% 60%, var(--user-accent-hover) 0%, transparent 70%);
+  opacity: 0.3;
+  animation: blob-drift-2 17s ease-in-out infinite alternate;
+}
+
+.blob-3 {
+  width: 260px;
+  height: 260px;
+  top: 38%;
+  left: 42%;
+  background: radial-gradient(circle at 50% 50%, var(--user-accent) 0%, transparent 65%);
+  opacity: 0.22;
+  animation: blob-drift-3 11s ease-in-out infinite alternate;
+}
+
+@keyframes blob-drift-1 {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-60px, 50px) scale(1.15); }
+}
+@keyframes blob-drift-2 {
+  from { transform: translate(0, 0) scale(1.05); }
+  to { transform: translate(70px, -45px) scale(0.92); }
+}
+@keyframes blob-drift-3 {
+  from { transform: translate(0, 0) scale(0.95); }
+  to { transform: translate(-40px, -60px) scale(1.18); }
+}
+
+/* Dotted grid backdrop for hero */
+.hero-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--user-text) 14%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, black 40%, transparent 75%);
+}
+
+/* ---------- Placeholder product art ---------- */
+.placeholder-art {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.placeholder-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.35), transparent 55%);
+  pointer-events: none;
+}
+
+/* ---------- Marquee ---------- */
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: marquee-scroll 32s linear infinite;
+  will-change: transform;
+}
+
+.marquee:hover .marquee-track,
+.marquee:focus-within .marquee-track {
+  animation-play-state: paused;
+}
+
+/* ---------- Flash deals scrollbar ---------- */
+.deals-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-snap-type: x proximity;
+}
+
+.deals-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.deals-scroll > * {
+  scroll-snap-align: start;
+}
+
+/* ---------- Quick-action reveal on product hover ---------- */
+.quick-actions {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.group-product:hover .quick-actions,
+.group-product:focus-within .quick-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .quick-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+/* ---------- Discount badge ---------- */
+.deal-badge {
+  background: var(--user-accent);
+  color: var(--user-accent-text);
+}
+
+/* ---------- Add-to-cart pop ---------- */
+@keyframes cart-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+.cart-pop {
+  animation: cart-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- Skeleton ---------- */
+@keyframes landing-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.landing-skeleton {
+  background: linear-gradient(
+    100deg,
+    var(--user-bg-hover) 20%,
+    color-mix(in srgb, var(--user-bg-hover) 55%, var(--user-bg-card)) 40%,
+    var(--user-bg-hover) 60%
+  );
+  background-size: 200% 100%;
+  animation: landing-shimmer 1.3s ease infinite;
+}
+
+/* ---------- Toast ---------- */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.landing-toast {
+  animation: toast-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- Promo banner gradient ---------- */
+.promo-banner {
+  background: linear-gradient(
+    135deg,
+    var(--user-accent) 0%,
+    var(--user-accent-hover) 55%,
+    color-mix(in srgb, var(--user-accent-hover) 70%, #7c2d12) 100%
+  );
+}
+
+/* ---------- Newsletter success ---------- */
+@keyframes success-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-pop {
+  animation: success-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ---------- Footer (dark always) ---------- */
+.landing-footer {
+  background: #0b0f14;
+  color: #a1aab6;
+}
+
+.landing-footer a {
+  transition: color 0.2s ease;
+}
+
+.landing-footer a:hover {
+  color: #f57224;
+}
+
+.pay-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #28313c;
+  background: #151a21;
+  color: #d1d5db;
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .blob,
+  .marquee-track,
+  .landing-btn-primary::before,
+  .landing-skeleton {
+    animation: none !important;
+  }
+
+  .landing-nav-link::after,
+  .landing-card,
+  .quick-actions,
+  .landing-btn {
+    transition: none !important;
+  }
+}
