@@ -90,10 +90,6 @@ export default function Hero() {
         aria-hidden="true"
         className="absolute inset-0 bg-[linear-gradient(to_top,rgba(4,7,12,0.85)_0%,transparent_32%)]"
       />
-      <div
-        aria-hidden="true"
-        className="absolute -right-24 top-1/3 h-96 w-96 rounded-full bg-[var(--user-accent)] opacity-[0.14] blur-[130px]"
-      />
 
       {/* ===== Content ===== */}
       <motion.div
@@ -158,7 +154,7 @@ export default function Hero() {
             <Magnetic>
               <a
                 href={HERO.primaryCta.href}
-                className="inline-flex min-h-[52px] items-center gap-2 rounded-xl bg-[var(--user-accent)] px-7 text-base font-extrabold text-white shadow-[0_12px_38px_rgba(245,114,36,0.45)] transition-all duration-200 hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                className="inline-flex min-h-[52px] items-center gap-2 rounded-xl bg-[var(--user-accent)] px-7 text-base font-extrabold text-white shadow-sm transition-colors duration-200 hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
               >
                 {HERO.primaryCta.label}
                 <ArrowRight size={19} aria-hidden="true" />

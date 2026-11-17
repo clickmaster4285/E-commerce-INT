@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -24,19 +24,26 @@ const FEED = [
   { icon: Banknote, text: "#ORD-000144 · Bank Transfer", amount: "Rs. 28,900", tone: "text-emerald-400" },
 ];
 
+const VISIBLE = 3;
+
 export default function FinalCta() {
   const reduceMotion = useReducedMotion();
-  const [shown, setShown] = useState(() => [FEED[0], FEED[1]]);
-  const [next, setNext] = useState(2);
+  const nextIndex = useRef(VISIBLE);
+  const uid = useRef(VISIBLE);
+  const [shown, setShown] = useState(() => FEED.slice(0, VISIBLE).map((item, i) => ({ ...item, uid: i })));
 
   useEffect(() => {
     if (reduceMotion) return;
     const id = window.setInterval(() => {
-      setShown((prev) => [...prev, FEED[next % FEED.length]].slice(-3));
-      setNext((n) => n + 1);
-    }, 2.4);
+      setShown((prev) => [
+        ...prev.slice(-(VISIBLE - 1)),
+        { ...FEED[nextIndex.current % FEED.length], uid: uid.current },
+      ]);
+      nextIndex.current += 1;
+      uid.current += 1;
+    }, 3000);
     return () => window.clearInterval(id);
-  }, [reduceMotion, next]);
+  }, [reduceMotion]);
 
   return (
     <section
@@ -45,9 +52,6 @@ export default function FinalCta() {
       className="scroll-mt-24 px-4 pb-14 pt-2 sm:px-6 lg:px-8"
     >
       <div className="final-cta mx-auto max-w-7xl overflow-hidden rounded-[2rem]">
-        {/* Ambient animated orbs */}
-        <div aria-hidden="true" className="cta-orb cta-orb-1" />
-        <div aria-hidden="true" className="cta-orb cta-orb-2" />
         <div aria-hidden="true" className="cta-grid absolute inset-0" />
 
         <div className="relative grid items-center gap-10 p-8 sm:p-12 lg:grid-cols-12 lg:gap-8 lg:p-16">
@@ -63,7 +67,7 @@ export default function FinalCta() {
             >
               See it running on
               <br />
-              <span className="bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500 bg-clip-text text-transparent">
+              <span className="text-orange-300">
                 your business — today.
               </span>
             </h2>
@@ -78,7 +82,7 @@ export default function FinalCta() {
                 href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi Click Master Store! Show me the full platform on a live demo.")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="cta-pulse inline-flex min-h-[56px] items-center gap-2.5 rounded-2xl bg-[var(--user-accent)] px-7 text-base font-extrabold text-white transition-all duration-200 hover:bg-[var(--user-accent-hover)] active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-400"
+                className="inline-flex min-h-[56px] items-center gap-2.5 rounded-2xl bg-[var(--user-accent)] px-7 text-base font-extrabold text-white shadow-sm transition-colors duration-200 hover:bg-[var(--user-accent-hover)] active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-400"
               >
                 <MessageCircle size={21} aria-hidden="true" />
                 Book a Free Demo
@@ -104,13 +108,10 @@ export default function FinalCta() {
 
           {/* Live activity feed (DEMO) */}
           <div className="lg:col-span-5" aria-hidden="true">
-            <div className="relative rounded-3xl border border-white/10 bg-[#0d1420]/90 p-5 shadow-[0_30px_80px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            <div className="relative rounded-3xl border border-white/10 bg-[#111926] p-5 shadow-lg">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  </span>
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
                   <p className="font-mono text-[10px] font-extrabold uppercase tracking-[0.2em] text-emerald-400">
                     Live activity
                   </p>
@@ -120,34 +121,34 @@ export default function FinalCta() {
                 </span>
               </div>
 
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-4 space-y-2">
                 <AnimatePresence initial={false} mode="popLayout">
-                  {shown.map(({ icon: Icon, text, amount, tone }, i) => (
+                  {shown.map(({ icon: Icon, text, amount, tone, uid: eventId }) => (
                     <motion.li
-                      key={`${text}-${i}-${shown.length}`}
+                      key={eventId}
                       layout
-                      initial={{ opacity: 0, x: 60, scale: 0.9 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={{ opacity: 0, x: -40, scale: 0.9 }}
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                      className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.04] px-4 py-3"
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.96 }}
+                      transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                      className="flex h-[60px] items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-4"
                     >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 ${tone}`}>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 ${tone}`}>
                         <Icon size={18} aria-hidden="true" />
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-bold text-white/85">{text}</span>
-                        {amount && (
-                          <span className="mt-0.5 block text-[11px] font-extrabold tabular-nums text-white/50">
-                            {amount}
-                          </span>
-                        )}
+                      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold leading-5 text-white/80">
+                        {text}
                       </span>
+                      {amount && (
+                        <span className="shrink-0 text-[12px] font-bold tabular-nums text-white/60">
+                          {amount}
+                        </span>
+                      )}
                     </motion.li>
                   ))}
                 </AnimatePresence>
               </ul>
-              <p className="mt-3 text-center text-[9px] font-semibold uppercase tracking-[0.25em] text-white/25">
+              <p className="mt-4 border-t border-white/5 pt-3 text-center text-[9px] font-semibold uppercase tracking-[0.25em] text-white/30">
                 Sample feed — what your dashboard emits
               </p>
             </div>

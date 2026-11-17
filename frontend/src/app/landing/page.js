@@ -1,7 +1,6 @@
 import "./landing.css";
 
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
-import CursorGlow from "@/components/landing/CursorGlow";
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
 import TrustStrip from "@/components/landing/TrustStrip";
@@ -92,7 +91,6 @@ export default function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify([organizationJsonLd, faqJsonLd]) }}
       />
 
-      <CursorGlow />
       <Navbar />
       <Hero />
       <TrustStrip />

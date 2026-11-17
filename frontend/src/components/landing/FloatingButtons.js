@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronUp, MessageCircle } from "lucide-react";
-import { WHATSAPP_NUMBER } from "./content";
+import { ChevronUp } from "lucide-react";
 
 export default function FloatingButtons() {
   const [showTop, setShowTop] = useState(false);
@@ -30,17 +29,6 @@ export default function FloatingButtons() {
         <ChevronUp size={22} aria-hidden="true" />
       </button>
 
-      {/* WhatsApp FAB */}
-      <a
-        href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi Click Master Store! I need help.")}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Chat with Click Master Store on WhatsApp"
-        className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_10px_28px_rgba(16,185,129,0.45)] transition-transform duration-200 hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
-      >
-        <span aria-hidden="true" className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-30 group-hover:opacity-0" />
-        <MessageCircle size={26} aria-hidden="true" className="relative" />
-      </a>
     </div>
   );
 }

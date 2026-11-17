@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { MousePointerClick, Menu, X, Moon, Sun, ArrowRight } from "lucide-react";
+import { Menu, X, Moon, Sun, ArrowRight } from "lucide-react";
 import { NAV_LINKS, HERO } from "./content";
 
 function getInitialTheme() {
@@ -42,23 +43,30 @@ export default function Navbar() {
   return (
     <header
       className={`landing-nav sticky top-0 z-[60] transition-shadow duration-300 ${
-        scrolled ? "shadow-[0_8px_30px_rgba(10,10,10,0.12)]" : ""
+        scrolled ? "shadow-[0_1px_0_0_var(--user-border),0_8px_30px_rgba(10,10,10,0.08)]" : ""
       }`}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/landing" className="flex min-h-[44px] shrink-0 items-center gap-2" aria-label="Click Master Store — home">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)]">
-            <MousePointerClick size={20} strokeWidth={2.2} aria-hidden="true" />
-          </span>
-          <span className="font-heading leading-none">
-            <span className="block text-[15px] font-extrabold tracking-tight text-[var(--user-text)] sm:text-lg">Click Master</span>
-            <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--user-accent)]">Store</span>
+        <Link href="/landing" className="flex min-h-[44px] shrink-0 items-center" aria-label="Click Master Store — home">
+          <span className="flex h-11 items-center rounded-xl bg-white px-3 ring-1 ring-black/5">
+            <Image
+              src="/landing/logo.webp"
+              alt="Click Master"
+              width={480}
+              height={330}
+              priority
+              className="h-8 w-auto"
+            />
           </span>
         </Link>
 
-        <nav className="ml-2 hidden items-center gap-6 lg:flex" aria-label="Primary">
+        <nav className="ml-4 hidden items-center gap-7 lg:flex" aria-label="Primary">
           {NAV_LINKS.map((l) => (
-            <a key={l.label} href={l.href} className="landing-nav-link">
+            <a
+              key={l.label}
+              href={l.href}
+              className="text-sm font-semibold text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
+            >
               {l.label}
             </a>
           ))}
@@ -69,14 +77,19 @@ export default function Navbar() {
             type="button"
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
           >
             {theme === "dark" ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
           </button>
 
-          <a href={HERO.secondaryCta.href} target="_blank" rel="noopener noreferrer" className="landing-btn landing-btn-primary hidden md:inline-flex">
+          <a
+            href={HERO.secondaryCta.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden min-h-[44px] items-center gap-2 rounded-full bg-[var(--user-accent)] px-6 text-sm font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] md:inline-flex"
+          >
             Talk to Us
-            <ArrowRight size={17} aria-hidden="true" />
+            <ArrowRight size={16} aria-hidden="true" />
           </a>
 
           <button
@@ -84,7 +97,7 @@ export default function Navbar() {
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
-            className="flex h-11 w-11 items-center justify-center rounded-xl text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)] lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)] lg:hidden"
           >
             {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
           </button>
@@ -122,7 +135,12 @@ export default function Navbar() {
                   {l.label}
                 </a>
               ))}
-              <a href={HERO.secondaryCta.href} target="_blank" rel="noopener noreferrer" className="landing-btn landing-btn-primary mt-3 justify-center">
+              <a
+                href={HERO.secondaryCta.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-[var(--user-accent)] px-6 font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)]"
+              >
                 Talk to Us
                 <ArrowRight size={17} aria-hidden="true" />
               </a>

@@ -1,12 +1,11 @@
 import {
   MousePointerClick,
-  MessageCircle,
   Phone,
   Mail,
   MapPin,
 } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaXTwitter, FaYoutube } from "react-icons/fa6";
-import { SITE, FOOTER, WHATSAPP_NUMBER } from "./content";
+import { SITE, FOOTER } from "./content";
 
 const SOCIAL_ICONS = {
   Facebook: FaFacebookF,
@@ -90,16 +89,6 @@ export default function Footer() {
                 <a href={`mailto:${SITE.email}`} className="inline-flex min-h-[32px] items-center hover:text-[#f57224]">{SITE.email}</a>
               </li>
             </ul>
-
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi Click Master Store! I would like to know more.")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-emerald-500 px-5 font-extrabold text-[#06281c] transition-all hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-emerald-300"
-            >
-              <MessageCircle size={20} aria-hidden="true" />
-              Chat on WhatsApp
-            </a>
 
             <p className="mt-6 text-xs font-extrabold uppercase tracking-widest text-white">Payments</p>
             <ul className="mt-2 flex flex-wrap gap-2" aria-label="Accepted payment methods">

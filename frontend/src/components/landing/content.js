@@ -239,7 +239,6 @@ export const FOOTER = {
       links: [
         { label: "Why Click Master", href: "#why" },
         { label: "Contact", href: "#contact" },
-        { label: "WhatsApp Support", href: `https://wa.me/${WHATSAPP_NUMBER}` },
       ],
     },
   ],
