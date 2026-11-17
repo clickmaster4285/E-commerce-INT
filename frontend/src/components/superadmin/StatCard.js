@@ -1,9 +1,8 @@
 const TONE_STYLES = {
   accent: { background: "var(--accent-soft)", color: "var(--accent)" },
-  indigo: { background: "var(--purple-soft)", color: "var(--purple-text)" },
-  emerald: { background: "var(--success-soft)", color: "var(--success-text)" },
-  amber: { background: "var(--warning-soft)", color: "var(--warning-text)" },
-  red: { background: "var(--danger-soft)", color: "var(--danger-text)" },
+  success: { background: "var(--success-soft)", color: "var(--success-text)" },
+  warning: { background: "var(--warning-soft)", color: "var(--warning-text)" },
+  danger: { background: "var(--danger-soft)", color: "var(--danger-text)" },
   slate: { background: "var(--bg-tertiary)", color: "var(--text-muted)" },
 };
 

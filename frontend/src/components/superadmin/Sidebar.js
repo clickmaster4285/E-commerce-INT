@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import FallbackImage from "@/components/common/FallbackImage";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -35,7 +36,7 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border-sidebar)] px-5">
         <Link href="/super-admin/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label="Super Admin home">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5 ring-1 ring-white/20">
-            <img src="/images/click-master-logo.webp" alt="Click Master" className="h-full w-full object-contain" />
+            <FallbackImage src="/images/click-master-logo.webp" alt="Click Master" className="h-full w-full object-contain" />
           </span>
           <span className="min-w-0 leading-tight">
             <span className="block truncate text-[15px] font-semibold tracking-tight text-[var(--text-sidebar)]">Click Master</span>
@@ -71,7 +72,7 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
                   aria-current={active ? "page" : undefined}
                   className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors ${
                     active
-                      ? "bg-[var(--bg-sidebar-active)] text-white"
+                      ? "super-nav-active"
                       : "text-[var(--text-sidebar-muted)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)]"
                   }`}
                 >
@@ -79,7 +80,7 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
                     size={18}
                     strokeWidth={2}
                     aria-hidden="true"
-                    className={`shrink-0 ${active ? "text-white" : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"}`}
+                    className={`shrink-0 ${active ? "" : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"}`}
                   />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {badge > 0 && (

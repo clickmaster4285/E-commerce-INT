@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ShieldCheck, UserCog, Store as StoreIcon, LogIn, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { ShieldCheck, UserCog, Store as StoreIcon, LogIn, Settings, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 
@@ -45,7 +45,10 @@ export default function ActivityPage() {
           ) : isLoading ? (
             <li className="px-6 py-10 text-center text-sm text-[var(--text-muted)]">Loading…</li>
           ) : items.length === 0 ? (
-            <li className="px-6 py-10 text-center text-sm text-[var(--text-muted)]">No activity recorded yet.</li>
+            <li className="flex flex-col items-center gap-2 px-6 py-10 text-center">
+              <ScrollText size={22} className="text-[var(--text-muted)]" aria-hidden="true" />
+              <span className="text-sm text-[var(--text-muted)]">No activity recorded yet.</span>
+            </li>
           ) : items.map((a) => {
             const Icon = TYPE_ICONS[a.entityType] || ShieldCheck;
             return (

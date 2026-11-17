@@ -83,7 +83,7 @@ export default function StoresPage() {
               {isLoading ? (
                 Array.from({ length: 3 }).map((_, i) => <tr key={i} className="animate-pulse"><td colSpan={5} className="px-4 py-4"><div className="h-4 w-full rounded bg-[var(--bg-tertiary)]" /></td></tr>)
               ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No stores found.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-10 text-center"><span className="flex flex-col items-center gap-2 text-sm text-[var(--text-muted)]"><StoreIcon size={22} aria-hidden="true" />No stores found.</span></td></tr>
               ) : items.map((s) => (
                 <tr key={s.id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
                   <td className="px-4 py-3">

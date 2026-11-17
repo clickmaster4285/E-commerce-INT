@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Users as UsersIcon } from "lucide-react";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 
 const FILTERS = [
@@ -90,7 +90,7 @@ export default function UsersPage() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => <tr key={i} className="animate-pulse"><td colSpan={6} className="px-4 py-4"><div className="h-4 w-full rounded bg-[var(--bg-tertiary)]" /></td></tr>)
               ) : items.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No users found.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center"><span className="flex flex-col items-center gap-2 text-sm text-[var(--text-muted)]"><UsersIcon size={22} aria-hidden="true" />No users found.</span></td></tr>
               ) : items.map((u) => (
                 <tr key={u.id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
                   <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">{u.name}<br /><span className="text-[10px] font-mono text-[var(--text-muted)]">@{u.username}</span></td>

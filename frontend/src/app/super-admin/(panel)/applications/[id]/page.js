@@ -47,7 +47,7 @@ export default function ApplicationDetailPage() {
     return (
       <div className="space-y-4">
         <Link href="/super-admin/applications" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--accent)]"><ArrowLeft size={16}/> Back to requests</Link>
-        <div className="card p-6 text-sm text-red-600">{actionError || "Application not found."}</div>
+        <div className="card p-6 text-sm text-[var(--danger-text)]">{actionError || "Application not found."}</div>
       </div>
     );
   }
@@ -83,9 +83,9 @@ export default function ApplicationDetailPage() {
           )}
 
           {item.status === "rejected" && item.rejection_reason && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-red-700">Rejection reason</p>
-              <p className="mt-1 text-sm leading-6 text-red-800">{item.rejection_reason}</p>
+            <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--danger-soft)", borderColor: "color-mix(in srgb, var(--danger) 32%, transparent)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-text)]">Rejection reason</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--danger-text)]">{item.rejection_reason}</p>
             </div>
           )}
         </div>
@@ -96,7 +96,15 @@ export default function ApplicationDetailPage() {
             <p className="mt-1 text-xs text-[var(--text-muted)]">Approved sellers are provisioned with a store and account instantly.</p>
           </div>
 
-          {actionError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{actionError}</div>}
+          {actionError && (
+            <div
+              role="alert"
+              className="rounded-lg border px-3 py-2 text-xs font-semibold"
+              style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}
+            >
+              {actionError}
+            </div>
+          )}
 
           {item.status === "pending" ? (
             <>

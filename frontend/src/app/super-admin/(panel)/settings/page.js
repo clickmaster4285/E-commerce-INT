@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
+import FallbackImage from "@/components/common/FallbackImage";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 
 export default function SettingsPage() {
@@ -54,7 +55,7 @@ export default function SettingsPage() {
         <section className="card lg:col-span-7 p-6">
           <div className="flex items-center gap-4">
             <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 ring-1 ring-[var(--border-card)]">
-              <img src="/images/click-master-logo.webp" alt="Click Master" className="h-full w-full object-contain" />
+              <FallbackImage src="/images/click-master-logo.webp" alt="Click Master" className="h-full w-full object-contain" />
             </span>
             <div className="min-w-0">
               <p className="text-lg font-semibold text-[var(--text-primary)]">{profile?.name}</p>

@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
-import { Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Filter, Inbox } from "lucide-react";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -98,7 +98,7 @@ export default function ApplicationsPage() {
               {isError ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--danger-text)]">Failed to load applications.</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No applications match this filter.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center"><span className="flex flex-col items-center gap-2 text-sm text-[var(--text-muted)]"><Inbox size={22} aria-hidden="true" />No applications match this filter.</span></td></tr>
               ) : items.map((item) => (
                 <tr key={item._id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
                   <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">{item.name}</td>

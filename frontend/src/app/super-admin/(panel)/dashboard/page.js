@@ -11,6 +11,7 @@ import {
   XCircle,
   Ban,
   ShoppingBag,
+  ScrollText,
 } from "lucide-react";
 import {
   ComposedChart,
@@ -48,12 +49,12 @@ export default function SuperAdminDashboardPage() {
   const hero = useMemo(
     () => [
       { label: "Total Users", value: totals.totalUsers ?? 0, icon: Users, tone: "accent", hint: "All registered customers & sellers" },
-      { label: "Total Sellers", value: totals.totalSellers ?? 0, icon: ShoppingBag, tone: "indigo", hint: "Approved store owners" },
+      { label: "Total Sellers", value: totals.totalSellers ?? 0, icon: ShoppingBag, tone: "accent", hint: "Approved store owners" },
       { label: "Total Stores", value: totals.totalStores ?? 0, icon: Store, tone: "accent", hint: "All stores on the platform" },
-      { label: "Pending Requests", value: totals.pendingApplications ?? 0, icon: ClipboardList, tone: "amber", hint: "Awaiting your review" },
-      { label: "Approved Stores", value: totals.approvedApplications ?? 0, icon: CheckCircle2, tone: "emerald", hint: "Active sellers" },
-      { label: "Rejected Requests", value: totals.rejectedApplications ?? 0, icon: XCircle, tone: "red", hint: "Declined applications" },
-      { label: "Suspended Stores", value: totals.suspendedStores ?? 0, icon: Ban, tone: "red", hint: "Store access restricted" },
+      { label: "Pending Requests", value: totals.pendingApplications ?? 0, icon: ClipboardList, tone: "warning", hint: "Awaiting your review" },
+      { label: "Approved Stores", value: totals.approvedApplications ?? 0, icon: CheckCircle2, tone: "success", hint: "Active sellers" },
+      { label: "Rejected Requests", value: totals.rejectedApplications ?? 0, icon: XCircle, tone: "danger", hint: "Declined applications" },
+      { label: "Suspended Stores", value: totals.suspendedStores ?? 0, icon: Ban, tone: "danger", hint: "Store access restricted" },
     ],
     [totals]
   );
@@ -121,7 +122,13 @@ export default function SuperAdminDashboardPage() {
                   cursor={{ fill: "var(--accent-soft)" }}
                   contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8, fontSize: 12 }}
                 />
-                <Area type="monotone" dataKey="count" name="Signups" stroke={CHART_COLORS.area} fill={CHART_COLORS.area} fillOpacity={0.18} strokeWidth={2} />
+                <defs>
+                  <linearGradient id="regAreaFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="count" name="Signups" stroke={CHART_COLORS.area} fill="url(#regAreaFill)" strokeWidth={2} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -158,8 +165,9 @@ export default function SuperAdminDashboardPage() {
             </button>
           </div>
           {recentRequests.length === 0 ? (
-            <div className="p-6 text-center text-sm text-[var(--text-muted)]">
-              No requests yet. Sellers who register will appear here.
+            <div className="flex flex-col items-center gap-2 p-8 text-center">
+              <ClipboardList size={22} className="text-[var(--text-muted)]" aria-hidden="true" />
+              <p className="text-sm text-[var(--text-muted)]">No requests yet. Sellers who register will appear here.</p>
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-color)]">
@@ -191,7 +199,10 @@ export default function SuperAdminDashboardPage() {
             </button>
           </div>
           {recentUsers.length === 0 ? (
-            <div className="p-6 text-center text-sm text-[var(--text-muted)]">No users yet.</div>
+            <div className="flex flex-col items-center gap-2 p-8 text-center">
+              <Users size={22} className="text-[var(--text-muted)]" aria-hidden="true" />
+              <p className="text-sm text-[var(--text-muted)]">No users yet.</p>
+            </div>
           ) : (
             <ul className="divide-y divide-[var(--border-color)]">
               {recentUsers.map((u) => (
@@ -219,7 +230,10 @@ export default function SuperAdminDashboardPage() {
           </button>
         </div>
         {recentActivity.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <ScrollText size={22} className="text-[var(--text-muted)]" aria-hidden="true" />
+            <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>
+          </div>
         ) : (
           <ul className="space-y-2">
             {recentActivity.map((a) => (

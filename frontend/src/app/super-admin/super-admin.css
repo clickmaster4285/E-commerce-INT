@@ -1,0 +1,241 @@
+/* ============================================================
+   SUPER-ADMIN THEME — "Slate + Indigo" (/super-admin only)
+   Scoped under .super-admin-theme (added on the section layout
+   root). Only the tokens listed are overridden; success/warning/
+   danger/info stay semantic. Main admin + storefront untouched.
+   ============================================================ */
+.super-admin-theme {
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: rgba(79, 70, 229, 0.10);
+  --accent-text: #ffffff;
+  --bg-primary: #f4f6fb;
+  --bg-secondary: #f4f6fb;
+  --bg-card: #ffffff;
+  --bg-sidebar: #0f172a;
+  --bg-sidebar-active: #4f46e5;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --border-color: #e5e7f0;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+html.dark .super-admin-theme {
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-soft: rgba(99, 102, 241, 0.16);
+  --accent-text: #ffffff;
+  --bg-primary: #0a0f1c;
+  --bg-secondary: #0a0f1c;
+  --bg-card: #111827;
+  --bg-sidebar: #0a0f1c;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --border-color: #1f2937;
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+}
+
+/* Consistent 12px card radius inside the panel */
+.super-admin-theme .card {
+  border-radius: 0.75rem;
+}
+
+/* Sidebar active item — accent background, white text, left indicator */
+.super-admin-theme .super-nav-active {
+  position: relative;
+  background: var(--bg-sidebar-active);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
+}
+.super-admin-theme .super-nav-active svg {
+  color: #ffffff;
+}
+.super-admin-theme .super-nav-active::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 5px;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* ============================================================
+   SUPER-ADMIN LOGIN (.super-login-*)
+   Frosted white-glass card for /super-admin/login only.
+   ============================================================ */
+.super-login-card {
+  --glass-opacity: 0.14;
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 24px;
+  padding: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, var(--glass-opacity));
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.45), 0 0 80px rgba(99, 102, 241, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  animation: superLoginCardIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (max-width: 640px) {
+  .super-login-card { padding: 28px 22px; }
+}
+
+/* Fallback when backdrop-filter is unavailable: solid light glass, dark text */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .super-login-card { background: rgba(255, 255, 255, 0.92); }
+  .super-login-brand, .super-login-title { color: #0f172a; }
+  .super-login-subtitle { color: #475569; }
+  .super-login-label { color: #334155; }
+  .super-login-note { color: #475569; }
+  .super-login-field { background: rgba(15, 23, 42, 0.06); border-color: rgba(15, 23, 42, 0.18); }
+  .super-login-field:focus-within { background: #ffffff; }
+  .super-login-input { color: #0f172a; }
+  .super-login-input::placeholder { color: #64748b; }
+  .super-login-icon { background: rgba(15, 23, 42, 0.08); color: #334155; }
+  .super-login-toggle { color: #64748b; }
+  .super-login-error { color: #b91c1c; }
+}
+
+.super-login-brand { font-size: 18px; font-weight: 600; color: #ffffff; letter-spacing: -0.01em; }
+.super-login-pill {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: #ffffff; background: rgba(79, 70, 229, 0.35); border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.super-login-title { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; color: #ffffff; line-height: 1.2; }
+.super-login-subtitle { font-size: 14px; color: rgba(255, 255, 255, 0.78); margin-top: 6px; }
+.super-login-label { display: block; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.9); margin-bottom: 8px; }
+
+.super-login-field {
+  display: flex; align-items: center; gap: 12px;
+  height: 52px; border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.10);
+  padding: 6px 8px 6px 12px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.super-login-field:hover { border-color: rgba(255, 255, 255, 0.4); }
+.super-login-field:focus-within {
+  border-color: rgba(165, 180, 252, 0.85);
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+}
+.super-login-field[data-error="true"] {
+  border-color: rgba(248, 113, 113, 0.75);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.22);
+}
+.super-login-icon {
+  flex: 0 0 36px; width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.8);
+}
+.super-login-input {
+  flex: 1 1 auto; min-width: 0; height: 100%;
+  background: transparent; border: 0; outline: 0;
+  color: #ffffff; font-size: 13.5px;
+}
+.super-login-input::placeholder { color: rgba(255, 255, 255, 0.55); }
+.super-login-input:-webkit-autofill,
+.super-login-input:-webkit-autofill:hover,
+.super-login-input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 60px rgba(30, 27, 75, 0.55) inset !important;
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  transition: background-color 9999s ease-out;
+}
+
+.super-login-toggle {
+  flex: 0 0 44px; width: 44px; height: 44px; margin-inline-end: -4px;
+  display: flex; align-items: center; justify-content: center; border-radius: 10px;
+  color: rgba(255, 255, 255, 0.72); transition: color 0.15s ease, background-color 0.15s ease;
+}
+.super-login-toggle:hover { color: #ffffff; background: rgba(255, 255, 255, 0.10); }
+.super-login-toggle:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+
+.super-login-error {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; font-size: 12px; color: #fecaca;
+}
+.super-login-caps {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; font-size: 12px; font-weight: 600; color: #fcd34d;
+}
+
+.super-login-button {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; height: 52px; border-radius: 14px;
+  font-size: 14.5px; font-weight: 600; color: #ffffff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  box-shadow: 0 12px 32px rgba(79, 70, 229, 0.4);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.super-login-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 44px rgba(79, 70, 229, 0.5);
+  filter: brightness(1.04);
+}
+.super-login-button:active:not(:disabled) { transform: scale(0.98); }
+.super-login-button:focus-visible {
+  outline: 2px solid #ffffff; outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent), 0 12px 32px rgba(79, 70, 229, 0.4);
+}
+.super-login-button:disabled { opacity: 0.65; cursor: not-allowed; }
+.super-login-arrow { transition: transform 0.18s ease; }
+.super-login-button:hover:not(:disabled) .super-login-arrow { transform: translateX(3px); }
+.spinner.super-login-btn-spinner { border-color: rgba(255, 255, 255, 0.3); border-top-color: #ffffff; }
+
+.super-login-field-wrap { animation: superLoginFieldIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes superLoginFieldIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes superLoginCardIn {
+  from { opacity: 0; transform: translateY(12px); filter: blur(6px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.super-login-glow-position {
+  position: absolute; top: 50%; right: clamp(24px, 8vw, 140px);
+  margin-top: -260px; pointer-events: none; z-index: 0;
+}
+@media (max-width: 1024px) {
+  .super-login-glow-position { right: auto; left: 50%; margin-left: -260px; }
+}
+.super-login-glow {
+  width: 520px; height: 520px; border-radius: 9999px;
+  background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.32), transparent 65%);
+  filter: blur(10px);
+  will-change: transform, opacity;
+  animation: superLoginGlowFloat 10s ease-in-out infinite;
+}
+@keyframes superLoginGlowFloat {
+  0%, 100% { opacity: 0.55; transform: scale(1) translate3d(0, 0, 0); }
+  50%      { opacity: 0.85; transform: scale(1.06) translate3d(0, -12px, 0); }
+}
+
+.super-login-note {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 12px; color: rgba(255, 255, 255, 0.7);
+}
+
+@keyframes superLoginShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-5px); }
+  40%      { transform: translateX(5px); }
+  60%      { transform: translateX(-5px); }
+  80%      { transform: translateX(5px); }
+}
+.super-login-shake { animation: superLoginShake 0.3s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .super-login-card, .super-login-field-wrap, .super-login-glow, .super-login-shake { animation: none !important; }
+}
