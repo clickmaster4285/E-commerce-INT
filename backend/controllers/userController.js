@@ -289,7 +289,7 @@ const loginUser = async (req, res) => {
           success: false,
           message: "This login is only for customers. Please use admin panel.",
         });
-    if (user.status === "inactive" || user.is_deleted)
+    if (user.status === "inactive" || user.status === "blocked" || user.is_deleted)
       return res
         .status(403)
         .json({

@@ -25,7 +25,7 @@ const employeeSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "staff",
-      enum: ["user", "admin", "staff", "manager"],
+      enum: ["user", "admin", "staff", "manager", "superadmin"],
     },
     status: { type: String, default: "active", enum: ["active", "inactive"] },
     // Profile picture — optimized data URL (Employees form se set hoti hai)

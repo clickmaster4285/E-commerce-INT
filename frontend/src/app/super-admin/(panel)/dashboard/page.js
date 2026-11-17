@@ -1,0 +1,264 @@
+"use client";
+
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Users,
+  Store,
+  LayoutGrid,
+  ClipboardList,
+  CheckCircle2,
+  XCircle,
+  Ban,
+  ShoppingBag,
+} from "lucide-react";
+import {
+  ComposedChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import StatusBadge from "@/components/superadmin/StatusBadge";
+import StatCard from "@/components/superadmin/StatCard";
+import { superAdminApi } from "@/apis/superadmin/superAdminApi";
+
+const CHART_COLORS = { area: "#2563eb", grid: "var(--border-color, #e2e8f0)" };
+
+export default function SuperAdminDashboardPage() {
+  const router = useRouter();
+
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["superadmin-dashboard"],
+    queryFn: superAdminApi.getDashboard,
+    retry: 1,
+    staleTime: 15000,
+  });
+
+  const totals = useMemo(() => data?.data?.totals || {}, [data]);
+  const recentRequests = useMemo(() => data?.data?.recentRequests || [], [data]);
+  const recentUsers = useMemo(() => data?.data?.recentUsers || [], [data]);
+  const recentActivity = useMemo(() => data?.data?.recentActivity || [], [data]);
+  const registrationSeries = useMemo(() => data?.data?.registrationSeries || [], [data]);
+
+  const hero = useMemo(
+    () => [
+      { label: "Total Users", value: totals.totalUsers ?? 0, icon: Users, tone: "accent", hint: "All registered customers & sellers" },
+      { label: "Total Sellers", value: totals.totalSellers ?? 0, icon: ShoppingBag, tone: "indigo", hint: "Approved store owners" },
+      { label: "Total Stores", value: totals.totalStores ?? 0, icon: Store, tone: "accent", hint: "All stores on the platform" },
+      { label: "Pending Requests", value: totals.pendingApplications ?? 0, icon: ClipboardList, tone: "amber", hint: "Awaiting your review" },
+      { label: "Approved Stores", value: totals.approvedApplications ?? 0, icon: CheckCircle2, tone: "emerald", hint: "Active sellers" },
+      { label: "Rejected Requests", value: totals.rejectedApplications ?? 0, icon: XCircle, tone: "red", hint: "Declined applications" },
+      { label: "Suspended Stores", value: totals.suspendedStores ?? 0, icon: Ban, tone: "red", hint: "Store access restricted" },
+    ],
+    [totals]
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">
+            Platform overview
+          </h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            Real-time health of the multi-tenant store network.
+          </p>
+        </div>
+        <button type="button" onClick={() => refetch()} className="btn-secondary h-10">
+          Refresh
+        </button>
+      </div>
+
+      {/* Errors / loading */}
+      {isError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Failed to load dashboard data.{" "}
+          <button type="button" onClick={() => refetch()} className="underline font-semibold">
+            Retry
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="card p-4 h-28 animate-pulse bg-[var(--bg-card)]" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+          {hero.map((item) => (
+            <StatCard key={item.label} {...item} />
+          ))}
+        </div>
+      )}
+
+      {/* Charts + Activity */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        {/* Registration chart */}
+        <section className="card lg:col-span-7 p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                Registrations · Last 7 days
+              </h2>
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">New customer signups per day</p>
+            </div>
+            <LayoutGrid size={18} className="text-[var(--text-muted)]" aria-hidden="true" />
+          </div>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={registrationSeries} margin={{ top: 8, right: 4, left: -14, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke={CHART_COLORS.grid} strokeDasharray="4 6" />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="var(--text-muted)" />
+                <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--text-muted)" allowDecimals={false} />
+                <Tooltip
+                  cursor={{ fill: "rgba(37,99,235,0.08)" }}
+                  contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8, fontSize: 12 }}
+                />
+                <Area type="monotone" dataKey="count" name="Signups" stroke={CHART_COLORS.area} fill={CHART_COLORS.area} fillOpacity={0.18} strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+
+        {/* Approval split */}
+        <section className="card lg:col-span-5 p-5">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">Approval split</h2>
+          <div className="mt-3 flex items-end gap-6">
+            <SplitMetric label="Approved" value={totals.approvedApplications ?? 0} color="#10b981" />
+            <SplitMetric label="Pending" value={totals.pendingApplications ?? 0} color="#f59e0b" />
+            <SplitMetric label="Rejected" value={totals.rejectedApplications ?? 0} color="#ef4444" />
+          </div>
+          <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+            <div
+              className="h-full bg-emerald-500 transition-all"
+              style={{ width: `${pct(totals.approvedApplications, totals)}%` }}
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+            <span>Approved {pct(totals.approvedApplications, totals, 0)}%</span>
+            <span>Total {((totals.approvedApplications ?? 0) + (totals.pendingApplications ?? 0) + (totals.rejectedApplications ?? 0))}</span>
+          </div>
+        </section>
+      </div>
+
+      {/* Recent signups */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <section className="card lg:col-span-7 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3.5">
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">Recent signup requests</h2>
+            <button onClick={() => router.push("/super-admin/applications")} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
+              View all
+            </button>
+          </div>
+          {recentRequests.length === 0 ? (
+            <div className="p-6 text-center text-sm text-[var(--text-muted)]">
+              No requests yet. Sellers who register will appear here.
+            </div>
+          ) : (
+            <ul className="divide-y divide-[var(--border-color)]">
+              {recentRequests.map((r) => (
+                <li key={r._id}>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/super-admin/applications/${r._id}`)}
+                    className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition hover:bg-[var(--bg-row-hover)]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-bold text-[var(--text-primary)]">{r.name}</p>
+                      <p className="truncate text-[11px] text-[var(--text-muted)]">{r.store_name} · {r.email}</p>
+                    </div>
+                    <StatusBadge value={r.status} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Recent users */}
+        <section className="card lg:col-span-5 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[var(--border-color)] px-5 py-3.5">
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">Recent users</h2>
+            <button onClick={() => router.push("/super-admin/users")} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
+              View all
+            </button>
+          </div>
+          {recentUsers.length === 0 ? (
+            <div className="p-6 text-center text-sm text-[var(--text-muted)]">No users yet.</div>
+          ) : (
+            <ul className="divide-y divide-[var(--border-color)]">
+              {recentUsers.map((u) => (
+                <li key={u._id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold text-[var(--text-primary)]">{u.name}</p>
+                    <p className="truncate text-[11px] text-[var(--text-muted)]">{u.email}</p>
+                  </div>
+                  <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                    {u.storeId ? "Seller" : "Customer"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      {/* Recent activity */}
+      <section className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-[var(--text-primary)]">Recent activity</h2>
+          <button onClick={() => router.push("/super-admin/activity")} className="text-[11px] font-bold text-[var(--accent)] hover:underline">
+            Full log
+          </button>
+        </div>
+        {recentActivity.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {recentActivity.map((a) => (
+              <li key={a._id} className="flex items-start gap-2.5 text-[12px]">
+                <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+                <span className="min-w-0 truncate text-[var(--text-secondary)]">{a.action}</span>
+                <span className="ml-auto shrink-0 text-[10px] font-mono tabular-nums text-[var(--text-muted)]">
+                  {timeAgo(a.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function pct(value = 0, totals = {}, floor = 0) {
+  const sum = (totals.approvedApplications ?? 0) + (totals.pendingApplications ?? 0) + (totals.rejectedApplications ?? 0);
+  if (!sum) return floor;
+  return Math.round(((value ?? 0) / sum) * 100);
+}
+
+function timeAgo(iso) {
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function SplitMetric({ label, value, color }) {
+  return (
+    <div className="min-w-0">
+      <p className="font-mono text-2xl font-extrabold tabular-nums" style={{ color }}>{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+    </div>
+  );
+}

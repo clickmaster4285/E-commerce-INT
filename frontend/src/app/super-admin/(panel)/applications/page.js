@@ -1,0 +1,119 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import StatusBadge from "@/components/superadmin/StatusBadge";
+import { superAdminApi } from "@/apis/superadmin/superAdminApi";
+import { Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+];
+
+export default function ApplicationsPage() {
+  const [status, setStatus] = useState("pending");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [debounced, setDebounced] = useState("");
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(search), 250);
+    return () => window.clearTimeout(id);
+  }, [search]);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["superadmin-requests", status, debounced, page],
+    queryFn: () => superAdminApi.listRequests({ status, search: debounced, page, limit: 10 }),
+    retry: 1,
+    placeholderData: (prev) => prev,
+  });
+
+  const items = useMemo(() => data?.data?.items || [], [data]);
+  const pages = useMemo(() => data?.data?.pages || 1, [data]);
+  const total = useMemo(() => data?.data?.total || 0, [data]);
+
+  const summary = useMemo(() => {
+    const counts = { pending: 0, approved: 0, rejected: 0 };
+    items.forEach((i) => { const s = String(i.status || "").toLowerCase(); if (counts[s] !== undefined) counts[s] += 1; });
+    return counts;
+  }, [items]);
+
+  if (isLoading) return <div className="card p-10 text-center text-sm text-[var(--text-muted)]">Loading…</div>;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">Signup requests</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Sellers apply here. Approve to provision their store and account.</p>
+        </div>
+        <div className="flex gap-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <span>Pending {summary.pending}</span>
+          <span>Approved {summary.approved}</span>
+          <span>Rejected {summary.rejected}</span>
+        </div>
+      </div>
+
+      <div className="card flex flex-wrap items-center gap-2 p-3">
+        <div className="relative min-w-[220px] flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
+          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search name, email or store..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] pl-9 pr-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search applications" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter size={16} className="text-[var(--text-muted)]" aria-hidden="true" />
+          <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="h-10 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm font-semibold text-[var(--text-primary)]" aria-label="Filter by status">
+            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="admin-table min-w-full text-[13px]">
+            <thead>
+              <tr className="bg-[var(--bg-tertiary)] text-left">
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Applicant</th>
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Store</th>
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Email</th>
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Submitted</th>
+                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isError ? (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-red-600">Failed to load applications.</td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No applications match this filter.</td></tr>
+              ) : items.map((item) => (
+                <tr key={item._id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
+                  <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">{item.name}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">{item.store_name}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">{item.email}</td>
+                  <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(item.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-3"><StatusBadge value={item.status} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <Link href={`/super-admin/applications/${item._id}`} className="inline-flex h-8 items-center rounded-md bg-[var(--accent)] px-3 text-[11px] font-bold text-[var(--accent-text)] hover:bg-[var(--accent-hover)]">Review</Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {pages > 1 && (
+          <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-3">
+            <span className="text-[11px] font-semibold text-[var(--text-muted)]">Page {page} of {pages} · {total} total</span>
+            <div className="flex gap-1">
+              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="rounded-md p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40" aria-label="Previous page"><ChevronLeft size={16} aria-hidden="true" /></button>
+              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} className="rounded-md p-2 text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40" aria-label="Next page"><ChevronRight size={16} aria-hidden="true" /></button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
