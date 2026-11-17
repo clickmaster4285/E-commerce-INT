@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { Search, ChevronLeft, ChevronRight, Filter } from "lucide-react";
@@ -46,22 +47,31 @@ export default function ApplicationsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">Signup requests</h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Sellers apply here. Approve to provision their store and account.</p>
-        </div>
-        <div className="flex gap-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-          <span>Pending {summary.pending}</span>
-          <span>Approved {summary.approved}</span>
-          <span>Rejected {summary.rejected}</span>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="Signup requests"
+        subtitle="Sellers apply here. Approve to provision their store and account."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--warning)]" aria-hidden="true" />
+              Pending {summary.pending}
+            </span>
+            <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--success)]" aria-hidden="true" />
+              Approved {summary.approved}
+            </span>
+            <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+              <span className="h-2 w-2 rounded-full bg-[var(--danger)]" aria-hidden="true" />
+              Rejected {summary.rejected}
+            </span>
+          </div>
+        }
+      />
 
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-[220px] flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
-          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search name, email or store..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] pl-9 pr-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search applications" />
+          <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
+          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search name, email or store..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search applications" />
         </div>
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-[var(--text-muted)]" aria-hidden="true" />
@@ -86,7 +96,7 @@ export default function ApplicationsPage() {
             </thead>
             <tbody>
               {isError ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-red-600">Failed to load applications.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--danger-text)]">Failed to load applications.</td></tr>
               ) : items.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--text-muted)]">No applications match this filter.</td></tr>
               ) : items.map((item) => (

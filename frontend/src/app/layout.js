@@ -16,9 +16,11 @@ export const viewport = {
 };
 
 // Theme scripts run synchronously before first paint to avoid dark-mode flash.
-const adminThemeScript = `(function(){try{if(!(location.pathname==="/admin"||location.pathname.indexOf("/admin/")===0))return;var m=document.cookie.match("(^|;)\\s*theme\\s*=\\s*([^;]+)");var t=m?decodeURIComponent(m[2]):"light";if(t==="dark"){document.documentElement.classList.add("dark");}}catch(e){}})()`;
+const isAdminLikePanel = '(location.pathname==="/admin"||location.pathname.indexOf("/admin/")===0||location.pathname==="/super-admin"||location.pathname.indexOf("/super-admin/")===0)';
 
-const userThemeScript = `(function(){try{if(location.pathname==="/admin"||location.pathname.indexOf("/admin/")===0)return;var m=document.cookie.match("(^|;)\\s*user-theme\\s*=\\s*([^;]+)");var t=m?decodeURIComponent(m[2]):"light";if(t==="dark"){document.documentElement.classList.add("user-dark");}}catch(e){}})()`;
+const adminThemeScript = `(function(){try{if(!${isAdminLikePanel})return;var m=document.cookie.match("(^|;)\\s*theme\\s*=\\s*([^;]+)");var t=m?decodeURIComponent(m[2]):"light";if(t==="dark"){document.documentElement.classList.add("dark");}}catch(e){}})()`;
+
+const userThemeScript = `(function(){try{if(${isAdminLikePanel})return;var m=document.cookie.match("(^|;)\\s*user-theme\\s*=\\s*([^;]+)");var t=m?decodeURIComponent(m[2]):"light";if(t==="dark"){document.documentElement.classList.add("user-dark");}}catch(e){}})()`;
 
 export default function RootLayout({ children }) {
   return (

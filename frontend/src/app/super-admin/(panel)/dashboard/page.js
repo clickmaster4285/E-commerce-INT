@@ -22,11 +22,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import StatCard from "@/components/superadmin/StatCard";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 
-const CHART_COLORS = { area: "#2563eb", grid: "var(--border-color, #e2e8f0)" };
+const CHART_COLORS = { area: "var(--accent)", grid: "var(--border-color)" };
 
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
@@ -59,26 +60,25 @@ export default function SuperAdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">
-            Platform overview
-          </h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Real-time health of the multi-tenant store network.
-          </p>
-        </div>
-        <button type="button" onClick={() => refetch()} className="btn-secondary h-10">
-          Refresh
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Platform overview"
+        subtitle="Real-time health of the multi-tenant store network."
+        actions={
+          <button type="button" onClick={() => refetch()} className="btn-secondary h-10">
+            Refresh
+          </button>
+        }
+      />
 
       {/* Errors / loading */}
       {isError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div
+          role="alert"
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}
+        >
           Failed to load dashboard data.{" "}
-          <button type="button" onClick={() => refetch()} className="underline font-semibold">
+          <button type="button" onClick={() => refetch()} className="font-semibold underline underline-offset-2">
             Retry
           </button>
         </div>
@@ -87,7 +87,7 @@ export default function SuperAdminDashboardPage() {
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="card p-4 h-28 animate-pulse bg-[var(--bg-card)]" />
+            <div key={i} className="card h-28 animate-pulse p-4" />
           ))}
         </div>
       ) : (
@@ -118,7 +118,7 @@ export default function SuperAdminDashboardPage() {
                 <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="var(--text-muted)" />
                 <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--text-muted)" allowDecimals={false} />
                 <Tooltip
-                  cursor={{ fill: "rgba(37,99,235,0.08)" }}
+                  cursor={{ fill: "var(--accent-soft)" }}
                   contentStyle={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8, fontSize: 12 }}
                 />
                 <Area type="monotone" dataKey="count" name="Signups" stroke={CHART_COLORS.area} fill={CHART_COLORS.area} fillOpacity={0.18} strokeWidth={2} />
@@ -131,13 +131,13 @@ export default function SuperAdminDashboardPage() {
         <section className="card lg:col-span-5 p-5">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">Approval split</h2>
           <div className="mt-3 flex items-end gap-6">
-            <SplitMetric label="Approved" value={totals.approvedApplications ?? 0} color="#10b981" />
-            <SplitMetric label="Pending" value={totals.pendingApplications ?? 0} color="#f59e0b" />
-            <SplitMetric label="Rejected" value={totals.rejectedApplications ?? 0} color="#ef4444" />
+            <SplitMetric label="Approved" value={totals.approvedApplications ?? 0} color="var(--success-text)" />
+            <SplitMetric label="Pending" value={totals.pendingApplications ?? 0} color="var(--warning-text)" />
+            <SplitMetric label="Rejected" value={totals.rejectedApplications ?? 0} color="var(--danger-text)" />
           </div>
           <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
             <div
-              className="h-full bg-emerald-500 transition-all"
+              className="h-full bg-[var(--success)] transition-all"
               style={{ width: `${pct(totals.approvedApplications, totals)}%` }}
             />
           </div>
@@ -257,7 +257,7 @@ function timeAgo(iso) {
 function SplitMetric({ label, value, color }) {
   return (
     <div className="min-w-0">
-      <p className="font-mono text-2xl font-extrabold tabular-nums" style={{ color }}>{value}</p>
+      <p className="font-mono text-2xl font-semibold tabular-nums" style={{ color }}>{value}</p>
       <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
     </div>
   );

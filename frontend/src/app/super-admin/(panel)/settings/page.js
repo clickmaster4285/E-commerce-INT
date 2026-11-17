@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 
 export default function SettingsPage() {
@@ -28,23 +29,35 @@ export default function SettingsPage() {
   };
 
   if (loading) return <div className="card p-10 text-center text-sm text-[var(--text-muted)]">Loading settings…</div>;
-  if (error || !data) return <div className="card p-6 text-sm text-red-600">{error}</div>;
+  if (error || !data) {
+    return (
+      <div
+        role="alert"
+        className="card p-6 text-sm"
+        style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}
+      >
+        {error}
+      </div>
+    );
+  }
 
   const { profile, environment } = data;
 
   return (
     <div className="space-y-5 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">Settings</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Account, security and environment configuration.</p>
-      </div>
+      <AdminPageHeader
+        title="Settings"
+        subtitle="Account, security and environment configuration."
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <section className="card lg:col-span-7 p-6">
           <div className="flex items-center gap-4">
-            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-lg font-black text-white">{String(profile?.name || "SA").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 ring-1 ring-[var(--border-card)]">
+              <img src="/images/click-master-logo.webp" alt="Click Master" className="h-full w-full object-contain" />
+            </span>
             <div className="min-w-0">
-              <p className="text-lg font-extrabold text-[var(--text-primary)]">{profile?.name}</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">{profile?.name}</p>
               <p className="truncate font-mono text-[13px] text-[var(--text-muted)]">{profile?.email}</p>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Last login: {profile?.lastLoginAt ? new Date(profile.lastLoginAt).toLocaleString() : "—"}</p>
             </div>
@@ -60,18 +73,18 @@ export default function SettingsPage() {
         <section className="card lg:col-span-5 p-6">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">Change password</h2>
           <form onSubmit={submit} className="mt-4 space-y-3">
-            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" placeholder="Current password" className="h-11 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-4 text-sm" aria-label="Current password" />
-            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" placeholder="New password (min 8 chars)" className="h-11 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-4 text-sm" aria-label="New password" />
-            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" placeholder="Confirm new password" className="h-11 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-4 text-sm" aria-label="Confirm new password" />
-            {formError && <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{formError}</p>}
-            {done && <p className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700"><CheckCircle2 size={14}/> Password updated.</p>}
-            <button type="submit" disabled={busy} className="btn-primary h-11 w-full">{busy ? <><Loader2 size={16} className="animate-spin"/> Updating…</> : "Update password"}</button>
+            <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" placeholder="Current password" className="input-field h-11" aria-label="Current password" />
+            <input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" placeholder="New password (min 8 chars)" className="input-field h-11" aria-label="New password" />
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" placeholder="Confirm new password" className="input-field h-11" aria-label="Confirm new password" />
+            {formError && <p role="alert" className="rounded-lg border px-3 py-2 text-xs font-medium" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>{formError}</p>}
+            {done && <p className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold" style={{ background: "var(--success-soft)", color: "var(--success-text)", borderColor: "color-mix(in srgb, var(--success) 35%, transparent)" }}><CheckCircle2 size={14} aria-hidden="true" /> Password updated.</p>}
+            <button type="submit" disabled={busy} className="btn-primary h-11 w-full">{busy ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Updating…</> : "Update password"}</button>
           </form>
         </section>
       </div>
 
       <div className="card p-4 text-[11px] leading-5 text-[var(--text-muted)]">
-        <p className="font-bold text-[var(--text-primary)]">Security notes</p>
+        <p className="font-semibold text-[var(--text-primary)]">Security notes</p>
         <ul className="mt-1.5 list-disc space-y-1 pl-4">
           <li>Super Admin session is independent from customer/seller sessions (own cookie, own secret).</li>
           <li>Seeded credentials are for local development only. Change <code>SUPER_ADMIN_PASSWORD</code> before production.</li>
@@ -83,6 +96,6 @@ export default function SettingsPage() {
 }
 
 function Tile({ label, value, tone }) {
-  const color = tone === "ok" ? "text-emerald-600" : tone === "warn" ? "text-amber-600" : tone === "bad" ? "text-red-600" : "text-[var(--text-primary)]";
-  return (<div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{label}</p><p className={`mt-1 font-mono text-sm font-bold ${color}`}>{value}</p></div>);
+  const color = tone === "ok" ? "var(--success-text)" : tone === "warn" ? "var(--warning-text)" : tone === "bad" ? "var(--danger-text)" : "var(--text-primary)";
+  return (<div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-3"><p className="text-[9px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p><p className="mt-1 font-mono text-sm font-semibold" style={{ color }}>{value}</p></div>);
 }

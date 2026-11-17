@@ -6,6 +6,7 @@ import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { Search, ChevronLeft, ChevronRight, Store as StoreIcon, ExternalLink } from "lucide-react";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -45,22 +46,26 @@ export default function StoresPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">Store Management</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Activate, suspend and inspect tenant stores.</p>
-      </div>
+      <AdminPageHeader
+        title="Store Management"
+        subtitle="Activate, suspend and inspect tenant stores."
+      />
 
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-[220px] flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
-          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search store name or email..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] pl-9 pr-3 text-sm outline-none" aria-label="Search stores" />
+          <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
+          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search store name or email..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search stores" />
         </div>
         <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="h-10 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm font-semibold text-[var(--text-primary)]" aria-label="Filter by status">
           {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
 
-      {isError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">Failed to load stores.</div>}
+      {isError && (
+        <div role="alert" className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>
+          Failed to load stores.
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
@@ -83,7 +88,7 @@ export default function StoresPage() {
                 <tr key={s.id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><StoreIcon size={16} aria-hidden="true" /></span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}><StoreIcon size={16} aria-hidden="true" /></span>
                       <a href={s.url} className="inline-flex items-center gap-1 font-bold text-[var(--text-primary)] hover:underline" target="_blank" rel="noreferrer">{s.store_name}<ExternalLink size={12} aria-hidden="true" /></a>
                     </div>
                   </td>
@@ -92,9 +97,9 @@ export default function StoresPage() {
                   <td className="px-4 py-3"><StatusBadge value={s.status} /></td>
                   <td className="px-4 py-3 text-right">
                     {s.status === "closed" ? (
-                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "activate" })} className="text-[11px] font-bold text-emerald-600 hover:underline">Activate</button>
+                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "activate" })} className="text-[12px] font-semibold text-[var(--success-text)] hover:underline">Activate</button>
                     ) : (
-                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "suspend" })} className="text-[11px] font-bold text-red-600 hover:underline">Suspend</button>
+                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "suspend" })} className="text-[12px] font-semibold text-[var(--danger-text)] hover:underline">Suspend</button>
                     )}
                   </td>
                 </tr>
@@ -106,8 +111,8 @@ export default function StoresPage() {
           <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-3">
             <span className="text-[11px] font-semibold text-[var(--text-muted)]">{page} of {pages}</span>
             <div className="flex gap-1">
-              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page"><ChevronLeft size={16} /></button>
-              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Next page"><ChevronRight size={16} /></button>
+              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={16} aria-hidden="true" /></button>
+              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Next page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={16} aria-hidden="true" /></button>
             </div>
           </div>
         )}

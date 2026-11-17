@@ -1,8 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import Sidebar from "@/components/superadmin/Sidebar";
 import Topbar from "@/components/superadmin/Topbar";
@@ -16,12 +15,42 @@ const BREADCRUMBS = {
   "/super-admin/settings": "Settings",
 };
 
+const readThemeCookie = () => {
+  try {
+    const match = document.cookie.match(/(?:^|;)\s*theme\s*=\s*([^;]+)/);
+    return decodeURIComponent(match?.[1] || "light") === "dark" ? "dark" : "light";
+  } catch {
+    return "light";
+  }
+};
+
 export default function SuperAdminShell({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const [state, setState] = useState({ status: "loading", admin: null });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [theme, setTheme] = useState("light");
+
+  // Same `theme` cookie the admin panel uses — the root layout applies it to
+  // <html class="dark"> before first paint for /admin and /super-admin.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setTheme(readThemeCookie()));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try {
+        document.cookie = `theme=${next}; path=/; max-age=31536000; samesite=lax`;
+        document.documentElement.classList.toggle("dark", next === "dark");
+      } catch {
+        // Cookie failures should not break the panel
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,8 +82,8 @@ export default function SuperAdminShell({ children }) {
 
   if (state.status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0b1220]">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" aria-label="Checking session" />
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
+        <span className="spinner" aria-label="Checking session" />
       </div>
     );
   }
@@ -67,7 +96,7 @@ export default function SuperAdminShell({ children }) {
       {/* Mobile scrim */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
@@ -85,8 +114,14 @@ export default function SuperAdminShell({ children }) {
           onLogout={handleLogout}
           breadcrumb={breadcrumb}
           adminName={state.admin?.name || "Super Admin"}
+          adminEmail={state.admin?.email || ""}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          loggingOut={loggingOut}
         />
-        <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain bg-[var(--bg-secondary)] px-3 py-4 sm:px-5 sm:py-6">
+          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        </main>
       </div>
     </div>
   );

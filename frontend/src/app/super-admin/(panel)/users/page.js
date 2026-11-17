@@ -6,6 +6,7 @@ import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 
 const FILTERS = [
   { value: "", label: "All users" },
@@ -49,24 +50,28 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">User Management</h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">{total} registered accounts across the platform.</p>
-      </div>
+      <AdminPageHeader
+        title="User Management"
+        subtitle={`${total} registered accounts across the platform.`}
+      />
 
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <div className="relative min-w-[220px] flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
-          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search name, email or username..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] pl-9 pr-3 text-sm outline-none" aria-label="Search users" />
+          <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
+          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search name, email or username..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search users" />
         </div>
         <div className="flex gap-2">
           {FILTERS.map((f) => (
-            <button key={f.value} type="button" onClick={() => { setFilter(f.value); setPage(1); }} aria-pressed={filter === f.value} className={`h-9 rounded-full px-3.5 text-[11px] font-bold uppercase tracking-wider transition ${filter === f.value ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"}`}>{f.label}</button>
+            <button key={f.value} type="button" onClick={() => { setFilter(f.value); setPage(1); }} aria-pressed={filter === f.value} className={`h-9 rounded-full px-4 text-[12px] font-semibold transition-colors ${filter === f.value ? "bg-[var(--accent)] text-[var(--accent-text)]" : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-row-hover)]"}`}>{f.label}</button>
           ))}
         </div>
       </div>
 
-      {isError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">Failed to load users.</div>}
+      {isError && (
+        <div role="alert" className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>
+          Failed to load users.
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
@@ -95,9 +100,9 @@ export default function UsersPage() {
                   <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(u.created_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-right">
                     {u.status === "blocked" ? (
-                      <button type="button" onClick={() => setTarget({ id: u.id, name: u.name, action: "unblock" })} className="text-[11px] font-bold text-emerald-600 hover:underline">Unblock</button>
+                      <button type="button" onClick={() => setTarget({ id: u.id, name: u.name, action: "unblock" })} className="text-[12px] font-semibold text-[var(--success-text)] hover:underline">Unblock</button>
                     ) : (
-                      <button type="button" onClick={() => setTarget({ id: u.id, name: u.name, action: "block" })} className="text-[11px] font-bold text-red-600 hover:underline">Block</button>
+                      <button type="button" onClick={() => setTarget({ id: u.id, name: u.name, action: "block" })} className="text-[12px] font-semibold text-[var(--danger-text)] hover:underline">Block</button>
                     )}
                   </td>
                 </tr>
@@ -109,8 +114,8 @@ export default function UsersPage() {
           <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-3">
             <span className="text-[11px] font-semibold text-[var(--text-muted)]">{page} of {pages}</span>
             <div className="flex gap-1">
-              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page"><ChevronLeft size={16} /></button>
-              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Next page"><ChevronRight size={16} /></button>
+              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={16} aria-hidden="true" /></button>
+              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Next page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={16} aria-hidden="true" /></button>
             </div>
           </div>
         )}

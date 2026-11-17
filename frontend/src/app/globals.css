@@ -1444,4 +1444,3 @@ html.dark .admin-pos-workspace :is(
 /* NOTE: Lato/Ubuntu ke liye @font-face rakhe gaye the, lekin unhe koi CSS/class
    use nahi karti thi — invoicePdf.js (jsPDF) /fonts/*.ttf ko seedha fetch karta hai.
    8 dead @font-face blocks hata diye. */
-

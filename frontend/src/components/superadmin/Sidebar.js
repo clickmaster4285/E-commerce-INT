@@ -26,20 +26,20 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex h-full w-[270px] flex-col border-r border-white/5 bg-[#0b1220] transition-transform duration-300 lg:static lg:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex h-full w-[270px] flex-col border-r border-[var(--border-sidebar)] bg-[var(--bg-sidebar)] text-[var(--text-sidebar)] transition-transform duration-300 lg:static lg:translate-x-0 ${
         open ? "translate-x-0" : "-translate-x-full"
       }`}
       aria-label="Super Admin navigation"
     >
       {/* Brand */}
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-5">
-        <Link href="/super-admin/dashboard" className="flex items-center gap-2.5" aria-label="Super Admin home">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-[11px] font-black text-white shadow-lg shadow-blue-500/30">
-            SA
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--border-sidebar)] px-5">
+        <Link href="/super-admin/dashboard" className="flex min-w-0 items-center gap-2.5" aria-label="Super Admin home">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5 ring-1 ring-white/20">
+            <img src="/images/click-master-logo.webp" alt="Click Master" className="h-full w-full object-contain" />
           </span>
-          <span className="leading-none">
-            <span className="block text-[15px] font-black tracking-tight text-white">Click Master</span>
-            <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-[0.25em] text-blue-400">
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-[15px] font-semibold tracking-tight text-[var(--text-sidebar)]">Click Master</span>
+            <span className="mt-0.5 block truncate text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--text-sidebar-muted)]">
               Super Admin
             </span>
           </span>
@@ -48,7 +48,7 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
           type="button"
           onClick={onClose}
           aria-label="Close menu"
-          className="rounded-lg p-2 text-white/60 hover:bg-white/5 lg:hidden"
+          className="rounded-lg p-2 text-[var(--text-sidebar-muted)] transition-colors hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)] lg:hidden"
         >
           <X size={20} aria-hidden="true" />
         </button>
@@ -56,7 +56,7 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
+        <p className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
           Platform
         </p>
         <ul className="space-y-1">
@@ -69,16 +69,21 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
                   href={href}
                   onClick={onClose}
                   aria-current={active ? "page" : undefined}
-                  className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors ${
+                  className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors ${
                     active
-                      ? "bg-blue-600 text-white shadow-lg shadow-blue-600/25"
-                      : "text-white/70 hover:bg-white/5 hover:text-white"
+                      ? "bg-[var(--bg-sidebar-active)] text-white"
+                      : "text-[var(--text-sidebar-muted)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)]"
                   }`}
                 >
-                  <Icon size={18} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+                  <Icon
+                    size={18}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                    className={`shrink-0 ${active ? "text-white" : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"}`}
+                  />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {badge > 0 && (
-                    <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-extrabold tabular-nums text-amber-950">
+                    <span className="rounded-full bg-[var(--warning)] px-2 py-0.5 text-[10px] font-bold tabular-nums text-[#1c1105]">
                       {badge}
                     </span>
                   )}
@@ -90,11 +95,11 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
       </nav>
 
       {/* Footer */}
-      <div className="shrink-0 border-t border-white/5 px-5 py-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">
+      <div className="shrink-0 border-t border-[var(--border-sidebar)] px-5 py-4">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
           Multi-tenant Platform
         </p>
-        <p className="mt-1 text-[11px] leading-4 text-white/45">
+        <p className="mt-1 text-[11px] leading-4 text-[var(--text-sidebar-muted)]">
           Manage sellers, stores, users and approvals in one place.
         </p>
       </div>

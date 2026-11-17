@@ -14,10 +14,7 @@ export default function ConfirmDialog({
 }) {
   if (!open) return null;
 
-  const toneClass =
-    confirmTone === "success"
-      ? "bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-emerald-600"
-      : "bg-red-600 hover:bg-red-700 focus-visible:outline-red-600";
+  const isSuccess = confirmTone === "success";
 
   return (
     <div
@@ -32,22 +29,25 @@ export default function ConfirmDialog({
         className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
         onClick={loading ? undefined : onCancel}
       />
-      <div className="relative w-full max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-6 shadow-2xl">
+      <div className="relative w-full max-w-md rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-lg)]">
         <button
           type="button"
           onClick={onCancel}
           disabled={loading}
-          className="absolute right-4 top-4 rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
+          className="absolute end-4 top-4 rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
           aria-label="Close"
         >
           <X size={18} aria-hidden="true" />
         </button>
         <div className="flex items-start gap-4">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+          <span
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+            style={{ background: "var(--warning-soft)", color: "var(--warning-text)" }}
+          >
             <AlertTriangle size={22} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h2 id="confirm-dialog-title" className="text-base font-extrabold text-[var(--text-primary)]">
+            <h2 id="confirm-dialog-title" className="text-base font-semibold text-[var(--text-primary)]">
               {title}
             </h2>
             <p className="mt-1.5 text-sm leading-6 text-[var(--text-muted)]">{message}</p>
@@ -61,7 +61,12 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] px-5 text-sm font-semibold text-white transition ${toneClass} disabled:opacity-60`}
+            className="btn-primary h-11 px-5 disabled:opacity-60"
+            style={
+              isSuccess
+                ? { background: "var(--success)" }
+                : { background: "var(--danger)" }
+            }
           >
             {loading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : null}
             {confirmLabel}

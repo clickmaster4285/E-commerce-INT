@@ -60,7 +60,7 @@ export default function ApplicationDetailPage() {
         <div className="card lg:col-span-7 p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] pb-4">
             <div>
-              <h1 className="text-xl font-black text-[var(--text-primary)]">{item.name}</h1>
+              <h1 className="text-xl font-semibold text-[var(--text-primary)]">{item.name}</h1>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Applicant details</p>
             </div>
             <StatusBadge value={item.status} />
@@ -77,14 +77,14 @@ export default function ApplicationDetailPage() {
 
           {item.store_description && (
             <div className="mt-5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-4">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">Store description</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Store description</p>
               <p className="mt-1.5 text-sm leading-6 text-[var(--text-secondary)]">{item.store_description}</p>
             </div>
           )}
 
           {item.status === "rejected" && item.rejection_reason && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-red-700">Rejection reason</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-red-700">Rejection reason</p>
               <p className="mt-1 text-sm leading-6 text-red-800">{item.rejection_reason}</p>
             </div>
           )}
@@ -136,7 +136,7 @@ function Detail({ icon: Icon, label, value }) {
     <div className="flex items-start gap-2.5">
       <Icon size={16} className="mt-0.5 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
       <div className="min-w-0">
-        <dt className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--text-muted)]">{label}</dt>
+        <dt className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</dt>
         <dd className="mt-0.5 break-words text-[13px] font-semibold text-[var(--text-primary)]">{value}</dd>
       </div>
     </div>
