@@ -674,7 +674,7 @@ const FRAME_TITLES = {
 
 export default function PlatformFeatures() {
   const reduce = useReducedMotion();
-  const [active, setActive] = useState(2); // Shipping & Delivery open by default
+  const [active, setActive] = useState(0); // Quotations open by default
   const tabsRef = useRef(null);
   const activeModule = MODULES[active];
   const Preview = PREVIEWS[activeModule.preview];

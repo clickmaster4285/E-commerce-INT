@@ -86,7 +86,7 @@ export default function Navbar() {
           </button>
 
           <Link
-            href="/login?mode=register"
+            href="/landing/signup"
             className="hidden min-h-[44px] items-center gap-2 rounded-full bg-[var(--user-accent)] px-6 text-sm font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] md:inline-flex"
           >
             Sign Up
@@ -137,7 +137,7 @@ export default function Navbar() {
                 </a>
               ))}
               <Link
-                href="/login?mode=register"
+                href="/landing/signup"
                 onClick={() => setOpen(false)}
                 className="mt-3 flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-[var(--user-accent)] px-6 font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)]"
               >
