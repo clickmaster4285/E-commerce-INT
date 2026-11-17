@@ -1,7 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import LazyGoogleLogin from "@/components/user/LazyGoogleLogin";
@@ -46,6 +46,20 @@ export default function UserLoginPage() {
   const { t } = useTranslation();
   const { nameOf } = useLocalized();
   const [isLogin, setIsLogin] = useState(true);
+
+  // Open directly in register mode when linked with ?mode=register
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      try {
+        if (new URLSearchParams(window.location.search).get("mode") === "register") {
+          setIsLogin(false);
+        }
+      } catch {
+        /* ignore */
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");

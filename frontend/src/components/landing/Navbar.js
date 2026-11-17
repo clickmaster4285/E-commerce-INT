@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X, Moon, Sun, ArrowRight } from "lucide-react";
-import { NAV_LINKS, HERO } from "./content";
+import { NAV_LINKS } from "./content";
 
 function getInitialTheme() {
   if (typeof window === "undefined") return "light";
@@ -85,15 +85,13 @@ export default function Navbar() {
             {theme === "dark" ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
           </button>
 
-          <a
-            href={HERO.secondaryCta.href}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/login?mode=register"
             className="hidden min-h-[44px] items-center gap-2 rounded-full bg-[var(--user-accent)] px-6 text-sm font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] md:inline-flex"
           >
-            Talk to Us
+            Sign Up
             <ArrowRight size={16} aria-hidden="true" />
-          </a>
+          </Link>
 
           <button
             type="button"
@@ -138,15 +136,14 @@ export default function Navbar() {
                   {l.label}
                 </a>
               ))}
-              <a
-                href={HERO.secondaryCta.href}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/login?mode=register"
+                onClick={() => setOpen(false)}
                 className="mt-3 flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-[var(--user-accent)] px-6 font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)]"
               >
-                Talk to Us
+                Sign Up
                 <ArrowRight size={17} aria-hidden="true" />
-              </a>
+              </Link>
             </motion.nav>
           </>
         )}
