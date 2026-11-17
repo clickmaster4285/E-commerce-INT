@@ -512,6 +512,18 @@ html:has(.user-theme) {
   font-size: calc(14px * var(--user-ui-scale));
 }
 
+/* Signup reference page keeps the light reference palette while honoring dark mode. */
+:root.user-dark .signup-reference-page { background: var(--user-bg) !important; }
+:root.user-dark .signup-reference-page > div:last-child { background: var(--user-bg); }
+:root.user-dark .signup-reference-page > div:last-child > div {
+  border-color: var(--user-border);
+  background: var(--user-bg-card);
+  box-shadow: var(--user-shadow-lg);
+}
+:root.user-dark .signup-reference-page > div:last-child > div :is(h2, label, p, span) { color: var(--user-text); }
+:root.user-dark .signup-reference-page > div:last-child > div input { background: var(--user-bg-input); color: var(--user-text); }
+:root.user-dark .signup-reference-page > div:last-child > div input::placeholder { color: var(--user-text-subtle); }
+
 /* ---------- 3) LUCIDE ICONS (numeric size) ---------- */
 /* Sirf woh icons jinpar explicit width attribute hai (lucide numeric size).
    Percentage-width svg (charts/illustrations) untouched rehte hain. */
