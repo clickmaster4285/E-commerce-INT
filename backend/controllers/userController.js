@@ -9,6 +9,7 @@ const CheckoutDraft = require("../models/CheckoutDraft");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Employee = require("../models/Employee");
+const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
@@ -289,13 +290,27 @@ const loginUser = async (req, res) => {
           success: false,
           message: "This login is only for customers. Please use admin panel.",
         });
-    if (user.status === "inactive" || user.status === "blocked" || user.is_deleted)
+    if (user.status === "inactive" || user.status === "blocked" || user.is_deleted) {
+      // If it's a pending seller, tell them the application is under review
+      try {
+        const app = await SellerApplication.findOne({ email: user.email }).select("status").lean();
+        if (user.status === "blocked" && app && String(app.status).toLowerCase() === "pending") {
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your seller application is under review. You will be notified by email once it is approved.",
+          });
+        }
+      } catch (lookupError) {
+        console.error("[login] seller application lookup failed:", lookupError.message);
+      }
       return res
         .status(403)
         .json({
           success: false,
           message: "Your account is inactive. Please contact administrator.",
         });
+    }
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid)
       return res

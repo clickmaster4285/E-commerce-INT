@@ -50,8 +50,8 @@ export default function StatCard({
           <Icon size={16} aria-hidden="true" />
         </span>
       </div>
-      <div className="mt-3 flex min-w-0 items-end justify-between gap-2">
-        <p className="min-w-0 truncate text-[28px] font-semibold leading-7 tabular-nums text-[var(--text-primary)] [font-variant-numeric:tabular-nums]">
+      <div className="mt-2 flex min-w-0 items-end justify-between gap-2">
+        <p className="min-w-0 truncate text-[26px] font-semibold leading-7 tabular-nums text-[var(--text-primary)] [font-variant-numeric:tabular-nums]">
           {value}
         </p>
         {trend ? (
@@ -79,7 +79,7 @@ export default function StatCard({
   );
 
   const baseClass =
-    "card flex min-h-[112px] flex-col justify-between border border-[var(--border-card)] p-[16px_18px] shadow-[var(--shadow-sm)]";
+    "card flex min-h-[96px] flex-col justify-between border border-[var(--border-card)] p-[12px_14px] shadow-[var(--shadow-sm)]";
 
   if (href) {
     return (

@@ -7,9 +7,9 @@ const { sendApplicationReceivedEmail } = require("../services/emailService");
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
-// Public endpoint — a seller requests to open a store. The account is NOT
-// created here; it only enters the review queue with status "pending".
-// After OTP-free signup, Super Admin approves → account + store provisioned.
+// Public endpoint — a seller requests to open a store. The account is created
+// immediately but stays "blocked" (cannot log in) until Super Admin approves.
+// After OTP-free signup, Super Admin approves → account activated + store linked.
 const sellerApply = async (req, res) => {
   try {
     const { name, email, phone, username, password, storeName, storeDescription } = req.body || {};
@@ -28,8 +28,8 @@ const sellerApply = async (req, res) => {
       return res.status(400).json({ success: false, message: "Please provide a valid email address." });
     }
 
-    const existingUser = await User.findOne({ email: cleanEmail }).select("_id").lean();
-    if (existingUser) {
+    const existingUser = await User.findOne({ email: cleanEmail }).select("_id role status storeId").lean();
+    if (existingUser && !(existingUser.role === "user" && existingUser.status === "blocked")) {
       return res.status(400).json({ success: false, message: "An account already exists with this email." });
     }
     const existingApp = await SellerApplication.findOne({ email: cleanEmail }).lean();
@@ -43,21 +43,44 @@ const sellerApply = async (req, res) => {
           message: "An application for this email is already under review.",
         });
       }
-      // Rejected → let them fix and resubmit once
+      // Rejected → clean slate: drop the old blocked user + rejected application
+      if (existingUser) await User.deleteOne({ _id: existingUser._id });
       await SellerApplication.deleteOne({ _id: existingApp._id });
     }
 
     const cleanPhone = typeof phone === "string" ? String(phone).replace(/\D/g, "").slice(0, 16) : "";
     const passwordHash = await bcrypt.hash(String(password), 10);
 
+    const baseUsername = String(username || cleanEmail.split("@")[0] || "seller")
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .slice(0, 20) || "seller";
+    let finalUsername = baseUsername;
+    for (let i = 1; await User.exists({ username: finalUsername }) && i < 100; i += 1) {
+      finalUsername = `${baseUsername}${i}`;
+    }
+
+    // Account is created right away — but BLOCKED (can't login) until approval.
+    const user = await User.create({
+      name: String(name).trim(),
+      username: finalUsername,
+      email: cleanEmail,
+      phone: cleanPhone,
+      password: passwordHash,
+      role: "user",
+      storeId: null,
+      emailVerified: false,
+      status: "blocked",
+    });
+
     const application = await SellerApplication.create({
       name: String(name).trim(),
       email: cleanEmail,
       phone: cleanPhone,
-      username: String(username || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30) || "",
+      username: String(username || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30) || finalUsername,
       passwordHash,
       store_name: String(storeName).trim(),
       store_description: String(storeDescription || "").trim().slice(0, 500),
+      user_id: user._id,
     });
 
     // Best-effort — a failed email must not block the application flow

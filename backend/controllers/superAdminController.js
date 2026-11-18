@@ -268,12 +268,26 @@ const approveRequest = async (req, res) => {
     }
 
     // Provision store + seller account exactly once (password from request)
-    const existingUser = await User.findOne({ email: application.email }).select("_id storeId").lean();
+    const existingUser = await User.findOne({ email: application.email }).select("_id storeId status").lean();
     if (existingUser) {
-      // Already provisioned via a previous attempt — just link it
+      const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
+      const store =
+        existingUser.storeId
+          ? await Store.findById(existingUser.storeId)
+          : await Store.create({
+              store_name: storeName0,
+              email: application.email,
+              phone: application.phone || "",
+              store_status: "open",
+            });
+      // Activate the account that was blocked at apply time
+      await User.updateOne(
+        { _id: existingUser._id },
+        { status: "active", emailVerified: true, storeId: store?._id || existingUser.storeId }
+      );
       await SellerApplication.updateOne(
         { _id: application._id },
-        { store_id: existingUser.storeId || null, user_id: existingUser._id }
+        { store_id: store?._id || existingUser.storeId || null, user_id: existingUser._id }
       );
       await notifySeller(
         sendApplicationApprovedEmail,
@@ -281,7 +295,7 @@ const approveRequest = async (req, res) => {
         "Approval",
         application._id
       );
-      return res.json({ success: true, message: "Application approved.", data: { storeProvisioned: false } });
+      return res.json({ success: true, message: "Seller approved and account activated.", data: { storeId: store?._id || null, userId: existingUser._id } });
     }
 
     const storeName = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");

@@ -373,7 +373,7 @@ export default function SignupPage() {
             Discover products, build your store, and grow with confidence.
           </p>
 
-          <ul className="mt-6 flex flex-wrap items-center gap-2.5 xl:flex-nowrap">
+          <ul className="mt-6 flex flex-col items-start gap-2.5">
             {[
               { icon: ShieldCheck, label: "Secure shopping" },
               { icon: Store, label: "Seller tools" },
@@ -381,7 +381,7 @@ export default function SignupPage() {
             ].map(({ icon: Icon, label }) => (
               <li
                 key={label}
-                className="flex items-center gap-2 whitespace-nowrap rounded-[12px] px-3 py-2"
+                className="flex items-center gap-2.5 whitespace-nowrap py-1"
               >
                 <span
                   aria-hidden="true"
@@ -389,7 +389,7 @@ export default function SignupPage() {
                 >
                   <Icon size={16} strokeWidth={2} />
                 </span>
-                <span className="whitespace-nowrap text-[13px] font-semibold text-white">{label}</span>
+                <span className="whitespace-nowrap text-[13px] font-medium tracking-[0.01em] text-white/90">{label}</span>
               </li>
             ))}
           </ul>

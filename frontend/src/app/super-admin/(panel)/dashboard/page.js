@@ -104,14 +104,14 @@ export default function SuperAdminDashboardPage() {
       )}
 
       {/* Stat cards */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
         {cards.map((card) => (
           <StatCard key={card.label} {...card} loading={isLoading} />
         ))}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr]">
         <SectionCard
           title="Registrations"
           description="New customer signups, last 7 days"
