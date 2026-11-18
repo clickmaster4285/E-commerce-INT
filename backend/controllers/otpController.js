@@ -6,6 +6,8 @@ const User = require("../models/User");
 const PendingRegistration = require("../models/PendingRegistration");
 const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
+const SellerApplication = require("../models/SellerApplication");
+const { sendApplicationReceivedEmail } = require("../services/emailService");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
@@ -338,6 +340,15 @@ const verifyEmailVerificationOtp = async (req, res) => {
       // ✅ Sahi OTP — ab User banao (is se pehle User exist nahi karta)
       const existingUser = await User.findOne({ email });
       if (existingUser && existingUser.emailVerified !== false) {
+        const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("status").lean();
+        if (existingUser.status === "blocked" && pendingApp) {
+          await PendingRegistration.deleteOne({ _id: pending._id });
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your application is already under review. You will be notified by email once it is approved.",
+          });
+        }
         await PendingRegistration.deleteOne({ _id: pending._id });
         return res
           .status(400)
@@ -376,12 +387,33 @@ const verifyEmailVerificationOtp = async (req, res) => {
         storeId: defaultStore?._id,
         role: "user",
         emailVerified: true,
+        // ✅ Pending Super Admin approval — login blocked until approval
+        status: "blocked",
       });
       await PendingRegistration.deleteOne({ _id: pending._id });
 
-      // ✅ Verified hone par seedha login karwa dete hain
-      setAuthCookies(res, user._id, user.role);
+      // Seller application queue — Super Admin reviews from here
+      const storeName = `${String(pending.name || "").trim().slice(0, 40) || "New"}'s Store`;
+      const application = await SellerApplication.create({
+        name: pending.name,
+        email: pending.email,
+        phone: pending.phone || "",
+        username: pending.username || "",
+        passwordHash: pending.passwordHash,
+        store_name: storeName,
+        store_description: "",
+        status: "pending",
+        user_id: user._id,
+      });
+      // Best-effort — failure must not block signup
+      try {
+        await sendApplicationReceivedEmail({ name: pending.name, email: pending.email, storeName });
+      } catch (emailError) {
+        console.error("[signup] pending-approval email failed:", emailError.message);
+      }
 
+      // Pending approval — do NOT set auth cookies (blocked account)
+      // User must be approved by Super Admin before getting an active session
       const io = req.io || getIO();
       await pushGlobalActivity(
         io,
@@ -397,7 +429,8 @@ const verifyEmailVerificationOtp = async (req, res) => {
 
       return res.json({
         success: true,
-        message: "Email verified successfully",
+        pendingApproval: true,
+        message: "Your application is pending Super Admin approval. We'll email you once it is approved.",
         user: {
           id: user._id,
           name: user.name,

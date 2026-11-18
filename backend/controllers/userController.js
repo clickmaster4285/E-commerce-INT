@@ -136,6 +136,19 @@ const createUser = async (req, res) => {
     // (purane users me emailVerified undefined hota hai — unhe verified maana jata hai)
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.emailVerified !== false) {
+      // Blocked + pending application → tell the applicant their application is under review
+      try {
+        const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("status").lean();
+        if (existingUser.status === "blocked" && pendingApp) {
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your application is already under review. You will be notified by email once it is approved.",
+          });
+        }
+      } catch (lookupError) {
+        console.error("[register] pending seller application lookup failed:", lookupError.message);
+      }
       return res.status(400).json({
         success: false,
         message: "Registration failed",

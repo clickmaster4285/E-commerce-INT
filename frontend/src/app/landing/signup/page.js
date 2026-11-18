@@ -205,7 +205,13 @@ export default function SignupPage() {
   };
 
   const handleVerify = async (otp) => {
-    await authApi.verifyEmailOtp(otpEmail, otp);
+    const res = await authApi.verifyEmailOtp(otpEmail, otp);
+
+    if (res?.pendingApproval) {
+      window.location.assign("/pending-approval");
+      return;
+    }
+
     setStep("welcome");
   };
 
