@@ -11,8 +11,16 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // Pending-approval screen — hamesha accessible (unauthenticated user ko yahi page dikhana hai)
-  if (pathname === '/pending-approval') {
+  // Landing page + seller signup — public. Yeh default page hai jo har
+  // logged-out visitor ko dikhta hai (neeche wala fallback yahin bhejta hai).
+  if (pathname === '/landing' || pathname.startsWith('/landing/')) {
+    return NextResponse.next();
+  }
+
+  // Super Admin panel — apna auth khud handle karta hai (SuperAdminShell
+  // logged-out user ko /super-admin/login par bhej deta hai), is liye yahan
+  // block nahi karte. Warna super admin login page hi nahi khulta.
+  if (pathname === '/super-admin' || pathname.startsWith('/super-admin/')) {
     return NextResponse.next();
   }
 
@@ -56,10 +64,9 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // Baqi sab stores/routes unauthenticated users ke liye
-  // Access ke liye Super Admin approval zaroori hai — tab tak pending-approval page dikhao
+  // Baqi sab stores/routes unauthenticated users ke liye — default landing page dikhao
   if (!hasSessionCookie) {
-    return NextResponse.redirect(new URL('/pending-approval', request.url));
+    return NextResponse.redirect(new URL('/landing', request.url));
   }
 
   return NextResponse.next();

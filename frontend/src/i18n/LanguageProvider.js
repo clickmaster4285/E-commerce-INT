@@ -20,7 +20,7 @@ import {
   isRtl,
   normalizeLocale,
 } from "./config";
-import { translate } from "./translations";
+import { translate, loadLocale, registerLocale } from "./translations";
 
 const LanguageContext = createContext(null);
 
@@ -33,17 +33,39 @@ function readStoredLocale(fallbackLocale = DEFAULT_LOCALE) {
   }
 }
 
-export function LanguageProvider({ children, initialLocale = DEFAULT_LOCALE, legacyCookieName = null }) {
+export function LanguageProvider({
+  children,
+  initialLocale = DEFAULT_LOCALE,
+  // Dictionary for `initialLocale`, passed by a server layout that already
+  // read the `lang` cookie — lets SSR + first client render use the right
+  // language with no English flash and no extra download.
+  initialMessages = null,
+  legacyCookieName = null,
+}) {
   const normalizedInitialLocale = normalizeLocale(initialLocale);
+  // Must run during render (not in an effect) so translate() sees it on the
+  // server and in the very first client render alike.
+  if (initialMessages) registerLocale(normalizedInitialLocale, initialMessages);
   const [locale, setLocale] = useState(normalizedInitialLocale);
 
   useEffect(() => {
     if (legacyCookieName) Cookies.remove(legacyCookieName, { path: "/" });
-    setLocale(readStoredLocale(normalizedInitialLocale));
+    const stored = readStoredLocale(normalizedInitialLocale);
+    let cancelled = false;
+    // Languages are split into lazy chunks: fetch the stored one, then switch.
+    loadLocale(stored).then(() => {
+      if (!cancelled) setLocale(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [legacyCookieName, normalizedInitialLocale]);
 
-  const changeLocale = useCallback((next) => {
+  const changeLocale = useCallback(async (next) => {
     const code = normalizeLocale(next);
+    // Download the dictionary BEFORE switching so the UI never shows a
+    // half-English state. Cached after the first time.
+    await loadLocale(code);
     try {
       Cookies.set(LANG_COOKIE, code, {
         expires: 365,

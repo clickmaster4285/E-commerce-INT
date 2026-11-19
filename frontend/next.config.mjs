@@ -9,14 +9,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ⚠️ NO locale ROUTING is configured on purpose.
 //    The app keeps its existing URLs and the language is carried in a plain
 //    `lang` cookie (see src/i18n/config.js) that covers both the admin panel
-//    and the storefront. Translations live in src/i18n/translations.js and are
-//    consumed client-side through src/i18n/LanguageProvider.js — no next-intl
+//    and the storefront. Translations are edited in
+//    src/i18n/translations.source.mjs, split per language into
+//    src/i18n/locales/*.json by `npm run i18n` (auto-runs before dev/build),
+//    and consumed client-side through src/i18n/LanguageProvider.js — no next-intl
 //    plugin, no route rewriting.
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /**
+   * Build speed: the project is 100% JavaScript (no .ts/.tsx files), but
+   * `allowJs` in tsconfig made `next build` run a full TypeScript pass over
+   * every .js file (~35s) that could not report real errors anyway
+   * (`checkJs` is off). Skipping it changes nothing at runtime.
+   * Use `npm run lint` to catch mistakes.
+   */
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   allowedDevOrigins: [
     '192.168.88.64',
+    '192.168.88.35',
     'localhost',
     '127.0.0.1',
   ],

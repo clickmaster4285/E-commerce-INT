@@ -283,9 +283,11 @@ export default function SignupPage() {
     } catch (err) {
       const data = err?.response?.data || {};
       if (data?.code === "SELLER_PENDING") {
-        // Yeh email pehle se apply kar chuka hai — application status page par bhej do
-        toast.info(data?.message || "Your application is already under review.");
-        window.location.assign(`/pending-approval?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        // Yeh email pehle se apply kar chuka hai — form par hi bata do (approval par email aayegi)
+        const msg = data?.message || "Your application is already under review. We will email you once it is approved.";
+        toast.info(msg);
+        setGeneralError(msg);
+        setLoading(false);
         return;
       }
       if (data.requireVerification || data.needsVerification) {
