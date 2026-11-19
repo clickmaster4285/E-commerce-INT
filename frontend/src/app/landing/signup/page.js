@@ -208,7 +208,7 @@ export default function SignupPage() {
     const res = await authApi.verifyEmailOtp(otpEmail, otp);
 
     if (res?.pendingApproval) {
-      window.location.assign("/pending-approval");
+      window.location.assign(`/pending-approval?email=${encodeURIComponent(otpEmail)}`);
       return;
     }
 

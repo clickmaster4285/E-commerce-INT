@@ -48,11 +48,12 @@ export default function UserLoginPage() {
   const [isLogin, setIsLogin] = useState(true);
 
   // Open directly in register mode when linked with ?mode=register
+  const [approvedInfo, setApprovedInfo] = useState(false);
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
       try {
-        if (new URLSearchParams(window.location.search).get("mode") === "register") {
-          setIsLogin(false);
+        if (new URLSearchParams(window.location.search).get("approved") === "1") {
+          setApprovedInfo(true);
         }
       } catch {
         /* ignore */
@@ -537,6 +538,15 @@ export default function UserLoginPage() {
               </>
             )}
 
+            {approvedInfo && (
+              <div className="mb-4 px-4 py-3 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-start gap-2">
+                <span aria-hidden="true" className="mt-0.5 shrink-0 text-[#10b981]">✓</span>
+                <div>
+                  <p className="text-sm font-semibold text-[#059669]">Application approved</p>
+                  <p className="text-[11px] text-[#047857]">A confirmation email was sent. Sign in below to open your store.</p>
+                </div>
+              </div>
+            )}
             {generalError && (
               <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
                 <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
