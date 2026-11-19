@@ -4,7 +4,14 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const { signSession, cookieOptions, getCookieName } = require("../middleware/superAdminAuth");
+const jwt = require("jsonwebtoken");
+const {
+  generateTokens,
+  setAuthCookies,
+  clearAuthCookies,
+  getCookieOptions,
+  getAccessCookieMaxAge,
+} = require("../middleware/superAdminAuth");
 const { logActivity } = require("../utils/superAdminActivity");
 const {
   sendApplicationApprovedEmail,
@@ -56,8 +63,8 @@ const loginSuperAdmin = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid email or password." });
     }
 
-    const token = signSession(superAdmin);
-    res.cookie(getCookieName(), token, cookieOptions());
+    const tokens = generateTokens(superAdmin);
+    setAuthCookies(res, tokens);
     superAdmin.lastLoginAt = new Date();
     await superAdmin.save().catch(() => {});
     await logActivity({
@@ -84,10 +91,45 @@ const loginSuperAdmin = async (req, res) => {
   }
 };
 
+const refreshSuperAdminToken = async (req, res) => {
+  try {
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return res.status(401).json({ success: false, message: "Refresh token required" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      clearAuthCookies(res);
+      return res.status(401).json({ success: false, message: "Invalid refresh token" });
+    }
+
+    // Wrong audience (seller/customer token) — do not wipe their session cookies.
+    if (decoded?.type !== "superadmin") {
+      return res.status(401).json({ success: false, message: "Invalid refresh token" });
+    }
+
+    const superAdmin = await SuperAdmin.findById(decoded.userId);
+    if (!superAdmin || superAdmin.status !== "active") {
+      clearAuthCookies(res);
+      return res.status(401).json({ success: false, message: "Super Admin account not found." });
+    }
+
+    const { accessToken } = generateTokens(superAdmin);
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge()));
+    return res.json({ success: true, message: "Token refreshed" });
+  } catch (error) {
+    log.error("[super-admin] refresh error:", error.message);
+    return res.status(500).json({ success: false, message: "Could not refresh session" });
+  }
+};
+
 const logoutSuperAdmin = async (req, res) => {
   try {
     const actor = req.superAdmin;
-    res.clearCookie(getCookieName(), { ...cookieOptions(), maxAge: 0 });
+    clearAuthCookies(res);
     if (actor) {
       await logActivity({
         action: "Super admin logged out",
@@ -669,6 +711,7 @@ const setUserStatus = async (req, res) => {
 module.exports = {
   // auth
   loginSuperAdmin,
+  refreshSuperAdminToken,
   logoutSuperAdmin,
   meSuperAdmin,
   // dashboard

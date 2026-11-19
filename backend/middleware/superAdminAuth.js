@@ -2,67 +2,78 @@ const jwt = require("jsonwebtoken");
 const SuperAdmin = require("../models/SuperAdmin");
 const log = require("../utils/logger");
 
-const getCookieName = () => {
-  const name = String(process.env.SUPER_ADMIN_COOKIE_NAME || "").trim();
-  if (!name) {
-    const err = new Error(
-      "SUPER_ADMIN_COOKIE_NAME is not configured. Set it in backend/.env before using the Super Admin panel."
-    );
-    err.code = "SUPERADMIN_COOKIE_NAME_MISSING";
-    throw err;
-  }
-  return name;
+const getAdminAccessMinutes = () => {
+  const minutes = Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
 };
 
-const getSessionTtlSeconds = () => {
-  const raw = String(process.env.SUPER_ADMIN_SESSION_TTL_SECONDS || "").trim();
-  const ttl = Number(raw);
-  if (!raw || !Number.isFinite(ttl) || ttl < 60) {
-    const err = new Error(
-      "SUPER_ADMIN_SESSION_TTL_SECONDS is not configured (or invalid). Set it in backend/.env before using the Super Admin panel."
-    );
-    err.code = "SUPERADMIN_SESSION_TTL_MISSING";
-    throw err;
-  }
-  return Math.floor(ttl);
+const getRefreshTokenDays = () => {
+  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
+  return Number.isFinite(days) && days > 0 ? days : 30;
 };
 
-const getSecret = () => {
-  const secret = String(process.env.SUPER_ADMIN_JWT_SECRET || "").trim();
+const getAccessCookieMaxAge = () => getAdminAccessMinutes() * 60 * 1000;
+const getRefreshCookieMaxAge = () => getRefreshTokenDays() * 24 * 60 * 60 * 1000;
+
+const getCookieOptions = (maxAge) => {
+  const requestedSameSite = String(process.env.AUTH_COOKIE_SAME_SITE || "lax").toLowerCase();
+  const sameSite = ["strict", "lax", "none"].includes(requestedSameSite) ? requestedSameSite : "lax";
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production" || sameSite === "none",
+    sameSite,
+    maxAge,
+    path: "/",
+  };
+};
+
+const getJwtSecret = () => {
+  const secret = String(process.env.JWT_SECRET || "").trim();
   if (!secret) {
-    const err = new Error(
-      "SUPER_ADMIN_JWT_SECRET is not configured. Set it in backend/.env before using the Super Admin panel."
-    );
-    err.code = "SUPERADMIN_SECRET_MISSING";
+    const err = new Error("JWT_SECRET is not configured.");
+    err.code = "JWT_SECRET_MISSING";
     throw err;
   }
   return secret;
 };
 
-const signSession = (superAdmin) =>
-  jwt.sign(
-    { sub: String(superAdmin._id), type: "superadmin", email: superAdmin.email, role: superAdmin.role || "superadmin" },
-    getSecret(),
-    { expiresIn: `${getSessionTtlSeconds()}s` }
-  );
+/** Same cookie names as seller/customer auth: accessToken + refreshToken. */
+const generateTokens = (superAdmin) => {
+  const payload = {
+    userId: String(superAdmin._id),
+    role: superAdmin.role || "superadmin",
+    type: "superadmin",
+  };
+  const accessToken = jwt.sign(payload, getJwtSecret(), {
+    expiresIn: `${getAdminAccessMinutes()}m`,
+  });
+  const refreshToken = jwt.sign(payload, getJwtSecret(), {
+    expiresIn: `${getRefreshTokenDays()}d`,
+  });
+  return { accessToken, refreshToken };
+};
 
-const cookieOptions = () => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  maxAge: getSessionTtlSeconds() * 1000,
-  path: "/",
-});
+const setAuthCookies = (res, tokens) => {
+  res.cookie("accessToken", tokens.accessToken, getCookieOptions(getAccessCookieMaxAge()));
+  res.cookie("refreshToken", tokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+};
 
-// Every superadmin request must present a valid superadmin token AND the
-// account must still exist + be active. Normal user/employee tokens cannot
-// pass — signature is verified with a dedicated secret.
+const clearAuthCookies = (res) => {
+  const { httpOnly, secure, sameSite, path } = getCookieOptions(0);
+  const options = { httpOnly, secure, sameSite, path };
+  res.clearCookie("accessToken", options);
+  res.clearCookie("refreshToken", options);
+};
+
+// Every superadmin request must present a valid superadmin accessToken AND the
+// account must still exist + be active. Seller/customer tokens cannot pass —
+// payload type must be "superadmin".
 const requireSuperAdmin = async (req, res, next) => {
   try {
     let token = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith("Bearer ")) token = authHeader.split(" ")[1];
-    if (!token && req.cookies?.[getCookieName()]) token = req.cookies[getCookieName()];
+    if (!token && req.cookies?.accessToken) token = req.cookies.accessToken;
 
     if (!token) {
       return res.status(401).json({ success: false, message: "Super Admin session required." });
@@ -70,7 +81,7 @@ const requireSuperAdmin = async (req, res, next) => {
 
     let payload;
     try {
-      payload = jwt.verify(token, getSecret());
+      payload = jwt.verify(token, getJwtSecret());
     } catch {
       return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
     }
@@ -78,7 +89,7 @@ const requireSuperAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "Not a Super Admin session." });
     }
 
-    const superAdmin = await SuperAdmin.findById(payload.sub).select("-passwordHash").lean();
+    const superAdmin = await SuperAdmin.findById(payload.userId).select("-passwordHash").lean();
     if (!superAdmin) {
       return res.status(401).json({ success: false, message: "Super Admin account not found." });
     }
@@ -94,4 +105,11 @@ const requireSuperAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = { requireSuperAdmin, signSession, cookieOptions, getCookieName };
+module.exports = {
+  requireSuperAdmin,
+  generateTokens,
+  setAuthCookies,
+  clearAuthCookies,
+  getCookieOptions,
+  getAccessCookieMaxAge,
+};
