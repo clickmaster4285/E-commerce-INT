@@ -143,18 +143,13 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
 
       {/* Collapse toggle + footer */}
       <div className="shrink-0 border-t border-[var(--border-sidebar)] px-2 py-3">
-        {showExpanded ? (
-          <p className="px-2 text-[12px] leading-4 text-[var(--text-sidebar-muted)]">
-            Platform control panel
-          </p>
-        ) : null}
         <button
           type="button"
           onClick={toggleCollapse}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-pressed={collapsed}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="mt-1 hidden h-9 w-full items-center justify-center rounded-[10px] text-[var(--text-sidebar-muted)] transition-colors hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:flex"
+          className="hidden h-9 w-full items-center justify-center rounded-[10px] text-[var(--text-sidebar-muted)] transition-colors hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] lg:flex"
         >
           {collapsed ? <ChevronsRight size={18} aria-hidden="true" /> : <ChevronsLeft size={18} aria-hidden="true" />}
         </button>

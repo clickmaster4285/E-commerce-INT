@@ -39,6 +39,8 @@ export const superAdminApi = {
   approveRequest: (id) => superAdminHttp.post(`/super-admin/requests/${id}/approve`).then((r) => r.data),
   rejectRequest: (id, reason = "") =>
     superAdminHttp.post(`/super-admin/requests/${id}/reject`, { reason }).then((r) => r.data),
+  requestInfo: (id, message) =>
+    superAdminHttp.post(`/super-admin/requests/${id}/request-info`, { message }).then((r) => r.data),
 
   // Stores
   listStores: (params = {}) =>

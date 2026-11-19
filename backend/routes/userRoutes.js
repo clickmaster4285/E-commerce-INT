@@ -40,7 +40,7 @@ const router = express.Router();
 // ==========================================
 //  PUBLIC ROUTES
 // ==========================================
-router.post("/register", limiters.register, createUser);
+router.post("/register", createUser);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
@@ -60,8 +60,8 @@ router.get("/email-health", getEmailHealth);
 // ==========================================
 // 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
 // ==========================================
-router.post("/send-email-otp", limiters.sendEmailOtp, sendEmailVerificationOtp);
-router.post("/verify-email-otp", limiters.verifyEmailOtp, verifyEmailVerificationOtp);
+router.post("/send-email-otp", sendEmailVerificationOtp);
+router.post("/verify-email-otp", verifyEmailVerificationOtp);
 
 // ==========================================
 // 🔐 FORGOT PASSWORD (OTP — 5 min expiry)

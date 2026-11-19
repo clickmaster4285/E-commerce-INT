@@ -27,6 +27,9 @@ const employeeSchema = new mongoose.Schema(
       default: "staff",
       enum: ["admin", "manager", "staff"],
     },
+    // Seller-owner account created at signup stays pending until Super Admin approves.
+    // While pending: the admin panel opens in read-only mode (GETs allowed, mutations blocked).
+    seller_pending: { type: Boolean, default: false, index: true },
     status: { type: String, default: "active", enum: ["active", "inactive"] },
     // Profile picture — optimized data URL (Employees form se set hoti hai)
     avatar: { type: String, default: "" },

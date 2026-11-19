@@ -19,6 +19,7 @@ router.get("/requests", superAdminController.listRequests);
 router.get("/requests/:id", superAdminController.getRequest);
 router.post("/requests/:id/approve", superAdminController.approveRequest);
 router.post("/requests/:id/reject", superAdminController.rejectRequest);
+router.post("/requests/:id/request-info", superAdminController.requestInfo);
 
 router.get("/stores", superAdminController.listStores);
 router.patch("/stores/:id/status", superAdminController.setStoreStatus);

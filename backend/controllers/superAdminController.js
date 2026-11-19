@@ -3,11 +3,13 @@ const SuperAdmin = require("../models/SuperAdmin");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
+const Employee = require("../models/Employee");
 const { signSession, cookieOptions, getCookieName } = require("../middleware/superAdminAuth");
 const { logActivity } = require("../utils/superAdminActivity");
 const {
   sendApplicationApprovedEmail,
   sendApplicationRejectedEmail,
+  sendApplicationInfoRequestedEmail,
 } = require("../services/emailService");
 const log = require("../utils/logger");
 
@@ -253,6 +255,17 @@ const getRequest = async (req, res) => {
 
 const approveRequest = async (req, res) => {
   try {
+    // Setup gate: approval stays locked until the seller completes store setup
+    // (details confirmation + verification documents). Checked before the atomic flip.
+    const setupCheck = await SellerApplication.findById(req.params.id).select("setup_completed status").lean();
+    if (setupCheck && setupCheck.status === "pending" && setupCheck.setup_completed === false) {
+      return res.status(409).json({
+        success: false,
+        code: "SETUP_INCOMPLETE",
+        message: "The seller has not finished store setup yet (documents missing). Approval unlocks once they submit.",
+      });
+    }
+
     // Atomic guard: only flip pending → approved once
     const application = await SellerApplication.findOneAndUpdate(
       { _id: req.params.id, status: "pending" },
@@ -269,27 +282,44 @@ const approveRequest = async (req, res) => {
         .json({ success: false, message: "This application is not pending (already reviewed)." });
     }
 
+    // Store is provisioned at signup time; open it and unblock the pending seller employee.
+    const storeId = application.store_id;
+    const store = storeId
+      ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { new: true })
+      : null;
+    await Employee.findOneAndUpdate(
+      { email: application.email },
+      { seller_pending: false, status: "active", ...(store ? { storeId: store._id } : {}) }
+    );
+
     // Provision store + seller account exactly once (password from request)
     const existingUser = await User.findOne({ email: application.email }).select("_id storeId status").lean();
     if (existingUser) {
-      const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
-      const store =
-        existingUser.storeId
-          ? await Store.findById(existingUser.storeId)
+      let openStore = store;
+      if (!openStore) {
+        const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
+        openStore = existingUser.storeId
+          ? await Store.findByIdAndUpdate(existingUser.storeId, { store_status: "open" }, { new: true })
           : await Store.create({
               store_name: storeName0,
               email: application.email,
               phone: application.phone || "",
               store_status: "open",
             });
+      }
       // Activate the account that was blocked at apply time
       await User.updateOne(
         { _id: existingUser._id },
-        { status: "active", emailVerified: true, storeId: store?._id || existingUser.storeId }
+        { status: "active", emailVerified: true, storeId: openStore._id }
       );
       await SellerApplication.updateOne(
         { _id: application._id },
-        { store_id: store?._id || existingUser.storeId || null, user_id: existingUser._id }
+        { store_id: openStore._id, user_id: existingUser._id }
+      );
+      // Resume-flow employees may have been created without a storeId — link them now
+      await Employee.findOneAndUpdate(
+        { email: application.email },
+        { seller_pending: false, status: "active", storeId: openStore._id }
       );
       await notifySeller(
         sendApplicationApprovedEmail,
@@ -297,16 +327,23 @@ const approveRequest = async (req, res) => {
         "Approval",
         application._id
       );
-      return res.json({ success: true, message: "Seller approved and account activated.", data: { storeId: store?._id || null, userId: existingUser._id } });
+      return res.json({ success: true, message: "Seller approved and account activated.", data: { storeId: openStore?._id || null, userId: existingUser._id } });
     }
 
-    const storeName = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
-    const store = await Store.create({
-      store_name: storeName,
-      email: application.email,
-      phone: application.phone || "",
-      store_status: "open",
-    });
+    const openStore = store || (application.store_name
+      ? await Store.create({
+          store_name: application.store_name,
+          email: application.email,
+          phone: application.phone || "",
+          store_status: "open",
+        })
+      : await Store.create({
+          store_name: [application.name, "Store"].filter(Boolean).join(" "),
+          email: application.email,
+          phone: application.phone || "",
+          store_status: "open",
+        }));
+    const storeFinal = openStore;
 
     let username = String(application.username || "").trim();
     const localPart = String(application.email).split("@")[0] || "";
@@ -326,14 +363,19 @@ const approveRequest = async (req, res) => {
       phone: application.phone || "",
       password: application.passwordHash,
       role: "user",
-      storeId: store._id,
+      storeId: storeFinal._id,
       emailVerified: true,
       status: "active",
     });
 
     await SellerApplication.updateOne(
       { _id: application._id },
-      { store_id: store._id, user_id: user._id }
+      { store_id: storeFinal._id, user_id: user._id }
+    );
+
+    await Employee.findOneAndUpdate(
+      { email: application.email },
+      { seller_pending: false, status: "active", storeId: storeFinal._id }
     );
 
     await logActivity({
@@ -354,11 +396,51 @@ const approveRequest = async (req, res) => {
     return res.json({
       success: true,
       message: "Seller approved and store provisioned.",
-      data: { storeId: store._id, userId: user._id },
+      data: { storeId: storeFinal._id, userId: user._id },
     });
   } catch (error) {
     log.error("[super-admin] approve error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to approve application." });
+  }
+};
+
+const requestInfo = async (req, res) => {
+  try {
+    const message = String(req.body?.message || "").trim().slice(0, 2000);
+    if (!message) {
+      return res.status(400).json({ success: false, message: "A message is required." });
+    }
+
+    const application = await SellerApplication.findOneAndUpdate(
+      { _id: req.params.id, status: "pending" },
+      { info_request_message: message, info_requested_at: new Date() },
+      { new: true }
+    );
+    if (!application) {
+      return res
+        .status(409)
+        .json({ success: false, message: "This application is not pending (already reviewed)." });
+    }
+
+    await logActivity({
+      action: `Seller info requested — ${application.name} (reason: ${message.slice(0, 120)})`,
+      actor: req.superAdmin,
+      entityType: "seller_application",
+      entityId: String(application._id),
+      details: { storeName: application.store_name, message: message.slice(0, 500) },
+    });
+
+    await notifySeller(
+      sendApplicationInfoRequestedEmail,
+      { name: application.name, email: application.email, storeName: application.store_name, message },
+      "Info request",
+      application._id
+    );
+
+    return res.json({ success: true, message: "Information request sent to the applicant." });
+  } catch (error) {
+    log.error("[super-admin] request-info error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to send information request." });
   }
 };
 
@@ -382,6 +464,15 @@ const rejectRequest = async (req, res) => {
       return res
         .status(409)
         .json({ success: false, message: "This application is not pending (already reviewed)." });
+    }
+
+    // Close the store created at signup so the seller's panel cannot transact
+    if (application.store_id) {
+      await Store.updateOne({ _id: application.store_id }, { store_status: "closed" });
+      await Employee.findOneAndUpdate(
+        { email: application.email },
+        { seller_pending: true, status: "inactive", storeId: application.store_id }
+      );
     }
 
     const storedReason = reason.slice(0, 500);
@@ -587,6 +678,7 @@ module.exports = {
   getRequest,
   approveRequest,
   rejectRequest,
+  requestInfo,
   // stores
   listStores,
   setStoreStatus,

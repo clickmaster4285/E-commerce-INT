@@ -55,6 +55,18 @@ const authMiddleware = async (req, res, next) => {
     };
     req.userType = userType;
 
+    // Pending sellers can browse the admin panel but cannot change anything.
+    if (userType === "employee" && entity.seller_pending) {
+      const safeMethods = ["GET", "HEAD", "OPTIONS"];
+      if (!safeMethods.includes(String(req.method || "GET").toUpperCase())) {
+        return res.status(403).json({
+          success: false,
+          code: "SELLER_PENDING",
+          message: "Your seller application is pending Super Admin approval. You can view all pages, but changes are locked until it is approved.",
+        });
+      }
+    }
+
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {

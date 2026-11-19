@@ -20,6 +20,36 @@ const sellerApplicationSchema = new mongoose.Schema(
     // Requested store
     store_name: { type: String, required: true, trim: true },
     store_description: { type: String, default: "", trim: true },
+    logo: {
+      img_url: { type: String, default: "" },
+      public_id: { type: String, default: "" },
+    },
+    business_category: { type: String, default: "", trim: true },
+    business_type: {
+      type: String,
+      enum: ["individual", "registered_business"],
+      default: "individual",
+    },
+    country: { type: String, default: "", trim: true },
+    city: { type: String, default: "", trim: true },
+    address: { type: String, default: "", trim: true },
+    zip_code: { type: String, default: "", trim: true },
+    // Verification documents uploaded during store setup (IDs, registration)
+    documents: {
+      type: [
+        {
+          name: { type: String, default: "", trim: true },
+          url: { type: String, default: "", trim: true },
+          public_id: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+    // Seller confirmed store details + submitted documents → unlocks Super Admin approval
+    setup_completed: { type: Boolean, default: false },
+    // Super Admin can ask the seller for more info — shown on the setup page + emailed
+    info_request_message: { type: String, default: "", trim: true },
+    info_requested_at: { type: Date, default: null },
     // Review workflow
     status: {
       type: String,

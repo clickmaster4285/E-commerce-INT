@@ -67,6 +67,33 @@ const setAuthCookies = (res, userId, role) => {
   });
 };
 
+// Seller admin session — same JWTs, type="employee". Pending sellers get this too,
+// so they can open the admin panel read-only until the Super Admin approves them.
+const setEmployeeAuthCookies = (res, employeeId, role) => {
+  const accessToken = jwt.sign(
+    { userId: employeeId, role, type: "employee" },
+    process.env.JWT_SECRET,
+    { expiresIn: `${getUserAccessDays()}d` },
+  );
+  const refreshToken = jwt.sign(
+    { userId: employeeId, role, type: "employee" },
+    process.env.JWT_SECRET,
+    { expiresIn: `${getRefreshTokenDays()}d` },
+  );
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
+  });
+  res.cookie("refreshToken", refreshToken, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+    maxAge: getRefreshTokenDays() * 24 * 60 * 60 * 1000,
+  });
+};
+
 // ==========================================
 // 🔁 ISSUE + SEND OTP (shared)
 // ==========================================
@@ -376,7 +403,37 @@ const verifyEmailVerificationOtp = async (req, res) => {
             .json({ success: false, message: "This phone number is already registered." });
         }
       }
-      const defaultStore = await Store.findOne();
+      const isSeller = !!(pending.storeName && String(pending.storeName).trim().length >= 3);
+
+      const Store = require("../models/Store");
+      const Employee = require("../models/Employee");
+
+      // Seller store is created up-front (closed) and stays read-only until approval.
+      let store = null;
+      if (isSeller) {
+        store = await Store.create({
+          store_name: pending.storeName,
+          tagline: "Welcome to our store",
+          description: pending.storeDescription || "",
+          business_category: pending.businessCategory || "",
+          business_type: pending.businessType || "individual",
+          logo: pending.storeLogoUrl
+            ? { img_url: pending.storeLogoUrl, public_id: "" }
+            : { img_url: "", public_id: "" },
+          email: pending.email,
+          phone: pending.phone || "",
+          country: pending.country || "PK",
+          city: pending.city || "",
+          address: pending.address || "",
+          zip_code: pending.zipCode || "",
+          store_status: "closed",
+          currency: "PKR",
+          tax_rate: 17,
+          weight_unit: "kg",
+        });
+      }
+
+      const defaultStore = isSeller ? null : await Store.findOne();
       const user = await User.create({
         name: pending.name,
         username: pending.username,
@@ -384,27 +441,58 @@ const verifyEmailVerificationOtp = async (req, res) => {
         email: pending.email,
         // ✅ passwordHash pehle se bcrypt-hashed hai — dobara hash nahi karna
         password: pending.passwordHash,
-        storeId: defaultStore?._id,
+        storeId: isSeller ? store._id : defaultStore?._id,
         role: "user",
         emailVerified: true,
         // ✅ Pending Super Admin approval — login blocked until approval
-        status: "blocked",
+        status: isSeller ? "blocked" : "blocked",
       });
-      await PendingRegistration.deleteOne({ _id: pending._id });
 
-      // Seller application queue — Super Admin reviews from here
-      const storeName = `${String(pending.name || "").trim().slice(0, 40) || "New"}'s Store`;
+      // Seller application queue — Super Admin reviews from here (everything supplied at signup)
       const application = await SellerApplication.create({
         name: pending.name,
         email: pending.email,
         phone: pending.phone || "",
         username: pending.username || "",
         passwordHash: pending.passwordHash,
-        store_name: storeName,
-        store_description: "",
+        store_name: isSeller ? pending.storeName : `${String(pending.name || "").trim().slice(0, 40) || "New"}'s Store`,
+        store_description: isSeller ? pending.storeDescription || "" : "",
+        logo: isSeller && pending.storeLogoUrl
+          ? { img_url: pending.storeLogoUrl, public_id: "" }
+          : { img_url: "", public_id: "" },
+        business_category: isSeller ? pending.businessCategory || "" : "",
+        business_type: isSeller ? pending.businessType || "individual" : "individual",
+        country: isSeller ? pending.country || "" : "",
+        city: isSeller ? pending.city || "" : "",
+        address: isSeller ? pending.address || "" : "",
+        zip_code: isSeller ? pending.zipCode || "" : "",
         status: "pending",
         user_id: user._id,
+        store_id: isSeller ? store._id : null,
       });
+
+      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable)
+      let employee = null;
+      if (isSeller) {
+        employee = await Employee.create({
+          name: pending.name,
+          username: pending.username,
+          email: pending.email,
+          phone: pending.phone || "",
+          password: pending.passwordHash,
+          role: "staff",
+          status: "active",
+          storeId: store._id,
+          seller_pending: true,
+        });
+        await SellerApplication.updateOne(
+          { _id: application._id },
+          { user_id: user._id, store_id: store._id }
+        );
+      }
+
+      await PendingRegistration.deleteOne({ _id: pending._id });
+      const storeName = isSeller ? pending.storeName : ((application.store_name) || "Your store");
       // Best-effort — failure must not block signup
       try {
         await sendApplicationReceivedEmail({ name: pending.name, email: pending.email, storeName });
@@ -412,8 +500,12 @@ const verifyEmailVerificationOtp = async (req, res) => {
         console.error("[signup] pending-approval email failed:", emailError.message);
       }
 
-      // Pending approval — do NOT set auth cookies (blocked account)
-      // User must be approved by Super Admin before getting an active session
+      // Pending approval — set user cookies (blocked account) AND a read-only
+      // employee session for the admin panel (all pages accessible, nothing writable).
+      setAuthCookies(res, user._id, user.role);
+      if (employee) {
+        setEmployeeAuthCookies(res, employee._id, employee.role);
+      }
       const io = req.io || getIO();
       await pushGlobalActivity(
         io,

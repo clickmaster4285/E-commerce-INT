@@ -14,7 +14,10 @@ const storeSchema = new mongoose.Schema({
   city: { type: String, default: "" },
   zip_code: { type: String, default: "" },
   address: { type: String, default: "" },
-  
+  description: { type: String, default: "" },
+  business_category: { type: String, default: "" },
+  business_type: { type: String, default: "" },
+
   // Business
   currency: { type: String, default: "PKR" },
   tax_rate: { type: Number, default: 0 },

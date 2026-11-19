@@ -16,6 +16,11 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
+  // Store setup onboarding — freshly verified seller needs to open it without a session
+  if (pathname === '/store-setup') {
+    return NextResponse.next();
+  }
+
   // Admin login — public page
   if (pathname === '/admin/login') {
     return NextResponse.next();

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   User,
@@ -16,20 +15,25 @@ import {
   Loader2,
   AlertCircle,
   ArrowRight,
+  ArrowLeft,
   Truck,
   Store,
   ShoppingBag,
   ShoppingCart,
   Check,
+  Building2,
+  FileText,
+  Globe,
+  MapPin,
+  Building,
 } from "lucide-react";
-import { storeApi } from "@/apis/user/storeApi";
 import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
 import { isValidPhone, normalizePhone, PHONE_MIN, PHONE_MAX } from "@/utils/phoneValidator";
+import { compressImage } from "@/utils/compressImage";
 import OtpVerifyCard from "@/components/user/OtpVerifyCard";
 import LazyGoogleLogin from "@/components/user/LazyGoogleLogin";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { useLocalized } from "@/i18n/localize";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -54,6 +58,44 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 /* Mirrors the backend register rules exactly:
    name required + ≥2, username optional ≥3 and letters/numbers/underscores only,
    phone optional 10–16 digits, email valid, password ≥6 */
+const BUSINESS_CATEGORIES = [
+  "Electronics",
+  "Fashion & Apparel",
+  "Home & Kitchen",
+  "Beauty & Personal Care",
+  "Sports & Outdoors",
+  "Grocery & Food",
+  "Baby & Kids",
+  "Automotive",
+  "Health & Wellness",
+  "Books & Stationery",
+  "Services",
+  "Other",
+];
+
+const COUNTRIES = [
+  "Pakistan",
+  "India",
+  "Bangladesh",
+  "Sri Lanka",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Qatar",
+  "Oman",
+  "Kuwait",
+  "Bahrain",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Germany",
+  "France",
+  "Australia",
+  "Turkey",
+  "Malaysia",
+  "Singapore",
+  "Egypt",
+];
+
 const scorePassword = (pw) => {
   if (!pw) return 0;
   let s = 0;
@@ -67,9 +109,8 @@ const scorePassword = (pw) => {
 export default function SignupPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { nameOf } = useLocalized();
 
-  const [step, setStep] = useState("form"); // form | otp | welcome
+  const [step, setStep] = useState("account"); // account | store | otp | welcome
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -83,13 +124,14 @@ export default function SignupPage() {
   const [generalError, setGeneralError] = useState("");
   const [otpEmail, setOtpEmail] = useState("");
 
-  const { data: store = null } = useQuery({
-    queryKey: ["storeInfo"],
-    queryFn: storeApi.getPublic,
-    staleTime: 5 * 60 * 1000,
-  });
-  const storeName = store?.store_name || "Click Master Store";
-  const storeNameDisplay = nameOf ? nameOf(store, "store_name") : storeName;
+  const [storeName, setStoreName] = useState("");
+  const [storeDescription, setStoreDescription] = useState("");
+  const [businessCategory, setBusinessCategory] = useState("");
+  const [country, setCountry] = useState("Pakistan");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
+  const [zipCode, setZipCode] = useState("");
+  const [storeLogo, setStoreLogo] = useState("");
 
   const inputBase =
     "w-full h-11 rounded-xl bg-[#f5f5f6] border pl-11 text-[14px] text-slate-900 placeholder:text-slate-400 outline-none transition";
@@ -99,6 +141,26 @@ export default function SignupPage() {
         ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-100"
         : "border-[#e5e5e7] focus:border-[#f57224] focus:ring-2 focus:ring-[#f57224]/15"
     }`;
+
+  const pickLogo = async (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    e.target.value = "";
+    if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Logo must be a JPG, PNG or WEBP image.");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image is too large — please pick one under 15MB.");
+      return;
+    }
+    try {
+      const compressed = await compressImage(file, { maxSize: 512, quality: 0.82 });
+      setStoreLogo(compressed);
+    } catch {
+      toast.error("Logo could not be processed. Please try another image.");
+    }
+  };
 
   const renderFieldError = (field) => {
     if (!errors[field]) return null;
@@ -127,14 +189,14 @@ export default function SignupPage() {
       });
     }
     const nextErrors = {};
-    for (const key of ["name", "username", "phone", "email", "password"]) {
+    for (const key of ["name", "username", "phone", "email", "password", "storeName", "storeDescription", "businessCategory", "country", "city", "address", "zipCode"]) {
       if (fieldErrors[key]) nextErrors[key] = String(fieldErrors[key]);
     }
     setErrors((prev) => ({ ...prev, ...nextErrors }));
     setGeneralError(Object.keys(nextErrors).length === 0 && message ? message : "");
   };
 
-  const validate = () => {
+  const validateAccount = () => {
     const next = {};
     if (!name.trim() || name.trim().length < 2) next.name = t("auth.signup.nameRequired");
     if (username.trim() && !/^[A-Za-z0-9_]{3,30}$/.test(username.trim())) {
@@ -153,6 +215,29 @@ export default function SignupPage() {
     return next;
   };
 
+  const validateStore = () => {
+    const next = {};
+    if (!storeName.trim()) next.storeName = "Please enter your store name.";
+    if (!storeDescription.trim() || storeDescription.trim().length < 10) next.storeDescription = "Please describe your store (at least 10 characters).";
+    if (!businessCategory) next.businessCategory = "Please select a business category.";
+    if (!country) next.country = "Please select a country.";
+    if (!city.trim() || city.trim().length < 2) next.city = "Please enter your city.";
+    if (!address.trim() || address.trim().length < 5) next.address = "Please enter a complete store address.";
+    return next;
+  };
+
+  const validate = () => ({ ...validateAccount(), ...validateStore() });
+
+  const handleNext = () => {
+    const nextErrors = validateAccount();
+    setErrors(nextErrors);
+    setGeneralError("");
+    if (Object.keys(nextErrors).length > 0) return;
+    setErrors({});
+    setStep("store");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     const nextErrors = validate();
@@ -167,9 +252,26 @@ export default function SignupPage() {
         phone,
         email: email.trim().toLowerCase(),
         password,
+        wantsStore: true,
+        storeName: storeName.trim(),
+        storeDescription: storeDescription.trim(),
+        businessCategory,
+        country,
+        city: city.trim(),
+        address: address.trim(),
+        zipCode: zipCode.trim(),
+        ...(storeLogo ? { storeLogo } : {}),
       });
-        const target = res?.email || email.trim().toLowerCase();
-        if (!res?.delivered) {
+        if (res?.pendingApproval) {
+          // Same email + password as the pending application → welcome, then /admin (read-only)
+          setPendingApproval(true);
+          setWelcomeTarget("/admin");
+          setStep("welcome");
+          setLoading(false);
+          return;
+        }
+      const target = res?.email || email.trim().toLowerCase();
+      if (!res?.delivered) {
           setGeneralError(res?.message || "Verification code could not be sent. Please try again later.");
           setLoading(false);
           return;
@@ -180,6 +282,12 @@ export default function SignupPage() {
       setLoading(false);
     } catch (err) {
       const data = err?.response?.data || {};
+      if (data?.code === "SELLER_PENDING") {
+        // Yeh email pehle se apply kar chuka hai — application status page par bhej do
+        toast.info(data?.message || "Your application is already under review.");
+        window.location.assign(`/pending-approval?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+        return;
+      }
       if (data.requireVerification || data.needsVerification) {
         setOtpEmail(data.email || email.trim().toLowerCase());
         setStep("otp");
@@ -204,14 +312,19 @@ export default function SignupPage() {
     }
   };
 
+  const [welcomeTarget, setWelcomeTarget] = useState("/");
+  const [pendingApproval, setPendingApproval] = useState(false);
+
   const handleVerify = async (otp) => {
     const res = await authApi.verifyEmailOtp(otpEmail, otp);
 
     if (res?.pendingApproval) {
-      window.location.assign(`/pending-approval?email=${encodeURIComponent(otpEmail)}`);
-      return;
+      // Seller signed up — send them into the admin panel (read-only until approval)
+      setPendingApproval(true);
+      setWelcomeTarget("/admin");
+    } else {
+      setWelcomeTarget("/");
     }
-
     setStep("welcome");
   };
 
@@ -223,88 +336,146 @@ export default function SignupPage() {
   useEffect(() => {
     if (step !== "welcome") return undefined;
     const id = window.setTimeout(() => {
-      window.location.assign("/");
+      window.location.assign(welcomeTarget);
     }, 2800);
     return () => window.clearTimeout(id);
-  }, [step]);
+  }, [step, welcomeTarget]);
 
   /* ═══════════ WELCOME / REDIRECTING OVERLAY ═══════════ */
   if (step === "welcome") {
+    const title = pendingApproval ? t("auth.signup.pendingTitle") : t("auth.signup.successTitle");
+    const subtitle = pendingApproval ? t("auth.signup.pendingSubtitle") : t("auth.signup.successSubtitle");
     return (
       <main
         role="dialog"
         aria-modal="true"
-        aria-label={t("auth.signup.successTitle")}
-        className="user-theme fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#05070b] px-6 text-center"
+        aria-label={title}
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden bg-[#070b12] px-6 text-center text-white"
       >
+        {/* Ambient background */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,106,31,0.16)_0%,transparent_60%)]"
+          className="pointer-events-none absolute inset-0"
+          style={{ background: "radial-gradient(ellipse 90% 60% at 50% 42%, rgba(245,114,36,0.18) 0%, rgba(245,114,36,0.05) 38%, transparent 70%)" }}
         />
         <div
           aria-hidden="true"
-          className="absolute inset-0"
-          style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.055) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+        />
+        {/* Horizon line accent */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 left-1/2 h-px w-[80%] -translate-x-1/2"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,154,77,0.45), transparent)" }}
         />
 
-        <motion.svg
-          viewBox="0 0 120 120"
-          className="relative h-28 w-28 sm:h-32 sm:w-32"
-          fill="none"
-          aria-hidden="true"
-        >
-          <motion.circle
-            cx="60"
-            cy="60"
-            r="52"
-            stroke="#FF6A1F"
-            strokeWidth="6"
-            strokeLinecap="round"
-            initial={{ pathLength: 0, rotate: -90 }}
-            animate={{ pathLength: 1, rotate: 0 }}
-            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-            style={{ transformOrigin: "center" }}
-          />
-          <motion.path
-            d="M38 62 L54 78 L84 44"
-            stroke="#22C55E"
-            strokeWidth="7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ delay: 0.7, duration: 0.6, ease: "easeOut" }}
-          />
-        </motion.svg>
+        {/* Brand row */}
+        <div className="relative z-10 flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f57224] shadow-[0_8px_24px_rgba(245,114,36,0.35)]">
+            <ShoppingBag size={17} strokeWidth={2.25} className="text-white" aria-hidden="true" />
+          </span>
+          <span className="text-left leading-tight">
+            <span className="block text-[15px] font-extrabold tracking-tight text-white">ClickMaster</span>
+            <span className="block text-[8px] font-bold uppercase tracking-[0.22em] text-[#ff9a4d]">Marketplace</span>
+          </span>
+        </div>
+
+        {/* Success emblem — layered glow */}
+        <div className="relative z-10 mt-8 flex items-center justify-center" aria-hidden="true">
+          <span className="absolute h-36 w-36 rounded-full bg-emerald-400/[0.07] blur-2xl" />
+          <span className="absolute h-28 w-28 rounded-full border border-emerald-400/15" />
+          <span className="absolute h-24 w-24 rounded-full border border-emerald-400/25" />
+          <motion.svg viewBox="0 0 96 96" className="relative h-24 w-24" fill="none">
+            <motion.circle
+              cx="48"
+              cy="48"
+              r="42"
+              stroke="#34d399"
+              strokeOpacity="0.9"
+              strokeWidth="4"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, rotate: -90 }}
+              animate={{ pathLength: 1, rotate: 0 }}
+              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+              style={{ transformOrigin: "center" }}
+            />
+            <motion.path
+              d="M31 50 L43 62 L67 38"
+              stroke="#34d399"
+              strokeWidth="5.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ delay: 0.65, duration: 0.55, ease: "easeOut" }}
+            />
+          </motion.svg>
+        </div>
+
+        {/* Status chip */}
+        {pendingApproval ? (
+          <motion.span
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, duration: 0.4 }}
+            className="relative z-10 mt-6 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 py-1 pl-1.5 pr-4 text-[10px] font-bold uppercase tracking-[0.22em] text-amber-300"
+          >
+            <ShieldCheck size={12} aria-hidden="true" />
+            Pending approval
+          </motion.span>
+        ) : null}
 
         <motion.h1
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9, duration: 0.5, ease: "easeOut" }}
-          className="relative mt-8 max-w-xl text-3xl font-black leading-tight text-white sm:text-4xl"
+          transition={{ delay: 0.45, duration: 0.5, ease: "easeOut" }}
+          className="relative z-10 mt-4 max-w-2xl text-balance text-[28px] font-extrabold leading-[1.15] tracking-tight text-white sm:text-4xl"
         >
-          {t("auth.signup.successTitle")}
+          {title}
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.05, duration: 0.5, ease: "easeOut" }}
-          className="relative mt-3 max-w-md text-sm leading-6 text-white/70 sm:text-base"
+          transition={{ delay: 0.6, duration: 0.5, ease: "easeOut" }}
+          className="relative z-10 mt-3 max-w-md text-[13.5px] leading-6 text-slate-400"
         >
-          {t("auth.signup.successSubtitle")}
+          {subtitle}
         </motion.p>
 
-        <div className="relative mt-8 h-1.5 w-56 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+        {/* What happens next — seller flow */}
+        {pendingApproval ? (
           <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-[#FF6A1F] to-[#FFB25E]"
-            initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ delay: 0.4, duration: 2.1, ease: "easeInOut" }}
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.75, duration: 0.5, ease: "easeOut" }}
+            className="relative z-10 mt-6 flex flex-col items-center gap-2 rounded-2xl border border-white/[0.07] bg-white/[0.04] px-6 py-4"
+          >
+            <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-slate-500">What happens next</p>
+            <p className="max-w-[420px] text-[12px] leading-5 text-slate-300">
+              Your store is submitted for review. Until the Super Admin approves it, the admin panel is
+              <span className="font-semibold text-white"> view-only</span> — you can browse every page but cannot change anything.
+            </p>
+          </motion.div>
+        ) : null}
+
+        {/* Progress */}
+        <div className="relative z-10 mt-8 flex h-1 w-56 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+          <motion.div
+            className="h-full w-full rounded-full bg-gradient-to-r from-[#FF6A1F] via-[#FFB25E] to-[#FF6A1F]"
+            initial={{ x: "-100%" }}
+            animate={{ x: "100%" }}
+            transition={{ delay: 0.3, duration: 1.6, ease: "easeInOut", repeat: Infinity }}
+            style={{ width: "55%" }}
           />
         </div>
-        <p className="relative mt-4 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-orange-200/80">
-          <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-          {t("auth.signup.redirecting")}
+        <p className="relative z-10 mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">
+          <Loader2 size={12} className="animate-spin text-[#ff9a4d]" aria-hidden="true" />
+          Opening your {pendingApproval ? "admin panel" : "marketplace"}…
+        </p>
+        <p className="relative z-10 mt-6 flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.28em] text-slate-700">
+          <ShieldCheck size={11} aria-hidden="true" />
+          Secure · ClickMaster Marketplace
         </p>
       </main>
     );
@@ -419,12 +590,43 @@ export default function SignupPage() {
           {/* Card header */}
           <div className="text-center">
             <h2 className="text-[23px] font-semibold leading-tight tracking-[-0.01em] text-slate-900">
-              Create your account
+              {step === "store" ? "Tell us about your store" : "Create your account"}
             </h2>
-            <p className="mt-1.5 text-[12.5px] leading-5 text-slate-500">
-              Join the marketplace in a few simple steps.
+            <p className="mt-1 text-[12.5px] leading-5 text-slate-500">
+              {step === "store" ? "This takes under a minute." : "Join the marketplace in two quick steps."}
             </p>
           </div>
+
+          {/* Step indicator */}
+          {(step === "account" || step === "store") && (
+            <ol className="mt-4 flex items-center justify-center gap-2" aria-label="Signup progress">
+              {[
+                { n: 1, label: "Account", active: step === "account", done: step === "store" },
+                { n: 2, label: "Your store", active: step === "store", done: false },
+              ].map((s, i) => (
+                <li key={s.n} className="flex items-center gap-2">
+                  {i > 0 && <span aria-hidden="true" className={`h-px w-8 sm:w-12 transition-colors ${step === "store" ? "bg-[#f57224]" : "bg-slate-200"}`} />}
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[10.5px] font-extrabold transition-colors ${
+                        s.done
+                          ? "bg-[#f57224] text-white"
+                          : s.active
+                            ? "bg-[#f57224] text-white shadow-[0_0_0_4px_rgba(245,114,36,0.18)]"
+                            : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {s.done ? <Check size={13} strokeWidth={3} /> : s.n}
+                    </span>
+                    <span className={`text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${s.active || s.done ? "text-slate-800" : "text-slate-400"}`}>
+                      {s.label}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
 
           {generalError && (
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
@@ -441,15 +643,15 @@ export default function SignupPage() {
                 title={t("auth.signup.title")}
                 onVerify={handleVerify}
                 onResend={handleResend}
-                onBack={() => setStep("form")}
+                onBack={() => setStep("account")}
                 backLabel={t("auth.signup.title")}
               />
             </div>
           )}
 
-          {/* ═══ STEP: FORM ═══ */}
-          {step === "form" && (
-            <form onSubmit={handleSubmit} className="mt-3 space-y-2" noValidate>
+          {/* ═══ STEP 1: ACCOUNT ═══ */}
+          {step === "account" && (
+            <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="mt-3 space-y-2" noValidate>
               {/* Name */}
               <div>
                 <label htmlFor="su-name" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Full name</label>
@@ -504,12 +706,14 @@ export default function SignupPage() {
                     maxLength={PHONE_MAX}
                     value={phone}
                     onChange={(e) => { setPhone(normalizePhone(e.target.value)); setErrors((p) => ({ ...p, phone: "" })); }}
-                    placeholder={t("auth.login.phoneNumber")}
+                    placeholder="0300 1234567"
                     aria-label={t("auth.login.phoneNumber")}
                     className={`${fieldCls("phone")} !pl-11`}
                   />
                 </div>
-                {renderFieldError("phone")}
+                {renderFieldError("phone") || (
+                  <p className="mt-1 px-1 text-[10px] font-medium text-slate-400">Digits only, 10–16 characters — used for delivery and order updates.</p>
+                )}
               </div>
 
               {/* Email */}
@@ -606,26 +810,215 @@ export default function SignupPage() {
                 {renderFieldError("confirmPassword")}
               </div>
 
-              {/* Submit */}
+              {/* Next */}
               <button
                 type="submit"
-                disabled={loading}
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-extrabold text-white transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f57224] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-extrabold text-white transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f57224]"
                 style={{ background: "linear-gradient(180deg,#ff8a3d 0%,#f57224 55%,#e2641b 100%)" }}
               >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-                    {t("auth.signup.signingUp")}
-                  </>
-                ) : (
-                  <>
-                    {t("auth.login.createAccount")}
-                    <ArrowRight size={16} aria-hidden="true" />
-                  </>
-                )}
+                Next
+                <ArrowRight size={16} aria-hidden="true" />
               </button>
+            </form>
+          )}
 
+          {/* ═══ STEP 2: YOUR STORE ═══ */}
+          {step === "store" && (
+            <form onSubmit={handleSubmit} className="mt-3 space-y-2" noValidate>
+
+              {/* Store name */}
+              <div>
+                <label htmlFor="su-store-name" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Store name</label>
+                <div className="relative">
+                  <Store size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                  <input
+                    id="su-store-name"
+                    type="text"
+                    autoComplete="organization"
+                    value={storeName}
+                    onChange={(e) => { setStoreName(e.target.value); setErrors((p) => ({ ...p, storeName: "" })); }}
+                    placeholder="e.g. Ahmed Electronics"
+                    className={`${fieldCls("storeName")} !pl-11`}
+                  />
+                </div>
+                {renderFieldError("storeName")}
+              </div>
+
+              {/* Store description */}
+              <div>
+                <label htmlFor="su-store-desc" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">What will you sell?</label>
+                <div className="relative">
+                  <FileText size={15} className="pointer-events-none absolute left-3.5 top-4 text-slate-400" aria-hidden="true" />
+                  <textarea
+                    id="su-store-desc"
+                    rows={2}
+                    maxLength={2000}
+                    value={storeDescription}
+                    onChange={(e) => { setStoreDescription(e.target.value); setErrors((p) => ({ ...p, storeDescription: "" })); }}
+                    placeholder="Brief description of your store (at least 10 characters)"
+                    className={`${fieldCls("storeDescription")} !pl-11 !h-auto py-3`}
+                  />
+                </div>
+                {renderFieldError("storeDescription")}
+              </div>
+
+              {/* Category */}
+              <div>
+                <label htmlFor="su-business-category" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Category</label>
+                <div className="relative">
+                  <Building size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                  <select
+                    id="su-business-category"
+                    value={businessCategory}
+                    onChange={(e) => { setBusinessCategory(e.target.value); setErrors((p) => ({ ...p, businessCategory: "" })); }}
+                    className={`${fieldCls("businessCategory")} appearance-none !pl-11`}
+                  >
+                    <option value="">Select category</option>
+                    {BUSINESS_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                {renderFieldError("businessCategory")}
+              </div>
+
+              {/* Country + city + zip */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="su-country" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Country</label>
+                  <div className="relative">
+                    <Globe size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <select
+                      id="su-country"
+                      value={country}
+                      onChange={(e) => { setCountry(e.target.value); setErrors((p) => ({ ...p, country: "" })); }}
+                      className={`${fieldCls("country")} appearance-none !pl-11`}
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {renderFieldError("country")}
+                </div>
+                <div className="grid grid-cols-[1fr_92px] gap-2">
+                  <div>
+                    <label htmlFor="su-city" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">City</label>
+                    <div className="relative">
+                      <MapPin size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                      <input
+                        id="su-city"
+                        type="text"
+                        value={city}
+                        onChange={(e) => { setCity(e.target.value); setErrors((p) => ({ ...p, city: "" })); }}
+                        placeholder="Lahore"
+                        className={`${fieldCls("city")} !pl-11`}
+                      />
+                    </div>
+                    {renderFieldError("city")}
+                  </div>
+                  <div>
+                    <label htmlFor="su-zip" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">ZIP</label>
+                    <input
+                      id="su-zip"
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={20}
+                      value={zipCode}
+                      onChange={(e) => setZipCode(e.target.value)}
+                      placeholder="54000"
+                      className={fieldCls("zipCode")}
+                      style={{ paddingLeft: "0.75rem" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label htmlFor="su-address" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Store address</label>
+                <div className="relative">
+                  <MapPin size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                  <input
+                    id="su-address"
+                    type="text"
+                    autoComplete="street-address"
+                    value={address}
+                    onChange={(e) => { setAddress(e.target.value); setErrors((p) => ({ ...p, address: "" })); }}
+                    placeholder="Street, area, Lahore"
+                    className={`${fieldCls("address")} !pl-11`}
+                  />
+                </div>
+                {renderFieldError("address")}
+              </div>
+
+              {/* Store logo (optional) */}
+              <div>
+                <span className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Store logo <span className="font-medium text-slate-400">(optional)</span></span>
+                <div className="flex items-center gap-3">
+                  <div
+                    aria-hidden="true"
+                    className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5e5e7] bg-[#f5f5f6] text-slate-400"
+                  >
+                    {storeLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={storeLogo} alt="Store logo preview" className="h-full w-full object-contain" />
+                    ) : (
+                      <Building2 size={20} />
+                    )}
+                  </div>
+                  <div className="flex flex-col items-start gap-1">
+                    <label
+                      htmlFor="su-store-logo"
+                      className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#e5e5e7] bg-white px-3 text-[12px] font-bold text-slate-700 transition hover:border-[#f57224] hover:text-[#e2641b]"
+                    >
+                      {storeLogo ? "Change logo" : "Upload logo"}
+                    </label>
+                    <p className="text-[9.5px] text-slate-400">JPG, PNG or WEBP — any size, we optimize it</p>
+                    {storeLogo && (
+                      <button type="button" onClick={() => setStoreLogo("")} className="text-[10px] font-bold text-red-500 hover:underline">
+                        Remove logo
+                      </button>
+                    )}
+                  </div>
+                  <input id="su-store-logo" type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={pickLogo} className="sr-only" />
+                </div>
+              </div>
+
+              {/* Back + Create account */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setStep("account"); setErrors({}); setGeneralError(""); }}
+                  className="flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#e5e5e7] bg-white px-4 text-[13px] font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                >
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-[14px] font-extrabold text-white transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f57224] disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{ background: "linear-gradient(180deg,#ff8a3d 0%,#f57224 55%,#e2641b 100%)" }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                      {t("auth.signup.signingUp")}
+                    </>
+                  ) : (
+                    <>
+                      {t("auth.login.createAccount")}
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {(step === "account" || step === "store") && (
+            <div className="mt-3 space-y-2">
               {/* Divider */}
               <div className="flex items-center gap-2.5 py-0.5" aria-hidden="true">
                 <span className="h-px flex-1 bg-slate-200" />
@@ -666,8 +1059,7 @@ export default function SignupPage() {
                   Sign in
                 </button>
               </p>
-            </form>
-
+            </div>
           )}
         </div>
       </div>

@@ -18,6 +18,7 @@ const BASE_LAYOUT = readTemplate("baseLayout.html");
 const PENDING_BODY = readTemplate("sellerPending.html");
 const APPROVED_BODY = readTemplate("sellerApproved.html");
 const REJECTED_BODY = readTemplate("sellerRejected.html");
+const INFO_REQUEST_BODY = readTemplate("sellerInfoRequest.html");
 
 const escapeHtml = (value) =>
   String(value || "").replace(/[&<>"']/g, (ch) => ({
@@ -105,6 +106,27 @@ const sendApplicationApprovedEmail = async ({ name, email, storeName }) => {
   });
 };
 
+const sendApplicationInfoRequestedEmail = async ({ name, email, storeName, message }) => {
+  const setupUrl = `${frontendBase()}/store-setup?email=${encodeURIComponent(email)}`;
+  const vars = baseVars({
+    NAME: escapeHtml(name),
+    STORENAME: escapeHtml(storeName),
+    EMAIL: escapeHtml(email),
+    MESSAGE: escapeHtml(message),
+    SETUP_URL: escapeHtml(setupUrl),
+  });
+  const html = render(INFO_REQUEST_BODY, vars);
+  const text = `Hi ${name}, our team reviewed your application for ${storeName} and needs more information: ${message}\n\nUpdate your application: ${setupUrl}`;
+  return sendWithRetry({
+    to: email,
+    subject: `We need more information — your seller application for ${storeName}`,
+    html,
+    text,
+    action: "Seller info requested",
+    entityId: email,
+  });
+};
+
 const sendApplicationRejectedEmail = async ({ name, email, storeName, reason }) => {
   const vars = baseVars({
     NAME: escapeHtml(name),
@@ -129,6 +151,7 @@ module.exports = {
   sendApplicationReceivedEmail,
   sendApplicationApprovedEmail,
   sendApplicationRejectedEmail,
+  sendApplicationInfoRequestedEmail,
   templatesAvailable: true,
   smtpConfigured: () => isSmtpConfigured(),
 };

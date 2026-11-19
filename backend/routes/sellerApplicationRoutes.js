@@ -9,6 +9,9 @@ const router = express.Router();
 // Public — apply + lightweight status lookup by email
 router.post("/apply", limiters.sellerApply, sellerApplicationController.sellerApply);
 router.get("/apply/status", sellerApplicationController.sellerApplyStatus);
+// Public — store setup (details confirmation + verification documents) keyed by email
+router.get("/apply/setup", sellerApplicationController.sellerSetupState);
+router.post("/apply/complete-setup", limiters.sellerApply, sellerApplicationController.completeSetup);
 
 // Signed-in applicant — where does MY application stand? (pending must be able to see this)
 router.get("/status", authMiddleware, sellerApplicationController.sellerStatusMe);
