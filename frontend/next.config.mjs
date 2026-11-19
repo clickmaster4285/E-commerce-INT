@@ -33,6 +33,10 @@ const nextConfig = {
     '192.168.88.35',
     'localhost',
     '127.0.0.1',
+    // Multi-tenant dev: nip.io root + har store subdomain + hosts-file custom domains (*.test)
+    '192.168.88.35.nip.io',
+    '*.192.168.88.35.nip.io',
+    '*.test',
   ],
 
   turbopack: {

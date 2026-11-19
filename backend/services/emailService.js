@@ -36,8 +36,8 @@ const frontendBase = () => String(process.env.CLIENT_URL || "").replace(/\/+$/, 
 
 const baseVars = (extra = {}) => ({
   YEAR: new Date().getFullYear(),
-  STORE_NAME: escapeHtml(process.env.DEFAULT_STORE_NAME || "Click Master Store"),
-  SUPPORT_EMAIL: escapeHtml(process.env.DEFAULT_STORE_SUPPORT_EMAIL || "hello@clickmasterstore.pk"),
+  STORE_NAME: escapeHtml(process.env.PLATFORM_NAME || "Click Master Store"),
+  SUPPORT_EMAIL: escapeHtml(process.env.PLATFORM_SUPPORT_EMAIL || "hello@clickmasterstore.pk"),
   ...extra,
 });
 
@@ -79,7 +79,7 @@ const sendApplicationReceivedEmail = async ({ name, email, storeName }) => {
   const text = `Hi ${name}, we've received your seller application for ${storeName}. Our team will review it and email you once a decision is made. Status: ${frontendBase()}/seller/status`;
   return sendWithRetry({
     to: email,
-    subject: `Your seller application is under review — ${process.env.DEFAULT_STORE_NAME || "Click Master Store"}`,
+    subject: `Your seller application is under review — ${process.env.PLATFORM_NAME || "Click Master Store"}`,
     html,
     text,
     action: "Seller application received",
@@ -139,7 +139,7 @@ const sendApplicationRejectedEmail = async ({ name, email, storeName, reason }) 
   const text = `Hi ${name}, we're sorry — your seller application for ${storeName} was not approved. Reason: ${reason || "Not provided"}. You may reapply at ${frontendBase()}/seller/apply`;
   return sendWithRetry({
     to: email,
-    subject: `Update regarding your seller application — ${process.env.DEFAULT_STORE_NAME || "Click Master Store"}`,
+    subject: `Update regarding your seller application — ${process.env.PLATFORM_NAME || "Click Master Store"}`,
     html,
     text,
     action: "Seller application rejected",

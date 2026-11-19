@@ -10,6 +10,7 @@ import Link from 'next/link';
 import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { disconnectSidebarSocket } from "./Sidebar";
 import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
@@ -20,7 +21,7 @@ let navbarSocket = null;
 function getNavbarSocket() {
   if (navbarSocket && navbarSocket.connected) return navbarSocket;
 
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
 
   navbarSocket = io(SOCKET_URL, {
     withCredentials: true,

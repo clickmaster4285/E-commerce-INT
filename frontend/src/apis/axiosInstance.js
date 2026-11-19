@@ -1,6 +1,7 @@
 import axios from "axios";
 import { toast } from "sonner";
 import { notifySellerPendingLocked } from "@/apis/sellerPendingToast";
+import { alignBackendUrl } from "@/lib/tenantHost";
 
 // ==========================================================
 // API BASE URL — single source of truth (frontend/.env driven)
@@ -28,29 +29,12 @@ if (!API_BASE_URL && typeof window !== "undefined") {
   );
 }
 
-const isLocalNetworkHost = (hostname) =>
-  hostname === "localhost" ||
-  hostname === "127.0.0.1" ||
-  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
-  /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
-  /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname);
-
-const getBaseURL = () => {
-  if (!API_BASE_URL || typeof window === "undefined") return API_BASE_URL;
-  try {
-    const apiUrl = new URL(API_BASE_URL);
-    const pageHost = window.location.hostname;
-    // Keep local development frontend and API on the same hostname. This makes
-    // localhost:3000 use localhost:5000 and LAN access use the same LAN IP,
-    // so the browser can send the HttpOnly auth cookies to both apps.
-    if (isLocalNetworkHost(apiUrl.hostname) && isLocalNetworkHost(pageHost)) {
-      apiUrl.hostname = pageHost;
-    }
-    return apiUrl.toString().replace(/\/+$/, "");
-  } catch {
-    return API_BASE_URL;
-  }
-};
+// Local development: API ko PAGE ke hostname par call karo (sirf port alag).
+// localhost:3000 → localhost:5000, 192.168.88.35:3000 → 192.168.88.35:5000,
+// alistore.192.168.88.35.nip.io:3000 → alistore.192.168.88.35.nip.io:5000
+// Is se HttpOnly auth cookies dono apps ko jaati hain aur backend Host se
+// store pehchanta hai. Logic: src/lib/tenantHost.js → alignBackendUrl
+const getBaseURL = () => alignBackendUrl(API_BASE_URL);
 
 const PUBLIC_AUTH_PATHS = [
   "/users/login",

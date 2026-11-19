@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
 import { slugKey } from "@/utils/slugKey";
@@ -184,7 +185,7 @@ const allMenuItems = [
 let sidebarSocket = null;
 
 function getSidebarSocket() {
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
 
   if (sidebarSocket) return sidebarSocket;
 

@@ -16,11 +16,11 @@ const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
 const log = require("./utils/logger");
 const User = require("./models/User");
-const Employee = require("./models/Employee");
-const Store = require("./models/Store");
 const ChatConversation = require("./models/ChatConversation");
 const SuperAdmin = require("./models/SuperAdmin");
 const { initSocket } = require("./utils/socket");
+const { resolveStore, resolveStoreByHost } = require("./middleware/resolveStore");
+const { isPlatformFamilyHost, ROOT_DOMAIN } = require("./utils/tenantHost");
 
 // ✅ Seed script ko import karein (Data yahan nahi, wahan rahega)
 const { seedAttributes } = require("./scripts/seedAttributes");
@@ -83,7 +83,6 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR;
 const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR;
 const BUNDLE_UPLOAD_SUBDIR = process.env.BUNDLE_UPLOAD_SUBDIR;
 const REVIEW_UPLOAD_SUBDIR = process.env.REVIEW_UPLOAD_SUBDIR;
-const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE;
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 
 // ==========================================
@@ -121,7 +120,15 @@ app.use(cors({
         if (isPrivate) return callback(null, true);
       } catch (error) { return callback(new Error("Invalid request origin")); }
     }
-    return callback(new Error("Not allowed by CORS"));
+
+    // Multi-tenant: platform root + uske saare store subdomains
+    // (dev: *.192.168.88.35.nip.io, prod: *.eccomerce.com) + registered custom domains
+    let originHost;
+    try { originHost = new URL(origin).hostname; } catch (error) { return callback(new Error("Invalid request origin")); }
+    if (isPlatformFamilyHost(originHost)) return callback(null, true);
+    return resolveStoreByHost(originHost)
+      .then(({ store }) => (store ? callback(null, true) : callback(new Error("Not allowed by CORS"))))
+      .catch(() => callback(new Error("Not allowed by CORS")));
   },
   credentials: true,
 }));
@@ -142,6 +149,8 @@ app.use(
 app.use(express.json({ limit: REQUEST_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: REQUEST_SIZE_LIMIT }));
 app.use(cookieParser());
+// Multi-tenant: Host header → req.tenant / req.store (block nahi karta)
+app.use(API_PREFIX, resolveStore);
 
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
@@ -266,62 +275,11 @@ const createUploadDirectories = () => {
 
 const seedDefaultData = async () => {
   try {
-    // 1. Store Seed
-    const storeName = process.env.DEFAULT_STORE_NAME;
-    if (storeName) {
-      let defaultStore = await Store.findOne({ store_name: storeName });
-      if (!defaultStore) {
-        await Store.create({
-          store_name: storeName,
-          tagline: process.env.DEFAULT_STORE_TAGLINE,
-          email: process.env.DEFAULT_STORE_EMAIL,
-          phone: process.env.DEFAULT_STORE_PHONE,
-          support_email: process.env.DEFAULT_STORE_SUPPORT_EMAIL,
-          support_phone: process.env.DEFAULT_STORE_SUPPORT_PHONE,
-          country: process.env.DEFAULT_STORE_COUNTRY,
-          state: process.env.DEFAULT_STORE_STATE,
-          city: process.env.DEFAULT_STORE_CITY,
-          zip_code: process.env.DEFAULT_STORE_ZIP_CODE,
-          address: process.env.DEFAULT_STORE_ADDRESS,
-          currency: process.env.DEFAULT_STORE_CURRENCY,
-          tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE),
-          weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
-          store_status: process.env.DEFAULT_STORE_STATUS,
-        });
-        log.info("✅ Default Store Created");
-      }
+    // Default store / store-admin auto-seed HATA diya gaya hai (multi-tenant):
+    // stores sirf seller signup se bante hain (Super Admin approval ke baad).
+    // Startup par sirf Super Admin + attributes seed hote hain.
 
-      // 2. Admin Seed (Employees collection only)
-      const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
-      const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
-      if (adminEmail && adminPassword) {
-        let admin = await Employee.findOne({ email: adminEmail });
-        if (!admin) {
-          const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
-          const adminPermissions = {
-            products: true, brands: true, categories: true,
-            users: true, orders: true, settings: true,
-            profile: true, employees: true, discounts: true,
-            deals: true, bundles: true, store: true, banners: true,
-            manageStock: true, shipping: true, order: true, attribute: true,
-            vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
-          };
-          await Employee.create({
-            name: process.env.DEFAULT_ADMIN_NAME,
-            username: process.env.DEFAULT_ADMIN_USERNAME,
-            email: adminEmail,
-            password: hashedPassword,
-            role: DEFAULT_ADMIN_ROLE,
-            status: "active",
-            storeId: defaultStore?._id || null,
-            permissions: adminPermissions,
-          });
-          log.info("✅ Default Admin Employee Created (employees collection)");
-        }
-      }
-    }
-
-    // 4. Super Admin Seed (development convenience; production requires a strong password)
+    // 1. Super Admin Seed (development convenience; production requires a strong password)
     const saEmail = process.env.SUPER_ADMIN_EMAIL;
     const saPassword = process.env.SUPER_ADMIN_PASSWORD;
     if (saEmail && saPassword) {
@@ -354,7 +312,7 @@ const seedDefaultData = async () => {
     } else {
       log.warn("[superadmin] SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD not set; /super-admin will be unavailable.");
     }
-    // 5. Attributes Auto-Seed
+    // 2. Attributes Auto-Seed
     await seedAttributes();
 
   } catch (error) {
@@ -409,6 +367,9 @@ const startServer = async () => {
         for (const ip of localIPv4s) console.log(`📡 Network: http://${ip}:${PORT}${apiPath}`);
       }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
+      if (ROOT_DOMAIN) {
+        console.log(`🏬 Platform: http://${ROOT_DOMAIN}:3000  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}:3000`);
+      }
     });
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi

@@ -2,6 +2,9 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const log = require("./logger");
+const { isPlatformFamilyHost } = require("./tenantHost");
+// Lazy: middleware/resolveStore → models/Store; circular require se bachne ke liye function ke andar
+const resolveStoreByHost = (host) => require("../middleware/resolveStore").resolveStoreByHost(host);
 
 let io = null;
 
@@ -206,7 +209,13 @@ const initSocket = (server) => {
         if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$/.test(origin)) {
           return callback(null, true);
         }
-        callback(new Error("CORS not allowed"));
+        // Multi-tenant: *.<ROOT_DOMAIN> store subdomains + registered custom domains
+        let originHost;
+        try { originHost = new URL(origin).hostname; } catch { return callback(new Error("CORS not allowed")); }
+        if (isPlatformFamilyHost(originHost)) return callback(null, true);
+        resolveStoreByHost(originHost)
+          .then(({ store }) => (store ? callback(null, true) : callback(new Error("CORS not allowed"))))
+          .catch(() => callback(new Error("CORS not allowed")));
       },
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],

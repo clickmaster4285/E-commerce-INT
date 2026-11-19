@@ -139,7 +139,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
   }
 
   const { user, from } = getSmtpConfig();
-  const storeName = trimEnv(process.env.DEFAULT_STORE_NAME);
+  const storeName = trimEnv(process.env.PLATFORM_NAME);
   // ✅ "Name <email>" format — Gmail/spam filter ke liye behtar
   const fromAddress = from || user;
   const fromHeader = /</.test(fromAddress)
@@ -174,7 +174,7 @@ const PURPOSE_COPY = {
 
 const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresInMinutes }) => {
   const copy = PURPOSE_COPY[purpose] || PURPOSE_COPY.email_verification;
-  const storeName = process.env.DEFAULT_STORE_NAME;
+  const storeName = process.env.PLATFORM_NAME;
   const safeStore = escapeHtml(storeName);
   const safeOtp = escapeHtml(otp);
 
