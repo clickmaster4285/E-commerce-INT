@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const categoryAttributeSchema = new mongoose.Schema(
   {
@@ -96,7 +97,7 @@ const categorySchema = new mongoose.Schema(
 
 // ✅ UPDATED: Index no longer requires tenant_id for uniqueness (Global Code Uniqueness)
 categorySchema.index(
-  { category_code: 1, is_deleted: 1 },
+  { storeId: 1, category_code: 1, is_deleted: 1 },
   { unique: true }
 );
 
@@ -106,5 +107,9 @@ categorySchema.index({
   parent_category_id: 1,
   is_deleted: 1,
 });
+
+
+// ── Multi-tenant ──
+categorySchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Category", categorySchema);

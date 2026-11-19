@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getStoreAdminUrl } from "@/apis/storeHandoff";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -265,7 +266,8 @@ export default function SignupPage() {
         if (res?.pendingApproval) {
           // Same email + password as the pending application → welcome, then /admin (read-only)
           setPendingApproval(true);
-          setWelcomeTarget("/admin");
+          // Multi-tenant: admin sirf store subdomain par → one-time sign-in link
+          setWelcomeTarget((await getStoreAdminUrl()) || "/");
           setStep("welcome");
           setLoading(false);
           return;
@@ -323,7 +325,8 @@ export default function SignupPage() {
     if (res?.pendingApproval) {
       // Seller signed up — send them into the admin panel (read-only until approval)
       setPendingApproval(true);
-      setWelcomeTarget("/admin");
+      // Multi-tenant: admin sirf store subdomain par → one-time sign-in link
+          setWelcomeTarget((await getStoreAdminUrl()) || "/");
     } else {
       setWelcomeTarget("/");
     }

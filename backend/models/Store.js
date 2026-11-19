@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { slugifySubdomain, RESERVED_SUBDOMAINS } = require("../utils/tenantHost");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const storeSchema = new mongoose.Schema({
   store_name: { type: String, default: "My Professional Store" },
@@ -87,7 +88,7 @@ storeSchema.statics.generateUniqueSubdomain = async function (name, excludeId = 
     const filter = { subdomain: candidate };
     if (excludeId) filter._id = { $ne: excludeId };
     // eslint-disable-next-line no-await-in-loop
-    const taken = await this.exists(filter);
+    const taken = await this.exists(filter).setOptions({ skipTenantScope: true });
     if (!taken) return candidate;
   }
   return `${base}-${Date.now().toString(36)}`;
@@ -100,5 +101,10 @@ storeSchema.pre("validate", async function () {
   }
   if (this.customDomain === "") this.customDomain = undefined;
 });
+
+// Store host par `Store.findOne()` / `findById()` sirf CURRENT store dete hain
+// (purana single-store code jaise storeController / socket bina badle sahi store
+// par kaam karta hai). Platform host (super admin) par saare stores.
+storeSchema.plugin(tenantScope, { field: "_id", stamp: false });
 
 module.exports = mongoose.model("Store", storeSchema);

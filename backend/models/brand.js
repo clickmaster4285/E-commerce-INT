@@ -1,4 +1,5 @@
   const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
   const brandSchema = new mongoose.Schema(
     {
@@ -115,7 +116,7 @@
 
   // ✅ Compound Unique Index: brand_code + is_deleted
   // Is se same brand_code wala naya brand ban sakta hai agar purana soft deleted ho
-  brandSchema.index({ brand_code: 1, is_deleted: 1 }, { unique: true });
+  brandSchema.index({ storeId: 1, brand_code: 1, is_deleted: 1 }, { unique: true });
 
   // ✅ Static: Sirf active (non-deleted) brands fetch karein
   brandSchema.statics.findActive = function (filter = {}) {
@@ -137,5 +138,9 @@
     this.deletedby = null;
     return this.save();
   };
+
+
+// ── Multi-tenant ──
+brandSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
   module.exports = mongoose.model("Brand", brandSchema);

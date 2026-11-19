@@ -10,7 +10,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission"); // ✅ ADDED
 
 // ✅ Multer setup for file upload (Logo)
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 
 // Uploads folder ka path set karein
 const uploadDir = path.join(__dirname, "../uploads");

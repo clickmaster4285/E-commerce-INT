@@ -4,6 +4,7 @@ import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useState, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/apis/axiosInstance';
+import { getStoreAdminUrl, isPlatformHost } from '@/apis/storeHandoff';
 import { useDispatch, useSelector } from 'react-redux';
 import { storeApi } from '@/apis/admin/storeApi';
 import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
@@ -165,7 +166,7 @@ export default function AdminLoginPage() {
       return response.data;
     },
 
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const role = String(data?.user?.role || '').toLowerCase();
 
       if (!data?.user || !['admin', 'staff', 'manager'].includes(role)) {
@@ -188,6 +189,17 @@ export default function AdminLoginPage() {
       // pichhle user ke cookie ke sath handshake hue the. Warna naye login
       // (jaise employee) ke baad bhi profile page / Navbar purane user ka data
       // dikhate rehte hain, kyunke socket ki identity handshake par fix ho jati hai.
+      // Multi-tenant: platform par login → seller ko uske store subdomain ke admin me bhejo
+      if (isPlatformHost()) {
+        const storeAdminUrl = await getStoreAdminUrl();
+        if (!storeAdminUrl) {
+          axiosInstance.post('/users/logout').catch(() => {});
+          toast.error('No store is linked to this account.');
+          return;
+        }
+        window.location.replace(storeAdminUrl);
+        return;
+      }
       window.location.replace('/admin/dashboard');
     },
 

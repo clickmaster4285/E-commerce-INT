@@ -5,19 +5,23 @@
      bilkul same — server fail ho to client fetch chalta hai.
    - Baaki poora home client hai (HomeClient) — filters/URL/sidebar
      behavior me zero change.
-   - ISR 60s: shell static rehti hai, banners minute me refresh.
+   - Multi-tenant: har store ke apne banners → page host-wise dynamic hai
+     (ISR cache sab stores me share hota tha, is liye hata diya). Backend ko
+     platform address par call karte hain aur asli store host `x-store-host`
+     header me bhejte hain (src/proxy.js ye header set karta hai).
    ========================================================== */
 
+import { headers } from "next/headers";
 import HomeClient from "./HomeClient";
-
-export const revalidate = 60;
 
 async function getInitialBanners() {
   try {
     const base = process.env.NEXT_PUBLIC_SERVERURL;
     if (!base) return null;
+    const storeHost = (await headers()).get("x-store-host") || "";
     const res = await fetch(`${base}/banners/active?limit=12`, {
-      next: { revalidate: 60 },
+      headers: { "x-store-host": storeHost },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const d = await res.json();

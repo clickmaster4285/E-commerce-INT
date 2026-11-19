@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const employeeSchema = new mongoose.Schema(
   {
@@ -147,5 +148,9 @@ const employeeSchema = new mongoose.Schema(
 
 employeeSchema.index({ "activities.timestamp": -1 });
 employeeSchema.index({ storeId: 1, department: 1 });
+
+
+// ── Multi-tenant ──
+employeeSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Employee", employeeSchema);

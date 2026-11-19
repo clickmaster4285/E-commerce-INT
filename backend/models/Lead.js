@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const leadProductSchema = new mongoose.Schema({
   product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
@@ -31,7 +32,7 @@ const historyEntrySchema = new mongoose.Schema({
 }, { _id: true });
 
 const leadSchema = new mongoose.Schema({
-  lead_number: { type: String, unique: true, index: true },
+  lead_number: { type: String, index: true },
   lead_type: { type: String, enum: ["Individual", "Business"], required: true, default: "Individual" },
   name: { type: String, required: true, trim: true, maxlength: 160 },
   translations: {
@@ -77,5 +78,10 @@ const leadSchema = new mongoose.Schema({
 leadSchema.index({ created_at: -1, _id: -1 });
 leadSchema.index({ status: 1, is_deleted: 1, created_at: -1 });
 leadSchema.index({ phone: 1, is_deleted: 1 });
+
+
+// ── Multi-tenant ──
+leadSchema.plugin(tenantScope); // har store ka data alag (storeId)
+leadSchema.index({ storeId: 1, lead_number: 1 }, { unique: true, partialFilterExpression: { lead_number: { $type: "string" } } }); // unique per store
 
 module.exports = mongoose.model("Lead", leadSchema);

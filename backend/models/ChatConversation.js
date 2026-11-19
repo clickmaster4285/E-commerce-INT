@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 const schema = new mongoose.Schema({
   customer_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
   order_id: { type: mongoose.Schema.Types.ObjectId, ref: "Order", default: null, index: true },
@@ -31,4 +32,8 @@ schema.statics.ensureChatIndexes = async function ensureChatIndexes() {
   if (obsoleteOrderIndex) await this.collection.dropIndex(obsoleteOrderIndex.name);
   await this.createIndexes();
 };
+
+// ── Multi-tenant ──
+schema.plugin(tenantScope); // har store ka data alag (storeId)
+
 module.exports = mongoose.models.ChatConversation || mongoose.model("ChatConversation", schema);

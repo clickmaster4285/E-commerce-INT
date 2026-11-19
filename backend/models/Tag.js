@@ -1,11 +1,11 @@
 // models/Tag.js
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const tagSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true, unique: true, lowercase: true },
+  name: { type: String, required: true, trim: true, lowercase: true },
   slug: { 
     type: String, 
-    unique: true, 
     sparse: true // ✅ Yeh line add karein
     },
     // Audit fields (optional but good practice)
@@ -15,5 +15,11 @@ const tagSchema = new mongoose.Schema({
   },
   { timestamps: true }
 );
+
+
+// ── Multi-tenant ──
+tagSchema.plugin(tenantScope); // har store ka data alag (storeId)
+tagSchema.index({ storeId: 1, name: 1 }, { unique: true }); // unique per store
+tagSchema.index({ storeId: 1, slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: "string" } } }); // unique per store
 
 module.exports = mongoose.model("Tag", tagSchema);

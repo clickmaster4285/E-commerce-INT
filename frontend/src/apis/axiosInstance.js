@@ -39,6 +39,7 @@ const getBaseURL = () => alignBackendUrl(API_BASE_URL);
 const PUBLIC_AUTH_PATHS = [
   "/users/login",
   "/users/admin/login",
+  "/users/admin/handoff/exchange",
   "/users/register",
   "/users/logout",
   "/users/send-email-otp",

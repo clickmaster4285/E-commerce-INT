@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const discountSchema = new mongoose.Schema(
   {
@@ -9,7 +10,6 @@ const discountSchema = new mongoose.Schema(
     code: {
       type: String,
       required: [true, "Discount code is required"],
-      unique: true,
       trim: true,
       uppercase: true,
       index: true,
@@ -256,5 +256,10 @@ discountSchema.index({
   applyTo: 1,
   isActive: 1,
 });
+
+
+// ── Multi-tenant ──
+discountSchema.plugin(tenantScope); // har store ka data alag (storeId)
+discountSchema.index({ storeId: 1, code: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("Discount", discountSchema);

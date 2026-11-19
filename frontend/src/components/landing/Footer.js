@@ -25,7 +25,7 @@ export default function Footer() {
         <div className="grid gap-10 md:grid-cols-12">
           {/* Brand */}
           <div className="md:col-span-4">
-            <a href="/landing" className="flex min-h-[44px] items-center gap-2" aria-label="Click Master Store — home">
+            <a href="/" className="flex min-h-[44px] items-center gap-2" aria-label="Click Master Store — home">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)]">
                 <MousePointerClick size={20} aria-hidden="true" />
               </span>

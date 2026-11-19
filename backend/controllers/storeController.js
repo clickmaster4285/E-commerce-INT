@@ -8,7 +8,8 @@ const log = require("../utils/logger");
 const getStoreInfo = async (req, res) => {
   try {
     let store = await Store.findOne();
-    if (!store) store = await Store.create({});
+    // Store host par ye hamesha current store hai; blank store khud se nahi banta
+    if (!store) return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found." });
     res.status(200).json({ success: true, data: store.toObject() });
   } catch (error) {
     log.error("Get Store Error:", error);
@@ -28,7 +29,8 @@ const updateStoreInfo = async (req, res) => {
     }
 
     let store = await Store.findOne();
-    if (!store) store = await Store.create({});
+    // Store host par ye hamesha current store hai; blank store khud se nahi banta
+    if (!store) return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found." });
 
     const oldData = store.toObject();
 
@@ -173,9 +175,10 @@ const getPublicStoreInfo = async (req, res) => {
     if (req.storeMissing) {
       return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found for this address." });
     }
-    if (req.store) return res.status(200).json({ success: true, data: publicStorePayload(req.store) });
-    // Platform host (localhost / IP / root domain) → purana default-store behaviour
-    return getStoreInfo(req, res);
+    // Store host par Store.findOne() tenant-scoped hai → sirf isi host ka store (fresh, cache nahi)
+    const store = await Store.findOne().lean();
+    if (!store) return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found." });
+    return res.status(200).json({ success: true, data: publicStorePayload(store) });
   } catch (error) {
     log.error("Get Public Store Error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -209,7 +212,7 @@ const checkSubdomain = async (req, res) => {
 
     const filter = { subdomain };
     if (req.user?.storeId) filter._id = { $ne: req.user.storeId };
-    const taken = await Store.exists(filter);
+    const taken = await Store.exists(filter).setOptions({ skipTenantScope: true }); // saare stores me check
     res.status(200).json({
       success: true,
       data: {
@@ -239,7 +242,7 @@ const updateStoreDomain = async (req, res) => {
       const clean = slugifySubdomain(subdomain);
       const error = validateSubdomain(clean);
       if (error) return res.status(400).json({ success: false, message: error });
-      if (await Store.exists({ subdomain: clean, _id: { $ne: store._id } })) {
+      if (await Store.exists({ subdomain: clean, _id: { $ne: store._id } }).setOptions({ skipTenantScope: true })) {
         return res.status(409).json({ success: false, message: "This subdomain is already taken." });
       }
       store.subdomain = clean;
@@ -258,7 +261,7 @@ const updateStoreDomain = async (req, res) => {
         if (isPlatformFamilyHost(domain)) {
           return res.status(400).json({ success: false, message: "Use the subdomain field for platform addresses." });
         }
-        if (await Store.exists({ customDomain: domain, _id: { $ne: store._id } })) {
+        if (await Store.exists({ customDomain: domain, _id: { $ne: store._id } }).setOptions({ skipTenantScope: true })) {
           return res.status(409).json({ success: false, message: "This domain is already connected to another store." });
         }
         if (store.customDomain !== domain) {

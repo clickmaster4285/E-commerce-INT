@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const purchasePaymentSchema = new mongoose.Schema(
   {
@@ -17,5 +18,9 @@ const purchasePaymentSchema = new mongoose.Schema(
 );
 
 purchasePaymentSchema.index({ po_id: 1, created_at: -1 });
+
+
+// ── Multi-tenant ──
+purchasePaymentSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("PurchasePayment", purchasePaymentSchema);

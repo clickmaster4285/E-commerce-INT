@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const auditChangeSchema = new mongoose.Schema({ field: String, before: String, after: String, action: String, product_name: String, variant_title: String, sku: String, from_quantity: Number, to_quantity: Number }, { _id: false });
 const activitySchema = new mongoose.Schema({ type: { type: String, required: true }, at: { type: Date, default: Date.now }, actor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null }, actor_name: { type: String, default: "Administrator" }, changes: { type: [auditChangeSchema], default: [] } }, { _id: false });
@@ -47,7 +48,7 @@ const receivingSchema = new mongoose.Schema(
 
 const purchaseOrderSchema = new mongoose.Schema(
   {
-    po_number: { type: String, unique: true, required: true, trim: true },
+    po_number: { type: String, required: true, trim: true },
     vendor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Vendor", required: true, index: true },
     vendor_snapshot: {
       name: { type: String, default: "" },
@@ -102,5 +103,10 @@ const purchaseOrderSchema = new mongoose.Schema(
 
 purchaseOrderSchema.index({ vendor_id: 1, status: 1, created_at: -1 });
 purchaseOrderSchema.index({ status: 1, created_at: -1 });
+
+
+// ── Multi-tenant ──
+purchaseOrderSchema.plugin(tenantScope); // har store ka data alag (storeId)
+purchaseOrderSchema.index({ storeId: 1, po_number: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("PurchaseOrder", purchaseOrderSchema);

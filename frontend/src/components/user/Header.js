@@ -217,7 +217,7 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
       ? store.logo.img_url
       : `${API_ORIGIN}/${store.logo.img_url}`
     : null;
-  const letter = (store?.store_name || "C").charAt(0).toUpperCase();
+  const letter = (store?.store_name || "S").charAt(0).toUpperCase();
 
   if (!logoUrl || failed) {
     return (
