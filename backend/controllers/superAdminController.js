@@ -297,17 +297,6 @@ const getRequest = async (req, res) => {
 
 const approveRequest = async (req, res) => {
   try {
-    // Setup gate: approval stays locked until the seller completes store setup
-    // (details confirmation + verification documents). Checked before the atomic flip.
-    const setupCheck = await SellerApplication.findById(req.params.id).select("setup_completed status").lean();
-    if (setupCheck && setupCheck.status === "pending" && setupCheck.setup_completed === false) {
-      return res.status(409).json({
-        success: false,
-        code: "SETUP_INCOMPLETE",
-        message: "The seller has not finished store setup yet (documents missing). Approval unlocks once they submit.",
-      });
-    }
-
     // Atomic guard: only flip pending → approved once
     const application = await SellerApplication.findOneAndUpdate(
       { _id: req.params.id, status: "pending" },
