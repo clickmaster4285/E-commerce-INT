@@ -1,5 +1,6 @@
 import axios from "axios";
 import { toast } from "sonner";
+import { notifySellerPendingLocked } from "@/apis/sellerPendingToast";
 
 // ==========================================================
 // API BASE URL — single source of truth (frontend/.env driven)
@@ -119,6 +120,11 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+
+      if (error.response?.status === 403 && error.response?.data?.code === "SELLER_PENDING") {
+        notifySellerPendingLocked();
+        return Promise.reject(error);
+      }
 
       const isChatRequest = originalRequest?.url?.includes("/chats/");
       if (error.response?.status === 429 && error.response?.data?.code !== "CHAT_MESSAGE_RATE_LIMIT" && !isChatRequest) {

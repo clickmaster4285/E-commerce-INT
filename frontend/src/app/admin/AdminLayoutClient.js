@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
 import adminHttp from '@/apis/axiosInstance';
+import { notifySellerPendingLocked } from '@/apis/sellerPendingToast';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
@@ -51,6 +52,11 @@ const KNOWN_ADMIN_ROUTE_PREFIXES = [
   '/admin/pos',
   '/admin/access-denied',
 ];
+
+// Pending seller = view-only. Writes are blocked by the click guard below AND
+// by the API (403 SELLER_PENDING). Leading glyphs/icons ignored: "+ Add Brand".
+const SELLER_PENDING_ACTION_REGEX =
+  /^[^a-z0-9]*(add|create|new|save|update|edit|delete|remove|archive|duplicate|approve|publish|submit|confirm|refund|ship|send|assign|restore|reset|import|upload|bulk)\b/i;
 
 // ==========================================
 // SINGLETON SOCKET
@@ -344,6 +350,43 @@ export default function AdminLayout({ children }) {
 
     router.replace(authResult.redirectTo);
   }, [authResult, router, userQueryError]);
+
+  // ==========================================
+  // PENDING SELLER LOCK — view-only panel
+  // Clicks on any write action (Add/Save/Delete/Send/…) are swallowed here and
+  // answered with a professional "awaiting approval" notice. Icon-only buttons
+  // that can't be label-matched are still stopped by the API-layer 403 toast.
+  // ==========================================
+  const pendingLock = !!userData?.seller_pending;
+
+  useEffect(() => {
+    if (!pendingLock) return undefined;
+    const onClickCapture = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const control = target.closest(
+        'button, [role="button"], a, input[type="submit"], input[type="button"]'
+      );
+      if (!control) return;
+      const label = (
+        control.textContent ||
+        control.getAttribute('aria-label') ||
+        control.getAttribute('value') ||
+        control.getAttribute('title') ||
+        ''
+      )
+        .trim()
+        .slice(0, 90);
+      if (!label) return;
+      if (SELLER_PENDING_ACTION_REGEX.test(label)) {
+        event.preventDefault();
+        event.stopPropagation();
+        notifySellerPendingLocked();
+      }
+    };
+    document.addEventListener('click', onClickCapture, true);
+    return () => document.removeEventListener('click', onClickCapture, true);
+  }, [pendingLock]);
 
   // ==========================================
   // USER LOG
