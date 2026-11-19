@@ -298,6 +298,14 @@ const seedDefaultData = async () => {
         let admin = await Employee.findOne({ email: adminEmail });
         if (!admin) {
           const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+          const adminPermissions = {
+            products: true, brands: true, categories: true,
+            users: true, orders: true, settings: true,
+            profile: true, employees: true, discounts: true,
+            deals: true, bundles: true, store: true, banners: true,
+            manageStock: true, shipping: true, order: true, attribute: true,
+            vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
+          };
           await Employee.create({
             name: process.env.DEFAULT_ADMIN_NAME,
             username: process.env.DEFAULT_ADMIN_USERNAME,
@@ -306,14 +314,7 @@ const seedDefaultData = async () => {
             role: DEFAULT_ADMIN_ROLE,
             status: "active",
             storeId: defaultStore?._id || null,
-            permissions: {
-              products: true, brands: true, categories: true,
-              users: true, orders: true, settings: true,
-              profile: true, employees: true, discounts: true,
-              deals: true, bundles: true, store: true, banners: true,
-              manageStock: true, shipping: true, order: true, attribute: true,
-              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
-            },
+            permissions: adminPermissions,
           });
           log.info("✅ Default Admin Employee Created (employees collection)");
         }

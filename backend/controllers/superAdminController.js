@@ -72,6 +72,7 @@ const loginSuperAdmin = async (req, res) => {
         id: superAdmin._id,
         name: superAdmin.name,
         email: superAdmin.email,
+        role: superAdmin.role || "superadmin",
         lastLoginAt: superAdmin.lastLoginAt,
       },
     });
@@ -107,6 +108,7 @@ const meSuperAdmin = (req, res) => {
       id: admin._id,
       name: admin.name,
       email: admin.email,
+      role: admin.role || "superadmin",
       lastLoginAt: admin.lastLoginAt,
     },
   });
@@ -506,7 +508,7 @@ const listUsers = async (req, res) => {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
     const filter = { is_deleted: { $ne: true } };
-    if (role && ["user", "admin", "staff"].includes(String(role))) filter.role = String(role);
+    if (role && String(role) === "user") filter.role = "user";
     if (status && ["active", "blocked", "inactive"].includes(String(status))) filter.status = String(status);
     if (type === "seller") filter.storeId = { $ne: null };
     else if (type === "customer") filter.storeId = null;

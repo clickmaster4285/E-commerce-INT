@@ -13,6 +13,7 @@ const superAdminSchema = new mongoose.Schema(
     },
     // bcrypt hash — never plain text
     passwordHash: { type: String, required: true },
+    role: { type: String, enum: ["superadmin", "staff"], default: "superadmin" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     lastLoginAt: { type: Date, default: null },
   },

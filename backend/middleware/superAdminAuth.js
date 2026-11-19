@@ -41,7 +41,7 @@ const getSecret = () => {
 
 const signSession = (superAdmin) =>
   jwt.sign(
-    { sub: String(superAdmin._id), type: "superadmin", email: superAdmin.email },
+    { sub: String(superAdmin._id), type: "superadmin", email: superAdmin.email, role: superAdmin.role || "superadmin" },
     getSecret(),
     { expiresIn: `${getSessionTtlSeconds()}s` }
   );

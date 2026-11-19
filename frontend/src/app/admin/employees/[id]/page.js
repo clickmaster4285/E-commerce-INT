@@ -342,13 +342,14 @@ function EmployeeOverview({
     return t("admin.employees.detail.daysAgo", { days: Math.floor(minutes / 1440) });
   };
 
+  const isAdminRole = String(role || "").toLowerCase() === "admin";
+
   const infoItems = [
     [t("admin.employees.form.fullName"), name, User],
     [t("admin.employees.form.username"), email.split("@")[0], IdCard],
     [t("admin.profile.email"), email, Mail],
     [t("admin.profile.phone"), phone || "—", Phone],
-    [t("admin.employees.form.departmentPlaceholder"), department, Layers],
-    [t("admin.employees.detail.employeeCode"), empId, Tag],
+    ...(isAdminRole ? [] : [[t("admin.employees.form.departmentPlaceholder"), department, Layers], [t("admin.employees.detail.employeeCode"), empId, Tag]]),
     [t("admin.employees.detail.joinedAt"), joinDate, Clock],
   ];
 
@@ -503,7 +504,7 @@ function EmployeeOverview({
                     </span>
                   )}
 
-                  {department && department !== "Not assigned" && (
+                  {!isAdminRole && department && department !== "Not assigned" && (
                     <span
                       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
                       style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
@@ -546,8 +547,7 @@ function EmployeeOverview({
               }}
             >
               {[
-                [t("admin.employees.detail.employeeCode"), empId, IdCard],
-                [t("admin.employees.form.department"), employeeDepartmentLabel(department, t), Layers],
+                ...(isAdminRole ? [] : [[t("admin.employees.detail.employeeCode"), empId, IdCard], [t("admin.employees.form.department"), employeeDepartmentLabel(department, t), Layers]]),
                 [t("admin.employees.detail.joinedAt"), joinDate, Calendar],
                 [t("admin.employees.detail.accessLevel"), `${enabledCount}/${totalCount}`, ShieldCheck],
               ].map(([label, value, Icon]) => (
@@ -584,6 +584,7 @@ function EmployeeOverview({
       </section>
 
       {/* ============ PERFORMANCE STATS ============ */}
+      {!isAdminRole && (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, tone, hint }) => {
           const toneStyle = STAT_TONES[tone];
@@ -626,6 +627,7 @@ function EmployeeOverview({
           );
         })}
       </div>
+      )}
 
       {/* ============ MAIN CONTENT GRID ============ */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
