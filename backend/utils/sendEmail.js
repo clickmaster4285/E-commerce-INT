@@ -12,10 +12,13 @@ const trimEnv = (value) => String(value || "").trim().replace(/^["']|["']$/g, ""
 
 const getSmtpConfig = () => {
   let host = trimEnv(process.env.SMTP_HOST);
-  const user = trimEnv(process.env.SMTP_USER);
-  const pass = trimEnv(process.env.SMTP_PASS).replace(/\s+/g, "");
-  const port = Number(trimEnv(process.env.SMTP_PORT));
-  const from = trimEnv(process.env.SMTP_FROM);
+  // Gmail shorthand: EMAIL_USER/EMAIL_PASS (or SMTP_USER/SMTP_PASS)
+  const user = trimEnv(process.env.EMAIL_USER) || trimEnv(process.env.SMTP_USER);
+  const pass = (trimEnv(process.env.EMAIL_PASS) || trimEnv(process.env.SMTP_PASS)).replace(/\s+/g, "");
+  // If only credentials are provided, default to Gmail (smtp.gmail.com:587 STARTTLS)
+  if (!host && user && pass) host = "smtp.gmail.com";
+  const port = Number(trimEnv(process.env.SMTP_PORT)) || (user && pass ? 587 : NaN);
+  const from = trimEnv(process.env.SMTP_FROM) || trimEnv(process.env.EMAIL_FROM);
 
   // Gmail host sirf env se aata hai (SMTP_HOST) — yahan koi hardcoded default nahi
 

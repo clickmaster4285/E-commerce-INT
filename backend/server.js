@@ -1,4 +1,4 @@
-const path = require("path");
+﻿const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
 const backendEnvPath = path.join(__dirname, ".env");
@@ -19,6 +19,7 @@ const User = require("./models/User");
 const Employee = require("./models/Employee");
 const Store = require("./models/Store");
 const ChatConversation = require("./models/ChatConversation");
+const SuperAdmin = require("./models/SuperAdmin");
 const { initSocket } = require("./utils/socket");
 
 // ✅ Seed script ko import karein (Data yahan nahi, wahan rahega)
@@ -236,6 +237,10 @@ app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 app.use(`${API_PREFIX}/chats`, chatRoutes);
+// ── Super Admin module (separate namespace + auth) ──
+app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
+// ── Public seller application (pending-review queue) ──
+app.use(`${API_PREFIX}/seller`, require("./routes/sellerApplicationRoutes"));
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
@@ -293,6 +298,14 @@ const seedDefaultData = async () => {
         let admin = await Employee.findOne({ email: adminEmail });
         if (!admin) {
           const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+          const adminPermissions = {
+            products: true, brands: true, categories: true,
+            users: true, orders: true, settings: true,
+            profile: true, employees: true, discounts: true,
+            deals: true, bundles: true, store: true, banners: true,
+            manageStock: true, shipping: true, order: true, attribute: true,
+            vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
+          };
           await Employee.create({
             name: process.env.DEFAULT_ADMIN_NAME,
             username: process.env.DEFAULT_ADMIN_USERNAME,
@@ -301,22 +314,48 @@ const seedDefaultData = async () => {
             role: DEFAULT_ADMIN_ROLE,
             status: "active",
             storeId: defaultStore?._id || null,
-            permissions: {
-              products: true, brands: true, categories: true,
-              users: true, orders: true, settings: true,
-              profile: true, employees: true, discounts: true,
-              deals: true, bundles: true, store: true, banners: true,
-              manageStock: true, shipping: true, order: true, attribute: true,
-              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
-            },
+            permissions: adminPermissions,
           });
           log.info("✅ Default Admin Employee Created (employees collection)");
         }
       }
     }
 
-    // ✅ 3. Attributes Auto-Seed (Imported Function Call)
-    await seedAttributes(); 
+    // 4. Super Admin Seed (development convenience; production requires a strong password)
+    const saEmail = process.env.SUPER_ADMIN_EMAIL;
+    const saPassword = process.env.SUPER_ADMIN_PASSWORD;
+    if (saEmail && saPassword) {
+      const emailSa = String(saEmail).toLowerCase().trim();
+      const saName = process.env.SUPER_ADMIN_NAME || emailSa.split("@")[0];
+      const isProduction = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+      const minPasswordLength = Number(process.env.SUPER_ADMIN_MIN_PASSWORD_LENGTH);
+      const passwordTooWeak =
+        !Number.isFinite(minPasswordLength) ||
+        minPasswordLength < 1 ||
+        String(saPassword).length < minPasswordLength;
+      if (isProduction && passwordTooWeak) {
+        log.warn(
+          "[superadmin] Refusing to seed: set SUPER_ADMIN_MIN_PASSWORD_LENGTH and a SUPER_ADMIN_PASSWORD of at least that length in production."
+        );
+      } else {
+        try {
+          const existing = await SuperAdmin.findOne({ email: emailSa });
+          if (existing) {
+            log.info("[superadmin] Super Admin already seeded; keeping existing credentials.");
+          } else {
+            const hashed = await bcrypt.hash(String(saPassword), SALT_ROUNDS);
+            await SuperAdmin.create({ name: saName, email: emailSa, passwordHash: hashed, status: "active" });
+            log.info("[superadmin] Super Admin seeded.");
+          }
+        } catch (e) {
+          log.error("[superadmin] Seed error:", e.message);
+        }
+      }
+    } else {
+      log.warn("[superadmin] SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD not set; /super-admin will be unavailable.");
+    }
+    // 5. Attributes Auto-Seed
+    await seedAttributes();
 
   } catch (error) {
     log.error("❌ Seed Error:", error.message);

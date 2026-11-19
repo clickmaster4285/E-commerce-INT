@@ -34,10 +34,18 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "User not found or deleted" });
     }
 
+    // "inactive" (admin deactivated) aur "blocked" (super-admin suspended)
+    // dono live sessions ko bhi block karte hain
     if (entity.status === "inactive") {
       return res.status(403).json({
         success: false,
         message: "Your account is inactive. Please contact admin.",
+      });
+    }
+    if (entity.status === "blocked") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is blocked. Please contact admin.",
       });
     }
 
@@ -46,6 +54,18 @@ const authMiddleware = async (req, res, next) => {
       tenant_id: entity.storeId || null,
     };
     req.userType = userType;
+
+    // Pending sellers can browse the admin panel but cannot change anything.
+    if (userType === "employee" && entity.seller_pending) {
+      const safeMethods = ["GET", "HEAD", "OPTIONS"];
+      if (!safeMethods.includes(String(req.method || "GET").toUpperCase())) {
+        return res.status(403).json({
+          success: false,
+          code: "SELLER_PENDING",
+          message: "Your seller application is pending Super Admin approval. You can view all pages, but changes are locked until it is approved.",
+        });
+      }
+    }
 
     next();
   } catch (error) {

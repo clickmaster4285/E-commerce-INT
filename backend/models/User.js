@@ -18,7 +18,9 @@ const userSchema = new mongoose.Schema(
     google_id: { type: String, default: null },
     provider: { type: String, default: "local", enum: ["local", "google"] },
     phone: { type: String, default: "" },
-    role: { type: String, default: "user", enum: ["user", "admin", "staff"] },
+    // Account status — super admin can block a seller without deleting data
+    status: { type: String, default: "active", enum: ["active", "blocked"], index: true },
+    role: { type: String, default: "user", enum: ["user"] },
 
     // ✅ Account page fields — ye pehle schema mein the hi nahi,
     // isliye avatar save aur preferences silently drop ho rahe the

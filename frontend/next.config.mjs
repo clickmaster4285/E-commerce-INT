@@ -16,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [
-    '192.168.88.62',
+    '192.168.88.64',
     'localhost',
     '127.0.0.1',
   ],
@@ -44,6 +44,21 @@ const nextConfig = {
         source: '/category/:id',
         destination: '/filtering-product?category=:id',
         permanent: true,
+      },
+      {
+        source: '/super-admin/settings',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/activity',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/activity-logs',
+        destination: '/super-admin/dashboard',
+        permanent: false,
       },
     ];
   },

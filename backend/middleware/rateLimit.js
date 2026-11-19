@@ -308,6 +308,11 @@ const limiters = {
     max: num(process.env.RATE_LIMIT_GOOGLE_LOGIN_MAX),
     keyBy: "ip",
   }),
+  sellerApply: createRateLimiter({
+    name: "seller-apply",
+    max: num(process.env.RATE_LIMIT_SELLER_APPLY_MAX) || 10,
+    keyBy: "ip",
+  }),
   adminLogin: createRateLimiter({
     name: "admin-login",
     max: num(process.env.RATE_LIMIT_ADMIN_LOGIN_MAX),

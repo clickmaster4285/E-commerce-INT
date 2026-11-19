@@ -1,5 +1,8 @@
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs");
+const sharp = require("sharp");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
@@ -9,6 +12,7 @@ const CheckoutDraft = require("../models/CheckoutDraft");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Employee = require("../models/Employee");
+const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
@@ -23,6 +27,23 @@ const REGISTER_OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS)
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "0");
+
+// Decode a base64 data URL (image) → sharp → uploads/store-logos/<name>.webp
+const STORE_LOGO_DIR = path.join(__dirname, "..", "uploads", "store-logos");
+const saveStoreLogoFromBase64 = async (raw) => {
+  const match = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(raw || "").trim());
+  if (!match) return null;
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > 4 * 1024 * 1024) return null;
+  if (!fs.existsSync(STORE_LOGO_DIR)) fs.mkdirSync(STORE_LOGO_DIR, { recursive: true });
+  const fileName = `logo-${Date.now()}-${crypto.randomBytes(6).toString("hex")}.webp`;
+  await sharp(buffer, { limitInputPixels: 20_000_000 })
+    .rotate()
+    .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 86 })
+    .toFile(path.join(STORE_LOGO_DIR, fileName));
+  return `/uploads/store-logos/${fileName}`;
+};
 
 // ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
 // jwt.sign "NaNm" jaise invalid expiresIn pe THROW kar deta hai (login/refresh
@@ -107,6 +128,20 @@ const createUser = async (req, res) => {
     const cleanPhone = normalizePhone(rawPhone);
     const cleanName = String(name || "").trim();
 
+    // Seller application fields — collected on the same signup page
+    const wantsStore = String(req.body.wantsStore ?? true) !== "false";
+    const storeName = String(req.body.storeName || "").trim().slice(0, 140);
+    const storeDescription = String(req.body.storeDescription || "").trim().slice(0, 2000);
+    const businessCategory = String(req.body.businessCategory || "").trim();
+    const businessType = ["individual", "registered_business"].includes(String(req.body.businessType || ""))
+      ? String(req.body.businessType)
+      : "individual";
+    const country = String(req.body.country || "").trim();
+    const city = String(req.body.city || "").trim();
+    const address = String(req.body.address || "").trim().slice(0, 300);
+    const zipCode = String(req.body.zipCode || "").trim().slice(0, 20);
+    const storeLogo = typeof req.body.storeLogo === "string" ? req.body.storeLogo : "";
+
     // ✅ Basic validation — User NAHI banega, sirf 400 milega
     const errors = {};
     if (!email || !isValidEmail(email)) errors.email = "Please enter a valid email address";
@@ -128,6 +163,16 @@ const createUser = async (req, res) => {
     }
     if (Object.keys(errors).length > 0)
       return res.status(400).json({ success: false, message: "Registration failed", errors });
+    if (wantsStore) {
+      if (!storeName || storeName.length < 1) errors.storeName = "Please enter your store name.";
+      if (!storeDescription || storeDescription.length < 10) errors.storeDescription = "Please describe your store (at least 10 characters).";
+      if (!businessCategory) errors.businessCategory = "Please select a business category.";
+      if (!country) errors.country = "Please select a country.";
+      if (!city || city.trim().length < 2) errors.city = "Please enter your city.";
+      if (!address || address.trim().length < 5) errors.address = "Please enter a complete store address.";
+    if (Object.keys(errors).length > 0)
+      return res.status(400).json({ success: false, message: "Registration failed", errors });
+    }
 
     const finalUsername = cleanUsername || email.split("@")[0] + Math.floor(Math.random() * 9999);
 
@@ -135,6 +180,55 @@ const createUser = async (req, res) => {
     // (purane users me emailVerified undefined hota hai — unhe verified maana jata hai)
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.emailVerified !== false) {
+      // Blocked + pending application → same email + password as signup means
+      // "continue where I left off" → welcome → read-only admin panel until approval.
+      try {
+        const pendingApp = await SellerApplication.findOne({ email, status: "pending" })
+          .select("status store_id")
+          .lean();
+        if (existingUser.status === "blocked" && pendingApp) {
+          const passwordMatches = await bcrypt.compare(String(password), existingUser.password || "");
+          if (passwordMatches) {
+            // Resume — make sure a pending-seller employee exists for the admin panel
+            let employee = await Employee.findOne({ email });
+            if (!employee) {
+              employee = await Employee.create({
+                name: existingUser.name,
+                username: existingUser.username,
+                email,
+                phone: existingUser.phone || "",
+                password: existingUser.password, // already bcrypt-hashed
+                role: "staff",
+                status: "active",
+                storeId: pendingApp.store_id || null,
+                seller_pending: true,
+              });
+            } else if (!employee.seller_pending || employee.status !== "active") {
+              employee.seller_pending = true;
+              employee.status = "active";
+              await employee.save();
+            }
+            const userTokens = generateTokens(existingUser._id, existingUser.role, "user");
+            res.cookie("accessToken", userTokens.accessToken, getCookieOptions(getAccessCookieMaxAge("user", existingUser.role)));
+            res.cookie("refreshToken", userTokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+            const employeeTokens = generateTokens(employee._id, employee.role, "employee");
+            res.cookie("accessToken", employeeTokens.accessToken, getCookieOptions(getAccessCookieMaxAge("employee", employee.role)));
+            res.cookie("refreshToken", employeeTokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+            return res.json({
+              success: true,
+              pendingApproval: true,
+              message: "Your application is under review. You can explore your admin panel in read-only mode until it is approved.",
+            });
+          }
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your application is already under review. You will be notified by email once it is approved.",
+          });
+        }
+      } catch (lookupError) {
+        console.error("[register] pending seller application lookup failed:", lookupError.message);
+      }
       return res.status(400).json({
         success: false,
         message: "Registration failed",
@@ -188,6 +282,15 @@ const createUser = async (req, res) => {
       await PendingRegistration.deleteOne({ _id: existingPending._id });
     }
 
+    let storeLogoUrl = "";
+    if (wantsStore && storeLogo) {
+      try {
+        storeLogoUrl = await saveStoreLogoFromBase64(storeLogo);
+      } catch (logoError) {
+        return res.status(400).json({ success: false, message: "Store logo could not be processed. Please upload a smaller JPG, PNG or WEBP image." });
+      }
+    }
+
     // ✅ OTP + hashes — DB me plain text kuch nahi jayega
     const code = generateOtpCode();
     const passwordHash = await bcrypt.hash(String(password), 10);
@@ -203,6 +306,15 @@ const createUser = async (req, res) => {
       existingPending.expiresAt = expiresAt;
       existingPending.attempts = 0;
       existingPending.lastSentAt = new Date();
+      existingPending.storeName = storeName;
+      existingPending.storeDescription = storeDescription;
+      existingPending.businessCategory = businessCategory;
+      existingPending.businessType = businessType;
+      existingPending.country = country;
+      existingPending.city = city;
+      existingPending.address = address;
+      existingPending.zipCode = zipCode;
+      if (storeLogoUrl) existingPending.storeLogoUrl = storeLogoUrl;
       await existingPending.save();
     } else {
       await PendingRegistration.create({
@@ -215,6 +327,15 @@ const createUser = async (req, res) => {
         expiresAt,
         attempts: 0,
         lastSentAt: new Date(),
+        storeName,
+        storeDescription,
+        businessCategory,
+        businessType,
+        country,
+        city,
+        address,
+        zipCode,
+        storeLogoUrl,
       });
     }
 
@@ -289,13 +410,27 @@ const loginUser = async (req, res) => {
           success: false,
           message: "This login is only for customers. Please use admin panel.",
         });
-    if (user.status === "inactive" || user.is_deleted)
+    if (user.status === "inactive" || user.status === "blocked" || user.is_deleted) {
+      // If it's a pending seller, tell them the application is under review
+      try {
+        const app = await SellerApplication.findOne({ email: user.email }).select("status").lean();
+        if (user.status === "blocked" && app && String(app.status).toLowerCase() === "pending") {
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your seller application is under review. You will be notified by email once it is approved.",
+          });
+        }
+      } catch (lookupError) {
+        console.error("[login] seller application lookup failed:", lookupError.message);
+      }
       return res
         .status(403)
         .json({
           success: false,
           message: "Your account is inactive. Please contact administrator.",
         });
+    }
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid)
       return res
@@ -572,17 +707,18 @@ const getMe = async (req, res) => {
       } catch (e) { /* ignore, fallback below */ }
       if (!storeDoc) storeDoc = entity.storeId || {};
     }
-    res.json({
-      success: true,
-      user: {
-        _id: entity._id,
-        name: entity.name,
-        username: entity.username,
-        email: entity.email,
-        phone: entity.phone || "",
-        role: entity.role,
-        status: entity.is_deleted ? "Inactive" : "Active",
-        avatar: entity.avatar || null,
+     res.json({
+       success: true,
+       user: {
+         _id: entity._id,
+         name: entity.name,
+         username: entity.username,
+         email: entity.email,
+         phone: entity.phone || "",
+         role: entity.role,
+         status: entity.is_deleted ? "Inactive" : "Active",
+         seller_pending: !!entity.seller_pending,
+         avatar: entity.avatar || null,
         permissions: entity.permissions || {
           dashboard: true, products: true, brands: true, categories: true,
           employees: true, discounts: true, deals: true, banners: true,

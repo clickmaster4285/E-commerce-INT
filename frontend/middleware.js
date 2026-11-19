@@ -11,15 +11,23 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // ✅ Admin Login — public page
-  // Token ho ya na ho, login page hamesha khulna chahiye. Pehle yahan token
-  // hone par /admin/dashboard par redirect ho jata tha, jis se expired/stale
-  // token ki surat mein admin dobara login hi nahi kar pata tha.
+  // Pending-approval screen — hamesha accessible (unauthenticated user ko yahi page dikhana hai)
+  if (pathname === '/pending-approval') {
+    return NextResponse.next();
+  }
+
+  // Store setup onboarding — freshly verified seller needs to open it without a session
+  if (pathname === '/store-setup') {
+    return NextResponse.next();
+  }
+
+  // Admin login — public page
   if (pathname === '/admin/login') {
     return NextResponse.next();
   }
 
-  // ✅ User Login — public page
+  // User login — public page (log in karne ke liye yahi kholna chahiye;
+  // agar logged in hai to storefront par bhej do)
   if (pathname === '/login') {
     if (hasAccessToken) {
       return NextResponse.redirect(new URL('/', request.url));
@@ -27,15 +35,31 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // ✅ Baqi sab ADMIN pages — protected
-  if (pathname.startsWith('/admin')) {
-    // Let the admin layout's API auth interceptor refresh an expired/missing
-    // access token when the long-lived refresh cookie is still present.
+  // Seller application form — public
+  if (pathname === '/seller/apply') {
+    return NextResponse.next();
+  }
+
+  // Seller dashboard — requires session (approved sellers)
+  if (pathname === '/seller/dashboard') {
     if (!hasSessionCookie) {
-      console.warn('🔒 Middleware blocked:', pathname, '| auth cookies missing');
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Admin pages — protected
+  if (pathname.startsWith('/admin')) {
+    if (!hasSessionCookie) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
-    // ✅ Success case: token present — allow through
+    return NextResponse.next();
+  }
+
+  // Baqi sab stores/routes unauthenticated users ke liye
+  // Access ke liye Super Admin approval zaroori hai — tab tak pending-approval page dikhao
+  if (!hasSessionCookie) {
+    return NextResponse.redirect(new URL('/pending-approval', request.url));
   }
 
   return NextResponse.next();

@@ -20,6 +20,16 @@ const pendingRegistrationSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     username: { type: String, required: true, trim: true },
     phone: { type: String, default: "" },
+    // Seller application — collected on the same signup page
+    storeName: { type: String, default: "", trim: true },
+    storeDescription: { type: String, default: "", trim: true },
+    businessCategory: { type: String, default: "", trim: true },
+    businessType: { type: String, enum: ["individual", "registered_business"], default: "individual" },
+    country: { type: String, default: "", trim: true },
+    city: { type: String, default: "", trim: true },
+    address: { type: String, default: "", trim: true },
+    zipCode: { type: String, default: "", trim: true },
+    storeLogoUrl: { type: String, default: "", trim: true },
     // ✅ bcrypt-hashed login password (User.create mein seedha pass hoga, dobara hash nahi hoga)
     passwordHash: { type: String, required: true },
     // ✅ bcrypt-hashed 6-digit OTP

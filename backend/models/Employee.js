@@ -25,8 +25,11 @@ const employeeSchema = new mongoose.Schema(
     role: {
       type: String,
       default: "staff",
-      enum: ["user", "admin", "staff", "manager"],
+      enum: ["admin", "manager", "staff"],
     },
+    // Seller-owner account created at signup stays pending until Super Admin approves.
+    // While pending: the admin panel opens in read-only mode (GETs allowed, mutations blocked).
+    seller_pending: { type: Boolean, default: false, index: true },
     status: { type: String, default: "active", enum: ["active", "inactive"] },
     // Profile picture — optimized data URL (Employees form se set hoti hai)
     avatar: { type: String, default: "" },
@@ -81,14 +84,14 @@ const employeeSchema = new mongoose.Schema(
     address: { type: String, default: "", trim: true },
 
     // --- HR & Organizational Details ---
-    employeeCode: { type: String, default: "", trim: true },
-    department: { type: String, default: "", trim: true },
+    employeeCode: { type: String, trim: true },
+    department: { type: String, trim: true },
 
-    // --- Performance & Stats ---
-    ordersHandled: { type: Number, default: 0 },
-    salesGenerated: { type: Number, default: 0 },
-    productsAdded: { type: Number, default: 0 },
-    performanceRating: { type: Number, default: 0 },
+    // --- Performance & Stats (only present once actually used) ---
+    ordersHandled: { type: Number },
+    salesGenerated: { type: Number },
+    productsAdded: { type: Number },
+    performanceRating: { type: Number },
 
     // --- Activities Log ---
     activities: [

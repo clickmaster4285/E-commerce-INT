@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
 import adminHttp from '@/apis/axiosInstance';
+import { notifySellerPendingLocked } from '@/apis/sellerPendingToast';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
@@ -51,6 +52,11 @@ const KNOWN_ADMIN_ROUTE_PREFIXES = [
   '/admin/pos',
   '/admin/access-denied',
 ];
+
+// Pending seller = view-only. Writes are blocked by the click guard below AND
+// by the API (403 SELLER_PENDING). Leading glyphs/icons ignored: "+ Add Brand".
+const SELLER_PENDING_ACTION_REGEX =
+  /^[^a-z0-9]*(add|create|new|save|update|edit|delete|remove|archive|duplicate|approve|publish|submit|confirm|refund|ship|send|assign|restore|reset|import|upload|bulk)\b/i;
 
 // ==========================================
 // SINGLETON SOCKET
@@ -344,6 +350,43 @@ export default function AdminLayout({ children }) {
 
     router.replace(authResult.redirectTo);
   }, [authResult, router, userQueryError]);
+
+  // ==========================================
+  // PENDING SELLER LOCK — view-only panel
+  // Clicks on any write action (Add/Save/Delete/Send/…) are swallowed here and
+  // answered with a professional "awaiting approval" notice. Icon-only buttons
+  // that can't be label-matched are still stopped by the API-layer 403 toast.
+  // ==========================================
+  const pendingLock = !!userData?.seller_pending;
+
+  useEffect(() => {
+    if (!pendingLock) return undefined;
+    const onClickCapture = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const control = target.closest(
+        'button, [role="button"], a, input[type="submit"], input[type="button"]'
+      );
+      if (!control) return;
+      const label = (
+        control.textContent ||
+        control.getAttribute('aria-label') ||
+        control.getAttribute('value') ||
+        control.getAttribute('title') ||
+        ''
+      )
+        .trim()
+        .slice(0, 90);
+      if (!label) return;
+      if (SELLER_PENDING_ACTION_REGEX.test(label)) {
+        event.preventDefault();
+        event.stopPropagation();
+        notifySellerPendingLocked();
+      }
+    };
+    document.addEventListener('click', onClickCapture, true);
+    return () => document.removeEventListener('click', onClickCapture, true);
+  }, [pendingLock]);
 
   // ==========================================
   // USER LOG
@@ -691,6 +734,22 @@ export default function AdminLayout({ children }) {
           onMenuClick={toggleSidebar}
           userData={userData}
         />
+
+        {/* Pending approval banner — seller account until the Super Admin approves it */}
+        {userData?.seller_pending ? (
+          <div
+            role="status"
+            className="mx-3 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-[12px] font-medium text-amber-900"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-400/25 text-amber-700">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </span>
+            <p>
+              <strong className="font-bold">Your store application is pending Super Admin approval.</strong>{" "}
+              You can view all pages but cannot create or edit anything yet — we&apos;ll email you once it&apos;s approved.
+            </p>
+          </div>
+        ) : null}
 
         {/* Page */}
         {/* Keep the scrollport LTR so switching to an RTL locale does not move
