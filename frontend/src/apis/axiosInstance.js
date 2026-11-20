@@ -2,6 +2,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { notifySellerPendingLocked } from "@/apis/sellerPendingToast";
 import { alignBackendUrl } from "@/lib/tenantHost";
+import { hasAuthSession } from "@/lib/authSession";
 
 // ==========================================================
 // API BASE URL — single source of truth (frontend/.env driven)
@@ -50,6 +51,34 @@ const PUBLIC_AUTH_PATHS = [
 ];
 
 const USER_PUBLIC_AUTH_PATHS = PUBLIC_AUTH_PATHS.filter((path) => path !== "/users/admin/login");
+
+// Sirf logged-in customer ke endpoints. Guest (u_sess marker nahi) par request
+// bheji hi nahi jati — pehle har page par profile/wishlist 401 + refresh 401 aate the.
+const USER_ONLY_PATHS = [
+  "/users/profile",
+  "/users/me",
+  "/users/wishlist",
+  "/users/phone",
+  "/users/password",
+  "/users/change-password",
+  "/users/checkout-drafts",
+  "/cart",
+  "/orders/my",
+  "/addresses",
+  "/reviews/my",
+];
+const pathOf = (url) => String(url || "").split("?")[0];
+const isUserOnlyPath = (url) =>
+  USER_ONLY_PATHS.some((path) => pathOf(url) === path || pathOf(url).startsWith(`${path}/`));
+
+// Network ke baghair 401 jaisa error — callers pehle se 401 (guest) handle karte hain
+const guestError = (config) => {
+  const error = new Error("Not logged in");
+  error.config = config;
+  error.isGuest = true;
+  error.response = { status: 401, data: { success: false, message: "Not logged in" }, config };
+  return error;
+};
 const FRIENDLY_SESSION_EXPIRED = "Session expired. Please log in again.";
 
 const notifyUserSessionExpired = () => {
@@ -60,7 +89,7 @@ const notifyUserSessionExpired = () => {
   }
 };
 
-function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
+function createAuthHttp({ refreshUrl, publicAuthPaths, mode, guestBlockedPaths = null }) {
   const http = axios.create({ withCredentials: true });
   let refreshPromise = null;
 
@@ -111,6 +140,7 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
       // ek hi browser me customer + admin dono logged-in reh sakte hain
       config.headers = config.headers || {};
       config.headers["X-Auth-Aud"] = mode;
+      if (guestBlockedPaths?.(config.url) && !hasAuthSession(mode)) return Promise.reject(guestError(config));
       return config;
     },
     (error) => Promise.reject(error),
@@ -136,8 +166,16 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
         );
       }
 
+      if (error?.isGuest) return Promise.reject(error);
+
       const isPublicAuthRequest = publicAuthPaths.some((path) => originalRequest?.url?.includes(path));
       if (isPublicAuthRequest) return Promise.reject(error);
+
+      // Koi session hi nahi (marker nahi) → refresh ka fayda nahi, seedha 401
+      if (error.response?.status === 401 && !hasAuthSession(mode)) {
+        if (mode === "admin") redirectToAdminLogin();
+        return Promise.reject(error);
+      }
 
       if (error.response?.status === 401 && !originalRequest?._retry) {
         if (originalRequest?.url === refreshUrl) {
@@ -186,6 +224,7 @@ export const userHttp = createAuthHttp({
   refreshUrl: "/users/refresh-token",
   publicAuthPaths: USER_PUBLIC_AUTH_PATHS,
   mode: "user",
+  guestBlockedPaths: isUserOnlyPath,
 });
 
 export default axiosInstance;

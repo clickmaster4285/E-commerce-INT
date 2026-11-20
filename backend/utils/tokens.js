@@ -140,7 +140,9 @@ function setAuthCookies(res, aud, { accessToken, refreshToken }) {
   const refreshMs = refreshDays() * DAY;
   res.cookie(cfg.cookies.access, accessToken, cookieOptions(cfg.accessMs()));
   res.cookie(cfg.cookies.refresh, refreshToken, cookieOptions(refreshMs, refreshCookiePath(aud)));
-  res.cookie(cfg.cookies.session, "1", cookieOptions(refreshMs));
+  // Marker JS-readable (httpOnly nahi): sirf "1", koi token nahi. Frontend isi se
+  // jaanta hai session hai ya nahi — guest par profile/wishlist/refresh calls nahi.
+  res.cookie(cfg.cookies.session, "1", { ...cookieOptions(refreshMs), httpOnly: false });
 }
 
 function clearAuthCookies(res, aud) {
