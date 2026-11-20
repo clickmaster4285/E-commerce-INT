@@ -569,7 +569,7 @@ const approveRequest = async (req, res) => {
       );
       await notifySeller(
         sendApplicationApprovedEmail,
-        { name: application.name, email: application.email, storeName: application.store_name },
+        { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(openStore) },
         "Approval",
         application._id
       );
@@ -634,7 +634,7 @@ const approveRequest = async (req, res) => {
 
     await notifySeller(
       sendApplicationApprovedEmail,
-      { name: application.name, email: application.email, storeName: application.store_name },
+      { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(storeFinal) },
       "Approval",
       application._id
     );

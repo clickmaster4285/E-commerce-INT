@@ -45,3 +45,32 @@ test("pending email escapes user-supplied values", async () => {
   assert.doesNotMatch(html, /<b>x<\/b>/);
   assert.match(html, /A &amp; B/);
 });
+
+const { sendApplicationApprovedEmail } = require("../services/emailService");
+
+test("approval email sends the seller to their admin panel and storefront", async () => {
+  sent.length = 0;
+  await sendApplicationApprovedEmail({
+    name: "Ali",
+    email: "ali@example.com",
+    storeName: "Ali Electronics",
+    storeUrl: "http://ali-electronics.example.test:3000",
+  });
+  const { subject, html, text } = sent[0];
+  assert.match(subject, /approved/i);
+  assert.match(html, /href="http:\/\/ali-electronics\.example\.test:3000\/admin\/login"[^>]*>Open your admin panel/);
+  assert.match(html, /href="http:\/\/ali-electronics\.example\.test:3000"[^>]*>Visit your storefront/);
+  assert.match(html, /ali-electronics\.example\.test:3000/);
+  assert.match(text, /\/admin\/login/);
+  assert.doesNotMatch(html, /seller\/dashboard/, "old 404 dashboard link is gone");
+  assert.doesNotMatch(html, /\{\{\w+\}\}/);
+});
+
+test("approval email without a store URL falls back to platform sign-in and hides the storefront button", async () => {
+  sent.length = 0;
+  await sendApplicationApprovedEmail({ name: "Sara", email: "sara@example.com", storeName: "Sara Store" });
+  const { html } = sent[0];
+  assert.match(html, /\/admin\/login"[^>]*>Open your admin panel/);
+  assert.match(html, /display:none;/);
+  assert.doesNotMatch(html, /\{\{\w+\}\}/);
+});

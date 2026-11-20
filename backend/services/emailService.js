@@ -95,15 +95,21 @@ const sendApplicationReceivedEmail = async ({ name, email, storeName, adminUrl }
   });
 };
 
-const sendApplicationApprovedEmail = async ({ name, email, storeName }) => {
+// storeUrl (store ka base URL) ho to buttons seedha seller ke store par jaate hain;
+// warna platform login (wahan se handoff seller ko uske admin panel me bhejta hai).
+const sendApplicationApprovedEmail = async ({ name, email, storeName, storeUrl }) => {
+  const adminUrl = storeUrl ? `${storeUrl}/admin/login` : `${frontendBase()}/admin/login`;
   const vars = baseVars({
     NAME: escapeHtml(name),
     STORENAME: escapeHtml(storeName),
     EMAIL: escapeHtml(email),
-    DASHBOARD_URL: escapeHtml(`${frontendBase()}/seller/dashboard`),
+    STORE_ADDRESS: escapeHtml(storeUrl ? storeUrl.replace(/^https?:\/\//, "") : "Available in your admin panel"),
+    ADMIN_URL: escapeHtml(adminUrl),
+    STOREFRONT_URL: escapeHtml(storeUrl || ""),
+    STOREFRONT_DISPLAY: storeUrl ? "" : "display:none;",
   });
   const html = render(APPROVED_BODY, vars);
-  const text = `Hi ${name}, congratulations! Your seller application for ${storeName} has been approved. Sign in at ${frontendBase()} and open your seller dashboard: ${frontendBase()}/seller/dashboard`;
+  const text = `Hi ${name}, congratulations! Your seller account for ${storeName} has been approved and your store is live. Open your admin panel: ${adminUrl}${storeUrl ? ` — Visit your storefront: ${storeUrl}` : ""}`;
   return sendWithRetry({
     to: email,
     subject: `Congratulations! Your seller account has been approved`,
