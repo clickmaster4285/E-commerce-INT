@@ -14,9 +14,6 @@ export default async function StoreNotFoundPage({ searchParams }) {
   const isPage = params.reason === "page";
 
   const title = isPage ? "This page isn't available here" : "Store not found";
-  const message = isPage
-    ? "This page belongs to the main platform, not to this store."
-    : "There is no store at this address. Check the link, or visit the main site.";
   const action = isPage ? { href: "/", label: "Go to store home" } : { href: platformUrl("/", "http:"), label: "Go to main site" };
 
   return (
@@ -24,7 +21,6 @@ export default async function StoreNotFoundPage({ searchParams }) {
       <div className="w-full max-w-md">
         <p className="text-[64px] font-extrabold leading-none text-[#f57224]">404</p>
         <h1 className="mt-4 text-[22px] font-extrabold text-white">{title}</h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-slate-300">{message}</p>
         <a
           href={action.href}
           className="mt-8 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110"
