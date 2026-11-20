@@ -13,6 +13,8 @@ const {
   getAccessCookieMaxAge,
 } = require("../middleware/superAdminAuth");
 const { logActivity } = require("../utils/superAdminActivity");
+const SuperAdminActivity = require("../models/SuperAdminActivity");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const {
   sendApplicationApprovedEmail,
   sendApplicationRejectedEmail,
@@ -252,33 +254,52 @@ const getDashboard = async (req, res) => {
    REQUESTS — the seller application queue
    ========================================== */
 
+// Platform host par tenant context nahi hota, phir bhi cross-store queries explicit rakho
+const CROSS_STORE = { skipTenantScope: true };
+const REQUEST_STATUSES = ["pending", "approved", "rejected"];
+
 const listRequests = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 10 } = req.query;
+    const { status, search, sort = "newest", page = 1, limit = 10 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
     const filter = {};
-    if (["pending", "approved", "rejected"].includes(String(status || ""))) {
+    if (REQUEST_STATUSES.includes(String(status || ""))) {
       filter.status = String(status);
     }
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      filter.$or = [{ name: pattern }, { email: pattern }, { store_name: pattern }];
+      const pattern = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [
+        { name: pattern },
+        { email: pattern },
+        { store_name: pattern },
+        { phone: pattern },
+        { username: pattern },
+        { city: pattern },
+      ];
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, grouped] = await Promise.all([
       SellerApplication.find(filter)
-        .sort({ created_at: -1 })
+        .sort({ created_at: sort === "oldest" ? 1 : -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum)
         .select("-passwordHash")
         .lean(),
       SellerApplication.countDocuments(filter),
+      // Status tabs ke counts (search/filter se independent)
+      SellerApplication.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     ]);
+
+    const counts = { all: 0, pending: 0, approved: 0, rejected: 0 };
+    for (const row of grouped) {
+      if (REQUEST_STATUSES.includes(row._id)) counts[row._id] = row.count;
+      counts.all += row.count;
+    }
 
     return res.json({
       success: true,
-      data: { items, total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
+      data: { items, total, counts, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load requests." });
@@ -289,9 +310,203 @@ const getRequest = async (req, res) => {
   try {
     const item = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
     if (!item) return res.status(404).json({ success: false, message: "Application not found." });
-    return res.json({ success: true, data: item });
+
+    // Linked store, seller accounts aur review history — detail page ke liye ek hi call
+    const [store, user, employee, activity] = await Promise.all([
+      item.store_id
+        ? Store.findById(item.store_id).setOptions(CROSS_STORE).select("store_name subdomain store_status createdAt").lean()
+        : null,
+      item.user_id
+        ? User.findById(item.user_id).setOptions(CROSS_STORE).select("status emailVerified created_at").lean()
+        : null,
+      item.store_id
+        ? Employee.findOne({ email: item.email, storeId: item.store_id })
+            .setOptions(CROSS_STORE)
+            .select("status seller_pending created_at")
+            .lean()
+        : null,
+      SuperAdminActivity.find({ entityType: "seller_application", entityId: String(item._id) })
+        .sort({ created_at: -1 })
+        .limit(30)
+        .select("action actor.name created_at")
+        .lean(),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        ...item,
+        store: store ? { ...store, url: storeAdminBaseUrl(store) } : null,
+        account: {
+          user: user || null,
+          adminAccess: employee
+            ? { status: employee.status, pending: !!employee.seller_pending, created_at: employee.created_at }
+            : null,
+        },
+        activity,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load request." });
+  }
+};
+
+// Pending request ki details theek karna (e.g. typo) — store bhi sync hota hai
+const EDITABLE_REQUEST_FIELDS = {
+  name: 100,
+  phone: 20,
+  store_name: 120,
+  store_description: 2000,
+  business_category: 80,
+  country: 80,
+  city: 80,
+  address: 300,
+  zip_code: 20,
+};
+
+const updateRequest = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const updates = {};
+    for (const [field, max] of Object.entries(EDITABLE_REQUEST_FIELDS)) {
+      if (body[field] === undefined) continue;
+      updates[field] = String(body[field] ?? "").trim().slice(0, max);
+    }
+    if (body.business_type !== undefined) {
+      if (!["individual", "registered_business"].includes(body.business_type)) {
+        return res.status(400).json({ success: false, message: "Invalid business type." });
+      }
+      updates.business_type = body.business_type;
+    }
+
+    const errors = {};
+    if ("name" in updates && updates.name.length < 2) errors.name = "Name must be at least 2 characters.";
+    if ("store_name" in updates && !updates.store_name) errors.store_name = "Store name is required.";
+    if ("phone" in updates && updates.phone && !/^\d{10,16}$/.test(updates.phone)) {
+      errors.phone = "Phone must be 10–16 digits.";
+    }
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ success: false, message: "Please fix the highlighted fields.", errors });
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ success: false, message: "Nothing to update." });
+    }
+
+    const before = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
+    if (!before) return res.status(404).json({ success: false, message: "Application not found." });
+    if (before.status !== "pending") {
+      return res.status(409).json({
+        success: false,
+        message: "Only pending requests can be edited. Approved stores are managed from Store Management.",
+      });
+    }
+
+    const changed = Object.keys(updates).filter((key) => String(before[key] ?? "") !== String(updates[key]));
+    if (!changed.length) {
+      return res.json({ success: true, message: "No changes to save.", data: before });
+    }
+
+    const application = await SellerApplication.findOneAndUpdate(
+      { _id: before._id, status: "pending" },
+      { $set: updates },
+      { new: true }
+    ).select("-passwordHash").lean();
+    if (!application) {
+      return res.status(409).json({ success: false, message: "This request was reviewed meanwhile. Please reload." });
+    }
+
+    // Signup par bana (closed) store request ke saath sync rahe
+    if (application.store_id) {
+      const storeUpdates = {};
+      const map = {
+        store_name: "store_name",
+        store_description: "description",
+        business_category: "business_category",
+        business_type: "business_type",
+        country: "country",
+        city: "city",
+        address: "address",
+        zip_code: "zip_code",
+        phone: "phone",
+      };
+      for (const [from, to] of Object.entries(map)) if (from in updates) storeUpdates[to] = updates[from];
+      if (Object.keys(storeUpdates).length) {
+        await Store.updateOne({ _id: application.store_id }, { $set: storeUpdates }).setOptions(CROSS_STORE);
+      }
+    }
+    if ("name" in updates) {
+      if (application.user_id) {
+        await User.updateOne({ _id: application.user_id }, { $set: { name: updates.name } }).setOptions(CROSS_STORE);
+      }
+      if (application.store_id) {
+        await Employee.updateOne(
+          { email: application.email, storeId: application.store_id },
+          { $set: { name: updates.name } }
+        ).setOptions(CROSS_STORE);
+      }
+    }
+
+    await logActivity({
+      action: `Signup request updated — ${application.name} (${changed.join(", ")})`,
+      actor: req.superAdmin,
+      entityType: "seller_application",
+      entityId: String(application._id),
+      details: { changed },
+    });
+
+    return res.json({ success: true, message: "Request updated.", data: application });
+  } catch (error) {
+    log.error("[super-admin] update request error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to update request." });
+  }
+};
+
+// Pending/rejected request delete — signup par bane (khali, closed) store aur
+// accounts bhi hatao taake wahi email dobara signup kar sake.
+const deleteRequest = async (req, res) => {
+  try {
+    const application = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
+    if (!application) return res.status(404).json({ success: false, message: "Application not found." });
+    if (application.status === "approved") {
+      return res.status(409).json({
+        success: false,
+        message: "Approved sellers cannot be deleted from here. Suspend or delete the store from Store Management.",
+      });
+    }
+
+    // Atomic: sirf tab delete jab abhi bhi approved nahi hua
+    const deleted = await SellerApplication.findOneAndDelete({ _id: application._id, status: { $ne: "approved" } });
+    if (!deleted) {
+      return res.status(409).json({ success: false, message: "This request was approved meanwhile. Please reload." });
+    }
+
+    const removed = { store: 0, adminAccounts: 0, userAccount: 0 };
+    if (application.store_id) {
+      const storeResult = await Store.deleteOne({ _id: application.store_id, store_status: { $ne: "open" } }).setOptions(CROSS_STORE);
+      removed.store = storeResult.deletedCount || 0;
+      if (removed.store) {
+        const empResult = await Employee.deleteMany({ storeId: application.store_id, email: application.email }).setOptions(CROSS_STORE);
+        removed.adminAccounts = empResult.deletedCount || 0;
+      }
+    }
+    if (application.user_id) {
+      // Sirf signup wala blocked account — active customer account kabhi nahi
+      const userResult = await User.deleteOne({ _id: application.user_id, status: "blocked" }).setOptions(CROSS_STORE);
+      removed.userAccount = userResult.deletedCount || 0;
+    }
+
+    await logActivity({
+      action: `Signup request deleted — ${application.name} (${application.store_name})`,
+      actor: req.superAdmin,
+      entityType: "seller_application",
+      entityId: String(application._id),
+      details: { email: application.email, status: application.status, removed },
+    });
+
+    return res.json({ success: true, message: "Signup request deleted.", data: { removed } });
+  } catch (error) {
+    log.error("[super-admin] delete request error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to delete request." });
   }
 };
 
@@ -764,6 +979,8 @@ module.exports = {
   // requests
   listRequests,
   getRequest,
+  updateRequest,
+  deleteRequest,
   approveRequest,
   rejectRequest,
   requestInfo,

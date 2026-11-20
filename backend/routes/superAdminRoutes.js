@@ -18,6 +18,8 @@ router.get("/dashboard", superAdminController.getDashboard);
 
 router.get("/requests", superAdminController.listRequests);
 router.get("/requests/:id", superAdminController.getRequest);
+router.patch("/requests/:id", superAdminController.updateRequest);
+router.delete("/requests/:id", superAdminController.deleteRequest);
 router.post("/requests/:id/approve", superAdminController.approveRequest);
 router.post("/requests/:id/reject", superAdminController.rejectRequest);
 router.post("/requests/:id/request-info", superAdminController.requestInfo);
