@@ -1647,6 +1647,7 @@ const translations = {
   "admin.login.brand": { en: "E-commerce Admin Panel", ar: "لوحة إدارة التجارة الإلكترونية", ur: "ای کامرس ایڈمن پینل" },
   "admin.login.defaultStoreName": { en: "My Store", ar: "متجري", ur: "میرا اسٹور" },
   "admin.login.capsLock": { en: "Caps Lock is on", ar: "مفتاح الأحرف الكبيرة مفعّل", ur: "کیپس لاک آن ہے" },
+  "admin.login.orGoogle": { en: "or continue with Google", ar: "أو تابع باستخدام Google", ur: "یا Google کے ساتھ جاری رکھیں" },
   "admin.login.hidePassword": { en: "Hide password", ar: "إخفاء كلمة المرور", ur: "پاس ورڈ چھپائیں" },
   "admin.login.showPassword": { en: "Show password", ar: "إظهار كلمة المرور", ur: "پاس ورڈ دکھائیں" },
   "admin.login.emailRequired": { en: "Email address is required.", ar: "البريد الإلكتروني مطلوب.", ur: "ای میل درج کرنا ضروری ہے۔" },

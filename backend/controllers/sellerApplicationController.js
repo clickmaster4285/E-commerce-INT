@@ -10,6 +10,7 @@ const log = require("../utils/logger");
 const { logActivity } = require("../utils/superAdminActivity");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
 const { sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
+const { findApplicationForToken, INVALID_SETUP_LINK } = require("../utils/sellerSetupToken");
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
@@ -172,12 +173,9 @@ const sellerApplyStatus = async (req, res) => {
 // update the details they submitted at signup and attach verification documents.
 const sellerSetupState = async (req, res) => {
   try {
-    const email = normalizeEmail(req.query.email);
-    if (!email) return res.status(400).json({ success: false, message: "email is required." });
-    const app = await SellerApplication.findOne({ email })
-      .select("-passwordHash")
-      .lean();
-    if (!app) return res.status(404).json({ success: false, message: "No application found for this email." });
+    // Sirf email se nahi — email me bheja gaya signed link (utils/sellerSetupToken.js)
+    const app = await findApplicationForToken(req.query.token, { select: "-passwordHash", lean: true });
+    if (!app) return res.status(401).json({ success: false, code: "INVALID_SETUP_LINK", message: INVALID_SETUP_LINK });
     return res.json({
       success: true,
       data: {
@@ -209,8 +207,12 @@ const sellerSetupState = async (req, res) => {
 const completeSetup = async (req, res) => {
   try {
     const body = req.body || {};
-    const email = normalizeEmail(body.email);
-    if (!email) return res.status(400).json({ success: false, message: "email is required." });
+    // Signed setup link zaroori — sirf email se kisi aur ki application badli ja sakti thi
+    const application = await findApplicationForToken(body.token);
+    if (!application) {
+      return res.status(401).json({ success: false, code: "INVALID_SETUP_LINK", message: INVALID_SETUP_LINK });
+    }
+    const email = normalizeEmail(application.email);
 
     const storeName = String(body.storeName || "").trim().slice(0, 140);
     const storeDescription = String(body.storeDescription || "").trim().slice(0, 2000);
@@ -235,8 +237,6 @@ const completeSetup = async (req, res) => {
       return res.status(400).json({ success: false, message: "Please fix the highlighted fields.", errors });
     }
 
-    const application = await SellerApplication.findOne({ email });
-    if (!application) return res.status(404).json({ success: false, message: "No application found for this email." });
     if (application.status === "approved") {
       return res.status(409).json({ success: false, message: "This application is already approved." });
     }

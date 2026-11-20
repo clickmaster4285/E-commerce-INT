@@ -1584,6 +1584,7 @@
   "admin.login.brand": "E-commerce Admin Panel",
   "admin.login.defaultStoreName": "My Store",
   "admin.login.capsLock": "Caps Lock is on",
+  "admin.login.orGoogle": "or continue with Google",
   "admin.login.hidePassword": "Hide password",
   "admin.login.showPassword": "Show password",
   "admin.login.emailRequired": "Email address is required.",

@@ -48,6 +48,7 @@ const PLATFORM_EXACT = new Set([
   "/users/refresh-token",
   // Seller platform par login → apne store par handoff
   "/users/admin/login",
+  "/users/google-login", // admin "Sign in with Google" (seller owner, phir handoff)
   "/users/admin/refresh-token",
   "/users/admin/handoff",
   "/users/logout",

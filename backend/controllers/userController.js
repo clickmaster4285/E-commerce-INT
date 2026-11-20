@@ -49,6 +49,7 @@ const saveStoreLogoFromBase64 = async (raw) => {
 // cookies aur DB-backed rotating refresh sessions (utils/tokens.js)
 const tokens = require("../utils/tokens");
 const { findPlatformEmployee, sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
+const { verifyGoogleIdToken } = require("../utils/googleAuth");
 
 // Frontend axios instance `X-Auth-Aud` bhejta hai — logout sirf usi session ka
 const audFromHeader = (req) => {
@@ -973,66 +974,76 @@ const changePasswordSocket = async (req, res) => {
   }
 };
 
+// ==========================================
+// ADMIN / STAFF GOOGLE LOGIN
+// ------------------------------------------
+// Pehle token ka payload bina signature check decode hota tha (koi bhi email
+// likh kar bhej sakta tha) aur customer (User) collection me dhoonda jata tha.
+// Ab: Google se verify (utils/googleAuth.js) → isi store ka Employee
+// (platform par sirf seller owner) → loginAdmin jaisi checks → admin session.
+// Naya account kabhi nahi banta.
+// ==========================================
 const googleLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential)
-      return res.status(400).json({ message: "Google credential missing" });
-    const payload = JSON.parse(
-      Buffer.from(credential.split(".")[1], "base64").toString(),
-    );
-    const { email, name, picture } = payload;
-    if (!email)
-      return res
-        .status(400)
-        .json({ message: "No email found in Google account" });
-    let user = await User.findOne({ email });
-    if (!user) {
-      // ✅ SECURITY FIX: Naye Google users ko direct access NAHI milega
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access Denied. Your email is not registered as Staff/Admin. Please contact administrator." 
-      });
+    let google;
+    try {
+      google = await verifyGoogleIdToken(req.body?.credential);
+    } catch (error) {
+      return res.status(401).json({ success: false, message: error.message || "Invalid Google token" });
     }
 
-    // ✅ EXISTING USER ROLE CHECK
-    if (!["admin", "staff", "manager"].includes(user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Only administrators, managers and staff members can log in.",
-      });
+    let employee;
+    if (req.store) {
+      // Tenant-scoped: sirf isi store ka staff
+      employee = await Employee.findOne({ email: google.email }).select("-activities");
     } else {
-      if (user.role !== "user")
-        return res
-          .status(403)
-          .json({ message: "Admin/Staff cannot use customer Google login." });
-      if (!user.avatar && picture) {
-        user.avatar = picture;
-        await user.save();
+      const found = await findPlatformEmployee(google.email);
+      if (found.ambiguous) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is linked to more than one store. Please sign in from your store's address.",
+        });
       }
+      employee = found.employee;
     }
-    // ⚠️ Pehle `type` payload me nahi tha → authMiddleware ise "user" maan kar
-    // User collection me dhoondta (Employee hai → "User not found" 401), aur
-    // admin refresh endpoint bhi is token ko reject kar deta tha. Ab type
-    // set hai + expiry/cookie dono ek hi helper se aate hain.
-    await tokens.issueSession(req, res, "admin", user);
+
+    const denied = () =>
+      res.status(403).json({ success: false, message: "This Google account is not a staff member of this store." });
+    if (!employee || employee.is_deleted) return denied();
+    if (!["admin", "staff", "manager"].includes(employee.role)) return denied();
+    if (employee.status === "inactive")
+      return res.status(403).json({ success: false, message: "Your account is inactive. Please contact administrator." });
+
+    const io = req.io || getIO();
+    void pushGlobalActivity(
+      io,
+      {
+        action: `${employee.name} (${employee.role}) logged in to admin panel via Google`,
+        category: "Authentication",
+        performedBy: employee._id,
+        performedByName: employee.name,
+        details: { ip: req.ip, role: employee.role, provider: "google" },
+      },
+      employee._id,
+    );
+
+    await tokens.issueSession(req, res, "admin", employee);
     return res.json({
       success: true,
       message: "Google login successful",
       user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
+        id: employee._id,
+        name: employee.name,
+        username: employee.username,
+        phone: employee.phone,
+        email: employee.email,
+        role: employee.role,
+        avatar: employee.avatar || (google.picture || null),
       },
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Google login failed", error: error.message });
+    log.error("googleLogin error:", error);
+    return res.status(500).json({ success: false, message: "Google login failed" });
   }
 };
 
@@ -1041,28 +1052,15 @@ const googleLogin = async (req, res) => {
 // ==========================================
 const googleCustomerLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential)
-      return res.status(400).json({ success: false, message: "Google credential missing" });
-
-    let payload;
+    // Shared verify (aud + iss + exp + email_verified) — utils/googleAuth.js
+    let google;
     try {
-      const tokenRes = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
-      );
-      if (!tokenRes.ok)
-        return res.status(401).json({ success: false, message: "Invalid Google token" });
-      payload = await tokenRes.json();
-    } catch {
-      return res.status(401).json({ success: false, message: "Invalid Google token" });
+      google = await verifyGoogleIdToken(req.body?.credential);
+    } catch (error) {
+      return res.status(401).json({ success: false, message: error.message || "Invalid Google token" });
     }
-
-    if (payload.aud !== process.env.GOOGLE_CLIENT_ID)
-      return res.status(401).json({ success: false, message: "Invalid Google token" });
-
-    const { sub: googleId, email, name, picture, email_verified } = payload;
-    if (!email)
-      return res.status(400).json({ success: false, message: "Google account did not return an email" });
+    const { sub: googleId, email, name, picture } = google;
+    const email_verified = true; // verifyGoogleIdToken sirf verified email par aage jane deta hai
 
     let user = await User.findOne({ $or: [{ email }, { google_id: googleId }] });
 

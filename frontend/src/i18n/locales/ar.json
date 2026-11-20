@@ -1556,6 +1556,7 @@
   "admin.login.brand": "لوحة إدارة التجارة الإلكترونية",
   "admin.login.defaultStoreName": "متجري",
   "admin.login.capsLock": "مفتاح الأحرف الكبيرة مفعّل",
+  "admin.login.orGoogle": "أو تابع باستخدام Google",
   "admin.login.hidePassword": "إخفاء كلمة المرور",
   "admin.login.showPassword": "إظهار كلمة المرور",
   "admin.login.emailRequired": "البريد الإلكتروني مطلوب.",

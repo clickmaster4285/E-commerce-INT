@@ -446,7 +446,14 @@ const requestInfo = async (req, res) => {
 
     await notifySeller(
       sendApplicationInfoRequestedEmail,
-      { name: application.name, email: application.email, storeName: application.store_name, message },
+      {
+        name: application.name,
+        email: application.email,
+        storeName: application.store_name,
+        message,
+        // /store-setup ka signed link (sirf email se ab application nahi khulti)
+        setupToken: require("../utils/sellerSetupToken").signSetupToken(application),
+      },
       "Info request",
       application._id
     );

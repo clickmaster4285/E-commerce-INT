@@ -66,7 +66,6 @@ const API = process.env.NEXT_PUBLIC_SERVERURL;
 const API_ORIGIN = (API || "").replace(/\/api\/?$/, "");
 const docUrl = (path) => (path?.startsWith("http") ? path : `${API_ORIGIN}${path}`);
 
-const emailOk = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 export default function StoreSetupPage() {
   return (
@@ -93,7 +92,8 @@ const labelCls = "mb-1.5 block text-[11px] font-extrabold uppercase tracking-[0.
 
 function StoreSetupInner() {
   const params = useSearchParams();
-  const email = (params?.get("email") || "").trim().toLowerCase();
+  // Email me aaya signed link (?token=...) — sirf email se application nahi khulti
+  const token = (params?.get("token") || "").trim();
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -121,7 +121,7 @@ function StoreSetupInner() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!email || !emailOk(email)) {
+      if (!token) {
         if (!cancelled) {
           setNotFound(true);
           setLoading(false);
@@ -129,7 +129,7 @@ function StoreSetupInner() {
         return;
       }
       try {
-        const res = await fetch(`${API}/seller/apply/setup?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`${API}/seller/apply/setup?token=${encodeURIComponent(token)}`);
         const body = await res.json().catch(() => null);
         if (cancelled) return;
         if (!res.ok || !body?.success) {
@@ -159,7 +159,7 @@ function StoreSetupInner() {
     return () => {
       cancelled = true;
     };
-  }, [email]);
+  }, [token]);
 
   const pickLogo = async (e) => {
     const file = e.target.files?.[0] || null;
@@ -243,7 +243,7 @@ function StoreSetupInner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email,
+          token,
           storeName: storeName.trim(),
           storeDescription: storeDescription.trim(),
           businessCategory,
@@ -303,13 +303,9 @@ function StoreSetupInner() {
     return shell(
       <div className="text-center">
         <AlertCircle size={40} strokeWidth={1.75} className="mx-auto text-amber-400" aria-hidden="true" />
-        <h2 className="mt-4 text-[18px] font-extrabold text-white">We couldn&apos;t find that application</h2>
+        <h2 className="mt-4 text-[18px] font-extrabold text-white">This setup link is invalid or has expired</h2>
         <p className="mt-2 text-[13px] leading-6 text-slate-400">
-          {email ? (
-            <>No seller application exists for <span className="font-semibold text-slate-200">{email}</span>. Double-check the email you used at signup.</>
-          ) : (
-            "This link is missing the email parameter. Open it from the email we sent you."
-          )}
+          Please open the store setup link from the latest email we sent you. Links expire after a few days for your security.
         </p>
         <a href="/landing/signup" className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110">
           Back to signup

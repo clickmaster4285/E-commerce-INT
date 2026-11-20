@@ -1584,6 +1584,7 @@
   "admin.login.brand": "ای کامرس ایڈمن پینل",
   "admin.login.defaultStoreName": "میرا اسٹور",
   "admin.login.capsLock": "کیپس لاک آن ہے",
+  "admin.login.orGoogle": "یا Google کے ساتھ جاری رکھیں",
   "admin.login.hidePassword": "پاس ورڈ چھپائیں",
   "admin.login.showPassword": "پاس ورڈ دکھائیں",
   "admin.login.emailRequired": "ای میل درج کرنا ضروری ہے۔",

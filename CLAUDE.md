@@ -24,6 +24,14 @@ Frontend (`cd frontend`):
 - `npm run dev`: uses `next dev --webpack`. `npm run build`, `npm run lint` (ESLint 9, `eslint-config-next`).
 - `npm run i18n`: regenerates `src/i18n/locales/*.json` from `src/i18n/translations.source.mjs`. It runs automatically before `dev` and `build`. **Edit UI strings in `translations.source.mjs`, never in the generated locale JSON.**
 
+Production checklist (multi-tenant security):
+- `NODE_ENV=production`: auth cookies get `Secure`.
+- `REDIS_URL` set: shared rate limits and single-use handoff links across servers. Without it, the handoff check falls back to MongoDB.
+- `INTERNAL_PROXY_SECRET`: the same value in both `.env` files. The backend trusts `x-store-host` only with it.
+- `JWT_USER_*`, `JWT_ADMIN_*`, `JWT_SA_*` access/refresh secrets: six different random values, not the dev ones. `JWT_SECRET` signs only short-lived purpose tokens (handoff, password reset, seller setup links).
+- `PUBLIC_STORE_PROTOCOL=https`.
+- `GOOGLE_CLIENT_ID` (backend) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (frontend) set to the same value, with the store hosts added as authorized origins in the Google console.
+
 Configuration comes entirely from `backend/.env` and `frontend/.env`. Server code reads `PORT`, `API_PREFIX`, `UPLOAD_DIR`, and similar values with no defaults, so a missing variable breaks startup or requests. The frontend calls the API through `NEXT_PUBLIC_SERVERURL` and has no fallback.
 
 ## Next.js 16 caveat (from `frontend/AGENTS.md`)
