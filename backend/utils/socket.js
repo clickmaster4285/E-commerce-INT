@@ -221,7 +221,6 @@ const needsPermissionMigration = (perms) => {
 // ==========================================
 const initSocket = (server) => {
   const { Server } = require("socket.io");
-  const jwt = require("jsonwebtoken");
 
   const uploadDir = path.join(__dirname, "../uploads");
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -275,86 +274,28 @@ const initSocket = (server) => {
   });
 
   // ==========================================
-  // ✅ GUEST-FRIENDLY AUTH MIDDLEWARE
-  // Connection pe sab ko allow, token optional
+  // ✅ GUEST-FRIENDLY AUTH MIDDLEWARE (store-bound)
+  // Connection pe sab ko allow, token optional. Identity DB se isi store ke
+  // context me load hoti hai (utils/socketAuth.js) — dusre store ka token,
+  // deleted/blocked account ya platform host → guest.
   // ==========================================
-  io.use((socket, next) => {
-    const rawCookie = socket.handshake.headers.cookie;
-
-    // ✅ Agar cookie/token nahi → guest user allow karo
-    if (!rawCookie) {
-      socket.userId = null;
-      socket.userRole = "guest";
-      socket.storeId = null;
-      socket.userName = "Guest";
-      socket.userPermissions = {};
-      return next();
-    }
-
-    const cookies = Object.fromEntries(
-      rawCookie.split("; ").map((c) => {
-        const [k, ...v] = c.split("=");
-        return [k.trim(), v.join("=")];
-      })
-    );
-
-    // ✅ Access token expire ho jaye toh refresh token se identity recover karo
-    // (REST interceptor bhi yehi karta hai — warna socket reconnect pe "guest" ban jata hai)
-    const tryRefreshAuth = () => {
-      const rt = cookies.refreshToken;
-      if (!rt) return false;
-      try {
-        const rDecoded = jwt.verify(rt, process.env.JWT_SECRET);
-        if (!rDecoded.userId && !rDecoded.id) return false;
-        socket.userId = rDecoded.userId || rDecoded.id;
-        socket.userType = rDecoded.type || "user";
-        socket.userRole = (rDecoded.role || "user").toLowerCase();
-        socket.storeId = rDecoded.storeId || null;
-        socket.userName = rDecoded.name || "User";
-        socket.userPermissions = rDecoded.permissions || {};
-        return true;
-      } catch (e) {
-        return false;
-      }
-    };
-
-    const token = cookies.accessToken || cookies.auth_token || cookies.access_token;
-
-    // ✅ Token nahi → refresh se try, warna guest allow
-    if (!token) {
-      if (!tryRefreshAuth()) {
-        socket.userId = null;
-        socket.userRole = "guest";
-        socket.storeId = null;
-        socket.userName = "Guest";
-        socket.userPermissions = {};
-      }
-      return next();
-    }
-
+  const { resolveSocketIdentity } = require("./socketAuth");
+  io.use(async (socket, next) => {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (!decoded.userId && !decoded.id) {
-        return next(new Error("Invalid token payload"));
-      }
-      socket.userId = decoded.userId || decoded.id;
-      socket.userType = decoded.type || 'user';
-      socket.userRole = (decoded.role || "user").toLowerCase();
-      socket.storeId = decoded.storeId || null;
-      socket.userName = decoded.name || "User";
-      socket.userPermissions = decoded.permissions || {};
-      next();
+      const identity = await resolveSocketIdentity({
+        cookieHeader: socket.handshake.headers.cookie,
+        tenantStoreId: socket.tenantStoreId,
+        // Client batata hai kaun sa session: admin panel "admin", storefront "user"
+        aud: socket.handshake.auth?.aud,
+      });
+      Object.assign(socket, identity);
     } catch (error) {
-      // ✅ Access token expired/invalid → refresh token se try, warna guest
-      if (!tryRefreshAuth()) {
-        socket.userId = null;
-        socket.userRole = "guest";
-        socket.storeId = null;
-        socket.userName = "Guest";
-        socket.userPermissions = {};
-      }
-      next();
+      Object.assign(socket, {
+        userId: null, userType: "guest", userRole: "guest", userName: "Guest",
+        userPermissions: {}, storeId: null, sellerPending: false, sessionId: null,
+      });
     }
+    return next();
   });
 
   // ==========================================
@@ -369,7 +310,17 @@ const initSocket = (server) => {
     return true;
   };
 
+  const SELLER_PENDING_ERR = {
+    success: false,
+    code: "SELLER_PENDING",
+    message: "Your seller application is pending Super Admin approval. Changes are locked until it is approved.",
+  };
+
   const requireRole = (socket, allowedRoles, callback) => {
+    if (socket.sellerPending) {
+      if (typeof callback === "function") callback(SELLER_PENDING_ERR);
+      return false;
+    }
     if (!allowedRoles.includes(socket.userRole)) {
       const err = { success: false, message: "Unauthorized — admin/employee access only" };
       if (typeof callback === "function") callback(err);
@@ -397,18 +348,30 @@ const initSocket = (server) => {
       if (typeof callback === "function") callback(err);
       return { allowed: false };
     }
-    if (role === "admin") {
-      return { allowed: true, permissions: socket.userPermissions || {}, name: socket.userName };
+    if (socket.sellerPending) {
+      if (typeof callback === "function") callback(SELLER_PENDING_ERR);
+      return { allowed: false };
     }
     try {
+      // Har event par DB se fresh (isi store ke context me — tenantScope).
+      // Admin bhi: connect ke baad demote / deactivate ho to foran asar.
       const Model = socket.userType === "employee"
         ? require("../models/Employee")
         : require("../models/User");
-      const doc = await Model.findById(socket.userId).select("name permissions").lean();
-      if (!doc) {
+      const doc = await Model.findById(socket.userId).select("name role permissions status is_deleted").lean();
+      if (!doc || doc.is_deleted || doc.status === "inactive" || doc.status === "blocked") {
         const err = { success: false, message: "User not found" };
         if (typeof callback === "function") callback(err);
         return { allowed: false };
+      }
+      const freshRole = String(doc.role || "").toLowerCase();
+      if (!STAFF_ROLES.includes(freshRole)) {
+        const err = { success: false, message: "Unauthorized — admin/employee access only" };
+        if (typeof callback === "function") callback(err);
+        return { allowed: false };
+      }
+      if (freshRole === "admin") {
+        return { allowed: true, permissions: doc.permissions || {}, name: doc.name || socket.userName };
       }
       const perms = doc.permissions || {};
       const ok = opts.strict
@@ -571,7 +534,18 @@ const initSocket = (server) => {
       socket.to(room).emit("chat:typing", { conversation_id: id, sender_type: senderType, isTyping: payload.isTyping });
     });
 
-    socket.on("join:employee", (employeeId) => socket.join(`employee:${employeeId}`));
+    // Employee room me private events (permissionsUpdated waghera) jaate hain →
+    // sirf apna room, ya admin isi store ke kisi employee ka (scoped lookup).
+    socket.on("join:employee", async (employeeId) => {
+      try {
+        const id = String(employeeId || "");
+        if (!id || socket.userType !== "employee") return;
+        if (id === String(socket.userId)) return socket.join(`employee:${id}`);
+        if (socket.userRole !== "admin" || !require("mongoose").isValidObjectId(id)) return;
+        const exists = await require("../models/Employee").exists({ _id: id });
+        if (exists) socket.join(`employee:${id}`);
+      } catch (e) { /* ignore */ }
+    });
     socket.on("leave:employee", (employeeId) => socket.leave(`employee:${employeeId}`));
 
     // ========== SHIPPING EVENTS (Admin-only for write, public for read) ==========
@@ -761,6 +735,8 @@ const initSocket = (server) => {
 
     socket.on("updateProfile", async (payload, callback) => {
       if (!requireAuth(socket, callback)) return;
+      // REST jaisa: pending seller sirf dekh sakta hai, badal nahi sakta
+      if (socket.sellerPending) { if (typeof callback === "function") callback(SELLER_PENDING_ERR); return; }
       try {
         const { updateProfileInfo } = require("../controllers/userController");
         const req = {
@@ -778,11 +754,15 @@ const initSocket = (server) => {
 
     socket.on("changePassword", async (payload, callback) => {
       if (!requireAuth(socket, callback)) return;
+      // REST jaisa: pending seller sirf dekh sakta hai, badal nahi sakta
+      if (socket.sellerPending) { if (typeof callback === "function") callback(SELLER_PENDING_ERR); return; }
       try {
         const { changePasswordSocket } = require("../controllers/userController");
         const req = {
           user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
           userType: socket.userType || 'user',
+          // Password badalne par baaki sessions revoke — ye wala (current) bacha rahe
+          sessionId: socket.sessionId || null,
           body: payload, io
         };
         const res = { status: () => ({ json: (d) => { if (callback) callback(d); } }), json: (d) => { if (callback) callback(d); } };

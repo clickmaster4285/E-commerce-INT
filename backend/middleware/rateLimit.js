@@ -1,5 +1,4 @@
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
-const jwt = require("jsonwebtoken");
 const log = require("../utils/logger");
 
 // ==========================================
@@ -162,23 +161,20 @@ const ipPart = (req) => {
 // Token ko sirf decode/verify karte hain — fail ho to guest, kabhi 401 nahi.
 // ==========================================
 const roleOf = (req) => {
-  try {
-    let token = null;
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.split(" ")[1];
-    }
-    if (!token && req.cookies?.accessToken) {
-      token = req.cookies.accessToken;
-    }
-    if (!token || !process.env.JWT_SECRET) return "guest";
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (String(decoded.role || "").toLowerCase() === "admin") return "admin";
-    if (decoded.userId) return "user";
-    return "guest";
-  } catch {
-    return "guest";
+  // Audience-wise access cookies (utils/tokens.js): admin (a_at) → user (u_at)
+  const { AUDIENCES, verifyAccess } = require("../utils/tokens");
+  const header = req.headers.authorization;
+  const bearer = header && header.startsWith("Bearer ") ? header.slice(7).trim() : null;
+  for (const aud of ["admin", "user"]) {
+    const token = bearer || req.cookies?.[AUDIENCES[aud].cookies.access];
+    if (!token) continue;
+    try {
+      const decoded = verifyAccess(aud, token);
+      if (String(decoded.role || "").toLowerCase() === "admin") return "admin";
+      if (decoded.userId) return "user";
+    } catch { /* next audience */ }
   }
+  return "guest";
 };
 
 const multiplierFor = (role) => {

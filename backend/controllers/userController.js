@@ -45,73 +45,22 @@ const saveStoreLogoFromBase64 = async (raw) => {
   return `/uploads/store-logos/${fileName}`;
 };
 
-// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
-// jwt.sign "NaNm" jaise invalid expiresIn pe THROW kar deta hai (login/refresh
-// dono 500/401 → user logout). Is liye har value validated fallback ke saath.
-const getUserAccessDays = () => {
-  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 7;
+// ✅ Tokens / cookies / sessions — har audience (user | admin) ke alag secrets,
+// cookies aur DB-backed rotating refresh sessions (utils/tokens.js)
+const tokens = require("../utils/tokens");
+
+// Frontend axios instance `X-Auth-Aud` bhejta hai — logout sirf usi session ka
+const audFromHeader = (req) => {
+  const hint = String(req.headers?.["x-auth-aud"] || "").trim().toLowerCase();
+  return hint === "admin" || hint === "user" ? hint : null;
 };
+const audForUserType = (userType) => (userType === "employee" ? "admin" : "user");
 
-const getAdminAccessMinutes = () => {
-  const minutes = Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
-};
-
-const getRefreshTokenDays = () => {
-  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 30;
-};
-
-// type=user + role=user → lamba (din), baaki sab (employee type ya admin/staff/manager role) → minutes
-const isLongLivedUserToken = (type, role) =>
-  String(type || "user").toLowerCase() !== "employee" &&
-  String(role || "").toLowerCase() === "user";
-
-const getAccessExpiry = (type, role) =>
-  isLongLivedUserToken(type, role)
-    ? `${getUserAccessDays()}d`
-    : `${getAdminAccessMinutes()}m`;
-
-// ⚠️ Ye value JWT expiry se EXACTLY match karti hai. Pehle admin ke liye
-// hardcoded 1 ghanta tha jabki JWT sirf 10 min ka tha — mismatch se cookie
-// zinda rehta tha par token expire ho jata tha, aur har 401 pe refresh chain
-// race karke admin ko logout kar deta tha.
-const getAccessCookieMaxAge = (type, role) =>
-  isLongLivedUserToken(type, role)
-    ? getUserAccessDays() * 24 * 60 * 60 * 1000
-    : getAdminAccessMinutes() * 60 * 1000;
-
-const getRefreshCookieMaxAge = () => getRefreshTokenDays() * 24 * 60 * 60 * 1000;
-
-const generateTokens = (userId, role, type = 'user') => {
-  const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: getAccessExpiry(type, role),
-  });
-  const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${getRefreshTokenDays()}d`,
-  });
-  return { accessToken, refreshToken };
-};
-
-const getCookieOptions = (maxAge) => {
-  const requestedSameSite = String(process.env.AUTH_COOKIE_SAME_SITE || "lax").toLowerCase();
-  const sameSite = ["strict", "lax", "none"].includes(requestedSameSite) ? requestedSameSite : "lax";
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || sameSite === "none",
-    sameSite,
-    maxAge,
-    path: "/",
-  };
-};
-
-const clearAuthCookies = (res) => {
-  const { httpOnly, secure, sameSite, path } = getCookieOptions(0);
-  const options = { httpOnly, secure, sameSite, path };
-  res.clearCookie("accessToken", options);
-  res.clearCookie("refreshToken", options);
-};
+// Password badla → is account ke baaki sab sessions band (current wala bacha rahe)
+const revokeOtherSessions = (req, userType, subjectId) =>
+  tokens
+    .revokeAllForSubject(audForUserType(userType), subjectId, { exceptFamilyId: req.sessionId || null })
+    .catch((e) => log.error("revoke sessions failed:", e.message));
 
 // ==========================================
 // REGISTER (Customer only)
@@ -208,12 +157,9 @@ const createUser = async (req, res) => {
               employee.status = "active";
               await employee.save();
             }
-            const userTokens = generateTokens(existingUser._id, existingUser.role, "user");
-            res.cookie("accessToken", userTokens.accessToken, getCookieOptions(getAccessCookieMaxAge("user", existingUser.role)));
-            res.cookie("refreshToken", userTokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
-            const employeeTokens = generateTokens(employee._id, employee.role, "employee");
-            res.cookie("accessToken", employeeTokens.accessToken, getCookieOptions(getAccessCookieMaxAge("employee", employee.role)));
-            res.cookie("refreshToken", employeeTokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+            // User + admin sessions alag cookies me (pehle employee wale user cookies overwrite kar dete the)
+            await tokens.issueSession(req, res, "user", existingUser);
+            await tokens.issueSession(req, res, "admin", employee);
             return res.json({
               success: true,
               pendingApproval: true,
@@ -460,13 +406,7 @@ const loginUser = async (req, res) => {
       },
       user._id,
     );
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role, 'user');
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(getRefreshCookieMaxAge()),
-    );
+    await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
       message: "Login successful",
@@ -538,13 +478,7 @@ const loginAdmin = async (req, res) => {
       },
       employee._id,
     );
-    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, 'employee');
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('employee', employee.role)));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(getRefreshCookieMaxAge()),
-    );
+    await tokens.issueSession(req, res, "admin", employee);
     res.json({
       success: true,
       message: "Admin login successful",
@@ -564,80 +498,41 @@ const loginAdmin = async (req, res) => {
   }
 };
 
+// Customer refresh — u_rt (path-restricted cookie) rotate hota hai
 const refreshAccessToken = async (req, res) => {
   try {
-    const token = req.cookies.refreshToken;
-    if (!token)
-      return res
-        .status(401)
-        .json({ success: false, message: "Refresh token required" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userType = decoded.type || 'user';
-    const Model = userType === 'employee' ? Employee : User;
-    const user = await Model.findById(decoded.userId);
-    if (!user)
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    const { accessToken } = generateTokens(decoded.userId, user.role, userType);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge(userType, user.role)));
+    const result = await tokens.rotateSession(req, res, "user", async (id) => {
+      const user = await User.findById(id).select("_id role status is_deleted storeId").lean();
+      if (!user || user.is_deleted || user.status === "blocked" || user.status === "inactive") return null;
+      return user;
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
     log.error("refreshAccessToken error:", error);
     return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
-// Admin refresh alias. Explicit employee tokens and signed legacy admin tokens
-// are accepted; customer tokens are rejected.
+// Admin/employee refresh — a_rt rotate hota hai
 const refreshAdminAccessToken = async (req, res) => {
-  let decoded;
   try {
-    const token = req.cookies.refreshToken;
-    if (!token)
-      return res
-        .status(401)
-        .json({ success: false, message: "Refresh token required" });
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const adminRoles = ["admin", "staff", "manager"];
-    // Older admin sessions did not always include the `type` claim. Their
-    // signed role and matching Employee record let us safely migrate them.
-    if (decoded.type && decoded.type !== "employee") {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid refresh token" });
-    }
-    if (!decoded.type && !adminRoles.includes(String(decoded.role || "").toLowerCase())) {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid refresh token" });
-    }
-    const user = await Employee.findById(decoded.userId);
-    if (!user || user.is_deleted || user.status === "inactive" || !["admin", "staff", "manager"].includes(user.role)) {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    }
-    const { accessToken } = generateTokens(decoded.userId, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
+    const result = await tokens.rotateSession(req, res, "admin", async (id) => {
+      const employee = await Employee.findById(id).select("_id role status is_deleted storeId").lean();
+      if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return null;
+      if (!["admin", "staff", "manager"].includes(employee.role)) return null;
+      return employee;
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
     log.error("refreshAdminAccessToken error:", error);
     return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
 const logoutUser = async (req, res) => {
+  const auds = audFromHeader(req) ? [audFromHeader(req)] : ["admin", "user"];
   try {
     if (req.user?._id) {
       const io = req.io || getIO();
@@ -652,10 +547,13 @@ const logoutUser = async (req, res) => {
         req.user._id,
       );
     }
-    clearAuthCookies(res);
+    for (const aud of auds) {
+      await tokens.revokeCurrentSession(req, aud).catch((e) => log.error("logout revoke failed:", e.message));
+      tokens.clearAuthCookies(res, aud);
+    }
     res.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    clearAuthCookies(res);
+    for (const aud of auds) tokens.clearAuthCookies(res, aud);
     res.json({ success: true, message: "Logged out successfully" });
   }
 };
@@ -815,6 +713,7 @@ const changePassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = req.user._id;
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     const io = req.io || getIO();
     await pushGlobalActivity(
       io,
@@ -1026,6 +925,7 @@ const changePasswordSocket = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = userId;
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     return res.json({
       success: true,
       message: "Password changed successfully",
@@ -1078,9 +978,7 @@ const googleLogin = async (req, res) => {
     // User collection me dhoondta (Employee hai → "User not found" 401), aur
     // admin refresh endpoint bhi is token ko reject kar deta tha. Ab type
     // set hai + expiry/cookie dono ek hi helper se aate hain.
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    await tokens.issueSession(req, res, "admin", user);
     return res.json({
       success: true,
       message: "Google login successful",
@@ -1141,7 +1039,8 @@ const googleCustomerLogin = async (req, res) => {
       user = await User.findById(user._id);
     } else {
       const randomPassword = await bcrypt.hash(require("crypto").randomBytes(32).toString("hex"), 10);
-      const defaultStore = await Store.findOne();
+      // Customer isi host ke store ka hai; platform par koi store nahi (random store nahi)
+      const defaultStore = req.store || null;
       user = await User.create({
         name: name || email.split("@")[0],
         username: email.split("@")[0] + Math.floor(Math.random() * 99999),
@@ -1170,9 +1069,7 @@ const googleCustomerLogin = async (req, res) => {
       user._id,
     );
 
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
       message: "Google login successful",
@@ -1588,6 +1485,7 @@ const changePasswordREST = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     res.json({ success: true, message: "Password changed successfully" });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -1659,12 +1557,11 @@ const exchangeStoreHandoff = async (req, res) => {
     usedHandoffIds.set(decoded.jti, decoded.exp * 1000);
 
     // Tenant-scoped: sirf isi store ka employee milega
-    const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name").lean();
+    const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name storeId").lean();
     if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return invalid();
 
-    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", employee.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    // Store host ka admin session — storeId isi store ka
+    await tokens.issueSession(req, res, "admin", { ...employee, storeId: req.store._id });
     res.json({ success: true, message: "Signed in to your store." });
   } catch (error) {
     log.error("Exchange store handoff error:", error);

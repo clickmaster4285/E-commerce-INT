@@ -96,6 +96,10 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
   http.interceptors.request.use(
     (config) => {
       config.baseURL = getBaseURL();
+      // Backend ko batao kaun sa session (a_at admin / u_at customer) use kare —
+      // ek hi browser me customer + admin dono logged-in reh sakte hain
+      config.headers = config.headers || {};
+      config.headers["X-Auth-Aud"] = mode;
       return config;
     },
     (error) => Promise.reject(error),

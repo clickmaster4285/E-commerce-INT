@@ -29,70 +29,16 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () =>
   String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 
-// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
-// jwt.sign invalid expiresIn ("NaNd") pe THROW kar deta hai → OTP verify ke
-// baad login fail. Is liye validated fallback.
-const getUserAccessDays = () => {
-  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 7;
-};
+// ✅ Sessions utils/tokens.js se — customer (aud "user") aur seller admin
+// (aud "admin") ke alag secrets + cookies. Pehle yahan hard-coded
+// secure:false / 7-din wale employee tokens the.
+const tokens = require("../utils/tokens");
 
-const getRefreshTokenDays = () => {
-  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 30;
-};
+const setAuthCookies = (req, res, user) => tokens.issueSession(req, res, "user", user);
 
-const setAuthCookies = (res, userId, role) => {
-  const accessToken = jwt.sign(
-    { userId, role, type: "user" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getUserAccessDays()}d` },
-  );
-  const refreshToken = jwt.sign(
-    { userId, role, type: "user" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getRefreshTokenDays()}d` },
-  );
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
-  });
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getRefreshTokenDays() * 24 * 60 * 60 * 1000,
-  });
-};
-
-// Seller admin session — same JWTs, type="employee". Pending sellers get this too,
-// so they can open the admin panel read-only until the Super Admin approves them.
-const setEmployeeAuthCookies = (res, employeeId, role) => {
-  const accessToken = jwt.sign(
-    { userId: employeeId, role, type: "employee" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getUserAccessDays()}d` },
-  );
-  const refreshToken = jwt.sign(
-    { userId: employeeId, role, type: "employee" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getRefreshTokenDays()}d` },
-  );
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
-  });
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getRefreshTokenDays() * 24 * 60 * 60 * 1000,
-  });
-};
+// Seller admin session. Pending sellers get this too, so they can open the
+// admin panel read-only until the Super Admin approves them.
+const setEmployeeAuthCookies = (req, res, employee) => tokens.issueSession(req, res, "admin", employee);
 
 // ==========================================
 // 🔁 ISSUE + SEND OTP (shared)
@@ -433,7 +379,9 @@ const verifyEmailVerificationOtp = async (req, res) => {
         });
       }
 
-      const defaultStore = isSeller ? null : await Store.findOne();
+      // Store host par wahi store (req.store); platform par koi "default" store nahi —
+      // pehle Store.findOne() platform par kisi bhi random store ko pakad leta tha
+      const defaultStore = isSeller ? null : req.store || null;
       const user = await User.create({
         name: pending.name,
         username: pending.username,
@@ -502,9 +450,9 @@ const verifyEmailVerificationOtp = async (req, res) => {
 
       // Pending approval — set user cookies (blocked account) AND a read-only
       // employee session for the admin panel (all pages accessible, nothing writable).
-      setAuthCookies(res, user._id, user.role);
+      await setAuthCookies(req, res, user);
       if (employee) {
-        setEmployeeAuthCookies(res, employee._id, employee.role);
+        await setEmployeeAuthCookies(req, res, employee);
       }
       const io = req.io || getIO();
       await pushGlobalActivity(
@@ -551,7 +499,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
     await record.save();
 
     // ✅ Verified hone par seedha login karwa dete hain
-    setAuthCookies(res, user._id, user.role);
+    await setAuthCookies(req, res, user);
 
     const io = req.io || getIO();
     await pushGlobalActivity(
@@ -736,9 +684,9 @@ const resetPasswordWithOtp = async (req, res) => {
       user._id,
     );
 
-    // ✅ Security: purane sessions invalid karne ke liye cookies clear
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    // ✅ Security: is account ke SAARE sessions (har device) band + cookies clear
+    await tokens.revokeAllForSubject("user", user._id, { reason: "password_reset" });
+    tokens.clearAuthCookies(res, "user");
 
     return res.json({
       success: true,

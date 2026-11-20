@@ -38,6 +38,7 @@ const getSocketUrl = () => getBackendOrigin();
 
 const SOCKET_OPTIONS = {
   withCredentials: true,
+  auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
   transports: (process.env.NEXT_PUBLIC_SOCKET_TRANSPORTS || "websocket,polling")
     .split(",")
     .map((t) => t.trim())

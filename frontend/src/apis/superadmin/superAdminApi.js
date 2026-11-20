@@ -1,8 +1,8 @@
 import axios from "axios";
 import { alignBackendUrl } from "@/lib/tenantHost";
 
-// Super Admin HTTP client — same accessToken / refreshToken cookies as
-// seller/customer auth. Backend mount path: /api/super-admin.
+// Super Admin HTTP client — apne alag cookies (sa_at / sa_rt / sa_sess, backend utils/tokens.js),
+// seller/customer se bilkul alag session. Backend mount path: /api/super-admin.
 // Uses alignBackendUrl so nip.io pages hit the same hostname as the API
 // (otherwise SameSite=Lax cookies never stick across IP vs nip.io).
 const API_BASE_URL =

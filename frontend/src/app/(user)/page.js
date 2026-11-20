@@ -20,7 +20,11 @@ async function getInitialBanners() {
     if (!base) return null;
     const storeHost = (await headers()).get("x-store-host") || "";
     const res = await fetch(`${base}/banners/active?limit=12`, {
-      headers: { "x-store-host": storeHost },
+      // Backend `x-store-host` sirf INTERNAL_PROXY_SECRET ke saath maanta hai (server-only env)
+      headers: {
+        "x-store-host": storeHost,
+        "x-internal-proxy-secret": process.env.INTERNAL_PROXY_SECRET || "",
+      },
       cache: "no-store",
     });
     if (!res.ok) return null;

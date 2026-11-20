@@ -4,14 +4,8 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const jwt = require("jsonwebtoken");
-const {
-  generateTokens,
-  setAuthCookies,
-  clearAuthCookies,
-  getCookieOptions,
-  getAccessCookieMaxAge,
-} = require("../middleware/superAdminAuth");
+// Super admin ka apna audience — sa_at / sa_rt cookies, alag secrets, rotating sessions
+const tokens = require("../utils/tokens");
 const { logActivity } = require("../utils/superAdminActivity");
 const {
   sendApplicationApprovedEmail,
@@ -63,8 +57,7 @@ const loginSuperAdmin = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid email or password." });
     }
 
-    const tokens = generateTokens(superAdmin);
-    setAuthCookies(res, tokens);
+    await tokens.issueSession(req, res, "superadmin", { _id: superAdmin._id, role: superAdmin.role || "superadmin" });
     superAdmin.lastLoginAt = new Date();
     await superAdmin.save().catch(() => {});
     await logActivity({
@@ -93,32 +86,12 @@ const loginSuperAdmin = async (req, res) => {
 
 const refreshSuperAdminToken = async (req, res) => {
   try {
-    const token = req.cookies?.refreshToken;
-    if (!token) {
-      return res.status(401).json({ success: false, message: "Refresh token required" });
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
-
-    // Wrong audience (seller/customer token) — do not wipe their session cookies.
-    if (decoded?.type !== "superadmin") {
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
-
-    const superAdmin = await SuperAdmin.findById(decoded.userId);
-    if (!superAdmin || superAdmin.status !== "active") {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Super Admin account not found." });
-    }
-
-    const { accessToken } = generateTokens(superAdmin);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge()));
+    const result = await tokens.rotateSession(req, res, "superadmin", async (id) => {
+      const superAdmin = await SuperAdmin.findById(id).select("_id role status").lean();
+      if (!superAdmin || superAdmin.status !== "active") return null;
+      return { _id: superAdmin._id, role: superAdmin.role || "superadmin" };
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     return res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
     log.error("[super-admin] refresh error:", error.message);
@@ -129,7 +102,8 @@ const refreshSuperAdminToken = async (req, res) => {
 const logoutSuperAdmin = async (req, res) => {
   try {
     const actor = req.superAdmin;
-    clearAuthCookies(res);
+    await tokens.revokeCurrentSession(req, "superadmin").catch(() => {});
+    tokens.clearAuthCookies(res, "superadmin");
     if (actor) {
       await logActivity({
         action: "Super admin logged out",
@@ -140,6 +114,7 @@ const logoutSuperAdmin = async (req, res) => {
     }
     return res.json({ success: true, message: "Logged out." });
   } catch (error) {
+    tokens.clearAuthCookies(res, "superadmin");
     return res.status(500).json({ success: false, message: "Logout failed." });
   }
 };

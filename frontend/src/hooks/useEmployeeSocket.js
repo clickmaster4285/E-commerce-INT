@@ -40,6 +40,7 @@ export function getEmployeeSocket() {
   if (!employeeSocket) {
     employeeSocket = io(SOCKET_URL, {
       withCredentials: true,
+      auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
 
       transports: [
         "websocket",

@@ -89,6 +89,7 @@ function getSocket() {
   try {
     globalSocket = io(SOCKET_URL, {
       withCredentials: true,
+      auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 3,        // ✅ Zyada attempts se spam kam

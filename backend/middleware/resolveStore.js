@@ -14,7 +14,10 @@
 //     tenantScope plugin har query ko isi store tak mehdood karta hai
 //   • /super-admin API band (404) — super admin sirf platform par hai
 //   • store na mile → 404 STORE_NOT_FOUND (sirf /store/resolve aur /health khule)
-// PLATFORM host par koi scope nahi (signup, store-setup, super admin).
+// PLATFORM host par koi scope nahi — is liye wahan sirf PLATFORM_EXACT /
+// PLATFORM_PREFIXES wali APIs khuli hain (signup, store-setup, seller login +
+// handoff, super admin). Baaki sab → 404 STORE_REQUIRED.
+// `x-store-host` sirf `x-internal-proxy-secret` (INTERNAL_PROXY_SECRET) ke saath.
 // ==========================================================
 
 const Store = require("../models/Store");
@@ -24,16 +27,59 @@ const { runWithStore } = require("../utils/tenantContext");
 const CACHE_TTL_MS = 60 * 1000;
 const cache = new Map(); // host → { store, expires }
 
+const crypto = require("crypto");
+
 const ALWAYS_OPEN = new Set(["/health", "/store/resolve"]);
+
+// ── PLATFORM host par sirf yehi APIs khuli hain ──
+// Baaki har store-owned API (products, orders, customers ...) platform par
+// chalti to tenant scope nahi lagta aur SAARE stores ka data aa jata — is liye
+// platform par woh 404 STORE_REQUIRED deti hain.
+const PLATFORM_EXACT = new Set([
+  "/health",
+  "/store/resolve",
+  "/store/check-subdomain",
+  // Seller signup (landing/signup)
+  "/users/register",
+  "/users/send-email-otp",
+  "/users/verify-email-otp",
+  "/users/google-customer-login",
+  "/users/email-health",
+  "/users/refresh-token",
+  // Seller platform par login → apne store par handoff
+  "/users/admin/login",
+  "/users/admin/refresh-token",
+  "/users/admin/handoff",
+  "/users/logout",
+]);
+const PLATFORM_PREFIXES = ["/super-admin", "/seller/apply"];
+
+function isPlatformRoute(path) {
+  if (PLATFORM_EXACT.has(path)) return true;
+  return PLATFORM_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
+// Next.js server ka shared secret — sirf isi ke saath `x-store-host` maana jata hai
+function hasInternalProxySecret(req) {
+  const expected = process.env.INTERNAL_PROXY_SECRET;
+  const given = req.headers["x-internal-proxy-secret"];
+  if (!expected || !given) return false;
+  const a = Buffer.from(String(given));
+  const b = Buffer.from(String(expected));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 function hostFromRequest(req) {
   const host = req.headers.host || "";
-  // Next.js server (SSR / middleware) backend ko platform address (IP) par call karta
-  // hai aur asli store host `x-store-host` me bhejta hai. Ye header sirf tab maana
-  // jata hai jab request khud platform host par aayi ho — browser store host se
-  // aa kar kisi aur store ka header nahi laga sakta.
+  // Next.js server (SSR / proxy.js) backend ko platform address (IP) par call karta
+  // hai aur asli store host `x-store-host` me bhejta hai. Ye header SIRF tab maana
+  // jata hai jab request platform host par ho AUR `x-internal-proxy-secret` sahi ho —
+  // warna koi bhi client platform host par ye header laga kar kisi bhi store ka
+  // context le sakta tha.
   const forwarded = req.headers["x-store-host"];
-  if (forwarded && parseTenantHost(host).type === "platform") return String(forwarded);
+  if (forwarded && parseTenantHost(host).type === "platform" && hasInternalProxySecret(req)) {
+    return String(forwarded);
+  }
   return host;
 }
 
@@ -88,7 +134,14 @@ async function resolveStore(req, res, next) {
   req.store = store;
   req.storeMissing = tenant.type !== "platform" && !store;
 
-  if (tenant.type === "platform") return next();
+  if (tenant.type === "platform") {
+    if (isPlatformRoute(req.path)) return next();
+    return res.status(404).json({
+      success: false,
+      code: "STORE_REQUIRED",
+      message: "This API is only available on a store address.",
+    });
+  }
 
   if (req.path === "/super-admin" || req.path.startsWith("/super-admin/")) {
     return res.status(404).json({ success: false, message: "Not found." });
@@ -108,4 +161,4 @@ function requireStore(req, res, next) {
   return notFound(res, req.tenant);
 }
 
-module.exports = { resolveStore, requireStore, resolveStoreByHost, clearStoreHostCache };
+module.exports = { resolveStore, requireStore, resolveStoreByHost, clearStoreHostCache, isPlatformRoute };
