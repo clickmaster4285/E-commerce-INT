@@ -1,4 +1,5 @@
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
+const { isAdminRole } = require("../utils/roles");
 const log = require("../utils/logger");
 
 // ==========================================
@@ -170,7 +171,8 @@ const roleOf = (req) => {
     if (!token) continue;
     try {
       const decoded = verifyAccess(aud, token);
-      if (String(decoded.role || "").toLowerCase() === "admin") return "admin";
+      // Owner ("storehandler") + admin dono full-access (utils/roles.js)
+      if (isAdminRole(decoded.role)) return "admin";
       if (decoded.userId) return "user";
     } catch { /* next audience */ }
   }

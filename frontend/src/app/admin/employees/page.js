@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole } from "@/lib/roles";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -245,7 +246,7 @@ export default function EmployeesPage() {
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
-  const isCurrentAdmin = String(currentUserProfile?.role || "").toLowerCase() === "admin";
+  const isCurrentAdmin = isAdminRole(currentUserProfile?.role);
   // ✅ Jis ko 'employees' permission hai wahi add/edit/delete kar sakta hai
   const canManageEmployees = isCurrentAdmin || currentUserProfile?.permissions?.employees !== false;
   const denyEmployeesAccess = () =>

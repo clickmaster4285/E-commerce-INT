@@ -1,12 +1,16 @@
 const bcrypt = require("bcryptjs");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const SuperAdmin = require("../models/SuperAdmin");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
+const jwt = require("jsonwebtoken"); // store admin handoff token (openStoreAdmin)
 // Super admin ka apna audience — sa_at / sa_rt cookies, alag secrets, rotating sessions
 const tokens = require("../utils/tokens");
-const { logActivity } = require("../utils/superAdminActivity");
+const { logActivity, activityRow, clientInfo } = require("../utils/superAdminActivity");
+const SuperAdminActivity = require("../models/SuperAdminActivity");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 
 // Seller ka employee: application ke store me (resume-flow wale purane records
 // bina storeId ke bhi ho sakte hain — woh seller_pending se pehchane jate hain)
@@ -66,12 +70,14 @@ const loginSuperAdmin = async (req, res) => {
 
     await tokens.issueSession(req, res, "superadmin", { _id: superAdmin._id, role: superAdmin.role || "superadmin" });
     superAdmin.lastLoginAt = new Date();
+    superAdmin.lastActiveAt = superAdmin.lastLoginAt;
     await superAdmin.save().catch(() => {});
     await logActivity({
-      action: "Super admin logged in",
+      action: "Signed in",
       actor: superAdmin,
       entityType: "auth",
       entityId: String(superAdmin._id),
+      details: clientInfo(req),
     });
 
     return res.json({
@@ -108,15 +114,24 @@ const refreshSuperAdminToken = async (req, res) => {
 
 const logoutSuperAdmin = async (req, res) => {
   try {
-    const actor = req.superAdmin;
+    let actor = req.superAdmin;
+    if (!actor) {
+      // Expired access token (sa_at) par bhi pata chale kaun logout hua
+      const token = req.cookies?.[tokens.AUDIENCES.superadmin.cookies.access];
+      try {
+        const payload = token ? tokens.verifyAccess("superadmin", token, { ignoreExpiration: true }) : null;
+        if (payload?.userId) actor = await SuperAdmin.findById(payload.userId).select("name email").lean();
+      } catch { actor = null; }
+    }
     await tokens.revokeCurrentSession(req, "superadmin").catch(() => {});
     tokens.clearAuthCookies(res, "superadmin");
     if (actor) {
       await logActivity({
-        action: "Super admin logged out",
+        action: "Signed out",
         actor: { _id: actor._id, name: actor.name, email: actor.email },
         entityType: "auth",
         entityId: String(actor._id),
+        details: clientInfo(req),
       });
     }
     return res.json({ success: true, message: "Logged out." });
@@ -234,33 +249,52 @@ const getDashboard = async (req, res) => {
    REQUESTS — the seller application queue
    ========================================== */
 
+// Platform host par tenant context nahi hota, phir bhi cross-store queries explicit rakho
+const CROSS_STORE = { skipTenantScope: true };
+const REQUEST_STATUSES = ["pending", "approved", "rejected"];
+
 const listRequests = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 10 } = req.query;
+    const { status, search, sort = "newest", page = 1, limit = 10 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
     const filter = {};
-    if (["pending", "approved", "rejected"].includes(String(status || ""))) {
+    if (REQUEST_STATUSES.includes(String(status || ""))) {
       filter.status = String(status);
     }
     if (search) {
-      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
-      filter.$or = [{ name: pattern }, { email: pattern }, { store_name: pattern }];
+      const pattern = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [
+        { name: pattern },
+        { email: pattern },
+        { store_name: pattern },
+        { phone: pattern },
+        { username: pattern },
+        { city: pattern },
+      ];
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, grouped] = await Promise.all([
       SellerApplication.find(filter)
-        .sort({ created_at: -1 })
+        .sort({ created_at: sort === "oldest" ? 1 : -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum)
         .select("-passwordHash")
         .lean(),
       SellerApplication.countDocuments(filter),
+      // Status tabs ke counts (search/filter se independent)
+      SellerApplication.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     ]);
+
+    const counts = { all: 0, pending: 0, approved: 0, rejected: 0 };
+    for (const row of grouped) {
+      if (REQUEST_STATUSES.includes(row._id)) counts[row._id] = row.count;
+      counts.all += row.count;
+    }
 
     return res.json({
       success: true,
-      data: { items, total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
+      data: { items, total, counts, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load requests." });
@@ -271,9 +305,203 @@ const getRequest = async (req, res) => {
   try {
     const item = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
     if (!item) return res.status(404).json({ success: false, message: "Application not found." });
-    return res.json({ success: true, data: item });
+
+    // Linked store, seller accounts aur review history — detail page ke liye ek hi call
+    const [store, user, employee, activity] = await Promise.all([
+      item.store_id
+        ? Store.findById(item.store_id).setOptions(CROSS_STORE).select("store_name subdomain store_status createdAt").lean()
+        : null,
+      item.user_id
+        ? User.findById(item.user_id).setOptions(CROSS_STORE).select("status emailVerified created_at").lean()
+        : null,
+      item.store_id
+        ? Employee.findOne({ email: item.email, storeId: item.store_id })
+            .setOptions(CROSS_STORE)
+            .select("status seller_pending created_at")
+            .lean()
+        : null,
+      SuperAdminActivity.find({ entityType: "seller_application", entityId: String(item._id) })
+        .sort({ created_at: -1 })
+        .limit(30)
+        .select("action actor.name created_at")
+        .lean(),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        ...item,
+        store: store ? { ...store, url: storeAdminBaseUrl(store) } : null,
+        account: {
+          user: user || null,
+          adminAccess: employee
+            ? { status: employee.status, pending: !!employee.seller_pending, created_at: employee.created_at }
+            : null,
+        },
+        activity,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load request." });
+  }
+};
+
+// Pending request ki details theek karna (e.g. typo) — store bhi sync hota hai
+const EDITABLE_REQUEST_FIELDS = {
+  name: 100,
+  phone: 20,
+  store_name: 120,
+  store_description: 2000,
+  business_category: 80,
+  country: 80,
+  city: 80,
+  address: 300,
+  zip_code: 20,
+};
+
+const updateRequest = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const updates = {};
+    for (const [field, max] of Object.entries(EDITABLE_REQUEST_FIELDS)) {
+      if (body[field] === undefined) continue;
+      updates[field] = String(body[field] ?? "").trim().slice(0, max);
+    }
+    if (body.business_type !== undefined) {
+      if (!["individual", "registered_business"].includes(body.business_type)) {
+        return res.status(400).json({ success: false, message: "Invalid business type." });
+      }
+      updates.business_type = body.business_type;
+    }
+
+    const errors = {};
+    if ("name" in updates && updates.name.length < 2) errors.name = "Name must be at least 2 characters.";
+    if ("store_name" in updates && !updates.store_name) errors.store_name = "Store name is required.";
+    if ("phone" in updates && updates.phone && !/^\d{10,16}$/.test(updates.phone)) {
+      errors.phone = "Phone must be 10–16 digits.";
+    }
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ success: false, message: "Please fix the highlighted fields.", errors });
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ success: false, message: "Nothing to update." });
+    }
+
+    const before = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
+    if (!before) return res.status(404).json({ success: false, message: "Application not found." });
+    if (before.status !== "pending") {
+      return res.status(409).json({
+        success: false,
+        message: "Only pending requests can be edited. Approved stores are managed from Store Management.",
+      });
+    }
+
+    const changed = Object.keys(updates).filter((key) => String(before[key] ?? "") !== String(updates[key]));
+    if (!changed.length) {
+      return res.json({ success: true, message: "No changes to save.", data: before });
+    }
+
+    const application = await SellerApplication.findOneAndUpdate(
+      { _id: before._id, status: "pending" },
+      { $set: updates },
+      { new: true }
+    ).select("-passwordHash").lean();
+    if (!application) {
+      return res.status(409).json({ success: false, message: "This request was reviewed meanwhile. Please reload." });
+    }
+
+    // Signup par bana (closed) store request ke saath sync rahe
+    if (application.store_id) {
+      const storeUpdates = {};
+      const map = {
+        store_name: "store_name",
+        store_description: "description",
+        business_category: "business_category",
+        business_type: "business_type",
+        country: "country",
+        city: "city",
+        address: "address",
+        zip_code: "zip_code",
+        phone: "phone",
+      };
+      for (const [from, to] of Object.entries(map)) if (from in updates) storeUpdates[to] = updates[from];
+      if (Object.keys(storeUpdates).length) {
+        await Store.updateOne({ _id: application.store_id }, { $set: storeUpdates }).setOptions(CROSS_STORE);
+      }
+    }
+    if ("name" in updates) {
+      if (application.user_id) {
+        await User.updateOne({ _id: application.user_id }, { $set: { name: updates.name } }).setOptions(CROSS_STORE);
+      }
+      if (application.store_id) {
+        await Employee.updateOne(
+          { email: application.email, storeId: application.store_id },
+          { $set: { name: updates.name } }
+        ).setOptions(CROSS_STORE);
+      }
+    }
+
+    await logActivity({
+      action: `Signup request updated — ${application.name} (${changed.join(", ")})`,
+      actor: req.superAdmin,
+      entityType: "seller_application",
+      entityId: String(application._id),
+      details: { changed },
+    });
+
+    return res.json({ success: true, message: "Request updated.", data: application });
+  } catch (error) {
+    log.error("[super-admin] update request error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to update request." });
+  }
+};
+
+// Pending/rejected request delete — signup par bane (khali, closed) store aur
+// accounts bhi hatao taake wahi email dobara signup kar sake.
+const deleteRequest = async (req, res) => {
+  try {
+    const application = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
+    if (!application) return res.status(404).json({ success: false, message: "Application not found." });
+    if (application.status === "approved") {
+      return res.status(409).json({
+        success: false,
+        message: "Approved sellers cannot be deleted from here. Suspend or delete the store from Store Management.",
+      });
+    }
+
+    // Atomic: sirf tab delete jab abhi bhi approved nahi hua
+    const deleted = await SellerApplication.findOneAndDelete({ _id: application._id, status: { $ne: "approved" } });
+    if (!deleted) {
+      return res.status(409).json({ success: false, message: "This request was approved meanwhile. Please reload." });
+    }
+
+    const removed = { store: 0, adminAccounts: 0, userAccount: 0 };
+    if (application.store_id) {
+      const storeResult = await Store.deleteOne({ _id: application.store_id, store_status: { $ne: "open" } }).setOptions(CROSS_STORE);
+      removed.store = storeResult.deletedCount || 0;
+      if (removed.store) {
+        const empResult = await Employee.deleteMany({ storeId: application.store_id, email: application.email }).setOptions(CROSS_STORE);
+        removed.adminAccounts = empResult.deletedCount || 0;
+      }
+    }
+    if (application.user_id) {
+      // Sirf signup wala blocked account — active customer account kabhi nahi
+      const userResult = await User.deleteOne({ _id: application.user_id, status: "blocked" }).setOptions(CROSS_STORE);
+      removed.userAccount = userResult.deletedCount || 0;
+    }
+
+    await logActivity({
+      action: `Signup request deleted — ${application.name} (${application.store_name})`,
+      actor: req.superAdmin,
+      entityType: "seller_application",
+      entityId: String(application._id),
+      details: { email: application.email, status: application.status, removed },
+    });
+
+    return res.json({ success: true, message: "Signup request deleted.", data: { removed } });
+  } catch (error) {
+    log.error("[super-admin] delete request error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to delete request." });
   }
 };
 
@@ -303,7 +531,7 @@ const approveRequest = async (req, res) => {
     // Email ab sirf store ke andar unique — isi application ke store ka seller employee
     await Employee.findOneAndUpdate(
       sellerEmployeeFilter(application),
-      { seller_pending: false, status: "active", ...(store ? { storeId: store._id } : {}) }
+      { seller_pending: false, status: "active", role: OWNER_ROLE, ...(store ? { storeId: store._id } : {}) }
     ).setOptions({ skipTenantScope: true });
 
     // Provision store + seller account exactly once (password from request)
@@ -333,11 +561,11 @@ const approveRequest = async (req, res) => {
       // Resume-flow employees may have been created without a storeId — link them now
       await Employee.findOneAndUpdate(
         sellerEmployeeFilter(application),
-        { seller_pending: false, status: "active", storeId: openStore._id }
+        { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: openStore._id }
       ).setOptions({ skipTenantScope: true });
       await notifySeller(
         sendApplicationApprovedEmail,
-        { name: application.name, email: application.email, storeName: application.store_name },
+        { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(openStore) },
         "Approval",
         application._id
       );
@@ -389,7 +617,7 @@ const approveRequest = async (req, res) => {
 
     await Employee.findOneAndUpdate(
       sellerEmployeeFilter(application),
-      { seller_pending: false, status: "active", storeId: storeFinal._id }
+      { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: storeFinal._id }
     ).setOptions({ skipTenantScope: true });
 
     await logActivity({
@@ -402,7 +630,7 @@ const approveRequest = async (req, res) => {
 
     await notifySeller(
       sendApplicationApprovedEmail,
-      { name: application.name, email: application.email, storeName: application.store_name },
+      { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(storeFinal) },
       "Approval",
       application._id
     );
@@ -561,7 +789,19 @@ const listStores = async (req, res) => {
         owner_name: owner?.name || "Default / Unassigned",
         owner_email: owner?.email || s.email || "",
         owner_username: owner?.username || "",
-        url: `/store/${s._id}`,
+        email: s.email || "",
+        phone: s.phone || "",
+        subdomain: s.subdomain || "",
+        city: s.city || "",
+        business_category: s.business_category || "",
+        description: s.description || "",
+        business_type: s.business_type || "individual",
+        country: s.country || "",
+        address: s.address || "",
+        zip_code: s.zip_code || "",
+        logo_url: s.logo?.img_url || "",
+        // Real storefront URL (subdomain) — same helper as request detail, emails and handoff
+        url: storeAdminBaseUrl(s),
         createdAt: s.createdAt,
         status: s.store_status || "open",
         approvalStatus: s.store_status === "closed" ? "suspended" : "active",
@@ -610,6 +850,51 @@ const setStoreStatus = async (req, res) => {
   }
 };
 
+const createStore = async (req, res) => {
+  try {
+    const { store_name, email, phone, subdomain, store_status = "open", business_category, business_type, description, country, city, address, zip_code, logo_url } = req.body || {};
+    if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
+    if (!["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
+    const store = await Store.create({ store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : "individual", description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim(), logo: { img_url: String(logo_url || "").trim(), public_id: "" } });
+    await logActivity({ action: `Store created: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: { subdomain: store.subdomain } });
+    return res.status(201).json({ success: true, message: "Store created.", data: store });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
+    return res.status(500).json({ success: false, message: "Failed to create store." });
+  }
+};
+
+const updateStore = async (req, res) => {
+  try {
+    const { store_name, email, phone, subdomain, store_status, business_category, business_type, description, country, city, address, zip_code, logo_url } = req.body || {};
+    if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
+    if (store_status && !["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
+    const store = await Store.findById(req.params.id);
+    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    Object.assign(store, { store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status: store_status || store.store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : store.business_type, description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim() });
+    if (logo_url !== undefined) store.logo = { ...(store.logo?.toObject?.() || store.logo || {}), img_url: String(logo_url || "").trim() };
+    await store.save();
+    await logActivity({ action: `Store updated: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: { status: store.store_status } });
+    return res.json({ success: true, message: "Store updated.", data: store });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
+    return res.status(500).json({ success: false, message: "Failed to update store." });
+  }
+};
+
+const deleteStore = async (req, res) => {
+  try {
+    const store = await Store.findById(req.params.id);
+    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    await Store.deleteOne({ _id: store._id });
+    await User.updateMany({ storeId: store._id }, { $unset: { storeId: 1 }, status: "inactive" });
+    await logActivity({ action: `Store deleted: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: {} });
+    return res.json({ success: true, message: "Store deleted." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to delete store." });
+  }
+};
+
 /* ==========================================
    USERS — list + block/unblock
    ========================================== */
@@ -629,35 +914,313 @@ const listUsers = async (req, res) => {
       filter.$or = [{ name: pattern }, { email: pattern }, { username: pattern }];
     }
 
-    const [users, total] = await Promise.all([
+    const Order = require("../models/Order");
+    const [users, total, counts] = await Promise.all([
       User.find(filter)
         .sort({ created_at: -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum)
-        .select("name username email phone role status storeId emailVerified created_at")
+        .select("name username email phone role status storeId emailVerified provider created_at")
+        .populate({ path: "storeId", select: "store_name subdomain store_status", options: CROSS_STORE })
         .lean(),
       User.countDocuments(filter),
+      // Tabs ke counts — search/filter se independent
+      Promise.all([
+        User.countDocuments({ is_deleted: { $ne: true } }),
+        User.countDocuments({ is_deleted: { $ne: true }, storeId: null }),
+        User.countDocuments({ is_deleted: { $ne: true }, storeId: { $ne: null } }),
+        User.countDocuments({ is_deleted: { $ne: true }, status: "blocked" }),
+      ]).then(([all, customer, seller, blocked]) => ({ all, customer, seller, blocked })),
     ]);
 
-    const items = users.map((u) => ({
-      id: u._id,
-      name: u.name,
-      username: u.username,
-      email: u.email,
-      phone: u.phone || "",
-      type: u.storeId ? "Seller" : "Customer",
-      role: u.role,
-      status: u.status || "active",
-      emailVerified: !!u.emailVerified,
-      created_at: u.created_at,
-    }));
+    // Orders per user (cross-store) — sirf is page ke users ke liye
+    const ids = users.map((u) => u._id);
+    const orderStats = ids.length
+      ? await Order.aggregate([
+          { $match: { user_id: { $in: ids } } },
+          { $group: { _id: "$user_id", count: { $sum: 1 }, total: { $sum: "$total" }, last_at: { $max: "$created_at" } } },
+        ]).option(CROSS_STORE)
+      : [];
+    const ordersByUser = new Map(orderStats.map((o) => [String(o._id), o]));
+
+    const items = users.map((u) => {
+      const store = u.storeId && typeof u.storeId === "object" ? u.storeId : null;
+      const o = ordersByUser.get(String(u._id));
+      return {
+        id: u._id,
+        name: u.name,
+        username: u.username,
+        email: u.email,
+        phone: u.phone || "",
+        provider: u.provider || "local",
+        type: u.storeId ? "Seller" : "Customer",
+        role: u.role,
+        status: u.status || "active",
+        emailVerified: !!u.emailVerified,
+        created_at: u.created_at,
+        store: store ? { id: store._id, name: store.store_name, subdomain: store.subdomain || "", status: store.store_status || "open", url: storeAdminBaseUrl(store) } : null,
+        orders: { count: o?.count || 0, total: o?.total || 0, last_at: o?.last_at || null },
+      };
+    });
 
     return res.json({
       success: true,
-      data: { items, total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
+      data: { items, total, counts, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load users." });
+  }
+};
+
+// User detail — profile + store (seller) + application + admin access + orders + audit history
+const getUser = async (req, res) => {
+  try {
+    const Order = require("../models/Order");
+    const user = await User.findOne({ _id: req.params.id, is_deleted: { $ne: true } })
+      .select("name username email phone role status storeId emailVerified provider avatar dob created_at updated_at")
+      .populate({ path: "storeId", select: "store_name subdomain store_status business_category logo created_at", options: CROSS_STORE })
+      .lean();
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+
+    const store = user.storeId && typeof user.storeId === "object" ? user.storeId : null;
+    const [application, employee, orderStats, recentOrders, history] = await Promise.all([
+      SellerApplication.findOne({ $or: [{ user_id: user._id }, { email: user.email }] }).select("status reviewed_at created_at store_name").sort({ created_at: -1 }).lean(),
+      store ? Employee.findOne({ email: user.email, storeId: store._id }).select("status seller_pending role").setOptions(CROSS_STORE).lean() : null,
+      Order.aggregate([
+        { $match: { user_id: user._id } },
+        { $group: { _id: null, count: { $sum: 1 }, total: { $sum: "$total" }, last_at: { $max: "$created_at" } } },
+      ]).option(CROSS_STORE),
+      Order.find({ user_id: user._id }).sort({ created_at: -1 }).limit(10).select("order_number total status created_at storeId").populate({ path: "storeId", select: "store_name", options: CROSS_STORE }).setOptions(CROSS_STORE).lean(),
+      SuperAdminActivity.find({ entityType: "user", entityId: String(user._id) }).sort({ created_at: -1 }).limit(20).lean(),
+    ]);
+    const stats = orderStats[0] || {};
+
+    return res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          phone: user.phone || "",
+          provider: user.provider || "local",
+          emailVerified: !!user.emailVerified,
+          status: user.status || "active",
+          type: user.storeId ? "Seller" : "Customer",
+          avatar: user.avatar || "",
+          dob: user.dob || "",
+          created_at: user.created_at,
+          updated_at: user.updated_at,
+        },
+        store: store
+          ? { id: store._id, name: store.store_name, subdomain: store.subdomain || "", status: store.store_status || "open", category: store.business_category || "", logo: store.logo?.img_url || "", url: storeAdminBaseUrl(store), created_at: store.created_at }
+          : null,
+        application: application ? { id: application._id, status: application.status, reviewed_at: application.reviewed_at, created_at: application.created_at, store_name: application.store_name } : null,
+        adminAccess: employee ? { status: employee.status, pending: !!employee.seller_pending, role: employee.role } : null,
+        orders: { count: stats.count || 0, total: stats.total || 0, last_at: stats.last_at || null },
+        recentOrders: recentOrders.map((o) => ({ id: o._id, order_number: o.order_number, total: o.total, status: o.status, created_at: o.created_at, store: o.storeId && typeof o.storeId === "object" ? { id: o.storeId._id, name: o.storeId.store_name } : null })),
+        history: history.map(activityRow),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load the user." });
+  }
+};
+
+/* ==========================================
+   MY ACTIVITY — logged-in member ki apni actions (time + description)
+   ========================================== */
+const ACTIVITY_TYPES = ["seller_application", "store", "user", "superadmin", "auth", "settings", "system"];
+// Ek member ki activity — feed + counts + stats (My activity aur Team detail dono)
+const activityFeed = async (actorId, query = {}) => {
+    const { type, search, page = 1, limit = 25 } = query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+    const base = { "actor.id": actorId };
+    const filter = { ...base };
+    if (type && ACTIVITY_TYPES.includes(String(type))) filter.entityType = String(type);
+    if (search) filter.action = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+    const [items, total, byType, today, week, all] = await Promise.all([
+      SuperAdminActivity.find(filter).sort({ created_at: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
+      SuperAdminActivity.countDocuments(filter),
+      SuperAdminActivity.aggregate([{ $match: base }, { $group: { _id: "$entityType", count: { $sum: 1 } } }]),
+      SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfDay } }),
+      SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfWeek } }),
+      SuperAdminActivity.countDocuments(base),
+    ]);
+    const counts = { all };
+    for (const row of byType) counts[row._id] = row.count;
+    return { items: items.map(activityRow), total, counts, stats: { today, week, all }, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) };
+};
+
+const myActivity = async (req, res) => {
+  try {
+    return res.json({ success: true, data: await activityFeed(req.superAdmin._id, req.query) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load your activity." });
+  }
+};
+
+// Team member detail page ka full activity feed (sign-ins + actions)
+const teamMemberActivity = async (req, res) => {
+  try {
+    const member = await SuperAdmin.findById(req.params.id).select("_id").lean();
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    return res.json({ success: true, data: await activityFeed(member._id, req.query) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load activity." });
+  }
+};
+
+// Edit user — name, username, email, phone (uniqueness check ke saath)
+const updateUser = async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+    const { name, username, email, phone } = req.body || {};
+    const errors = {};
+    const changed = [];
+
+    if (name !== undefined) {
+      const v = String(name).trim();
+      if (v.length < 2) errors.name = "Name must be at least 2 characters.";
+      else if (v !== user.name) { user.name = v; changed.push("name"); }
+    }
+    if (username !== undefined) {
+      const v = String(username).trim().toLowerCase();
+      if (!/^[a-z0-9._]{3,30}$/.test(v)) errors.username = "3–30 characters: letters, numbers, dots or underscores.";
+      else if (v !== String(user.username).toLowerCase()) {
+        if (await User.exists({ _id: { $ne: user._id }, username: v })) errors.username = "This username is already taken.";
+        else { user.username = v; changed.push("username"); }
+      }
+    }
+    if (email !== undefined) {
+      const v = String(email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) errors.email = "Enter a valid email address.";
+      else if (v !== user.email) {
+        if (await User.exists({ _id: { $ne: user._id }, email: v })) errors.email = "Another account already uses this email.";
+        else { user.email = v; changed.push("email"); }
+      }
+    }
+    if (phone !== undefined) {
+      const v = String(phone).replace(/\D/g, "").slice(0, 16);
+      if (v && v.length < 10) errors.phone = "Phone must be 10–16 digits.";
+      else if (v !== (user.phone || "")) {
+        if (v && (await User.exists({ _id: { $ne: user._id }, phone: v }))) errors.phone = "Another account already uses this phone number.";
+        else { user.phone = v; changed.push("phone"); }
+      }
+    }
+    if (Object.keys(errors).length) return res.status(400).json({ success: false, message: Object.values(errors)[0], errors });
+    if (!changed.length) return res.json({ success: true, message: "No changes to save." });
+
+    const previousEmail = (await User.findById(user._id).select("email").lean())?.email;
+    await user.save();
+    // Seller ka store-admin login bhi same rakho (naam / email / phone)
+    if (user.storeId) {
+      const sync = {};
+      if (changed.includes("name")) sync.name = user.name;
+      if (changed.includes("email")) sync.email = user.email;
+      if (changed.includes("phone")) sync.phone = user.phone;
+      if (Object.keys(sync).length) await Employee.updateOne({ storeId: user.storeId, email: previousEmail }, { $set: sync }).setOptions(CROSS_STORE);
+    }
+    await logActivity({
+      action: `User updated — ${user.name} (${user.email})`,
+      actor: req.superAdmin,
+      entityType: "user",
+      entityId: String(user._id),
+      details: { changed },
+    });
+    return res.json({ success: true, message: "User updated." });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "That email or username is already in use." });
+    return res.status(500).json({ success: false, message: "Failed to update the user." });
+  }
+};
+
+// Naya password set karo (purana dikh nahi sakta — bcrypt hash hai). Seller ka store-admin login bhi same.
+const setUserPassword = async (req, res) => {
+  try {
+    const password = String(req.body?.password || "");
+    if (password.length < 8) return res.status(400).json({ success: false, message: "Password must be at least 8 characters.", errors: { password: "Password must be at least 8 characters." } });
+    const user = await User.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+    const hash = await bcrypt.hash(password, 10);
+    user.password = hash;
+    await user.save();
+    if (user.storeId) await Employee.updateOne({ storeId: user.storeId, email: user.email }, { $set: { password: hash } }).setOptions(CROSS_STORE);
+    await logActivity({
+      action: `User password reset — ${user.name} (${user.email})`,
+      actor: req.superAdmin,
+      entityType: "user",
+      entityId: String(user._id),
+      details: user.storeId ? { scope: "account and store admin login" } : {},
+    });
+    return res.json({ success: true, message: `Password updated for ${user.name}.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to set the password." });
+  }
+};
+
+// Delete user (soft delete) — seller ho to store-admin login bhi band; store khud delete nahi hota
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
+    if (!user) return res.status(404).json({ success: false, message: "User not found." });
+    user.is_deleted = true;
+    user.deleted_at = new Date();
+    user.status = "blocked";
+    await user.save();
+    if (user.storeId) {
+      await Employee.updateOne({ storeId: user.storeId, email: user.email }, { $set: { status: "inactive" } }).setOptions(CROSS_STORE);
+    }
+    await logActivity({
+      action: `User deleted — ${user.name} (${user.email})`,
+      actor: req.superAdmin,
+      entityType: "user",
+      entityId: String(user._id),
+      details: { type: user.storeId ? "seller" : "customer" },
+    });
+    return res.json({ success: true, message: `${user.name}'s account has been deleted.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to delete the user." });
+  }
+};
+
+/* Store admin panel — super admin ko store owner ke taur par one-time sign-in link
+   (same store_handoff token jo seller login handoff use karta hai, 2 min, ek baar) */
+const openStoreAdmin = async (req, res) => {
+  try {
+    const store = await Store.findById(req.params.id).select("store_name subdomain").setOptions(CROSS_STORE).lean();
+    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    const baseUrl = storeAdminBaseUrl(store);
+    if (!baseUrl) return res.status(400).json({ success: false, message: "This store has no address yet." });
+
+    // Owner pehle (storehandler), warna store ka koi active admin
+    const employees = await Employee.find({ storeId: store._id, is_deleted: { $ne: true }, status: { $ne: "inactive" } })
+      .select("_id role email created_at").sort({ created_at: 1 }).setOptions(CROSS_STORE).lean();
+    const target = employees.find((e) => isOwnerRole(e.role)) || employees.find((e) => isAdminRole(e.role));
+    if (!target) return res.status(404).json({ success: false, message: "This store has no active admin account to open." });
+
+    const token = jwt.sign(
+      { type: "store_handoff", employeeId: String(target._id), storeId: String(store._id), jti: require("crypto").randomUUID(), via: "superadmin", by: String(req.superAdmin._id) },
+      process.env.JWT_SECRET,
+      { expiresIn: 120 },
+    );
+    await logActivity({
+      action: `Opened store admin panel — ${store.store_name}`,
+      actor: req.superAdmin,
+      entityType: "store",
+      entityId: String(store._id),
+      details: { as: target.email },
+    });
+    return res.json({ success: true, data: { url: `${baseUrl}/admin-handoff#token=${encodeURIComponent(token)}` } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Could not open the store admin panel." });
   }
 };
 
@@ -687,7 +1250,273 @@ const setUserStatus = async (req, res) => {
   }
 };
 
+/* ==========================================
+   TEAM — super admin + staff accounts (superadmins collection)
+   Staff = full panel access, sirf Team manage nahi kar sakte (route-level guard).
+   ========================================== */
+const TEAM_ROLES = ["superadmin", "staff"];
+const TEAM_PASSWORD_MIN = 8;
+const seedEmail = () => String(process.env.SUPER_ADMIN_EMAIL || "").trim().toLowerCase();
+const isSeedAccount = (doc) => !!doc && String(doc.email).toLowerCase() === seedEmail();
+
+// Kaun kis account ko badal sakta hai (edit / status / password / remove):
+//  • staff apna account nahi badal sakta (super admin apna badal sakta hai)
+//  • staff sirf doosre staff ko; super admin accounts sirf super admin badalta hai
+//  • seeded primary account aur "last super admin" ke alag checks neeche hain
+const manageBlockReason = (target, me) => {
+  const meRole = me?.role || "superadmin";
+  const targetRole = target?.role || "superadmin";
+  const self = String(target?._id) === String(me?._id);
+  if (self && meRole !== "superadmin") return "You cannot change your own account. Ask a super admin.";
+  if (meRole !== "superadmin" && targetRole === "superadmin") return "Only super admins can change a super admin account.";
+  return null;
+};
+
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+const publicMember = (m, me) => ({
+  id: m._id,
+  name: m.name,
+  email: m.email,
+  phone: m.phone || "",
+  role: m.role || "superadmin",
+  status: m.status,
+  lastLoginAt: m.lastLoginAt,
+  lastActiveAt: m.lastActiveAt || m.lastLoginAt || null,
+  // 5 min ke andar koi request = online
+  online: Boolean(m.status === "active" && m.lastActiveAt && Date.now() - new Date(m.lastActiveAt).getTime() < ONLINE_WINDOW_MS),
+  created_at: m.created_at,
+  createdBy: m.createdBy && typeof m.createdBy === "object" ? { id: m.createdBy._id, name: m.createdBy.name } : null,
+  isSeed: isSeedAccount(m),
+  isSelf: String(m._id) === String(me?._id),
+  canManage: !manageBlockReason(m, me),
+});
+
+// Aakhri active super admin ko demote/deactivate/delete nahi karne dete — warna koi Team manage nahi kar sakega
+const otherActiveSuperAdmins = (excludeId) =>
+  SuperAdmin.countDocuments({ _id: { $ne: excludeId }, role: "superadmin", status: "active" });
+
+const listTeam = async (req, res) => {
+  try {
+    // Team page = sirf staff. Super admin accounts (seeded) list me nahi aate.
+    const members = await SuperAdmin.find({ role: "staff" }).populate("createdBy", "name").sort({ created_at: -1 }).lean();
+    const counts = {
+      all: members.length,
+      active: members.filter((m) => m.status === "active").length,
+      inactive: members.filter((m) => m.status === "inactive").length,
+    };
+    return res.json({ success: true, data: { items: members.map((m) => publicMember(m, req.superAdmin)), counts } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load the team." });
+  }
+};
+
+const createTeamMember = async (req, res) => {
+  try {
+    const { name, email, password, phone = "" } = req.body || {};
+    const role = "staff"; // Team page se sirf staff add hote hain; super admin sirf .env seed se
+    const errors = {};
+    const cleanName = String(name || "").trim();
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanPhone = String(phone || "").replace(/\D/g, "").slice(0, 16);
+    if (cleanName.length < 2) errors.name = "Name must be at least 2 characters.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) errors.email = "Enter a valid email address.";
+    if (String(password || "").length < TEAM_PASSWORD_MIN) errors.password = `Password must be at least ${TEAM_PASSWORD_MIN} characters.`;
+    if (!TEAM_ROLES.includes(String(role))) errors.role = "Invalid role.";
+    if (Object.keys(errors).length) return res.status(400).json({ success: false, message: "Please fix the highlighted fields.", errors });
+
+    if (await SuperAdmin.exists({ email: cleanEmail })) {
+      return res.status(409).json({ success: false, message: "A team member with this email already exists.", errors: { email: "This email is already on the team." } });
+    }
+
+    const member = await SuperAdmin.create({
+      name: cleanName,
+      email: cleanEmail,
+      phone: cleanPhone,
+      passwordHash: await bcrypt.hash(String(password), 10),
+      role: String(role),
+      status: "active",
+      createdBy: req.superAdmin._id,
+    });
+    await logActivity({
+      action: `Team member added — ${member.name} (${member.role})`,
+      actor: req.superAdmin,
+      entityType: "superadmin",
+      entityId: String(member._id),
+      details: { email: member.email, role: member.role },
+    });
+    return res.status(201).json({ success: true, message: `${member.name} has been added to the team.`, data: publicMember(member.toObject(), req.superAdmin) });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "A team member with this email already exists." });
+    return res.status(500).json({ success: false, message: "Failed to add the team member." });
+  }
+};
+
+const updateTeamMember = async (req, res) => {
+  try {
+    const member = await SuperAdmin.findById(req.params.id);
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    const blocked = manageBlockReason(member, req.superAdmin);
+    if (blocked) return res.status(403).json({ success: false, message: blocked });
+    const { name, phone, role } = req.body || {};
+    const errors = {};
+    const changed = [];
+
+    if (name !== undefined) {
+      const cleanName = String(name).trim();
+      if (cleanName.length < 2) errors.name = "Name must be at least 2 characters.";
+      else if (cleanName !== member.name) { member.name = cleanName; changed.push("name"); }
+    }
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).replace(/\D/g, "").slice(0, 16);
+      if (cleanPhone !== (member.phone || "")) { member.phone = cleanPhone; changed.push("phone"); }
+    }
+    if (role !== undefined && String(role) !== (member.role || "superadmin")) {
+      if (!TEAM_ROLES.includes(String(role))) errors.role = "Invalid role.";
+      else if (String(member._id) === String(req.superAdmin._id)) errors.role = "You cannot change your own role.";
+      else if (isSeedAccount(member)) errors.role = "The primary super admin account's role cannot be changed.";
+      else if (role === "staff" && (await otherActiveSuperAdmins(member._id)) === 0) errors.role = "At least one active super admin is required.";
+      else { member.role = String(role); changed.push("role"); }
+    }
+    if (Object.keys(errors).length) return res.status(400).json({ success: false, message: Object.values(errors)[0], errors });
+    if (!changed.length) return res.json({ success: true, message: "No changes to save.", data: publicMember(member.toObject(), req.superAdmin) });
+
+    await member.save();
+    await logActivity({
+      action: `Team member updated — ${member.name} (${changed.join(", ")})`,
+      actor: req.superAdmin,
+      entityType: "superadmin",
+      entityId: String(member._id),
+      details: { changed },
+    });
+    return res.json({ success: true, message: "Team member updated.", data: publicMember(member.toObject(), req.superAdmin) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to update the team member." });
+  }
+};
+
+const setTeamMemberStatus = async (req, res) => {
+  try {
+    const status = String(req.body?.status || "");
+    if (!["active", "inactive"].includes(status)) return res.status(400).json({ success: false, message: "Invalid status." });
+    const member = await SuperAdmin.findById(req.params.id);
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    const blocked = manageBlockReason(member, req.superAdmin);
+    if (blocked) return res.status(403).json({ success: false, message: blocked });
+    if (status === "inactive") {
+      if (String(member._id) === String(req.superAdmin._id)) return res.status(400).json({ success: false, message: "You cannot deactivate your own account." });
+      if (isSeedAccount(member)) return res.status(400).json({ success: false, message: "The primary super admin account cannot be deactivated." });
+      if ((member.role || "superadmin") === "superadmin" && (await otherActiveSuperAdmins(member._id)) === 0) {
+        return res.status(400).json({ success: false, message: "At least one active super admin is required." });
+      }
+    }
+    if (member.status === status) return res.json({ success: true, message: "No change.", data: publicMember(member.toObject(), req.superAdmin) });
+    member.status = status;
+    await member.save();
+    await logActivity({
+      action: `Team member ${status === "active" ? "activated" : "deactivated"} — ${member.name}`,
+      actor: req.superAdmin,
+      entityType: "superadmin",
+      entityId: String(member._id),
+      details: { status },
+    });
+    return res.json({ success: true, message: `${member.name} is now ${status}.`, data: publicMember(member.toObject(), req.superAdmin) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to update the status." });
+  }
+};
+
+const resetTeamMemberPassword = async (req, res) => {
+  try {
+    const password = String(req.body?.password || "");
+    if (password.length < TEAM_PASSWORD_MIN) {
+      return res.status(400).json({ success: false, message: `Password must be at least ${TEAM_PASSWORD_MIN} characters.`, errors: { password: `Password must be at least ${TEAM_PASSWORD_MIN} characters.` } });
+    }
+    const member = await SuperAdmin.findById(req.params.id);
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    const blocked = manageBlockReason(member, req.superAdmin);
+    if (blocked) return res.status(403).json({ success: false, message: blocked });
+    member.passwordHash = await bcrypt.hash(password, 10);
+    await member.save();
+    await logActivity({
+      action: `Team member password reset — ${member.name}`,
+      actor: req.superAdmin,
+      entityType: "superadmin",
+      entityId: String(member._id),
+    });
+    return res.json({ success: true, message: `Password updated for ${member.name}.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to reset the password." });
+  }
+};
+
+const deleteTeamMember = async (req, res) => {
+  try {
+    const member = await SuperAdmin.findById(req.params.id);
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    const blocked = manageBlockReason(member, req.superAdmin);
+    if (blocked) return res.status(403).json({ success: false, message: blocked });
+    if (String(member._id) === String(req.superAdmin._id)) return res.status(400).json({ success: false, message: "You cannot remove your own account." });
+    if (isSeedAccount(member)) return res.status(400).json({ success: false, message: "The primary super admin account cannot be removed." });
+    if ((member.role || "superadmin") === "superadmin" && member.status === "active" && (await otherActiveSuperAdmins(member._id)) === 0) {
+      return res.status(400).json({ success: false, message: "At least one active super admin is required." });
+    }
+    await SuperAdmin.deleteOne({ _id: member._id });
+    await logActivity({
+      action: `Team member removed — ${member.name} (${member.role || "superadmin"})`,
+      actor: req.superAdmin,
+      entityType: "superadmin",
+      entityId: String(member._id),
+      details: { email: member.email },
+    });
+    return res.json({ success: true, message: `${member.name} has been removed from the team.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to remove the team member." });
+  }
+};
+
+// Detail page — profile + jo actions is member ne kiye + is account par kya hua (audit log)
+const getTeamMember = async (req, res) => {
+  try {
+    const member = await SuperAdmin.findById(req.params.id).populate("createdBy", "name email").lean();
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    // Dekhna sab ko allowed hai — sirf badalna restricted (manageBlockReason)
+    const id = String(member._id);
+    const [performed, totalPerformed, logins, history] = await Promise.all([
+      SuperAdminActivity.find({ "actor.id": member._id, entityType: { $ne: "auth" } }).sort({ created_at: -1 }).limit(30).lean(),
+      SuperAdminActivity.countDocuments({ "actor.id": member._id, entityType: { $ne: "auth" } }),
+      SuperAdminActivity.countDocuments({ "actor.id": member._id, action: /logged in|signed in/i }),
+      SuperAdminActivity.find({ entityType: "superadmin", entityId: id }).sort({ created_at: -1 }).limit(20).lean(),
+    ]);
+    return res.json({
+      success: true,
+      data: {
+        member: publicMember(member, req.superAdmin),
+        stats: { actions: totalPerformed, logins },
+        performed: performed.map(activityRow),
+        history: history.map(activityRow),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load the team member." });
+  }
+};
+
 module.exports = {
+  // team
+  listTeam,
+  getTeamMember,
+  getUser,
+  updateUser,
+  setUserPassword,
+  deleteUser,
+  openStoreAdmin,
+  myActivity,
+  teamMemberActivity,
+  createTeamMember,
+  updateTeamMember,
+  setTeamMemberStatus,
+  resetTeamMemberPassword,
+  deleteTeamMember,
   // auth
   loginSuperAdmin,
   refreshSuperAdminToken,
@@ -698,11 +1527,16 @@ module.exports = {
   // requests
   listRequests,
   getRequest,
+  updateRequest,
+  deleteRequest,
   approveRequest,
   rejectRequest,
   requestInfo,
   // stores
   listStores,
+  createStore,
+  updateStore,
+  deleteStore,
   setStoreStatus,
   // users
   listUsers,

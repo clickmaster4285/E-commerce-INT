@@ -1,6 +1,7 @@
 'use client';
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole } from "@/lib/roles";
 import { useState, useEffect, useRef } from 'react';
 import {
   Menu, Sun, Moon, LogOut, User, ChevronDown
@@ -157,7 +158,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
   const displayName = currentUser.name || "User";
   const displayEmail = currentUser.email || "";
   const userRole = currentUser.role || userData?.role || "";
-  const isAdmin = userRole?.toLowerCase() === "admin";
+  const isAdmin = isAdminRole(userRole);
 
   useEffect(() => {
     const handler = (e) => {

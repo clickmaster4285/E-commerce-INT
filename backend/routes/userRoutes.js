@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  checkRegistration,
   createUser,
   loginUser,
   loginAdmin,
@@ -26,6 +27,7 @@ const {
   exchangeStoreHandoff,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { allowPendingSeller } = require("../middleware/allowPendingSeller");
 const { checkPermission } = require("../middleware/checkPermission");
 const { limiters } = require("../middleware/rateLimit");
 const {
@@ -43,6 +45,8 @@ const router = express.Router();
 //  PUBLIC ROUTES
 // ==========================================
 router.post("/register", createUser);
+// Signup step 1 — email/username/phone pehle se liye hue? (same limiter as register)
+router.post("/register/check", limiters.register, checkRegistration);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
@@ -51,7 +55,8 @@ router.post("/refresh-token", refreshAccessToken);
 // ke liye nahi). Shape/logic purani jaisi.
 router.post("/admin/refresh-token", refreshAdminAccessToken);
 // Multi-tenant: platform par login ke baad store subdomain ke admin panel me bhejna
-router.post("/admin/handoff", authMiddleware.requireAdmin, createStoreHandoff);
+// Pending sellers need this right after signup to reach their (view-only) admin panel
+router.post("/admin/handoff", allowPendingSeller, authMiddleware.requireAdmin, createStoreHandoff);
 router.post("/admin/handoff/exchange", limiters.adminLogin, exchangeStoreHandoff);
 router.post("/logout", logoutUser);
 router.post("/google-login", limiters.adminLogin, googleLogin);

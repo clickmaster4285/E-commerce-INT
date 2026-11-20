@@ -1,4 +1,5 @@
 const Store = require("../models/Store");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { validatePhone } = require("../utils/phoneValidator");
@@ -21,7 +22,7 @@ const getStoreInfo = async (req, res) => {
 const updateStoreInfo = async (req, res) => {
   try {
     // ✅ CHECK STORE PERMISSION
-    if (req.user.role !== "admin" && !req.user.permissions?.store) {
+    if (!isAdminRole(req.user.role) && !req.user.permissions?.store) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You don't have permission to edit store settings. Please contact an administrator or another staff member to grant you store access.",

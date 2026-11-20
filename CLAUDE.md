@@ -22,7 +22,7 @@ Backend (`cd backend`):
 
 Frontend (`cd frontend`):
 - `npm run dev`: uses `next dev --webpack`. `npm run build`, `npm run lint` (ESLint 9, `eslint-config-next`).
-- `npm run i18n`: regenerates `src/i18n/locales/*.json` from `src/i18n/translations.source.mjs`. It runs automatically before `dev` and `build`. **Edit UI strings in `translations.source.mjs`, never in the generated locale JSON.**
+- UI strings live in `src/i18n/locales/<code>.json` (one file per language). Edit those directly and add every new key to `en.json`, which is the fallback.
 
 Production checklist (multi-tenant security):
 - `NODE_ENV=production`: auth cookies get `Secure`.

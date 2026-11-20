@@ -9,10 +9,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ⚠️ NO locale ROUTING is configured on purpose.
 //    The app keeps its existing URLs and the language is carried in a plain
 //    `lang` cookie (see src/i18n/config.js) that covers both the admin panel
-//    and the storefront. Translations are edited in
-//    src/i18n/translations.source.mjs, split per language into
-//    src/i18n/locales/*.json by `npm run i18n` (auto-runs before dev/build),
-//    and consumed client-side through src/i18n/LanguageProvider.js — no next-intl
+//    and the storefront. Translations live in
+//    src/i18n/locales/*.json (one file per language) and are consumed client-side through src/i18n/LanguageProvider.js — no next-intl
 //    plugin, no route rewriting.
 
 /** @type {import('next').NextConfig} */
@@ -30,12 +28,12 @@ const nextConfig = {
 
   allowedDevOrigins: [
     '192.168.88.64',
-    '192.168.88.35',
+    '192.168.88.64',
     'localhost',
     '127.0.0.1',
     // Multi-tenant dev: nip.io root + har store subdomain + hosts-file custom domains (*.test)
-    '192.168.88.35.nip.io',
-    '*.192.168.88.35.nip.io',
+    '192.168.88.64.nip.io',
+    '*.192.168.88.64.nip.io',
     '*.test',
   ],
 
@@ -68,14 +66,10 @@ const nextConfig = {
         destination: '/super-admin/dashboard',
         permanent: false,
       },
-      {
-        source: '/super-admin/activity',
-        destination: '/super-admin/dashboard',
-        permanent: false,
-      },
+      // /super-admin/activity ab real page hai ("My activity") — purana alias wahan bhejo
       {
         source: '/super-admin/activity-logs',
-        destination: '/super-admin/dashboard',
+        destination: '/super-admin/activity',
         permanent: false,
       },
     ];

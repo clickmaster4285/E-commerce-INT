@@ -1,4 +1,5 @@
 const bcrypt = require("bcryptjs");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { validatePhone } = require("../utils/phoneValidator");
@@ -202,7 +203,7 @@ exports.getAllEmployees = async (req, res) => {
     const statusFilter = String(req.query.status || "all").trim();
     const departmentFilter = String(req.query.department || "all").trim();
 
-    const filter = { is_deleted: false, role: { $ne: "admin" } };
+    const filter = { is_deleted: false, role: { $nin: ADMIN_ROLES } };
     const conditions = [];
     if (search) {
       conditions.push({
@@ -248,8 +249,8 @@ exports.getAllEmployees = async (req, res) => {
     // ---- PAGINATED MODE ----
     const total = await Employee.countDocuments(filter);
     const [activeCount, inactiveCount] = await Promise.all([
-      Employee.countDocuments({ is_deleted: false, role: { $ne: "admin" }, status: "active" }),
-      Employee.countDocuments({ is_deleted: false, role: { $ne: "admin" }, status: "inactive" }),
+      Employee.countDocuments({ is_deleted: false, role: { $nin: ADMIN_ROLES }, status: "active" }),
+      Employee.countDocuments({ is_deleted: false, role: { $nin: ADMIN_ROLES }, status: "inactive" }),
     ]);
     const pages = Math.max(1, Math.ceil(total / limit));
     const safePage = Math.min(page, pages || 1);
@@ -391,6 +392,11 @@ exports.createEmployee = async (req, res) => {
       avatar,
       preferences,
     } = req.body;
+
+    // Owner role (storehandler) form se assign nahi ho sakta
+    if (!ASSIGNABLE_ROLES.includes(String(role || "").toLowerCase())) {
+      return res.status(400).json({ success: false, message: "Invalid role." });
+    }
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -602,6 +608,14 @@ exports.updateEmployee = async (req, res) => {
     const userFields = ["name", "username", "email", "phone", "status", "role", "avatar"];
     const directUpdates = {};
 
+    // Store owner ka role/status change nahi ho sakta; owner role kisi ko assign nahi ho sakta
+    if (updates.role !== undefined && !ASSIGNABLE_ROLES.includes(String(updates.role || "").toLowerCase())) {
+      return res.status(400).json({ success: false, message: "Invalid role." });
+    }
+    if (isOwnerRole(employee.role) && ((updates.role !== undefined && String(updates.role) !== employee.role) || (updates.status !== undefined && String(updates.status) !== employee.status))) {
+      return res.status(403).json({ success: false, message: "The store owner account cannot be demoted or deactivated." });
+    }
+
     for (const field of userFields) {
       if (
         updates[field] !== undefined &&
@@ -752,6 +766,14 @@ exports.deleteEmployee = async (
         success: false,
         message:
           "Employee not found",
+      });
+    }
+
+    // Store owner (storehandler) delete nahi ho sakta — store usi ka hai
+    if (isOwnerRole(employee.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "The store owner account cannot be deleted.",
       });
     }
 
