@@ -450,9 +450,10 @@ function StoreSetupInner() {
               {existingDocs.map((doc) => (
                 <li key={doc.url} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                   <FileText size={15} className="shrink-0 text-slate-400" aria-hidden="true" />
-                  <a href={docUrl(doc.url)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-[12px] font-semibold text-slate-200 hover:text-white" title={doc.name}>
+                  {/* KYC documents private hain (sirf Super Admin khol sakta hai) — yahan sirf naam */}
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-slate-200" title={doc.name}>
                     {doc.name}
-                  </a>
+                  </span>
                   <button type="button" onClick={() => removeExistingDoc(doc.url)} aria-label={`Remove ${doc.name}`} className="shrink-0 rounded-lg p-1.5 text-slate-500 transition hover:bg-red-500/10 hover:text-red-400">
                     <Trash2 size={15} aria-hidden="true" />
                   </button>

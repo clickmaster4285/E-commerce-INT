@@ -2,6 +2,7 @@ const sharp = require("sharp");
 const fs = require("fs-extra");
 const path = require("path");
 const mongoose = require("mongoose");
+const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 
 // ✅ Same shared multer config jo product images ke liye use hota hai (memory storage)
 const upload = require("../config/uploadConfig");
@@ -26,11 +27,8 @@ const processBundleImage = async (req, res, next) => {
 
     req.bundleId = bundleId;
 
-    const uploadFolder = path.join(
-      __dirname,
-      "../uploads/bundles",
-      bundleId.toString()
-    );
+    // Store ka apna folder: uploads/stores/<storeId>/bundles/<bundleId>
+    const uploadFolder = uploadDirFor(req, "bundles", bundleId.toString());
 
     await fs.ensureDir(uploadFolder);
 
@@ -51,7 +49,7 @@ const processBundleImage = async (req, res, next) => {
     const stats = await fs.stat(filePath);
 
     // ✅ Store hone wala path (DB me string ke roop me jata hai)
-    req.bundleImage = `uploads/bundles/${bundleId}/${fileName}`;
+    req.bundleImage = uploadUrlFor(filePath).slice(1);
 
     // Metadata (agar kabhi zarurat pade)
     req.bundleImageMeta = {

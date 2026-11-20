@@ -56,9 +56,11 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
   const maxSize = configuredMaxSize * 1024 * 1024;
   if (rawBuffer.length > maxSize) throw new Error(`Image too large (max ${configuredMaxSize}MB)`);
 
-  const uploadDir = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
-  const storeDir = path.join(uploadDir, process.env.STORE_UPLOAD_SUBDIR || "store");
+  // Store ka apna folder: uploads/stores/<storeId>/store (socket event runWithStore me chalta hai)
+  const { uploadDirFor, uploadUrlFor } = require("./uploadPaths");
+  const storeDir = uploadDirFor(null, process.env.STORE_UPLOAD_SUBDIR || "store");
   if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
+  const relativeFor = (filePath) => uploadUrlFor(filePath).slice(1);
 
   const safeName = (fileName || "logo")
     .replace(/\s+/g, "-")
@@ -77,7 +79,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     const filePath = path.join(storeDir, finalName);
     fs.writeFileSync(filePath, rawBuffer);
     verifyFile(filePath, "SVG");
-    return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: `uploads/store/${finalName}` };
+    return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: relativeFor(filePath) };
   }
 
   // ⚠️ WEBP (alpha support) — JPEG me alpha channel nahi hota, is liye transparent
@@ -93,7 +95,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
       .webp({ quality: 88, alphaQuality: 100, effort: 4 })
       .toFile(filePath);
     const savedSize = verifyFile(filePath, "WebP");
-    return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: `uploads/store/${finalName}` };
+    return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: relativeFor(filePath) };
   } catch (err) {
     log.warn("⚠️ Sharp compression failed, saving raw:", err.message);
     const fallbackExt = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
@@ -101,7 +103,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     const fallbackPath = path.join(storeDir, fallbackName);
     fs.writeFileSync(fallbackPath, rawBuffer);
     const savedSize = verifyFile(fallbackPath, "Raw fallback");
-    return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: savedSize, relativePath: `uploads/store/${fallbackName}` };
+    return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: savedSize, relativePath: relativeFor(fallbackPath) };
   }
 };
 
@@ -148,17 +150,10 @@ const deleteOldLogo = async (logoUrlOverride) => {
     if (existing?.logo?.img_url) {
       const imgUrl = logoUrlOverride ?? existing.logo.img_url;
       if (!imgUrl) return;
-      const uploadDir = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
-      const storeSubdirectory = process.env.STORE_UPLOAD_SUBDIR || "store";
-      const fileName = path.basename(imgUrl);
-      const possiblePaths = [
-        path.join(uploadDir, storeSubdirectory, fileName),
-        path.join(__dirname, "..", "uploads", "store", fileName),
-        path.isAbsolute(imgUrl) ? imgUrl : null,
-      ].filter(Boolean);
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) { fs.unlinkSync(p); break; }
-      }
+      // Sirf isi store ki (ya purani shared uploads/store) file — pehle absolute
+      // path bhi maana jata tha (img_url se koi bhi server file mit sakti thi)
+      const filePath = require("./uploadPaths").localPathForUrl(null, imgUrl);
+      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
   } catch (e) { log.error("❌ deleteOldLogo error:", e.message); }
 };

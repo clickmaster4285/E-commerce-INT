@@ -5,7 +5,8 @@ const path = require("path");
 const fs = require("fs-extra");
 const log = require("../utils/logger");
 
-const IMAGE_FOLDER = path.join(__dirname, "../uploads/bundles");
+const { uploadDirFor } = require("../utils/uploadPaths");
+const IMAGE_FOLDER = path.join(__dirname, "../uploads/bundles"); // purana shared folder
 
 // ==========================================
 // HELPERS
@@ -82,25 +83,34 @@ const productsExist = async (products) => {
   return found === new Set(ids).size;
 };
 
+// Bundle ke image folders: naya (uploads/stores/<storeId>/bundles/<id>) + purana
+// (uploads/bundles/<id>). Bundle id global unique hai — purana folder bhi isi ka.
+const bundleImageFolders = (bundleId) => [
+  uploadDirFor(null, "bundles", String(bundleId)),
+  path.join(IMAGE_FOLDER, String(bundleId)),
+];
+
 const removeBundleImageFolder = async (bundleId) => {
-  try {
-    const dir = path.join(IMAGE_FOLDER, String(bundleId));
-    if (await fs.pathExists(dir)) await fs.remove(dir);
-  } catch (_) {}
+  for (const dir of bundleImageFolders(bundleId)) {
+    try {
+      if (await fs.pathExists(dir)) await fs.remove(dir);
+    } catch (_) {}
+  }
 };
 
 // Purani cover files hata do (nayi image save hone ke baad)
 const cleanupOldCovers = async (bundleId, keepFileName) => {
-  try {
-    const dir = path.join(IMAGE_FOLDER, String(bundleId));
-    if (!(await fs.pathExists(dir))) return;
-    const files = await fs.readdir(dir);
-    await Promise.all(
-      files
-        .filter((f) => f !== keepFileName)
-        .map((f) => fs.remove(path.join(dir, f)))
-    );
-  } catch (_) {}
+  for (const dir of bundleImageFolders(bundleId)) {
+    try {
+      if (!(await fs.pathExists(dir))) continue;
+      const files = await fs.readdir(dir);
+      await Promise.all(
+        files
+          .filter((f) => f !== keepFileName)
+          .map((f) => fs.remove(path.join(dir, f)))
+      );
+    } catch (_) {}
+  }
 };
 
 // ==========================================

@@ -8,12 +8,17 @@ import PageHeader from "@/components/superadmin/PageHeader";
 import StatusBadge from "@/components/superadmin/StatusBadge";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
+import { getBackendOrigin } from "@/lib/tenantHost";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
+// KYC documents ab private hain (backend sirf super admin session ke saath deta hai).
+// sa_at cookie host-only hai → link PAGE ke hostname par backend port ka hona chahiye
+// (getBackendOrigin / alignBackendUrl), raw NEXT_PUBLIC_SERVERURL (IP) par cookie nahi jata.
 const docUrl = (path) => {
   if (!path) return "";
   if (path.startsWith("http")) return path;
-  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
+  const origin = (typeof window !== "undefined" && getBackendOrigin()) || API_ORIGIN;
+  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
 };
 
 export default function ApplicationDetailPage() {

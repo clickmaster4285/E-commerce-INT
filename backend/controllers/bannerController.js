@@ -1,6 +1,7 @@
 const Banner = require("../models/Banner");
 const fs = require("fs");
 const path = require("path");
+const { uploadUrlFor, localPathForUrl } = require("../utils/uploadPaths");
 const { getIO } = require("../utils/socket");
 const { queueTranslationSync } = require("../utils/translationService");
 
@@ -11,10 +12,14 @@ const emitSocketEvent = (event, data) => {
   } catch (_) {}
 };
 
+// Banner image paths DB me bina leading slash: "uploads/stores/<id>/banners/x.webp"
+const storedPath = (file) => uploadUrlFor(file.path).slice(1);
+
 const deleteFile = (filePath) => {
   if (!filePath) return;
-  const fullPath = path.join(__dirname, "..", filePath);
-  if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ kabhi nahi
+  const fullPath = localPathForUrl(null, filePath);
+  if (fullPath && fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
 };
 
 // ==========================================
@@ -253,9 +258,10 @@ exports.createBanner = async (req, res) => {
     });
 
     if (req.files) {
-      if (req.files.desktopImage) data.desktopImage = `uploads/banners/${req.files.desktopImage[0].filename}`;
-      if (req.files.tabletImage) data.tabletImage = `uploads/banners/${req.files.tabletImage[0].filename}`;
-      if (req.files.mobileImage) data.mobileImage = `uploads/banners/${req.files.mobileImage[0].filename}`;
+      // Asal saved path se URL (store folder: uploads/stores/<storeId>/banners/...)
+      if (req.files.desktopImage) data.desktopImage = storedPath(req.files.desktopImage[0]);
+      if (req.files.tabletImage) data.tabletImage = storedPath(req.files.tabletImage[0]);
+      if (req.files.mobileImage) data.mobileImage = storedPath(req.files.mobileImage[0]);
     }
 
     // Position validation: must be positive integer
@@ -316,7 +322,7 @@ exports.updateBanner = async (req, res) => {
       ["desktopImage", "tabletImage", "mobileImage"].forEach((field) => {
         if (req.files[field]) {
           deleteFile(banner[field]);
-          data[field] = `uploads/banners/${req.files[field][0].filename}`;
+          data[field] = storedPath(req.files[field][0]);
         }
       });
     }

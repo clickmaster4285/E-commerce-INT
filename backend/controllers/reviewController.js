@@ -353,9 +353,9 @@ const deleteReviewMediaFiles = async (review) => {
   ];
   for (const url of urls) {
     try {
-      const clean = String(url || "").replace(/^\/+/, "");
-      const filePath = path.join(process.cwd(), clean);
-      if (await fs.pathExists(filePath)) await fs.remove(filePath);
+      // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ null
+      const filePath = require("../utils/uploadPaths").localPathForUrl(null, url);
+      if (filePath && (await fs.pathExists(filePath))) await fs.remove(filePath);
     } catch (err) {
       log.error("Review media delete error:", err.message);
     }
