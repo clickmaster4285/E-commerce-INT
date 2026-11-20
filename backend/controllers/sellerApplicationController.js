@@ -7,7 +7,6 @@ const SellerApplication = require("../models/SellerApplication");
 const User = require("../models/User");
 const Store = require("../models/Store");
 const log = require("../utils/logger");
-const { logActivity } = require("../utils/superAdminActivity");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
 const { sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
 const { findApplicationForToken, INVALID_SETUP_LINK } = require("../utils/sellerSetupToken");
@@ -339,12 +338,6 @@ const completeSetup = async (req, res) => {
       }).catch((error) => log.error("[seller] setup store sync failed:", error.message));
     }
 
-    await logActivity({
-      action: `Seller completed store setup — ${application.name} (${storeName})`,
-      entityType: "seller_application",
-      entityId: String(application._id),
-      details: { email, storeName, documents: application.documents.length },
-    });
 
     return res.json({
       success: true,

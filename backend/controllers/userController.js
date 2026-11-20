@@ -21,6 +21,20 @@ const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 const { suggestUsernames, uniqueUsername } = require("../utils/username");
+const { validateStoreAddress, slugifySubdomain } = require("../utils/tenantHost");
+
+/* Store web address check — format, reserved, kisi store ya doosre pending signup ne to nahi liya?
+   @returns {{ error: string|null, suggestion: string }} */
+const checkStoreSubdomain = async (raw, email) => {
+  const sub = String(raw || "").trim().toLowerCase();
+  const formatError = validateStoreAddress(sub);
+  if (formatError) return { error: formatError, suggestion: "" };
+  const taken =
+    (await Store.exists({ subdomain: sub }).setOptions({ skipTenantScope: true })) ||
+    (await PendingRegistration.exists({ subdomain: sub, email: { $ne: email || "" }, expiresAt: { $gt: new Date() } }));
+  if (!taken) return { error: null, suggestion: "" };
+  return { error: "This store address is already taken.", suggestion: await Store.generateUniqueSubdomain(sub) };
+};
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -113,13 +127,23 @@ const checkRegistration = async (req, res) => {
       if (clash) errors.phone = "This phone number is already registered";
     }
 
+    // Store web address (seller signup step 2)
+    let subdomainSuggestion = "";
+    if (typeof req.body?.subdomain === "string" && req.body.subdomain.trim()) {
+      const { error, suggestion } = await checkStoreSubdomain(req.body.subdomain, email);
+      if (error) errors.subdomain = error;
+      subdomainSuggestion = suggestion;
+    } else if (typeof req.body?.storeName === "string" && slugifySubdomain(req.body.storeName).length >= 3) {
+      subdomainSuggestion = await Store.generateUniqueSubdomain(req.body.storeName);
+    }
+
     // Username taken ho, ya khali ho aur naam mil gaya ho → naam se professional suggestions
     const name = String(req.body?.name || "").trim();
     const suggestions = errors.username || (!cleanUsername && name.length >= 2)
       ? await suggestUsernames(name, email, { excludeEmail: email })
       : [];
 
-    return res.json({ success: true, available: Object.keys(errors).length === 0, errors, suggestions, ...(code ? { code } : {}) });
+    return res.json({ success: true, available: Object.keys(errors).length === 0, errors, suggestions, ...(subdomainSuggestion ? { subdomainSuggestion } : {}), ...(code ? { code } : {}) });
   } catch (error) {
     log.error("[register/check] error:", error.message);
     return res.status(500).json({ success: false, message: "Could not check availability. Please try again." });
@@ -148,6 +172,7 @@ const createUser = async (req, res) => {
       });
     }
     const storeName = String(req.body.storeName || "").trim().slice(0, 140);
+    const storeSubdomain = String(req.body.subdomain || "").trim().toLowerCase();
     const storeDescription = String(req.body.storeDescription || "").trim().slice(0, 2000);
     const businessCategory = String(req.body.businessCategory || "").trim();
     const businessType = ["individual", "registered_business"].includes(String(req.body.businessType || ""))
@@ -187,6 +212,11 @@ const createUser = async (req, res) => {
       if (!country) errors.country = "Please select a country.";
       if (!city || city.trim().length < 2) errors.city = "Please enter your city.";
       if (!address || address.trim().length < 5) errors.address = "Please enter a complete store address.";
+      if (!storeSubdomain) errors.subdomain = "Please choose your store web address.";
+      else {
+        const { error } = await checkStoreSubdomain(storeSubdomain, email);
+        if (error) errors.subdomain = error;
+      }
     if (Object.keys(errors).length > 0)
       return res.status(400).json({ success: false, message: "Registration failed", errors });
     }
@@ -333,6 +363,7 @@ const createUser = async (req, res) => {
       existingPending.lastSentAt = new Date();
       existingPending.storeId = signupStoreId;
       existingPending.storeName = wantsStore ? storeName : "";
+      existingPending.subdomain = wantsStore ? storeSubdomain : "";
       existingPending.storeDescription = storeDescription;
       existingPending.businessCategory = businessCategory;
       existingPending.businessType = businessType;
@@ -355,6 +386,7 @@ const createUser = async (req, res) => {
         lastSentAt: new Date(),
         storeId: signupStoreId,
         storeName: wantsStore ? storeName : "",
+        subdomain: wantsStore ? storeSubdomain : "",
         storeDescription,
         businessCategory,
         businessType,

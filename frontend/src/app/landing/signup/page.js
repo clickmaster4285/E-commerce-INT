@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoreAdminUrl } from "@/apis/storeHandoff";
 import SearchCombobox from "@/components/common/SearchCombobox";
-import { BUSINESS_CATEGORIES } from "@/lib/storeOptions";
+import { ROOT_DOMAIN } from "@/lib/tenantHost";
+import { BUSINESS_CATEGORIES, STORE_ADDRESS_MAX } from "@/lib/storeOptions";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -36,17 +37,16 @@ import {
   UserRound,
   BadgeCheck,
   LayoutDashboard,
+  Link2,
+  CheckCircle2,
 } from "lucide-react";
 import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
 import { isValidPhone, normalizePhone, PHONE_MIN, PHONE_MAX } from "@/utils/phoneValidator";
-import { compressImage } from "@/utils/compressImage";
 import OtpVerifyCard from "@/components/user/OtpVerifyCard";
-import LazyGoogleLogin from "@/components/user/LazyGoogleLogin";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
@@ -81,22 +81,27 @@ const scorePassword = (pw) => {
 
 /* ═══════════ SHARED DESIGN SYSTEM (dono steps same tokens use karte hain) ═══════════ */
 const INPUT_BASE =
-  "w-full h-12 rounded-xl border bg-white pl-11 pr-4 text-[14px] text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-150 disabled:cursor-not-allowed disabled:bg-slate-50";
+  "w-full h-11 rounded-xl border bg-white pl-11 pr-4 text-[14px] text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-150 disabled:cursor-not-allowed disabled:bg-slate-50";
 const inputState = (hasError) =>
   hasError
     ? "border-red-300 bg-red-50/40 focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
     : "border-slate-200 hover:border-slate-300 focus:border-[#f57224] focus:ring-4 focus:ring-[#f57224]/15";
 
+/* Wizard card (Shopify/Stripe style) — white card on soft gray, actions footer bar me */
+const CARD_SHELL = "mt-5 [@media(max-height:820px)]:mt-4 rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.14)]";
+const CARD = "p-5 sm:p-6 [@media(max-height:820px)]:sm:p-5";
+const CARD_FOOTER = "-mx-5 -mb-5 mt-2 flex rounded-b-2xl flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/80 px-5 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 [@media(max-height:820px)]:py-3 [@media(max-height:820px)]:sm:-mx-5 [@media(max-height:820px)]:sm:-mb-5 [@media(max-height:820px)]:sm:px-5";
+
 const PRIMARY_BTN =
-  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#f57224] px-5 text-[14.5px] font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_-8px_rgba(245,114,36,0.6)] transition hover:bg-[#e8651a] active:translate-y-px focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/30 disabled:cursor-not-allowed disabled:bg-[#f57224]/55 disabled:shadow-none disabled:active:translate-y-0";
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#f57224] px-5 text-[14.5px] font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.08),0_6px_14px_-6px_rgba(245,114,36,0.45)] transition hover:bg-[#e8651a] active:translate-y-px focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/30 disabled:cursor-not-allowed disabled:bg-[#f57224]/55 disabled:shadow-none disabled:active:translate-y-0";
 const SECONDARY_BTN =
   "inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
 
 /* Field wrapper — label, icon, hint, error ek jaisi spacing ke saath.
    Component bahar define hai taake re-render par input focus na khoye. */
-function Field({ id, label, optional, hint, error, icon: Icon, iconTop = false, counter, trailing, below, children }) {
+function Field({ id, label, optional, hint, error, icon: Icon, iconTop = false, counter, trailing, below, className = "", children }) {
   return (
-    <div>
+    <div className={className}>
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
         <label htmlFor={id} className="text-[12.5px] font-semibold text-slate-700">
           {label}
@@ -154,65 +159,61 @@ function SectionHeading({ icon: Icon, title, description }) {
 /* Connected stepper — ek compact row (node + label, beech me connector).
    done / active / upcoming teeno states alag dikhte hain; dono steps par same. */
 const SIGNUP_STEPS = [
-  { label: "Account", sub: "Login details", icon: UserRound },
-  { label: "Store", sub: "Business info", icon: Store },
-  { label: "Location", sub: "& branding", icon: MapPin },
+  { label: "Account details", short: "Account", sub: "Login & location", desc: "Your login details and business location", icon: UserRound },
+  { label: "Store setup", short: "Store", sub: "Details & web address", desc: "Your store name, web address and what you sell", icon: Store },
 ];
 
+
 function SignupStepper({ currentIndex }) {
-  const total = SIGNUP_STEPS.length;
-  const renderStep = (s, i) => {
-    const status = i < currentIndex ? "done" : i === currentIndex ? "active" : "upcoming";
-    const Icon = s.icon;
-    return (
-      <li key={s.label} aria-current={status === "active" ? "step" : undefined} className="flex shrink-0 items-center gap-2">
-        <span
-          data-tone="accent"
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
-            status === "done"
-              ? "bg-[#f57224] text-white shadow-[0_6px_14px_-4px_rgba(245,114,36,0.6)]"
-              : status === "active"
-                ? "border-2 border-[#f57224] bg-white text-[#f57224] shadow-[0_0_0_4px_rgba(245,114,36,0.14)]"
-                : "border-2 border-slate-200 bg-slate-50 text-slate-400"
-          }`}
-        >
-          {status === "done" ? <Check size={17} strokeWidth={3} aria-hidden="true" /> : <Icon size={16} aria-hidden="true" />}
-        </span>
-        {/* Mobile par sirf active step ka text — baaki sirf icon (tang jagah) */}
-        <span className={`min-w-0 flex-col ${status === "active" ? "flex" : "hidden sm:flex"}`}>
-          <span data-tone="accent" className={`truncate text-[13px] font-semibold leading-4 ${status === "upcoming" ? "text-slate-400" : "text-slate-900"}`}>
-            {s.label}
-          </span>
-          <span
-            data-tone="accent"
-            className={`truncate pt-0.5 text-[11px] font-medium leading-4 ${
-              status === "done" ? "text-emerald-600" : status === "active" ? "text-[#e2641b]" : "text-slate-400"
-            }`}
-          >
-            {status === "done" ? "Completed" : status === "active" ? `Step ${i + 1} of ${total}` : s.sub}
-          </span>
-        </span>
-        <span className="sr-only">{status === "done" ? "(completed)" : status === "active" ? "(current step)" : "(upcoming)"}</span>
-      </li>
-    );
-  };
+  const current = SIGNUP_STEPS[currentIndex] || SIGNUP_STEPS[0];
+  const CurrentIcon = current.icon;
+  // Card header: left icon tile + step title/desc · right numbered step chips (① Account — ② Store)
   return (
-    <nav aria-label="Signup progress" className="mt-5 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 sm:px-4">
-      <ol className="flex items-center gap-2 sm:gap-2.5">
-        {SIGNUP_STEPS.map((s, i) => [
-          i > 0 && (
-            <li key={`c${i}`} aria-hidden="true" className="relative h-[3px] min-w-4 flex-1 overflow-hidden rounded-full bg-slate-200">
-              <span
-                data-tone="accent"
-                className="absolute inset-y-0 left-0 rounded-full bg-[#f57224] transition-[width] duration-500 ease-out"
-                style={{ width: currentIndex >= i ? "100%" : "0%" }}
-              />
-            </li>
-          ),
-          renderStep(s, i),
-        ])}
-      </ol>
-    </nav>
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="flex min-w-0 items-center gap-3.5">
+        <span data-tone="accent" aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f57224]/10 text-[#f57224] ring-1 ring-[#f57224]/15">
+          <CurrentIcon size={20} strokeWidth={2} />
+        </span>
+        <div className="min-w-0">
+          <h3 className="truncate text-[16px] font-semibold leading-6 text-slate-900">{current.label}</h3>
+          <p className="truncate text-[12.5px] leading-5 text-slate-500">{current.desc}</p>
+        </div>
+      </div>
+      <nav aria-label="Signup progress" className="shrink-0">
+        <ol className="flex items-center gap-2">
+          {SIGNUP_STEPS.map((step, i) => {
+            const status = i < currentIndex ? "done" : i === currentIndex ? "active" : "upcoming";
+            return (
+              <li key={step.label} aria-current={status === "active" ? "step" : undefined} className="flex items-center gap-2">
+                {i > 0 && <span aria-hidden="true" className={`h-px w-6 ${status === "upcoming" ? "bg-slate-200" : "bg-[#f57224]/50"}`} />}
+                <span
+                  data-tone="accent"
+                  className={`inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-[12.5px] font-semibold ring-1 transition-colors ${
+                    status === "active"
+                      ? "bg-[#f57224]/10 text-[#c2541a] ring-[#f57224]/25"
+                      : status === "done"
+                        ? "bg-white text-slate-700 ring-slate-200"
+                        : "bg-white text-slate-400 ring-slate-200"
+                  }`}
+                >
+                  <span
+                    data-tone="accent"
+                    aria-hidden="true"
+                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                      status === "upcoming" ? "bg-slate-100 text-slate-400" : status === "done" ? "bg-emerald-500 text-white" : "bg-[#f57224] text-white"
+                    }`}
+                  >
+                    {status === "done" ? <Check size={12} strokeWidth={3} /> : i + 1}
+                  </span>
+                  {step.short}
+                  <span className="sr-only"> — {status === "done" ? "completed" : status === "active" ? "current step" : "upcoming"}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+    </div>
   );
 }
 
@@ -238,7 +239,7 @@ export default function SignupPage() {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const [step, setStep] = useState("account"); // account | store | location | otp | welcome
+  const [step, setStep] = useState("account"); // account | store | otp | welcome
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -250,7 +251,6 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false); // step 1 → server par email/username/phone availability
   const [emailPending, setEmailPending] = useState(false); // email ki application already under review
-  const [usernameSuggestions, setUsernameSuggestions] = useState([]); // naam se professional usernames (server se)
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState("");
   const [otpEmail, setOtpEmail] = useState("");
@@ -262,22 +262,22 @@ export default function SignupPage() {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [zipCode, setZipCode] = useState("");
-  const [storeLogo, setStoreLogo] = useState("");
+  // Store web address — seller khud likhta hai (live availability check)
+  const [subdomain, setSubdomain] = useState("");
+  const [subdomainCheck, setSubdomainCheck] = useState({ state: "idle", value: "", suggestion: "" }); // idle | checking | available | taken
 
-  const [logoBusy, setLogoBusy] = useState(false);
 
   /* Desktop par window scroll nahi hota — step badalne par right panel ko top par le jao */
   const formPanelRef = useRef(null);
   useEffect(() => {
     formPanelRef.current?.scrollTo?.({ top: 0 });
   }, [step]);
-  const [logoDragActive, setLogoDragActive] = useState(false);
 
-  /* Countries + cities dono country-state-city library se. Library sirf Location step
-     par ek baar lazy load hoti hai (~8MB city data signup ke initial bundle me nahi aata). */
+  /* Countries + cities dono country-state-city library se. Library account step par
+     ek baar lazy load hoti hai (~8MB city data signup ke initial bundle me nahi aata). */
   const [geo, setGeo] = useState(null); // { Country, City } | { failed: true }
   useEffect(() => {
-    if (step !== "location" || geo) return undefined;
+    if (step !== "account" || geo) return undefined;
     let cancelled = false;
     import("country-state-city")
       .then(({ Country, City }) => { if (!cancelled) setGeo({ Country, City }); })
@@ -299,45 +299,41 @@ export default function SignupPage() {
     // Library me ek naam kai states me repeat hota hai — unique + A–Z
     return [...new Set(list.map((c) => c.name))].sort((a, b) => a.localeCompare(b));
   }, [geo, allCountries, country]);
-  const citiesLoading = step === "location" && !geo;
+  const citiesLoading = step === "account" && !geo;
+
+  /* Web address ki live availability (400ms debounce) — server format + reserved + taken check karta hai */
+  useEffect(() => {
+    const value = subdomain.trim();
+    if (step !== "store" || value.length < 3) return undefined;
+    const id = window.setTimeout(async () => {
+      setSubdomainCheck({ state: "checking", value, suggestion: "" });
+      try {
+        const res = await authApi.checkRegistration({ subdomain: value, ...(isValidEmail(email) ? { email: email.trim().toLowerCase() } : {}) });
+        const error = res?.errors?.subdomain;
+        setSubdomainCheck({ state: error ? "taken" : "available", value, suggestion: res?.subdomainSuggestion || "" });
+        setErrors((p) => ({ ...p, subdomain: error || "" }));
+      } catch {
+        setSubdomainCheck({ state: "idle", value, suggestion: "" }); // network fail — submit par dobara check hota hai
+      }
+    }, 400);
+    return () => window.clearTimeout(id);
+  }, [subdomain, step, email]);
+
+  // Web address seller khud likhta hai — store naam se auto-fill nahi
+  const changeStoreName = (value) => {
+    setStoreName(value);
+    setErrors((p) => ({ ...p, storeName: "" }));
+  };
+  const changeSubdomain = (value) => {
+    // Sirf a-z 0-9 aur hyphen — type karte waqt hi saaf
+    const clean = String(value).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, STORE_ADDRESS_MAX);
+    setSubdomain(clean);
+    setErrors((p) => ({ ...p, subdomain: "" }));
+    setSubdomainCheck({ state: "idle", value: "", suggestion: "" });
+  };
 
   const fieldCls = (field, withToggle = false) =>
     `${INPUT_BASE} ${withToggle ? "!pr-11" : ""} ${inputState(!!errors[field])}`;
-
-  /* File input aur drag-and-drop dono isi validation se guzarte hain */
-  const processLogo = async (file) => {
-    if (!file) return;
-    if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error("Logo must be a JPG, PNG or WEBP image.");
-      return;
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      toast.error("Image is too large — please pick one under 15MB.");
-      return;
-    }
-    setLogoBusy(true);
-    try {
-      const compressed = await compressImage(file, { maxSize: 512, quality: 0.82 });
-      setStoreLogo(compressed);
-    } catch {
-      toast.error("Logo could not be processed. Please try another image.");
-    } finally {
-      setLogoBusy(false);
-    }
-  };
-
-  const pickLogo = async (e) => {
-    const file = e.target.files?.[0] || null;
-    if (!file) return;
-    e.target.value = "";
-    await processLogo(file);
-  };
-
-  const onLogoDrop = (e) => {
-    e.preventDefault();
-    setLogoDragActive(false);
-    processLogo(e.dataTransfer?.files?.[0] || null);
-  };
 
   /* Backend field errors ko form par map karo (email/password/name/username/phone) */
   const parseBackendError = (err) => {
@@ -356,7 +352,7 @@ export default function SignupPage() {
       });
     }
     const nextErrors = {};
-    for (const key of ["name", "username", "phone", "email", "password", "storeName", "storeDescription", "businessCategory", "country", "city", "address", "zipCode"]) {
+    for (const key of ["name", "username", "phone", "email", "password", "storeName", "subdomain", "storeDescription", "businessCategory", "country", "city", "address", "zipCode"]) {
       if (fieldErrors[key]) nextErrors[key] = String(fieldErrors[key]);
     }
     setErrors((prev) => ({ ...prev, ...nextErrors }));
@@ -389,6 +385,11 @@ export default function SignupPage() {
     if (!storeName.trim()) next.storeName = "Please enter your store name.";
     if (!storeDescription.trim()) next.storeDescription = "Please describe your store.";
     if (!businessCategory) next.businessCategory = "Please select a business category.";
+    const sub = subdomain.trim();
+    if (!sub) next.subdomain = "Please choose your store web address.";
+    else if (sub.length < 3) next.subdomain = "Store address must be at least 3 characters.";
+    else if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(sub)) next.subdomain = "Use only lowercase letters, numbers and hyphens (not at the start or end).";
+    else if (subdomainCheck.value === sub && subdomainCheck.state === "taken") next.subdomain = errors.subdomain || "This store address is already taken.";
     return next;
   };
 
@@ -404,23 +405,9 @@ export default function SignupPage() {
 
   const validate = () => ({ ...validateAccount(), ...validateStore() });
 
-  /* Error wale field ka step kholo (account errors ke liye banner already hai) */
-  const STORE_DETAIL_FIELDS = ["storeName", "storeDescription", "businessCategory"];
-  const ACCOUNT_FIELD_KEYS = ["name", "username", "phone", "email", "password", "confirmPassword"];
-  const goToErrorStep = (errs) => {
-    if (ACCOUNT_FIELD_KEYS.some((k) => errs[k])) return; // banner "Go to account step" dikhata hai
-    if (STORE_DETAIL_FIELDS.some((k) => errs[k])) setStep("store");
-  };
-
-  const handleStoreNext = () => {
-    const nextErrors = validateStoreDetails();
-    setErrors(nextErrors);
-    setGeneralError("");
-    if (Object.keys(nextErrors).length > 0) return;
-    setErrors({});
-    setStep("location");
-    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
-  };
+  /* Step 1 (account + location) ke fields — store step par inka error aaye to banner wapas bhejta hai */
+  const ACCOUNT_FIELD_KEYS = ["name", "username", "phone", "email", "password", "confirmPassword", "country", "city", "address", "zipCode"];
+  const goToErrorStep = () => {}; // store aakhri step hai — account errors ke liye banner "Go to account step"
 
   /* Server se poochho: email / username / phone pehle se registered to nahi?
      Network fail ho to block nahi karte — final submit waise bhi dobara check karta hai. */
@@ -429,7 +416,6 @@ export default function SignupPage() {
       const res = await authApi.checkRegistration(fields);
       const found = res?.errors || {};
       setEmailPending(res?.code === "SELLER_PENDING");
-      if (Array.isArray(res?.suggestions) && res.suggestions.length) setUsernameSuggestions(res.suggestions);
       if (Object.keys(found).length) setErrors((p) => ({ ...p, ...found }));
       return found;
     } catch {
@@ -445,14 +431,8 @@ export default function SignupPage() {
     checkAvailability({ [field]: clean });
   };
 
-  // Username khali ho aur naam likha ho → naam se suggestions (hamza.asif …) dikhao
-  const loadUsernameSuggestions = () => {
-    if (username.trim() || name.trim().length < 2 || usernameSuggestions.length) return;
-    checkAvailability({ name: name.trim(), username: "", ...(isValidEmail(email) ? { email: email.trim().toLowerCase() } : {}) });
-  };
-
   const handleNext = async () => {
-    const nextErrors = validateAccount();
+    const nextErrors = { ...validateAccount(), ...validateLocation() };
     setErrors(nextErrors);
     setGeneralError("");
     if (Object.keys(nextErrors).length > 0) return;
@@ -485,13 +465,13 @@ export default function SignupPage() {
         password,
         wantsStore: true,
         storeName: storeName.trim(),
+        subdomain: subdomain.trim(),
         storeDescription: storeDescription.trim(),
         businessCategory,
         country,
         city: city.trim(),
         address: address.trim(),
         zipCode: zipCode.trim(),
-        ...(storeLogo ? { storeLogo } : {}),
       });
         if (res?.pendingApproval) {
           // Same email + password as the pending application → welcome, then /admin (read-only)
@@ -533,17 +513,6 @@ export default function SignupPage() {
       // Generic "Registration failed" ke bajaye asli field error dikhao (e.g. "This email is already registered")
       const firstFieldError = Object.values(err?.response?.data?.errors || {}).find((m) => typeof m === "string" && m.trim());
       toast.error(firstFieldError || getApiErrorMessage(err, t("auth.login.registrationFailed")));
-      setLoading(false);
-    }
-  };
-
-  const handleGoogle = async (credential) => {
-    setLoading(true);
-    try {
-      await authApi.googleCustomerLogin(credential);
-      window.location.href = "/";
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, t("auth.login.googleFailed")));
       setLoading(false);
     }
   };
@@ -729,14 +698,13 @@ export default function SignupPage() {
   const strengthColors = ["", "bg-red-400", "bg-amber-400", "bg-lime-400", "bg-emerald-500"];
 
   /* ═══════════ SIGNUP PAGE ═══════════ */
-  const isWizardStep = step === "account" || step === "store" || step === "location";
-  const stepIndex = step === "account" ? 0 : step === "store" ? 1 : 2;
-  const accountHasErrors = (step === "store" || step === "location") && ACCOUNT_FIELD_KEYS.some((k) => errors[k]);
+  const isWizardStep = step === "account" || step === "store";
+  const stepIndex = step === "account" ? 0 : 1;
+  const accountHasErrors = step === "store" && ACCOUNT_FIELD_KEYS.some((k) => errors[k]);
 
   const HEADERS = {
-    account: { title: "Create your seller account", subtitle: "Start selling on ClickMaster in three quick steps." },
-    store: { title: "Tell us about your store", subtitle: "Your store name and what you sell. You can edit these later." },
-    location: { title: "Location & branding", subtitle: "Where you operate and how your store looks. The logo is optional." },
+    account: { title: "Create your seller account", subtitle: "Start selling on ClickMaster in two quick steps." },
+    store: { title: "Set up your store", subtitle: "Your store name, web address and what you sell." },
     otp: { title: "Verify your email", subtitle: "Enter the code we sent to finish creating your account." },
   };
   const header = HEADERS[step] || HEADERS.account;
@@ -746,7 +714,7 @@ export default function SignupPage() {
        sirf right panel apne andar scroll karta hai. Mobile/tablet: natural page scroll. */
     <main className="user-theme signup-reference-page flex min-h-dvh bg-white lg:h-dvh lg:min-h-0">
       {/* ═══════════ LEFT — NAVY BRAND PANEL (lg+, stationary) ═══════════ */}
-      <div className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[44%] xl:w-[48%] 2xl:w-1/2">
+      <div className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[42%] xl:w-[44%] 2xl:w-[46%]">
         {/* Background layers: navy gradient + orange glow + faded artwork + dot grid */}
         <div
           aria-hidden="true"
@@ -827,35 +795,32 @@ export default function SignupPage() {
           form bina card ke beech me; top (Sign in) aur bottom (footer) anchored. */}
       <div
         ref={formPanelRef}
-        className="flex min-w-0 flex-1 flex-col items-center bg-white px-5 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14"
+        className="flex min-w-0 flex-1 flex-col items-center bg-white px-5 lg:bg-slate-50 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14"
       >
-        {/* Top bar — mobile par brand, har jagah "Sign in" */}
-        <header className="flex w-full shrink-0 items-center justify-between gap-3 py-5 lg:justify-end">
-          <span className="lg:hidden"><BrandMark size="sm" /></span>
-          <p className="flex items-center gap-2.5 text-[13px] text-slate-500">
-            <span className="hidden sm:inline">Already have an account?</span>
-            <button
-              type="button"
-              onClick={() => router.push("/admin/login")}
-              className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/20"
-            >
-              Sign in
-            </button>
-          </p>
+        {/* Top bar — sirf mobile par brand ("Sign in" ab card ke neeche) */}
+        <header className="flex w-full shrink-0 items-center py-4 lg:hidden">
+          <BrandMark size="sm" />
         </header>
 
         {/* Form — box nahi, sirf controlled width; my-auto = space ho to vertically center */}
-        <div className="my-auto w-full max-w-[460px] shrink-0 py-4 2xl:max-w-[500px]">
+        {/* Wizard steps wide (multi-column, desktop par scroll nahi); OTP card narrow */}
+        <div className={`my-auto w-full shrink-0 py-4 ${isWizardStep ? "max-w-[760px]" : "max-w-[460px] 2xl:max-w-[500px]"}`}>
           {/* Step number stepper me already hai — alag eyebrow pill ki zaroorat nahi */}
-          <div>
-            <h2 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-slate-900 2xl:text-[30px]">{header.title}</h2>
-            <p className="pt-1 text-[13.5px] leading-5 text-slate-500">{header.subtitle}</p>
+          <div className="text-center">
+            <h2 className="[@media(max-height:820px)]:text-[22px] text-[26px] font-bold leading-tight tracking-[-0.02em] text-slate-900 2xl:text-[30px]">{header.title}</h2>
+            <p className="pt-1.5 text-[14px] leading-5 text-slate-500">{header.subtitle}</p>
           </div>
 
-          {isWizardStep && <SignupStepper currentIndex={stepIndex} />}
+          {/* Ek hi card: upar steps ki strip, phir form, neeche actions */}
+          <div className={isWizardStep ? CARD_SHELL : ""}>
+          {isWizardStep && (
+            <div className="rounded-t-2xl border-b border-slate-100 px-5 py-4 sm:px-6">
+              <SignupStepper currentIndex={stepIndex} />
+            </div>
+          )}
 
           {generalError && (
-            <div role="alert" data-tone="error" className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <div role="alert" data-tone="error" className="mx-5 mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 sm:mx-6">
               <AlertCircle size={18} className="mt-px shrink-0 text-red-500" aria-hidden="true" />
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-red-800">Something needs your attention</p>
@@ -866,7 +831,7 @@ export default function SignupPage() {
 
           {/* Store step par account field ka backend error — user ko wapas le jao */}
           {accountHasErrors && (
-            <div role="alert" data-tone="error" className="mt-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div role="alert" data-tone="error" className="mx-5 mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:mx-6">
               <AlertCircle size={18} className="mt-px shrink-0 text-amber-600" aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-amber-900">Please review your account details</p>
@@ -901,7 +866,8 @@ export default function SignupPage() {
 
           {/* ═══ STEP 1: ACCOUNT ═══ */}
           {step === "account" && (
-            <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="mt-5 space-y-4" noValidate>
+            <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className={`${CARD} grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-2`} noValidate>
+              {/* Har row me do fields: naam · username / phone · email / password · confirm */}
               <Field id="su-name" label="Full name" icon={User} error={errors.name}>
                 <input
                   {...fieldA11y("su-name", errors.name)}
@@ -915,28 +881,14 @@ export default function SignupPage() {
                 />
               </Field>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="contents">
                 <Field
+                 
                   id="su-username"
                   label="Username"
                   optional
                   icon={AtSign}
                   error={errors.username}
-                  below={usernameSuggestions.length ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5" aria-label="Suggested usernames">
-                      <span className="text-[11.5px] text-slate-500">Try:</span>
-                      {usernameSuggestions.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => { setUsername(s); setUsernameSuggestions([]); setErrors((p) => ({ ...p, username: "" })); }}
-                          className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[11.5px] font-medium text-slate-700 transition hover:border-[#f57224] hover:bg-[#f57224]/10 hover:text-[#f57224]"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 >
                   <input
                     {...fieldA11y("su-username", errors.username)}
@@ -944,7 +896,6 @@ export default function SignupPage() {
                     autoComplete="username"
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: "" })); }}
-                    onFocus={loadUsernameSuggestions}
                     onBlur={(e) => checkFieldOnBlur("username", e.target.value)}
                     placeholder={t("auth.login.username")}
                     className={fieldCls("username")}
@@ -967,7 +918,7 @@ export default function SignupPage() {
                 </Field>
               </div>
 
-              <Field id="su-email" label="Email address" icon={Mail} error={errors.email}>
+                            <Field id="su-email" label="Email address" icon={Mail} error={errors.email}>
                 {/* suppressHydrationWarning: temp-mail jaisi browser extensions is input par
                     attributes inject karti hain → dev overlay me false hydration "issue" */}
                 <input
@@ -985,14 +936,15 @@ export default function SignupPage() {
               </Field>
               {/* Pending application wale email ke liye: error ke neeche sign-in shortcut */}
               {emailPending && errors.email ? (
-                <button type="button" onClick={() => router.push("/admin/login")} className="-mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#f57224] hover:underline">
+                <button type="button" onClick={() => router.push("/admin/login")} className="-mt-1 inline-flex items-center gap-1 justify-self-start text-[12.5px] font-semibold text-[#f57224] hover:underline md:order-last md:col-span-2">
                   Sign in to continue your application <ArrowRight size={13} aria-hidden="true" />
                 </button>
               ) : null}
 
               {/* Password + confirm ek row me (sm+) — 48px inputs, kam vertical height */}
-              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+              <div className="contents">
               <Field
+               
                 id="su-password"
                 label="Password"
                 icon={Lock}
@@ -1038,6 +990,7 @@ export default function SignupPage() {
               </Field>
 
               <Field
+               
                 id="su-confirm"
                 label="Confirm password"
                 icon={ShieldCheck}
@@ -1066,27 +1019,108 @@ export default function SignupPage() {
               </Field>
               </div>
 
-              <button type="submit" disabled={checking} className={`${PRIMARY_BTN} !mt-6 w-full`}>
+              <div className="space-y-3 border-t border-slate-100 pt-4 md:col-span-2">
+              {/* Group 3 — Location — desktop par ek hi row */}
+              <section aria-labelledby="su-sec-location">
+                <SectionHeading icon={MapPin} title={<span id="su-sec-location">Business location</span>} description="Used for shipping and tax settings" />
+                <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3 sm:grid-cols-2">
+                    <Field
+                      id="su-country"
+                      label="Country"
+                      icon={Globe}
+                      error={errors.country}
+                    >
+                      {/* Searchable list (native select 250 items ka poora-screen popup kholta tha) */}
+                      <SearchCombobox
+                        id="su-country"
+                        value={country}
+                        onChange={(v) => {
+                          setCountry(v);
+                          setCity(""); // purani city doosre country ki hai
+                          setErrors((p) => ({ ...p, country: "", city: "" }));
+                        }}
+                        options={countryOptions}
+                        loading={step === "account" && !geo}
+                        invalid={!!errors.country}
+                        describedBy={errors.country ? "su-country-error" : undefined}
+                        inputClassName={fieldCls("country", true)}
+                        itemLabel="country"
+                        allowCustom={false}
+                        pinned={["Pakistan"]}
+                      />
+                    </Field>
+
+                    <Field id="su-city" label="City" icon={Building2} error={errors.city}>
+                      <SearchCombobox
+                        id="su-city"
+                        itemLabel="city"
+                        value={city}
+                        onChange={(v) => { setCity(v); setErrors((p) => ({ ...p, city: "" })); }}
+                        options={cityOptions}
+                        loading={citiesLoading}
+                        invalid={!!errors.city}
+                        describedBy={errors.city ? "su-city-error" : undefined}
+                        inputClassName={fieldCls("city", true)}
+                      />
+                    </Field>
+                    <Field id="su-address" label="Street address" icon={MapPin} error={errors.address}>
+                      <input
+                        {...fieldA11y("su-address", errors.address)}
+                        type="text"
+                        autoComplete="street-address"
+                        value={address}
+                        onChange={(e) => { setAddress(e.target.value); setErrors((p) => ({ ...p, address: "" })); }}
+                        placeholder="Shop no., street, area"
+                        className={fieldCls("address")}
+                      />
+                    </Field>
+
+                    <Field id="su-zip" label="ZIP code" optional icon={Hash} error={errors.zipCode}>
+                      <input
+                        {...fieldA11y("su-zip", errors.zipCode)}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                        maxLength={20}
+                        value={zipCode}
+                        onChange={(e) => setZipCode(e.target.value)}
+                        placeholder="54000"
+                        className={fieldCls("zipCode")}
+                      />
+                    </Field>
+                </div>
+              </section>
+              </div>
+
+              <div className={`${CARD_FOOTER} md:col-span-2`}>
+              <p className="text-center text-[13px] text-slate-500 sm:text-left">
+                Already have an account?{" "}
+                <button type="button" onClick={() => router.push("/admin/login")} className="font-semibold text-[#e2641b] underline-offset-2 transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f57224]/30">
+                  Sign in
+                </button>
+              </p>
+              <button type="submit" disabled={checking} className={`${PRIMARY_BTN} w-full sm:w-auto sm:min-w-[260px]`}>
                 {checking ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Checking details…</> : "Continue to store details"}
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
+              </div>
             </form>
           )}
 
-          {/* ═══ STEP 2: STORE DETAILS ═══ */}
+          {/* ═══ STEP 2: STORE DETAILS + WEB ADDRESS (final) ═══ */}
           {step === "store" && (
-            <form onSubmit={(e) => { e.preventDefault(); handleStoreNext(); }} className="mt-5 space-y-5" noValidate>
+            <form onSubmit={handleSubmit} className={`${CARD} space-y-5`} noValidate aria-busy={loading}>
               {/* Group 1 — Store identity */}
               <section aria-labelledby="su-sec-identity">
                 <SectionHeading icon={Store} title={<span id="su-sec-identity">Store identity</span>} description="Your store name and what kind of business it is" />
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3.5 md:grid-cols-2">
                   <Field id="su-store-name" label="Store name" icon={Store} error={errors.storeName}>
                     <input
                       {...fieldA11y("su-store-name", errors.storeName)}
                       type="text"
                       autoComplete="organization"
                       value={storeName}
-                      onChange={(e) => { setStoreName(e.target.value); setErrors((p) => ({ ...p, storeName: "" })); }}
+                      onChange={(e) => changeStoreName(e.target.value)}
                       placeholder="e.g. Ahmed Electronics"
                       className={fieldCls("storeName")}
                     />
@@ -1114,8 +1148,61 @@ export default function SignupPage() {
                 </div>
               </section>
 
-              {/* Group 2 — Business description */}
-              <section aria-labelledby="su-sec-desc">
+              {/* Web address + description — desktop par side by side (bina scroll fit) */}
+              <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 md:grid-cols-2">
+              {/* Group 2 — Store web address (required) */}
+              <section aria-labelledby="su-sec-web" className="min-w-0">
+                <SectionHeading icon={Globe} title={<span id="su-sec-web">Store web address</span>} description="Where customers will find your store" />
+                <Field
+                  id="su-subdomain"
+                  label="Web address"
+                  counter={<span className={`text-[11px] font-medium tabular-nums ${subdomain.length >= STORE_ADDRESS_MAX ? "text-[#e2641b]" : "text-slate-400"}`}>{subdomain.length}/{STORE_ADDRESS_MAX}</span>}
+                  icon={Link2}
+                  error={errors.subdomain}
+                  below={!errors.subdomain && (
+                    <p id="su-subdomain-hint" className="flex items-center gap-1.5 pt-1.5 text-[11.5px] leading-4" aria-live="polite">
+                      {subdomain.trim().length < 3 ? (
+                        <span className="text-slate-500">Lowercase letters, numbers and hyphens · 3–{STORE_ADDRESS_MAX} characters</span>
+                      ) : subdomainCheck.value === subdomain.trim() && subdomainCheck.state === "checking" ? (
+                        <><Loader2 size={12} className="animate-spin text-slate-400" aria-hidden="true" /><span className="text-slate-500">Checking availability…</span></>
+                      ) : subdomainCheck.value === subdomain.trim() && subdomainCheck.state === "available" ? (
+                        <><CheckCircle2 size={13} className="text-emerald-500" aria-hidden="true" /><span className="font-medium text-emerald-700">{subdomain.trim()}.{ROOT_DOMAIN} is available</span></>
+                      ) : (
+                        <span className="text-slate-500">You can connect your own domain later from the store settings.</span>
+                      )}
+                    </p>
+                  )}
+                  trailing={
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 max-w-[55%] -translate-y-1/2 truncate text-[13px] font-medium text-slate-400">.{ROOT_DOMAIN}</span>
+                  }
+                >
+                  <input
+                    {...fieldA11y("su-subdomain", errors.subdomain, true)}
+                    type="text"
+                    inputMode="url"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    maxLength={STORE_ADDRESS_MAX}
+                    value={subdomain}
+                    onChange={(e) => changeSubdomain(e.target.value)}
+                    placeholder="your-store"
+                    className={`${fieldCls("subdomain")} pr-[calc(55%+1rem)] font-medium`}
+                  />
+                </Field>
+                {errors.subdomain && subdomainCheck.suggestion && subdomainCheck.value === subdomain.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => { changeSubdomain(subdomainCheck.suggestion); }}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-[#f57224]/30 bg-[#f57224]/[0.06] px-2.5 py-1.5 text-[12px] font-semibold text-[#c2541a] transition hover:bg-[#f57224]/[0.12]"
+                  >
+                    Use {subdomainCheck.suggestion}.{ROOT_DOMAIN}
+                  </button>
+                )}
+              </section>
+
+              {/* Group 3 — Business description */}
+              <section aria-labelledby="su-sec-desc" className="min-w-0">
                 <SectionHeading icon={FileText} title={<span id="su-sec-desc">Business description</span>} description="Tell buyers what you sell and why they should choose you" />
                 <div className="space-y-4">
                   <Field
@@ -1146,205 +1233,24 @@ export default function SignupPage() {
                   </Field>
                 </div>
               </section>
+              </div>
 
-              {/* Back + Continue */}
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row">
+              {/* Back + Create account — card footer */}
+              <div className={CARD_FOOTER}>
                 <button
                   type="button"
+                  disabled={loading}
                   onClick={() => { setStep("account"); setErrors({}); setGeneralError(""); }}
                   className={`${SECONDARY_BTN} sm:w-auto`}
                 >
                   <ArrowLeft size={16} aria-hidden="true" />
                   Back
                 </button>
-                <button type="submit" className={`${PRIMARY_BTN} w-full sm:w-auto sm:flex-1`}>
-                  Continue
-                  <ArrowRight size={17} aria-hidden="true" />
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* ═══ STEP 3: LOCATION & BRANDING ═══ */}
-          {step === "location" && (
-            <form onSubmit={handleSubmit} className="mt-5 space-y-5" noValidate aria-busy={loading}>
-              {/* Group 3 — Location */}
-              <section aria-labelledby="su-sec-location">
-                <SectionHeading icon={MapPin} title={<span id="su-sec-location">Business location</span>} description="Used for shipping and tax settings" />
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field
-                      id="su-country"
-                      label="Country"
-                      icon={Globe}
-                      error={errors.country}
-                    >
-                      {/* Searchable list (native select 250 items ka poora-screen popup kholta tha) */}
-                      <SearchCombobox
-                        id="su-country"
-                        value={country}
-                        onChange={(v) => {
-                          setCountry(v);
-                          setCity(""); // purani city doosre country ki hai
-                          setErrors((p) => ({ ...p, country: "", city: "" }));
-                        }}
-                        options={countryOptions}
-                        loading={step === "location" && !geo}
-                        invalid={!!errors.country}
-                        describedBy={errors.country ? "su-country-error" : undefined}
-                        inputClassName={fieldCls("country", true)}
-                        itemLabel="country"
-                        allowCustom={false}
-                        pinned={["Pakistan"]}
-                      />
-                    </Field>
-
-                    <Field id="su-city" label="City" icon={Building2} error={errors.city}>
-                      <SearchCombobox
-                        id="su-city"
-                        itemLabel="city"
-                        value={city}
-                        onChange={(v) => { setCity(v); setErrors((p) => ({ ...p, city: "" })); }}
-                        options={cityOptions}
-                        loading={citiesLoading}
-                        invalid={!!errors.city}
-                        describedBy={errors.city ? "su-city-error" : undefined}
-                        inputClassName={fieldCls("city", true)}
-                      />
-                    </Field>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_132px]">
-                    <Field id="su-address" label="Street address" icon={MapPin} error={errors.address}>
-                      <input
-                        {...fieldA11y("su-address", errors.address)}
-                        type="text"
-                        autoComplete="street-address"
-                        value={address}
-                        onChange={(e) => { setAddress(e.target.value); setErrors((p) => ({ ...p, address: "" })); }}
-                        placeholder="Shop no., street, area"
-                        className={fieldCls("address")}
-                      />
-                    </Field>
-
-                    <Field id="su-zip" label="ZIP code" optional icon={Hash} error={errors.zipCode}>
-                      <input
-                        {...fieldA11y("su-zip", errors.zipCode)}
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="postal-code"
-                        maxLength={20}
-                        value={zipCode}
-                        onChange={(e) => setZipCode(e.target.value)}
-                        placeholder="54000"
-                        className={fieldCls("zipCode")}
-                      />
-                    </Field>
-                  </div>
-                </div>
-              </section>
-
-              {/* Group 4 — Branding / logo upload */}
-              {/* relative: sr-only file input (absolute) isi section ke andar rahe —
-                  warna woh scroll panel se bahar nikal kar poore page ko scroll karwata hai */}
-              <section aria-labelledby="su-sec-brand" className="relative">
-                <SectionHeading icon={ImagePlus} title={<span id="su-sec-brand">Store branding</span>} description="Optional — add or change it any time" />
-                <input
-                  id="su-store-logo"
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp"
-                  onChange={pickLogo}
-                  disabled={logoBusy || loading}
-                  className="peer sr-only"
-                />
-                {storeLogo ? (
-                  <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:p-4">
-                    <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={storeLogo} alt="Store logo preview" className="h-full w-full object-contain" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-900">
-                        <BadgeCheck size={15} className="shrink-0 text-emerald-500" aria-hidden="true" />
-                        Logo ready
-                      </p>
-                      <p className="pt-0.5 text-[12px] leading-4 text-slate-500">Optimized for fast loading on your store.</p>
-                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                        <label
-                          htmlFor="su-store-logo"
-                          className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${logoBusy ? "pointer-events-none opacity-60" : ""}`}
-                        >
-                          {logoBusy ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={13} aria-hidden="true" />}
-                          Replace
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setStoreLogo("")}
-                          disabled={logoBusy || loading}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                        >
-                          <Trash2 size={13} aria-hidden="true" />
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <label
-                    htmlFor="su-store-logo"
-                    onDragOver={(e) => { e.preventDefault(); if (!logoDragActive) setLogoDragActive(true); }}
-                    onDragLeave={() => setLogoDragActive(false)}
-                    onDrop={onLogoDrop}
-                    className={`flex cursor-pointer items-center gap-4 rounded-xl border-2 border-dashed px-4 py-3.5 transition-colors peer-focus-visible:border-[#f57224] peer-focus-visible:ring-4 peer-focus-visible:ring-[#f57224]/15 ${
-                      logoDragActive
-                        ? "border-[#f57224] bg-[#f57224]/[0.06]"
-                        : "border-slate-200 bg-slate-50/60 hover:border-[#f57224]/50 hover:bg-[#f57224]/[0.03]"
-                    } ${logoBusy ? "pointer-events-none" : ""}`}
-                  >
-                    <span
-                      data-tone="accent"
-                      aria-hidden="true"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[#f57224] shadow-sm ring-1 ring-slate-200"
-                    >
-                      {logoBusy ? <Loader2 size={19} className="animate-spin" /> : <ImagePlus size={19} />}
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-[13px] font-medium text-slate-700">
-                        {logoBusy ? (
-                          "Optimizing your logo…"
-                        ) : (
-                          <>
-                            <span data-tone="accent" className="font-semibold text-[#e2641b]">Click to upload</span> or drag and drop
-                          </>
-                        )}
-                      </span>
-                      <span className="pt-0.5 text-[11.5px] text-slate-500">JPG, PNG or WEBP · up to 15MB · square works best</span>
-                    </span>
-                  </label>
-                )}
-              </section>
-
-              {/* Back + Create account */}
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row">
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => { setStep("store"); setErrors({}); setGeneralError(""); }}
-                  className={`${SECONDARY_BTN} sm:w-auto`}
-                >
-                  <ArrowLeft size={16} aria-hidden="true" />
-                  Back
-                </button>
-                <button type="submit" disabled={loading || logoBusy} className={`${PRIMARY_BTN} w-full sm:w-auto sm:flex-1`}>
+                <button type="submit" disabled={loading} className={`${PRIMARY_BTN} w-full sm:w-auto sm:min-w-[260px]`}>
                   {loading ? (
                     <>
                       <Loader2 size={17} className="animate-spin" aria-hidden="true" />
                       {t("auth.signup.signingUp")}
-                    </>
-                  ) : logoBusy ? (
-                    <>
-                      <Loader2 size={17} className="animate-spin" aria-hidden="true" />
-                      Processing logo…
                     </>
                   ) : (
                     <>
@@ -1356,38 +1262,12 @@ export default function SignupPage() {
               </div>
             </form>
           )}
-
-          {/* Google sirf account step par */}
-          {step === "account" && (
-            <div className="mt-5">
-              <div className="flex items-center gap-3" aria-hidden="true">
-                <span className="h-px flex-1 bg-slate-200" />
-                <span className="text-[11.5px] font-medium text-slate-400">or sign up with</span>
-                <span className="h-px flex-1 bg-slate-200" />
-              </div>
-              <div className="mt-3 flex justify-center">
-                {GOOGLE_CLIENT_ID ? (
-                  <LazyGoogleLogin
-                    clientId={GOOGLE_CLIENT_ID}
-                    onSuccess={(res) => handleGoogle(res.credential)}
-                    onError={() => toast.error(t("auth.login.googleFailed"))}
-                    theme="outline"
-                    size="large"
-                    text="continue_with"
-                    shape="rectangular"
-                    width="300"
-                  />
-                ) : (
-                  <p className="text-center text-[12px] text-slate-400">{t("auth.login.googleUnavailable")}</p>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
 
         </div>
 
         {/* Bottom anchor — trust + help (© left panel me hai; mobile par yahan) */}
-        <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-100 py-4 text-[12px] text-slate-400">
+        <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-100 py-4 text-[12px] text-slate-400 [@media(max-height:820px)]:py-2.5">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck size={13} aria-hidden="true" />
             Secure, encrypted signup

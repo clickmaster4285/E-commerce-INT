@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard } from "lucide-react";
+import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard, UserCog } from "lucide-react";
 import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDate, timeAgo, assetUrl } from "@/lib/superadminFormat";
@@ -80,6 +80,7 @@ export default function StoresPage() {
             { label: "Visit storefront", icon: ExternalLink, href: storefrontUrl(s), external: true, disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { label: "Open admin panel", icon: LayoutDashboard, onClick: () => openStoreAdmin(s.id), disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { separator: true },
+            { label: "Manage owner", icon: UserCog, href: s.owner_id ? `/super-admin/users/${s.owner_id}` : undefined, disabled: !s.owner_id, hint: "This store has no owner account" },
             { label: "Edit store", icon: Pencil, onClick: () => setFormStore(s) },
             s.status === "closed"
               ? { label: "Activate store", icon: CircleCheck, onClick: () => setStatusTarget({ ...s, next: "open" }) }
@@ -97,7 +98,7 @@ export default function StoresPage() {
       <PageHeader
         title="Stores"
         description={isLoading ? "Every storefront on the platform." : `${total.toLocaleString()} storefront${total === 1 ? "" : "s"} on the platform.`}
-        actions={<Button variant="primary" icon={Plus} onClick={() => setFormStore("new")}>Add store</Button>}
+        actions={<Button variant="primary" icon={Plus} href="/super-admin/stores/new">Add store</Button>}
       />
 
       {notice && <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>}
@@ -114,7 +115,7 @@ export default function StoresPage() {
           rowKey={(s) => s.id}
           loading={isLoading}
           error={isError ? { title: "Couldn't load stores", action: <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button> } : null}
-          empty={{ icon: StoreIcon, title: debounced ? "No stores match your search" : "No stores yet", description: debounced ? "Try a different store name or email." : "Approve a seller request or add a store manually.", action: !debounced && <Button size="sm" variant="primary" icon={Plus} onClick={() => setFormStore("new")}>Add store</Button> }}
+          empty={{ icon: StoreIcon, title: debounced ? "No stores match your search" : "No stores yet", description: debounced ? "Try a different store name or email." : "Approve a seller request or add a store manually.", action: !debounced && <Button size="sm" variant="primary" icon={Plus} href="/super-admin/stores/new">Add store</Button> }}
         />
         <Pagination page={page} pages={pages} total={total} pageSize={PAGE_SIZE} onChange={setPage} itemLabel="stores" />
       </Card>

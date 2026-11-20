@@ -8,7 +8,6 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const SuperAdminActivity = require("../models/SuperAdminActivity");
 
 const appId = new mongoose.Types.ObjectId();
 const storeId = new mongoose.Types.ObjectId();
@@ -77,7 +76,6 @@ test("deleteRequest removes the pending request with its closed store and signup
     [Store, "deleteOne", (filter) => { calls.store = filter; return q({ deletedCount: 1 }); }],
     [Employee, "deleteMany", (filter) => { calls.employees = filter; return q({ deletedCount: 1 }); }],
     [User, "deleteOne", (filter) => { calls.user = filter; return q({ deletedCount: 1 }); }],
-    [SuperAdminActivity, "create", async () => ({})],
   ]);
   try {
     const res = mockRes();
@@ -115,7 +113,6 @@ test("updateRequest saves changes and syncs the linked store", async () => {
     [SellerApplication, "findById", () => q(baseApp({ city: "Lahore" }))],
     [SellerApplication, "findOneAndUpdate", (filter, update) => { calls.app = { filter, update }; return q(baseApp({ ...update.$set })); }],
     [Store, "updateOne", (filter, update) => { calls.store = update; return q({}); }],
-    [SuperAdminActivity, "create", async () => ({})],
   ]);
   try {
     const res = mockRes();

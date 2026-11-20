@@ -417,8 +417,14 @@ const verifyEmailVerificationOtp = async (req, res) => {
       // Seller store is created up-front (closed) and stays read-only until approval.
       let store = null;
       if (isSeller) {
+        // Seller ka chuna hua address — beech me kisi ne le liya ho to us se milta-julta free address
+        let subdomain = String(pending.subdomain || "").trim().toLowerCase();
+        if (!subdomain || (await Store.exists({ subdomain }).setOptions({ skipTenantScope: true }))) {
+          subdomain = await Store.generateUniqueSubdomain(subdomain || pending.storeName);
+        }
         store = await Store.create({
           store_name: pending.storeName,
+          subdomain,
           tagline: "Welcome to our store",
           description: pending.storeDescription || "",
           business_category: pending.businessCategory || "",

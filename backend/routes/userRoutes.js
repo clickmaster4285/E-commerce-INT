@@ -46,7 +46,7 @@ const router = express.Router();
 // ==========================================
 router.post("/register", createUser);
 // Signup step 1 — email/username/phone pehle se liye hue? (same limiter as register)
-router.post("/register/check", limiters.register, checkRegistration);
+router.post("/register/check", limiters.registerCheck, checkRegistration);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);

@@ -52,7 +52,8 @@ const userSchema = new mongoose.Schema(
     is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
   },
-  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
+  // Collection: customer_users (pehle "users") — scripts/renameAuthCollections.js
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" }, collection: "customer_users" },
 );
 
 userSchema.methods.softDelete = function (userId) {

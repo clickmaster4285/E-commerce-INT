@@ -87,8 +87,6 @@ export const superAdminApi = {
 
   // Dashboard
   getDashboard: () => superAdminHttp.get("/super-admin/dashboard").then((r) => r.data),
-  // Logged-in member ki apni activity (time + description)
-  myActivity: (params = {}) => superAdminHttp.get("/super-admin/activity/me", { params }).then((r) => r.data),
 
   // Requests
   listRequests: (params = {}) =>
@@ -107,6 +105,8 @@ export const superAdminApi = {
   listStores: (params = {}) =>
     superAdminHttp.get("/super-admin/stores", { params }).then((r) => r.data),
   createStore: (payload) => superAdminHttp.post("/super-admin/stores", payload).then((r) => r.data),
+  // Add store page — signup jaise fields se store + owner (seedha approved)
+  createSellerStore: (payload) => superAdminHttp.post("/super-admin/stores/with-owner", payload).then((r) => r.data),
   updateStore: (id, payload) => superAdminHttp.patch(`/super-admin/stores/${id}`, payload).then((r) => r.data),
   deleteStore: (id) => superAdminHttp.delete(`/super-admin/stores/${id}`).then((r) => r.data),
   setStoreStatus: (id, status) =>
@@ -127,7 +127,6 @@ export const superAdminApi = {
   // Team (super admin + staff accounts) — super admin only
   listTeam: () => superAdminHttp.get("/super-admin/team").then((r) => r.data),
   getTeamMember: (id) => superAdminHttp.get(`/super-admin/team/${id}`).then((r) => r.data),
-  teamMemberActivity: (id, params = {}) => superAdminHttp.get(`/super-admin/team/${id}/activity`, { params }).then((r) => r.data),
   createTeamMember: (payload) => superAdminHttp.post("/super-admin/team", payload).then((r) => r.data),
   updateTeamMember: (id, payload) => superAdminHttp.patch(`/super-admin/team/${id}`, payload).then((r) => r.data),
   setTeamMemberStatus: (id, status) =>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Sun, Moon, LogOut, ChevronDown, ChevronRight, ShieldCheck, Bell, Activity } from "lucide-react";
+import { Menu, Sun, Moon, LogOut, ChevronDown, ChevronRight, ShieldCheck, Bell } from "lucide-react";
 import { NAV } from "@/components/superadmin/Sidebar";
 import { IconButton, Avatar, cx } from "@/components/superadmin/ui";
 
@@ -12,7 +12,7 @@ const useBreadcrumbs = (pathname) => {
   const section = NAV.find((n) => pathname === n.href || pathname?.startsWith(`${n.href}/`));
   if (!section) return [];
   const crumbs = [{ label: section.label, href: section.href }];
-  if (pathname !== section.href) crumbs.push({ label: "Details" });
+  if (pathname !== section.href) crumbs.push({ label: pathname.endsWith("/new") ? `Add ${section.label.replace(/s$/, "").toLowerCase()}` : "Details" });
   return crumbs;
 };
 
@@ -96,11 +96,6 @@ export default function Topbar({ onMenuClick, onLogout, adminName = "Super Admin
                 </span>
               </div>
               <div className="p-1.5">
-                <Link href="/super-admin/activity" role="menuitem" onClick={() => setMenuOpen(false)} className="sa-menu__item">
-                  <Activity size={15} aria-hidden="true" />
-                  My activity
-                </Link>
-                <div className="sa-menu__sep" role="separator" />
                 <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onLogout(); }} disabled={loggingOut} className="sa-menu__item sa-menu__item--danger">
                   <LogOut size={15} aria-hidden="true" />
                   {loggingOut ? "Signing out…" : "Sign out"}
