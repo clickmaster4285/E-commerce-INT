@@ -165,7 +165,7 @@ const createUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Registration failed", errors });
     if (wantsStore) {
       if (!storeName || storeName.length < 1) errors.storeName = "Please enter your store name.";
-      if (!storeDescription || storeDescription.length < 10) errors.storeDescription = "Please describe your store (at least 10 characters).";
+      if (!storeDescription) errors.storeDescription = "Please describe your store.";
       if (!businessCategory) errors.businessCategory = "Please select a business category.";
       if (!country) errors.country = "Please select a country.";
       if (!city || city.trim().length < 2) errors.city = "Please enter your city.";

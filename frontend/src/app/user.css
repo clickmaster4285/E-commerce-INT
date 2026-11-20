@@ -520,9 +520,11 @@ html:has(.user-theme) {
   background: var(--user-bg-card);
   box-shadow: var(--user-shadow-lg);
 }
-:root.user-dark .signup-reference-page > div:last-child > div :is(h2, label, p, span) { color: var(--user-text); }
-:root.user-dark .signup-reference-page > div:last-child > div input { background: var(--user-bg-input); color: var(--user-text); }
-:root.user-dark .signup-reference-page > div:last-child > div input::placeholder { color: var(--user-text-subtle); }
+/* [data-tone] wale elements (errors, stepper, accents) apna rang rakhte hain */
+:root.user-dark .signup-reference-page > div:last-child > div :is(h2, h3, label, p, span):not([data-tone], [data-tone] *) { color: var(--user-text); }
+:root.user-dark .signup-reference-page > div:last-child > div :is(input, select, textarea):not([aria-invalid="true"]) { background: var(--user-bg-input); color: var(--user-text); border-color: var(--user-border); }
+:root.user-dark .signup-reference-page > div:last-child > div :is(input, textarea)::placeholder { color: var(--user-text-subtle); }
+:root.user-dark .signup-reference-page > div:last-child > header :is(span) { color: var(--user-text); }
 
 /* ---------- 3) LUCIDE ICONS (numeric size) ---------- */
 /* Sirf woh icons jinpar explicit width attribute hai (lucide numeric size).
