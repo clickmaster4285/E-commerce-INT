@@ -513,13 +513,11 @@ html:has(.user-theme) {
 }
 
 /* Signup reference page keeps the light reference palette while honoring dark mode. */
-:root.user-dark .signup-reference-page { background: var(--user-bg) !important; }
-:root.user-dark .signup-reference-page > div:last-child { background: var(--user-bg); }
-:root.user-dark .signup-reference-page > div:last-child > div {
-  border-color: var(--user-border);
-  background: var(--user-bg-card);
-  box-shadow: var(--user-shadow-lg);
-}
+/* Full-panel layout: poora right panel hi surface hai (form ke gird koi card/box nahi) */
+:root.user-dark .signup-reference-page { background: var(--user-bg-card) !important; }
+:root.user-dark .signup-reference-page > div:last-child { background: var(--user-bg-card) !important; }
+:root.user-dark .signup-reference-page > div:last-child > footer { border-color: var(--user-border); }
+:root.user-dark .signup-reference-page > div:last-child > header button { background: transparent; color: var(--user-text); border-color: var(--user-border); }
 /* [data-tone] wale elements (errors, stepper, accents) apna rang rakhte hain */
 :root.user-dark .signup-reference-page > div:last-child > div :is(h2, h3, label, p, span):not([data-tone], [data-tone] *) { color: var(--user-text); }
 :root.user-dark .signup-reference-page > div:last-child > div :is(input, select, textarea):not([aria-invalid="true"]) { background: var(--user-bg-input); color: var(--user-text); border-color: var(--user-border); }

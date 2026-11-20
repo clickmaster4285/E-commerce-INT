@@ -45,6 +45,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
   const logoUrl = store?.logo?.img_url
@@ -852,9 +853,9 @@ export default function SignupPage() {
   return (
     /* Desktop (lg+): main exactly viewport height — window scroll nahi hota,
        sirf right panel apne andar scroll karta hai. Mobile/tablet: natural page scroll. */
-    <main className="user-theme signup-reference-page flex min-h-dvh bg-[#f3f4f7] lg:h-dvh lg:min-h-0">
+    <main className="user-theme signup-reference-page flex min-h-dvh bg-white lg:h-dvh lg:min-h-0">
       {/* ═══════════ LEFT — NAVY BRAND PANEL (lg+, stationary) ═══════════ */}
-      <div className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[44%] xl:w-[46%]">
+      <div className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[44%] xl:w-[48%] 2xl:w-1/2">
         {/* Background layers: navy gradient + orange glow + faded artwork + dot grid */}
         <div
           aria-hidden="true"
@@ -931,24 +932,32 @@ export default function SignupPage() {
       {/* ═══════════ RIGHT — FORM ═══════════ */}
       {/* Desktop par yahi independent scroll container hai. justify-center ki jagah
           auto margins (mt-auto / mb-auto) — content lamba ho to top clip nahi hota. */}
+      {/* "Full panel" layout (Shopify/Stripe style): poora right side white page,
+          form bina card ke beech me; top (Sign in) aur bottom (footer) anchored. */}
       <div
         ref={formPanelRef}
-        className="flex min-w-0 flex-1 flex-col items-center px-4 py-6 sm:px-8 sm:py-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:px-10 lg:py-6 lg:[scrollbar-gutter:stable_both-edges] xl:px-14"
+        className="flex min-w-0 flex-1 flex-col items-center bg-white px-5 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14"
       >
-        {/* Mobile / tablet brand header */}
-        <header className="mb-6 mt-auto flex w-full max-w-[520px] shrink-0 items-center justify-between lg:hidden">
-          <BrandMark size="sm" />
-          <span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-slate-500">
-            <ShieldCheck size={13} aria-hidden="true" />
-            Secure signup
-          </span>
+        {/* Top bar — mobile par brand, har jagah "Sign in" */}
+        <header className="flex w-full shrink-0 items-center justify-between gap-3 py-5 lg:justify-end">
+          <span className="lg:hidden"><BrandMark size="sm" /></span>
+          <p className="flex items-center gap-2.5 text-[13px] text-slate-500">
+            <span className="hidden sm:inline">Already have an account?</span>
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/20"
+            >
+              Sign in
+            </button>
+          </p>
         </header>
 
-        <div className="w-full max-w-[520px] shrink-0 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_24px_56px_-16px_rgba(15,23,42,0.18)] sm:p-7 lg:mt-auto xl:p-8">
-          {/* Card header */}
+        {/* Form — box nahi, sirf controlled width; my-auto = space ho to vertically center */}
+        <div className="my-auto w-full max-w-[460px] shrink-0 py-4 2xl:max-w-[500px]">
           {/* Step number stepper me already hai — alag eyebrow pill ki zaroorat nahi */}
           <div>
-            <h2 className="text-[24px] font-bold leading-tight tracking-[-0.02em] text-slate-900">{header.title}</h2>
+            <h2 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-slate-900 2xl:text-[30px]">{header.title}</h2>
             <p className="pt-1 text-[13.5px] leading-5 text-slate-500">{header.subtitle}</p>
           </div>
 
@@ -1450,26 +1459,20 @@ export default function SignupPage() {
             </div>
           )}
 
-          {isWizardStep && (
-            <div className="mt-4 flex flex-col items-center gap-2">
-              <p className="text-center text-[13px] text-slate-500">
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => router.push("/login")}
-                  className="font-semibold text-[#e2641b] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:underline"
-                >
-                  Sign in
-                </button>
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* <footer> (p nahi) — globals.css ka unlayered `p { margin: 0 }` mb-auto ko override kar deta */}
-        <footer className="mb-auto mt-4 flex shrink-0 items-center justify-center gap-1.5 pb-1 text-center text-[11.5px] text-slate-400">
-          <ShieldCheck size={13} aria-hidden="true" />
-          Your information is encrypted and secure · ClickMaster Marketplace
+        {/* Bottom anchor — trust + help (© left panel me hai; mobile par yahan) */}
+        <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-100 py-4 text-[12px] text-slate-400">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck size={13} aria-hidden="true" />
+            Secure, encrypted signup
+            <span className="lg:hidden">· © {new Date().getFullYear()} ClickMaster</span>
+          </span>
+          {SUPPORT_EMAIL ? (
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-slate-500 transition hover:text-slate-800">
+              Need help? Contact support
+            </a>
+          ) : null}
         </footer>
       </div>
     </main>
