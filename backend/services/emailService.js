@@ -1,48 +1,33 @@
-const fs = require("fs");
-const path = require("path");
 const { sendEmail, isSmtpConfigured } = require("../utils/sendEmail");
 const { logActivity } = require("../utils/superAdminActivity");
+const {
+  escapeHtml: esc,
+  platformName,
+  supportEmail,
+  hero,
+  pill,
+  details,
+  buttons,
+  steps,
+  note,
+  paragraph,
+  link,
+  renderEmail,
+} = require("../utils/emailLayout");
 
 // ==========================================
 // 📧 SELLER APPLICATION EMAIL SERVICE
 // ==========================================
-// Templates live in backend/templates/emails/.
+// Design utils/emailLayout.js me hai (OTP email bhi wahi use karti hai).
 // Delivery is attempted twice; failure never throws — the caller (apply /
 // approve / reject) must not fail because an email could not be sent.
 // Final failures are logged via logActivity() for audit.
 
-const readTemplate = (name) =>
-  fs.readFileSync(path.join(__dirname, "..", "templates", "emails", name), "utf8");
-
-const BASE_LAYOUT = readTemplate("baseLayout.html");
-const PENDING_BODY = readTemplate("sellerPending.html");
-const APPROVED_BODY = readTemplate("sellerApproved.html");
-const REJECTED_BODY = readTemplate("sellerRejected.html");
-const INFO_REQUEST_BODY = readTemplate("sellerInfoRequest.html");
-
-const escapeHtml = (value) =>
-  String(value || "").replace(/[&<>"']/g, (ch) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  })[ch]);
-
-const fillTemplate = (tpl, vars) =>
-  tpl.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] !== undefined ? vars[key] : ""));
-
 const frontendBase = () => String(process.env.CLIENT_URL || "").replace(/\/+$/, "");
-
-const baseVars = (extra = {}) => ({
-  YEAR: new Date().getFullYear(),
-  STORE_NAME: escapeHtml(process.env.PLATFORM_NAME || "Click Master Store"),
-  SUPPORT_EMAIL: escapeHtml(process.env.PLATFORM_SUPPORT_EMAIL || "hello@clickmasterstore.pk"),
-  ...extra,
-});
-
-const render = (body, vars) =>
-  fillTemplate(BASE_LAYOUT, baseVars({ CONTENT: fillTemplate(body, vars) }));
+const hostOf = (url) => String(url || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+const firstName = (name) => String(name || "").trim().split(/\s+/)[0] || "there";
+const today = () => new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+const SELLER_FOOTER = "You are receiving this email because you created a seller account.";
 
 const sendWithRetry = async ({ to, subject, html, text, action, entityId }) => {
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -68,93 +53,154 @@ const sendWithRetry = async ({ to, subject, html, text, action, entityId }) => {
   return { delivered: false, reason: "unknown" };
 };
 
-// adminUrl (optional): store ka admin panel base URL. Signup ke baad store ban
-// chuka hota hai → seller view-only admin panel me sign in kar sakta hai.
+// ------------------------------------------
+// 1) Signup complete — pending approval
+// adminUrl (optional): store ka base URL → seller view-only admin panel me jaa sakta hai
+// ------------------------------------------
 const sendApplicationReceivedEmail = async ({ name, email, storeName, adminUrl }) => {
   const actionUrl = adminUrl ? `${adminUrl}/admin/login` : frontendBase();
-  const nextStep = adminUrl
-    ? "While you wait, you can sign in to your admin panel to look around. It is view-only, so creating and editing are locked until approval."
-    : "There is nothing else you need to do right now.";
-  const vars = baseVars({
-    NAME: escapeHtml(name),
-    STORENAME: escapeHtml(storeName),
-    EMAIL: escapeHtml(email),
-    NEXT_STEP: escapeHtml(nextStep),
-    ACTION_URL: escapeHtml(actionUrl),
-    ACTION_LABEL: escapeHtml(adminUrl ? "Open your admin panel" : `Visit ${process.env.PLATFORM_NAME || "Click Master Store"}`),
-  });
-  const html = render(PENDING_BODY, vars);
-  const text = `Hi ${name}, your seller account for ${storeName} has been created and is pending approval. ${nextStep} We will email you as soon as your account is approved. ${actionUrl}`;
+  const content = [
+    hero({
+      tone: "warning",
+      symbol: "&#8987;",
+      eyebrow: "Pending approval",
+      title: `Your seller account has been created, ${firstName(name)}.`,
+      introHtml: `Thank you for joining ${esc(platformName())}. We have received your request for <strong style="color:#0f172a;">${esc(storeName)}</strong> and our team is reviewing it now.`,
+    }),
+    details("Account summary", [
+      ["Store", esc(storeName)],
+      ["Account email", esc(email)],
+      ["Submitted", esc(today())],
+      ["Status", pill("Pending approval", "warning")],
+    ]),
+    steps("What happens next", [
+      { title: "Account created", text: "Your email is verified and your store has been set up.", done: true },
+      {
+        title: "Review by our team",
+        text: adminUrl
+          ? "While you wait, you can explore your admin panel. It is view-only until approval."
+          : "There is nothing else you need to do right now.",
+      },
+      { title: "Approval email", text: "As soon as you are approved, we will email you and your store goes live." },
+    ]),
+    buttons([{ url: actionUrl, label: adminUrl ? "Open your admin panel" : `Visit ${platformName()}` }]),
+  ].join("");
+
+  const text = `Hi ${name}, your seller account for ${storeName} has been created and is pending approval. ${
+    adminUrl ? "While you wait, you can explore your admin panel (view-only until approval)." : "There is nothing else you need to do right now."
+  } We will email you as soon as your account is approved. ${actionUrl}`;
+
   return sendWithRetry({
     to: email,
-    subject: `Your seller account is pending approval — ${process.env.PLATFORM_NAME || "Click Master Store"}`,
-    html,
+    subject: `Your seller account is pending approval — ${platformName()}`,
+    html: renderEmail({ preheader: `We're reviewing ${storeName}. We'll email you as soon as it's approved.`, content, footerNote: SELLER_FOOTER }),
     text,
     action: "Seller application received",
     entityId: email,
   });
 };
 
-// storeUrl (store ka base URL) ho to buttons seedha seller ke store par jaate hain;
-// warna platform login (wahan se handoff seller ko uske admin panel me bhejta hai).
+// ------------------------------------------
+// 2) Approved — store live
+// storeUrl ho to buttons seedha seller ke store par; warna platform admin login (handoff)
+// ------------------------------------------
 const sendApplicationApprovedEmail = async ({ name, email, storeName, storeUrl }) => {
   const adminUrl = storeUrl ? `${storeUrl}/admin/login` : `${frontendBase()}/admin/login`;
-  const vars = baseVars({
-    NAME: escapeHtml(name),
-    STORENAME: escapeHtml(storeName),
-    EMAIL: escapeHtml(email),
-    STORE_ADDRESS: escapeHtml(storeUrl ? storeUrl.replace(/^https?:\/\//, "") : "Available in your admin panel"),
-    ADMIN_URL: escapeHtml(adminUrl),
-    STOREFRONT_URL: escapeHtml(storeUrl || ""),
-    STOREFRONT_DISPLAY: storeUrl ? "" : "display:none;",
-  });
-  const html = render(APPROVED_BODY, vars);
-  const text = `Hi ${name}, congratulations! Your seller account for ${storeName} has been approved and your store is live. Open your admin panel: ${adminUrl}${storeUrl ? ` — Visit your storefront: ${storeUrl}` : ""}`;
+  const content = [
+    hero({
+      tone: "success",
+      symbol: "&#10003;",
+      eyebrow: "Approved",
+      title: `Congratulations, ${firstName(name)}! Your store is live.`,
+      introHtml: `Great news — your seller account for <strong style="color:#0f172a;">${esc(storeName)}</strong> has been approved. Your admin panel is now fully unlocked.`,
+    }),
+    details("Your store", [
+      ["Store", esc(storeName)],
+      ...(storeUrl ? [["Store address", link(storeUrl, hostOf(storeUrl))]] : []),
+      ["Sign in with", esc(email)],
+      ["Status", pill("Live", "success")],
+    ]),
+    buttons([
+      { url: adminUrl, label: "Open your admin panel" },
+      storeUrl ? { url: storeUrl, label: "Visit your storefront", variant: "secondary" } : null,
+    ]),
+    steps("Get ready to sell", [
+      { title: "Add your products", text: "Upload photos, set prices and manage stock from your admin panel." },
+      { title: "Customize your store", text: "Add your logo, banners and store details so buyers recognise you." },
+      { title: "Start selling", text: "Share your store link and manage orders as they come in." },
+    ]),
+  ].join("");
+
+  const text = `Hi ${name}, congratulations! Your seller account for ${storeName} has been approved and your store is live. Open your admin panel: ${adminUrl}${
+    storeUrl ? ` — Visit your storefront: ${storeUrl}` : ""
+  }`;
+
   return sendWithRetry({
     to: email,
-    subject: `Congratulations! Your seller account has been approved`,
-    html,
+    subject: `Congratulations! ${storeName} is approved and live`,
+    html: renderEmail({ preheader: `${storeName} is live. Sign in to add your first products.`, content, footerNote: SELLER_FOOTER }),
     text,
     action: "Seller application approved",
     entityId: email,
   });
 };
 
+// ------------------------------------------
+// 3) More information needed
+// ------------------------------------------
 const sendApplicationInfoRequestedEmail = async ({ name, email, storeName, message }) => {
   const setupUrl = `${frontendBase()}/store-setup?email=${encodeURIComponent(email)}`;
-  const vars = baseVars({
-    NAME: escapeHtml(name),
-    STORENAME: escapeHtml(storeName),
-    EMAIL: escapeHtml(email),
-    MESSAGE: escapeHtml(message),
-    SETUP_URL: escapeHtml(setupUrl),
-  });
-  const html = render(INFO_REQUEST_BODY, vars);
-  const text = `Hi ${name}, our team reviewed your application for ${storeName} and needs more information: ${message}\n\nUpdate your application: ${setupUrl}`;
+  const content = [
+    hero({
+      tone: "brand",
+      symbol: "&#9998;",
+      eyebrow: "Action needed",
+      title: `We need a bit more information, ${firstName(name)}.`,
+      introHtml: `Our team reviewed your request for <strong style="color:#0f172a;">${esc(storeName)}</strong> and needs a few more details before we can approve it.`,
+    }),
+    note("Message from our review team", esc(message), "brand"),
+    paragraph("Update your store details and upload any documents we asked for. Your request stays pending until you submit, then it goes straight back to our review queue."),
+    buttons([{ url: setupUrl, label: "Update your details" }]),
+  ].join("");
+
+  const text = `Hi ${name}, our team reviewed your request for ${storeName} and needs more information: ${message}\n\nUpdate your details: ${setupUrl}`;
+
   return sendWithRetry({
     to: email,
-    subject: `We need more information — your seller application for ${storeName}`,
-    html,
+    subject: `Action needed: more information for ${storeName}`,
+    html: renderEmail({ preheader: `Our team needs a few more details to approve ${storeName}.`, content, footerNote: SELLER_FOOTER }),
     text,
     action: "Seller info requested",
     entityId: email,
   });
 };
 
+// ------------------------------------------
+// 4) Rejected
+// (Reapply ka self-service flow abhi nahi — same email dobara signup block hai,
+//  is liye support se rabta ka button.)
+// ------------------------------------------
 const sendApplicationRejectedEmail = async ({ name, email, storeName, reason }) => {
-  const vars = baseVars({
-    NAME: escapeHtml(name),
-    STORENAME: escapeHtml(storeName),
-    EMAIL: escapeHtml(email),
-    REASON: escapeHtml(reason && String(reason).trim() ? reason : "No reason was provided."),
-    APPLY_URL: escapeHtml(`${frontendBase()}/seller/apply`),
-  });
-  const html = render(REJECTED_BODY, vars);
-  const text = `Hi ${name}, we're sorry — your seller application for ${storeName} was not approved. Reason: ${reason || "Not provided"}. You may reapply at ${frontendBase()}/seller/apply`;
+  const cleanReason = reason && String(reason).trim() ? String(reason).trim() : "No reason was provided.";
+  const content = [
+    hero({
+      tone: "danger",
+      symbol: "&#10005;",
+      eyebrow: "Not approved",
+      title: "An update on your seller request",
+      introHtml: `Thank you for your interest in selling on ${esc(platformName())}, ${esc(firstName(name))}. After careful review, we are unable to approve <strong style="color:#0f172a;">${esc(storeName)}</strong> at this time.`,
+    }),
+    note("Reason", esc(cleanReason), "danger"),
+    paragraph("If you have addressed the points above, or believe this was a mistake, reply to this email or contact our team. We'll be happy to take another look."),
+    buttons([{ url: `mailto:${supportEmail()}?subject=${encodeURIComponent(`Seller request: ${storeName}`)}`, label: "Contact support" }]),
+  ].join("");
+
+  const text = `Hi ${name}, we're sorry — your seller request for ${storeName} was not approved. Reason: ${cleanReason} If you have addressed this or believe it was a mistake, contact us at ${supportEmail()}.`;
+
   return sendWithRetry({
     to: email,
-    subject: `Update regarding your seller application — ${process.env.PLATFORM_NAME || "Click Master Store"}`,
-    html,
+    subject: `Update on your seller request — ${platformName()}`,
+    html: renderEmail({ preheader: `An update on your seller request for ${storeName}.`, content, footerNote: SELLER_FOOTER }),
     text,
     action: "Seller application rejected",
     entityId: email,

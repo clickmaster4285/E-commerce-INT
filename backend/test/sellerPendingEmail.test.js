@@ -71,6 +71,28 @@ test("approval email without a store URL falls back to platform sign-in and hide
   await sendApplicationApprovedEmail({ name: "Sara", email: "sara@example.com", storeName: "Sara Store" });
   const { html } = sent[0];
   assert.match(html, /\/admin\/login"[^>]*>Open your admin panel/);
-  assert.match(html, /display:none;/);
+  assert.doesNotMatch(html, /Visit your storefront/);
+  assert.doesNotMatch(html, /\{\{\w+\}\}/);
+});
+
+const { sendApplicationRejectedEmail, sendApplicationInfoRequestedEmail } = require("../services/emailService");
+
+test("rejection email shows the reason and a working support action (no dead reapply link)", async () => {
+  sent.length = 0;
+  await sendApplicationRejectedEmail({ name: "Zain", email: "zain@example.com", storeName: "Zain Auto", reason: "Logo is unclear" });
+  const { subject, html } = sent[0];
+  assert.match(subject, /seller request/i);
+  assert.match(html, /Logo is unclear/);
+  assert.match(html, /href="mailto:[^"]+"[^>]*>Contact support/);
+  assert.doesNotMatch(html, /seller\/apply/);
+  assert.doesNotMatch(html, /\{\{\w+\}\}/);
+});
+
+test("info request email links to store setup and escapes the reviewer message", async () => {
+  sent.length = 0;
+  await sendApplicationInfoRequestedEmail({ name: "Sara", email: "sara@example.com", storeName: "Sara Store", message: "Upload <ID> card" });
+  const { html } = sent[0];
+  assert.match(html, /store-setup\?email=sara%40example\.com/);
+  assert.match(html, /Upload &lt;ID&gt; card/);
   assert.doesNotMatch(html, /\{\{\w+\}\}/);
 });
