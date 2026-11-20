@@ -68,18 +68,26 @@ const sendWithRetry = async ({ to, subject, html, text, action, entityId }) => {
   return { delivered: false, reason: "unknown" };
 };
 
-const sendApplicationReceivedEmail = async ({ name, email, storeName }) => {
+// adminUrl (optional): store ka admin panel base URL. Signup ke baad store ban
+// chuka hota hai → seller view-only admin panel me sign in kar sakta hai.
+const sendApplicationReceivedEmail = async ({ name, email, storeName, adminUrl }) => {
+  const actionUrl = adminUrl ? `${adminUrl}/admin/login` : frontendBase();
+  const nextStep = adminUrl
+    ? "While you wait, you can sign in to your admin panel to look around. It is view-only, so creating and editing are locked until approval."
+    : "There is nothing else you need to do right now.";
   const vars = baseVars({
     NAME: escapeHtml(name),
     STORENAME: escapeHtml(storeName),
     EMAIL: escapeHtml(email),
-    STATUS_URL: escapeHtml(`${frontendBase()}/seller/status`),
+    NEXT_STEP: escapeHtml(nextStep),
+    ACTION_URL: escapeHtml(actionUrl),
+    ACTION_LABEL: escapeHtml(adminUrl ? "Open your admin panel" : `Visit ${process.env.PLATFORM_NAME || "Click Master Store"}`),
   });
   const html = render(PENDING_BODY, vars);
-  const text = `Hi ${name}, we've received your seller application for ${storeName}. Our team will review it and email you once a decision is made. Status: ${frontendBase()}/seller/status`;
+  const text = `Hi ${name}, your seller account for ${storeName} has been created and is pending approval. ${nextStep} We will email you as soon as your account is approved. ${actionUrl}`;
   return sendWithRetry({
     to: email,
-    subject: `Your seller application is under review — ${process.env.PLATFORM_NAME || "Click Master Store"}`,
+    subject: `Your seller account is pending approval — ${process.env.PLATFORM_NAME || "Click Master Store"}`,
     html,
     text,
     action: "Seller application received",

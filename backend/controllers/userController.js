@@ -1599,17 +1599,10 @@ const changePasswordREST = async (req, res) => {
 // nahi hota. Platform par ek 2-minute, ek-baar wala token banta hai; store
 // subdomain ka /admin/handoff page usay exchange karke wahan cookies set karta hai.
 // ==========================================
-const { ROOT_DOMAIN } = require("../utils/tenantHost");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 
 const HANDOFF_TTL_SECONDS = 120;
 const usedHandoffIds = new Map(); // jti → expiresAt (single-use; production me Redis behtar)
-
-const storeAdminBaseUrl = (store) => {
-  const protocol = process.env.PUBLIC_STORE_PROTOCOL || (process.env.NODE_ENV === "production" ? "https" : "http");
-  const port = String(process.env.PUBLIC_STORE_PORT || "").trim();
-  if (!store?.subdomain || !ROOT_DOMAIN) return null;
-  return `${protocol}://${store.subdomain}.${ROOT_DOMAIN}${port ? `:${port}` : ""}`;
-};
 
 // @route POST /api/users/admin/handoff   (logged-in employee, platform host)
 const createStoreHandoff = async (req, res) => {

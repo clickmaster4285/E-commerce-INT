@@ -8,6 +8,7 @@ const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const SellerApplication = require("../models/SellerApplication");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
@@ -495,7 +496,12 @@ const verifyEmailVerificationOtp = async (req, res) => {
       const storeName = isSeller ? pending.storeName : ((application.store_name) || "Your store");
       // Best-effort — failure must not block signup
       try {
-        await sendApplicationReceivedEmail({ name: pending.name, email: pending.email, storeName });
+        await sendApplicationReceivedEmail({
+          name: pending.name,
+          email: pending.email,
+          storeName,
+          adminUrl: storeAdminBaseUrl(store), // store null ho to null → generic link
+        });
       } catch (emailError) {
         console.error("[signup] pending-approval email failed:", emailError.message);
       }
