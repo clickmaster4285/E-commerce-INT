@@ -7,6 +7,7 @@ import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
 import adminHttp from '@/apis/axiosInstance';
 import { notifySellerPendingLocked } from '@/apis/sellerPendingToast';
+import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
@@ -194,7 +195,10 @@ export default function AdminLayout({ children }) {
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: false,
-    refetchOnWindowFocus: false,
+    // Pending seller: approval check (har 45s + tab focus par) taake approve hote hi
+    // panel khud unlock ho jaye. Approved users par koi polling nahi.
+    refetchInterval: (query) => (query.state.data?.seller_pending ? 45 * 1000 : false),
+    refetchOnWindowFocus: (query) => (query.state.data?.seller_pending ? 'always' : false),
   });
 
   // ==========================================
@@ -359,6 +363,20 @@ export default function AdminLayout({ children }) {
   // that can't be label-matched are still stopped by the API-layer 403 toast.
   // ==========================================
   const pendingLock = !!userData?.seller_pending;
+
+  // Pending → approved (isi session me) — seller ko batao ke store live hai
+  const wasPendingRef = useRef(false);
+  useEffect(() => {
+    if (!userData) return;
+    if (wasPendingRef.current && !pendingLock) {
+      toast.success('Your store has been approved!', {
+        id: 'seller-approved',
+        description: 'Your store is now live and your admin panel is fully unlocked. You can start adding products.',
+        duration: 8000,
+      });
+    }
+    wasPendingRef.current = pendingLock;
+  }, [pendingLock, userData]);
 
   useEffect(() => {
     if (!pendingLock) return undefined;
