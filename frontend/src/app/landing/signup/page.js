@@ -945,7 +945,7 @@ export default function SignupPage() {
             <span className="hidden sm:inline">Already have an account?</span>
             <button
               type="button"
-              onClick={() => router.push("/login")}
+              onClick={() => router.push("/admin/login")}
               className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/20"
             >
               Sign in
