@@ -471,7 +471,7 @@ const deleteReviewResponse = async (req, res) => {
     const review = await Review.findOneAndUpdate(
       { _id: req.params.id, is_deleted: { $ne: true } },
       { $unset: { storeResponse: 1 } },
-      { new: false },
+      { returnDocument: "after" },
     );
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
     emitSocketEvent("reviewUpdated", {

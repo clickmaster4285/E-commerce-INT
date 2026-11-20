@@ -2456,7 +2456,7 @@ const toggleProductStatus = async (req, res) => {
           },
         },
       ],
-      // "returnDocument: 'after'" (Mongoose 9 me 'new: true' deprecated hai)
+      // "returnDocument: 'after'" (Mongoose 9 me 'returnDocument: "after"' deprecated hai)
       { returnDocument: "after", updatePipeline: true, runValidators: false }
     );
 

@@ -404,7 +404,7 @@ const updateRequest = async (req, res) => {
     const application = await SellerApplication.findOneAndUpdate(
       { _id: before._id, status: "pending" },
       { $set: updates },
-      { new: true }
+      { returnDocument: "after" }
     ).select("-passwordHash").lean();
     if (!application) {
       return res.status(409).json({ success: false, message: "This request was reviewed meanwhile. Please reload." });

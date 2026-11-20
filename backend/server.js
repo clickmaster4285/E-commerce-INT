@@ -392,7 +392,7 @@ const startServer = async () => {
       }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
       if (ROOT_DOMAIN) {
-        console.log(`🏬 Platform: http://${ROOT_DOMAIN}:3000  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}:3000`);
+        console.log(`🏬 Platform: http://${ROOT_DOMAIN}  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}`);
       }
     });
   } catch (error) {
