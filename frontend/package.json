@@ -7,10 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "warmup": "node scripts/warmup.js",
-    "i18n": "node scripts/build-translations.mjs",
-    "predev": "npm run i18n",
-    "prebuild": "npm run i18n"
+    "warmup": "node scripts/warmup.js"
   },
   "browserslist": [
     "> 0.5%",

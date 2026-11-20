@@ -2,26 +2,12 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pencil, X } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { Modal, Button, Alert, TextInput, TextArea, SelectInput, FormSection } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 
-const BUSINESS_CATEGORIES = [
-  "Electronics",
-  "Fashion & Apparel",
-  "Home & Kitchen",
-  "Beauty & Personal Care",
-  "Sports & Outdoors",
-  "Grocery & Food",
-  "Baby & Kids",
-  "Automotive",
-  "Health & Wellness",
-  "Books & Stationery",
-  "Services",
-  "Other",
-];
-
+const BUSINESS_CATEGORIES = ["Electronics", "Fashion & Apparel", "Home & Kitchen", "Beauty & Personal Care", "Sports & Outdoors", "Grocery & Food", "Baby & Kids", "Automotive", "Health & Wellness", "Books & Stationery", "Services", "Other"];
 const FIELDS = ["name", "phone", "store_name", "business_category", "business_type", "store_description", "country", "city", "address", "zip_code"];
-
 const pick = (item) => Object.fromEntries(FIELDS.map((key) => [key, item?.[key] ?? ""]));
 
 /* Pending signup request edit — sirf badle hue fields bhejta hai */
@@ -33,7 +19,8 @@ export default function EditRequestDialog({ item, onClose, onSaved }) {
 
   const initial = pick(item);
   const changes = Object.fromEntries(FIELDS.filter((key) => String(form[key]) !== String(initial[key])).map((key) => [key, form[key]]));
-  const dirty = Object.keys(changes).length > 0;
+  const changeCount = Object.keys(changes).length;
+  const dirty = changeCount > 0;
 
   const mutation = useMutation({
     mutationFn: () => superAdminApi.updateRequest(item._id, changes),
@@ -67,115 +54,64 @@ export default function EditRequestDialog({ item, onClose, onSaved }) {
     mutation.mutate();
   };
 
-  const categories = form.business_category && !BUSINESS_CATEGORIES.includes(form.business_category)
-    ? [form.business_category, ...BUSINESS_CATEGORIES]
-    : BUSINESS_CATEGORIES;
+  const categories = form.business_category && !BUSINESS_CATEGORIES.includes(form.business_category) ? [form.business_category, ...BUSINESS_CATEGORIES] : BUSINESS_CATEGORIES;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm" />
-      <form
-        onSubmit={submit}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-request-title"
-        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] shadow-[var(--shadow-lg)]"
-        noValidate
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft,rgba(37,99,235,0.1))] text-[var(--accent)]">
-              <Pencil size={18} aria-hidden="true" />
-            </span>
-            <div>
-              <h2 id="edit-request-title" className="text-[16px] font-semibold text-[var(--text-primary)]">Edit signup request</h2>
-              <p className="text-[12px] text-[var(--text-muted)]">Changes also update the seller&apos;s store profile. Email can&apos;t be changed.</p>
-            </div>
+    <Modal
+      open
+      onClose={onClose}
+      as="form"
+      onSubmit={submit}
+      size="lg"
+      icon={Pencil}
+      title="Edit signup request"
+      description="Changes also update the seller's store profile. The login email can't be changed."
+      busy={mutation.isPending}
+      footer={
+        <>
+          <span className="me-auto text-[12.5px] text-[var(--text-muted)]">{dirty ? `${changeCount} unsaved change${changeCount === 1 ? "" : "s"}` : "No changes yet"}</span>
+          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={!dirty} loading={mutation.isPending}>Save changes</Button>
+        </>
+      }
+    >
+      <div className="space-y-6 pt-1">
+        {formError && <Alert tone="danger">{formError}</Alert>}
+
+        <FormSection title="Seller">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <TextInput label="Full name" value={form.name} onChange={set("name")} error={errors.name} autoFocus />
+            <TextInput label="Phone" value={form.phone} onChange={set("phone")} error={errors.phone} inputMode="numeric" placeholder="03001234567" />
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
+          <TextInput label="Email" value={item.email} disabled hint="Login email — cannot be changed." />
+        </FormSection>
 
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
-          {formError && (
-            <p role="alert" className="rounded-lg border px-3 py-2.5 text-xs font-semibold" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>
-              {formError}
-            </p>
-          )}
-
-          <fieldset className="space-y-3">
-            <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Seller</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input label="Full name" value={form.name} onChange={set("name")} error={errors.name} autoFocus />
-              <Input label="Phone" value={form.phone} onChange={set("phone")} error={errors.phone} inputMode="numeric" placeholder="03001234567" />
-            </div>
-            <Input label="Email" value={item.email} disabled hint="Login email — cannot be changed." />
-          </fieldset>
-
-          <fieldset className="space-y-3">
-            <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Store</legend>
-            <Input label="Store name" value={form.store_name} onChange={set("store_name")} error={errors.store_name} />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Select label="Business category" value={form.business_category} onChange={set("business_category")}>
-                <option value="">Select a category</option>
-                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-              </Select>
-              <Select label="Business type" value={form.business_type || "individual"} onChange={set("business_type")}>
-                <option value="individual">Individual</option>
-                <option value="registered_business">Registered business</option>
-              </Select>
-            </div>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-[var(--text-secondary)]">Description</span>
-              <textarea value={form.store_description} onChange={set("store_description")} rows={3} maxLength={2000} className="input-field w-full" />
-            </label>
-          </fieldset>
-
-          <fieldset className="space-y-3">
-            <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Location</legend>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input label="Country" value={form.country} onChange={set("country")} />
-              <Input label="City" value={form.city} onChange={set("city")} />
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
-              <Input label="Street address" value={form.address} onChange={set("address")} />
-              <Input label="ZIP code" value={form.zip_code} onChange={set("zip_code")} />
-            </div>
-          </fieldset>
-        </div>
-
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border-color)] bg-[var(--bg-card-alt)] px-6 py-3.5">
-          <span className="text-[12px] text-[var(--text-muted)]">
-            {dirty ? `${Object.keys(changes).length} unsaved change${Object.keys(changes).length === 1 ? "" : "s"}` : "No changes yet"}
-          </span>
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="btn-secondary h-10 px-4">Cancel</button>
-            <button type="submit" disabled={!dirty || mutation.isPending} className="btn-primary h-10 px-5 disabled:cursor-not-allowed disabled:opacity-50">
-              {mutation.isPending ? <><Loader2 size={15} className="animate-spin" aria-hidden="true" /> Saving…</> : "Save changes"}
-            </button>
+        <FormSection title="Store">
+          <TextInput label="Store name" value={form.store_name} onChange={set("store_name")} error={errors.store_name} />
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <SelectInput label="Business category" value={form.business_category} onChange={set("business_category")}>
+              <option value="">Select a category</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </SelectInput>
+            <SelectInput label="Business type" value={form.business_type || "individual"} onChange={set("business_type")}>
+              <option value="individual">Individual</option>
+              <option value="registered_business">Registered business</option>
+            </SelectInput>
           </div>
-        </div>
-      </form>
-    </div>
-  );
-}
+          <TextArea label="Description" value={form.store_description} onChange={set("store_description")} rows={3} maxLength={2000} />
+        </FormSection>
 
-function Input({ label, error, hint, ...props }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[12px] font-semibold text-[var(--text-secondary)]">{label}</span>
-      <input {...props} aria-invalid={error ? "true" : undefined} className={`input-field h-10 w-full ${error ? "!border-[var(--danger)]" : ""} disabled:opacity-60`} />
-      {error ? <span className="mt-1 block text-[11.5px] font-medium text-[var(--danger-text)]">{error}</span> : hint ? <span className="mt-1 block text-[11.5px] text-[var(--text-muted)]">{hint}</span> : null}
-    </label>
-  );
-}
-
-function Select({ label, children, ...props }) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[12px] font-semibold text-[var(--text-secondary)]">{label}</span>
-      <select {...props} className="input-field h-10 w-full">{children}</select>
-    </label>
+        <FormSection title="Location">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <TextInput label="Country" value={form.country} onChange={set("country")} />
+            <TextInput label="City" value={form.city} onChange={set("city")} />
+          </div>
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[1fr_140px]">
+            <TextInput label="Street address" value={form.address} onChange={set("address")} />
+            <TextInput label="ZIP code" value={form.zip_code} onChange={set("zip_code")} />
+          </div>
+        </FormSection>
+      </div>
+    </Modal>
   );
 }
