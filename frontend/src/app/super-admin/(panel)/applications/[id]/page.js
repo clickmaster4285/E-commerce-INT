@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   CheckCircle2, XCircle, Mail, Phone, Store as StoreIcon, User, MapPin, Building2, FileText, MessageSquare,
-  Pencil, Trash2, ExternalLink, AtSign, Tag, Briefcase, Hash, CalendarClock, ShieldCheck, KeyRound, Loader2,
+  Pencil, Trash2, ExternalLink, AtSign, Tag, Briefcase, Hash, CalendarClock, ShieldCheck, KeyRound, Loader2, Globe, LayoutDashboard,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import PageHeader from "@/components/superadmin/PageHeader";
@@ -234,9 +234,31 @@ export default function ApplicationDetailPage() {
                 </p>
               </div>
             ) : (
-              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-4 text-[13px] text-[var(--text-secondary)]">
-                <p className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">Review complete <StatusBadge value={item.status} /></p>
-                {item.reviewed_at && <p className="mt-1 text-[12px] text-[var(--text-muted)]">{formatDateTime(item.reviewed_at)} · {timeAgo(item.reviewed_at)}</p>}
+              <div className="space-y-3">
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-4 text-[13px] text-[var(--text-secondary)]">
+                  <p className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">Review complete <StatusBadge value={item.status} /></p>
+                  {item.reviewed_at && <p className="mt-1 text-[12px] text-[var(--text-muted)]">{formatDateTime(item.reviewed_at)} · {timeAgo(item.reviewed_at)}</p>}
+                </div>
+
+                {/* Approved → store live: customer storefront + seller admin panel (naye tab me) */}
+                {item.status === "approved" && item.store?.url ? (
+                  <div className="space-y-2.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Store is live</p>
+                    <StoreLink
+                      href={item.store.url}
+                      icon={Globe}
+                      title="Visit storefront"
+                      subtitle="Open the store as a customer sees it"
+                      primary
+                    />
+                    <StoreLink
+                      href={`${item.store.url}/admin`}
+                      icon={LayoutDashboard}
+                      title="Open admin panel"
+                      subtitle="Seller dashboard — sign-in required"
+                    />
+                  </div>
+                ) : null}
               </div>
             )}
           </Section>
@@ -379,6 +401,31 @@ function Detail({ icon: Icon, label, value }) {
         <dd className="mt-0.5 break-words text-[13.5px] font-semibold text-[var(--text-primary)]">{value}</dd>
       </div>
     </div>
+  );
+}
+
+function StoreLink({ href, icon: Icon, title, subtitle, primary = false }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`group flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${
+        primary
+          ? "border-transparent bg-[var(--accent)] text-white hover:brightness-110"
+          : "border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:border-[var(--accent)]"
+      }`}
+    >
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${primary ? "bg-white/15" : "bg-[var(--bg-tertiary)] text-[var(--accent)]"}`}>
+        <Icon size={17} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13.5px] font-semibold">{title}</span>
+        <span className={`block truncate text-[12px] ${primary ? "text-white/80" : "text-[var(--text-muted)]"}`}>{subtitle}</span>
+      </span>
+      <ExternalLink size={15} className={`shrink-0 transition-transform group-hover:translate-x-0.5 ${primary ? "text-white/80" : "text-[var(--text-muted)]"}`} aria-hidden="true" />
+      <span className="sr-only">(opens in a new tab)</span>
+    </a>
   );
 }
 
