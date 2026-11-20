@@ -77,7 +77,7 @@ export default function SuperAdminShell({ children }) {
     <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
 
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} pendingCount={pendingCount} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} pendingCount={pendingCount} role={state.admin?.role || "superadmin"} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
@@ -85,13 +85,14 @@ export default function SuperAdminShell({ children }) {
           onLogout={handleLogout}
           adminName={state.admin?.name || "Super Admin"}
           adminEmail={state.admin?.email || ""}
+          adminRole={state.admin?.role || "superadmin"}
           theme={theme}
           onToggleTheme={toggleTheme}
           loggingOut={loggingOut}
           pendingCount={pendingCount}
         />
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</div>
+          <div className="mx-auto w-full max-w-[1920px] px-4 py-5 sm:px-6 sm:py-6 lg:px-8">{children}</div>
         </main>
       </div>
     </div>

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Otp = require("../models/Otp");
@@ -472,7 +473,8 @@ const verifyEmailVerificationOtp = async (req, res) => {
         store_id: isSeller ? store._id : null,
       });
 
-      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable)
+      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable).
+      // Store owner = "admin" role (full panel access); read-only is enforced by seller_pending, not role.
       let employee = null;
       if (isSeller) {
         employee = await Employee.create({
@@ -481,7 +483,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
           email: pending.email,
           phone: pending.phone || "",
           password: pending.passwordHash,
-          role: "staff",
+          role: OWNER_ROLE,
           status: "active",
           storeId: store._id,
           seller_pending: true,

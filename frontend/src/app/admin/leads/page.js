@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { isAdminRole } from "@/lib/roles";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -148,7 +149,7 @@ export default function LeadsPage() {
           <FilterDropdown ariaLabel={t("admin.leads.filters.status")} value={filters.status} onChange={(value) => changeFilter("status", value)} options={[{ value: "", label: t("admin.leads.filters.statusAll") }, ...["New", "Contacted", "Qualified", "Converted", "Lost"].map((value) => ({ value, label: leadValueLabel(value, t) }))]} />
           <FilterDropdown ariaLabel={t("admin.leads.filters.type")} value={filters.lead_type} onChange={(value) => changeFilter("lead_type", value)} options={[{ value: "", label: t("admin.leads.filters.typeAll") }, { value: "Individual", label: leadValueLabel("Individual", t) }, { value: "Business", label: leadValueLabel("Business", t) }]} />
           <FilterDropdown ariaLabel={t("admin.leads.filters.source")} value={filters.source} onChange={(value) => changeFilter("source", value)} options={[{ value: "", label: t("admin.leads.filters.sourceAll") }, ...["Walk-in", "Phone Call", "WhatsApp", "Referral", "Email", "Social Media", "Other"].map((value) => ({ value, label: leadValueLabel(value, t) }))]} />
-          <FilterDropdown ariaLabel={t("admin.leads.filters.employee")} value={filters.assigned_employee_id} onChange={(value) => changeFilter("assigned_employee_id", value)} options={[{ value: "", label: t("admin.leads.filters.employeeAll") }, ...employees.filter((emp) => emp.role !== "admin" && !emp.is_deleted).map((emp) => ({ value: emp._id, label: emp.name }))]} />
+          <FilterDropdown ariaLabel={t("admin.leads.filters.employee")} value={filters.assigned_employee_id} onChange={(value) => changeFilter("assigned_employee_id", value)} options={[{ value: "", label: t("admin.leads.filters.employeeAll") }, ...employees.filter((emp) => !isAdminRole(emp.role) && !emp.is_deleted).map((emp) => ({ value: emp._id, label: emp.name }))]} />
         </div>
       </div>
       <section className="min-w-0 overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">

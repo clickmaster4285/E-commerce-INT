@@ -66,14 +66,10 @@ const nextConfig = {
         destination: '/super-admin/dashboard',
         permanent: false,
       },
-      {
-        source: '/super-admin/activity',
-        destination: '/super-admin/dashboard',
-        permanent: false,
-      },
+      // /super-admin/activity ab real page hai ("My activity") — purana alias wahan bhejo
       {
         source: '/super-admin/activity-logs',
-        destination: '/super-admin/dashboard',
+        destination: '/super-admin/activity',
         permanent: false,
       },
     ];

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoreAdminUrl } from "@/apis/storeHandoff";
+import SearchCombobox from "@/components/common/SearchCombobox";
+import { BUSINESS_CATEGORIES } from "@/lib/storeOptions";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -67,21 +69,6 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 /* Mirrors the backend register rules exactly:
    name required + ≥2, username optional ≥3 and letters/numbers/underscores only,
    phone optional 10–16 digits, email valid, password ≥6 */
-const BUSINESS_CATEGORIES = [
-  "Electronics",
-  "Fashion & Apparel",
-  "Home & Kitchen",
-  "Beauty & Personal Care",
-  "Sports & Outdoors",
-  "Grocery & Food",
-  "Baby & Kids",
-  "Automotive",
-  "Health & Wellness",
-  "Books & Stationery",
-  "Services",
-  "Other",
-];
-
 const scorePassword = (pw) => {
   if (!pw) return 0;
   let s = 0;
@@ -166,141 +153,6 @@ function SectionHeading({ icon: Icon, title, description }) {
 
 /* Connected stepper — ek compact row (node + label, beech me connector).
    done / active / upcoming teeno states alag dikhte hain; dono steps par same. */
-/* Searchable city dropdown (combobox). Options country-state-city library se aate hain.
-   Type karo → filter; ↑ ↓ Enter Esc keyboard; list me na ho to typed naam bhi chalega. */
-const CITY_RENDER_LIMIT = 80;
-function CityCombobox({ id, value, onChange, options, loading, inputClassName, describedBy, invalid }) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
-  const listRef = useRef(null);
-  const query = value.trim().toLowerCase();
-
-  // "starts with" pehle, phir "contains"; render limit taake 20k cities par bhi smooth rahe
-  const { matches, total } = useMemo(() => {
-    if (!options.length) return { matches: [], total: 0 };
-    if (!query) return { matches: options.slice(0, CITY_RENDER_LIMIT), total: options.length };
-    const starts = [];
-    const contains = [];
-    for (const o of options) {
-      const l = o.toLowerCase();
-      if (l.startsWith(query)) starts.push(o);
-      else if (l.includes(query)) contains.push(o);
-    }
-    const all = starts.concat(contains);
-    return { matches: all.slice(0, CITY_RENDER_LIMIT), total: all.length };
-  }, [options, query]);
-
-  const exactMatch = options.some((o) => o.toLowerCase() === query);
-  const listId = `${id}-listbox`;
-
-  useEffect(() => {
-    if (active < 0 || !listRef.current) return;
-    listRef.current.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [active]);
-
-  const choose = (name) => {
-    onChange(name);
-    setOpen(false);
-    setActive(-1);
-  };
-
-  const onKeyDown = (e) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (!open) setOpen(true);
-      setActive((i) => Math.min(i + 1, matches.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActive((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && open && active >= 0 && matches[active]) {
-      e.preventDefault(); // form submit na ho — sirf city select ho
-      choose(matches[active]);
-    } else if (e.key === "Escape" && open) {
-      e.preventDefault();
-      setOpen(false);
-    }
-  };
-
-  const placeholder = loading ? "Loading cities…" : options.length ? "Search or select a city" : "Enter your city";
-
-  return (
-    <>
-      <input
-        id={id}
-        type="text"
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={open && active >= 0 ? `${id}-opt-${active}` : undefined}
-        aria-invalid={invalid ? "true" : undefined}
-        aria-describedby={describedBy}
-        autoComplete="off"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); setActive(-1); }}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onKeyDown={onKeyDown}
-        className={inputClassName}
-      />
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label={open ? "Close city list" : "Open city list"}
-        onMouseDown={(e) => { e.preventDefault(); document.getElementById(id)?.focus(); setOpen((o) => !o); }}
-        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-      >
-        {loading ? (
-          <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-        ) : (
-          <ChevronDown size={16} aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`} />
-        )}
-      </button>
-
-      {open && !loading && (matches.length > 0 || query) && (
-        <ul
-          ref={listRef}
-          id={listId}
-          role="listbox"
-          aria-label="Cities"
-          className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-60 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.25)]"
-        >
-          {matches.map((name, i) => (
-            <li
-              key={name}
-              id={`${id}-opt-${i}`}
-              data-index={i}
-              role="option"
-              aria-selected={name === value}
-              // mousedown + preventDefault: input blur se pehle select ho jaye
-              onMouseDown={(e) => { e.preventDefault(); choose(name); }}
-              onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-center justify-between gap-2 px-3.5 py-2 text-[13.5px] ${
-                i === active ? "bg-[#f57224]/[0.08] text-slate-900" : "text-slate-700"
-              }`}
-            >
-              <span className="truncate">{name}</span>
-              {name === value && <Check size={14} className="shrink-0 text-[#f57224]" aria-hidden="true" />}
-            </li>
-          ))}
-          {total > matches.length && (
-            <li role="presentation" className="px-3.5 pb-1 pt-2 text-[11.5px] text-slate-400">
-              Showing {matches.length} of {total.toLocaleString()} — type to narrow down
-            </li>
-          )}
-          {query && !exactMatch && matches.length === 0 && (
-            <li role="presentation" className="px-3.5 py-1.5 text-[12px] text-slate-500">
-              No match found — <span className="font-semibold text-slate-700">“{value.trim()}”</span> will be used as your city.
-            </li>
-          )}
-        </ul>
-      )}
-    </>
-  );
-}
-
 const SIGNUP_STEPS = [
   { label: "Account", sub: "Login details", icon: UserRound },
   { label: "Store", sub: "Business info", icon: Store },
@@ -396,6 +248,9 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false); // step 1 → server par email/username/phone availability
+  const [emailPending, setEmailPending] = useState(false); // email ki application already under review
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]); // naam se professional usernames (server se)
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState("");
   const [otpEmail, setOtpEmail] = useState("");
@@ -567,11 +422,45 @@ export default function SignupPage() {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
-  const handleNext = () => {
+  /* Server se poochho: email / username / phone pehle se registered to nahi?
+     Network fail ho to block nahi karte — final submit waise bhi dobara check karta hai. */
+  const checkAvailability = async (fields) => {
+    try {
+      const res = await authApi.checkRegistration(fields);
+      const found = res?.errors || {};
+      setEmailPending(res?.code === "SELLER_PENDING");
+      if (Array.isArray(res?.suggestions) && res.suggestions.length) setUsernameSuggestions(res.suggestions);
+      if (Object.keys(found).length) setErrors((p) => ({ ...p, ...found }));
+      return found;
+    } catch {
+      return {};
+    }
+  };
+
+  const checkFieldOnBlur = (field, value) => {
+    const clean = String(value || "").trim();
+    if (!clean || errors[field]) return;
+    if (field === "email" && !isValidEmail(clean)) return;
+    if (field === "username" && !/^[A-Za-z0-9_]{3,30}$/.test(clean)) return;
+    checkAvailability({ [field]: clean });
+  };
+
+  // Username khali ho aur naam likha ho → naam se suggestions (hamza.asif …) dikhao
+  const loadUsernameSuggestions = () => {
+    if (username.trim() || name.trim().length < 2 || usernameSuggestions.length) return;
+    checkAvailability({ name: name.trim(), username: "", ...(isValidEmail(email) ? { email: email.trim().toLowerCase() } : {}) });
+  };
+
+  const handleNext = async () => {
     const nextErrors = validateAccount();
     setErrors(nextErrors);
     setGeneralError("");
     if (Object.keys(nextErrors).length > 0) return;
+    // Step 1 se aage tabhi jab server bhi keh de ke email/username/phone free hain
+    setChecking(true);
+    const taken = await checkAvailability({ name: name.trim(), email: email.trim().toLowerCase(), username: username.trim(), phone });
+    setChecking(false);
+    if (Object.keys(taken).length > 0) return;
     setErrors({});
     setStep("store");
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
@@ -641,7 +530,9 @@ export default function SignupPage() {
         return;
       }
       parseBackendError(err);
-      toast.error(getApiErrorMessage(err, t("auth.login.registrationFailed")));
+      // Generic "Registration failed" ke bajaye asli field error dikhao (e.g. "This email is already registered")
+      const firstFieldError = Object.values(err?.response?.data?.errors || {}).find((m) => typeof m === "string" && m.trim());
+      toast.error(firstFieldError || getApiErrorMessage(err, t("auth.login.registrationFailed")));
       setLoading(false);
     }
   };
@@ -1025,13 +916,36 @@ export default function SignupPage() {
               </Field>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field id="su-username" label="Username" optional icon={AtSign} error={errors.username}>
+                <Field
+                  id="su-username"
+                  label="Username"
+                  optional
+                  icon={AtSign}
+                  error={errors.username}
+                  below={usernameSuggestions.length ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5" aria-label="Suggested usernames">
+                      <span className="text-[11.5px] text-slate-500">Try:</span>
+                      {usernameSuggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => { setUsername(s); setUsernameSuggestions([]); setErrors((p) => ({ ...p, username: "" })); }}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[11.5px] font-medium text-slate-700 transition hover:border-[#f57224] hover:bg-[#f57224]/10 hover:text-[#f57224]"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                >
                   <input
                     {...fieldA11y("su-username", errors.username)}
                     type="text"
                     autoComplete="username"
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: "" })); }}
+                    onFocus={loadUsernameSuggestions}
+                    onBlur={(e) => checkFieldOnBlur("username", e.target.value)}
                     placeholder={t("auth.login.username")}
                     className={fieldCls("username")}
                   />
@@ -1063,11 +977,18 @@ export default function SignupPage() {
                   required
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: "" })); }}
+                  onChange={(e) => { setEmail(e.target.value); setEmailPending(false); setErrors((p) => ({ ...p, email: "" })); }}
+                  onBlur={(e) => checkFieldOnBlur("email", e.target.value)}
                   placeholder="you@example.com"
                   className={fieldCls("email")}
                 />
               </Field>
+              {/* Pending application wale email ke liye: error ke neeche sign-in shortcut */}
+              {emailPending && errors.email ? (
+                <button type="button" onClick={() => router.push("/admin/login")} className="-mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#f57224] hover:underline">
+                  Sign in to continue your application <ArrowRight size={13} aria-hidden="true" />
+                </button>
+              ) : null}
 
               {/* Password + confirm ek row me (sm+) — 48px inputs, kam vertical height */}
               <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
@@ -1145,8 +1066,8 @@ export default function SignupPage() {
               </Field>
               </div>
 
-              <button type="submit" className={`${PRIMARY_BTN} !mt-6 w-full`}>
-                Continue to store details
+              <button type="submit" disabled={checking} className={`${PRIMARY_BTN} !mt-6 w-full`}>
+                {checking ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Checking details…</> : "Continue to store details"}
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
             </form>
@@ -1257,27 +1178,31 @@ export default function SignupPage() {
                       label="Country"
                       icon={Globe}
                       error={errors.country}
-                      trailing={<ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />}
                     >
-                      <select
-                        {...fieldA11y("su-country", errors.country)}
+                      {/* Searchable list (native select 250 items ka poora-screen popup kholta tha) */}
+                      <SearchCombobox
+                        id="su-country"
                         value={country}
-                        onChange={(e) => {
-                          setCountry(e.target.value);
+                        onChange={(v) => {
+                          setCountry(v);
                           setCity(""); // purani city doosre country ki hai
                           setErrors((p) => ({ ...p, country: "", city: "" }));
                         }}
-                        className={`${fieldCls("country", true)} !h-11 cursor-pointer appearance-none`}
-                      >
-                        {countryOptions.map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </select>
+                        options={countryOptions}
+                        loading={step === "location" && !geo}
+                        invalid={!!errors.country}
+                        describedBy={errors.country ? "su-country-error" : undefined}
+                        inputClassName={fieldCls("country", true)}
+                        itemLabel="country"
+                        allowCustom={false}
+                        pinned={["Pakistan"]}
+                      />
                     </Field>
 
                     <Field id="su-city" label="City" icon={Building2} error={errors.city}>
-                      <CityCombobox
+                      <SearchCombobox
                         id="su-city"
+                        itemLabel="city"
                         value={city}
                         onChange={(v) => { setCity(v); setErrors((p) => ({ ...p, city: "" })); }}
                         options={cityOptions}

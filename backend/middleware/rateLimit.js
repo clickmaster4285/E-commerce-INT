@@ -1,4 +1,5 @@
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const jwt = require("jsonwebtoken");
 const log = require("../utils/logger");
 
@@ -173,7 +174,7 @@ const roleOf = (req) => {
     }
     if (!token || !process.env.JWT_SECRET) return "guest";
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (String(decoded.role || "").toLowerCase() === "admin") return "admin";
+    if (isAdminRole(decoded.role)) return "admin";
     if (decoded.userId) return "user";
     return "guest";
   } catch {

@@ -4,24 +4,26 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import FallbackImage from "@/components/common/FallbackImage";
-import { LayoutDashboard, ClipboardList, Store, Users, X, PanelLeftClose, PanelLeftOpen, ExternalLink } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Store, Users, UserCog, X, PanelLeftClose, PanelLeftOpen, ExternalLink } from "lucide-react";
 import { cx } from "@/components/superadmin/ui";
 
-// Ek hi NAV list — Topbar breadcrumbs bhi isi se banta hai
+// Ek hi NAV list — Topbar breadcrumbs bhi isi se banta hai. superOnly = staff ko nahi dikhta.
 export const NAV = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/super-admin/applications", label: "Signup Requests", icon: ClipboardList, badgeKey: "pending" },
   { href: "/super-admin/stores", label: "Stores", icon: Store },
   { href: "/super-admin/users", label: "Users", icon: Users },
+  { href: "/super-admin/team", label: "Team", icon: UserCog },
 ];
 
 const STORAGE_KEY = "super-admin-sidebar-collapsed";
 const readCollapsed = () => { try { return window.localStorage.getItem(STORAGE_KEY) === "1"; } catch { return false; } };
 const writeCollapsed = (v) => { try { window.localStorage.setItem(STORAGE_KEY, v ? "1" : "0"); } catch { /* private mode */ } };
 
-export default function Sidebar({ open, onClose, pendingCount = 0 }) {
+export default function Sidebar({ open, onClose, pendingCount = 0, role = "superadmin" }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const items = NAV.filter((n) => !n.superOnly || role === "superadmin");
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setCollapsed(readCollapsed()));
@@ -69,7 +71,7 @@ export default function Sidebar({ open, onClose, pendingCount = 0 }) {
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {expanded && <p className="mb-2 px-2.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[var(--text-sidebar-muted)]/80">Platform</p>}
         <ul className="space-y-0.5">
-          {NAV.map(({ href, label, icon: Icon, badgeKey }) => {
+          {items.map(({ href, label, icon: Icon, badgeKey }) => {
             const active = pathname === href || pathname?.startsWith(`${href}/`);
             const badge = badgeKey === "pending" ? pendingCount : 0;
             return (

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, Sun, Moon, LogOut, ChevronDown, ChevronRight, ShieldCheck, Bell } from "lucide-react";
+import { Menu, Sun, Moon, LogOut, ChevronDown, ChevronRight, ShieldCheck, Bell, Activity } from "lucide-react";
 import { NAV } from "@/components/superadmin/Sidebar";
 import { IconButton, Avatar, cx } from "@/components/superadmin/ui";
 
@@ -16,7 +16,7 @@ const useBreadcrumbs = (pathname) => {
   return crumbs;
 };
 
-export default function Topbar({ onMenuClick, onLogout, adminName = "Super Admin", adminEmail = "", theme = "light", onToggleTheme, loggingOut = false, pendingCount = 0 }) {
+export default function Topbar({ onMenuClick, onLogout, adminName = "Super Admin", adminEmail = "", adminRole = "superadmin", theme = "light", onToggleTheme, loggingOut = false, pendingCount = 0 }) {
   const pathname = usePathname();
   const crumbs = useBreadcrumbs(pathname);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -92,10 +92,15 @@ export default function Topbar({ onMenuClick, onLogout, adminName = "Super Admin
                   </span>
                 </div>
                 <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--accent)]">
-                  <ShieldCheck size={12} aria-hidden="true" /> Super Admin
+                  <ShieldCheck size={12} aria-hidden="true" /> {adminRole === "staff" ? "Staff" : "Super Admin"}
                 </span>
               </div>
               <div className="p-1.5">
+                <Link href="/super-admin/activity" role="menuitem" onClick={() => setMenuOpen(false)} className="sa-menu__item">
+                  <Activity size={15} aria-hidden="true" />
+                  My activity
+                </Link>
+                <div className="sa-menu__sep" role="separator" />
                 <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onLogout(); }} disabled={loggingOut} className="sa-menu__item sa-menu__item--danger">
                   <LogOut size={15} aria-hidden="true" />
                   {loggingOut ? "Signing out…" : "Sign out"}

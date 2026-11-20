@@ -1,3 +1,4 @@
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 /**
  * Unified Permission Middleware
  * Compatible with separated User/Employee architecture
@@ -14,7 +15,7 @@ const checkPermission = (permissionKey) => {
     }
 
     // Admin bypass
-    if (req.user.role?.toLowerCase() === "admin") {
+    if (isAdminRole(req.user.role)) {
       return next();
     }
 
@@ -37,7 +38,7 @@ const staffPermissionCheck = (req, res, next) => {
   }
 
   const role = req.user.role?.toLowerCase();
-  if (role === "admin" || role === "manager" || role === "staff") {
+  if (isStaffRole(role)) {
     return next();
   }
 
@@ -56,7 +57,7 @@ const adminMiddleware = (req, res, next) => {
     });
   }
 
-  if (req.user.role?.toLowerCase() === "admin") {
+  if (isAdminRole(req.user.role)) {
     return next();
   }
 

@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isAdminRole } from "@/lib/roles";
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
@@ -239,7 +240,7 @@ export default function AdminLayout({ children }) {
     // ==========================================
     const role = userData?.role?.toLowerCase();
 
-    if (role === 'admin') {
+    if (isAdminRole(role)) {
       return {
         isAuthenticated: true,
         checkComplete: true,
@@ -485,7 +486,7 @@ export default function AdminLayout({ children }) {
     if (
       isLoginPage ||
       !userData?._id ||
-      userData?.role?.toLowerCase() === 'admin'
+      isAdminRole(userData?.role)
     ) {
       return;
     }
@@ -539,7 +540,7 @@ export default function AdminLayout({ children }) {
         return undefined;
       };
       const routeRevoked =
-        String(nextRole).toLowerCase() !== 'admin' &&
+        !isAdminRole(nextRole) &&
         matchedRoute &&
         (matchedRoute[1] === 'dashboard'
           ? nextPermissions.dashboard === false

@@ -9,6 +9,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, Card, CardHeader, CardBody, Button, StatusBadge, Badge, Avatar, Alert, Skeleton, DropdownMenu, ConfirmDialog, Modal, TextArea, EmptyState } from "@/components/superadmin/ui";
 import EditRequestDialog from "@/components/superadmin/EditRequestDialog";
+import useOpenStoreAdmin from "@/components/superadmin/useOpenStoreAdmin";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDateTime, timeAgo, assetUrl } from "@/lib/superadminFormat";
 
@@ -22,6 +23,7 @@ export default function ApplicationDetailPage() {
   const [reason, setReason] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [notice, setNotice] = useState(null); // { tone, text }
+  const { openStoreAdmin, openingId } = useOpenStoreAdmin({ onError: (text) => setNotice({ tone: "danger", text }) });
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["superadmin-application", String(id)],
@@ -109,7 +111,7 @@ export default function ApplicationDetailPage() {
         <Alert tone="danger" title="Rejection reason">{item.rejection_reason}</Alert>
       )}
       {item.status === "approved" && item.store?.url && (
-        <Alert tone="success" title="Store is live" action={<div className="flex gap-2"><Button size="sm" variant="secondary" icon={LayoutDashboard} href={`${item.store.url}/admin`} external>Admin panel</Button><Button size="sm" variant="primary" icon={Globe} href={item.store.url} external>Visit storefront</Button></div>}>
+        <Alert tone="success" title="Store is live" action={<div className="flex gap-2"><Button size="sm" variant="secondary" icon={LayoutDashboard} loading={openingId === String(item.store._id)} onClick={() => openStoreAdmin(item.store._id)}>Admin panel</Button><Button size="sm" variant="primary" icon={Globe} href={item.store.url} external>Visit storefront</Button></div>}>
           {item.store.url.replace(/^https?:\/\//, "")}
         </Alert>
       )}
@@ -212,7 +214,6 @@ export default function ApplicationDetailPage() {
                 ) : <span className="text-[13px] text-[var(--text-muted)]">—</span>}
               </AccessRow>
               <AccessRow icon={ShieldCheck} label="Seller account">{item.account?.user ? <StatusBadge value={item.account.user.status} /> : <span className="text-[13px] text-[var(--text-muted)]">—</span>}</AccessRow>
-              <AccessRow icon={AtSign} label="Request ID"><span className="font-mono text-[12px] text-[var(--text-muted)]">{String(item._id).slice(-8)}</span></AccessRow>
             </ul>
           </Card>
 

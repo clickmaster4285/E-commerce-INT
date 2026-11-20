@@ -87,6 +87,8 @@ export const superAdminApi = {
 
   // Dashboard
   getDashboard: () => superAdminHttp.get("/super-admin/dashboard").then((r) => r.data),
+  // Logged-in member ki apni activity (time + description)
+  myActivity: (params = {}) => superAdminHttp.get("/super-admin/activity/me", { params }).then((r) => r.data),
 
   // Requests
   listRequests: (params = {}) =>
@@ -113,6 +115,24 @@ export const superAdminApi = {
   // Users
   listUsers: (params = {}) =>
     superAdminHttp.get("/super-admin/users", { params }).then((r) => r.data),
+  getUser: (id) => superAdminHttp.get(`/super-admin/users/${id}`).then((r) => r.data),
+  updateUser: (id, payload) => superAdminHttp.patch(`/super-admin/users/${id}`, payload).then((r) => r.data),
+  deleteUser: (id) => superAdminHttp.delete(`/super-admin/users/${id}`).then((r) => r.data),
+  setUserPassword: (id, password) => superAdminHttp.post(`/super-admin/users/${id}/password`, { password }).then((r) => r.data),
+  // One-time sign-in link into a store's admin panel (as the store owner)
+  openStoreAdmin: (storeId) => superAdminHttp.post(`/super-admin/stores/${storeId}/admin-access`).then((r) => r.data),
   setUserStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
+
+  // Team (super admin + staff accounts) — super admin only
+  listTeam: () => superAdminHttp.get("/super-admin/team").then((r) => r.data),
+  getTeamMember: (id) => superAdminHttp.get(`/super-admin/team/${id}`).then((r) => r.data),
+  teamMemberActivity: (id, params = {}) => superAdminHttp.get(`/super-admin/team/${id}/activity`, { params }).then((r) => r.data),
+  createTeamMember: (payload) => superAdminHttp.post("/super-admin/team", payload).then((r) => r.data),
+  updateTeamMember: (id, payload) => superAdminHttp.patch(`/super-admin/team/${id}`, payload).then((r) => r.data),
+  setTeamMemberStatus: (id, status) =>
+    superAdminHttp.patch(`/super-admin/team/${id}/status`, { status }).then((r) => r.data),
+  resetTeamMemberPassword: (id, password) =>
+    superAdminHttp.post(`/super-admin/team/${id}/password`, { password }).then((r) => r.data),
+  deleteTeamMember: (id) => superAdminHttp.delete(`/super-admin/team/${id}`).then((r) => r.data),
 };

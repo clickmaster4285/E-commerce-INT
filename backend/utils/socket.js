@@ -1,4 +1,5 @@
 const path = require("path");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("./roles");
 const fs = require("fs");
 const crypto = require("crypto");
 const log = require("./logger");
@@ -388,7 +389,6 @@ const initSocket = (server) => {
   // - non-strict (REST checkPermission jaisa): sirf === false par deny
   // - NOTE: khud ki permission change karna updateEmployee me alag se blocked hai
   // ==========================================
-  const STAFF_ROLES = ["admin", "staff", "manager"];
 
   const requireSocketPermission = async (socket, permissionKey, callback, opts = {}) => {
     const role = String(socket.userRole || "guest").toLowerCase();
@@ -397,7 +397,7 @@ const initSocket = (server) => {
       if (typeof callback === "function") callback(err);
       return { allowed: false };
     }
-    if (role === "admin") {
+    if (isAdminRole(role)) {
       return { allowed: true, permissions: socket.userPermissions || {}, name: socket.userName };
     }
     try {
@@ -488,7 +488,7 @@ const initSocket = (server) => {
 
     // Chat rooms are always joined through authenticated, server-side authorization.
     socket.on("chat:inbox:join", async (callback) => {
-      if (socket.userType !== "employee" || !["admin", "manager", "staff"].includes(String(socket.userRole || "").toLowerCase())) {
+      if (socket.userType !== "employee" || !STAFF_ROLES.includes(String(socket.userRole || "").toLowerCase())) {
         if (typeof callback === "function") callback({ success: false, message: "Support access required" });
         return;
       }
@@ -519,7 +519,7 @@ const initSocket = (server) => {
           return;
         }
         let allowed = socket.userType === "user" && String(conversation.customer_id) === String(socket.userId);
-        if (socket.userType === "employee" && ["admin", "manager", "staff"].includes(String(socket.userRole || "").toLowerCase())) {
+        if (socket.userType === "employee" && STAFF_ROLES.includes(String(socket.userRole || "").toLowerCase())) {
           const gate = await requireSocketPermission(socket, "order", callback);
           allowed = gate.allowed;
         }

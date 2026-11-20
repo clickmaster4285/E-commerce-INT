@@ -3,9 +3,16 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard } from "lucide-react";
-import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Alert, Button, DropdownMenu, ConfirmDialog, Modal, TextInput, TextArea, SelectInput, FormSection } from "@/components/superadmin/ui";
+import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDate, timeAgo, assetUrl } from "@/lib/superadminFormat";
+import { storeUrl } from "@/lib/tenantHost";
+import useOpenStoreAdmin from "@/components/superadmin/useOpenStoreAdmin";
+import StoreFormDialog from "@/components/superadmin/StoreFormDialog";
+
+// Storefront / admin links subdomain se banao (same helper jo handoff use karta hai) — backend `url` sirf fallback
+const storefrontUrl = (s, path = "/") => (s.subdomain ? storeUrl(s.subdomain, path) : s.url ? `${s.url}${path === "/" ? "" : path}` : null);
+const hostOf = (url) => (url ? url.replace(/^https?:\/\//, "").replace(/\/$/, "") : "");
 
 const STATUS_TABS = [
   { value: "", label: "All" },
@@ -13,86 +20,7 @@ const STATUS_TABS = [
   { value: "maintenance", label: "Maintenance" },
   { value: "closed", label: "Suspended" },
 ];
-const STATUS_OPTIONS = [{ value: "open", label: "Open" }, { value: "maintenance", label: "Maintenance" }, { value: "closed", label: "Suspended" }];
-const EMPTY_FORM = { store_name: "", email: "", phone: "", description: "", business_category: "", business_type: "individual", country: "PK", city: "", address: "", zip_code: "", logo_url: "", store_status: "open" };
 const PAGE_SIZE = 20;
-
-function StoreFormDialog({ store, onClose, onSaved }) {
-  const editing = Boolean(store);
-  const [form, setForm] = useState(editing ? { ...EMPTY_FORM, ...store } : EMPTY_FORM);
-  const [error, setError] = useState("");
-  const mutation = useMutation({
-    mutationFn: (payload) => (editing ? superAdminApi.updateStore(store.id, payload) : superAdminApi.createStore(payload)),
-    onSuccess: onSaved,
-    onError: (e) => setError(e?.response?.data?.message || "Could not save this store."),
-  });
-  const set = (key) => (e) => setForm((c) => ({ ...c, [key]: e.target.value }));
-  const setLogo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setForm((c) => ({ ...c, logo_url: String(reader.result || "") }));
-    reader.readAsDataURL(file);
-  };
-  const submit = (e) => { e.preventDefault(); setError(""); mutation.mutate(form); };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      as="form"
-      onSubmit={submit}
-      size="lg"
-      icon={StoreIcon}
-      title={editing ? `Edit ${store.store_name}` : "Add a new store"}
-      description={editing ? "Keep the storefront identity and contact details up to date." : "Create a storefront directly without a seller application."}
-      busy={mutation.isPending}
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={mutation.isPending}>{editing ? "Save changes" : "Create store"}</Button>
-        </>
-      }
-    >
-      <div className="space-y-6 pt-1">
-        {error && <Alert tone="danger">{error}</Alert>}
-        <FormSection title="Store">
-          <TextInput label="Store name" required value={form.store_name} onChange={set("store_name")} placeholder="e.g. Northstar Electronics" autoFocus />
-          <TextArea label="Description" value={form.description} onChange={set("description")} placeholder="What does this store sell?" />
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <TextInput label="Business category" value={form.business_category} onChange={set("business_category")} placeholder="Fashion, electronics…" />
-            <SelectInput label="Business type" value={form.business_type} onChange={set("business_type")}>
-              <option value="individual">Individual</option>
-              <option value="registered_business">Registered business</option>
-            </SelectInput>
-          </div>
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <SelectInput label="Store status" value={form.store_status} onChange={set("store_status")}>
-              {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </SelectInput>
-            <TextInput label="Store logo" type="file" accept="image/png,image/jpeg,image/webp" onChange={setLogo} />
-          </div>
-        </FormSection>
-        <FormSection title="Contact">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <TextInput label="Store email" type="email" value={form.email} onChange={set("email")} placeholder="owner@store.com" />
-            <TextInput label="Phone" value={form.phone} onChange={set("phone")} placeholder="+92 300 0000000" />
-          </div>
-        </FormSection>
-        <FormSection title="Location">
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <TextInput label="Country" value={form.country} onChange={set("country")} placeholder="PK" />
-            <TextInput label="City" value={form.city} onChange={set("city")} placeholder="Lahore" />
-          </div>
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-[1fr_140px]">
-            <TextInput label="Address" value={form.address} onChange={set("address")} placeholder="Complete store address" />
-            <TextInput label="ZIP code" value={form.zip_code} onChange={set("zip_code")} placeholder="54000" />
-          </div>
-        </FormSection>
-      </div>
-    </Modal>
-  );
-}
 
 export default function StoresPage() {
   const qc = useQueryClient();
@@ -104,6 +32,7 @@ export default function StoresPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [statusTarget, setStatusTarget] = useState(null);
   const [notice, setNotice] = useState(null);
+  const { openStoreAdmin } = useOpenStoreAdmin({ onError: (text) => setNotice({ tone: "danger", text }) });
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebounced(search.trim()), 250);
@@ -138,7 +67,7 @@ export default function StoresPage() {
   });
 
   const columns = [
-    { key: "store", header: "Store", cell: (s) => <EntityCell avatar={<Avatar name={s.store_name} shape="square" src={s.logo_url ? assetUrl(s.logo_url) : undefined} />} primary={s.store_name} secondary={s.business_category || (s.business_type === "registered_business" ? "Registered business" : "Individual seller")} maxWidth={300} /> },
+    { key: "store", header: "Store", cell: (s) => <EntityCell avatar={<Avatar name={s.store_name} shape="square" src={s.logo_url ? assetUrl(s.logo_url) : undefined} />} primary={s.store_name} secondary={hostOf(storefrontUrl(s)) || s.business_category || "No subdomain yet"} maxWidth={320} /> },
     { key: "owner", header: "Owner", cell: (s) => s.owner_name ? <EntityCell avatar={<Avatar name={s.owner_name} size="sm" />} primary={s.owner_name} secondary={s.owner_email} maxWidth={260} /> : <span className="text-[var(--text-muted)]">No owner</span> },
     { key: "created", header: "Created", className: "whitespace-nowrap", cell: (s) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(s.createdAt)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(s.createdAt)}</p></>) },
     { key: "status", header: "Status", cell: (s) => <StatusBadge value={s.status} /> },
@@ -148,8 +77,8 @@ export default function StoresPage() {
         <DropdownMenu
           label={`Actions for ${s.store_name}`}
           items={[
-            { label: "Visit storefront", icon: ExternalLink, href: s.url, external: true, disabled: !s.url },
-            { label: "Open admin panel", icon: LayoutDashboard, href: s.url ? `${s.url}/admin` : undefined, external: true, disabled: !s.url },
+            { label: "Visit storefront", icon: ExternalLink, href: storefrontUrl(s), external: true, disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
+            { label: "Open admin panel", icon: LayoutDashboard, onClick: () => openStoreAdmin(s.id), disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { separator: true },
             { label: "Edit store", icon: Pencil, onClick: () => setFormStore(s) },
             s.status === "closed"

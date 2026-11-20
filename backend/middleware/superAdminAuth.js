@@ -97,6 +97,12 @@ const requireSuperAdmin = async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Super Admin account is inactive." });
     }
 
+    // Last seen — har minute me max ek write ("Online now" / "Last seen")
+    const now = Date.now();
+    if (!superAdmin.lastActiveAt || now - new Date(superAdmin.lastActiveAt).getTime() > 60 * 1000) {
+      SuperAdmin.updateOne({ _id: superAdmin._id }, { $set: { lastActiveAt: new Date(now) } }).catch(() => {});
+    }
+
     req.superAdmin = superAdmin;
     return next();
   } catch (error) {
@@ -105,8 +111,15 @@ const requireSuperAdmin = async (req, res, next) => {
   }
 };
 
+// Team management sirf role "superadmin" ke liye — staff ko 403 (requireSuperAdmin ke baad lagao)
+const requireSuperAdminRole = (req, res, next) => {
+  if ((req.superAdmin?.role || "superadmin") === "superadmin") return next();
+  return res.status(403).json({ success: false, message: "Only super admins can manage the team." });
+};
+
 module.exports = {
   requireSuperAdmin,
+  requireSuperAdminRole,
   generateTokens,
   setAuthCookies,
   clearAuthCookies,
