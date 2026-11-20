@@ -81,29 +81,6 @@ const BUSINESS_CATEGORIES = [
   "Other",
 ];
 
-const COUNTRIES = [
-  "Pakistan",
-  "India",
-  "Bangladesh",
-  "Sri Lanka",
-  "United Arab Emirates",
-  "Saudi Arabia",
-  "Qatar",
-  "Oman",
-  "Kuwait",
-  "Bahrain",
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Germany",
-  "France",
-  "Australia",
-  "Turkey",
-  "Malaysia",
-  "Singapore",
-  "Egypt",
-];
-
 const scorePassword = (pw) => {
   if (!pw) return 0;
   let s = 0;
@@ -440,27 +417,33 @@ export default function SignupPage() {
   }, [step]);
   const [logoDragActive, setLogoDragActive] = useState(false);
 
-  /* Selected country ki cities — country-state-city library sirf Location step par
-     lazy load hoti hai (~8MB city data signup ke initial bundle me nahi aata) */
-  // cityData.country = jis country ki list load ho chuki; mismatch = abhi loading
-  const [cityData, setCityData] = useState({ country: null, options: [] });
+  /* Countries + cities dono country-state-city library se. Library sirf Location step
+     par ek baar lazy load hoti hai (~8MB city data signup ke initial bundle me nahi aata). */
+  const [geo, setGeo] = useState(null); // { Country, City } | { failed: true }
   useEffect(() => {
-    if (step !== "location" || cityData.country === country) return undefined;
+    if (step !== "location" || geo) return undefined;
     let cancelled = false;
     import("country-state-city")
-      .then(({ Country, City }) => {
-        if (cancelled) return;
-        const match = Country.getAllCountries().find((c) => c.name === country);
-        const list = match ? City.getCitiesOfCountry(match.isoCode) || [] : [];
-        // Library me ek naam kai states me repeat hota hai — unique + A–Z
-        const options = [...new Set(list.map((c) => c.name))].sort((a, b) => a.localeCompare(b));
-        setCityData({ country, options });
-      })
-      .catch(() => { if (!cancelled) setCityData({ country, options: [] }); }); // fail ho to free text chalta rahe
+      .then(({ Country, City }) => { if (!cancelled) setGeo({ Country, City }); })
+      .catch(() => { if (!cancelled) setGeo({ failed: true }); }); // fail ho to free text chalta rahe
     return () => { cancelled = true; };
-  }, [step, country, cityData.country]);
-  const citiesLoading = step === "location" && cityData.country !== country;
-  const cityOptions = cityData.country === country ? cityData.options : [];
+  }, [step, geo]);
+
+  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []), [geo]);
+  // Load hone tak selected country hi option rahe (select khali na dikhe).
+  // Flag emoji nahi — Windows Chrome unhe "PK" jaise letters me dikhata hai.
+  const countryOptions = useMemo(
+    () => (allCountries.length ? allCountries.map((c) => c.name) : [country]),
+    [allCountries, country]
+  );
+  const cityOptions = useMemo(() => {
+    if (!geo?.City) return [];
+    const match = allCountries.find((c) => c.name === country);
+    const list = match ? geo.City.getCitiesOfCountry(match.isoCode) || [] : [];
+    // Library me ek naam kai states me repeat hota hai — unique + A–Z
+    return [...new Set(list.map((c) => c.name))].sort((a, b) => a.localeCompare(b));
+  }, [geo, allCountries, country]);
+  const citiesLoading = step === "location" && !geo;
 
   const fieldCls = (field, withToggle = false) =>
     `${INPUT_BASE} ${withToggle ? "!pr-11" : ""} ${inputState(!!errors[field])}`;
@@ -1275,10 +1258,10 @@ export default function SignupPage() {
                           setCity(""); // purani city doosre country ki hai
                           setErrors((p) => ({ ...p, country: "", city: "" }));
                         }}
-                        className={`${fieldCls("country", true)} cursor-pointer appearance-none`}
+                        className={`${fieldCls("country", true)} !h-11 cursor-pointer appearance-none`}
                       >
-                        {COUNTRIES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
+                        {countryOptions.map((name) => (
+                          <option key={name} value={name}>{name}</option>
                         ))}
                       </select>
                     </Field>
