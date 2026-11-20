@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 
 let globalSocket = null;
@@ -98,6 +99,7 @@ function getSocket() {
       autoConnect: false, // ✅ idle-connect: transport idle/interaction par khulta hai
       timeout: 15000,
     });
+    attachSocketAuthSync(globalSocket, "admin");
     scheduleConnect(globalSocket);
   } catch (err) {
     // ✅ Silent — socket init fail par bhi console error show na ho

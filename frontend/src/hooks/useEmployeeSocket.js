@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -70,6 +71,7 @@ export function getEmployeeSocket() {
         // ✅ Silent — error console par show na ho, reconnection waise hi chalega
       }
     );
+    attachSocketAuthSync(employeeSocket, "admin");
   }
 
   return employeeSocket;

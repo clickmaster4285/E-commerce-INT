@@ -292,7 +292,7 @@ const initSocket = (server) => {
     } catch (error) {
       Object.assign(socket, {
         userId: null, userType: "guest", userRole: "guest", userName: "Guest",
-        userPermissions: {}, storeId: null, sellerPending: false, sessionId: null,
+        userPermissions: {}, storeId: null, sellerPending: false, sessionId: null, needsRefresh: null,
       });
     }
     return next();
@@ -443,6 +443,8 @@ const initSocket = (server) => {
     // Har event handler bhi isi store ke context me (tenantScope plugin queries scope karta hai)
     socket.use((packet, next) => runWithStore(socket.tenantStoreId, next));
     if (socket.tenantStoreId) socket.join(storeRoom(socket.tenantStoreId));
+    // Access token expire tha (session marker maujood) → client refresh + reconnect kare
+    if (socket.needsRefresh) socket.emit("auth:refresh-needed", { aud: socket.needsRefresh });
 
     if (socket.userId) socket.join(`employee:${socket.userId}`);
     if (socket.userId && socket.userType === "user" && String(socket.userRole || "").toLowerCase() === "user") {

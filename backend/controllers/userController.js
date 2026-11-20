@@ -48,6 +48,7 @@ const saveStoreLogoFromBase64 = async (raw) => {
 // ✅ Tokens / cookies / sessions — har audience (user | admin) ke alag secrets,
 // cookies aur DB-backed rotating refresh sessions (utils/tokens.js)
 const tokens = require("../utils/tokens");
+const { findPlatformEmployee, sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
 
 // Frontend axios instance `X-Auth-Aud` bhejta hai — logout sirf usi session ka
 const audFromHeader = (req) => {
@@ -139,7 +140,9 @@ const createUser = async (req, res) => {
           const passwordMatches = await bcrypt.compare(String(password), existingUser.password || "");
           if (passwordMatches) {
             // Resume — make sure a pending-seller employee exists for the admin panel
-            let employee = await Employee.findOne({ email });
+            // Email ab sirf store ke andar unique — isi application ke store ka employee
+            let employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
+              .setOptions({ skipTenantScope: true });
             if (!employee) {
               employee = await Employee.create({
                 name: existingUser.name,
@@ -179,6 +182,14 @@ const createUser = async (req, res) => {
         success: false,
         message: "Registration failed",
         errors: { email: "This email is already registered" },
+      });
+    }
+    // Option A: ek seller email sirf ek store ka owner (kisi bhi store ka admin / pending seller)
+    if (wantsStore && (await sellerEmailTaken(email))) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration failed",
+        errors: { email: SELLER_EMAIL_TAKEN_MESSAGE },
       });
     }
     // ✅ Legacy adhoora User (fix se pehle OTP ke bina bana) — pending flow ke liye hata do
@@ -436,7 +447,21 @@ const loginAdmin = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Please provide email and password" });
-    const employee = await Employee.findOne({ email }).select("-activities");
+    // Store host: isi store ka staff (tenant-scoped, email per-store unique).
+    // Platform host: koi store nahi → sirf seller OWNER (Option A: ek email ek store).
+    let employee;
+    if (req.store) {
+      employee = await Employee.findOne({ email: String(email).toLowerCase().trim() }).select("-activities");
+    } else {
+      const found = await findPlatformEmployee(email);
+      if (found.ambiguous) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is linked to more than one store. Please sign in from your store's address.",
+        });
+      }
+      employee = found.employee;
+    }
     if (!employee)
       return res
         .status(401)
@@ -1499,8 +1524,9 @@ const changePasswordREST = async (req, res) => {
 // ==========================================
 const { ROOT_DOMAIN } = require("../utils/tenantHost");
 
+const { claimOnce } = require("../utils/oneTimeToken");
+
 const HANDOFF_TTL_SECONDS = 120;
-const usedHandoffIds = new Map(); // jti → expiresAt (single-use; production me Redis behtar)
 
 const storeAdminBaseUrl = (store) => {
   const protocol = process.env.PUBLIC_STORE_PROTOCOL || (process.env.NODE_ENV === "production" ? "https" : "http");
@@ -1551,10 +1577,9 @@ const exchangeStoreHandoff = async (req, res) => {
     }
     if (decoded.type !== "store_handoff" || String(decoded.storeId) !== String(req.store._id)) return invalid();
 
-    const now = Date.now();
-    for (const [id, exp] of usedHandoffIds) if (exp < now) usedHandoffIds.delete(id);
-    if (usedHandoffIds.has(decoded.jti)) return invalid();
-    usedHandoffIds.set(decoded.jti, decoded.exp * 1000);
+    // Single-use — Redis (ya Mongo fallback): restart / dusre server par bhi dobara nahi chalta
+    const remaining = decoded.exp - Math.floor(Date.now() / 1000);
+    if (!(await claimOnce("handoff", decoded.jti, remaining))) return invalid();
 
     // Tenant-scoped: sirf isi store ka employee milega
     const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name storeId").lean();

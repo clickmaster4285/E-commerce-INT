@@ -7,6 +7,13 @@ const Employee = require("../models/Employee");
 // Super admin ka apna audience — sa_at / sa_rt cookies, alag secrets, rotating sessions
 const tokens = require("../utils/tokens");
 const { logActivity } = require("../utils/superAdminActivity");
+
+// Seller ka employee: application ke store me (resume-flow wale purane records
+// bina storeId ke bhi ho sakte hain — woh seller_pending se pehchane jate hain)
+const sellerEmployeeFilter = (application) =>
+  application.store_id
+    ? { email: application.email, $or: [{ storeId: application.store_id }, { storeId: null, seller_pending: true }] }
+    : { email: application.email, seller_pending: true };
 const {
   sendApplicationApprovedEmail,
   sendApplicationRejectedEmail,
@@ -293,10 +300,11 @@ const approveRequest = async (req, res) => {
     const store = storeId
       ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { new: true })
       : null;
+    // Email ab sirf store ke andar unique — isi application ke store ka seller employee
     await Employee.findOneAndUpdate(
-      { email: application.email },
+      sellerEmployeeFilter(application),
       { seller_pending: false, status: "active", ...(store ? { storeId: store._id } : {}) }
-    );
+    ).setOptions({ skipTenantScope: true });
 
     // Provision store + seller account exactly once (password from request)
     const existingUser = await User.findOne({ email: application.email }).select("_id storeId status").lean();
@@ -324,9 +332,9 @@ const approveRequest = async (req, res) => {
       );
       // Resume-flow employees may have been created without a storeId — link them now
       await Employee.findOneAndUpdate(
-        { email: application.email },
+        sellerEmployeeFilter(application),
         { seller_pending: false, status: "active", storeId: openStore._id }
-      );
+      ).setOptions({ skipTenantScope: true });
       await notifySeller(
         sendApplicationApprovedEmail,
         { name: application.name, email: application.email, storeName: application.store_name },
@@ -380,9 +388,9 @@ const approveRequest = async (req, res) => {
     );
 
     await Employee.findOneAndUpdate(
-      { email: application.email },
+      sellerEmployeeFilter(application),
       { seller_pending: false, status: "active", storeId: storeFinal._id }
-    );
+    ).setOptions({ skipTenantScope: true });
 
     await logActivity({
       action: `Seller approved — ${application.name} (${application.store_name})`,
@@ -476,9 +484,9 @@ const rejectRequest = async (req, res) => {
     if (application.store_id) {
       await Store.updateOne({ _id: application.store_id }, { store_status: "closed" });
       await Employee.findOneAndUpdate(
-        { email: application.email },
+        sellerEmployeeFilter(application),
         { seller_pending: true, status: "inactive", storeId: application.store_id }
-      );
+      ).setOptions({ skipTenantScope: true });
     }
 
     const storedReason = reason.slice(0, 500);

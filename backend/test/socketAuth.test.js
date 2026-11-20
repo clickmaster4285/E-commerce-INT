@@ -99,6 +99,17 @@ test("pending seller is flagged", async () => {
   DB.employee[ADMIN_A] = original;
 });
 
+test("expired/missing access token but session marker → guest + needsRefresh for that audience", async () => {
+  const id = await identify(cookie({ a_sess: "1", a_at: "admin|not-json" }), STORE_A, "admin");
+  assert.equal(id.userRole, "guest");
+  assert.equal(id.needsRefresh, "admin");
+  assert.equal((await identify(cookie({ u_sess: "1" }), STORE_A, "user")).needsRefresh, "user");
+  // Koi session hi nahi → refresh ka kehna bekaar
+  assert.equal((await identify(undefined, STORE_A, "admin")).needsRefresh, null);
+  // aud=user ke liye admin marker nahi gina jata
+  assert.equal((await identify(cookie({ a_sess: "1" }), STORE_A, "user")).needsRefresh, null);
+});
+
 test("parseCookies handles spacing and encoded values", () => {
   assert.deepEqual(parseCookies("a=1;b = x%3Dy ;  c=3=4"), { a: "1", b: "x=y", c: "3=4" });
 });

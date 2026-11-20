@@ -32,6 +32,9 @@ const GUEST = Object.freeze({
   storeId: null,
   sellerPending: false,
   sessionId: null,
+  // Session hai (a_sess/u_sess) lekin access token expire → client REST refresh
+  // kare aur reconnect (socket refresh cookie kabhi nahi dekhta)
+  needsRefresh: null,
 });
 
 const guest = () => ({ ...GUEST, userPermissions: {} });
@@ -90,7 +93,10 @@ async function resolveSocketIdentity({
       if (d && d.userId) { decoded = d; type = TYPE_FOR[candidate]; break; }
     } catch { /* expired / invalid → next audience */ }
   }
-  if (!decoded) return guest();
+  if (!decoded) {
+    const stale = audiences.find((a) => cookies[AUDIENCES[a].cookies.session]);
+    return stale ? { ...guest(), needsRefresh: stale } : guest();
+  }
 
   // Token kisi aur store ka → guest (DB lookup se pehle hi)
   if (String(decoded.storeId || "") !== String(tenantStoreId)) return guest();

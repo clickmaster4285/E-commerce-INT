@@ -10,6 +10,7 @@ import Link from 'next/link';
 import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { disconnectSidebarSocket } from "./Sidebar";
 import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
@@ -31,6 +32,7 @@ function getNavbarSocket() {
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,
   });
+  attachSocketAuthSync(navbarSocket, "admin");
 
   return navbarSocket;
 }

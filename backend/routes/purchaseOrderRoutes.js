@@ -1,6 +1,7 @@
 const express = require("express");
 const { getNextPONumber, createPO, getAllPOs, getPOByIdAdmin, updatePO, confirmPO, cancelPO, closePO, deliverPO, receivePO, recordPOPayment } = require("../controllers/purchaseOrderController");
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
 const router = express.Router();
 

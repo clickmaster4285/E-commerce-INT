@@ -332,6 +332,7 @@ const limiters = {
 };
 
 module.exports = {
+  getRedisClient, // shared client (utils/oneTimeToken.js bhi use karta hai)
   createRateLimiter,
   createChatMessageRateLimiter,
   consumeChatMessageRateLimit,

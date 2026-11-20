@@ -25,8 +25,8 @@ const router = express.Router();
 // 🛡️ ADMIN — saari reviews (paginated + stats)
 // ✅ "/:id" routes se PEHLE — warna "admin" ko id samajh liya jayega.
 // ==========================================
-router.get("/admin/all", authMiddleware, checkPermission("reviews"), getAdminReviews);
-router.get("/admin/:id", authMiddleware, checkPermission("reviews"), getAdminReviewById);
+router.get("/admin/all", authMiddleware.requireAdmin, checkPermission("reviews"), getAdminReviews);
+router.get("/admin/:id", authMiddleware.requireAdmin, checkPermission("reviews"), getAdminReviewById);
 
 // ==========================================
 // 🌐 PUBLIC — reviews + summary for one product
@@ -37,7 +37,7 @@ router.get("/product/:productId", getProductReviews);
 // 🔒 CUSTOMER — current user ki apni reviews (product_id → rating map)
 // ✅ "/:id" routes se PEHLE — warna "my" ko id samajh liya jayega.
 // ==========================================
-router.get("/my", authMiddleware, getMyReviews);
+router.get("/my", authMiddleware.requireUser, getMyReviews);
 
 // ==========================================
 // 🔒 CUSTOMER — write a review (images + video go to uploads/reviews/)
@@ -53,7 +53,7 @@ const handleMulterError = (err, req, res, next) => {
 
 router.post(
   "/",
-  authMiddleware,
+  authMiddleware.requireUser,
   (req, res, next) => reviewMediaUpload(req, res, (err) => handleMulterError(err, req, res, next)),
   saveReviewMedia,
   limiters.reviewCreate,
@@ -61,18 +61,18 @@ router.post(
 );
 router.put(
   "/:id",
-  authMiddleware,
+  authMiddleware.requireUser,
   (req, res, next) => reviewMediaUpload(req, res, (err) => handleMulterError(err, req, res, next)),
   saveReviewMedia,
   updateReview,
 );
-router.delete("/:id", authMiddleware, deleteReview);
+router.delete("/:id", authMiddleware.requireUser, deleteReview);
 
 // ==========================================
 // 🛡️ ADMIN — hide/unhide a review
 // ==========================================
-router.patch("/:id/status", authMiddleware, checkPermission("reviews"), setReviewStatus);
-router.patch("/:id/response", authMiddleware, checkPermission("reviews"), setReviewResponse);
-router.delete("/:id/response", authMiddleware, checkPermission("reviews"), deleteReviewResponse);
+router.patch("/:id/status", authMiddleware.requireAdmin, checkPermission("reviews"), setReviewStatus);
+router.patch("/:id/response", authMiddleware.requireAdmin, checkPermission("reviews"), setReviewResponse);
+router.delete("/:id/response", authMiddleware.requireAdmin, checkPermission("reviews"), deleteReviewResponse);
 
 module.exports = router;

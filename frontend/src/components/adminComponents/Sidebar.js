@@ -13,6 +13,7 @@ import {
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
@@ -206,6 +207,7 @@ function getSidebarSocket() {
   });
 
   sidebarSocket.on("disconnect", (reason) => {});
+  attachSocketAuthSync(sidebarSocket, "admin");
 
   return sidebarSocket;
 }

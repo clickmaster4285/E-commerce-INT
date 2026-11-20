@@ -107,4 +107,19 @@ storeSchema.pre("validate", async function () {
 // par kaam karta hai). Platform host (super admin) par saare stores.
 storeSchema.plugin(tenantScope, { field: "_id", stamp: false });
 
+// Naya store → uske apne default attributes (Attribute ab per-store hai).
+// Background me — signup / approval request iska intezar nahi karti.
+storeSchema.pre("save", function () {
+  this.$locals.wasNew = this.isNew;
+});
+storeSchema.post("save", function (doc) {
+  if (!doc.$locals?.wasNew) return;
+  setImmediate(() => {
+    const { seedAttributesForStore } = require("../scripts/seedAttributes");
+    seedAttributesForStore(doc._id).catch((error) =>
+      require("../utils/logger").error("[store] attribute seed failed:", error.message),
+    );
+  });
+});
+
 module.exports = mongoose.model("Store", storeSchema);

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -102,6 +103,7 @@ export function getAdminSocket() {
     adminSocket.on("connect_error", () => {
       // Silent — reconnection waise hi chalegi
     });
+    attachSocketAuthSync(adminSocket, "admin");
   }
 
   return adminSocket;

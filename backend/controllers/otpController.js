@@ -598,8 +598,9 @@ const verifyForgotPasswordOtp = async (req, res) => {
     record.verified = true;
     await record.save();
 
+    // storeId token me — reset sirf usi store (host) par complete hoga
     const resetToken = jwt.sign(
-      { email, purpose: "password_reset", otpId: String(record._id) },
+      { email, purpose: "password_reset", otpId: String(record._id), storeId: req.store?._id ? String(req.store._id) : null },
       process.env.JWT_SECRET,
       { expiresIn: `${RESET_TOKEN_EXPIRE_MINUTES}m` },
     );
@@ -643,7 +644,12 @@ const resetPasswordWithOtp = async (req, res) => {
         .json({ success: false, message: "Reset link expired. Please start again." });
     }
 
-    if (payload.purpose !== "password_reset" || normalizeEmail(payload.email) !== email)
+    const requestStoreId = req.store?._id ? String(req.store._id) : null;
+    if (
+      payload.purpose !== "password_reset" ||
+      normalizeEmail(payload.email) !== email ||
+      (payload.storeId || null) !== requestStoreId // store A ka reset store B par nahi
+    )
       return res
         .status(400)
         .json({ success: false, message: "Invalid reset request. Please start again." });

@@ -9,6 +9,7 @@ const Store = require("../models/Store");
 const log = require("../utils/logger");
 const { logActivity } = require("../utils/superAdminActivity");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
+const { sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
@@ -65,6 +66,10 @@ const sellerApply = async (req, res) => {
       return res.status(400).json({ success: false, message: "An account already exists with this email." });
     }
     const existingApp = await SellerApplication.findOne({ email: cleanEmail }).lean();
+    // Option A: bina application wala purana store admin bhi isi email ka owner hai
+    if (!existingApp && (await sellerEmailTaken(cleanEmail))) {
+      return res.status(400).json({ success: false, message: SELLER_EMAIL_TAKEN_MESSAGE });
+    }
     if (existingApp) {
       if (existingApp.status === "approved") {
         return res.status(400).json({ success: false, message: "This store application was already approved." });

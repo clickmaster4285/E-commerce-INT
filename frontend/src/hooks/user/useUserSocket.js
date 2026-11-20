@@ -1,6 +1,7 @@
 ﻿"use client";
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 
 /* ==========================================================
@@ -95,6 +96,7 @@ export function getUserSocket() {
   userSocket.on("connect_error", () => {
     // Silent — reconnection waise hi chalegi
   });
+  attachSocketAuthSync(userSocket, "user");
 
   return userSocket;
 }

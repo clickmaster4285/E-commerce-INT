@@ -1,5 +1,6 @@
 const express = require("express");
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf customer session (u_at)
+const authMiddleware = require("../middleware/authMiddleware").requireUser;
 const {
   getMyAddresses,
   createAddress,

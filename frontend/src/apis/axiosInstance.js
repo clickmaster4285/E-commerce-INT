@@ -66,9 +66,20 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
 
   const startRefresh = () => {
     if (!refreshPromise) {
-      refreshPromise = http.post(refreshUrl, undefined, { timeout: 15000 }).finally(() => {
-        refreshPromise = null;
-      });
+      refreshPromise = http
+        .post(refreshUrl, undefined, { timeout: 15000 })
+        .then((response) => {
+          // Sockets naye access token ke saath reconnect karein (lib/socketAuthSync.js)
+          try {
+            window.dispatchEvent(new CustomEvent("auth-refreshed", { detail: { mode } }));
+          } catch {
+            // server rendering
+          }
+          return response;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
     }
     return refreshPromise;
   };
