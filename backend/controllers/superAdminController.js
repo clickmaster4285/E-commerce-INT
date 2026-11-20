@@ -571,6 +571,17 @@ const listStores = async (req, res) => {
         owner_name: owner?.name || "Default / Unassigned",
         owner_email: owner?.email || s.email || "",
         owner_username: owner?.username || "",
+        email: s.email || "",
+        phone: s.phone || "",
+        subdomain: s.subdomain || "",
+        city: s.city || "",
+        business_category: s.business_category || "",
+        description: s.description || "",
+        business_type: s.business_type || "individual",
+        country: s.country || "",
+        address: s.address || "",
+        zip_code: s.zip_code || "",
+        logo_url: s.logo?.img_url || "",
         url: `/store/${s._id}`,
         createdAt: s.createdAt,
         status: s.store_status || "open",
@@ -617,6 +628,51 @@ const setStoreStatus = async (req, res) => {
     return res.json({ success: true, message: "Store updated.", data: { status: store.store_status } });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to update store." });
+  }
+};
+
+const createStore = async (req, res) => {
+  try {
+    const { store_name, email, phone, subdomain, store_status = "open", business_category, business_type, description, country, city, address, zip_code, logo_url } = req.body || {};
+    if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
+    if (!["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
+    const store = await Store.create({ store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : "individual", description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim(), logo: { img_url: String(logo_url || "").trim(), public_id: "" } });
+    await logActivity({ action: `Store created: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: { subdomain: store.subdomain } });
+    return res.status(201).json({ success: true, message: "Store created.", data: store });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
+    return res.status(500).json({ success: false, message: "Failed to create store." });
+  }
+};
+
+const updateStore = async (req, res) => {
+  try {
+    const { store_name, email, phone, subdomain, store_status, business_category, business_type, description, country, city, address, zip_code, logo_url } = req.body || {};
+    if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
+    if (store_status && !["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
+    const store = await Store.findById(req.params.id);
+    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    Object.assign(store, { store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status: store_status || store.store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : store.business_type, description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim() });
+    if (logo_url !== undefined) store.logo = { ...(store.logo?.toObject?.() || store.logo || {}), img_url: String(logo_url || "").trim() };
+    await store.save();
+    await logActivity({ action: `Store updated: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: { status: store.store_status } });
+    return res.json({ success: true, message: "Store updated.", data: store });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
+    return res.status(500).json({ success: false, message: "Failed to update store." });
+  }
+};
+
+const deleteStore = async (req, res) => {
+  try {
+    const store = await Store.findById(req.params.id);
+    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    await Store.deleteOne({ _id: store._id });
+    await User.updateMany({ storeId: store._id }, { $unset: { storeId: 1 }, status: "inactive" });
+    await logActivity({ action: `Store deleted: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: {} });
+    return res.json({ success: true, message: "Store deleted." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to delete store." });
   }
 };
 
@@ -713,6 +769,9 @@ module.exports = {
   requestInfo,
   // stores
   listStores,
+  createStore,
+  updateStore,
+  deleteStore,
   setStoreStatus,
   // users
   listUsers,

@@ -23,6 +23,9 @@ router.post("/requests/:id/reject", superAdminController.rejectRequest);
 router.post("/requests/:id/request-info", superAdminController.requestInfo);
 
 router.get("/stores", superAdminController.listStores);
+router.post("/stores", superAdminController.createStore);
+router.patch("/stores/:id", superAdminController.updateStore);
+router.delete("/stores/:id", superAdminController.deleteStore);
 router.patch("/stores/:id/status", superAdminController.setStoreStatus);
 
 router.get("/users", superAdminController.listUsers);

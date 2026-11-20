@@ -101,6 +101,9 @@ export const superAdminApi = {
   // Stores
   listStores: (params = {}) =>
     superAdminHttp.get("/super-admin/stores", { params }).then((r) => r.data),
+  createStore: (payload) => superAdminHttp.post("/super-admin/stores", payload).then((r) => r.data),
+  updateStore: (id, payload) => superAdminHttp.patch(`/super-admin/stores/${id}`, payload).then((r) => r.data),
+  deleteStore: (id) => superAdminHttp.delete(`/super-admin/stores/${id}`).then((r) => r.data),
   setStoreStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/stores/${id}/status`, { status }).then((r) => r.data),
 

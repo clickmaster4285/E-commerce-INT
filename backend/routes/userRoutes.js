@@ -26,6 +26,7 @@ const {
   exchangeStoreHandoff,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { allowPendingSeller } = require("../middleware/allowPendingSeller");
 const { checkPermission } = require("../middleware/checkPermission");
 const { limiters } = require("../middleware/rateLimit");
 const {
@@ -51,7 +52,8 @@ router.post("/refresh-token", refreshAccessToken);
 // ke liye nahi). Shape/logic purani jaisi.
 router.post("/admin/refresh-token", refreshAdminAccessToken);
 // Multi-tenant: platform par login ke baad store subdomain ke admin panel me bhejna
-router.post("/admin/handoff", authMiddleware, createStoreHandoff);
+// Pending sellers need this right after signup to reach their (view-only) admin panel
+router.post("/admin/handoff", allowPendingSeller, authMiddleware, createStoreHandoff);
 router.post("/admin/handoff/exchange", limiters.adminLogin, exchangeStoreHandoff);
 router.post("/logout", logoutUser);
 router.post("/google-login", limiters.adminLogin, googleLogin);

@@ -1,134 +1,42 @@
+
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import StatusBadge from "@/components/superadmin/StatusBadge";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Building2, CheckCircle2, ChevronLeft, ChevronRight, Edit3, ExternalLink, Loader2, Plus, Search, Store as StoreIcon, Trash2, X } from "lucide-react";
 import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
-import { superAdminApi } from "@/apis/superadmin/superAdminApi";
-import { Search, ChevronLeft, ChevronRight, Store as StoreIcon, ExternalLink } from "lucide-react";
 import PageHeader from "@/components/superadmin/PageHeader";
+import StatusBadge from "@/components/superadmin/StatusBadge";
+import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 
-const STATUS_OPTIONS = [
-  { value: "", label: "All" },
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Suspended" },
-  { value: "maintenance", label: "Maintenance" },
-];
+const STATUS_OPTIONS = [{ value: "", label: "All statuses" }, { value: "open", label: "Open" }, { value: "closed", label: "Suspended" }, { value: "maintenance", label: "Maintenance" }];
+const EMPTY_FORM = { store_name: "", email: "", phone: "", description: "", business_category: "", business_type: "individual", country: "PK", city: "", address: "", zip_code: "", logo_url: "", store_status: "open" };
+
+function StoreForm({ store, onClose, onSaved }) {
+  const [form, setForm] = useState(store ? { ...EMPTY_FORM, ...store } : EMPTY_FORM);
+  const [error, setError] = useState("");
+  const editing = Boolean(store);
+  const mutation = useMutation({ mutationFn: (payload) => editing ? superAdminApi.updateStore(store.id, payload) : superAdminApi.createStore(payload), onSuccess: onSaved, onError: (e) => setError(e?.response?.data?.message || "Could not save this store.") });
+  const set = (key) => (e) => setForm((current) => ({ ...current, [key]: e.target.value }));
+  const setLogo = (e) => { const file = e.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setForm((current) => ({ ...current, logo_url: String(reader.result || "") })); reader.readAsDataURL(file); };
+  const submit = (e) => { e.preventDefault(); setError(""); mutation.mutate(form); };
+  return <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="store-form-title"><button type="button" className="absolute inset-0 cursor-default" aria-label="Close form" onClick={mutation.isPending ? undefined : onClose} /><section className="relative z-10 flex max-h-[min(760px,92vh)] w-full max-w-2xl flex-col overflow-y-auto rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] shadow-2xl"><div className="flex items-start justify-between border-b border-[var(--border-color)] px-6 py-5"><div><p className="text-[11px] font-bold uppercase tracking-[.16em] text-[var(--accent)]">Store workspace</p><h2 id="store-form-title" className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{editing ? "Edit store" : "Add a new store"}</h2><p className="mt-1 text-sm text-[var(--text-muted)]">Keep storefront identity and contact details up to date.</p></div><button type="button" onClick={onClose} disabled={mutation.isPending} className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]" aria-label="Close"><X size={19} /></button></div><form onSubmit={submit} className="flex min-h-0 flex-1 flex-col"><div className="space-y-5 overflow-y-auto px-6 py-6">{error ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</div> : null}<div><label className="form-label" htmlFor="store_name">Store name <span className="text-red-500">*</span></label><input id="store_name" required value={form.store_name} onChange={set("store_name")} className="form-input" placeholder="e.g. Northstar Electronics" /></div><div><label className="form-label" htmlFor="description">Store description</label><textarea id="description" value={form.description} onChange={set("description")} className="form-input min-h-24 resize-y" placeholder="Describe what this store sells..." /></div><div className="grid gap-4 sm:grid-cols-2"><div><label className="form-label" htmlFor="email">Owner / store email</label><input id="email" type="email" value={form.email} onChange={set("email")} className="form-input" placeholder="owner@store.com" /></div><div><label className="form-label" htmlFor="phone">Phone</label><input id="phone" value={form.phone} onChange={set("phone")} className="form-input" placeholder="+92 300 0000000" /></div></div><div className="grid gap-4 sm:grid-cols-2"><div><label className="form-label" htmlFor="city">City</label><input id="city" value={form.city} onChange={set("city")} className="form-input" placeholder="Lahore" /></div></div><div className="grid gap-4 sm:grid-cols-2"><div><label className="form-label" htmlFor="business_category">Business category</label><input id="business_category" value={form.business_category} onChange={set("business_category")} className="form-input" placeholder="Fashion, electronics..." /></div><div><label className="form-label" htmlFor="store_status">Store status</label><select id="store_status" value={form.store_status} onChange={set("store_status")} className="form-input">{STATUS_OPTIONS.slice(1).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div></div><div className="grid gap-4 sm:grid-cols-2"><div><label className="form-label" htmlFor="business_type">Business type</label><select id="business_type" value={form.business_type} onChange={set("business_type")} className="form-input"><option value="individual">Individual</option><option value="registered_business">Registered business</option></select></div><div><label className="form-label" htmlFor="country">Country</label><input id="country" value={form.country} onChange={set("country")} className="form-input" placeholder="PK" /></div></div><div className="grid gap-4 sm:grid-cols-2"><div><label className="form-label" htmlFor="address">Address</label><input id="address" value={form.address} onChange={set("address")} className="form-input" placeholder="Complete store address" /></div><div><label className="form-label" htmlFor="zip_code">ZIP / postal code</label><input id="zip_code" value={form.zip_code} onChange={set("zip_code")} className="form-input" placeholder="54000" /></div></div><div><label className="form-label" htmlFor="logo_file">Store logo</label><input id="logo_file" type="file" accept="image/png,image/jpeg,image/webp" onChange={setLogo} className="form-input file:me-3 file:rounded-md file:border-0 file:bg-[var(--accent-soft)] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-[var(--accent)]" /></div></div><div className="mt-auto flex items-center justify-end gap-3 border-t border-[var(--border-color)] px-6 py-4"><button type="button" onClick={onClose} disabled={mutation.isPending} className="btn-secondary h-11">Cancel</button><button type="submit" disabled={mutation.isPending} className="btn-primary h-11 min-w-32">{mutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{editing ? "Save changes" : "Create store"}</button></div></form></section></div>;
+}
 
 export default function StoresPage() {
   const qc = useQueryClient();
-  const [status, setStatus] = useState("");
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [page, setPage] = useState(1);
-  const [target, setTarget] = useState(null);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebounced(search), 250);
-    return () => window.clearTimeout(id);
-  }, [search]);
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["superadmin-stores", status, debounced, page],
-    queryFn: () => superAdminApi.listStores({ status, search: debounced, page, limit: 10 }),
-    retry: 1,
-    placeholderData: (prev) => prev,
-  });
-
-  const items = data?.data?.items || [];
-  const pages = data?.data?.pages || 1;
-
-  const mutation = useMutation({
-    mutationFn: ({ id, to }) => superAdminApi.setStoreStatus(id, to),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-stores"] }); setTarget(null); },
-    onError: () => setTarget(null),
-  });
-
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Store Management"
-        description="Activate, suspend and inspect tenant stores."
-        breadcrumbs={[{ label: "Super Admin" }, { label: "Store Management" }]}
-      />
-
-      <div className="card flex flex-wrap items-center gap-2 p-3">
-        <div className="relative min-w-[220px] flex-1">
-          <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
-          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search store name or email..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search stores" />
-        </div>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="h-10 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm font-semibold text-[var(--text-primary)]" aria-label="Filter by status">
-          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
-
-      {isError && (
-        <div role="alert" className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>
-          Failed to load stores.
-        </div>
-      )}
-
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table min-w-full text-[13px]">
-            <thead>
-              <tr className="bg-[var(--bg-tertiary)] text-left">
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Store</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Owner</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Created</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => <tr key={i} className="animate-pulse"><td colSpan={5} className="px-4 py-4"><div className="h-4 w-full rounded bg-[var(--bg-tertiary)]" /></td></tr>)
-              ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center"><span className="flex flex-col items-center gap-2 text-sm text-[var(--text-muted)]"><StoreIcon size={22} aria-hidden="true" />No stores found.</span></td></tr>
-              ) : items.map((s) => (
-                <tr key={s.id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}><StoreIcon size={16} aria-hidden="true" /></span>
-                      <a href={s.url} className="inline-flex items-center gap-1 font-bold text-[var(--text-primary)] hover:underline" target="_blank" rel="noreferrer">{s.store_name}<ExternalLink size={12} aria-hidden="true" /></a>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3"><span className="font-semibold text-[var(--text-secondary)]">{s.owner_name}</span><br /><span className="text-[11px] text-[var(--text-muted)]">{s.owner_email}</span></td>
-                  <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(s.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3"><StatusBadge value={s.status} /></td>
-                  <td className="px-4 py-3 text-right">
-                    {s.status === "closed" ? (
-                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "activate" })} className="text-[12px] font-semibold text-[var(--success-text)] hover:underline">Activate</button>
-                    ) : (
-                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "suspend" })} className="text-[12px] font-semibold text-[var(--danger-text)] hover:underline">Suspend</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {pages > 1 && (
-          <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-3">
-            <span className="text-[11px] font-semibold text-[var(--text-muted)]">{page} of {pages}</span>
-            <div className="flex gap-1">
-              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={16} aria-hidden="true" /></button>
-              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Next page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={16} aria-hidden="true" /></button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <ConfirmDialog
-        open={!!target}
-        title={target ? (target.action === "suspend" ? `Suspend ${target.name}?` : `Reactivate ${target.name}?`) : ""}
-        message={target ? (target.action === "suspend" ? "Seller login will be blocked and the store will be marked closed." : "Seller login will be restored and the store will be marked open.") : ""}
-        confirmLabel={target?.action === "suspend" ? "Suspend" : "Reactivate"}
-        confirmTone={target?.action === "suspend" ? "danger" : "success"}
-        loading={mutation.isPending}
-        onCancel={() => setTarget(null)}
-        onConfirm={() => mutation.mutate({ id: target.id, to: target.action === "suspend" ? "closed" : "open" })}
-      />
-    </div>
-  );
+  const [status, setStatus] = useState(""); const [search, setSearch] = useState(""); const [debounced, setDebounced] = useState(""); const [page, setPage] = useState(1); const [formStore, setFormStore] = useState(null); const [deleteTarget, setDeleteTarget] = useState(null); const [statusTarget, setStatusTarget] = useState(null);
+  useEffect(() => { const id = window.setTimeout(() => setDebounced(search), 250); return () => window.clearTimeout(id); }, [search]);
+  const query = useQuery({ queryKey: ["superadmin-stores", status, debounced, page], queryFn: () => superAdminApi.listStores({ status, search: debounced, page, limit: 10 }), retry: 1, placeholderData: (prev) => prev });
+  const items = query.data?.data?.items || []; const pages = query.data?.data?.pages || 1; const total = query.data?.data?.total || 0;
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ["superadmin-stores"] }); setFormStore(null); };
+  const statusMutation = useMutation({ mutationFn: ({ id, status: next }) => superAdminApi.setStoreStatus(id, next), onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-stores"] }); setStatusTarget(null); } });
+  const deleteMutation = useMutation({ mutationFn: (id) => superAdminApi.deleteStore(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-stores"] }); setDeleteTarget(null); } });
+  const counts = useMemo(() => ({ open: items.filter((s) => s.status === "open").length, attention: items.filter((s) => s.status !== "open").length }), [items]);
+  return <div className="space-y-6"><PageHeader title="Store management" description="Create, maintain and monitor every storefront from one workspace." breadcrumbs={[{ label: "Super Admin" }, { label: "Store management" }]} actions={<button type="button" onClick={() => setFormStore("new")} className="btn-primary h-11 px-4"><Plus size={17} />Add store</button>} /><div className="grid gap-3 sm:grid-cols-3"><div className="card flex items-center gap-3 p-4"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Building2 size={19} /></span><div><p className="text-xs font-semibold text-[var(--text-muted)]">Total stores</p><p className="mt-0.5 text-2xl font-semibold text-[var(--text-primary)]">{total}</p></div></div><div className="card flex items-center gap-3 p-4"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"><CheckCircle2 size={19} /></span><div><p className="text-xs font-semibold text-[var(--text-muted)]">Open on this page</p><p className="mt-0.5 text-2xl font-semibold text-[var(--text-primary)]">{counts.open}</p></div></div><div className="card flex items-center gap-3 p-4"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><StoreIcon size={19} /></span><div><p className="text-xs font-semibold text-[var(--text-muted)]">Needs attention</p><p className="mt-0.5 text-2xl font-semibold text-[var(--text-primary)]">{counts.attention}</p></div></div></div><div className="card flex flex-wrap items-center gap-3 p-3"><div className="relative min-w-[220px] flex-1"><Search size={17} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" /><input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search stores by name or email..." className="form-input h-11 ps-10" aria-label="Search stores" /></div><select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="form-input h-11 w-full sm:w-44" aria-label="Filter by status">{STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>{query.isError ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Failed to load stores. Please try again.</div> : null}<div className="card overflow-hidden"><div className="overflow-x-auto"><table className="admin-table min-w-full text-[13px]"><thead><tr className="bg-[var(--bg-tertiary)] text-left"><th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Store</th><th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Owner</th><th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Created</th><th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Status</th><th className="px-5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Actions</th></tr></thead><tbody>{query.isLoading ? Array.from({ length: 4 }).map((_, i) => <tr key={i} className="animate-pulse"><td colSpan={5} className="px-5 py-5"><div className="h-4 rounded bg-[var(--bg-tertiary)]" /></td></tr>) : items.length === 0 ? <tr><td colSpan={5} className="px-5 py-14 text-center"><StoreIcon size={25} className="mx-auto text-[var(--text-muted)]" /><p className="mt-2 text-sm font-semibold text-[var(--text-secondary)]">No stores found</p><p className="mt-1 text-xs text-[var(--text-muted)]">Try adjusting your search or create a new store.</p></td></tr> : items.map((s) => <tr key={s.id} className="border-t border-[var(--border-color)] transition-colors hover:bg-[var(--bg-row-hover)]"><td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><StoreIcon size={17} /></span><div className="min-w-0"><a href={s.url} target="_blank" rel="noreferrer" className="inline-flex max-w-[220px] items-center gap-1 truncate font-bold text-[var(--text-primary)] hover:text-[var(--accent)]">{s.store_name}<ExternalLink size={12} /></a><p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{s.owner_username ? `@${s.owner_username}` : "Tenant storefront"}</p></div></div></td><td className="px-5 py-4"><span className="font-semibold text-[var(--text-secondary)]">{s.owner_name}</span><br /><span className="text-[11px] text-[var(--text-muted)]">{s.owner_email}</span></td><td className="whitespace-nowrap px-5 py-4 text-[var(--text-muted)]">{s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "—"}</td><td className="px-5 py-4"><StatusBadge value={s.status} /></td><td className="px-5 py-4"><div className="flex justify-end gap-1"><button type="button" onClick={() => setFormStore(s)} className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]" title="Edit store" aria-label={`Edit ${s.store_name}`}><Edit3 size={16} /></button><button type="button" onClick={() => setStatusTarget({ ...s, next: s.status === "closed" ? "open" : "closed" })} className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold ${s.status === "closed" ? "text-emerald-600 hover:bg-emerald-50" : "text-amber-600 hover:bg-amber-50"}`}>{s.status === "closed" ? "Activate" : "Suspend"}</button><button type="button" onClick={() => setDeleteTarget(s)} className="rounded-lg p-2 text-[var(--text-muted)] hover:bg-red-50 hover:text-red-600" title="Delete store" aria-label={`Delete ${s.store_name}`}><Trash2 size={16} /></button></div></td></tr>)}</tbody></table></div>{pages > 1 ? <div className="flex items-center justify-between border-t border-[var(--border-color)] px-5 py-3"><span className="text-xs font-semibold text-[var(--text-muted)]">Page {page} of {pages}</span><div className="flex gap-1"><button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="rounded-lg p-2 hover:bg-[var(--bg-tertiary)] disabled:opacity-40" aria-label="Previous page"><ChevronLeft size={16} /></button><button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} className="rounded-lg p-2 hover:bg-[var(--bg-tertiary)] disabled:opacity-40" aria-label="Next page"><ChevronRight size={16} /></button></div></div> : null}</div>{formStore ? <StoreForm store={formStore === "new" ? null : formStore} onClose={() => setFormStore(null)} onSaved={invalidate} /> : null}<ConfirmDialog open={Boolean(statusTarget)} title={statusTarget ? `${statusTarget.next === "open" ? "Activate" : "Suspend"} ${statusTarget.store_name}?` : ""} message={statusTarget?.next === "open" ? "The store and its seller login will be restored." : "The storefront will be suspended and seller login will be blocked."} confirmLabel={statusTarget?.next === "open" ? "Activate store" : "Suspend store"} confirmTone={statusTarget?.next === "open" ? "success" : "danger"} loading={statusMutation.isPending} onCancel={() => setStatusTarget(null)} onConfirm={() => statusMutation.mutate({ id: statusTarget.id, status: statusTarget.next })} /><ConfirmDialog open={Boolean(deleteTarget)} title={deleteTarget ? `Delete ${deleteTarget.store_name}?` : ""} message="This permanently removes the storefront and deactivates its linked seller accounts. This action cannot be undone." confirmLabel="Delete store" confirmTone="danger" loading={deleteMutation.isPending} onCancel={() => setDeleteTarget(null)} onConfirm={() => deleteMutation.mutate(deleteTarget.id)} /></div>;
 }
+
+
+
+
+
