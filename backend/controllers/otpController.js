@@ -349,6 +349,64 @@ const verifyEmailVerificationOtp = async (req, res) => {
             .json({ success: false, message: "This phone number is already registered." });
         }
       }
+      // ── Store customer signup (storefront register) ──
+      // Seller approval / SellerApplication / blocked status sirf platform seller
+      // signup ke liye — customer foran active hota hai aur login ho jata hai.
+      if (pending.storeId) {
+        if (!req.store || String(req.store._id) !== String(pending.storeId)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Please verify your email on the store where you registered." });
+        }
+        const customer = await User.create({
+          name: pending.name,
+          username: pending.username,
+          phone: pending.phone || "",
+          email: pending.email,
+          // ✅ passwordHash pehle se bcrypt-hashed hai — dobara hash nahi karna
+          password: pending.passwordHash,
+          storeId: req.store._id,
+          role: "user",
+          emailVerified: true,
+          status: "active",
+        });
+        await PendingRegistration.deleteOne({ _id: pending._id });
+        await setAuthCookies(req, res, customer);
+
+        const io = req.io || getIO();
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${customer.name} verified their email`,
+            category: "Authentication",
+            performedBy: customer._id,
+            performedByName: customer.name,
+            details: { email: customer.email },
+          },
+          customer._id,
+        );
+
+        return res.json({
+          success: true,
+          message: "Email verified. Welcome!",
+          user: {
+            id: customer._id,
+            name: customer.name,
+            username: customer.username,
+            phone: customer.phone,
+            email: customer.email,
+            role: customer.role,
+            avatar: customer.avatar || null,
+          },
+        });
+      }
+
+      // ── Platform seller signup (naya store, Super Admin approval) ──
+      if (req.store) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Please verify your seller account on the main signup page." });
+      }
       const isSeller = !!(pending.storeName && String(pending.storeName).trim().length >= 3);
 
       const Store = require("../models/Store");

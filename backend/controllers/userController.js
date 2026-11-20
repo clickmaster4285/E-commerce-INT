@@ -78,8 +78,18 @@ const createUser = async (req, res) => {
     const cleanPhone = normalizePhone(rawPhone);
     const cleanName = String(name || "").trim();
 
-    // Seller application fields — collected on the same signup page
-    const wantsStore = String(req.body.wantsStore ?? true) !== "false";
+    // Store host par signup = HAMESHA isi store ka customer (store-setup fields nahi).
+    // Seller signup (naya store) sirf platform host (landing/signup) par.
+    // Pehle wantsStore default true tha → storefront register form (jo store fields
+    // bhejta hi nahi) "Please enter your store name" 400 deta tha.
+    const signupStoreId = req.store?._id || null;
+    const wantsStore = !signupStoreId && String(req.body.wantsStore ?? true) !== "false";
+    if (!signupStoreId && !wantsStore) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer accounts are created on a store's website.",
+      });
+    }
     const storeName = String(req.body.storeName || "").trim().slice(0, 140);
     const storeDescription = String(req.body.storeDescription || "").trim().slice(0, 2000);
     const businessCategory = String(req.body.businessCategory || "").trim();
@@ -263,7 +273,8 @@ const createUser = async (req, res) => {
       existingPending.expiresAt = expiresAt;
       existingPending.attempts = 0;
       existingPending.lastSentAt = new Date();
-      existingPending.storeName = storeName;
+      existingPending.storeId = signupStoreId;
+      existingPending.storeName = wantsStore ? storeName : "";
       existingPending.storeDescription = storeDescription;
       existingPending.businessCategory = businessCategory;
       existingPending.businessType = businessType;
@@ -284,7 +295,8 @@ const createUser = async (req, res) => {
         expiresAt,
         attempts: 0,
         lastSentAt: new Date(),
-        storeName,
+        storeId: signupStoreId,
+        storeName: wantsStore ? storeName : "",
         storeDescription,
         businessCategory,
         businessType,
