@@ -17,9 +17,7 @@ Backend (`cd backend`):
 - `npm run dev`: nodemon `server.js`. `npm start` runs it without nodemon.
 - `npm test`: runs all tests with `node --test` (files in `test/`). Run one file with `node --test test/chatModels.test.js`; filter by name with `node --test --test-name-pattern="partial unique" test/`.
 - `node scripts/migrateTenantIndexes.js`: run after changing model indexes (dry run; add `--apply`).
-- `node scripts/migrateAttributesPerStore.js --apply`: copies legacy global attributes into every store (run after `migrateTenantIndexes.js --apply`).
-- `bash postman/run-tenant-isolation.sh` (repo root): cross-store isolation checks with the Postman CLI against the running dev server. Credentials go in git-ignored `postman/.env.local` (template `postman/.env.local.example`).
-- `npm run backfillSubdomains`, `npm run backfill:translations`, `npm run translation:check`: one-off data scripts.
+- `node scripts/migrateAttributesPerStore.js --apply`: copies legacy global attributes into every store (run after `migrateTenantIndexes.js --apply`).- `npm run backfillSubdomains`, `npm run backfill:translations`, `npm run translation:check`: one-off data scripts.
 - `npm run argos:serve`: local translation server (needs `uv`). The default target is `LIBRETRANSLATE_URL`.
 
 Frontend (`cd frontend`):
