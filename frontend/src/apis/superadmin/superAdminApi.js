@@ -92,6 +92,9 @@ export const superAdminApi = {
   listRequests: (params = {}) =>
     superAdminHttp.get("/super-admin/requests", { params }).then((r) => r.data),
   getRequest: (id) => superAdminHttp.get(`/super-admin/requests/${id}`).then((r) => r.data),
+  updateRequest: (id, payload) =>
+    superAdminHttp.patch(`/super-admin/requests/${id}`, payload).then((r) => r.data),
+  deleteRequest: (id) => superAdminHttp.delete(`/super-admin/requests/${id}`).then((r) => r.data),
   approveRequest: (id) => superAdminHttp.post(`/super-admin/requests/${id}/approve`).then((r) => r.data),
   rejectRequest: (id, reason = "") =>
     superAdminHttp.post(`/super-admin/requests/${id}/reject`, { reason }).then((r) => r.data),
