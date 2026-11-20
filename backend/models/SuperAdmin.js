@@ -25,8 +25,8 @@ const superAdminSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
-    // pehle "superadmins" → "super_users" — scripts/renameAuthCollections.js
-    collection: "admin_super_users",
+    // Super Admin panel accounts.
+    collection: "superadmin_users",
   }
 );
 

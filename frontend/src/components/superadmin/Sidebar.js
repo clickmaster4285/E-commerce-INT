@@ -12,8 +12,8 @@ export const NAV = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/super-admin/applications", label: "Signup Requests", icon: ClipboardList, badgeKey: "pending" },
   { href: "/super-admin/stores", label: "Stores", icon: Store },
-  { href: "/super-admin/users", label: "Users", icon: Users },
-  { href: "/super-admin/team", label: "Team", icon: UserCog },
+  { href: "/super-admin/users", label: "Store Admins", icon: Users },
+  { href: "/super-admin/team", label: "Employee", icon: UserCog },
 ];
 
 const STORAGE_KEY = "super-admin-sidebar-collapsed";

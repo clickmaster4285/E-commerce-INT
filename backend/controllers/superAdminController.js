@@ -745,6 +745,20 @@ const listStores = async (req, res) => {
   }
 };
 
+const getStore = async (req, res) => {
+  try {
+    const store = await Store.findById(req.params.id).lean();
+    if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    const ownerIds = await sellerUserIds();
+    const owner = await User.findOne({ storeId: store._id, _id: { $in: ownerIds } })
+      .select("name username email phone status createdAt")
+      .lean();
+    return res.json({ success: true, data: { ...store, id: store._id, status: store.store_status || "open", logo_url: store.logo?.img_url || "", url: storeAdminBaseUrl(store), owner: owner || null } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load store." });
+  }
+};
+
 const setStoreStatus = async (req, res) => {
   try {
     const { status } = req.body || {};
@@ -1429,6 +1443,7 @@ const getTeamMember = async (req, res) => {
 };
 
 module.exports = {
+  getStore,
   // team
   listTeam,
   getTeamMember,

@@ -98,10 +98,19 @@ function TabGrid({ tab }) {
 
   if (!products.length && !displayedProducts.length) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
-        <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-        <p className="text-sm font-bold text-[var(--user-text)]">{t("admin.products.table.empty")}</p>
-        <p className="text-[0.6875rem] text-[var(--user-text-muted)]">{t("storefront.featured.comingSoon")}</p>
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-6 py-14 text-center sm:py-16">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(ellipse_at_top,var(--user-accent-soft),transparent_70%)]" />
+        <div className="relative mx-auto flex max-w-sm flex-col items-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--user-accent-soft)] bg-[var(--user-accent-soft)] text-[var(--user-accent)]">
+            <PackageSearch size={26} strokeWidth={1.7} />
+          </span>
+          <p className="mt-5 text-base font-extrabold tracking-tight text-[var(--user-text)]">
+            {t("admin.products.table.empty")}
+          </p>
+          <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--user-text-muted)]">
+            {t("storefront.featured.comingSoon")}
+          </p>
+        </div>
       </div>
     );
   }

@@ -225,6 +225,9 @@ export default function AddStorePage() {
                     aria-invalid={errors.subdomain ? "true" : undefined}
                     placeholder="your-store"
                     autoComplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore
+                    data-bwignore
                     spellCheck={false}
                     maxLength={STORE_ADDRESS_MAX}
                     className="min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[13.5px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"

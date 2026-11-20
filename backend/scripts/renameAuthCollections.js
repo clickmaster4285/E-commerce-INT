@@ -3,8 +3,9 @@
  *
  *   employees              → admin_users      (store admin panel logins — Employee model)
  *   users                  → customer_users   (platform + storefront accounts — User model)
- *   superadmins            → admin_super_users (Super Admin panel logins — SuperAdmin model)
- *   super_users            → admin_super_users (beech wala naam, agar pehle rename ho chuka ho)
+ *   superadmins            → superadmin_users (Super Admin panel logins — SuperAdmin model)
+ *   super_users            → superadmin_users (beech wala naam, agar pehle rename ho chuka ho)
+ *   admin_super_users      → superadmin_users (current legacy name)
  *   superadmin_activities  → DROP (activity feature hata diya gaya)
  *
  * Rename me saara data + indexes saath jaate hain. Dry run default hai:
@@ -19,8 +20,9 @@ const mongoose = require("mongoose");
 const RENAMES = [
   ["employees", "admin_users"],
   ["users", "customer_users"],
-  ["superadmins", "admin_super_users"],
-  ["super_users", "admin_super_users"],
+  ["superadmins", "superadmin_users"],
+  ["super_users", "superadmin_users"],
+  ["admin_super_users", "superadmin_users"],
 ];
 const DROP = "superadmin_activities";
 

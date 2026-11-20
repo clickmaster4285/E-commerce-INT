@@ -1181,6 +1181,9 @@ export default function SignupPage() {
                     type="text"
                     inputMode="url"
                     autoComplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore
+                    data-bwignore
                     autoCapitalize="none"
                     spellCheck={false}
                     maxLength={STORE_ADDRESS_MAX}

@@ -104,6 +104,7 @@ export const superAdminApi = {
   // Stores
   listStores: (params = {}) =>
     superAdminHttp.get("/super-admin/stores", { params }).then((r) => r.data),
+  getStore: (id) => superAdminHttp.get(`/super-admin/stores/${id}`).then((r) => r.data),
   createStore: (payload) => superAdminHttp.post("/super-admin/stores", payload).then((r) => r.data),
   // Add store page — signup jaise fields se store + owner (seedha approved)
   createSellerStore: (payload) => superAdminHttp.post("/super-admin/stores/with-owner", payload).then((r) => r.data),

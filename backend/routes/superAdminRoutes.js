@@ -25,6 +25,7 @@ router.post("/requests/:id/reject", superAdminController.rejectRequest);
 router.post("/requests/:id/request-info", superAdminController.requestInfo);
 
 router.get("/stores", superAdminController.listStores);
+router.get("/stores/:id", superAdminController.getStore);
 router.post("/stores", superAdminController.createStore);
 router.post("/stores/with-owner", superAdminController.createSellerStore); // Add store page — store + owner
 router.patch("/stores/:id", superAdminController.updateStore);

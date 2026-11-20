@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard, UserCog } from "lucide-react";
 import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
@@ -23,6 +24,7 @@ const STATUS_TABS = [
 const PAGE_SIZE = 20;
 
 export default function StoresPage() {
+  const router = useRouter();
   const qc = useQueryClient();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -72,11 +74,13 @@ export default function StoresPage() {
     { key: "created", header: "Created", className: "whitespace-nowrap", cell: (s) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(s.createdAt)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(s.createdAt)}</p></>) },
     { key: "status", header: "Status", cell: (s) => <StatusBadge value={s.status} /> },
     {
-      key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56,
+      key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56, stopRowClick: true,
       cell: (s) => (
         <DropdownMenu
           label={`Actions for ${s.store_name}`}
           items={[
+            { label: "View store details", icon: StoreIcon, href: `/super-admin/stores/${s.id}` },
+            { separator: true },
             { label: "Visit storefront", icon: ExternalLink, href: storefrontUrl(s), external: true, disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { label: "Open admin panel", icon: LayoutDashboard, onClick: () => openStoreAdmin(s.id), disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { separator: true },
@@ -113,6 +117,7 @@ export default function StoresPage() {
           columns={columns}
           rows={items}
           rowKey={(s) => s.id}
+          onRowClick={(s) => router.push(`/super-admin/stores/${s.id}`)}
           loading={isLoading}
           error={isError ? { title: "Couldn't load stores", action: <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button> } : null}
           empty={{ icon: StoreIcon, title: debounced ? "No stores match your search" : "No stores yet", description: debounced ? "Try a different store name or email." : "Approve a seller request or add a store manually.", action: !debounced && <Button size="sm" variant="primary" icon={Plus} href="/super-admin/stores/new">Add store</Button> }}
