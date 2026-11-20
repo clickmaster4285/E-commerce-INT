@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole } from "@/lib/roles";
 import { useEffect, useState, useCallback } from "react";
 import {
   User,
@@ -232,7 +233,7 @@ export default function ProfilePage() {
           setEditForm(data);
           const perms = userData.permissions || data.permissions || {};
           const role = userData.role || data.role || "";
-          if (role === "admin") {
+          if (isAdminRole(role)) {
             setHasProfilePermission(true);
             setHasStorePermission(true);
           } else {

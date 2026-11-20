@@ -1,6 +1,7 @@
 "use client";
 
 import { Building2, Check, ChevronDown, ContactRound, Mail, MapPin, Phone, StickyNote, UserRound, X } from "lucide-react";
+import { isAdminRole } from "@/lib/roles";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { employeeApi } from "@/apis/admin/employeeApi";
@@ -65,7 +66,7 @@ export default function LeadFormModal({ open, form, setForm, editing = false, is
           <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
             <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.source")}</span><LeadDropdown value={form.source || "Other"} onChange={(value) => update("source", value)} ariaLabel={t("admin.leads.ui.leadSource")} options={sources.map((source) => ({ value: source, label: optionLabel(source, t) }))} /></div>
             <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.status")}</span><LeadDropdown value={form.status || "New"} onChange={(value) => update("status", value)} ariaLabel={t("admin.leads.ui.leadStatus")} options={["New", "Contacted", "Qualified", "Converted", "Lost"].map((status) => ({ value: status, label: optionLabel(status, t) }))} /></div>
-            <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.assignedEmployee")}</span><LeadDropdown value={form.assigned_employee_id?._id || form.assigned_employee_id || ""} onChange={(value) => update("assigned_employee_id", value)} ariaLabel={t("admin.leads.ui.assignedEmployee")} options={[{ value: "", label: t("admin.leads.value.unassigned") }, ...employees.filter((employee) => (employee.role !== "admin" && employee.status === "active" && !employee.is_deleted) || String(employee._id) === String(form.assigned_employee_id?._id || form.assigned_employee_id || "")).map((employee) => ({ value: employee._id, label: employee.name }))]} /></div>
+            <div><span className="mb-1.5 block text-xs font-semibold text-slate-600">{t("admin.leads.ui.assignedEmployee")}</span><LeadDropdown value={form.assigned_employee_id?._id || form.assigned_employee_id || ""} onChange={(value) => update("assigned_employee_id", value)} ariaLabel={t("admin.leads.ui.assignedEmployee")} options={[{ value: "", label: t("admin.leads.value.unassigned") }, ...employees.filter((employee) => (!isAdminRole(employee.role) && employee.status === "active" && !employee.is_deleted) || String(employee._id) === String(form.assigned_employee_id?._id || form.assigned_employee_id || "")).map((employee) => ({ value: employee._id, label: employee.name }))]} /></div>
             {field(t("admin.leads.ui.nextFollowUp"), "next_follow_up_date", "date", false, null)}
           </div>
         </section>

@@ -56,7 +56,8 @@ const authMiddleware = async (req, res, next) => {
     req.userType = userType;
 
     // Pending sellers can browse the admin panel but cannot change anything.
-    if (userType === "employee" && entity.seller_pending) {
+    // Routes that don't write store data opt out via allowPendingSeller.
+    if (userType === "employee" && entity.seller_pending && !req.allowPendingSeller) {
       const safeMethods = ["GET", "HEAD", "OPTIONS"];
       if (!safeMethods.includes(String(req.method || "GET").toUpperCase())) {
         return res.status(403).json({

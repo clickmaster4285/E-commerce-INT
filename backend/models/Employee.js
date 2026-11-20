@@ -23,10 +23,11 @@ const employeeSchema = new mongoose.Schema(
     },
     password: { type: String, required: true, minlength: 6 },
     phone: { type: String, default: "", trim: true },
+    // storehandler = store owner (seller signup). Dekho utils/roles.js
     role: {
       type: String,
       default: "staff",
-      enum: ["admin", "manager", "staff"],
+      enum: ["storehandler", "admin", "manager", "staff"],
     },
     // Seller-owner account created at signup stays pending until Super Admin approves.
     // While pending: the admin panel opens in read-only mode (GETs allowed, mutations blocked).

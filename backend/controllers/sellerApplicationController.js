@@ -83,13 +83,13 @@ const sellerApply = async (req, res) => {
     const cleanPhone = typeof phone === "string" ? String(phone).replace(/\D/g, "").slice(0, 16) : "";
     const passwordHash = await bcrypt.hash(String(password), 10);
 
-    const baseUsername = String(username || cleanEmail.split("@")[0] || "seller")
-      .replace(/[^a-zA-Z0-9_]/g, "")
-      .slice(0, 20) || "seller";
-    let finalUsername = baseUsername;
-    for (let i = 1; await User.exists({ username: finalUsername }) && i < 100; i += 1) {
-      finalUsername = `${baseUsername}${i}`;
+    // Diya hua username (unique banao) — warna naam se professional username (hamza.asif)
+    const requested = String(username || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20).toLowerCase();
+    let finalUsername = requested;
+    for (let i = 1; finalUsername && (await User.exists({ username: finalUsername })) && i < 100; i += 1) {
+      finalUsername = `${requested}${i}`;
     }
+    if (!finalUsername) finalUsername = await require("../utils/username").uniqueUsername(name, cleanEmail);
 
     // Account is created right away — but BLOCKED (can't login) until approval.
     const user = await User.create({

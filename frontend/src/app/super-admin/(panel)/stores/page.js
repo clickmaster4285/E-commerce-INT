@@ -1,19 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import StatusBadge from "@/components/superadmin/StatusBadge";
-import ConfirmDialog from "@/components/superadmin/ConfirmDialog";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard } from "lucide-react";
+import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
-import { Search, ChevronLeft, ChevronRight, Store as StoreIcon, ExternalLink } from "lucide-react";
-import PageHeader from "@/components/superadmin/PageHeader";
+import { formatDate, timeAgo, assetUrl } from "@/lib/superadminFormat";
+import { storeUrl } from "@/lib/tenantHost";
+import useOpenStoreAdmin from "@/components/superadmin/useOpenStoreAdmin";
+import StoreFormDialog from "@/components/superadmin/StoreFormDialog";
 
-const STATUS_OPTIONS = [
+// Storefront / admin links subdomain se banao (same helper jo handoff use karta hai) — backend `url` sirf fallback
+const storefrontUrl = (s, path = "/") => (s.subdomain ? storeUrl(s.subdomain, path) : s.url ? `${s.url}${path === "/" ? "" : path}` : null);
+const hostOf = (url) => (url ? url.replace(/^https?:\/\//, "").replace(/\/$/, "") : "");
+
+const STATUS_TABS = [
   { value: "", label: "All" },
   { value: "open", label: "Open" },
-  { value: "closed", label: "Suspended" },
   { value: "maintenance", label: "Maintenance" },
+  { value: "closed", label: "Suspended" },
 ];
+const PAGE_SIZE = 20;
 
 export default function StoresPage() {
   const qc = useQueryClient();
@@ -21,113 +28,118 @@ export default function StoresPage() {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
-  const [target, setTarget] = useState(null);
+  const [formStore, setFormStore] = useState(null); // "new" | store
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [statusTarget, setStatusTarget] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const { openStoreAdmin } = useOpenStoreAdmin({ onError: (text) => setNotice({ tone: "danger", text }) });
 
   useEffect(() => {
-    const id = window.setTimeout(() => setDebounced(search), 250);
+    const id = window.setTimeout(() => setDebounced(search.trim()), 250);
     return () => window.clearTimeout(id);
   }, [search]);
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ["superadmin-stores", status, debounced, page],
-    queryFn: () => superAdminApi.listStores({ status, search: debounced, page, limit: 10 }),
+    queryFn: () => superAdminApi.listStores({ status, search: debounced, page, limit: PAGE_SIZE }),
     retry: 1,
     placeholderData: (prev) => prev,
   });
-
   const items = data?.data?.items || [];
   const pages = data?.data?.pages || 1;
+  const total = data?.data?.total || 0;
 
-  const mutation = useMutation({
-    mutationFn: ({ id, to }) => superAdminApi.setStoreStatus(id, to),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["superadmin-stores"] }); setTarget(null); },
-    onError: () => setTarget(null),
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["superadmin-stores"] });
+    qc.invalidateQueries({ queryKey: ["superadmin-dashboard"] });
+  };
+  const onError = (fallback) => (err) => { setNotice({ tone: "danger", text: err?.response?.data?.message || fallback }); setDeleteTarget(null); setStatusTarget(null); };
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status: next }) => superAdminApi.setStoreStatus(id, next),
+    onSuccess: (res, vars) => { invalidate(); setStatusTarget(null); setNotice({ tone: "success", text: res?.message || (vars.status === "open" ? "Store activated." : "Store suspended.") }); },
+    onError: onError("Could not update the store status."),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id) => superAdminApi.deleteStore(id),
+    onSuccess: (res) => { invalidate(); setDeleteTarget(null); setNotice({ tone: "success", text: res?.message || "Store deleted." }); },
+    onError: onError("Could not delete the store."),
   });
 
+  const columns = [
+    { key: "store", header: "Store", cell: (s) => <EntityCell avatar={<Avatar name={s.store_name} shape="square" src={s.logo_url ? assetUrl(s.logo_url) : undefined} />} primary={s.store_name} secondary={hostOf(storefrontUrl(s)) || s.business_category || "No subdomain yet"} maxWidth={320} /> },
+    { key: "owner", header: "Owner", cell: (s) => s.owner_name ? <EntityCell avatar={<Avatar name={s.owner_name} size="sm" />} primary={s.owner_name} secondary={s.owner_email} maxWidth={260} /> : <span className="text-[var(--text-muted)]">No owner</span> },
+    { key: "created", header: "Created", className: "whitespace-nowrap", cell: (s) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(s.createdAt)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(s.createdAt)}</p></>) },
+    { key: "status", header: "Status", cell: (s) => <StatusBadge value={s.status} /> },
+    {
+      key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56,
+      cell: (s) => (
+        <DropdownMenu
+          label={`Actions for ${s.store_name}`}
+          items={[
+            { label: "Visit storefront", icon: ExternalLink, href: storefrontUrl(s), external: true, disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
+            { label: "Open admin panel", icon: LayoutDashboard, onClick: () => openStoreAdmin(s.id), disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
+            { separator: true },
+            { label: "Edit store", icon: Pencil, onClick: () => setFormStore(s) },
+            s.status === "closed"
+              ? { label: "Activate store", icon: CircleCheck, onClick: () => setStatusTarget({ ...s, next: "open" }) }
+              : { label: "Suspend store", icon: Ban, onClick: () => setStatusTarget({ ...s, next: "closed" }) },
+            { separator: true },
+            { label: "Delete store", icon: Trash2, tone: "danger", onClick: () => setDeleteTarget(s) },
+          ]}
+        />
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageHeader
-        title="Store Management"
-        description="Activate, suspend and inspect tenant stores."
-        breadcrumbs={[{ label: "Super Admin" }, { label: "Store Management" }]}
+        title="Stores"
+        description={isLoading ? "Every storefront on the platform." : `${total.toLocaleString()} storefront${total === 1 ? "" : "s"} on the platform.`}
+        actions={<Button variant="primary" icon={Plus} onClick={() => setFormStore("new")}>Add store</Button>}
       />
 
-      <div className="card flex flex-wrap items-center gap-2 p-3">
-        <div className="relative min-w-[220px] flex-1">
-          <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
-          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search store name or email..." className="h-10 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] ps-9 pe-3 text-sm outline-none focus:border-[var(--accent)]" aria-label="Search stores" />
-        </div>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className="h-10 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-sm font-semibold text-[var(--text-primary)]" aria-label="Filter by status">
-          {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-      </div>
+      {notice && <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>}
 
-      {isError && (
-        <div role="alert" className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ background: "var(--danger-soft)", color: "var(--danger-text)", borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)" }}>
-          Failed to load stores.
-        </div>
-      )}
+      <Card>
+        <Tabs label="Filter by status" value={status} onChange={(v) => { setStatus(v); setPage(1); }} items={STATUS_TABS} />
+        <CardToolbar>
+          <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search by store name or email…" label="Search stores" />
+          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
+        </CardToolbar>
+        <DataTable
+          columns={columns}
+          rows={items}
+          rowKey={(s) => s.id}
+          loading={isLoading}
+          error={isError ? { title: "Couldn't load stores", action: <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button> } : null}
+          empty={{ icon: StoreIcon, title: debounced ? "No stores match your search" : "No stores yet", description: debounced ? "Try a different store name or email." : "Approve a seller request or add a store manually.", action: !debounced && <Button size="sm" variant="primary" icon={Plus} onClick={() => setFormStore("new")}>Add store</Button> }}
+        />
+        <Pagination page={page} pages={pages} total={total} pageSize={PAGE_SIZE} onChange={setPage} itemLabel="stores" />
+      </Card>
 
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="admin-table min-w-full text-[13px]">
-            <thead>
-              <tr className="bg-[var(--bg-tertiary)] text-left">
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Store</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Owner</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Created</th>
-                <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Status</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 3 }).map((_, i) => <tr key={i} className="animate-pulse"><td colSpan={5} className="px-4 py-4"><div className="h-4 w-full rounded bg-[var(--bg-tertiary)]" /></td></tr>)
-              ) : items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center"><span className="flex flex-col items-center gap-2 text-sm text-[var(--text-muted)]"><StoreIcon size={22} aria-hidden="true" />No stores found.</span></td></tr>
-              ) : items.map((s) => (
-                <tr key={s.id} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-row-hover)]">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}><StoreIcon size={16} aria-hidden="true" /></span>
-                      <a href={s.url} className="inline-flex items-center gap-1 font-bold text-[var(--text-primary)] hover:underline" target="_blank" rel="noreferrer">{s.store_name}<ExternalLink size={12} aria-hidden="true" /></a>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3"><span className="font-semibold text-[var(--text-secondary)]">{s.owner_name}</span><br /><span className="text-[11px] text-[var(--text-muted)]">{s.owner_email}</span></td>
-                  <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(s.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3"><StatusBadge value={s.status} /></td>
-                  <td className="px-4 py-3 text-right">
-                    {s.status === "closed" ? (
-                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "activate" })} className="text-[12px] font-semibold text-[var(--success-text)] hover:underline">Activate</button>
-                    ) : (
-                      <button type="button" onClick={() => setTarget({ id: s.id, name: s.store_name, action: "suspend" })} className="text-[12px] font-semibold text-[var(--danger-text)] hover:underline">Suspend</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {pages > 1 && (
-          <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-3">
-            <span className="text-[11px] font-semibold text-[var(--text-muted)]">{page} of {pages}</span>
-            <div className="flex gap-1">
-              <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Previous page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={16} aria-hidden="true" /></button>
-              <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Next page" className="rounded-md p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={16} aria-hidden="true" /></button>
-            </div>
-          </div>
-        )}
-      </div>
+      {formStore && <StoreFormDialog store={formStore === "new" ? null : formStore} onClose={() => setFormStore(null)} onSaved={(res) => { invalidate(); setFormStore(null); setNotice({ tone: "success", text: res?.message || "Store saved." }); }} />}
 
       <ConfirmDialog
-        open={!!target}
-        title={target ? (target.action === "suspend" ? `Suspend ${target.name}?` : `Reactivate ${target.name}?`) : ""}
-        message={target ? (target.action === "suspend" ? "Seller login will be blocked and the store will be marked closed." : "Seller login will be restored and the store will be marked open.") : ""}
-        confirmLabel={target?.action === "suspend" ? "Suspend" : "Reactivate"}
-        confirmTone={target?.action === "suspend" ? "danger" : "success"}
-        loading={mutation.isPending}
-        onCancel={() => setTarget(null)}
-        onConfirm={() => mutation.mutate({ id: target.id, to: target.action === "suspend" ? "closed" : "open" })}
+        open={Boolean(statusTarget)}
+        title={statusTarget ? `${statusTarget.next === "open" ? "Activate" : "Suspend"} ${statusTarget.store_name}?` : ""}
+        message={statusTarget?.next === "open" ? "The storefront goes back online and the seller can sign in again." : "The storefront goes offline and the seller is locked out until you activate it again."}
+        confirmLabel={statusTarget?.next === "open" ? "Activate store" : "Suspend store"}
+        confirmTone={statusTarget?.next === "open" ? "success" : "danger"}
+        loading={statusMutation.isPending}
+        onCancel={() => setStatusTarget(null)}
+        onConfirm={() => statusMutation.mutate({ id: statusTarget.id, status: statusTarget.next })}
+      />
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title={deleteTarget ? `Delete ${deleteTarget.store_name}?` : ""}
+        message="This permanently removes the storefront and deactivates its linked seller accounts. This cannot be undone."
+        confirmLabel="Delete store"
+        confirmTone="danger"
+        loading={deleteMutation.isPending}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
       />
     </div>
   );

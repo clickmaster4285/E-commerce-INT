@@ -87,11 +87,16 @@ export const superAdminApi = {
 
   // Dashboard
   getDashboard: () => superAdminHttp.get("/super-admin/dashboard").then((r) => r.data),
+  // Logged-in member ki apni activity (time + description)
+  myActivity: (params = {}) => superAdminHttp.get("/super-admin/activity/me", { params }).then((r) => r.data),
 
   // Requests
   listRequests: (params = {}) =>
     superAdminHttp.get("/super-admin/requests", { params }).then((r) => r.data),
   getRequest: (id) => superAdminHttp.get(`/super-admin/requests/${id}`).then((r) => r.data),
+  updateRequest: (id, payload) =>
+    superAdminHttp.patch(`/super-admin/requests/${id}`, payload).then((r) => r.data),
+  deleteRequest: (id) => superAdminHttp.delete(`/super-admin/requests/${id}`).then((r) => r.data),
   approveRequest: (id) => superAdminHttp.post(`/super-admin/requests/${id}/approve`).then((r) => r.data),
   rejectRequest: (id, reason = "") =>
     superAdminHttp.post(`/super-admin/requests/${id}/reject`, { reason }).then((r) => r.data),
@@ -101,12 +106,33 @@ export const superAdminApi = {
   // Stores
   listStores: (params = {}) =>
     superAdminHttp.get("/super-admin/stores", { params }).then((r) => r.data),
+  createStore: (payload) => superAdminHttp.post("/super-admin/stores", payload).then((r) => r.data),
+  updateStore: (id, payload) => superAdminHttp.patch(`/super-admin/stores/${id}`, payload).then((r) => r.data),
+  deleteStore: (id) => superAdminHttp.delete(`/super-admin/stores/${id}`).then((r) => r.data),
   setStoreStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/stores/${id}/status`, { status }).then((r) => r.data),
 
   // Users
   listUsers: (params = {}) =>
     superAdminHttp.get("/super-admin/users", { params }).then((r) => r.data),
+  getUser: (id) => superAdminHttp.get(`/super-admin/users/${id}`).then((r) => r.data),
+  updateUser: (id, payload) => superAdminHttp.patch(`/super-admin/users/${id}`, payload).then((r) => r.data),
+  deleteUser: (id) => superAdminHttp.delete(`/super-admin/users/${id}`).then((r) => r.data),
+  setUserPassword: (id, password) => superAdminHttp.post(`/super-admin/users/${id}/password`, { password }).then((r) => r.data),
+  // One-time sign-in link into a store's admin panel (as the store owner)
+  openStoreAdmin: (storeId) => superAdminHttp.post(`/super-admin/stores/${storeId}/admin-access`).then((r) => r.data),
   setUserStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
+
+  // Team (super admin + staff accounts) — super admin only
+  listTeam: () => superAdminHttp.get("/super-admin/team").then((r) => r.data),
+  getTeamMember: (id) => superAdminHttp.get(`/super-admin/team/${id}`).then((r) => r.data),
+  teamMemberActivity: (id, params = {}) => superAdminHttp.get(`/super-admin/team/${id}/activity`, { params }).then((r) => r.data),
+  createTeamMember: (payload) => superAdminHttp.post("/super-admin/team", payload).then((r) => r.data),
+  updateTeamMember: (id, payload) => superAdminHttp.patch(`/super-admin/team/${id}`, payload).then((r) => r.data),
+  setTeamMemberStatus: (id, status) =>
+    superAdminHttp.patch(`/super-admin/team/${id}/status`, { status }).then((r) => r.data),
+  resetTeamMemberPassword: (id, password) =>
+    superAdminHttp.post(`/super-admin/team/${id}/password`, { password }).then((r) => r.data),
+  deleteTeamMember: (id) => superAdminHttp.delete(`/super-admin/team/${id}`).then((r) => r.data),
 };

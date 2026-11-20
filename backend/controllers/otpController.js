@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Otp = require("../models/Otp");
@@ -8,6 +9,7 @@ const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const SellerApplication = require("../models/SellerApplication");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
@@ -471,7 +473,8 @@ const verifyEmailVerificationOtp = async (req, res) => {
         store_id: isSeller ? store._id : null,
       });
 
-      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable)
+      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable).
+      // Store owner = "admin" role (full panel access); read-only is enforced by seller_pending, not role.
       let employee = null;
       if (isSeller) {
         employee = await Employee.create({
@@ -480,7 +483,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
           email: pending.email,
           phone: pending.phone || "",
           password: pending.passwordHash,
-          role: "staff",
+          role: OWNER_ROLE,
           status: "active",
           storeId: store._id,
           seller_pending: true,
@@ -495,7 +498,12 @@ const verifyEmailVerificationOtp = async (req, res) => {
       const storeName = isSeller ? pending.storeName : ((application.store_name) || "Your store");
       // Best-effort — failure must not block signup
       try {
-        await sendApplicationReceivedEmail({ name: pending.name, email: pending.email, storeName });
+        await sendApplicationReceivedEmail({
+          name: pending.name,
+          email: pending.email,
+          storeName,
+          adminUrl: storeAdminBaseUrl(store), // store null ho to null → generic link
+        });
       } catch (emailError) {
         console.error("[signup] pending-approval email failed:", emailError.message);
       }

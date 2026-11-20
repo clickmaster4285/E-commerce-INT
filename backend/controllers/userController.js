@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
@@ -19,6 +20,7 @@ const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
+const { suggestUsernames, uniqueUsername } = require("../utils/username");
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -119,6 +121,60 @@ const clearAuthCookies = (res) => {
 // ==========================================
 // REGISTER (Customer only)
 // ==========================================
+// Public — signup Step 1 ke liye: email / username / phone pehle se liye hue to hain nahi?
+// Rules bilkul createUser wale hain (verified User, pending seller, PendingRegistration clashes)
+// taake user ko aakhri step ke bajaye pehle step par hi pata chal jaye.
+const checkRegistration = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const cleanUsername = String(req.body?.username || "").trim().toLowerCase();
+    const cleanPhone = normalizePhone(typeof req.body?.phone === "string" ? req.body.phone : "");
+    const errors = {};
+    let code;
+
+    if (email && isValidEmail(email)) {
+      const existingUser = await User.findOne({ email }).select("status emailVerified").lean();
+      if (existingUser && existingUser.emailVerified !== false) {
+        const pendingApp =
+          existingUser.status === "blocked"
+            ? await SellerApplication.findOne({ email, status: "pending" }).select("_id").lean()
+            : null;
+        if (pendingApp) {
+          code = "SELLER_PENDING";
+          errors.email = "An application for this email is already under review. Sign in to continue where you left off.";
+        } else {
+          errors.email = "This email is already registered";
+        }
+      }
+    }
+
+    if (cleanUsername) {
+      const clash =
+        (await User.findOne({ username: cleanUsername }).select("_id").lean()) ||
+        (await PendingRegistration.findOne({ username: cleanUsername, email: { $ne: email } }).select("_id").lean());
+      if (clash) errors.username = "This username is already taken";
+    }
+
+    if (cleanPhone) {
+      const clash =
+        (await User.findOne({ phone: cleanPhone }).select("_id").lean()) ||
+        (await PendingRegistration.findOne({ phone: cleanPhone, email: { $ne: email } }).select("_id").lean());
+      if (clash) errors.phone = "This phone number is already registered";
+    }
+
+    // Username taken ho, ya khali ho aur naam mil gaya ho → naam se professional suggestions
+    const name = String(req.body?.name || "").trim();
+    const suggestions = errors.username || (!cleanUsername && name.length >= 2)
+      ? await suggestUsernames(name, email, { excludeEmail: email })
+      : [];
+
+    return res.json({ success: true, available: Object.keys(errors).length === 0, errors, suggestions, ...(code ? { code } : {}) });
+  } catch (error) {
+    log.error("[register/check] error:", error.message);
+    return res.status(500).json({ success: false, message: "Could not check availability. Please try again." });
+  }
+};
+
 const createUser = async (req, res) => {
   try {
     const { name, username, phone, email: rawEmail, password } = req.body;
@@ -165,7 +221,7 @@ const createUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Registration failed", errors });
     if (wantsStore) {
       if (!storeName || storeName.length < 1) errors.storeName = "Please enter your store name.";
-      if (!storeDescription || storeDescription.length < 10) errors.storeDescription = "Please describe your store (at least 10 characters).";
+      if (!storeDescription) errors.storeDescription = "Please describe your store.";
       if (!businessCategory) errors.businessCategory = "Please select a business category.";
       if (!country) errors.country = "Please select a country.";
       if (!city || city.trim().length < 2) errors.city = "Please enter your city.";
@@ -174,7 +230,8 @@ const createUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Registration failed", errors });
     }
 
-    const finalUsername = cleanUsername || email.split("@")[0] + Math.floor(Math.random() * 9999);
+    // Username khali ho to naam se professional username (hamza.asif), email-prefix+random nahi
+    const finalUsername = cleanUsername || (await uniqueUsername(cleanName, email, { excludeEmail: email }));
 
     // ✅ Verified User ka email dobara register nahi ho sakta
     // (purane users me emailVerified undefined hota hai — unhe verified maana jata hai)
@@ -198,7 +255,7 @@ const createUser = async (req, res) => {
                 email,
                 phone: existingUser.phone || "",
                 password: existingUser.password, // already bcrypt-hashed
-                role: "staff",
+                role: OWNER_ROLE, // store owner
                 status: "active",
                 storeId: pendingApp.store_id || null,
                 seller_pending: true,
@@ -505,7 +562,7 @@ const loginAdmin = async (req, res) => {
       return res
         .status(401)
         .json({ success: false, message: "Password incorrect" });
-    if (!["admin", "staff", "manager"].includes(employee.role))
+    if (!isStaffRole(employee.role))
       return res
         .status(403)
         .json({
@@ -602,7 +659,7 @@ const refreshAdminAccessToken = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Refresh token required" });
     decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const adminRoles = ["admin", "staff", "manager"];
+    const adminRoles = STAFF_ROLES;
     // Older admin sessions did not always include the `type` claim. Their
     // signed role and matching Employee record let us safely migrate them.
     if (decoded.type && decoded.type !== "employee") {
@@ -618,7 +675,7 @@ const refreshAdminAccessToken = async (req, res) => {
         .json({ success: false, message: "Invalid refresh token" });
     }
     const user = await Employee.findById(decoded.userId);
-    if (!user || user.is_deleted || user.status === "inactive" || !["admin", "staff", "manager"].includes(user.role)) {
+    if (!user || user.is_deleted || user.status === "inactive" || !isStaffRole(user.role)) {
       clearAuthCookies(res);
       return res
         .status(401)
@@ -770,7 +827,7 @@ const updateProfile = async (req, res) => {
     await Model.findByIdAndUpdate(userId, update);
     // ✅ Store fields sirf 'store' permission par (admin bypass)
     const canEditStoreHere =
-      String(req.user?.role || "").toLowerCase() === "admin" ||
+      isAdminRole(req.user?.role) ||
       !!req.user?.permissions?.store;
     if (store && req.user.storeId && canEditStoreHere) {
       await Store.findByIdAndUpdate(req.user.storeId, {
@@ -921,7 +978,7 @@ const updateProfileInfo = async (req, res) => {
     // Socket path par req.user.permissions stale ho sakte hain — fresh load karo.
     let requesterRole = req.user?.role || "";
     let requesterStorePerm = req.user?.permissions?.store;
-    if (String(requesterRole).toLowerCase() !== "admin" && requesterStorePerm === undefined) {
+    if (!isAdminRole(requesterRole) && requesterStorePerm === undefined) {
       try {
         const reqDoc = await Model.findById(userId).select("role permissions").lean();
         if (reqDoc) {
@@ -931,7 +988,7 @@ const updateProfileInfo = async (req, res) => {
       } catch (e) { /* ignore — neeche deny hoga */ }
     }
     const canEditStore =
-      String(requesterRole).toLowerCase() === "admin" || !!requesterStorePerm;
+      isAdminRole(requesterRole) || !!requesterStorePerm;
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
     if (email !== undefined)
@@ -1059,7 +1116,7 @@ const googleLogin = async (req, res) => {
     }
 
     // ✅ EXISTING USER ROLE CHECK
-    if (!["admin", "staff", "manager"].includes(user.role)) {
+    if (!isStaffRole(user.role)) {
       return res.status(403).json({
         success: false,
         message: "Access denied. Only administrators, managers and staff members can log in.",
@@ -1144,7 +1201,7 @@ const googleCustomerLogin = async (req, res) => {
       const defaultStore = await Store.findOne();
       user = await User.create({
         name: name || email.split("@")[0],
-        username: email.split("@")[0] + Math.floor(Math.random() * 99999),
+        username: await uniqueUsername(name || email.split("@")[0], email),
         email,
         password: randomPassword,
         role: "user",
@@ -1599,17 +1656,10 @@ const changePasswordREST = async (req, res) => {
 // nahi hota. Platform par ek 2-minute, ek-baar wala token banta hai; store
 // subdomain ka /admin/handoff page usay exchange karke wahan cookies set karta hai.
 // ==========================================
-const { ROOT_DOMAIN } = require("../utils/tenantHost");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 
 const HANDOFF_TTL_SECONDS = 120;
 const usedHandoffIds = new Map(); // jti → expiresAt (single-use; production me Redis behtar)
-
-const storeAdminBaseUrl = (store) => {
-  const protocol = process.env.PUBLIC_STORE_PROTOCOL || (process.env.NODE_ENV === "production" ? "https" : "http");
-  const port = String(process.env.PUBLIC_STORE_PORT || "").trim();
-  if (!store?.subdomain || !ROOT_DOMAIN) return null;
-  return `${protocol}://${store.subdomain}.${ROOT_DOMAIN}${port ? `:${port}` : ""}`;
-};
 
 // @route POST /api/users/admin/handoff   (logged-in employee, platform host)
 const createStoreHandoff = async (req, res) => {
@@ -1675,6 +1725,7 @@ const exchangeStoreHandoff = async (req, res) => {
 module.exports = {
   createStoreHandoff,
   exchangeStoreHandoff,
+  checkRegistration,
   createUser,
   loginUser,
   loginAdmin,

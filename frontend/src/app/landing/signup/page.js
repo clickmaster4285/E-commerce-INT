@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoreAdminUrl } from "@/apis/storeHandoff";
+import SearchCombobox from "@/components/common/SearchCombobox";
+import { BUSINESS_CATEGORIES } from "@/lib/storeOptions";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -17,7 +19,6 @@ import {
   AlertCircle,
   ArrowRight,
   ArrowLeft,
-  Truck,
   Store,
   ShoppingBag,
   ShoppingCart,
@@ -27,6 +28,14 @@ import {
   Globe,
   MapPin,
   Building,
+  ChevronDown,
+  ImagePlus,
+  Trash2,
+  RefreshCw,
+  Hash,
+  UserRound,
+  BadgeCheck,
+  LayoutDashboard,
 } from "lucide-react";
 import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
 import { isValidPhone, normalizePhone, PHONE_MIN, PHONE_MAX } from "@/utils/phoneValidator";
@@ -38,6 +47,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL;
 
 function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
   const logoUrl = store?.logo?.img_url
@@ -59,44 +69,6 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 /* Mirrors the backend register rules exactly:
    name required + ≥2, username optional ≥3 and letters/numbers/underscores only,
    phone optional 10–16 digits, email valid, password ≥6 */
-const BUSINESS_CATEGORIES = [
-  "Electronics",
-  "Fashion & Apparel",
-  "Home & Kitchen",
-  "Beauty & Personal Care",
-  "Sports & Outdoors",
-  "Grocery & Food",
-  "Baby & Kids",
-  "Automotive",
-  "Health & Wellness",
-  "Books & Stationery",
-  "Services",
-  "Other",
-];
-
-const COUNTRIES = [
-  "Pakistan",
-  "India",
-  "Bangladesh",
-  "Sri Lanka",
-  "United Arab Emirates",
-  "Saudi Arabia",
-  "Qatar",
-  "Oman",
-  "Kuwait",
-  "Bahrain",
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Germany",
-  "France",
-  "Australia",
-  "Turkey",
-  "Malaysia",
-  "Singapore",
-  "Egypt",
-];
-
 const scorePassword = (pw) => {
   if (!pw) return 0;
   let s = 0;
@@ -107,11 +79,166 @@ const scorePassword = (pw) => {
   return Math.min(4, s);
 };
 
+/* ═══════════ SHARED DESIGN SYSTEM (dono steps same tokens use karte hain) ═══════════ */
+const INPUT_BASE =
+  "w-full h-12 rounded-xl border bg-white pl-11 pr-4 text-[14px] text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-150 disabled:cursor-not-allowed disabled:bg-slate-50";
+const inputState = (hasError) =>
+  hasError
+    ? "border-red-300 bg-red-50/40 focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
+    : "border-slate-200 hover:border-slate-300 focus:border-[#f57224] focus:ring-4 focus:ring-[#f57224]/15";
+
+const PRIMARY_BTN =
+  "inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#f57224] px-5 text-[14.5px] font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.08),0_10px_24px_-8px_rgba(245,114,36,0.6)] transition hover:bg-[#e8651a] active:translate-y-px focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/30 disabled:cursor-not-allowed disabled:bg-[#f57224]/55 disabled:shadow-none disabled:active:translate-y-0";
+const SECONDARY_BTN =
+  "inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
+
+/* Field wrapper — label, icon, hint, error ek jaisi spacing ke saath.
+   Component bahar define hai taake re-render par input focus na khoye. */
+function Field({ id, label, optional, hint, error, icon: Icon, iconTop = false, counter, trailing, below, children }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <label htmlFor={id} className="text-[12.5px] font-semibold text-slate-700">
+          {label}
+          {optional && <span className="ml-1 font-normal text-slate-400">(optional)</span>}
+        </label>
+        {counter}
+      </div>
+      <div className="group relative">
+        {Icon && (
+          <Icon
+            size={16}
+            aria-hidden="true"
+            className={`pointer-events-none absolute left-3.5 z-[1] transition-colors ${
+              iconTop ? "top-[15px]" : "top-1/2 -translate-y-1/2"
+            } ${error ? "text-red-400" : "text-slate-400 group-focus-within:text-[#f57224]"}`}
+          />
+        )}
+        {children}
+        {trailing}
+      </div>
+      {below}
+      {error ? (
+        <p id={`${id}-error`} role="alert" data-tone="error" className="flex pt-1.5 items-start gap-1.5 text-[12px] font-medium leading-4 text-red-600">
+          <AlertCircle size={13} className="mt-px shrink-0" aria-hidden="true" />
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={`${id}-hint`} className="pt-1.5 text-[11.5px] leading-4 text-slate-500">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+const fieldA11y = (id, error, hasHint = false) => ({
+  id,
+  "aria-invalid": error ? "true" : undefined,
+  "aria-describedby": error ? `${id}-error` : hasHint ? `${id}-hint` : undefined,
+});
+
+function SectionHeading({ icon: Icon, title, description }) {
+  return (
+    /* Compact heading — group saaf dikhe lekin vertical jagah kam le */
+    <div className="mb-3 flex items-center gap-2.5">
+      <span data-tone="accent" aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f57224]/10 text-[#f57224]">
+        <Icon size={15} strokeWidth={2} />
+      </span>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+        <h3 className="text-[14px] font-semibold leading-5 text-slate-900">{title}</h3>
+        <p className="text-[11.5px] leading-4 text-slate-400">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+/* Connected stepper — ek compact row (node + label, beech me connector).
+   done / active / upcoming teeno states alag dikhte hain; dono steps par same. */
+const SIGNUP_STEPS = [
+  { label: "Account", sub: "Login details", icon: UserRound },
+  { label: "Store", sub: "Business info", icon: Store },
+  { label: "Location", sub: "& branding", icon: MapPin },
+];
+
+function SignupStepper({ currentIndex }) {
+  const total = SIGNUP_STEPS.length;
+  const renderStep = (s, i) => {
+    const status = i < currentIndex ? "done" : i === currentIndex ? "active" : "upcoming";
+    const Icon = s.icon;
+    return (
+      <li key={s.label} aria-current={status === "active" ? "step" : undefined} className="flex shrink-0 items-center gap-2">
+        <span
+          data-tone="accent"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
+            status === "done"
+              ? "bg-[#f57224] text-white shadow-[0_6px_14px_-4px_rgba(245,114,36,0.6)]"
+              : status === "active"
+                ? "border-2 border-[#f57224] bg-white text-[#f57224] shadow-[0_0_0_4px_rgba(245,114,36,0.14)]"
+                : "border-2 border-slate-200 bg-slate-50 text-slate-400"
+          }`}
+        >
+          {status === "done" ? <Check size={17} strokeWidth={3} aria-hidden="true" /> : <Icon size={16} aria-hidden="true" />}
+        </span>
+        {/* Mobile par sirf active step ka text — baaki sirf icon (tang jagah) */}
+        <span className={`min-w-0 flex-col ${status === "active" ? "flex" : "hidden sm:flex"}`}>
+          <span data-tone="accent" className={`truncate text-[13px] font-semibold leading-4 ${status === "upcoming" ? "text-slate-400" : "text-slate-900"}`}>
+            {s.label}
+          </span>
+          <span
+            data-tone="accent"
+            className={`truncate pt-0.5 text-[11px] font-medium leading-4 ${
+              status === "done" ? "text-emerald-600" : status === "active" ? "text-[#e2641b]" : "text-slate-400"
+            }`}
+          >
+            {status === "done" ? "Completed" : status === "active" ? `Step ${i + 1} of ${total}` : s.sub}
+          </span>
+        </span>
+        <span className="sr-only">{status === "done" ? "(completed)" : status === "active" ? "(current step)" : "(upcoming)"}</span>
+      </li>
+    );
+  };
+  return (
+    <nav aria-label="Signup progress" className="mt-5 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 sm:px-4">
+      <ol className="flex items-center gap-2 sm:gap-2.5">
+        {SIGNUP_STEPS.map((s, i) => [
+          i > 0 && (
+            <li key={`c${i}`} aria-hidden="true" className="relative h-[3px] min-w-4 flex-1 overflow-hidden rounded-full bg-slate-200">
+              <span
+                data-tone="accent"
+                className="absolute inset-y-0 left-0 rounded-full bg-[#f57224] transition-[width] duration-500 ease-out"
+                style={{ width: currentIndex >= i ? "100%" : "0%" }}
+              />
+            </li>
+          ),
+          renderStep(s, i),
+        ])}
+      </ol>
+    </nav>
+  );
+}
+
+function BrandMark({ size = "lg" }) {
+  const big = size === "lg";
+  return (
+    <div className="flex items-center gap-3">
+      <span
+        aria-hidden="true"
+        className={`flex items-center justify-center rounded-xl bg-[#f57224] shadow-[0_8px_20px_-4px_rgba(245,114,36,0.55)] ${big ? "h-11 w-11" : "h-9 w-9"}`}
+      >
+        <ShoppingBag size={big ? 22 : 18} strokeWidth={2.25} className="text-white" />
+      </span>
+      <span className="text-left leading-tight">
+        <span className={`block font-bold tracking-tight ${big ? "text-[20px] text-white" : "text-[16px] text-slate-900"}`}>ClickMaster</span>
+        <span data-tone="accent" className={`block font-bold uppercase tracking-[0.22em] text-[#f57224] ${big ? "text-[10px]" : "text-[9px]"}`}>Marketplace</span>
+      </span>
+    </div>
+  );
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const [step, setStep] = useState("account"); // account | store | otp | welcome
+  const [step, setStep] = useState("account"); // account | store | location | otp | welcome
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -121,6 +248,9 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false); // step 1 → server par email/username/phone availability
+  const [emailPending, setEmailPending] = useState(false); // email ki application already under review
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]); // naam se professional usernames (server se)
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState("");
   const [otpEmail, setOtpEmail] = useState("");
@@ -134,19 +264,49 @@ export default function SignupPage() {
   const [zipCode, setZipCode] = useState("");
   const [storeLogo, setStoreLogo] = useState("");
 
-  const inputBase =
-    "w-full h-11 rounded-xl bg-[#f5f5f6] border pl-11 text-[14px] text-slate-900 placeholder:text-slate-400 outline-none transition";
-  const fieldCls = (field, withToggle = false) =>
-    `${inputBase} ${withToggle ? "pr-10" : "pr-4"} ${
-      errors[field]
-        ? "border-red-400 focus:border-red-400 focus:ring-2 focus:ring-red-100"
-        : "border-[#e5e5e7] focus:border-[#f57224] focus:ring-2 focus:ring-[#f57224]/15"
-    }`;
+  const [logoBusy, setLogoBusy] = useState(false);
 
-  const pickLogo = async (e) => {
-    const file = e.target.files?.[0] || null;
+  /* Desktop par window scroll nahi hota — step badalne par right panel ko top par le jao */
+  const formPanelRef = useRef(null);
+  useEffect(() => {
+    formPanelRef.current?.scrollTo?.({ top: 0 });
+  }, [step]);
+  const [logoDragActive, setLogoDragActive] = useState(false);
+
+  /* Countries + cities dono country-state-city library se. Library sirf Location step
+     par ek baar lazy load hoti hai (~8MB city data signup ke initial bundle me nahi aata). */
+  const [geo, setGeo] = useState(null); // { Country, City } | { failed: true }
+  useEffect(() => {
+    if (step !== "location" || geo) return undefined;
+    let cancelled = false;
+    import("country-state-city")
+      .then(({ Country, City }) => { if (!cancelled) setGeo({ Country, City }); })
+      .catch(() => { if (!cancelled) setGeo({ failed: true }); }); // fail ho to free text chalta rahe
+    return () => { cancelled = true; };
+  }, [step, geo]);
+
+  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []), [geo]);
+  // Load hone tak selected country hi option rahe (select khali na dikhe).
+  // Flag emoji nahi — Windows Chrome unhe "PK" jaise letters me dikhata hai.
+  const countryOptions = useMemo(
+    () => (allCountries.length ? allCountries.map((c) => c.name) : [country]),
+    [allCountries, country]
+  );
+  const cityOptions = useMemo(() => {
+    if (!geo?.City) return [];
+    const match = allCountries.find((c) => c.name === country);
+    const list = match ? geo.City.getCitiesOfCountry(match.isoCode) || [] : [];
+    // Library me ek naam kai states me repeat hota hai — unique + A–Z
+    return [...new Set(list.map((c) => c.name))].sort((a, b) => a.localeCompare(b));
+  }, [geo, allCountries, country]);
+  const citiesLoading = step === "location" && !geo;
+
+  const fieldCls = (field, withToggle = false) =>
+    `${INPUT_BASE} ${withToggle ? "!pr-11" : ""} ${inputState(!!errors[field])}`;
+
+  /* File input aur drag-and-drop dono isi validation se guzarte hain */
+  const processLogo = async (file) => {
     if (!file) return;
-    e.target.value = "";
     if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
       toast.error("Logo must be a JPG, PNG or WEBP image.");
       return;
@@ -155,22 +315,28 @@ export default function SignupPage() {
       toast.error("Image is too large — please pick one under 15MB.");
       return;
     }
+    setLogoBusy(true);
     try {
       const compressed = await compressImage(file, { maxSize: 512, quality: 0.82 });
       setStoreLogo(compressed);
     } catch {
       toast.error("Logo could not be processed. Please try another image.");
+    } finally {
+      setLogoBusy(false);
     }
   };
 
-  const renderFieldError = (field) => {
-    if (!errors[field]) return null;
-    return (
-      <div className="flex items-center gap-1.5 mt-1 px-1">
-        <AlertCircle size={12} className="text-red-500 shrink-0" />
-        <p className="text-[0.6875rem] font-semibold text-red-600">{errors[field]}</p>
-      </div>
-    );
+  const pickLogo = async (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    e.target.value = "";
+    await processLogo(file);
+  };
+
+  const onLogoDrop = (e) => {
+    e.preventDefault();
+    setLogoDragActive(false);
+    processLogo(e.dataTransfer?.files?.[0] || null);
   };
 
   /* Backend field errors ko form par map karo (email/password/name/username/phone) */
@@ -195,6 +361,7 @@ export default function SignupPage() {
     }
     setErrors((prev) => ({ ...prev, ...nextErrors }));
     setGeneralError(Object.keys(nextErrors).length === 0 && message ? message : "");
+    goToErrorStep(nextErrors);
   };
 
   const validateAccount = () => {
@@ -216,24 +383,84 @@ export default function SignupPage() {
     return next;
   };
 
-  const validateStore = () => {
+  /* Store info ab do wizard steps me hai — rules bilkul wahi, sirf split kiye hain */
+  const validateStoreDetails = () => {
     const next = {};
     if (!storeName.trim()) next.storeName = "Please enter your store name.";
-    if (!storeDescription.trim() || storeDescription.trim().length < 10) next.storeDescription = "Please describe your store (at least 10 characters).";
+    if (!storeDescription.trim()) next.storeDescription = "Please describe your store.";
     if (!businessCategory) next.businessCategory = "Please select a business category.";
+    return next;
+  };
+
+  const validateLocation = () => {
+    const next = {};
     if (!country) next.country = "Please select a country.";
     if (!city.trim() || city.trim().length < 2) next.city = "Please enter your city.";
     if (!address.trim() || address.trim().length < 5) next.address = "Please enter a complete store address.";
     return next;
   };
 
+  const validateStore = () => ({ ...validateStoreDetails(), ...validateLocation() });
+
   const validate = () => ({ ...validateAccount(), ...validateStore() });
 
-  const handleNext = () => {
+  /* Error wale field ka step kholo (account errors ke liye banner already hai) */
+  const STORE_DETAIL_FIELDS = ["storeName", "storeDescription", "businessCategory"];
+  const ACCOUNT_FIELD_KEYS = ["name", "username", "phone", "email", "password", "confirmPassword"];
+  const goToErrorStep = (errs) => {
+    if (ACCOUNT_FIELD_KEYS.some((k) => errs[k])) return; // banner "Go to account step" dikhata hai
+    if (STORE_DETAIL_FIELDS.some((k) => errs[k])) setStep("store");
+  };
+
+  const handleStoreNext = () => {
+    const nextErrors = validateStoreDetails();
+    setErrors(nextErrors);
+    setGeneralError("");
+    if (Object.keys(nextErrors).length > 0) return;
+    setErrors({});
+    setStep("location");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+  };
+
+  /* Server se poochho: email / username / phone pehle se registered to nahi?
+     Network fail ho to block nahi karte — final submit waise bhi dobara check karta hai. */
+  const checkAvailability = async (fields) => {
+    try {
+      const res = await authApi.checkRegistration(fields);
+      const found = res?.errors || {};
+      setEmailPending(res?.code === "SELLER_PENDING");
+      if (Array.isArray(res?.suggestions) && res.suggestions.length) setUsernameSuggestions(res.suggestions);
+      if (Object.keys(found).length) setErrors((p) => ({ ...p, ...found }));
+      return found;
+    } catch {
+      return {};
+    }
+  };
+
+  const checkFieldOnBlur = (field, value) => {
+    const clean = String(value || "").trim();
+    if (!clean || errors[field]) return;
+    if (field === "email" && !isValidEmail(clean)) return;
+    if (field === "username" && !/^[A-Za-z0-9_]{3,30}$/.test(clean)) return;
+    checkAvailability({ [field]: clean });
+  };
+
+  // Username khali ho aur naam likha ho → naam se suggestions (hamza.asif …) dikhao
+  const loadUsernameSuggestions = () => {
+    if (username.trim() || name.trim().length < 2 || usernameSuggestions.length) return;
+    checkAvailability({ name: name.trim(), username: "", ...(isValidEmail(email) ? { email: email.trim().toLowerCase() } : {}) });
+  };
+
+  const handleNext = async () => {
     const nextErrors = validateAccount();
     setErrors(nextErrors);
     setGeneralError("");
     if (Object.keys(nextErrors).length > 0) return;
+    // Step 1 se aage tabhi jab server bhi keh de ke email/username/phone free hain
+    setChecking(true);
+    const taken = await checkAvailability({ name: name.trim(), email: email.trim().toLowerCase(), username: username.trim(), phone });
+    setChecking(false);
+    if (Object.keys(taken).length > 0) return;
     setErrors({});
     setStep("store");
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
@@ -244,7 +471,10 @@ export default function SignupPage() {
     const nextErrors = validate();
     setErrors(nextErrors);
     setGeneralError("");
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      goToErrorStep(nextErrors);
+      return;
+    }
     setLoading(true);
     try {
       const res = await authApi.register({
@@ -300,7 +530,9 @@ export default function SignupPage() {
         return;
       }
       parseBackendError(err);
-      toast.error(getApiErrorMessage(err, t("auth.login.registrationFailed")));
+      // Generic "Registration failed" ke bajaye asli field error dikhao (e.g. "This email is already registered")
+      const firstFieldError = Object.values(err?.response?.data?.errors || {}).find((m) => typeof m === "string" && m.trim());
+      toast.error(firstFieldError || getApiErrorMessage(err, t("auth.login.registrationFailed")));
       setLoading(false);
     }
   };
@@ -497,152 +729,165 @@ export default function SignupPage() {
   const strengthColors = ["", "bg-red-400", "bg-amber-400", "bg-lime-400", "bg-emerald-500"];
 
   /* ═══════════ SIGNUP PAGE ═══════════ */
+  const isWizardStep = step === "account" || step === "store" || step === "location";
+  const stepIndex = step === "account" ? 0 : step === "store" ? 1 : 2;
+  const accountHasErrors = (step === "store" || step === "location") && ACCOUNT_FIELD_KEYS.some((k) => errors[k]);
+
+  const HEADERS = {
+    account: { title: "Create your seller account", subtitle: "Start selling on ClickMaster in three quick steps." },
+    store: { title: "Tell us about your store", subtitle: "Your store name and what you sell. You can edit these later." },
+    location: { title: "Location & branding", subtitle: "Where you operate and how your store looks. The logo is optional." },
+    otp: { title: "Verify your email", subtitle: "Enter the code we sent to finish creating your account." },
+  };
+  const header = HEADERS[step] || HEADERS.account;
+
   return (
-    <main className="user-theme signup-reference-page flex min-h-[100dvh] bg-[#f4f4f6]">
-      {/* ═══════════ LEFT — HERO ARTWORK + OVERLAY ═══════════ */}
-      <div className="relative hidden shrink-0 overflow-hidden lg:flex lg:flex-col lg:w-[44%] xl:w-[48%] p-6 xl:p-10">
+    /* Desktop (lg+): main exactly viewport height — window scroll nahi hota,
+       sirf right panel apne andar scroll karta hai. Mobile/tablet: natural page scroll. */
+    <main className="user-theme signup-reference-page flex min-h-dvh bg-white lg:h-dvh lg:min-h-0">
+      {/* ═══════════ LEFT — NAVY BRAND PANEL (lg+, stationary) ═══════════ */}
+      <div className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[44%] xl:w-[48%] 2xl:w-1/2">
+        {/* Background layers: navy gradient + orange glow + faded artwork + dot grid */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url(/landing/fulfillment-hub.png)", backgroundColor: "#050a14" }}
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(155deg, #0d1834 0%, #0a1229 55%, #070d1f 100%)" }}
         />
-        {/* Readability overlay — strong contrast on the left, artwork visible right */}
-        <div aria-hidden="true" className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(5,10,25,0.85) 0%, rgba(5,10,25,0.45) 55%, transparent 100%)" }} />
+        <div
+          aria-hidden="true"
+          className="absolute -right-32 -top-32 h-[520px] w-[520px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(245,114,36,0.20) 0%, transparent 62%)" }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-40 -left-24 h-[480px] w-[480px] rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(59,91,219,0.16) 0%, transparent 65%)" }}
+        />
+        {/* Warehouse artwork — sirf neeche-daayen halki texture, text ke peeche nahi */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
+          style={{
+            backgroundImage: "url(/landing/fulfillment-hub.png)",
+            maskImage: "linear-gradient(to top left, black 0%, transparent 60%)",
+            WebkitMaskImage: "linear-gradient(to top left, black 0%, transparent 60%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+            maskImage: "linear-gradient(to bottom, black 0%, transparent 85%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 0%, transparent 85%)",
+          }}
+        />
 
-        {/* Content overlay — not clickable */}
-        <div className="relative flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f57224] shadow-[0_6px_16px_rgba(245,114,36,0.4)]"
-          >
-            <ShoppingBag size={22} strokeWidth={2.25} className="text-white" />
-          </span>
-          <span className="text-left leading-tight" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
-            <span className="block text-[22px] font-bold tracking-tight text-white">
-              ClickMaster
-            </span>
-            <span className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#ff9a4d]">
-              Marketplace
-            </span>
-          </span>
-        </div>
+        {/* Simple: logo top · message center · footer bottom */}
+        <div className="relative flex min-h-0 w-full flex-col px-10 py-10 xl:px-14 xl:py-12 [@media(max-height:700px)]:py-7">
+          <BrandMark />
 
-        <div className="relative mt-8 max-w-[420px]">
-          <h1
-            className="block font-extrabold text-white"
-            style={{
-              fontSize: "clamp(28px, 3vw, 44px)",
-              lineHeight: 1.1,
-              letterSpacing: "-0.02em",
-              textShadow: "0 2px 20px rgba(0,0,0,0.35)",
-            }}
-          >
-            <span className="block min-[640px]:whitespace-nowrap">One marketplace.</span>
-            <span
-              className="block min-[640px]:whitespace-nowrap bg-gradient-to-r from-[#ff9a4d] to-[#f57224] bg-clip-text text-transparent"
-              style={{ textShadow: "none" }}
-            >
-              Endless possibilities.
-            </span>
-          </h1>
-          <p
-            className="mt-3 max-w-[420px] leading-[1.55] text-white/80"
-            style={{
-              fontSize: "clamp(14px, 1.1vw, 16px)",
-              textShadow: "0 2px 16px rgba(0,0,0,0.45)",
-            }}
-          >
-            Discover products, build your store, and grow with confidence.
-          </p>
+          <div className="my-auto w-full max-w-[440px] py-8">
+            <h1 className="text-[clamp(30px,2.6vw,40px)] font-bold leading-[1.15] tracking-[-0.02em] text-white">
+              Launch your store.
+              <span className="block text-[#ff9a4d]">Grow with confidence.</span>
+            </h1>
+            <p className="pt-4 text-[15px] leading-[1.65] text-slate-300">
+              Create your seller account and manage your storefront, orders and POS from one dashboard.
+            </p>
 
-          <ul className="mt-6 flex flex-col items-start gap-2.5">
-            {[
-              { icon: ShieldCheck, label: "Secure shopping" },
-              { icon: Store, label: "Seller tools" },
-              { icon: Truck, label: "Reliable delivery" },
-            ].map(({ icon: Icon, label }) => (
-              <li
-                key={label}
-                className="flex items-center gap-2.5 whitespace-nowrap py-1"
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[#f57224]/15 text-[#ff9a4d]"
-                >
-                  <Icon size={16} strokeWidth={2} />
-                </span>
-                <span className="whitespace-nowrap text-[13px] font-medium tracking-[0.01em] text-white/90">{label}</span>
-              </li>
-            ))}
-          </ul>
+            <ul className="mt-9 space-y-5 [@media(max-height:700px)]:mt-7 [@media(max-height:700px)]:space-y-4">
+              {[
+                { icon: Store, text: "Your own branded storefront" },
+                { icon: LayoutDashboard, text: "Admin panel and POS in one place" },
+                { icon: ShieldCheck, text: "Secure, verified seller accounts" },
+              ].map(({ icon: Icon, text }) => (
+                <li key={text} className="flex items-center gap-3.5">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-[#ff9a4d]"
+                  >
+                    <Icon size={17} />
+                  </span>
+                  <span className="text-[14.5px] font-medium text-slate-200">{text}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="text-[12px] text-slate-500">© {new Date().getFullYear()} ClickMaster Marketplace</p>
         </div>
       </div>
 
-      {/* ═══════════ RIGHT — FORM CARD ═══════════ */}
-      <div className="flex flex-1 items-center justify-center px-4 py-6 sm:px-6">
-        <div className="w-full max-w-[440px] rounded-2xl border border-black/5 bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.16)] sm:p-6">
-          {/* Mobile logo */}
-          <div className="mb-4 flex lg:hidden items-center gap-2" aria-label="Click Master">
-            <span
-              aria-hidden="true"
-              className="flex h-8 w-8 items-center justify-center rounded-md bg-[#f57224]"
+      {/* ═══════════ RIGHT — FORM ═══════════ */}
+      {/* Desktop par yahi independent scroll container hai. justify-center ki jagah
+          auto margins (mt-auto / mb-auto) — content lamba ho to top clip nahi hota. */}
+      {/* "Full panel" layout (Shopify/Stripe style): poora right side white page,
+          form bina card ke beech me; top (Sign in) aur bottom (footer) anchored. */}
+      <div
+        ref={formPanelRef}
+        className="flex min-w-0 flex-1 flex-col items-center bg-white px-5 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14"
+      >
+        {/* Top bar — mobile par brand, har jagah "Sign in" */}
+        <header className="flex w-full shrink-0 items-center justify-between gap-3 py-5 lg:justify-end">
+          <span className="lg:hidden"><BrandMark size="sm" /></span>
+          <p className="flex items-center gap-2.5 text-[13px] text-slate-500">
+            <span className="hidden sm:inline">Already have an account?</span>
+            <button
+              type="button"
+              onClick={() => router.push("/admin/login")}
+              className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/20"
             >
-              <ShoppingBag size={16} className="text-white" />
-            </span>
-            <span className="text-[14px] font-extrabold tracking-tight text-slate-900">ClickMaster</span>
+              Sign in
+            </button>
+          </p>
+        </header>
+
+        {/* Form — box nahi, sirf controlled width; my-auto = space ho to vertically center */}
+        <div className="my-auto w-full max-w-[460px] shrink-0 py-4 2xl:max-w-[500px]">
+          {/* Step number stepper me already hai — alag eyebrow pill ki zaroorat nahi */}
+          <div>
+            <h2 className="text-[26px] font-bold leading-tight tracking-[-0.02em] text-slate-900 2xl:text-[30px]">{header.title}</h2>
+            <p className="pt-1 text-[13.5px] leading-5 text-slate-500">{header.subtitle}</p>
           </div>
 
-          {/* Card header */}
-          <div className="text-center">
-            <h2 className="text-[23px] font-semibold leading-tight tracking-[-0.01em] text-slate-900">
-              {step === "store" ? "Tell us about your store" : "Create your account"}
-            </h2>
-            <p className="mt-1 text-[12.5px] leading-5 text-slate-500">
-              {step === "store" ? "This takes under a minute." : "Join the marketplace in two quick steps."}
-            </p>
-          </div>
-
-          {/* Step indicator */}
-          {(step === "account" || step === "store") && (
-            <ol className="mt-4 flex items-center justify-center gap-2" aria-label="Signup progress">
-              {[
-                { n: 1, label: "Account", active: step === "account", done: step === "store" },
-                { n: 2, label: "Your store", active: step === "store", done: false },
-              ].map((s, i) => (
-                <li key={s.n} className="flex items-center gap-2">
-                  {i > 0 && <span aria-hidden="true" className={`h-px w-8 sm:w-12 transition-colors ${step === "store" ? "bg-[#f57224]" : "bg-slate-200"}`} />}
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      aria-hidden="true"
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[10.5px] font-extrabold transition-colors ${
-                        s.done
-                          ? "bg-[#f57224] text-white"
-                          : s.active
-                            ? "bg-[#f57224] text-white shadow-[0_0_0_4px_rgba(245,114,36,0.18)]"
-                            : "bg-slate-100 text-slate-400"
-                      }`}
-                    >
-                      {s.done ? <Check size={13} strokeWidth={3} /> : s.n}
-                    </span>
-                    <span className={`text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${s.active || s.done ? "text-slate-800" : "text-slate-400"}`}>
-                      {s.label}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          )}
+          {isWizardStep && <SignupStepper currentIndex={stepIndex} />}
 
           {generalError && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-              <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-500" aria-hidden="true" />
-              <p className="text-sm text-red-600">{generalError}</p>
+            <div role="alert" data-tone="error" className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <AlertCircle size={18} className="mt-px shrink-0 text-red-500" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-red-800">Something needs your attention</p>
+                <p className="pt-0.5 text-[12.5px] leading-5 text-red-700">{generalError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Store step par account field ka backend error — user ko wapas le jao */}
+          {accountHasErrors && (
+            <div role="alert" data-tone="error" className="mt-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <AlertCircle size={18} className="mt-px shrink-0 text-amber-600" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-amber-900">Please review your account details</p>
+                <p className="pt-0.5 text-[12.5px] leading-5 text-amber-800">
+                  {ACCOUNT_FIELD_KEYS.map((k) => errors[k]).find(Boolean)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setStep("account"); setGeneralError(""); }}
+                  className="mt-1.5 inline-flex items-center gap-1 text-[12.5px] font-semibold text-amber-900 underline-offset-2 hover:underline"
+                >
+                  <ArrowLeft size={13} aria-hidden="true" />
+                  Go to account step
+                </button>
+              </div>
             </div>
           )}
 
           {/* ═══ STEP: OTP ═══ */}
           {step === "otp" && (
-            <div className="mt-5">
+            <div className="mt-6">
               <OtpVerifyCard
                 email={otpEmail}
                 title={t("auth.signup.title")}
@@ -656,54 +901,59 @@ export default function SignupPage() {
 
           {/* ═══ STEP 1: ACCOUNT ═══ */}
           {step === "account" && (
-            <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="mt-3 space-y-2" noValidate>
-              {/* Name */}
-              <div>
-                <label htmlFor="su-name" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Full name</label>
-                <div className="relative">
-                  <User size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="su-name"
-                    type="text"
-                    required
-                    autoComplete="name"
-                    value={name}
-                    onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }}
-                    placeholder="Enter your full name"
-                    aria-label={t("auth.login.fullName")}
-                    className={`${fieldCls("name")} !pl-11`}
-                  />
-                </div>
-                {renderFieldError("name")}
-              </div>
+            <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className="mt-5 space-y-4" noValidate>
+              <Field id="su-name" label="Full name" icon={User} error={errors.name}>
+                <input
+                  {...fieldA11y("su-name", errors.name)}
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }}
+                  placeholder="Enter your full name"
+                  className={fieldCls("name")}
+                />
+              </Field>
 
-              {/* Username */}
-              <div>
-                <label htmlFor="su-username" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Username <span className="font-medium text-slate-400">(optional)</span></label>
-                <div className="relative">
-                  <AtSign size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                  id="su-username"
+                  label="Username"
+                  optional
+                  icon={AtSign}
+                  error={errors.username}
+                  below={usernameSuggestions.length ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5" aria-label="Suggested usernames">
+                      <span className="text-[11.5px] text-slate-500">Try:</span>
+                      {usernameSuggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => { setUsername(s); setUsernameSuggestions([]); setErrors((p) => ({ ...p, username: "" })); }}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 font-mono text-[11.5px] font-medium text-slate-700 transition hover:border-[#f57224] hover:bg-[#f57224]/10 hover:text-[#f57224]"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                >
                   <input
-                    id="su-username"
+                    {...fieldA11y("su-username", errors.username)}
                     type="text"
-                    required
                     autoComplete="username"
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: "" })); }}
+                    onFocus={loadUsernameSuggestions}
+                    onBlur={(e) => checkFieldOnBlur("username", e.target.value)}
                     placeholder={t("auth.login.username")}
-                    aria-label={t("auth.login.username")}
-                    className={`${fieldCls("username")} !pl-11`}
+                    className={fieldCls("username")}
                   />
-                </div>
-                {renderFieldError("username")}
-              </div>
+                </Field>
 
-              {/* Phone */}
-              <div>
-                <label htmlFor="su-phone" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Phone number</label>
-                <div className="relative">
-                  <Phone size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                <Field id="su-phone" label="Phone number" icon={Phone} error={errors.phone} counter={<span id="su-phone-hint" className="text-[11px] font-medium text-slate-400">{PHONE_MIN}–{PHONE_MAX} digits</span>}>
                   <input
-                    id="su-phone"
+                    {...fieldA11y("su-phone", errors.phone, true)}
                     type="tel"
                     required
                     inputMode="numeric"
@@ -712,309 +962,394 @@ export default function SignupPage() {
                     value={phone}
                     onChange={(e) => { setPhone(normalizePhone(e.target.value)); setErrors((p) => ({ ...p, phone: "" })); }}
                     placeholder="0300 1234567"
-                    aria-label={t("auth.login.phoneNumber")}
-                    className={`${fieldCls("phone")} !pl-11`}
+                    className={fieldCls("phone")}
                   />
-                </div>
-                {renderFieldError("phone") || (
-                  <p className="mt-1 px-1 text-[10px] font-medium text-slate-400">Digits only, 10–16 characters — used for delivery and order updates.</p>
-                )}
+                </Field>
               </div>
 
-              {/* Email */}
-              <div>
-                <label htmlFor="su-email" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Email address</label>
-                <div className="relative">
-                  <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="su-email"
-                    type="email"
-                    required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: "" })); }}
-                    placeholder="you@example.com"
-                    aria-label="Email"
-                    className={`${fieldCls("email")} !pl-11`}
-                  />
-                </div>
-                {renderFieldError("email")}
-              </div>
+              <Field id="su-email" label="Email address" icon={Mail} error={errors.email}>
+                {/* suppressHydrationWarning: temp-mail jaisi browser extensions is input par
+                    attributes inject karti hain → dev overlay me false hydration "issue" */}
+                <input
+                  {...fieldA11y("su-email", errors.email)}
+                  suppressHydrationWarning
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setEmailPending(false); setErrors((p) => ({ ...p, email: "" })); }}
+                  onBlur={(e) => checkFieldOnBlur("email", e.target.value)}
+                  placeholder="you@example.com"
+                  className={fieldCls("email")}
+                />
+              </Field>
+              {/* Pending application wale email ke liye: error ke neeche sign-in shortcut */}
+              {emailPending && errors.email ? (
+                <button type="button" onClick={() => router.push("/admin/login")} className="-mt-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-[#f57224] hover:underline">
+                  Sign in to continue your application <ArrowRight size={13} aria-hidden="true" />
+                </button>
+              ) : null}
 
-              {/* Password */}
-              <div>
-                <label htmlFor="su-password" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Password</label>
-                <div className="relative">
-                  <Lock size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="su-password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "", confirmPassword: "" })); }}
-                    placeholder={t("auth.login.password")}
-                    aria-label={t("auth.login.password")}
-                    className={`${fieldCls("password", true)} !pl-11 !pr-11`}
-                  />
+              {/* Password + confirm ek row me (sm+) — 48px inputs, kam vertical height */}
+              <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+              <Field
+                id="su-password"
+                label="Password"
+                icon={Lock}
+                error={errors.password}
+                trailing={
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f57224]/40"
                   >
                     {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                   </button>
-                </div>
-                {password && (
-                  <div className="mt-1 flex items-center gap-2 px-1" aria-hidden="true">
-                    <div className="flex flex-1 gap-1">
-                      {[1, 2, 3, 4].map((i) => (
-                        <span
-                          key={i}
-                          className={`h-1.5 flex-1 rounded-full transition-colors ${
-                            strength >= i ? strengthColors[strength] : "bg-slate-200"
-                          }`}
-                        />
-                      ))}
+                }
+                below={
+                  password ? (
+                    <div className="mt-2 flex items-center gap-3" aria-live="polite">
+                      <div className="flex flex-1 gap-1" aria-hidden="true">
+                        {[1, 2, 3, 4].map((i) => (
+                          <span
+                            key={i}
+                            data-tone="accent"
+                            className={`h-1 flex-1 rounded-full transition-colors duration-300 ${strength >= i ? strengthColors[strength] : "bg-slate-200"}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="min-w-[44px] text-right text-[11px] font-semibold text-slate-500">{strengthLabels[strength]}</span>
                     </div>
-                    <span className="w-11 text-right text-[9.5px] font-bold uppercase tracking-wider text-slate-500">
-                      {strengthLabels[strength]}
-                    </span>
-                  </div>
-                )}
-                {renderFieldError("password")}
-              </div>
+                  ) : null
+                }
+              >
+                <input
+                  {...fieldA11y("su-password", errors.password)}
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "", confirmPassword: "" })); }}
+                  placeholder="At least 6 characters"
+                  className={fieldCls("password", true)}
+                />
+              </Field>
 
-              {/* Confirm password */}
-              <div>
-                <label htmlFor="su-confirm" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Confirm password</label>
-                <div className="relative">
-                  <ShieldCheck size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="su-confirm"
-                    type={showConfirm ? "text" : "password"}
-                    required
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => { setConfirmPassword(e.target.value); setErrors((p) => ({ ...p, confirmPassword: "" })); }}
-                    placeholder={t("auth.signup.confirmPasswordPlaceholder")}
-                    aria-label={t("auth.signup.confirmPassword")}
-                    className={`${fieldCls("confirmPassword", true)} !pl-11 !pr-11`}
-                  />
+              <Field
+                id="su-confirm"
+                label="Confirm password"
+                icon={ShieldCheck}
+                error={errors.confirmPassword}
+                trailing={
                   <button
                     type="button"
                     onClick={() => setShowConfirm((v) => !v)}
                     aria-label={showConfirm ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f57224]/40"
                   >
                     {showConfirm ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                   </button>
-                </div>
-                {renderFieldError("confirmPassword")}
+                }
+              >
+                <input
+                  {...fieldA11y("su-confirm", errors.confirmPassword)}
+                  type={showConfirm ? "text" : "password"}
+                  required
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setErrors((p) => ({ ...p, confirmPassword: "" })); }}
+                  placeholder={t("auth.signup.confirmPasswordPlaceholder")}
+                  className={fieldCls("confirmPassword", true)}
+                />
+              </Field>
               </div>
 
-              {/* Next */}
-              <button
-                type="submit"
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[14px] font-extrabold text-white transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f57224]"
-                style={{ background: "linear-gradient(180deg,#ff8a3d 0%,#f57224 55%,#e2641b 100%)" }}
-              >
-                Next
-                <ArrowRight size={16} aria-hidden="true" />
+              <button type="submit" disabled={checking} className={`${PRIMARY_BTN} !mt-6 w-full`}>
+                {checking ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Checking details…</> : "Continue to store details"}
+                <ArrowRight size={17} aria-hidden="true" />
               </button>
             </form>
           )}
 
-          {/* ═══ STEP 2: YOUR STORE ═══ */}
+          {/* ═══ STEP 2: STORE DETAILS ═══ */}
           {step === "store" && (
-            <form onSubmit={handleSubmit} className="mt-3 space-y-2" noValidate>
+            <form onSubmit={(e) => { e.preventDefault(); handleStoreNext(); }} className="mt-5 space-y-5" noValidate>
+              {/* Group 1 — Store identity */}
+              <section aria-labelledby="su-sec-identity">
+                <SectionHeading icon={Store} title={<span id="su-sec-identity">Store identity</span>} description="Your store name and what kind of business it is" />
+                <div className="space-y-4">
+                  <Field id="su-store-name" label="Store name" icon={Store} error={errors.storeName}>
+                    <input
+                      {...fieldA11y("su-store-name", errors.storeName)}
+                      type="text"
+                      autoComplete="organization"
+                      value={storeName}
+                      onChange={(e) => { setStoreName(e.target.value); setErrors((p) => ({ ...p, storeName: "" })); }}
+                      placeholder="e.g. Ahmed Electronics"
+                      className={fieldCls("storeName")}
+                    />
+                  </Field>
 
-              {/* Store name */}
-              <div>
-                <label htmlFor="su-store-name" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Store name</label>
-                <div className="relative">
-                  <Store size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="su-store-name"
-                    type="text"
-                    autoComplete="organization"
-                    value={storeName}
-                    onChange={(e) => { setStoreName(e.target.value); setErrors((p) => ({ ...p, storeName: "" })); }}
-                    placeholder="e.g. Ahmed Electronics"
-                    className={`${fieldCls("storeName")} !pl-11`}
-                  />
-                </div>
-                {renderFieldError("storeName")}
-              </div>
-
-              {/* Store description */}
-              <div>
-                <label htmlFor="su-store-desc" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">What will you sell?</label>
-                <div className="relative">
-                  <FileText size={15} className="pointer-events-none absolute left-3.5 top-4 text-slate-400" aria-hidden="true" />
-                  <textarea
-                    id="su-store-desc"
-                    rows={2}
-                    maxLength={2000}
-                    value={storeDescription}
-                    onChange={(e) => { setStoreDescription(e.target.value); setErrors((p) => ({ ...p, storeDescription: "" })); }}
-                    placeholder="Brief description of your store (at least 10 characters)"
-                    className={`${fieldCls("storeDescription")} !pl-11 !h-auto py-3`}
-                  />
-                </div>
-                {renderFieldError("storeDescription")}
-              </div>
-
-              {/* Category */}
-              <div>
-                <label htmlFor="su-business-category" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Category</label>
-                <div className="relative">
-                  <Building size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <select
+                  <Field
                     id="su-business-category"
-                    value={businessCategory}
-                    onChange={(e) => { setBusinessCategory(e.target.value); setErrors((p) => ({ ...p, businessCategory: "" })); }}
-                    className={`${fieldCls("businessCategory")} appearance-none !pl-11`}
+                    label="Business category"
+                    icon={Building}
+                    error={errors.businessCategory}
+                    trailing={<ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />}
                   >
-                    <option value="">Select category</option>
-                    {BUSINESS_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                {renderFieldError("businessCategory")}
-              </div>
-
-              {/* Country + city + zip */}
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="su-country" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Country</label>
-                  <div className="relative">
-                    <Globe size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                     <select
-                      id="su-country"
-                      value={country}
-                      onChange={(e) => { setCountry(e.target.value); setErrors((p) => ({ ...p, country: "" })); }}
-                      className={`${fieldCls("country")} appearance-none !pl-11`}
+                      {...fieldA11y("su-business-category", errors.businessCategory)}
+                      value={businessCategory}
+                      onChange={(e) => { setBusinessCategory(e.target.value); setErrors((p) => ({ ...p, businessCategory: "" })); }}
+                      className={`${fieldCls("businessCategory", true)} cursor-pointer appearance-none ${businessCategory ? "" : "!text-slate-400"}`}
                     >
-                      {COUNTRIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                      <option value="">Select a category</option>
+                      {BUSINESS_CATEGORIES.map((c) => (
+                        <option key={c} value={c} className="text-slate-900">{c}</option>
                       ))}
                     </select>
-                  </div>
-                  {renderFieldError("country")}
+                  </Field>
                 </div>
-                <div className="grid grid-cols-[1fr_92px] gap-2">
-                  <div>
-                    <label htmlFor="su-city" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">City</label>
-                    <div className="relative">
-                      <MapPin size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                      <input
-                        id="su-city"
-                        type="text"
-                        value={city}
-                        onChange={(e) => { setCity(e.target.value); setErrors((p) => ({ ...p, city: "" })); }}
-                        placeholder="Lahore"
-                        className={`${fieldCls("city")} !pl-11`}
-                      />
-                    </div>
-                    {renderFieldError("city")}
-                  </div>
-                  <div>
-                    <label htmlFor="su-zip" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">ZIP</label>
-                    <input
-                      id="su-zip"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={20}
-                      value={zipCode}
-                      onChange={(e) => setZipCode(e.target.value)}
-                      placeholder="54000"
-                      className={fieldCls("zipCode")}
-                      style={{ paddingLeft: "0.75rem" }}
-                    />
-                  </div>
-                </div>
-              </div>
+              </section>
 
-              {/* Address */}
-              <div>
-                <label htmlFor="su-address" className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Store address</label>
-                <div className="relative">
-                  <MapPin size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="su-address"
-                    type="text"
-                    autoComplete="street-address"
-                    value={address}
-                    onChange={(e) => { setAddress(e.target.value); setErrors((p) => ({ ...p, address: "" })); }}
-                    placeholder="Street, area, Lahore"
-                    className={`${fieldCls("address")} !pl-11`}
-                  />
-                </div>
-                {renderFieldError("address")}
-              </div>
-
-              {/* Store logo (optional) */}
-              <div>
-                <span className="mb-1.5 block text-[11px] font-extrabold text-slate-700">Store logo <span className="font-medium text-slate-400">(optional)</span></span>
-                <div className="flex items-center gap-3">
-                  <div
-                    aria-hidden="true"
-                    className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e5e5e7] bg-[#f5f5f6] text-slate-400"
+              {/* Group 2 — Business description */}
+              <section aria-labelledby="su-sec-desc">
+                <SectionHeading icon={FileText} title={<span id="su-sec-desc">Business description</span>} description="Tell buyers what you sell and why they should choose you" />
+                <div className="space-y-4">
+                  <Field
+                    id="su-store-desc"
+                    label="What will you sell?"
+                    icon={FileText}
+                    iconTop
+                    error={errors.storeDescription}
+                    counter={
+                      <span
+                        id="su-store-desc-hint"
+                        data-tone="accent"
+                        className="text-[11px] font-medium tabular-nums text-slate-400"
+                      >
+                        {storeDescription.length}/2000
+                      </span>
+                    }
                   >
-                    {storeLogo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={storeLogo} alt="Store logo preview" className="h-full w-full object-contain" />
-                    ) : (
-                      <Building2 size={20} />
-                    )}
-                  </div>
-                  <div className="flex flex-col items-start gap-1">
-                    <label
-                      htmlFor="su-store-logo"
-                      className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#e5e5e7] bg-white px-3 text-[12px] font-bold text-slate-700 transition hover:border-[#f57224] hover:text-[#e2641b]"
-                    >
-                      {storeLogo ? "Change logo" : "Upload logo"}
-                    </label>
-                    <p className="text-[9.5px] text-slate-400">JPG, PNG or WEBP — any size, we optimize it</p>
-                    {storeLogo && (
-                      <button type="button" onClick={() => setStoreLogo("")} className="text-[10px] font-bold text-red-500 hover:underline">
-                        Remove logo
-                      </button>
-                    )}
-                  </div>
-                  <input id="su-store-logo" type="file" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={pickLogo} className="sr-only" />
+                    <textarea
+                      {...fieldA11y("su-store-desc", errors.storeDescription, true)}
+                      rows={2}
+                      maxLength={2000}
+                      value={storeDescription}
+                      onChange={(e) => { setStoreDescription(e.target.value); setErrors((p) => ({ ...p, storeDescription: "" })); }}
+                      placeholder="e.g. Affordable smartphones, accessories and gadgets with nationwide delivery."
+                      className={`${fieldCls("storeDescription")} !h-auto min-h-[76px] resize-y py-3 leading-[1.5]`}
+                    />
+                  </Field>
                 </div>
-              </div>
+              </section>
 
-              {/* Back + Create account */}
-              <div className="flex items-center gap-2">
+              {/* Back + Continue */}
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row">
                 <button
                   type="button"
                   onClick={() => { setStep("account"); setErrors({}); setGeneralError(""); }}
-                  className="flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#e5e5e7] bg-white px-4 text-[13px] font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                  className={`${SECONDARY_BTN} sm:w-auto`}
                 >
                   <ArrowLeft size={16} aria-hidden="true" />
                   Back
                 </button>
+                <button type="submit" className={`${PRIMARY_BTN} w-full sm:w-auto sm:flex-1`}>
+                  Continue
+                  <ArrowRight size={17} aria-hidden="true" />
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ═══ STEP 3: LOCATION & BRANDING ═══ */}
+          {step === "location" && (
+            <form onSubmit={handleSubmit} className="mt-5 space-y-5" noValidate aria-busy={loading}>
+              {/* Group 3 — Location */}
+              <section aria-labelledby="su-sec-location">
+                <SectionHeading icon={MapPin} title={<span id="su-sec-location">Business location</span>} description="Used for shipping and tax settings" />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field
+                      id="su-country"
+                      label="Country"
+                      icon={Globe}
+                      error={errors.country}
+                    >
+                      {/* Searchable list (native select 250 items ka poora-screen popup kholta tha) */}
+                      <SearchCombobox
+                        id="su-country"
+                        value={country}
+                        onChange={(v) => {
+                          setCountry(v);
+                          setCity(""); // purani city doosre country ki hai
+                          setErrors((p) => ({ ...p, country: "", city: "" }));
+                        }}
+                        options={countryOptions}
+                        loading={step === "location" && !geo}
+                        invalid={!!errors.country}
+                        describedBy={errors.country ? "su-country-error" : undefined}
+                        inputClassName={fieldCls("country", true)}
+                        itemLabel="country"
+                        allowCustom={false}
+                        pinned={["Pakistan"]}
+                      />
+                    </Field>
+
+                    <Field id="su-city" label="City" icon={Building2} error={errors.city}>
+                      <SearchCombobox
+                        id="su-city"
+                        itemLabel="city"
+                        value={city}
+                        onChange={(v) => { setCity(v); setErrors((p) => ({ ...p, city: "" })); }}
+                        options={cityOptions}
+                        loading={citiesLoading}
+                        invalid={!!errors.city}
+                        describedBy={errors.city ? "su-city-error" : undefined}
+                        inputClassName={fieldCls("city", true)}
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_132px]">
+                    <Field id="su-address" label="Street address" icon={MapPin} error={errors.address}>
+                      <input
+                        {...fieldA11y("su-address", errors.address)}
+                        type="text"
+                        autoComplete="street-address"
+                        value={address}
+                        onChange={(e) => { setAddress(e.target.value); setErrors((p) => ({ ...p, address: "" })); }}
+                        placeholder="Shop no., street, area"
+                        className={fieldCls("address")}
+                      />
+                    </Field>
+
+                    <Field id="su-zip" label="ZIP code" optional icon={Hash} error={errors.zipCode}>
+                      <input
+                        {...fieldA11y("su-zip", errors.zipCode)}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                        maxLength={20}
+                        value={zipCode}
+                        onChange={(e) => setZipCode(e.target.value)}
+                        placeholder="54000"
+                        className={fieldCls("zipCode")}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </section>
+
+              {/* Group 4 — Branding / logo upload */}
+              {/* relative: sr-only file input (absolute) isi section ke andar rahe —
+                  warna woh scroll panel se bahar nikal kar poore page ko scroll karwata hai */}
+              <section aria-labelledby="su-sec-brand" className="relative">
+                <SectionHeading icon={ImagePlus} title={<span id="su-sec-brand">Store branding</span>} description="Optional — add or change it any time" />
+                <input
+                  id="su-store-logo"
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={pickLogo}
+                  disabled={logoBusy || loading}
+                  className="peer sr-only"
+                />
+                {storeLogo ? (
+                  <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 sm:p-4">
+                    <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={storeLogo} alt="Store logo preview" className="h-full w-full object-contain" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-900">
+                        <BadgeCheck size={15} className="shrink-0 text-emerald-500" aria-hidden="true" />
+                        Logo ready
+                      </p>
+                      <p className="pt-0.5 text-[12px] leading-4 text-slate-500">Optimized for fast loading on your store.</p>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <label
+                          htmlFor="su-store-logo"
+                          className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${logoBusy ? "pointer-events-none opacity-60" : ""}`}
+                        >
+                          {logoBusy ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={13} aria-hidden="true" />}
+                          Replace
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setStoreLogo("")}
+                          disabled={logoBusy || loading}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                        >
+                          <Trash2 size={13} aria-hidden="true" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="su-store-logo"
+                    onDragOver={(e) => { e.preventDefault(); if (!logoDragActive) setLogoDragActive(true); }}
+                    onDragLeave={() => setLogoDragActive(false)}
+                    onDrop={onLogoDrop}
+                    className={`flex cursor-pointer items-center gap-4 rounded-xl border-2 border-dashed px-4 py-3.5 transition-colors peer-focus-visible:border-[#f57224] peer-focus-visible:ring-4 peer-focus-visible:ring-[#f57224]/15 ${
+                      logoDragActive
+                        ? "border-[#f57224] bg-[#f57224]/[0.06]"
+                        : "border-slate-200 bg-slate-50/60 hover:border-[#f57224]/50 hover:bg-[#f57224]/[0.03]"
+                    } ${logoBusy ? "pointer-events-none" : ""}`}
+                  >
+                    <span
+                      data-tone="accent"
+                      aria-hidden="true"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-[#f57224] shadow-sm ring-1 ring-slate-200"
+                    >
+                      {logoBusy ? <Loader2 size={19} className="animate-spin" /> : <ImagePlus size={19} />}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-[13px] font-medium text-slate-700">
+                        {logoBusy ? (
+                          "Optimizing your logo…"
+                        ) : (
+                          <>
+                            <span data-tone="accent" className="font-semibold text-[#e2641b]">Click to upload</span> or drag and drop
+                          </>
+                        )}
+                      </span>
+                      <span className="pt-0.5 text-[11.5px] text-slate-500">JPG, PNG or WEBP · up to 15MB · square works best</span>
+                    </span>
+                  </label>
+                )}
+              </section>
+
+              {/* Back + Create account */}
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row">
                 <button
-                  type="submit"
+                  type="button"
                   disabled={loading}
-                  className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl text-[14px] font-extrabold text-white transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f57224] disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ background: "linear-gradient(180deg,#ff8a3d 0%,#f57224 55%,#e2641b 100%)" }}
+                  onClick={() => { setStep("store"); setErrors({}); setGeneralError(""); }}
+                  className={`${SECONDARY_BTN} sm:w-auto`}
                 >
+                  <ArrowLeft size={16} aria-hidden="true" />
+                  Back
+                </button>
+                <button type="submit" disabled={loading || logoBusy} className={`${PRIMARY_BTN} w-full sm:w-auto sm:flex-1`}>
                   {loading ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                      <Loader2 size={17} className="animate-spin" aria-hidden="true" />
                       {t("auth.signup.signingUp")}
+                    </>
+                  ) : logoBusy ? (
+                    <>
+                      <Loader2 size={17} className="animate-spin" aria-hidden="true" />
+                      Processing logo…
                     </>
                   ) : (
                     <>
                       {t("auth.login.createAccount")}
-                      <ArrowRight size={16} aria-hidden="true" />
+                      <ArrowRight size={17} aria-hidden="true" />
                     </>
                   )}
                 </button>
@@ -1022,51 +1357,48 @@ export default function SignupPage() {
             </form>
           )}
 
-          {(step === "account" || step === "store") && (
-            <div className="mt-3 space-y-2">
-              {/* Divider */}
-              <div className="flex items-center gap-2.5 py-0.5" aria-hidden="true">
+          {/* Google sirf account step par */}
+          {step === "account" && (
+            <div className="mt-5">
+              <div className="flex items-center gap-3" aria-hidden="true">
                 <span className="h-px flex-1 bg-slate-200" />
-                <span className="text-[9px] font-medium text-slate-400">or continue with</span>
+                <span className="text-[11.5px] font-medium text-slate-400">or sign up with</span>
                 <span className="h-px flex-1 bg-slate-200" />
               </div>
-
-              {/* Google continue */}
-              {GOOGLE_CLIENT_ID ? (
-                <div className="flex flex-col items-center gap-1.5">
+              <div className="mt-3 flex justify-center">
+                {GOOGLE_CLIENT_ID ? (
                   <LazyGoogleLogin
                     clientId={GOOGLE_CLIENT_ID}
                     onSuccess={(res) => handleGoogle(res.credential)}
                     onError={() => toast.error(t("auth.login.googleFailed"))}
                     theme="outline"
-                    size="medium"
+                    size="large"
                     text="continue_with"
-                    shape="pill"
+                    shape="rectangular"
                     width="300"
                   />
-                </div>
-              ) : (
-                <p className="text-center text-[10.5px] text-slate-400">{t("auth.login.googleUnavailable")}</p>
-              )}
-
-              {/* Secure + sign-in */}
-              <p className="flex items-center justify-center gap-1.5 text-[9.5px] font-medium text-slate-400">
-                <ShieldCheck size={11} aria-hidden="true" />
-                Your information is secure
-              </p>
-              <p className="text-center text-[11px] text-slate-500">
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => router.push("/login")}
-                  className="font-extrabold text-[#f57224] hover:underline"
-                >
-                  Sign in
-                </button>
-              </p>
+                ) : (
+                  <p className="text-center text-[12px] text-slate-400">{t("auth.login.googleUnavailable")}</p>
+                )}
+              </div>
             </div>
           )}
+
         </div>
+
+        {/* Bottom anchor — trust + help (© left panel me hai; mobile par yahan) */}
+        <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-100 py-4 text-[12px] text-slate-400">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck size={13} aria-hidden="true" />
+            Secure, encrypted signup
+            <span className="lg:hidden">· © {new Date().getFullYear()} ClickMaster</span>
+          </span>
+          {SUPPORT_EMAIL ? (
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-slate-500 transition hover:text-slate-800">
+              Need help? Contact support
+            </a>
+          ) : null}
+        </footer>
       </div>
     </main>
   );

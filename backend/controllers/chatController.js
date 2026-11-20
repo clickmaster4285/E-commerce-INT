@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const crypto = require("crypto");
 const ChatConversation = require("../models/ChatConversation");
 const ChatMessage = require("../models/ChatMessage");
@@ -12,7 +13,7 @@ const { consumeChatMessageRateLimit, CHAT_MESSAGE_RATE_LIMITED_MESSAGE } = requi
 const MAX_MESSAGE_LENGTH = 4000;
 const escapeRegex = (value) => String(value || "").replace(/[-/\^$*+?.()|[\]{}]/g, "\\$&");
 const roleOf = (req) => String(req.user?.role || "").toLowerCase();
-const isStaff = (req) => req.userType === "employee" && ["admin", "manager", "staff"].includes(roleOf(req)) && (roleOf(req) === "admin" || req.user?.permissions?.order !== false);
+const isStaff = (req) => req.userType === "employee" && isStaffRole(roleOf(req)) && (isAdminRole(roleOf(req)) || req.user?.permissions?.order !== false);
 const isCustomer = (req) => req.userType === "user" && roleOf(req) === "user";
 const guestTokenOf = (req) => typeof req.headers?.["x-chat-guest-token"] === "string" ? req.headers["x-chat-guest-token"].trim() : "";
 const guestTokenHash = (token) => crypto.createHash("sha256").update(token).digest("hex");
