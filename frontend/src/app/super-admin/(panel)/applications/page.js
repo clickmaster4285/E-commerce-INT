@@ -18,7 +18,8 @@ const TABS = [
   { value: "approved", label: "Approved", countKey: "approved" },
   { value: "rejected", label: "Rejected", countKey: "rejected" },
 ];
-const PAGE_SIZE = 10;
+// 20 per page; pagination footer sirf tab jab requests ek page se zyada hon
+const PAGE_SIZE = 20;
 
 export default function ApplicationsPage() {
   const router = useRouter();
@@ -236,7 +237,7 @@ export default function ApplicationsPage() {
           </table>
         </div>
 
-        {total > 0 && (
+        {total > PAGE_SIZE && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)] px-4 py-3">
             <span className="text-[12px] text-[var(--text-muted)]">
               Showing <strong className="font-semibold text-[var(--text-primary)]">{from}–{to}</strong> of <strong className="font-semibold text-[var(--text-primary)]">{total}</strong>
