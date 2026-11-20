@@ -975,10 +975,11 @@ const updateProfileInfo = async (req, res) => {
         ? await Store.findById(updatedUser.storeId)
         : null;
       if (!store) store = await Store.findOne();
-      if (!store) store = await Store.create({});
-      
-      Object.assign(store, storeUpdateFields);
-      updatedStore = await store.save();
+      // Blank store khud se nahi banta (multi-tenant)
+      if (store) {
+        Object.assign(store, storeUpdateFields);
+        updatedStore = await store.save();
+      }
       
       if (!updatedUser.storeId && updatedStore) {
         updatedUser.storeId = updatedStore._id;
@@ -1590,7 +1591,90 @@ const changePasswordREST = async (req, res) => {
     res.json({ success: true, message: "Password changed successfully" });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
+// ==========================================
+// 🔀 STORE ADMIN HANDOFF (platform → store subdomain)
+// ------------------------------------------
+// Cookies host-only hain: platform (192.168.88.35.nip.io) par login/signup
+// ke baad seller store subdomain (alistore.192.168.88.35.nip.io) par logged-in
+// nahi hota. Platform par ek 2-minute, ek-baar wala token banta hai; store
+// subdomain ka /admin/handoff page usay exchange karke wahan cookies set karta hai.
+// ==========================================
+const { ROOT_DOMAIN } = require("../utils/tenantHost");
+
+const HANDOFF_TTL_SECONDS = 120;
+const usedHandoffIds = new Map(); // jti → expiresAt (single-use; production me Redis behtar)
+
+const storeAdminBaseUrl = (store) => {
+  const protocol = process.env.PUBLIC_STORE_PROTOCOL || (process.env.NODE_ENV === "production" ? "https" : "http");
+  const port = String(process.env.PUBLIC_STORE_PORT || "").trim();
+  if (!store?.subdomain || !ROOT_DOMAIN) return null;
+  return `${protocol}://${store.subdomain}.${ROOT_DOMAIN}${port ? `:${port}` : ""}`;
+};
+
+// @route POST /api/users/admin/handoff   (logged-in employee, platform host)
+const createStoreHandoff = async (req, res) => {
+  try {
+    if (req.userType !== "employee") {
+      return res.status(403).json({ success: false, message: "Only store staff can open a store admin panel." });
+    }
+    if (!req.user?.storeId) {
+      return res.status(404).json({ success: false, message: "No store is linked to this account." });
+    }
+    const store = await Store.findById(req.user.storeId).select("subdomain store_name").lean();
+    const baseUrl = storeAdminBaseUrl(store);
+    if (!baseUrl) return res.status(404).json({ success: false, message: "Store address is not configured." });
+
+    const token = jwt.sign(
+      { type: "store_handoff", employeeId: String(req.user._id), storeId: String(store._id), jti: crypto.randomUUID() },
+      process.env.JWT_SECRET,
+      { expiresIn: HANDOFF_TTL_SECONDS },
+    );
+    // Token URL ke #fragment me — server logs / Referer me nahi jata
+    res.json({
+      success: true,
+      data: { storeUrl: baseUrl, subdomain: store.subdomain, url: `${baseUrl}/admin-handoff#token=${encodeURIComponent(token)}` },
+    });
+  } catch (error) {
+    log.error("Create store handoff error:", error);
+    res.status(500).json({ success: false, message: "Could not open the store admin panel." });
+  }
+};
+
+// @route POST /api/users/admin/handoff/exchange   body: { token }   (store host, public)
+const exchangeStoreHandoff = async (req, res) => {
+  const invalid = () => res.status(401).json({ success: false, message: "This sign-in link is invalid or has expired. Please log in again." });
+  try {
+    if (!req.store) return invalid();
+    let decoded;
+    try {
+      decoded = jwt.verify(String(req.body?.token || ""), process.env.JWT_SECRET);
+    } catch {
+      return invalid();
+    }
+    if (decoded.type !== "store_handoff" || String(decoded.storeId) !== String(req.store._id)) return invalid();
+
+    const now = Date.now();
+    for (const [id, exp] of usedHandoffIds) if (exp < now) usedHandoffIds.delete(id);
+    if (usedHandoffIds.has(decoded.jti)) return invalid();
+    usedHandoffIds.set(decoded.jti, decoded.exp * 1000);
+
+    // Tenant-scoped: sirf isi store ka employee milega
+    const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name").lean();
+    if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return invalid();
+
+    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, "employee");
+    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", employee.role)));
+    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    res.json({ success: true, message: "Signed in to your store." });
+  } catch (error) {
+    log.error("Exchange store handoff error:", error);
+    res.status(500).json({ success: false, message: "Could not sign in to the store." });
+  }
+};
+
 module.exports = {
+  createStoreHandoff,
+  exchangeStoreHandoff,
   createUser,
   loginUser,
   loginAdmin,

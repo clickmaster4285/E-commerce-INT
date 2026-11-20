@@ -22,6 +22,8 @@ const {
   toggleWishlist,
   updateProfileREST,
   changePasswordREST,
+  createStoreHandoff,
+  exchangeStoreHandoff,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission");
@@ -48,6 +50,9 @@ router.post("/refresh-token", refreshAccessToken);
 // employee-type refresh token accept karta hai (user going admin panel
 // ke liye nahi). Shape/logic purani jaisi.
 router.post("/admin/refresh-token", refreshAdminAccessToken);
+// Multi-tenant: platform par login ke baad store subdomain ke admin panel me bhejna
+router.post("/admin/handoff", authMiddleware, createStoreHandoff);
+router.post("/admin/handoff/exchange", limiters.adminLogin, exchangeStoreHandoff);
 router.post("/logout", logoutUser);
 router.post("/google-login", limiters.adminLogin, googleLogin);
 router.post("/google-customer-login", limiters.googleLogin, googleCustomerLogin);

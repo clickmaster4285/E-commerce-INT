@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const auditChangeSchema = new mongoose.Schema({ field: String, before: String, after: String }, { _id: false });
 const activitySchema = new mongoose.Schema({ type: { type: String, required: true }, at: { type: Date, default: Date.now }, actor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null }, actor_name: { type: String, default: "Administrator" }, changes: { type: [auditChangeSchema], default: [] } }, { _id: false });
@@ -75,5 +76,9 @@ const customerSchema = new mongoose.Schema(
 customerSchema.index({ name: 1, phone: 1 });
 customerSchema.index({ phone: 1 });
 customerSchema.index({ email: 1 });
+
+
+// ── Multi-tenant ──
+customerSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Customer", customerSchema);

@@ -177,13 +177,6 @@ export default function ApplicationDetailPage() {
             </div>
           ) : null}
 
-          {item.setup_completed === false ? (
-            <div className="mt-5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-4 text-sm text-[var(--text-secondary)]">
-              <p className="font-bold text-[var(--text-primary)]">Store setup incomplete</p>
-              <p className="mt-1">The seller has not finished their store details and documents yet — approval will unlock once they submit.</p>
-            </div>
-          ) : null}
-
           {item.status === "rejected" && item.rejection_reason && (
             <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--danger-soft)", borderColor: "color-mix(in srgb, var(--danger) 32%, transparent)" }}>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--danger-text)]">Rejection reason</p>
@@ -210,7 +203,7 @@ export default function ApplicationDetailPage() {
 
           {item.status === "pending" ? (
             <>
-              <button type="button" onClick={() => setApproveOpen(true)} disabled={approveMut.isPending || item.setup_completed === false} title={item.setup_completed === false ? "Seller has not finished store setup" : undefined} className="btn-primary h-12 disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" onClick={() => setApproveOpen(true)} disabled={approveMut.isPending} className="btn-primary h-12 disabled:cursor-not-allowed disabled:opacity-50">
                 <CheckCircle2 size={18} aria-hidden="true" /> Approve & provision store
               </button>
               <button type="button" onClick={() => { setInfoOpen((v) => !v); setActionError(""); }} disabled={infoMut.isPending} className="btn-secondary h-12">

@@ -12,6 +12,7 @@ import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
 import { useOrderSocketSync } from '../../hooks/admin/useOrderSocketSync';
 import { io } from 'socket.io-client';
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { useTranslation } from '../../i18n/LanguageProvider';
 
 // ==========================================
@@ -68,7 +69,7 @@ function getLayoutPermSocket() {
     return layoutPermSocket;
   }
 
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
 
   layoutPermSocket = io(SOCKET_URL, {
     withCredentials: true,

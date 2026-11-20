@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   Store,
   FileText,
@@ -92,7 +92,6 @@ const selectCls = `${inputCls} appearance-none`;
 const labelCls = "mb-1.5 block text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-400";
 
 function StoreSetupInner() {
-  const router = useRouter();
   const params = useSearchParams();
   const email = (params?.get("email") || "").trim().toLowerCase();
 
@@ -265,7 +264,8 @@ function StoreSetupInner() {
         return;
       }
       toast.success("Store setup submitted!");
-      router.replace(`/pending-approval?email=${encodeURIComponent(email)}`);
+      // Show the built-in "Your store setup is submitted" screen below.
+      setAlreadyDone(true);
     } catch {
       toast.error("Network error — please try again.");
     } finally {
@@ -308,7 +308,7 @@ function StoreSetupInner() {
           {email ? (
             <>No seller application exists for <span className="font-semibold text-slate-200">{email}</span>. Double-check the email you used at signup.</>
           ) : (
-            "This link is missing the email parameter. Open it from the email we sent you, or from the pending approval screen."
+            "This link is missing the email parameter. Open it from the email we sent you."
           )}
         </p>
         <a href="/landing/signup" className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110">
@@ -326,8 +326,8 @@ function StoreSetupInner() {
         <p className="mt-2 text-[13px] leading-6 text-slate-400">
           A Super Admin is reviewing your application. We&apos;ll email you as soon as it&apos;s approved.
         </p>
-        <a href={`/pending-approval?email=${encodeURIComponent(email)}`} className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110">
-          View application status
+        <a href="/" className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110">
+          Back to home
         </a>
       </div>
     );

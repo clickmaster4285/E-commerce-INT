@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 const contextItemSchema = new mongoose.Schema({
   product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: null },
   product_name: { type: String, default: "", maxlength: 160 },
@@ -40,4 +41,8 @@ const schema = new mongoose.Schema({
 }, { timestamps: { createdAt: "created_at", updatedAt: false } });
 schema.index({ conversation_id: 1, created_at: -1, _id: -1 });
 schema.index({ conversation_id: 1, sender_type: 1, read_at: 1 });
+
+// ── Multi-tenant ──
+schema.plugin(tenantScope); // har store ka data alag (storeId)
+
 module.exports = mongoose.models.ChatMessage || mongoose.model("ChatMessage", schema);

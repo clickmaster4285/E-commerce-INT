@@ -4,8 +4,9 @@ const superAdminController = require("../controllers/superAdminController");
 
 const router = express.Router();
 
-/* Public auth */
+/* Public auth — same accessToken / refreshToken cookies as the rest of the app */
 router.post("/auth/login", superAdminController.loginSuperAdmin);
+router.post("/auth/refresh-token", superAdminController.refreshSuperAdminToken);
 router.post("/auth/logout", superAdminController.logoutSuperAdmin);
 
 /* Everything below needs a valid superadmin session */

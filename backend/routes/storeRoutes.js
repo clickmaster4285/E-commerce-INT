@@ -2,12 +2,15 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const fs = require("fs");
-const { getStoreInfo, updateStoreInfo } = require("../controllers/storeController");
+const {
+  getStoreInfo, updateStoreInfo,
+  getPublicStoreInfo, resolveTenant, checkSubdomain, updateStoreDomain,
+} = require("../controllers/storeController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { checkPermission } = require("../middleware/checkPermission"); // ✅ ADDED
 
 // ✅ Multer setup for file upload (Logo)
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 
 // Uploads folder ka path set karein
 const uploadDir = path.join(__dirname, "../uploads");
@@ -47,8 +50,15 @@ const upload = multer({
 // Master-data: short public cache (60s). Protected PUT/admin GET untouched.
 router.get("/public", (req, res, next) => {
   res.set("Cache-Control", "public, max-age=60, must-revalidate");
+  // Host ke hisaab se alag store → cache bhi host-wise alag rehna chahiye
+  res.set("Vary", "Origin, Host");
   next();
-}, getStoreInfo);
+}, getPublicStoreInfo);
+
+// ✅ MULTI-TENANT
+router.get("/resolve", resolveTenant);                       // public — ye host kis store ka hai
+router.get("/check-subdomain", checkSubdomain);              // public — signup / store-setup me availability
+router.put("/domain", authMiddleware, checkPermission("store"), updateStoreDomain);
 
 // ✅ PROTECTED ROUTES — Admin only
 router.route("/")

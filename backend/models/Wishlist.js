@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const wishlistSchema = new mongoose.Schema(
   {
@@ -12,5 +13,9 @@ const wishlistSchema = new mongoose.Schema(
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );
+
+
+// ── Multi-tenant ──
+wishlistSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Wishlist", wishlistSchema);

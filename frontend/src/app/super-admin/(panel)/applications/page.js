@@ -106,9 +106,6 @@ export default function ApplicationsPage() {
                   <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">{item.name}</td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">
                     {item.store_name || <span className="italic text-[var(--text-muted)]">Not finished yet</span>}
-                    {!item.setup_completed && item.status === "pending" ? (
-                      <span className="mt-1 block text-[9px] font-bold uppercase tracking-wider text-amber-600">Setup pending</span>
-                    ) : null}
                   </td>
                   <td className="px-4 py-3 text-[var(--text-secondary)]">{item.email}</td>
                   <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">{item.phone || "—"}</td>

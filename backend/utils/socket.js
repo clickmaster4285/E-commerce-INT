@@ -2,8 +2,43 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const log = require("./logger");
+const { isPlatformFamilyHost } = require("./tenantHost");
+// Lazy: middleware/resolveStore → models/Store; circular require se bachne ke liye function ke andar
+const resolveStoreByHost = (host) => require("../middleware/resolveStore").resolveStoreByHost(host);
+
+const { runWithStore, getStoreId } = require("./tenantContext");
 
 let io = null;
+
+// ==========================================
+// TENANT-AWARE IO (multi-tenant broadcasts)
+// ------------------------------------------
+// Store context (HTTP request / socket event jo kisi store host par ho) me:
+//   io.emit(ev)          → sirf usi store ke sockets  (room "store:<id>")
+//   io.to("chat:admins") → sirf usi store ke admins   (room "chat:admins:<id>")
+// Baaki rooms (employee:<id>, chat:conversation:<id> ...) pehle se unique IDs hain.
+// Platform context (super admin) me sab kuch pehle jaisa global.
+// ==========================================
+const storeRoom = (storeId) => `store:${storeId}`;
+const SHARED_ROOMS = new Set(["chat:admins"]);
+const mapRoom = (room, storeId) =>
+  typeof room === "string" && SHARED_ROOMS.has(room) ? `${room}:${storeId}` : room;
+
+function createTenantIO(server) {
+  return new Proxy(server, {
+    get(target, prop) {
+      const storeId = getStoreId();
+      if (storeId) {
+        if (prop === "emit") return (...args) => target.to(storeRoom(storeId)).emit(...args);
+        if (prop === "to" || prop === "in") {
+          return (room) => target.to(Array.isArray(room) ? room.map((r) => mapRoom(r, storeId)) : mapRoom(room, storeId));
+        }
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
 
 // ==========================================
 // HELPER: COMPRESS & SAVE LOGO
@@ -198,7 +233,7 @@ const initSocket = (server) => {
     .join(",");
   const allowedOrigins = allowedOriginsEnv.split(",").map(u => u.trim()).filter(Boolean);
 
-  io = new Server(server, {
+  io = createTenantIO(new Server(server, {
     cors: {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
@@ -206,7 +241,13 @@ const initSocket = (server) => {
         if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$/.test(origin)) {
           return callback(null, true);
         }
-        callback(new Error("CORS not allowed"));
+        // Multi-tenant: *.<ROOT_DOMAIN> store subdomains + registered custom domains
+        let originHost;
+        try { originHost = new URL(origin).hostname; } catch { return callback(new Error("CORS not allowed")); }
+        if (isPlatformFamilyHost(originHost)) return callback(null, true);
+        resolveStoreByHost(originHost)
+          .then(({ store }) => (store ? callback(null, true) : callback(new Error("CORS not allowed"))))
+          .catch(() => callback(new Error("CORS not allowed")));
       },
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
@@ -216,6 +257,21 @@ const initSocket = (server) => {
     pingTimeout: 60000,
     pingInterval: 25000,
     transports: ["polling", "websocket"],
+  }));
+
+  // ==========================================
+  // TENANT RESOLUTION — handshake Host se store
+  // (socket bhi page ke hostname par connect hota hai: alistore.<root>:5000)
+  // ==========================================
+  io.use(async (socket, next) => {
+    try {
+      const { tenant, store } = await resolveStoreByHost(socket.handshake.headers.host);
+      if (tenant.type !== "platform" && !store) return next(new Error("Store not found"));
+      socket.tenantStoreId = store ? String(store._id) : null;
+      return next();
+    } catch (error) {
+      return next(error);
+    }
   });
 
   // ==========================================
@@ -414,10 +470,17 @@ const initSocket = (server) => {
     };
   }
 
+  // Aakhri middleware: connection handler isi store ke context me chale
+  io.use((socket, next) => runWithStore(socket.tenantStoreId, next));
+
   // ==========================================
   // CONNECTION HANDLER
   // ==========================================
   io.on("connection", (socket) => {
+    // Har event handler bhi isi store ke context me (tenantScope plugin queries scope karta hai)
+    socket.use((packet, next) => runWithStore(socket.tenantStoreId, next));
+    if (socket.tenantStoreId) socket.join(storeRoom(socket.tenantStoreId));
+
     if (socket.userId) socket.join(`employee:${socket.userId}`);
     if (socket.userId && socket.userType === "user" && String(socket.userRole || "").toLowerCase() === "user") {
       socket.join(`chat:customer:${socket.userId}`);
@@ -431,7 +494,7 @@ const initSocket = (server) => {
       }
       const gate = await requireSocketPermission(socket, "order", callback);
       if (!gate.allowed) return;
-      socket.join("chat:admins");
+      socket.join(socket.tenantStoreId ? `chat:admins:${socket.tenantStoreId}` : "chat:admins");
       try {
         const ChatConversation = require("../models/ChatConversation");
         const [row] = await ChatConversation.aggregate([{ $group: { _id: null, total: { $sum: "$unread_admin_count" } } }]);
@@ -979,19 +1042,24 @@ const initSocket = (server) => {
     });
 
     // ========== RELAY EVENTS ==========
-    socket.on("productCreated", (p) => socket.broadcast.emit("productCreated", p));
-    socket.on("productUpdated", (p) => socket.broadcast.emit("productUpdated", p));
-    socket.on("productDeleted", (id) => socket.broadcast.emit("productDeleted", id));
-    socket.on("employeeRelayCreated", (d) => socket.broadcast.emit("employeeCreated", { success: true, data: d }));
-    socket.on("employeeRelayUpdated", (d) => socket.broadcast.emit("employeeUpdated", { success: true, data: d }));
-    socket.on("employeeRelayDeleted", (id) => socket.broadcast.emit("employeeDeleted", { success: true, data: { id } }));
-    socket.on("employeeRelayStatusToggled", (d) => socket.broadcast.emit("employeeStatusToggled", { success: true, data: d }));
+    socket.on("productCreated", (p) => relayToStore(socket).emit("productCreated", p));
+    socket.on("productUpdated", (p) => relayToStore(socket).emit("productUpdated", p));
+    socket.on("productDeleted", (id) => relayToStore(socket).emit("productDeleted", id));
+    socket.on("employeeRelayCreated", (d) => relayToStore(socket).emit("employeeCreated", { success: true, data: d }));
+    socket.on("employeeRelayUpdated", (d) => relayToStore(socket).emit("employeeUpdated", { success: true, data: d }));
+    socket.on("employeeRelayDeleted", (id) => relayToStore(socket).emit("employeeDeleted", { success: true, data: { id } }));
+    socket.on("employeeRelayStatusToggled", (d) => relayToStore(socket).emit("employeeStatusToggled", { success: true, data: d }));
 
     socket.on("disconnect", (reason) => {});
   });
 
   return io;
 };
+
+/** socket.broadcast ka store-safe version: sirf usi store ke baaki sockets */
+function relayToStore(socket) {
+  return socket.tenantStoreId ? socket.to(storeRoom(socket.tenantStoreId)) : socket.broadcast;
+}
 
 const getIO = () => {
   if (!io) throw new Error("Socket.IO not initialized! Call initSocket(server) first.");

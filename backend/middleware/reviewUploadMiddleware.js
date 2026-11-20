@@ -1,4 +1,4 @@
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 const path = require("path");
 const fs = require("fs-extra");
 const sharp = require("sharp");

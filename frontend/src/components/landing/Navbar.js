@@ -47,7 +47,7 @@ export default function Navbar() {
       }`}
     >
       <div className="relative mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/landing" className="flex min-h-[44px] shrink-0 items-center" aria-label="Click Master Store — home">
+        <Link href="/" className="flex min-h-[44px] shrink-0 items-center" aria-label="Click Master Store — home">
           <span className="flex h-11 items-center rounded-xl bg-white px-3 ring-1 ring-black/5">
             <Image
               src="/landing/logo.webp"

@@ -1,13 +1,13 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    username: { type: String, required: true, unique: true, trim: true },
+    username: { type: String, required: true, trim: true },
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
     },
@@ -61,5 +61,11 @@ userSchema.methods.softDelete = function (userId) {
   this.deletedby = userId;
   return this.save();
 };
+
+
+// ── Multi-tenant ──
+userSchema.plugin(tenantScope); // har store ka data alag (storeId)
+userSchema.index({ storeId: 1, username: 1 }, { unique: true }); // unique per store
+userSchema.index({ storeId: 1, email: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("User", userSchema);

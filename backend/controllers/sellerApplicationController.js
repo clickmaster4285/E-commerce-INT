@@ -200,7 +200,7 @@ const sellerSetupState = async (req, res) => {
 };
 
 // Seller submits verification documents + confirms store details.
-// Approval by Super Admin stays locked until this is done (setup_completed = true).
+// Marks the application as setup-complete after the seller submits store details/docs.
 const completeSetup = async (req, res) => {
   try {
     const body = req.body || {};
