@@ -270,7 +270,7 @@ const updateVendor = async (req, res) => {
     const fields = ["vendor_code", "name", "company_name", "contact_person", "email", "phone", "whatsapp", "address", "city", "state", "country", "zip_code", "tax_id", "bank_details", "lead_time_days", "rating", "is_active"];
     const changes = diffFields(existing.toObject(), { ...existing.toObject(), ...update }, fields.map((key) => [key, key.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())]));
     if (changes.length) update.activity = [...(existing.activity || []), auditEvent(req, "updated", changes)];
-    const vendor = await Vendor.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
+    const vendor = await Vendor.findByIdAndUpdate(req.params.id, update, { returnDocument: "after", runValidators: true });
     try { (req.io || getIO()).emit("vendorUpdated", vendor.toObject()); } catch {}
     res.status(200).json({ success: true, message: "Vendor updated", data: vendor });
   } catch (e) {

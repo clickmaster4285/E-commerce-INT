@@ -287,7 +287,7 @@ const approveRequest = async (req, res) => {
         reviewed_by: req.superAdmin._id,
         reviewed_at: new Date(),
       },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!application) {
       return res
@@ -298,7 +298,7 @@ const approveRequest = async (req, res) => {
     // Store is provisioned at signup time; open it and unblock the pending seller employee.
     const storeId = application.store_id;
     const store = storeId
-      ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { new: true })
+      ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { returnDocument: "after" })
       : null;
     // Email ab sirf store ke andar unique — isi application ke store ka seller employee
     await Employee.findOneAndUpdate(
@@ -313,7 +313,7 @@ const approveRequest = async (req, res) => {
       if (!openStore) {
         const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
         openStore = existingUser.storeId
-          ? await Store.findByIdAndUpdate(existingUser.storeId, { store_status: "open" }, { new: true })
+          ? await Store.findByIdAndUpdate(existingUser.storeId, { store_status: "open" }, { returnDocument: "after" })
           : await Store.create({
               store_name: storeName0,
               email: application.email,
@@ -428,7 +428,7 @@ const requestInfo = async (req, res) => {
     const application = await SellerApplication.findOneAndUpdate(
       { _id: req.params.id, status: "pending" },
       { info_request_message: message, info_requested_at: new Date() },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!application) {
       return res
@@ -472,7 +472,7 @@ const rejectRequest = async (req, res) => {
         reviewed_by: req.superAdmin._id,
         reviewed_at: new Date(),
       },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!application) {
       return res

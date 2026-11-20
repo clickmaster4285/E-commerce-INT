@@ -238,7 +238,7 @@ async function rotateSession(req, res, aud, loadSubject) {
   const claimed = await Session().findOneAndUpdate(
     { _id: session._id, revokedAt: null },
     { $set: { revokedAt: new Date(), revokedReason: "rotated" } },
-    { new: true },
+    { returnDocument: "after" },
   );
   if (!claimed) return { ok: true, grace: true };
 

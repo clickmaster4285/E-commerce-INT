@@ -344,7 +344,7 @@ exports.updateBanner = async (req, res) => {
 
     data.updatedby = req.user?._id || null;
 
-    const updated = await Banner.findByIdAndUpdate(req.params.id, data, { new: true })
+    const updated = await Banner.findByIdAndUpdate(req.params.id, data, { returnDocument: "after" })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
     queueTranslationSync(Banner, updated._id);

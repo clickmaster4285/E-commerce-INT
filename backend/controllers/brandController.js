@@ -332,7 +332,7 @@ const updateBrand = async (req, res) => {
     const trackedFields = ["brand_name", "name", "brand_code", "description", "country", "status"];
     const changes = getChanges(existingBrand.toObject(), updateData, trackedFields);
 
-    const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, { new: true })
+    const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, { returnDocument: "after" })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 

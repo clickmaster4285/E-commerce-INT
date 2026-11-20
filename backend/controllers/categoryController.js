@@ -694,7 +694,7 @@ const updateCategory = async (req, res) => {
     const updatedCategory = await Category.findByIdAndUpdate(
       req.params.id,
       { $set: updateData },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!updatedCategory) {

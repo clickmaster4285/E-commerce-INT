@@ -877,7 +877,7 @@ const updateProfileInfo = async (req, res) => {
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
     const updatedUser = await Model.findByIdAndUpdate(userId, userUpdateFields, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     })
       .select("-password")
@@ -1312,7 +1312,7 @@ const createCheckoutDraft = async (req, res) => {
     const checkoutDoc = await CheckoutDraft.findOneAndUpdate(
       { user_id: req.user._id },
       { $setOnInsert: { user_id: req.user._id } },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
     );
     const cutoff = new Date(now.getTime() - CHECKOUT_DRAFT_MAX_AGE_MS);
     const completedDrafts = checkoutDoc.drafts.filter((draft) => draft.status === "completed");
@@ -1507,7 +1507,7 @@ const updateProfileREST = async (req, res) => {
     if (name) update.name = name;
     if (username) update.username = username;
     const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    const user = await Model.findByIdAndUpdate(req.user._id, update, { returnDocument: "after" }).select("-password");
     res.json({ success: true, user });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };

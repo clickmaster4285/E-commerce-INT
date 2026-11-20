@@ -462,7 +462,7 @@ const sellerStoreUpdate = async (req, res) => {
     if (update.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(update.email)) {
       return res.status(400).json({ success: false, message: "Please provide a valid email address." });
     }
-    const store = await Store.findByIdAndUpdate(req.user?.storeId, update, { new: true, runValidators: true })
+    const store = await Store.findByIdAndUpdate(req.user?.storeId, update, { returnDocument: "after", runValidators: true })
       .select("store_name tagline email phone support_email support_phone country state city zip_code address currency tax_rate weight_unit store_status")
       .lean();
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
