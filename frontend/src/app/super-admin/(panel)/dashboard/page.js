@@ -170,7 +170,7 @@ export default function SuperAdminDashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader title="Recent customers" action={<Button variant="link" size="sm" iconRight={ArrowRight} href="/super-admin/users">View all</Button>} />
+          <CardHeader title="Recent customers" />
           {isLoading ? (
             <ListSkeleton />
           ) : recentUsers.length === 0 ? (

@@ -16,11 +16,10 @@ const toPlainMap = (map) => {
  * 🌍 Seed `values` ko DB me likhte waqt option-level translations (Urdu /
  * Arabic) ko bachana zaroori hai.
  *
- * Ye function server START par chalti hai (`server.js` -> `seedAttributes()`),
- * aur dev me har backend file edit par nodemon restart hota hai. Pehle yahan
- * seed ke plain `{label, value}` seedha `$set` hote the — jis se har restart
- * par SAARI option translations mit jati thi (translation backfill ke baad bhi
- * turant wipe ho jati thi).
+ * Ye seed naya store banne par chalti hai (`Store` post-save →
+ * `seedAttributesForStore`). Manual backfill: `node scripts/seedAttributes.js`.
+ * Pehle yahan seed ke plain `{label, value}` seedha `$set` hote the — jis se
+ * dobara seed par SAARI option translations mit jati thi.
  *
  * Ab: jis option ka `value` (stable machine code) aur `label` dono match hain,
  * uski existing translations carry over hoti hain. Label badal gaya ho to
@@ -262,7 +261,7 @@ async function seedAttributesInContext() {
         data_type: attr.data_type,
         variant_allowed: attr.variant_allowed ?? false,
         unit: attr.unit || null,
-        // 🌍 Option labels ki translations bacha lo (restart-wipe fix).
+        // 🌍 Option labels ki translations bacha lo (dobara seed par wipe na ho).
         values: carryOverLabelTranslations(attr.values, existingByCode.get(attr.code)),
         is_active: true,
       };
@@ -300,7 +299,7 @@ function seedAttributesForStore(storeId) {
   return runWithStore(storeId, () => seedAttributesInContext());
 }
 
-/** Server start: har store ke liye uska apna set */
+/** Manual backfill: har existing store ke liye uska apna set. Server start isko nahi chalata. */
 async function seedAttributes() {
   const Store = require("../models/Store");
   const stores = await Store.find({}).select("_id").setOptions({ skipTenantScope: true }).lean();

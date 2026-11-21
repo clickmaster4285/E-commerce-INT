@@ -3,11 +3,14 @@ const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isA
 const SuperAdmin = require("../models/SuperAdmin");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
+const Plan = require("../models/Plan");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const jwt = require("jsonwebtoken"); // store admin handoff token (openStoreAdmin)
 // Super admin ka apna audience — sa_at / sa_rt cookies, alag secrets, rotating sessions
 const tokens = require("../utils/tokens");
+const { logActivity, activityRow, clientInfo } = require("../utils/superAdminActivity");
+const SuperAdminActivity = require("../models/SuperAdminActivity");
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
 
 // Seller ka employee: application ke store me (resume-flow wale purane records
@@ -30,6 +33,12 @@ const notifySeller = async (sendFn, payload, action, entityId) => {
     const result = await sendFn(payload);
     if (!result?.delivered) {
       console.error(`[super-admin] ${action} email not delivered:`, result?.reason || "unknown");
+      await logActivity({
+        action: `${action} email not delivered`,
+        entityType: "seller_application",
+        entityId: String(entityId || ""),
+        details: { to: payload?.email, reason: result?.reason || "unknown" },
+      }).catch(() => {});
     }
     return result;
   } catch (error) {
@@ -65,6 +74,13 @@ const loginSuperAdmin = async (req, res) => {
     superAdmin.lastLoginAt = new Date();
     superAdmin.lastActiveAt = superAdmin.lastLoginAt;
     await superAdmin.save().catch(() => {});
+    await logActivity({
+      action: "Signed in",
+      actor: superAdmin,
+      entityType: "auth",
+      entityId: String(superAdmin._id),
+      details: clientInfo(req),
+    });
 
     return res.json({
       success: true,
@@ -100,8 +116,26 @@ const refreshSuperAdminToken = async (req, res) => {
 
 const logoutSuperAdmin = async (req, res) => {
   try {
+    let actor = req.superAdmin;
+    if (!actor) {
+      // Expired access token (sa_at) par bhi pata chale kaun logout hua
+      const token = req.cookies?.[tokens.AUDIENCES.superadmin.cookies.access];
+      try {
+        const payload = token ? tokens.verifyAccess("superadmin", token, { ignoreExpiration: true }) : null;
+        if (payload?.userId) actor = await SuperAdmin.findById(payload.userId).select("name email").lean();
+      } catch { actor = null; }
+    }
     await tokens.revokeCurrentSession(req, "superadmin").catch(() => {});
     tokens.clearAuthCookies(res, "superadmin");
+    if (actor) {
+      await logActivity({
+        action: "Signed out",
+        actor,
+        entityType: "auth",
+        entityId: String(actor._id),
+        details: clientInfo(req),
+      });
+    }
     return res.json({ success: true, message: "Logged out." });
   } catch (error) {
     tokens.clearAuthCookies(res, "superadmin");
@@ -640,15 +674,24 @@ const listStores = async (req, res) => {
 
     // Owner = store ka Employee (seller) — customer_users me seller nahi hota
     const storeIds = stores.map((s) => s._id);
-    const owners = await Employee.find({ storeId: { $in: storeIds }, role: OWNER_ROLE })
-      .select("name username email storeId seller_pending")
-      .setOptions(CROSS_STORE)
-      .lean();
+    // Owner = store ka Employee (seller); plans = assigned subscription catalog
+    const planIds = [...new Set(stores.map((s) => s.planId).filter(Boolean).map(String))];
+    const [owners, plans] = await Promise.all([
+      Employee.find({ storeId: { $in: storeIds }, role: OWNER_ROLE })
+        .select("name username email storeId seller_pending")
+        .setOptions(CROSS_STORE)
+        .lean(),
+      planIds.length
+        ? Plan.find({ _id: { $in: planIds } }).select("name status price billingInterval currency").lean()
+        : Promise.resolve([]),
+    ]);
     const ownerByStore = new Map();
     owners.forEach((o) => ownerByStore.set(String(o.storeId), o));
+    const planById = new Map(plans.map((p) => [String(p._id), p]));
 
     const items = stores.map((s) => {
       const owner = ownerByStore.get(String(s._id));
+      const plan = s.planId ? planById.get(String(s.planId)) : null;
       return {
         id: s._id,
         store_name: s.store_name,
@@ -667,6 +710,8 @@ const listStores = async (req, res) => {
         address: s.address || "",
         zip_code: s.zip_code || "",
         logo_url: s.logo?.img_url || "",
+        planId: s.planId || null,
+        plan: plan ? { id: plan._id, name: plan.name, status: plan.status, price: plan.price, billingInterval: plan.billingInterval, currency: plan.currency } : null,
         // Real storefront URL (subdomain) — same helper as request detail, emails and handoff
         url: storeAdminBaseUrl(s),
         createdAt: s.createdAt,
@@ -688,11 +733,31 @@ const getStore = async (req, res) => {
   try {
     const store = await Store.findById(req.params.id).lean();
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
-    const owner = await Employee.findOne({ storeId: store._id, role: OWNER_ROLE })
-      .select("name username email phone status seller_pending createdAt")
-      .setOptions(CROSS_STORE)
-      .lean();
-    return res.json({ success: true, data: { ...store, id: store._id, status: store.store_status || "open", approvalStatus: owner?.seller_pending ? "pending" : store.store_status === "closed" ? "suspended" : "active", logo_url: store.logo?.img_url || "", url: storeAdminBaseUrl(store), owner: owner || null } });
+    const [owner, plan] = await Promise.all([
+      Employee.findOne({ storeId: store._id, role: OWNER_ROLE })
+        .select("name username email phone status seller_pending createdAt")
+        .setOptions(CROSS_STORE)
+        .lean(),
+      store.planId
+        ? Plan.findById(store.planId).select("name status price billingInterval currency").lean()
+        : Promise.resolve(null),
+    ]);
+    return res.json({
+      success: true,
+      data: {
+        ...store,
+        id: store._id,
+        status: store.store_status || "open",
+        approvalStatus: owner?.seller_pending ? "pending" : store.store_status === "closed" ? "suspended" : "active",
+        logo_url: store.logo?.img_url || "",
+        url: storeAdminBaseUrl(store),
+        owner: owner || null,
+        planId: store.planId || null,
+        plan: plan
+          ? { id: plan._id, name: plan.name, status: plan.status, price: plan.price, billingInterval: plan.billingInterval, currency: plan.currency }
+          : null,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load store." });
   }
@@ -725,6 +790,17 @@ const setStoreStatus = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to update store." });
   }
+};
+
+/** Empty / null / "" → null (no plan). Otherwise must be a real Plan id. */
+const resolvePlanIdInput = async (raw) => {
+  if (raw === undefined) return { skipped: true };
+  if (raw === null || raw === "") return { planId: null };
+  const id = String(raw).trim();
+  if (!/^[a-f\d]{24}$/i.test(id)) return { error: "Invalid plan." };
+  const plan = await Plan.findById(id).select("_id").lean();
+  if (!plan) return { error: "Plan not found." };
+  return { planId: plan._id };
 };
 
 /* ==========================================
@@ -846,6 +922,13 @@ const createSellerStore = async (req, res) => {
 
     const storeUrl = storeAdminBaseUrl(created.store);
     await pushStoreActivity(created.store._id, req, "created", "Store created by Super Admin", { storeName });
+    await logActivity({
+      action: `Store created: ${storeName}`,
+      actor: req.superAdmin,
+      entityType: "store",
+      entityId: String(created.store._id),
+      details: { subdomain },
+    });
     if (b.notify === true) {
       await notifySeller(sendApplicationApprovedEmail, { name, email, storeName, storeUrl }, "Approval", created.application._id);
     }
@@ -861,11 +944,29 @@ const createSellerStore = async (req, res) => {
 
 const createStore = async (req, res) => {
   try {
-    const { store_name, email, phone, subdomain, store_status = "open", business_category, business_type, description, country, city, address, zip_code, logo_url } = req.body || {};
+    const { store_name, email, phone, subdomain, store_status = "open", business_category, business_type, description, country, city, address, zip_code, logo_url, planId } = req.body || {};
     if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
     if (!["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
-    const store = await Store.create({ store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : "individual", description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim(), logo: { img_url: String(logo_url || "").trim(), public_id: "" } });
+    const planResult = await resolvePlanIdInput(planId === undefined ? null : planId);
+    if (planResult.error) return res.status(400).json({ success: false, message: planResult.error });
+    const store = await Store.create({
+      store_name: String(store_name).trim(),
+      email: String(email || "").trim(),
+      phone: String(phone || "").trim(),
+      subdomain: String(subdomain || "").trim().toLowerCase() || undefined,
+      store_status,
+      business_category: String(business_category || "").trim(),
+      business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : "individual",
+      description: String(description || "").trim(),
+      country: String(country || "").trim(),
+      city: String(city || "").trim(),
+      address: String(address || "").trim(),
+      zip_code: String(zip_code || "").trim(),
+      logo: { img_url: String(logo_url || "").trim(), public_id: "" },
+      planId: planResult.planId ?? null,
+    });
     await pushStoreActivity(store._id, req, "created", "Store created by Super Admin", { storeName: store.store_name });
+    await logActivity({ action: `Store created: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: { subdomain: store.subdomain } });
     return res.status(201).json({ success: true, message: "Store created.", data: store });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
@@ -875,17 +976,34 @@ const createStore = async (req, res) => {
 
 const updateStore = async (req, res) => {
   try {
-    const { store_name, email, phone, subdomain, store_status, business_category, business_type, description, country, city, address, zip_code, logo_url } = req.body || {};
+    const { store_name, email, phone, subdomain, store_status, business_category, business_type, description, country, city, address, zip_code, logo_url, planId } = req.body || {};
     if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
     if (store_status && !["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
     const store = await Store.findById(req.params.id);
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    const planResult = await resolvePlanIdInput(planId);
+    if (planResult.error) return res.status(400).json({ success: false, message: planResult.error });
     const before = store.toObject();
-    Object.assign(store, { store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status: store_status || store.store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : store.business_type, description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim() });
+    Object.assign(store, {
+      store_name: String(store_name).trim(),
+      email: String(email || "").trim(),
+      phone: String(phone || "").trim(),
+      subdomain: String(subdomain || "").trim().toLowerCase() || undefined,
+      store_status: store_status || store.store_status,
+      business_category: String(business_category || "").trim(),
+      business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : store.business_type,
+      description: String(description || "").trim(),
+      country: String(country || "").trim(),
+      city: String(city || "").trim(),
+      address: String(address || "").trim(),
+      zip_code: String(zip_code || "").trim(),
+    });
+    if (!planResult.skipped) store.planId = planResult.planId;
     if (logo_url !== undefined) store.logo = { ...(store.logo?.toObject?.() || store.logo || {}), img_url: String(logo_url || "").trim() };
     await store.save();
-    const changes = getChanges(before, store.toObject(), ["store_name", "email", "phone", "business_category", "description", "country", "city", "address", "zip_code", "store_status"]);
+    const changes = getChanges(before, store.toObject(), ["store_name", "email", "phone", "business_category", "description", "country", "city", "address", "zip_code", "store_status", "planId"]);
     await pushStoreActivity(store._id, req, "updated", "Store details updated by Super Admin", { changes });
+    await logActivity({ action: `Store updated: ${store.store_name}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: { status: store.store_status, changes } });
     return res.json({ success: true, message: "Store updated.", data: store });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
@@ -897,9 +1015,11 @@ const deleteStore = async (req, res) => {
   try {
     const store = await Store.findById(req.params.id);
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    const storeName = store.store_name;
     await Store.deleteOne({ _id: store._id });
     await User.updateMany({ storeId: store._id }, { $unset: { storeId: 1 }, status: "inactive" });
     await Employee.deleteMany({ storeId: store._id }).setOptions(CROSS_STORE);
+    await logActivity({ action: `Store deleted: ${storeName}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: {} });
     return res.json({ success: true, message: "Store deleted." });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to delete store." });
@@ -1378,6 +1498,14 @@ const publicMember = (m, me) => ({
 const recordSuperAdminActivity = async (req, action, category = "System", details = {}) => {
   if (!req?.superAdmin?._id) return;
   await SuperAdmin.updateOne({ _id: req.superAdmin._id }, { $push: { activities: { $each: [{ action, category, details, timestamp: new Date() }], $position: 0, $slice: 100 } } });
+  // Global audit feed (My activity / Team ActivityFeed) — best-effort
+  await logActivity({
+    action,
+    actor: req.superAdmin,
+    entityType: "superadmin",
+    entityId: String(details?.memberId || req.superAdmin._id),
+    details: { category, ...details },
+  }).catch(() => {});
 };
 
 // Aakhri active super admin ko demote/deactivate/delete nahi karne dete — warna koi Team manage nahi kar sakega
@@ -1545,6 +1673,421 @@ const getTeamMember = async (req, res) => {
   }
 };
 
+/* ==========================================
+   MY ACTIVITY — logged-in member ki apni actions (time + description)
+   ========================================== */
+const ACTIVITY_TYPES = ["seller_application", "store", "user", "superadmin", "auth", "settings", "system", "plan"];
+// Ek member ki activity — feed + counts + stats (My activity aur Team detail dono)
+const activityFeed = async (actorId, query = {}) => {
+  const { type, search, page = 1, limit = 25 } = query;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+  const base = { "actor.id": actorId };
+  const filter = { ...base };
+  if (type && ACTIVITY_TYPES.includes(String(type))) filter.entityType = String(type);
+  if (search) filter.action = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+  const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+  const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+  const [items, total, byType, today, week, all] = await Promise.all([
+    SuperAdminActivity.find(filter).sort({ created_at: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
+    SuperAdminActivity.countDocuments(filter),
+    SuperAdminActivity.aggregate([{ $match: base }, { $group: { _id: "$entityType", count: { $sum: 1 } } }]),
+    SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfDay } }),
+    SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfWeek } }),
+    SuperAdminActivity.countDocuments(base),
+  ]);
+  const counts = { all };
+  for (const row of byType) counts[row._id] = row.count;
+  return { items: items.map(activityRow), total, counts, stats: { today, week, all }, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) || 1 };
+};
+
+const myActivity = async (req, res) => {
+  try {
+    return res.json({ success: true, data: await activityFeed(req.superAdmin._id, req.query) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load your activity." });
+  }
+};
+
+// Team member detail page ka full activity feed (sign-ins + actions)
+const teamMemberActivity = async (req, res) => {
+  try {
+    const member = await SuperAdmin.findById(req.params.id).select("_id").lean();
+    if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
+    return res.json({ success: true, data: await activityFeed(member._id, req.query) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load activity." });
+  }
+};
+
+/* ==========================================
+   PLANS — platform subscription catalog
+   ========================================== */
+
+const parseLimit = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) return { error: true };
+  return n;
+};
+
+const LIMIT_ERROR_LABELS = {
+  maxProducts: "Max products",
+  maxStaffAccounts: "Max staff accounts",
+  maxOrders: "Max orders",
+  maxChats: "Max chats",
+  maxLeads: "Max leads",
+  maxQuotes: "Max quotes",
+  maxInvoices: "Max invoices",
+};
+
+const publicLimits = (limits = {}) => {
+  const out = {};
+  for (const key of Plan.LIMIT_KEYS) out[key] = limits?.[key] ?? null;
+  return out;
+};
+
+const publicCreatedBy = (createdBy) => {
+  if (!createdBy) return null;
+  if (typeof createdBy === "object" && createdBy._id) {
+    return { id: createdBy._id, name: createdBy.name || "", email: createdBy.email || "" };
+  }
+  return { id: createdBy, name: "", email: "" };
+};
+
+const publicPlan = (p, storeCount = 0) => ({
+  id: p._id,
+  name: p.name,
+  slug: p.slug,
+  description: p.description || "",
+  status: p.status || "active",
+  sortOrder: p.sortOrder ?? 0,
+  price: p.price ?? 0,
+  billingInterval: p.billingInterval || "monthly",
+  currency: p.currency || "PKR",
+  limits: publicLimits(p.limits),
+  features: {
+    orderManagement: p.features?.orderManagement || "basic",
+    analytics: p.features?.analytics || "basic",
+    pos: Boolean(p.features?.pos),
+    customDomain: Boolean(p.features?.customDomain),
+  },
+  storeCount,
+  createdBy: publicCreatedBy(p.createdBy),
+  created_at: p.created_at,
+  updated_at: p.updated_at,
+});
+
+/** Activity against a plan entity (create / update / status / delete) */
+const planEntityActivityFeed = async (planId, query = {}) => {
+  const { search, page = 1, limit = 25 } = query;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 25));
+  const base = { entityType: "plan", entityId: String(planId) };
+  const filter = { ...base };
+  if (search) filter.action = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+
+  const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+  const startOfWeek = new Date(startOfDay); startOfWeek.setDate(startOfWeek.getDate() - 6);
+
+  const [items, total, today, week, all] = await Promise.all([
+    SuperAdminActivity.find(filter).sort({ created_at: -1 }).skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
+    SuperAdminActivity.countDocuments(filter),
+    SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfDay } }),
+    SuperAdminActivity.countDocuments({ ...base, created_at: { $gte: startOfWeek } }),
+    SuperAdminActivity.countDocuments(base),
+  ]);
+  return {
+    items: items.map(activityRow),
+    total,
+    counts: { all },
+    stats: { today, week, all },
+    page: pageNum,
+    limit: limitNum,
+    pages: Math.ceil(total / limitNum) || 1,
+  };
+};
+
+const parsePlanBody = async (body, { forUpdate = false, existing = null } = {}) => {
+  const errors = {};
+  const name = String(body?.name ?? existing?.name ?? "").trim();
+  if (name.length < 2) errors.name = "Name must be at least 2 characters.";
+
+  const description = String(body?.description ?? existing?.description ?? "").trim();
+  const statusRaw = body?.status ?? existing?.status ?? "active";
+  if (!["active", "inactive"].includes(String(statusRaw))) errors.status = "Status must be active or inactive.";
+
+  let sortOrder = existing?.sortOrder ?? 0;
+  if (body?.sortOrder !== undefined && body?.sortOrder !== null && body?.sortOrder !== "") {
+    const n = Number(body.sortOrder);
+    if (!Number.isFinite(n) || !Number.isInteger(n)) errors.sortOrder = "Sort order must be a whole number.";
+    else sortOrder = n;
+  }
+
+  let price = existing?.price ?? 0;
+  if (body?.price !== undefined && body?.price !== null && body?.price !== "") {
+    const n = Number(body.price);
+    if (!Number.isFinite(n) || n < 0) errors.price = "Price must be zero or greater.";
+    else price = n;
+  } else if (!forUpdate && (body?.price === undefined || body?.price === null || body?.price === "")) {
+    price = 0;
+  }
+
+  const billingInterval = String(body?.billingInterval ?? existing?.billingInterval ?? "monthly");
+  if (!Plan.BILLING_INTERVALS.includes(billingInterval)) errors.billingInterval = "Invalid billing interval.";
+
+  const currency = String(body?.currency ?? existing?.currency ?? "PKR").trim().toUpperCase() || "PKR";
+  if (!/^[A-Z]{3}$/.test(currency)) errors.currency = "Currency must be a 3-letter ISO code.";
+
+  const limitsIn = body?.limits || {};
+  const limits = {};
+  for (const key of Plan.LIMIT_KEYS) {
+    const parsed = body?.limits ? parseLimit(limitsIn[key]) : (existing?.limits?.[key] ?? null);
+    if (parsed?.error) errors[key] = `${LIMIT_ERROR_LABELS[key] || key} must be a whole number or unlimited.`;
+    else limits[key] = parsed;
+  }
+
+  // Missing keys keep the stored value — the form no longer edits order, analytics, or custom domain.
+  const featuresIn = body?.features && typeof body.features === "object" ? body.features : {};
+  const hasFeature = (key) => Object.prototype.hasOwnProperty.call(featuresIn, key);
+  const orderManagement = hasFeature("orderManagement")
+    ? String(featuresIn.orderManagement)
+    : String(existing?.features?.orderManagement ?? "basic");
+  const analytics = hasFeature("analytics")
+    ? String(featuresIn.analytics)
+    : String(existing?.features?.analytics ?? "basic");
+  if (!Plan.FEATURE_TIERS.includes(orderManagement)) errors.orderManagement = "Invalid order management tier.";
+  if (!Plan.FEATURE_TIERS.includes(analytics)) errors.analytics = "Invalid analytics tier.";
+  const pos = hasFeature("pos") ? Boolean(featuresIn.pos) : Boolean(existing?.features?.pos);
+  const customDomain = hasFeature("customDomain")
+    ? Boolean(featuresIn.customDomain)
+    : Boolean(existing?.features?.customDomain);
+
+  if (Object.keys(errors).length) return { errors };
+
+  const slug = await Plan.uniqueSlug(name, existing?._id || null);
+
+  return {
+    data: {
+      name,
+      slug,
+      description,
+      status: statusRaw,
+      sortOrder,
+      price,
+      billingInterval,
+      currency,
+      limits,
+      features: { orderManagement, analytics, pos, customDomain },
+    },
+  };
+};
+
+const listPlans = async (req, res) => {
+  try {
+    const { status, search } = req.query;
+    const filter = {};
+    if (["active", "inactive"].includes(String(status || ""))) filter.status = String(status);
+    if (search) {
+      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: pattern }, { slug: pattern }, { description: pattern }];
+    }
+
+    const [plans, counts] = await Promise.all([
+      Plan.find(filter).sort({ sortOrder: 1, created_at: -1 }).lean(),
+      Promise.all([
+        Plan.countDocuments({}),
+        Plan.countDocuments({ status: "active" }),
+        Plan.countDocuments({ status: "inactive" }),
+      ]).then(([all, active, inactive]) => ({ all, active, inactive })),
+    ]);
+
+    const planIds = plans.map((p) => p._id);
+    const storeCounts = planIds.length
+      ? await Store.aggregate([
+          { $match: { planId: { $in: planIds } } },
+          { $group: { _id: "$planId", count: { $sum: 1 } } },
+        ]).option({ skipTenantScope: true })
+      : [];
+    const countByPlan = new Map(storeCounts.map((r) => [String(r._id), r.count]));
+
+    return res.json({
+      success: true,
+      data: {
+        items: plans.map((p) => publicPlan(p, countByPlan.get(String(p._id)) || 0)),
+        counts,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load plans." });
+  }
+};
+
+const getPlan = async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.id).populate("createdBy", "name email").lean();
+    if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
+
+    const [storeCount, stores, activityTotal, activityWeek] = await Promise.all([
+      Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }),
+      Store.find({ planId: plan._id })
+        .select("store_name subdomain store_status logo createdAt")
+        .sort({ createdAt: -1 })
+        .limit(12)
+        .setOptions({ skipTenantScope: true })
+        .lean(),
+      SuperAdminActivity.countDocuments({ entityType: "plan", entityId: String(plan._id) }),
+      SuperAdminActivity.countDocuments({
+        entityType: "plan",
+        entityId: String(plan._id),
+        created_at: { $gte: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - 6); return d; })() },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        plan: publicPlan(plan, storeCount),
+        stores: stores.map((s) => ({
+          id: s._id,
+          store_name: s.store_name,
+          subdomain: s.subdomain || "",
+          status: s.store_status || "open",
+          logo_url: s.logo?.img_url || "",
+          createdAt: s.createdAt,
+        })),
+        stats: { stores: storeCount, activity: activityTotal, activityWeek },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load the plan." });
+  }
+};
+
+const planActivity = async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.id).select("_id").lean();
+    if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
+    return res.json({ success: true, data: await planEntityActivityFeed(plan._id, req.query) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load plan activity." });
+  }
+};
+
+const createPlan = async (req, res) => {
+  try {
+    const parsed = await parsePlanBody(req.body || {}, { forUpdate: false });
+    if (parsed.errors) {
+      return res.status(400).json({ success: false, message: "Please fix the highlighted fields.", errors: parsed.errors });
+    }
+    const plan = await Plan.create({
+      ...parsed.data,
+      createdBy: req.superAdmin?._id || null,
+    });
+    await logActivity({
+      action: `Plan created: ${plan.name}`,
+      actor: req.superAdmin,
+      entityType: "plan",
+      entityId: String(plan._id),
+      details: { price: plan.price, billingInterval: plan.billingInterval },
+    });
+    const lean = plan.toObject();
+    lean.createdBy = req.superAdmin
+      ? { _id: req.superAdmin._id, name: req.superAdmin.name, email: req.superAdmin.email }
+      : null;
+    return res.status(201).json({ success: true, message: `${plan.name} has been created.`, data: publicPlan(lean, 0) });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: "A plan with that name already exists.", errors: { name: "This name is already taken." } });
+    }
+    return res.status(500).json({ success: false, message: "Failed to create the plan." });
+  }
+};
+
+const updatePlan = async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
+    const parsed = await parsePlanBody(req.body || {}, { forUpdate: true, existing: plan.toObject() });
+    if (parsed.errors) {
+      return res.status(400).json({ success: false, message: "Please fix the highlighted fields.", errors: parsed.errors });
+    }
+    const before = plan.name;
+    Object.assign(plan, parsed.data);
+    await plan.save();
+    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+    await logActivity({
+      action: `Plan updated: ${plan.name}`,
+      actor: req.superAdmin,
+      entityType: "plan",
+      entityId: String(plan._id),
+      details: { changed: before !== plan.name ? ["name"] : ["details"] },
+    });
+    return res.json({ success: true, message: "Plan updated.", data: publicPlan(plan.toObject(), storeCount) });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ success: false, message: "A plan with that name already exists.", errors: { name: "This name is already taken." } });
+    }
+    return res.status(500).json({ success: false, message: "Failed to update the plan." });
+  }
+};
+
+const setPlanStatus = async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!["active", "inactive"].includes(String(status || ""))) {
+      return res.status(400).json({ success: false, message: "status must be active or inactive." });
+    }
+    const plan = await Plan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
+    const previous = plan.status;
+    if (previous === status) {
+      const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+      return res.json({ success: true, message: "No change.", data: publicPlan(plan.toObject(), storeCount) });
+    }
+    plan.status = status;
+    await plan.save();
+    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+    await logActivity({
+      action: `Plan ${previous} → ${status}: ${plan.name}`,
+      actor: req.superAdmin,
+      entityType: "plan",
+      entityId: String(plan._id),
+      details: { previous, next: status },
+    });
+    return res.json({ success: true, message: `${plan.name} is now ${status}.`, data: publicPlan(plan.toObject(), storeCount) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to update plan status." });
+  }
+};
+
+const deletePlan = async (req, res) => {
+  try {
+    const plan = await Plan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
+    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+    if (storeCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Cannot delete "${plan.name}" — ${storeCount} store${storeCount === 1 ? " is" : "s are"} still on this plan. Reassign them first.`,
+      });
+    }
+    await Plan.deleteOne({ _id: plan._id });
+    await logActivity({
+      action: `Plan deleted: ${plan.name}`,
+      actor: req.superAdmin,
+      entityType: "plan",
+      entityId: String(plan._id),
+      details: {},
+    });
+    return res.json({ success: true, message: "Plan deleted." });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to delete the plan." });
+  }
+};
+
 module.exports = {
   getStore,
   // team
@@ -1591,4 +2134,15 @@ module.exports = {
   resetStoreAdminPassword,
   updateStoreAdmin,
   setStoreAdminStatus,
+  // plans
+  listPlans,
+  getPlan,
+  planActivity,
+  createPlan,
+  updatePlan,
+  setPlanStatus,
+  deletePlan,
+  // activity
+  myActivity,
+  teamMemberActivity,
 };

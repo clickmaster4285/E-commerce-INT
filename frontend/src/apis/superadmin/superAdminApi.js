@@ -113,17 +113,8 @@ export const superAdminApi = {
   setStoreStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/stores/${id}/status`, { status }).then((r) => r.data),
 
-  // Users
-  listUsers: (params = {}) =>
-    superAdminHttp.get("/super-admin/users", { params }).then((r) => r.data),
-  getUser: (id) => superAdminHttp.get(`/super-admin/users/${id}`).then((r) => r.data),
-  updateUser: (id, payload) => superAdminHttp.patch(`/super-admin/users/${id}`, payload).then((r) => r.data),
-  deleteUser: (id) => superAdminHttp.delete(`/super-admin/users/${id}`).then((r) => r.data),
-  setUserPassword: (id, password) => superAdminHttp.post(`/super-admin/users/${id}/password`, { password }).then((r) => r.data),
   // One-time sign-in link into a store's admin panel (as the store owner)
   openStoreAdmin: (storeId) => superAdminHttp.post(`/super-admin/stores/${storeId}/admin-access`).then((r) => r.data),
-  setUserStatus: (id, status) =>
-    superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
 
   // Store admins (store ke owner/admin — admin_users)
   listStoreAdmins: (params = {}) =>
@@ -143,4 +134,19 @@ export const superAdminApi = {
   resetTeamMemberPassword: (id, password) =>
     superAdminHttp.post(`/super-admin/team/${id}/password`, { password }).then((r) => r.data),
   deleteTeamMember: (id) => superAdminHttp.delete(`/super-admin/team/${id}`).then((r) => r.data),
+  // Logged-in member ki apni activity (time + description)
+  myActivity: (params = {}) => superAdminHttp.get("/super-admin/activity/me", { params }).then((r) => r.data),
+  teamMemberActivity: (id, params = {}) => superAdminHttp.get(`/super-admin/team/${id}/activity`, { params }).then((r) => r.data),
+
+  // Plans (platform subscription catalog)
+  listPlans: (params = {}) =>
+    superAdminHttp.get("/super-admin/plans", { params }).then((r) => r.data),
+  getPlan: (id) => superAdminHttp.get(`/super-admin/plans/${id}`).then((r) => r.data),
+  planActivity: (id, params = {}) =>
+    superAdminHttp.get(`/super-admin/plans/${id}/activity`, { params }).then((r) => r.data),
+  createPlan: (payload) => superAdminHttp.post("/super-admin/plans", payload).then((r) => r.data),
+  updatePlan: (id, payload) => superAdminHttp.patch(`/super-admin/plans/${id}`, payload).then((r) => r.data),
+  setPlanStatus: (id, status) =>
+    superAdminHttp.patch(`/super-admin/plans/${id}/status`, { status }).then((r) => r.data),
+  deletePlan: (id) => superAdminHttp.delete(`/super-admin/plans/${id}`).then((r) => r.data),
 };

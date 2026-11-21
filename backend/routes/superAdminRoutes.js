@@ -15,6 +15,7 @@ router.use(requireSuperAdmin);
 router.get("/auth/me", superAdminController.meSuperAdmin);
 
 router.get("/dashboard", superAdminController.getDashboard);
+router.get("/activity/me", superAdminController.myActivity);
 
 router.get("/requests", superAdminController.listRequests);
 router.get("/requests/:id", superAdminController.getRequest);
@@ -51,9 +52,19 @@ router.patch("/users/:id/status", superAdminController.setUserStatus);
 router.get("/team", superAdminController.listTeam);
 router.post("/team", superAdminController.createTeamMember);
 router.get("/team/:id", superAdminController.getTeamMember);
+router.get("/team/:id/activity", superAdminController.teamMemberActivity);
 router.patch("/team/:id", superAdminController.updateTeamMember);
 router.patch("/team/:id/status", superAdminController.setTeamMemberStatus);
 router.post("/team/:id/password", superAdminController.resetTeamMemberPassword);
 router.delete("/team/:id", superAdminController.deleteTeamMember);
+
+/* Plans — platform subscription catalog (limits + feature tiers) */
+router.get("/plans", superAdminController.listPlans);
+router.post("/plans", superAdminController.createPlan);
+router.get("/plans/:id/activity", superAdminController.planActivity);
+router.get("/plans/:id", superAdminController.getPlan);
+router.patch("/plans/:id", superAdminController.updatePlan);
+router.patch("/plans/:id/status", superAdminController.setPlanStatus);
+router.delete("/plans/:id", superAdminController.deletePlan);
 
 module.exports = router;

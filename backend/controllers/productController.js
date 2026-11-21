@@ -1716,6 +1716,12 @@ const createProduct = async (req, res) => {
   let createdProduct = null;
 
   try {
+    const { assertWithinLimit } = require("../utils/planLimits");
+    const planBlock = await assertWithinLimit("products");
+    if (planBlock) {
+      return res.status(planBlock.status).json({ message: planBlock.message });
+    }
+
     const productName = String(req.body.name || "").trim();
 
     if (!productName) {

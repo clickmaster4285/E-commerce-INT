@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Mail, Phone, Pencil, KeyRound, Ban, CircleCheck, Trash2, ShieldCheck, UserCog, Clock, CalendarPlus, Activity, LogIn, Hash, ClipboardList, Store, Users, Settings, MoreHorizontal, Check, Wifi, History } from "lucide-react";
 import { PageHeader, Card, CardHeader, CardBody, Button, StatusBadge, Badge, Avatar, Alert, Skeleton, DropdownMenu, ConfirmDialog, EmptyState, StatCard } from "@/components/superadmin/ui";
 import TeamMemberDialog, { ResetPasswordDialog } from "@/components/superadmin/TeamMemberDialog";
+import ActivityFeed from "@/components/superadmin/ActivityFeed";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDateTime, timeAgo } from "@/lib/superadminFormat";
 
@@ -143,6 +144,14 @@ export default function TeamMemberPage() {
           {member.activities?.length ? <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">{member.activities.slice(0, 30).map((entry, index) => <li key={`${entry.timestamp}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" /><p className="text-[13px] font-medium text-[var(--text-primary)]">{entry.action}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{entry.category || "System"} · {formatDateTime(entry.timestamp)}</p></li>)}</ol> : <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>}
         </CardBody>
       </Card>
+
+      <ActivityFeed
+        queryKey={["superadmin-team-activity", String(id)]}
+        fetcher={(params) => superAdminApi.teamMemberActivity(id, params)}
+        title="Activity"
+        description={`When ${member.isSelf ? "you" : member.name} signed in and out, and everything done in the panel`}
+        who={member.isSelf ? "you" : member.name}
+      />
 
       {dialog === "edit" && <TeamMemberDialog member={member} onClose={close} onSaved={ok("Team member updated.")} />}
       {dialog === "password" && <ResetPasswordDialog member={member} onClose={close} onSaved={ok("Password updated.")} />}

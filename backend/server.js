@@ -22,9 +22,6 @@ const { initSocket } = require("./utils/socket");
 const { resolveStore, resolveStoreByHost } = require("./middleware/resolveStore");
 const { isPlatformFamilyHost, ROOT_DOMAIN } = require("./utils/tenantHost");
 
-// ✅ Seed script ko import karein (Data yahan nahi, wahan rahega)
-const { seedAttributes } = require("./scripts/seedAttributes");
-
 // ==========================================
 // ROUTES IMPORT
 // ==========================================
@@ -301,7 +298,7 @@ const seedDefaultData = async () => {
   try {
     // Default store / store-admin auto-seed HATA diya gaya hai (multi-tenant):
     // stores sirf seller signup se bante hain (Super Admin approval ke baad).
-    // Startup par sirf Super Admin + attributes seed hote hain.
+    // Attributes startup par nahi — naya store save hote hi Store model seed karta hai.
 
     // 1. Super Admin Seed (development convenience; production requires a strong password)
     const saEmail = process.env.SUPER_ADMIN_EMAIL;
@@ -336,8 +333,6 @@ const seedDefaultData = async () => {
     } else {
       log.warn("[superadmin] SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD not set; /super-admin will be unavailable.");
     }
-    // 2. Attributes Auto-Seed
-    await seedAttributes();
 
   } catch (error) {
     log.error("❌ Seed Error:", error.message);
