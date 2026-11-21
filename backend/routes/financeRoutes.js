@@ -1,6 +1,7 @@
 const express = require("express");
-const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
-const authMiddleware = require("../middleware/authMiddleware");
+const { isAdminRole } = require("../utils/roles");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { getFinanceOverview } = require("../controllers/financeController");
 
 const router = express.Router();

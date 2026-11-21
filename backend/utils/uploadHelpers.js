@@ -1,20 +1,17 @@
   const path = require("path");
   const fs = require("fs-extra");
 const log = require("./logger");
+const { UPLOAD_ROOT, uploadDirFor, localPathForUrl } = require("./uploadPaths");
 
   // Single image delete
   const deleteImageFile = async (imgUrl) => {
     try {
       if (!imgUrl) return;
 
-      const cleanPath = imgUrl.replace(/^\/+/, "");
+      // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ → null
+      const filePath = localPathForUrl(null, imgUrl);
 
-      const filePath = path.join(
-        process.cwd(),
-        cleanPath
-      );
-
-      if (await fs.pathExists(filePath)) {
+      if (filePath && (await fs.pathExists(filePath))) {
         await fs.remove(filePath);
       }
     } catch (error) {
@@ -31,15 +28,16 @@ const log = require("./logger");
     try {
       if (!productId) return;
 
-      const folderPath = path.join(
-        process.cwd(),
-        "uploads",
-        "products",
-        productId.toString()
-      );
+      // Naya: uploads/stores/<storeId>/products/<id> · purana: uploads/products/<id>
+      const folders = [
+        uploadDirFor(null, "products", productId.toString()),
+        path.join(UPLOAD_ROOT, "products", productId.toString()),
+      ];
 
-      if (await fs.pathExists(folderPath)) {
-        await fs.remove(folderPath);
+      for (const folderPath of folders) {
+        if (await fs.pathExists(folderPath)) {
+          await fs.remove(folderPath);
+        }
       }
     } catch (error) {
       log.error(

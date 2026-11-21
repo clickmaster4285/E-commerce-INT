@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs-extra");
 const mongoose = require("mongoose");
+const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 
 const saveProductImages = async (req, res, next) => {
   try {
@@ -18,12 +19,8 @@ const saveProductImages = async (req, res, next) => {
     // Controller bhi isi ID ko use karega
     req.productId = productId;
 
-    const uploadDirectory = path.join(
-      process.cwd(),
-      "uploads",
-      "products",
-      productId.toString()
-    );
+    // Store ka apna folder: uploads/stores/<storeId>/products/<productId>
+    const uploadDirectory = uploadDirFor(req, "products", productId.toString());
 
     // Folder create karo agar exist nahi karta
     await fs.ensureDir(uploadDirectory);
@@ -51,7 +48,7 @@ const saveProductImages = async (req, res, next) => {
       await fs.writeFile(filePath, file.buffer);
 
       savedImages.push({
-        img_url: `/uploads/products/${productId}/${fileName}`,
+        img_url: uploadUrlFor(filePath),
         img_size: file.size,
         mimeType: file.mimetype,
         width: metadata.width,

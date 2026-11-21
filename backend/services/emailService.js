@@ -148,8 +148,9 @@ const sendApplicationApprovedEmail = async ({ name, email, storeName, storeUrl }
 // ------------------------------------------
 // 3) More information needed
 // ------------------------------------------
-const sendApplicationInfoRequestedEmail = async ({ name, email, storeName, message }) => {
-  const setupUrl = `${frontendBase()}/store-setup?email=${encodeURIComponent(email)}`;
+const sendApplicationInfoRequestedEmail = async ({ name, email, storeName, message, setupToken }) => {
+  // Signed link (utils/sellerSetupToken.js) — sirf email wala link koi bhi bana sakta tha
+  const setupUrl = `${frontendBase()}/store-setup?token=${encodeURIComponent(setupToken || "")}`;
   const content = [
     hero({
       tone: "brand",

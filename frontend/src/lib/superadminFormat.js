@@ -1,4 +1,5 @@
 // Super Admin — date/time + small display helpers (sab pages same format use karein)
+import { getBackendOrigin } from "./tenantHost";
 
 const toDate = (value) => {
   if (!value) return null;
@@ -60,8 +61,12 @@ export const initials = (name = "") =>
 
 /** Backend relative upload path → absolute URL */
 const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
+// Browser me PAGE ke hostname par backend (getBackendOrigin / alignBackendUrl):
+// KYC documents (/uploads/documents) private hain aur sirf super admin ke sa_at
+// cookie ke saath milte hain — wo host-only hai, raw IP wale URL par jata hi nahi.
 export const assetUrl = (path) => {
   if (!path) return "";
   if (/^(https?:|data:)/.test(path)) return path;
-  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
+  const origin = (typeof window !== "undefined" && getBackendOrigin()) || API_ORIGIN;
+  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
 };

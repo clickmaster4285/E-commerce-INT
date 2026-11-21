@@ -47,73 +47,24 @@ const saveStoreLogoFromBase64 = async (raw) => {
   return `/uploads/store-logos/${fileName}`;
 };
 
-// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
-// jwt.sign "NaNm" jaise invalid expiresIn pe THROW kar deta hai (login/refresh
-// dono 500/401 → user logout). Is liye har value validated fallback ke saath.
-const getUserAccessDays = () => {
-  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 7;
+// ✅ Tokens / cookies / sessions — har audience (user | admin) ke alag secrets,
+// cookies aur DB-backed rotating refresh sessions (utils/tokens.js)
+const tokens = require("../utils/tokens");
+const { findPlatformEmployee, sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
+const { verifyGoogleIdToken } = require("../utils/googleAuth");
+
+// Frontend axios instance `X-Auth-Aud` bhejta hai — logout sirf usi session ka
+const audFromHeader = (req) => {
+  const hint = String(req.headers?.["x-auth-aud"] || "").trim().toLowerCase();
+  return hint === "admin" || hint === "user" ? hint : null;
 };
+const audForUserType = (userType) => (userType === "employee" ? "admin" : "user");
 
-const getAdminAccessMinutes = () => {
-  const minutes = Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
-};
-
-const getRefreshTokenDays = () => {
-  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 30;
-};
-
-// type=user + role=user → lamba (din), baaki sab (employee type ya admin/staff/manager role) → minutes
-const isLongLivedUserToken = (type, role) =>
-  String(type || "user").toLowerCase() !== "employee" &&
-  String(role || "").toLowerCase() === "user";
-
-const getAccessExpiry = (type, role) =>
-  isLongLivedUserToken(type, role)
-    ? `${getUserAccessDays()}d`
-    : `${getAdminAccessMinutes()}m`;
-
-// ⚠️ Ye value JWT expiry se EXACTLY match karti hai. Pehle admin ke liye
-// hardcoded 1 ghanta tha jabki JWT sirf 10 min ka tha — mismatch se cookie
-// zinda rehta tha par token expire ho jata tha, aur har 401 pe refresh chain
-// race karke admin ko logout kar deta tha.
-const getAccessCookieMaxAge = (type, role) =>
-  isLongLivedUserToken(type, role)
-    ? getUserAccessDays() * 24 * 60 * 60 * 1000
-    : getAdminAccessMinutes() * 60 * 1000;
-
-const getRefreshCookieMaxAge = () => getRefreshTokenDays() * 24 * 60 * 60 * 1000;
-
-const generateTokens = (userId, role, type = 'user') => {
-  const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: getAccessExpiry(type, role),
-  });
-  const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${getRefreshTokenDays()}d`,
-  });
-  return { accessToken, refreshToken };
-};
-
-const getCookieOptions = (maxAge) => {
-  const requestedSameSite = String(process.env.AUTH_COOKIE_SAME_SITE || "lax").toLowerCase();
-  const sameSite = ["strict", "lax", "none"].includes(requestedSameSite) ? requestedSameSite : "lax";
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || sameSite === "none",
-    sameSite,
-    maxAge,
-    path: "/",
-  };
-};
-
-const clearAuthCookies = (res) => {
-  const { httpOnly, secure, sameSite, path } = getCookieOptions(0);
-  const options = { httpOnly, secure, sameSite, path };
-  res.clearCookie("accessToken", options);
-  res.clearCookie("refreshToken", options);
-};
+// Password badla → is account ke baaki sab sessions band (current wala bacha rahe)
+const revokeOtherSessions = (req, userType, subjectId) =>
+  tokens
+    .revokeAllForSubject(audForUserType(userType), subjectId, { exceptFamilyId: req.sessionId || null })
+    .catch((e) => log.error("revoke sessions failed:", e.message));
 
 // ==========================================
 // REGISTER (Customer only)
@@ -184,8 +135,18 @@ const createUser = async (req, res) => {
     const cleanPhone = normalizePhone(rawPhone);
     const cleanName = String(name || "").trim();
 
-    // Seller application fields — collected on the same signup page
-    const wantsStore = String(req.body.wantsStore ?? true) !== "false";
+    // Store host par signup = HAMESHA isi store ka customer (store-setup fields nahi).
+    // Seller signup (naya store) sirf platform host (landing/signup) par.
+    // Pehle wantsStore default true tha → storefront register form (jo store fields
+    // bhejta hi nahi) "Please enter your store name" 400 deta tha.
+    const signupStoreId = req.store?._id || null;
+    const wantsStore = !signupStoreId && String(req.body.wantsStore ?? true) !== "false";
+    if (!signupStoreId && !wantsStore) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer accounts are created on a store's website.",
+      });
+    }
     const storeName = String(req.body.storeName || "").trim().slice(0, 140);
     const storeDescription = String(req.body.storeDescription || "").trim().slice(0, 2000);
     const businessCategory = String(req.body.businessCategory || "").trim();
@@ -247,7 +208,9 @@ const createUser = async (req, res) => {
           const passwordMatches = await bcrypt.compare(String(password), existingUser.password || "");
           if (passwordMatches) {
             // Resume — make sure a pending-seller employee exists for the admin panel
-            let employee = await Employee.findOne({ email });
+            // Email ab sirf store ke andar unique — isi application ke store ka employee
+            let employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
+              .setOptions({ skipTenantScope: true });
             if (!employee) {
               employee = await Employee.create({
                 name: existingUser.name,
@@ -265,12 +228,9 @@ const createUser = async (req, res) => {
               employee.status = "active";
               await employee.save();
             }
-            const userTokens = generateTokens(existingUser._id, existingUser.role, "user");
-            res.cookie("accessToken", userTokens.accessToken, getCookieOptions(getAccessCookieMaxAge("user", existingUser.role)));
-            res.cookie("refreshToken", userTokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
-            const employeeTokens = generateTokens(employee._id, employee.role, "employee");
-            res.cookie("accessToken", employeeTokens.accessToken, getCookieOptions(getAccessCookieMaxAge("employee", employee.role)));
-            res.cookie("refreshToken", employeeTokens.refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+            // User + admin sessions alag cookies me (pehle employee wale user cookies overwrite kar dete the)
+            await tokens.issueSession(req, res, "user", existingUser);
+            await tokens.issueSession(req, res, "admin", employee);
             return res.json({
               success: true,
               pendingApproval: true,
@@ -290,6 +250,14 @@ const createUser = async (req, res) => {
         success: false,
         message: "Registration failed",
         errors: { email: "This email is already registered" },
+      });
+    }
+    // Option A: ek seller email sirf ek store ka owner (kisi bhi store ka admin / pending seller)
+    if (wantsStore && (await sellerEmailTaken(email))) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration failed",
+        errors: { email: SELLER_EMAIL_TAKEN_MESSAGE },
       });
     }
     // ✅ Legacy adhoora User (fix se pehle OTP ke bina bana) — pending flow ke liye hata do
@@ -363,7 +331,8 @@ const createUser = async (req, res) => {
       existingPending.expiresAt = expiresAt;
       existingPending.attempts = 0;
       existingPending.lastSentAt = new Date();
-      existingPending.storeName = storeName;
+      existingPending.storeId = signupStoreId;
+      existingPending.storeName = wantsStore ? storeName : "";
       existingPending.storeDescription = storeDescription;
       existingPending.businessCategory = businessCategory;
       existingPending.businessType = businessType;
@@ -384,7 +353,8 @@ const createUser = async (req, res) => {
         expiresAt,
         attempts: 0,
         lastSentAt: new Date(),
-        storeName,
+        storeId: signupStoreId,
+        storeName: wantsStore ? storeName : "",
         storeDescription,
         businessCategory,
         businessType,
@@ -517,13 +487,7 @@ const loginUser = async (req, res) => {
       },
       user._id,
     );
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role, 'user');
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(getRefreshCookieMaxAge()),
-    );
+    await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
       message: "Login successful",
@@ -553,7 +517,21 @@ const loginAdmin = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Please provide email and password" });
-    const employee = await Employee.findOne({ email }).select("-activities");
+    // Store host: isi store ka staff (tenant-scoped, email per-store unique).
+    // Platform host: koi store nahi → sirf seller OWNER (Option A: ek email ek store).
+    let employee;
+    if (req.store) {
+      employee = await Employee.findOne({ email: String(email).toLowerCase().trim() }).select("-activities");
+    } else {
+      const found = await findPlatformEmployee(email);
+      if (found.ambiguous) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is linked to more than one store. Please sign in from your store's address.",
+        });
+      }
+      employee = found.employee;
+    }
     if (!employee)
       return res
         .status(401)
@@ -595,13 +573,7 @@ const loginAdmin = async (req, res) => {
       },
       employee._id,
     );
-    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, 'employee');
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('employee', employee.role)));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(getRefreshCookieMaxAge()),
-    );
+    await tokens.issueSession(req, res, "admin", employee);
     res.json({
       success: true,
       message: "Admin login successful",
@@ -621,80 +593,42 @@ const loginAdmin = async (req, res) => {
   }
 };
 
+// Customer refresh — u_rt (path-restricted cookie) rotate hota hai
 const refreshAccessToken = async (req, res) => {
   try {
-    const token = req.cookies.refreshToken;
-    if (!token)
-      return res
-        .status(401)
-        .json({ success: false, message: "Refresh token required" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userType = decoded.type || 'user';
-    const Model = userType === 'employee' ? Employee : User;
-    const user = await Model.findById(decoded.userId);
-    if (!user)
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    const { accessToken } = generateTokens(decoded.userId, user.role, userType);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge(userType, user.role)));
+    const result = await tokens.rotateSession(req, res, "user", async (id) => {
+      const user = await User.findById(id).select("_id role status is_deleted storeId").lean();
+      if (!user || user.is_deleted || user.status === "blocked" || user.status === "inactive") return null;
+      return user;
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
     log.error("refreshAccessToken error:", error);
     return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
-// Admin refresh alias. Explicit employee tokens and signed legacy admin tokens
-// are accepted; customer tokens are rejected.
+// Admin/employee refresh — a_rt rotate hota hai
 const refreshAdminAccessToken = async (req, res) => {
-  let decoded;
   try {
-    const token = req.cookies.refreshToken;
-    if (!token)
-      return res
-        .status(401)
-        .json({ success: false, message: "Refresh token required" });
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const adminRoles = STAFF_ROLES;
-    // Older admin sessions did not always include the `type` claim. Their
-    // signed role and matching Employee record let us safely migrate them.
-    if (decoded.type && decoded.type !== "employee") {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid refresh token" });
-    }
-    if (!decoded.type && !adminRoles.includes(String(decoded.role || "").toLowerCase())) {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid refresh token" });
-    }
-    const user = await Employee.findById(decoded.userId);
-    if (!user || user.is_deleted || user.status === "inactive" || !isStaffRole(user.role)) {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    }
-    const { accessToken } = generateTokens(decoded.userId, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
+    const result = await tokens.rotateSession(req, res, "admin", async (id) => {
+      const employee = await Employee.findById(id).select("_id role status is_deleted storeId").lean();
+      if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return null;
+      // Owner ("storehandler") / admin / manager / staff — utils/roles.js
+      if (!isStaffRole(employee.role)) return null;
+      return employee;
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
     log.error("refreshAdminAccessToken error:", error);
     return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
 const logoutUser = async (req, res) => {
+  const auds = audFromHeader(req) ? [audFromHeader(req)] : ["admin", "user"];
   try {
     if (req.user?._id) {
       const io = req.io || getIO();
@@ -709,10 +643,13 @@ const logoutUser = async (req, res) => {
         req.user._id,
       );
     }
-    clearAuthCookies(res);
+    for (const aud of auds) {
+      await tokens.revokeCurrentSession(req, aud).catch((e) => log.error("logout revoke failed:", e.message));
+      tokens.clearAuthCookies(res, aud);
+    }
     res.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    clearAuthCookies(res);
+    for (const aud of auds) tokens.clearAuthCookies(res, aud);
     res.json({ success: true, message: "Logged out successfully" });
   }
 };
@@ -872,6 +809,7 @@ const changePassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = req.user._id;
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     const io = req.io || getIO();
     await pushGlobalActivity(
       io,
@@ -998,7 +936,7 @@ const updateProfileInfo = async (req, res) => {
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
     const updatedUser = await Model.findByIdAndUpdate(userId, userUpdateFields, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     })
       .select("-password")
@@ -1083,6 +1021,7 @@ const changePasswordSocket = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = userId;
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     return res.json({
       success: true,
       message: "Password changed successfully",
@@ -1093,68 +1032,77 @@ const changePasswordSocket = async (req, res) => {
   }
 };
 
+// ==========================================
+// ADMIN / STAFF GOOGLE LOGIN
+// ------------------------------------------
+// Pehle token ka payload bina signature check decode hota tha (koi bhi email
+// likh kar bhej sakta tha) aur customer (User) collection me dhoonda jata tha.
+// Ab: Google se verify (utils/googleAuth.js) → isi store ka Employee
+// (platform par sirf seller owner) → loginAdmin jaisi checks → admin session.
+// Naya account kabhi nahi banta.
+// ==========================================
 const googleLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential)
-      return res.status(400).json({ message: "Google credential missing" });
-    const payload = JSON.parse(
-      Buffer.from(credential.split(".")[1], "base64").toString(),
-    );
-    const { email, name, picture } = payload;
-    if (!email)
-      return res
-        .status(400)
-        .json({ message: "No email found in Google account" });
-    let user = await User.findOne({ email });
-    if (!user) {
-      // ✅ SECURITY FIX: Naye Google users ko direct access NAHI milega
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access Denied. Your email is not registered as Staff/Admin. Please contact administrator." 
-      });
+    let google;
+    try {
+      google = await verifyGoogleIdToken(req.body?.credential);
+    } catch (error) {
+      return res.status(401).json({ success: false, message: error.message || "Invalid Google token" });
     }
 
-    // ✅ EXISTING USER ROLE CHECK
-    if (!isStaffRole(user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Only administrators, managers and staff members can log in.",
-      });
+    let employee;
+    if (req.store) {
+      // Tenant-scoped: sirf isi store ka staff
+      employee = await Employee.findOne({ email: google.email }).select("-activities");
     } else {
-      if (user.role !== "user")
-        return res
-          .status(403)
-          .json({ message: "Admin/Staff cannot use customer Google login." });
-      if (!user.avatar && picture) {
-        user.avatar = picture;
-        await user.save();
+      const found = await findPlatformEmployee(google.email);
+      if (found.ambiguous) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is linked to more than one store. Please sign in from your store's address.",
+        });
       }
+      employee = found.employee;
     }
-    // ⚠️ Pehle `type` payload me nahi tha → authMiddleware ise "user" maan kar
-    // User collection me dhoondta (Employee hai → "User not found" 401), aur
-    // admin refresh endpoint bhi is token ko reject kar deta tha. Ab type
-    // set hai + expiry/cookie dono ek hi helper se aate hain.
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+
+    const denied = () =>
+      res.status(403).json({ success: false, message: "This Google account is not a staff member of this store." });
+    if (!employee || employee.is_deleted) return denied();
+    // Owner ("storehandler") / admin / manager / staff — utils/roles.js
+    if (!isStaffRole(employee.role)) return denied();
+    if (employee.status === "inactive")
+      return res.status(403).json({ success: false, message: "Your account is inactive. Please contact administrator." });
+
+    const io = req.io || getIO();
+    void pushGlobalActivity(
+      io,
+      {
+        action: `${employee.name} (${employee.role}) logged in to admin panel via Google`,
+        category: "Authentication",
+        performedBy: employee._id,
+        performedByName: employee.name,
+        details: { ip: req.ip, role: employee.role, provider: "google" },
+      },
+      employee._id,
+    );
+
+    await tokens.issueSession(req, res, "admin", employee);
     return res.json({
       success: true,
       message: "Google login successful",
       user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
+        id: employee._id,
+        name: employee.name,
+        username: employee.username,
+        phone: employee.phone,
+        email: employee.email,
+        role: employee.role,
+        avatar: employee.avatar || (google.picture || null),
       },
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Google login failed", error: error.message });
+    log.error("googleLogin error:", error);
+    return res.status(500).json({ success: false, message: "Google login failed" });
   }
 };
 
@@ -1163,28 +1111,15 @@ const googleLogin = async (req, res) => {
 // ==========================================
 const googleCustomerLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential)
-      return res.status(400).json({ success: false, message: "Google credential missing" });
-
-    let payload;
+    // Shared verify (aud + iss + exp + email_verified) — utils/googleAuth.js
+    let google;
     try {
-      const tokenRes = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
-      );
-      if (!tokenRes.ok)
-        return res.status(401).json({ success: false, message: "Invalid Google token" });
-      payload = await tokenRes.json();
-    } catch {
-      return res.status(401).json({ success: false, message: "Invalid Google token" });
+      google = await verifyGoogleIdToken(req.body?.credential);
+    } catch (error) {
+      return res.status(401).json({ success: false, message: error.message || "Invalid Google token" });
     }
-
-    if (payload.aud !== process.env.GOOGLE_CLIENT_ID)
-      return res.status(401).json({ success: false, message: "Invalid Google token" });
-
-    const { sub: googleId, email, name, picture, email_verified } = payload;
-    if (!email)
-      return res.status(400).json({ success: false, message: "Google account did not return an email" });
+    const { sub: googleId, email, name, picture } = google;
+    const email_verified = true; // verifyGoogleIdToken sirf verified email par aage jane deta hai
 
     let user = await User.findOne({ $or: [{ email }, { google_id: googleId }] });
 
@@ -1198,7 +1133,8 @@ const googleCustomerLogin = async (req, res) => {
       user = await User.findById(user._id);
     } else {
       const randomPassword = await bcrypt.hash(require("crypto").randomBytes(32).toString("hex"), 10);
-      const defaultStore = await Store.findOne();
+      // Customer isi host ke store ka hai; platform par koi store nahi (random store nahi)
+      const defaultStore = req.store || null;
       user = await User.create({
         name: name || email.split("@")[0],
         username: await uniqueUsername(name || email.split("@")[0], email),
@@ -1227,9 +1163,7 @@ const googleCustomerLogin = async (req, res) => {
       user._id,
     );
 
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
       message: "Google login successful",
@@ -1435,7 +1369,7 @@ const createCheckoutDraft = async (req, res) => {
     const checkoutDoc = await CheckoutDraft.findOneAndUpdate(
       { user_id: req.user._id },
       { $setOnInsert: { user_id: req.user._id } },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
     );
     const cutoff = new Date(now.getTime() - CHECKOUT_DRAFT_MAX_AGE_MS);
     const completedDrafts = checkoutDoc.drafts.filter((draft) => draft.status === "completed");
@@ -1630,7 +1564,7 @@ const updateProfileREST = async (req, res) => {
     if (name) update.name = name;
     if (username) update.username = username;
     const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    const user = await Model.findByIdAndUpdate(req.user._id, update, { returnDocument: "after" }).select("-password");
     res.json({ success: true, user });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -1645,6 +1579,7 @@ const changePasswordREST = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     res.json({ success: true, message: "Password changed successfully" });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -1658,8 +1593,9 @@ const changePasswordREST = async (req, res) => {
 // ==========================================
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
 
+const { claimOnce } = require("../utils/oneTimeToken");
+
 const HANDOFF_TTL_SECONDS = 120;
-const usedHandoffIds = new Map(); // jti → expiresAt (single-use; production me Redis behtar)
 
 // @route POST /api/users/admin/handoff   (logged-in employee, platform host)
 const createStoreHandoff = async (req, res) => {
@@ -1703,18 +1639,16 @@ const exchangeStoreHandoff = async (req, res) => {
     }
     if (decoded.type !== "store_handoff" || String(decoded.storeId) !== String(req.store._id)) return invalid();
 
-    const now = Date.now();
-    for (const [id, exp] of usedHandoffIds) if (exp < now) usedHandoffIds.delete(id);
-    if (usedHandoffIds.has(decoded.jti)) return invalid();
-    usedHandoffIds.set(decoded.jti, decoded.exp * 1000);
+    // Single-use — Redis (ya Mongo fallback): restart / dusre server par bhi dobara nahi chalta
+    const remaining = decoded.exp - Math.floor(Date.now() / 1000);
+    if (!(await claimOnce("handoff", decoded.jti, remaining))) return invalid();
 
     // Tenant-scoped: sirf isi store ka employee milega
-    const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name").lean();
+    const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name storeId").lean();
     if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return invalid();
 
-    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", employee.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    // Store host ka admin session — storeId isi store ka
+    await tokens.issueSession(req, res, "admin", { ...employee, storeId: req.store._id });
     res.json({ success: true, message: "Signed in to your store." });
   } catch (error) {
     log.error("Exchange store handoff error:", error);

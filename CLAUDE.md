@@ -16,13 +16,21 @@ Code comments are often in Roman Urdu/Hindi. Keep that style when editing nearby
 Backend (`cd backend`):
 - `npm run dev`: nodemon `server.js`. `npm start` runs it without nodemon.
 - `npm test`: runs all tests with `node --test` (files in `test/`). Run one file with `node --test test/chatModels.test.js`; filter by name with `node --test --test-name-pattern="partial unique" test/`.
-- `node scripts/migrateTenantIndexes.js`: run after changing model indexes.
-- `npm run backfillSubdomains`, `npm run backfill:translations`, `npm run translation:check`: one-off data scripts.
+- `node scripts/migrateTenantIndexes.js`: run after changing model indexes (dry run; add `--apply`).
+- `node scripts/migrateAttributesPerStore.js --apply`: copies legacy global attributes into every store (run after `migrateTenantIndexes.js --apply`).- `npm run backfillSubdomains`, `npm run backfill:translations`, `npm run translation:check`: one-off data scripts.
 - `npm run argos:serve`: local translation server (needs `uv`). The default target is `LIBRETRANSLATE_URL`.
 
 Frontend (`cd frontend`):
 - `npm run dev`: uses `next dev --webpack`. `npm run build`, `npm run lint` (ESLint 9, `eslint-config-next`).
 - UI strings live in `src/i18n/locales/<code>.json` (one file per language). Edit those directly and add every new key to `en.json`, which is the fallback.
+
+Production checklist (multi-tenant security):
+- `NODE_ENV=production`: auth cookies get `Secure`.
+- `REDIS_URL` set: shared rate limits and single-use handoff links across servers. Without it, the handoff check falls back to MongoDB.
+- `INTERNAL_PROXY_SECRET`: the same value in both `.env` files. The backend trusts `x-store-host` only with it.
+- `JWT_USER_*`, `JWT_ADMIN_*`, `JWT_SA_*` access/refresh secrets: six different random values, not the dev ones. `JWT_SECRET` signs only short-lived purpose tokens (handoff, password reset, seller setup links).
+- `PUBLIC_STORE_PROTOCOL=https`.
+- `GOOGLE_CLIENT_ID` (backend) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (frontend) set to the same value, with the store hosts added as authorized origins in the Google console.
 
 Configuration comes entirely from `backend/.env` and `frontend/.env`. Server code reads `PORT`, `API_PREFIX`, `UPLOAD_DIR`, and similar values with no defaults, so a missing variable breaks startup or requests. The frontend calls the API through `NEXT_PUBLIC_SERVERURL` and has no fallback.
 
@@ -44,6 +52,8 @@ Backend isolation:
 - `utils/tenantScopePlugin.js` is applied to store-owned models. It automatically filters queries by `storeId` and stamps it on writes. Any new store-owned model needs `schema.plugin(tenantScope)`. The `Store` model scopes on its own `_id`, so `Store.findOne()` returns the current store. For intentional cross-store queries, use `.setOptions({ skipTenantScope: true })`.
 - Unique indexes are compound with `storeId`, for example `{ storeId, sku }`.
 - Always use `utils/tenantMulter` for uploads, never plain `multer`, because plain multer loses the AsyncLocalStorage context.
+- Upload folders and URLs come from `utils/uploadPaths.js`: `uploadDirFor(req, kind, ...)` → `uploads/stores/<storeId>/<kind>/...`, `uploadUrlFor(savedPath)` for the URL, `localPathForUrl(req, url)` before deleting (refuses other stores' files). KYC files in `uploads/documents` are served only to a super admin session.
+- Auth: each audience has its own tokens and cookies (`utils/tokens.js`: customer `u_at`/`u_rt`, admin `a_at`/`a_rt`, super admin `sa_at`/`sa_rt`). Admin routers use `authMiddleware.requireAdmin`, customer routes `requireUser`; the frontend sends `X-Auth-Aud`.
 - Socket.IO (`utils/socket.js`): `io` is a tenant-aware Proxy. `emit` goes to room `store:<id>`, and `chat:admins` maps to `chat:admins:<id>`. Use `relayToStore(socket)` instead of `socket.broadcast`. Controllers reach `io` through `req.io`. On the frontend, `hooks/admin/use*SocketSync.js` invalidate React Query caches when socket events arrive.
 - Cookies are host-only. After a seller logs in on the platform host, a one-time handoff takes them to their store: `/users/admin/handoff`, then frontend `/admin-handoff#token=...`.
 

@@ -312,16 +312,18 @@ const updateBrand = async (req, res) => {
       // Sirf purani FILE delete karo (tabhi jab wo local upload ho).
       const oldImgUrl = existingBrand.logo?.img_url || "";
       if (oldImgUrl && oldImgUrl.startsWith("uploads/")) {
-        const oldFilePath = path.join(__dirname, "..", oldImgUrl);
-        if (await fs.pathExists(oldFilePath)) {
+        // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ null
+        const oldFilePath = require("../utils/uploadPaths").localPathForUrl(null, oldImgUrl);
+        if (oldFilePath && (await fs.pathExists(oldFilePath))) {
           await fs.remove(oldFilePath);
         }
       }
       updateData.logo = req.brandImage;
       if (updateData.logo.img_url) {
+        // Purana (uploads/brands/<id>/) aur naya (uploads/stores/<storeId>/brands/<id>/) dono
         updateData.logo.img_url = updateData.logo.img_url.replace(
-          /uploads\/brands\/[^/]+\//,
-          `uploads/brands/${existingBrand._id}/`
+          /(uploads\/(?:stores\/[^/]+\/)?brands\/)[^/]+\//,
+          `$1${existingBrand._id}/`
         );
       }
     }
@@ -330,7 +332,7 @@ const updateBrand = async (req, res) => {
     const trackedFields = ["brand_name", "name", "brand_code", "description", "country", "status"];
     const changes = getChanges(existingBrand.toObject(), updateData, trackedFields);
 
-    const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, { new: true })
+    const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, { returnDocument: "after" })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
 

@@ -154,8 +154,32 @@ app.use(API_PREFIX, resolveStore);
 
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
+// 🔒 KYC documents (uploads/documents) PRIVATE — sirf super admin session (sa_at).
+// Path normalize karke check (".../x/../documents/..." jaisa chakkar bhi pakda jata
+// hai), warna neeche wala public static inhe kisi ko bhi de deta tha.
+const { requireSuperAdmin } = require("./middleware/superAdminAuth");
+const documentsDir = path.join(uploadDir, "documents");
+app.use("/uploads", (req, res, next) => {
+  let normalized;
+  try {
+    normalized = path.posix.normalize(decodeURIComponent(req.path));
+  } catch {
+    return res.status(400).json({ success: false, message: "Bad path." });
+  }
+  if (normalized !== "/documents" && !normalized.startsWith("/documents/")) return next();
+  return requireSuperAdmin(req, res, () => {
+    res.set("Cache-Control", "private, no-store");
+    const fileName = normalized.slice("/documents/".length);
+    if (!fileName || fileName.includes("/")) return res.status(404).json({ success: false, message: "Not found." });
+    return res.sendFile(fileName, { root: documentsDir, dotfiles: "deny" }, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ success: false, message: "Not found." });
+    });
+  });
+});
+
 // ✅ /uploads: saari filenames Date.now/uuid wali hain (overwrite par naya
 // naam banta hai) → 1y immutable safe. Webp pehle se compressed hai.
+// Naye uploads store ke folder me: /uploads/stores/<storeId>/... (utils/uploadPaths.js)
 app.use(
   "/uploads",
   express.static(uploadDir, {
@@ -368,7 +392,7 @@ const startServer = async () => {
       }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
       if (ROOT_DOMAIN) {
-        console.log(`🏬 Platform: http://${ROOT_DOMAIN}:3000  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}:3000`);
+        console.log(`🏬 Platform: http://${ROOT_DOMAIN}  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}`);
       }
     });
   } catch (error) {

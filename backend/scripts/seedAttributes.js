@@ -1,6 +1,7 @@
 // backend/scripts/seedAttributes.js
 const Attribute = require("../models/Attribute");
 const log = require("../utils/logger");
+const { runWithStore } = require("../utils/tenantContext");
 const { hashText } = require("../utils/translationService");
 
 const toValues = (arr) =>
@@ -233,9 +234,10 @@ const LEGACY_CODES = [
   "audio_color",
 ];
 
-async function seedAttributes() {
+// Attribute ab per-store hai (tenantScope): ye function CURRENT store context me
+// chalta hai — find / updateOne / updateMany khud isi store tak, upsert storeId stamp.
+async function seedAttributesInContext() {
   try {
-    console.log("\n🌍 Seeding GLOBAL attributes...");
     let created = 0;
     let updated = 0;
 
@@ -284,13 +286,26 @@ async function seedAttributes() {
       { $set: { is_active: false } }
     );
 
-    console.log(
-      `\n🎉 Done! Created: ${created}, Updated: ${updated}, Legacy deactivated: ${legacy.modifiedCount}\n`
-    );
+    log.info(`[attributes] store seeded — created: ${created}, updated: ${updated}, legacy off: ${legacy.modifiedCount}`);
+    return { created, updated };
   } catch (error) {
     log.error("❌ Error in attribute seeding:", error.message);
     throw error;
   }
+}
+
+/** Ek store ke default attributes (naya store → models/Store.js post-save) */
+function seedAttributesForStore(storeId) {
+  if (!storeId) throw new Error("seedAttributesForStore: storeId required");
+  return runWithStore(storeId, () => seedAttributesInContext());
+}
+
+/** Server start: har store ke liye uska apna set */
+async function seedAttributes() {
+  const Store = require("../models/Store");
+  const stores = await Store.find({}).select("_id").setOptions({ skipTenantScope: true }).lean();
+  for (const store of stores) await seedAttributesForStore(store._id);
+  console.log(`🌍 Attributes seeded for ${stores.length} store(s).`);
 }
 
 if (require.main === module) {
@@ -310,4 +325,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { seedAttributes, ATTRIBUTES_TO_SEED };
+module.exports = { seedAttributes, seedAttributesForStore, ATTRIBUTES_TO_SEED };

@@ -35,7 +35,8 @@ async function storeExists(host) {
   try {
     // Platform address (IP) par call + asli host header me — backend isi ko maanta hai
     const res = await fetch(`${API_BASE}/store/resolve`, {
-      headers: { 'x-store-host': host },
+      // Backend `x-store-host` sirf is shared secret ke saath maanta hai
+      headers: { 'x-store-host': host, 'x-internal-proxy-secret': process.env.INTERNAL_PROXY_SECRET || '' },
       cache: 'no-store',
       signal: AbortSignal.timeout(3000),
     });
@@ -50,9 +51,13 @@ async function storeExists(host) {
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
-  const hasAccessToken = !!request.cookies.get('accessToken');
-  const hasRefreshToken = !!request.cookies.get('refreshToken');
-  const hasSessionCookie = hasAccessToken || hasRefreshToken;
+  // Har role ke alag cookies (backend utils/tokens.js). Refresh cookie (a_rt/u_rt)
+  // ka path sirf backend refresh route hai — page requests ke saath nahi aata, is
+  // liye `*_sess` (sirf "session hai" ka nishan, token nahi) dekhte hain.
+  const has = (name) => !!request.cookies.get(name);
+  const hasAdminSession = has('a_at') || has('a_sess');
+  const hasCustomerAccess = has('u_at');
+  const hasCustomerSession = hasCustomerAccess || has('u_sess');
 
   const tenant = parseTenantHost(request.headers.get('host'));
   const isStore = tenant.type === 'subdomain' || tenant.type === 'custom';
@@ -88,17 +93,17 @@ export async function proxy(request) {
     if (pathname === '/admin/login') return pass();
 
     if (pathname.startsWith('/admin')) {
-      if (!hasSessionCookie) return redirect('/admin/login');
+      if (!hasAdminSession) return redirect('/admin/login');
       return pass();
     }
 
     if (pathname === '/login') {
-      if (hasAccessToken) return redirect('/');
+      if (hasCustomerAccess) return redirect('/');
       return pass();
     }
 
     if (pathname === '/seller/dashboard') {
-      if (!hasSessionCookie) return redirect('/login');
+      if (!(hasAdminSession || hasCustomerSession)) return redirect('/login');
       return pass();
     }
 

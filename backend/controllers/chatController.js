@@ -399,7 +399,7 @@ exports.sendMessage = async (req, res) => {
     const updated = await ChatConversation.findOneAndUpdate({ _id: conversation._id, status: "open" }, {
       $set: { last_message: preview, last_message_at: message.created_at, last_message_sender_type: senderType },
       $inc: senderType === "customer" ? { unread_admin_count: 1 } : { unread_customer_count: 1 },
-    }, { new: true }).lean();
+    }, { returnDocument: "after" }).lean();
     if (!updated) { await ChatMessage.deleteOne({ _id: message._id }); return fail(res, 409, "This conversation was closed before the message could be sent"); }
     if (req.io) {
       req.io.to(roomOf(conversation._id)).emit("chat:message", { conversation_id: String(conversation._id), message: message.toObject() });

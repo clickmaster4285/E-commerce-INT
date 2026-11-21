@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 // ==========================================
 // 🔐 OTP MODEL
@@ -33,6 +34,10 @@ const otpSchema = new mongoose.Schema(
   },
   { versionKey: false },
 );
+
+// ── Multi-tenant ── OTP usi store ka jahan maanga gaya (store host par storeId,
+// platform signup par null). Store A ka code / reset token store B par nahi chalta.
+otpSchema.plugin(tenantScope);
 
 // ✅ TTL — expire hone par document khud delete ho jata hai
 otpSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });

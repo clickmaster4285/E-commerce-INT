@@ -6,23 +6,20 @@ const {
   getStoreInfo, updateStoreInfo,
   getPublicStoreInfo, resolveTenant, checkSubdomain, updateStoreDomain,
 } = require("../controllers/storeController");
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission"); // ✅ ADDED
 
 // ✅ Multer setup for file upload (Logo)
 const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 
-// Uploads folder ka path set karein
-const uploadDir = path.join(__dirname, "../uploads");
-
-// Agar uploads folder nahi hai toh automatically bana dein (Crash se bachne ke liye)
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const { uploadDirFor } = require("../utils/uploadPaths");
 
 const storage = multer.diskStorage({
+  // Store ka apna folder: uploads/stores/<storeId>/store (utils/uploadPaths.js)
   destination: function (req, file, cb) {
-    cb(null, uploadDir);
+    const dir = uploadDirFor(req, process.env.STORE_UPLOAD_SUBDIR || "store");
+    fs.mkdir(dir, { recursive: true }, (err) => cb(err, dir));
   },
   filename: function (req, file, cb) {
     // File ke naam mein spaces ko hyphen se replace karein taake URL mein masla na ho

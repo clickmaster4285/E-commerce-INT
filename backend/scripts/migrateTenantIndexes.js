@@ -38,7 +38,11 @@ const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
 
   for (const name of mongoose.modelNames()) {
     const Model = mongoose.model(name);
-    if (name === "Store" || !Model.schema.path("storeId")) continue; // sirf scoped models
+    // Sirf tenantScope wale models (storeId field hona kaafi nahi — RefreshSession
+    // me storeId hai lekin superadmin sessions ka store null hi rehna chahiye)
+    if (name === "Store" || !Model.schema.$tenantScopeField) continue;
+    // Global attributes kisi EK store ko assign nahi hote — har store ki copy bannti hai
+    const copyPerStore = name === "Attribute";
 
     const existing = await Model.collection.indexes().catch(() => []); // collection na ho to []
     // Sirf wo global unique indexes jo ab schema me NAHI hain (schema me jaan boojh kar global
@@ -58,7 +62,9 @@ const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
       console.log(`  drop global unique index ${ix.name}  ${JSON.stringify(ix.key)}`);
       if (APPLY) await Model.collection.dropIndex(ix.name);
     }
-    if (orphans) {
+    if (orphans && copyPerStore) {
+      console.log(`  ${orphans} global document(s) → copy into every store: node scripts/migrateAttributesPerStore.js --apply`);
+    } else if (orphans) {
       console.log(`  ${orphans} document(s) without storeId${assignStore ? ` → ${assignStore.subdomain}` : " (use --assign <subdomain>)"}`);
       if (APPLY && assignStore) {
         await Model.updateMany(

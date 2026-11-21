@@ -5,17 +5,19 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const jwt = require("jsonwebtoken");
-const {
-  generateTokens,
-  setAuthCookies,
-  clearAuthCookies,
-  getCookieOptions,
-  getAccessCookieMaxAge,
-} = require("../middleware/superAdminAuth");
+const jwt = require("jsonwebtoken"); // store admin handoff token (openStoreAdmin)
+// Super admin ka apna audience — sa_at / sa_rt cookies, alag secrets, rotating sessions
+const tokens = require("../utils/tokens");
 const { logActivity, activityRow, clientInfo } = require("../utils/superAdminActivity");
 const SuperAdminActivity = require("../models/SuperAdminActivity");
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
+
+// Seller ka employee: application ke store me (resume-flow wale purane records
+// bina storeId ke bhi ho sakte hain — woh seller_pending se pehchane jate hain)
+const sellerEmployeeFilter = (application) =>
+  application.store_id
+    ? { email: application.email, $or: [{ storeId: application.store_id }, { storeId: null, seller_pending: true }] }
+    : { email: application.email, seller_pending: true };
 const {
   sendApplicationApprovedEmail,
   sendApplicationRejectedEmail,
@@ -66,8 +68,7 @@ const loginSuperAdmin = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid email or password." });
     }
 
-    const tokens = generateTokens(superAdmin);
-    setAuthCookies(res, tokens);
+    await tokens.issueSession(req, res, "superadmin", { _id: superAdmin._id, role: superAdmin.role || "superadmin" });
     superAdmin.lastLoginAt = new Date();
     superAdmin.lastActiveAt = superAdmin.lastLoginAt;
     await superAdmin.save().catch(() => {});
@@ -98,32 +99,12 @@ const loginSuperAdmin = async (req, res) => {
 
 const refreshSuperAdminToken = async (req, res) => {
   try {
-    const token = req.cookies?.refreshToken;
-    if (!token) {
-      return res.status(401).json({ success: false, message: "Refresh token required" });
-    }
-
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
-
-    // Wrong audience (seller/customer token) — do not wipe their session cookies.
-    if (decoded?.type !== "superadmin") {
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
-
-    const superAdmin = await SuperAdmin.findById(decoded.userId);
-    if (!superAdmin || superAdmin.status !== "active") {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Super Admin account not found." });
-    }
-
-    const { accessToken } = generateTokens(superAdmin);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge()));
+    const result = await tokens.rotateSession(req, res, "superadmin", async (id) => {
+      const superAdmin = await SuperAdmin.findById(id).select("_id role status").lean();
+      if (!superAdmin || superAdmin.status !== "active") return null;
+      return { _id: superAdmin._id, role: superAdmin.role || "superadmin" };
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     return res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
     log.error("[super-admin] refresh error:", error.message);
@@ -135,14 +116,15 @@ const logoutSuperAdmin = async (req, res) => {
   try {
     let actor = req.superAdmin;
     if (!actor) {
-      const token = req.cookies?.accessToken || req.cookies?.refreshToken;
+      // Expired access token (sa_at) par bhi pata chale kaun logout hua
+      const token = req.cookies?.[tokens.AUDIENCES.superadmin.cookies.access];
       try {
-        // expired access token par bhi pata chale kaun logout hua
-        const payload = token ? jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true }) : null;
-        if (payload?.type === "superadmin") actor = await SuperAdmin.findById(payload.userId).select("name email").lean();
+        const payload = token ? tokens.verifyAccess("superadmin", token, { ignoreExpiration: true }) : null;
+        if (payload?.userId) actor = await SuperAdmin.findById(payload.userId).select("name email").lean();
       } catch { actor = null; }
     }
-    clearAuthCookies(res);
+    await tokens.revokeCurrentSession(req, "superadmin").catch(() => {});
+    tokens.clearAuthCookies(res, "superadmin");
     if (actor) {
       await logActivity({
         action: "Signed out",
@@ -154,6 +136,7 @@ const logoutSuperAdmin = async (req, res) => {
     }
     return res.json({ success: true, message: "Logged out." });
   } catch (error) {
+    tokens.clearAuthCookies(res, "superadmin");
     return res.status(500).json({ success: false, message: "Logout failed." });
   }
 };
@@ -421,7 +404,7 @@ const updateRequest = async (req, res) => {
     const application = await SellerApplication.findOneAndUpdate(
       { _id: before._id, status: "pending" },
       { $set: updates },
-      { new: true }
+      { returnDocument: "after" }
     ).select("-passwordHash").lean();
     if (!application) {
       return res.status(409).json({ success: false, message: "This request was reviewed meanwhile. Please reload." });
@@ -532,7 +515,7 @@ const approveRequest = async (req, res) => {
         reviewed_by: req.superAdmin._id,
         reviewed_at: new Date(),
       },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!application) {
       return res
@@ -543,12 +526,13 @@ const approveRequest = async (req, res) => {
     // Store is provisioned at signup time; open it and unblock the pending seller employee.
     const storeId = application.store_id;
     const store = storeId
-      ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { new: true })
+      ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { returnDocument: "after" })
       : null;
+    // Email ab sirf store ke andar unique — isi application ke store ka seller employee
     await Employee.findOneAndUpdate(
-      { email: application.email },
+      sellerEmployeeFilter(application),
       { seller_pending: false, status: "active", role: OWNER_ROLE, ...(store ? { storeId: store._id } : {}) }
-    );
+    ).setOptions({ skipTenantScope: true });
 
     // Provision store + seller account exactly once (password from request)
     const existingUser = await User.findOne({ email: application.email }).select("_id storeId status").lean();
@@ -557,7 +541,7 @@ const approveRequest = async (req, res) => {
       if (!openStore) {
         const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
         openStore = existingUser.storeId
-          ? await Store.findByIdAndUpdate(existingUser.storeId, { store_status: "open" }, { new: true })
+          ? await Store.findByIdAndUpdate(existingUser.storeId, { store_status: "open" }, { returnDocument: "after" })
           : await Store.create({
               store_name: storeName0,
               email: application.email,
@@ -576,9 +560,9 @@ const approveRequest = async (req, res) => {
       );
       // Resume-flow employees may have been created without a storeId — link them now
       await Employee.findOneAndUpdate(
-        { email: application.email },
+        sellerEmployeeFilter(application),
         { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: openStore._id }
-      );
+      ).setOptions({ skipTenantScope: true });
       await notifySeller(
         sendApplicationApprovedEmail,
         { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(openStore) },
@@ -632,9 +616,9 @@ const approveRequest = async (req, res) => {
     );
 
     await Employee.findOneAndUpdate(
-      { email: application.email },
+      sellerEmployeeFilter(application),
       { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: storeFinal._id }
-    );
+    ).setOptions({ skipTenantScope: true });
 
     await logActivity({
       action: `Seller approved — ${application.name} (${application.store_name})`,
@@ -672,7 +656,7 @@ const requestInfo = async (req, res) => {
     const application = await SellerApplication.findOneAndUpdate(
       { _id: req.params.id, status: "pending" },
       { info_request_message: message, info_requested_at: new Date() },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!application) {
       return res
@@ -690,7 +674,14 @@ const requestInfo = async (req, res) => {
 
     await notifySeller(
       sendApplicationInfoRequestedEmail,
-      { name: application.name, email: application.email, storeName: application.store_name, message },
+      {
+        name: application.name,
+        email: application.email,
+        storeName: application.store_name,
+        message,
+        // /store-setup ka signed link (sirf email se ab application nahi khulti)
+        setupToken: require("../utils/sellerSetupToken").signSetupToken(application),
+      },
       "Info request",
       application._id
     );
@@ -716,7 +707,7 @@ const rejectRequest = async (req, res) => {
         reviewed_by: req.superAdmin._id,
         reviewed_at: new Date(),
       },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!application) {
       return res
@@ -728,9 +719,9 @@ const rejectRequest = async (req, res) => {
     if (application.store_id) {
       await Store.updateOne({ _id: application.store_id }, { store_status: "closed" });
       await Employee.findOneAndUpdate(
-        { email: application.email },
+        sellerEmployeeFilter(application),
         { seller_pending: true, status: "inactive", storeId: application.store_id }
-      );
+      ).setOptions({ skipTenantScope: true });
     }
 
     const storedReason = reason.slice(0, 500);

@@ -13,11 +13,12 @@ const employeeSchema = new mongoose.Schema(
     },
     translation_source: { name: { type: String, default: "" } },
     translation_status: { name: { type: String, default: "pending" } },
-    username: { type: String, required: true, unique: true, trim: true },
+    // Multi-tenant: unique sirf store ke andar ({storeId, username} / {storeId, email}
+    // neeche). Seller OWNER email phir bhi poore platform me ek hi store ka — utils/sellerOwnership.js
+    username: { type: String, required: true, trim: true },
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
     },
@@ -149,6 +150,11 @@ const employeeSchema = new mongoose.Schema(
 
 employeeSchema.index({ "activities.timestamp": -1 });
 employeeSchema.index({ storeId: 1, department: 1 });
+// Per-store unique (purane global unique indexes migrateTenantIndexes.js hatata hai)
+employeeSchema.index({ storeId: 1, email: 1 }, { unique: true });
+employeeSchema.index({ storeId: 1, username: 1 }, { unique: true });
+// Platform login (seller owner by email, saare stores)
+employeeSchema.index({ email: 1 });
 
 
 // ── Multi-tenant ──

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -38,6 +39,7 @@ const getSocketUrl = () => getBackendOrigin();
 
 const SOCKET_OPTIONS = {
   withCredentials: true,
+  auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
   transports: (process.env.NEXT_PUBLIC_SOCKET_TRANSPORTS || "websocket,polling")
     .split(",")
     .map((t) => t.trim())
@@ -101,6 +103,7 @@ export function getAdminSocket() {
     adminSocket.on("connect_error", () => {
       // Silent — reconnection waise hi chalegi
     });
+    attachSocketAuthSync(adminSocket, "admin");
   }
 
   return adminSocket;

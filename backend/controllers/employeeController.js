@@ -694,7 +694,7 @@ exports.updateEmployee = async (req, res) => {
     // Updated by
     if (Object.keys(directUpdates).length > 0 || Object.keys(employeeUpdates).length > 0) {
       const finalUpdates = { ...directUpdates, ...employeeUpdates, updatedby: performerId };
-      await Employee.findByIdAndUpdate(id, { $set: finalUpdates }, { new: true });
+      await Employee.findByIdAndUpdate(id, { $set: finalUpdates }, { returnDocument: "after" });
     }
 
     // Activity

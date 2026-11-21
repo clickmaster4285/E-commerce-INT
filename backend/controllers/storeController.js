@@ -97,7 +97,8 @@ const updateStoreInfo = async (req, res) => {
 
     let logoChanged = false;
     if (req.file) {
-      const relativePath = req.file.relativePath || `uploads/store/${req.file.filename}`;
+      // Socket upload relativePath deta hai; REST (multer) ka asal saved path
+      const relativePath = req.file.relativePath || require("../utils/uploadPaths").uploadUrlFor(req.file.path).slice(1);
       const cleanPath = relativePath.includes("/uploads/")
         ? relativePath.substring(relativePath.indexOf("uploads/"))
         : relativePath;

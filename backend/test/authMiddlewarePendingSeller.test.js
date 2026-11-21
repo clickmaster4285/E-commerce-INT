@@ -1,11 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 require("dotenv").config({ path: require("node:path").join(__dirname, "..", ".env"), quiet: true });
-process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret";
+// Admin session token ab apne audience secret se (utils/tokens.js)
+process.env.JWT_ADMIN_ACCESS_SECRET = process.env.JWT_ADMIN_ACCESS_SECRET || "test-admin-access-secret";
 
 const authMiddleware = require("../middleware/authMiddleware");
+const tokens = require("../utils/tokens");
 const { allowPendingSeller } = require("../middleware/allowPendingSeller");
 const Employee = require("../models/Employee");
 
@@ -14,8 +15,9 @@ const asQuery = (data) => ({ select() { return this; }, async lean() { return da
 
 const run = async ({ method, pending = true, optIn = false }) => {
   const original = Employee.findById;
-  Employee.findById = () => asQuery({ _id: employeeId, status: "active", seller_pending: pending, storeId: new mongoose.Types.ObjectId() });
-  const token = jwt.sign({ userId: String(employeeId), role: "staff", type: "employee" }, process.env.JWT_SECRET);
+  const storeId = new mongoose.Types.ObjectId();
+  Employee.findById = () => asQuery({ _id: employeeId, status: "active", seller_pending: pending, storeId });
+  const token = tokens.signAccess("admin", { subjectId: employeeId, role: "staff", storeId, sid: "test-session" });
   const req = { method, headers: { authorization: `Bearer ${token}` }, cookies: {} };
   const res = {
     statusCode: 200,

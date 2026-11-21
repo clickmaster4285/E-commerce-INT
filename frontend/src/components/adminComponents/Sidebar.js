@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
@@ -192,6 +193,7 @@ function getSidebarSocket() {
 
   sidebarSocket = io(SOCKET_URL, {
     withCredentials: true,
+    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
     transports: ["websocket", "polling"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -206,6 +208,7 @@ function getSidebarSocket() {
   });
 
   sidebarSocket.on("disconnect", (reason) => {});
+  attachSocketAuthSync(sidebarSocket, "admin");
 
   return sidebarSocket;
 }

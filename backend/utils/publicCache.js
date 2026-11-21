@@ -12,13 +12,20 @@
 //   invalidate hote hain taake admin change foran reflect ho.
 // ======================================================
 
+const { getStoreId } = require("./tenantContext");
+
 const store = new Map(); // key -> { t, status, body }
 const MAX_ENTRIES = 500;
 
 const now = () => Date.now();
 
+// ⚠️ Multi-tenant: key me STORE bhi. Pehle key sirf "GET /api/brands?slim=1" thi →
+// jo store pehle maangta uska response 60s tak SAB stores ko milta tha
+// (electro par fahadstore ke brands / banners / deals dikhte the).
+const scopeOf = (storeId = getStoreId()) => (storeId ? `store:${storeId}` : "platform");
+
 function keyOf(req) {
-  return `${req.method} ${req.originalUrl || req.url}`;
+  return `${scopeOf(req.store?._id || getStoreId())}|${req.method} ${req.originalUrl || req.url}`;
 }
 
 function set(key, status, body) {
@@ -58,13 +65,23 @@ function publicCache(ttlMs = 30 * 1000) {
 
 // Admin ya public mutation ke baad namespace(s) drop karo.
 // Namespace = URL ka pehla segment (products / deals / ...).
+// Store context me sirf USI store ki entries (dusre stores ka cache sahi rehta hai);
+// bina context (scripts / platform / banner scheduler) → saare stores.
 function invalidate(namespaces) {
   const list = Array.isArray(namespaces) ? namespaces : [namespaces];
+  const prefix = String(process.env.API_PREFIX || "/api").replace(/\/+$/, "");
+  const storeId = getStoreId();
+  const onlyScope = storeId ? `${scopeOf(storeId)}|` : null;
   for (const key of [...store.keys()]) {
-    if (list.some((ns) => key === `GET /api/${ns}` || key.startsWith(`GET /api/${ns}?`) || key.startsWith(`GET /api/${ns}/`))) {
+    if (onlyScope && !key.startsWith(onlyScope)) continue;
+    const request = key.slice(key.indexOf("|") + 1);
+    if (list.some((ns) => {
+      const base = `GET ${prefix}/${ns}`;
+      return request === base || request.startsWith(`${base}?`) || request.startsWith(`${base}/`);
+    })) {
       store.delete(key);
     }
   }
 }
 
-module.exports = { publicCache, invalidate };
+module.exports = { publicCache, invalidate, keyOf };

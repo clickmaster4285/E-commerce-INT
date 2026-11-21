@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 
 let globalSocket = null;
@@ -89,6 +90,7 @@ function getSocket() {
   try {
     globalSocket = io(SOCKET_URL, {
       withCredentials: true,
+      auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: 3,        // ✅ Zyada attempts se spam kam
@@ -97,6 +99,7 @@ function getSocket() {
       autoConnect: false, // ✅ idle-connect: transport idle/interaction par khulta hai
       timeout: 15000,
     });
+    attachSocketAuthSync(globalSocket, "admin");
     scheduleConnect(globalSocket);
   } catch (err) {
     // ✅ Silent — socket init fail par bhi console error show na ho

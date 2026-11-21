@@ -11,6 +11,8 @@ import { PageHeader, Card, CardHeader, CardBody, Button, StatusBadge, Badge, Ava
 import EditRequestDialog from "@/components/superadmin/EditRequestDialog";
 import useOpenStoreAdmin from "@/components/superadmin/useOpenStoreAdmin";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
+// KYC document links assetUrl se — page ke host par backend (lib/superadminFormat.js),
+// taake private /uploads/documents ke saath super admin ka sa_at cookie jaye
 import { formatDateTime, timeAgo, assetUrl } from "@/lib/superadminFormat";
 
 const LIST = "/super-admin/applications";

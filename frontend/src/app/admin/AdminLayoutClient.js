@@ -14,6 +14,7 @@ import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
 import { useOrderSocketSync } from '../../hooks/admin/useOrderSocketSync';
 import { io } from 'socket.io-client';
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 import { useTranslation } from '../../i18n/LanguageProvider';
 
@@ -75,11 +76,13 @@ function getLayoutPermSocket() {
 
   layoutPermSocket = io(SOCKET_URL, {
     withCredentials: true,
+    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,
   });
+  attachSocketAuthSync(layoutPermSocket, "admin");
 
   return layoutPermSocket;
 }

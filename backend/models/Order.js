@@ -61,7 +61,7 @@ const orderSchema = new mongoose.Schema(
     },
     payment: {
       method: { type: String, enum: ["cod", "bank", "card"], required: true },
-      status: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
+      status: { type: String, enum: ["pending", "paid", "failed", "refunded"], default: "pending" },
     },
 
     subtotal: { type: Number, required: true },

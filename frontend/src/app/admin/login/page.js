@@ -12,6 +12,8 @@ import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
 import { toast } from 'sonner';
 import { useTranslation } from '@/i18n/LanguageProvider';
 import AdminLanguageSwitcher from '@/components/adminComponents/AdminLanguageSwitcher';
+import LazyGoogleLogin from '@/components/user/LazyGoogleLogin';
+import { isStaffRole } from '@/lib/roles';
 import {
   Mail,
   Lock,
@@ -157,16 +159,12 @@ export default function AdminLoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [capsLockOn, setCapsLockOn] = useState(false);
 
-  const loginMutation = useMutation({
-    mutationFn: async (userData) => {
-      const response = await axiosInstance.post('/users/admin/login', userData);
-      return response.data;
-    },
-
-    onSuccess: async (data) => {
+  // Password aur Google dono login ke baad ek hi flow (role check, handoff, redirect)
+  const handleAdminLoginSuccess = async (data) => {
       const role = String(data?.user?.role || '').toLowerCase();
 
-      if (!data?.user || !['admin', 'staff', 'manager'].includes(role)) {
+      // Owner ("storehandler") / admin / manager / staff — lib/roles.js
+      if (!data?.user || !isStaffRole(role)) {
         axiosInstance.post('/users/logout').catch(() => {});
         toast.error(t('admin.login.accessDenied'));
         return;
@@ -192,7 +190,15 @@ export default function AdminLoginPage() {
         return;
       }
       window.location.replace('/admin/dashboard');
+  };
+
+  const loginMutation = useMutation({
+    mutationFn: async (userData) => {
+      const response = await axiosInstance.post('/users/admin/login', userData);
+      return response.data;
     },
+
+    onSuccess: handleAdminLoginSuccess,
 
     onError: (err) => {
       if (err.response?.data?.message) {
@@ -207,7 +213,25 @@ export default function AdminLoginPage() {
     },
   });
 
-  const isSubmitting = loginMutation.isPending;
+  // ✅ Sign in with Google — backend Google se token verify karta hai aur sirf
+  // isi store ka staff (platform par seller owner) maanta hai; naya account nahi banta
+  const googleLoginMutation = useMutation({
+    mutationFn: async (credential) => {
+      const response = await axiosInstance.post('/users/google-login', { credential });
+      return response.data;
+    },
+    onSuccess: handleAdminLoginSuccess,
+    onError: (err) => {
+      if (!err.response) {
+        toast.error(t('admin.login.serverUnavailable'));
+        return;
+      }
+      toast.error(err.response?.data?.message || t('auth.login.googleFailed'));
+    },
+  });
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+  const isSubmitting = loginMutation.isPending || googleLoginMutation.isPending;
 
   const handleEmailChange = (e) => {
     setEmail(e.target.value);
@@ -437,6 +461,28 @@ export default function AdminLoginPage() {
               )}
             </button>
           </form>
+
+          {/* Sign in with Google (staff / seller owner) */}
+          {googleClientId && (
+            <>
+              <div className="my-5 flex items-center gap-3 text-[11.5px] text-[var(--text-muted)]">
+                <span className="h-px flex-1 bg-[var(--border-card)]" aria-hidden="true" />
+                {t('admin.login.orGoogle')}
+                <span className="h-px flex-1 bg-[var(--border-card)]" aria-hidden="true" />
+              </div>
+              <div className="flex justify-center">
+                <LazyGoogleLogin
+                  clientId={googleClientId}
+                  onSuccess={(res) => googleLoginMutation.mutate(res.credential)}
+                  onError={() => toast.error(t('auth.login.googleFailed'))}
+                  shape="pill"
+                  size="large"
+                  width={320}
+                  text="signin_with"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Bottom anchor — trust + help */}

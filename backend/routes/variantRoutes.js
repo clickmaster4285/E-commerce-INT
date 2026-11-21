@@ -11,7 +11,8 @@ const {
 
 const Variant = require("../models/Variant");
 
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { staffPermissionCheck } = require("../middleware/checkPermission");
 
 const {

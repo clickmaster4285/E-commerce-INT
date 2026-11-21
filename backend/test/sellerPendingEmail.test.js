@@ -90,9 +90,17 @@ test("rejection email shows the reason and a working support action (no dead rea
 
 test("info request email links to store setup and escapes the reviewer message", async () => {
   sent.length = 0;
-  await sendApplicationInfoRequestedEmail({ name: "Sara", email: "sara@example.com", storeName: "Sara Store", message: "Upload <ID> card" });
+  await sendApplicationInfoRequestedEmail({
+    name: "Sara",
+    email: "sara@example.com",
+    storeName: "Sara Store",
+    message: "Upload <ID> card",
+    setupToken: "signed.setup.token",
+  });
   const { html } = sent[0];
-  assert.match(html, /store-setup\?email=sara%40example\.com/);
+  // Signed link (utils/sellerSetupToken.js) — sirf email wala link ab nahi
+  assert.match(html, /store-setup\?token=signed\.setup\.token/);
+  assert.doesNotMatch(html, /store-setup\?email=/);
   assert.match(html, /Upload &lt;ID&gt; card/);
   assert.doesNotMatch(html, /\{\{\w+\}\}/);
 });

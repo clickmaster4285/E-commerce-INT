@@ -626,7 +626,7 @@ const savePosSale = async (req, res, existingSale = null) => {
 
       saleWriteAttempted = true;
       const savedSale = existingSale
-        ? await PosSale.findByIdAndUpdate(saleId, { $set: saleData }, { new: true, runValidators: true })
+        ? await PosSale.findByIdAndUpdate(saleId, { $set: saleData }, { returnDocument: "after", runValidators: true })
         : await PosSale.create({ ...saleData, _id: saleId });
       if (!savedSale) throw new Error("Sale could not be saved.");
       if (historyRows.length) await StockHistory.insertMany(historyRows);

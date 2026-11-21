@@ -1,6 +1,7 @@
 ﻿"use client";
 import { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
 import { getBackendOrigin } from "@/lib/tenantHost";
 
 /* ==========================================================
@@ -31,6 +32,7 @@ const getSocketUrl = () => getBackendOrigin();
 
 const SOCKET_OPTIONS = {
   withCredentials: true,
+  auth: { aud: "user" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
   transports: (process.env.NEXT_PUBLIC_SOCKET_TRANSPORTS || "websocket,polling")
     .split(",")
     .map((t) => t.trim())
@@ -94,6 +96,7 @@ export function getUserSocket() {
   userSocket.on("connect_error", () => {
     // Silent — reconnection waise hi chalegi
   });
+  attachSocketAuthSync(userSocket, "user");
 
   return userSocket;
 }
