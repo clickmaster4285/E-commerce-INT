@@ -24,16 +24,22 @@ const PLATFORM_ALLOWED = [...PLATFORM_ONLY, '/admin/login', '/store-not-found'];
 const matches = (pathname, list) => list.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
 // ── Store exists? (backend /store/resolve, 60s cache) ──
-const API_BASE = (process.env.NEXT_PUBLIC_SERVERURL || '').trim().replace(/\/+$/, '');
+// Server-side resolve: NEXT_INTERNAL_API_URL (localhost http) — public HTTPS
+// NEXT_PUBLIC_SERVERURL nginx/TLS se Node me fail ho sakta hai.
+const API_BASE = (
+  process.env.NEXT_INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_SERVERURL ||
+  ''
+).trim().replace(/\/+$/, '');
 const STORE_CACHE_MS = 60 * 1000;
 const storeCache = new Map(); // host → { exists, expires }
 
 async function storeExists(host) {
   const hit = storeCache.get(host);
   if (hit && hit.expires > Date.now()) return hit.exists;
-  if (!API_BASE) return true;
+  if (!API_BASE) return false;
   try {
-    // Platform address (IP) par call + asli host header me — backend isi ko maanta hai
+    // Localhost/platform address par call + asli host `x-store-host` me
     const res = await fetch(`${API_BASE}/store/resolve`, {
       // Backend `x-store-host` sirf is shared secret ke saath maanta hai
       headers: { 'x-store-host': host, 'x-internal-proxy-secret': process.env.INTERNAL_PROXY_SECRET || '' },
@@ -45,7 +51,7 @@ async function storeExists(host) {
     storeCache.set(host, { exists, expires: Date.now() + STORE_CACHE_MS });
     return exists;
   } catch {
-    return true; // backend down → page khulne do (API khud 404 dega), dev block na ho
+    return false; // resolve fail → store-not-found (exist assume mat karo)
   }
 }
 
