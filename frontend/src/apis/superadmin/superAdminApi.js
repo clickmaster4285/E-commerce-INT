@@ -113,17 +113,8 @@ export const superAdminApi = {
   setStoreStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/stores/${id}/status`, { status }).then((r) => r.data),
 
-  // Users
-  listUsers: (params = {}) =>
-    superAdminHttp.get("/super-admin/users", { params }).then((r) => r.data),
-  getUser: (id) => superAdminHttp.get(`/super-admin/users/${id}`).then((r) => r.data),
-  updateUser: (id, payload) => superAdminHttp.patch(`/super-admin/users/${id}`, payload).then((r) => r.data),
-  deleteUser: (id) => superAdminHttp.delete(`/super-admin/users/${id}`).then((r) => r.data),
-  setUserPassword: (id, password) => superAdminHttp.post(`/super-admin/users/${id}/password`, { password }).then((r) => r.data),
   // One-time sign-in link into a store's admin panel (as the store owner)
   openStoreAdmin: (storeId) => superAdminHttp.post(`/super-admin/stores/${storeId}/admin-access`).then((r) => r.data),
-  setUserStatus: (id, status) =>
-    superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
 
   // Store admins (store ke owner/admin — admin_users)
   listStoreAdmins: (params = {}) =>

@@ -109,7 +109,7 @@ export default function TeamMemberDialog({ member, onClose, onSaved }) {
 }
 
 /** Set a new password for a member (no email is sent — share it directly). */
-// `save(password)` dene par kisi bhi account ke liye (users page bhi) — default team member
+// `save(password)` dene par kisi bhi account ke liye — default team member
 export function ResetPasswordDialog({ member, onClose, onSaved, save, description }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");

@@ -163,7 +163,6 @@ export default function AddStorePage() {
             )}
             <div className="mt-7 flex flex-wrap justify-center gap-2">
               <Button variant="primary" icon={LayoutDashboard} loading={openingId === String(created.storeId)} onClick={() => openStoreAdmin(created.storeId)}>Open admin panel</Button>
-              {created.userId && <Button variant="secondary" icon={UserRound} href={`/super-admin/users/${created.userId}`}>View owner</Button>}
               <Button variant="secondary" icon={Plus} onClick={addAnother}>Add another store</Button>
               <Button variant="ghost" href={LIST}>Back to stores</Button>
             </div>

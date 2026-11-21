@@ -11,7 +11,7 @@ const PAGE_SIZE = 20;
 const ENTITY = {
   seller_application: { icon: ClipboardList, href: (id) => `/super-admin/applications/${id}` },
   store: { icon: Store, href: () => "/super-admin/stores" },
-  user: { icon: Users, href: (id) => `/super-admin/users/${id}` },
+  user: { icon: Users, href: null },
   superadmin: { icon: UserCog, href: (id) => `/super-admin/team/${id}` },
   plan: { icon: BadgeDollarSign, href: (id) => `/super-admin/plans/${id}` },
   auth: { icon: LogIn, href: null },
