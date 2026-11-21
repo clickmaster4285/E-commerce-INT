@@ -33,6 +33,7 @@ export default function AddStorePage() {
   const [formError, setFormError] = useState("");
   const [notify, setNotify] = useState(false);
   const [subCheck, setSubCheck] = useState({ state: "idle", value: "", suggestion: "" });
+  const [subdomainTouched, setSubdomainTouched] = useState(false);
   const [created, setCreated] = useState(null);
   const [geo, setGeo] = useState(null);
   const { openStoreAdmin, openingId } = useOpenStoreAdmin({ onError: (text) => setFormError(text) });
@@ -53,8 +54,12 @@ export default function AddStorePage() {
 
   const update = (key, value) => { setForm((p) => ({ ...p, [key]: value })); setErrors((p) => ({ ...p, [key]: "" })); };
   const set = (key) => (e) => update(key, e.target.value);
-  const changeStoreName = (value) => update("storeName", value); // web address alag se likha jata hai
+  const changeStoreName = (value) => {
+    update("storeName", value);
+    if (!subdomainTouched) update("subdomain", value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, STORE_ADDRESS_MAX));
+  };
   const changeSubdomain = (value) => {
+    setSubdomainTouched(true);
     update("subdomain", String(value).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, STORE_ADDRESS_MAX));
   };
 
@@ -136,7 +141,7 @@ export default function AddStorePage() {
 
   const addAnother = () => {
     setCreated(null); setForm(EMPTY); setErrors({}); setFormError(""); setNotify(false);
-    setSubCheck({ state: "idle", value: "", suggestion: "" });
+    setSubCheck({ state: "idle", value: "", suggestion: "" }); setSubdomainTouched(false);
   };
 
   /* ── Success state ── */

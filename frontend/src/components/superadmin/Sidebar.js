@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import FallbackImage from "@/components/common/FallbackImage";
-import { LayoutDashboard, ClipboardList, Store, Users, UserCog, X, PanelLeftClose, PanelLeftOpen, ExternalLink } from "lucide-react";
+import { LayoutDashboard, ClipboardList, Store, UserCog, ShieldCheck, X, PanelLeftClose, PanelLeftOpen, ExternalLink } from "lucide-react";
 import { cx } from "@/components/superadmin/ui";
 
 // Ek hi NAV list — Topbar breadcrumbs bhi isi se banta hai. superOnly = staff ko nahi dikhta.
@@ -12,7 +12,7 @@ export const NAV = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/super-admin/applications", label: "Signup Requests", icon: ClipboardList, badgeKey: "pending" },
   { href: "/super-admin/stores", label: "Stores", icon: Store },
-  { href: "/super-admin/users", label: "Store Admins", icon: Users },
+  { href: "/super-admin/store-admins", label: "Store Admins", icon: ShieldCheck },
   { href: "/super-admin/team", label: "Employee", icon: UserCog },
 ];
 

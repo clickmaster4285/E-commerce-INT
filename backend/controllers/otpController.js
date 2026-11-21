@@ -312,11 +312,12 @@ const verifyEmailVerificationOtp = async (req, res) => {
           .json({ success: false, message: `Incorrect code. ${left} attempt${left === 1 ? "" : "s"} remaining.` });
       }
 
-      // ✅ Sahi OTP — ab User banao (is se pehle User exist nahi karta)
+      // ✅ Sahi OTP — ab identity banao (customer = User, seller = Employee)
+      const Employee = require("../models/Employee");
       const existingUser = await User.findOne({ email });
       if (existingUser && existingUser.emailVerified !== false) {
         const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("status").lean();
-        if (existingUser.status === "blocked" && pendingApp) {
+        if (pendingApp) {
           await PendingRegistration.deleteOne({ _id: pending._id });
           return res.status(403).json({
             success: false,
@@ -330,13 +331,15 @@ const verifyEmailVerificationOtp = async (req, res) => {
           .json({ success: false, message: "This email is already registered. Please log in." });
       }
       if (existingUser && existingUser.emailVerified === false) {
-        // Legacy adhoora record — naye verified User ke liye jagah banao
+        // Legacy adhoora record — naye account ke liye jagah banao
         await User.deleteOne({ _id: existingUser._id });
       }
+      // Seller ka identity Employee (admin_users) me hai — username/phone wahan check karo
       if (pending.username) {
-        const clash = await User.findOne({
-          username: String(pending.username).toLowerCase().trim(),
-        });
+        const uname = String(pending.username).toLowerCase().trim();
+        const clash = pending.storeId
+          ? await User.findOne({ username: uname })
+          : await Employee.findOne({ username: uname }).setOptions({ skipTenantScope: true });
         if (clash) {
           return res
             .status(400)
@@ -344,7 +347,10 @@ const verifyEmailVerificationOtp = async (req, res) => {
         }
       }
       if (pending.phone) {
-        const phoneClash = await User.findOne({ phone: String(pending.phone).trim() });
+        const phone = String(pending.phone).trim();
+        const phoneClash = pending.storeId
+          ? await User.findOne({ phone })
+          : await Employee.findOne({ phone }).setOptions({ skipTenantScope: true });
         if (phoneClash) {
           return res
             .status(400)
@@ -412,7 +418,6 @@ const verifyEmailVerificationOtp = async (req, res) => {
       const isSeller = !!(pending.storeName && String(pending.storeName).trim().length >= 3);
 
       const Store = require("../models/Store");
-      const Employee = require("../models/Employee");
 
       // Seller store is created up-front (closed) and stays read-only until approval.
       let store = null;
@@ -445,22 +450,8 @@ const verifyEmailVerificationOtp = async (req, res) => {
         });
       }
 
-      // Store host par wahi store (req.store); platform par koi "default" store nahi —
-      // pehle Store.findOne() platform par kisi bhi random store ko pakad leta tha
-      const defaultStore = isSeller ? null : req.store || null;
-      const user = await User.create({
-        name: pending.name,
-        username: pending.username,
-        phone: pending.phone || "",
-        email: pending.email,
-        // ✅ passwordHash pehle se bcrypt-hashed hai — dobara hash nahi karna
-        password: pending.passwordHash,
-        storeId: isSeller ? store._id : defaultStore?._id,
-        role: "user",
-        emailVerified: true,
-        // ✅ Pending Super Admin approval — login blocked until approval
-        status: isSeller ? "blocked" : "blocked",
-      });
+      // Seller ka identity sirf Employee (admin_users) + SellerApplication hai —
+      // customer_users me seller ka duplicate account nahi banta.
 
       // Seller application queue — Super Admin reviews from here (everything supplied at signup)
       const application = await SellerApplication.create({
@@ -481,30 +472,23 @@ const verifyEmailVerificationOtp = async (req, res) => {
         address: isSeller ? pending.address || "" : "",
         zip_code: isSeller ? pending.zipCode || "" : "",
         status: "pending",
-        user_id: user._id,
+        user_id: null,
         store_id: isSeller ? store._id : null,
       });
 
       // Seller gets an employee session in read-only mode (all pages viewable, nothing editable).
       // Store owner = "admin" role (full panel access); read-only is enforced by seller_pending, not role.
-      let employee = null;
-      if (isSeller) {
-        employee = await Employee.create({
-          name: pending.name,
-          username: pending.username,
-          email: pending.email,
-          phone: pending.phone || "",
-          password: pending.passwordHash,
-          role: OWNER_ROLE,
-          status: "active",
-          storeId: store._id,
-          seller_pending: true,
-        });
-        await SellerApplication.updateOne(
-          { _id: application._id },
-          { user_id: user._id, store_id: store._id }
-        );
-      }
+      const employee = await Employee.create({
+        name: pending.name,
+        username: pending.username,
+        email: pending.email,
+        phone: pending.phone || "",
+        password: pending.passwordHash,
+        role: OWNER_ROLE,
+        status: "active",
+        storeId: isSeller ? store._id : null,
+        seller_pending: true,
+      });
 
       await PendingRegistration.deleteOne({ _id: pending._id });
       const storeName = isSeller ? pending.storeName : ((application.store_name) || "Your store");
@@ -520,23 +504,19 @@ const verifyEmailVerificationOtp = async (req, res) => {
         console.error("[signup] pending-approval email failed:", emailError.message);
       }
 
-      // Pending approval — set user cookies (blocked account) AND a read-only
-      // employee session for the admin panel (all pages accessible, nothing writable).
-      await setAuthCookies(req, res, user);
-      if (employee) {
-        await setEmployeeAuthCookies(req, res, employee);
-      }
+      // Pending approval — sirf read-only employee session (customer account nahi banta).
+      await setEmployeeAuthCookies(req, res, employee);
       const io = req.io || getIO();
       await pushGlobalActivity(
         io,
         {
-          action: `${user.name} verified their email`,
+          action: `${employee.name} verified their email`,
           category: "Authentication",
-          performedBy: user._id,
-          performedByName: user.name,
-          details: { email: user.email },
+          performedBy: employee._id,
+          performedByName: employee.name,
+          details: { email: employee.email },
         },
-        user._id,
+        employee._id,
       );
 
       return res.json({
@@ -544,13 +524,13 @@ const verifyEmailVerificationOtp = async (req, res) => {
         pendingApproval: true,
         message: "Your application is pending Super Admin approval. We'll email you once it is approved.",
         user: {
-          id: user._id,
-          name: user.name,
-          username: user.username,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar || null,
+          id: employee._id,
+          name: employee.name,
+          username: employee.username,
+          phone: employee.phone,
+          email: employee.email,
+          role: employee.role,
+          avatar: employee.avatar || null,
         },
       });
     }

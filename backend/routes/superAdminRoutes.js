@@ -32,6 +32,12 @@ router.patch("/stores/:id", superAdminController.updateStore);
 router.delete("/stores/:id", superAdminController.deleteStore);
 router.patch("/stores/:id/status", superAdminController.setStoreStatus);
 
+router.get("/store-admins", superAdminController.listStoreAdmins);
+router.get("/store-admins/:id", superAdminController.getStoreAdmin);
+router.patch("/store-admins/:id", superAdminController.updateStoreAdmin);
+router.post("/store-admins/:id/password", superAdminController.resetStoreAdminPassword);
+router.patch("/store-admins/:id/status", superAdminController.setStoreAdminStatus);
+
 router.get("/users", superAdminController.listUsers);
 router.get("/users/:id", superAdminController.getUser);
 router.patch("/users/:id", superAdminController.updateUser);

@@ -22,6 +22,7 @@ const {
   sendApplicationInfoRequestedEmail,
 } = require("../services/emailService");
 const log = require("../utils/logger");
+const { pushStoreActivity, getChanges } = require("../utils/activityHelper");
 
 // Best-effort seller notification — delivery failure must never reverse a decision
 const notifySeller = async (sendFn, payload, action, entityId) => {
@@ -273,13 +274,11 @@ const getRequest = async (req, res) => {
     const item = await SellerApplication.findById(req.params.id).select("-passwordHash").lean();
     if (!item) return res.status(404).json({ success: false, message: "Application not found." });
 
-    // Linked store, seller accounts aur review history — detail page ke liye ek hi call
-    const [store, user, employee] = await Promise.all([
+    // Linked store aur seller admin account — detail page ke liye ek hi call.
+    // Seller ka identity Employee me hai, customer_users me koi record nahi.
+    const [store, employee] = await Promise.all([
       item.store_id
         ? Store.findById(item.store_id).setOptions(CROSS_STORE).select("store_name subdomain store_status createdAt").lean()
-        : null,
-      item.user_id
-        ? User.findById(item.user_id).setOptions(CROSS_STORE).select("status emailVerified created_at").lean()
         : null,
       item.store_id
         ? Employee.findOne({ email: item.email, storeId: item.store_id })
@@ -295,7 +294,7 @@ const getRequest = async (req, res) => {
         ...item,
         store: store ? { ...store, url: storeAdminBaseUrl(store) } : null,
         account: {
-          user: user || null,
+          user: null,
           adminAccess: employee
             ? { status: employee.status, pending: !!employee.seller_pending, created_at: employee.created_at }
             : null,
@@ -391,9 +390,6 @@ const updateRequest = async (req, res) => {
       }
     }
     if ("name" in updates) {
-      if (application.user_id) {
-        await User.updateOne({ _id: application.user_id }, { $set: { name: updates.name } }).setOptions(CROSS_STORE);
-      }
       if (application.store_id) {
         await Employee.updateOne(
           { email: application.email, storeId: application.store_id },
@@ -429,7 +425,7 @@ const deleteRequest = async (req, res) => {
       return res.status(409).json({ success: false, message: "This request was approved meanwhile. Please reload." });
     }
 
-    const removed = { store: 0, adminAccounts: 0, userAccount: 0 };
+    const removed = { store: 0, adminAccounts: 0 };
     if (application.store_id) {
       const storeResult = await Store.deleteOne({ _id: application.store_id, store_status: { $ne: "open" } }).setOptions(CROSS_STORE);
       removed.store = storeResult.deletedCount || 0;
@@ -438,12 +434,6 @@ const deleteRequest = async (req, res) => {
         removed.adminAccounts = empResult.deletedCount || 0;
       }
     }
-    if (application.user_id) {
-      // Sirf signup wala blocked account — active customer account kabhi nahi
-      const userResult = await User.deleteOne({ _id: application.user_id, status: "blocked" }).setOptions(CROSS_STORE);
-      removed.userAccount = userResult.deletedCount || 0;
-    }
-
 
     return res.json({ success: true, message: "Signup request deleted.", data: { removed } });
   } catch (error) {
@@ -481,104 +471,53 @@ const approveRequest = async (req, res) => {
       { seller_pending: false, status: "active", role: OWNER_ROLE, ...(store ? { storeId: store._id } : {}) }
     ).setOptions({ skipTenantScope: true });
 
-    // Provision store + seller account exactly once (password from request)
-    const existingUser = await User.findOne({ email: application.email }).select("_id storeId status").lean();
-    if (existingUser) {
-      let openStore = store;
-      if (!openStore) {
-        const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
-        openStore = existingUser.storeId
-          ? await Store.findByIdAndUpdate(existingUser.storeId, { store_status: "open" }, { returnDocument: "after" })
-          : await Store.create({
-              store_name: storeName0,
-              email: application.email,
-              phone: application.phone || "",
-              store_status: "open",
-            });
-      }
-      // Activate the account that was blocked at apply time
-      await User.updateOne(
-        { _id: existingUser._id },
-        { status: "active", emailVerified: true, storeId: openStore._id }
-      );
-      await SellerApplication.updateOne(
-        { _id: application._id },
-        { store_id: openStore._id, user_id: existingUser._id }
-      );
-      // Resume-flow employees may have been created without a storeId — link them now
-      await Employee.findOneAndUpdate(
-        sellerEmployeeFilter(application),
+    // Store signup time pe already provision hota hai; nahi ho to ab banao.
+    let openStore = store;
+    if (!openStore) {
+      const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
+      openStore = await Store.create({
+        store_name: storeName0,
+        email: application.email,
+        phone: application.phone || "",
+        store_status: "open",
+      });
+    }
+
+    await SellerApplication.updateOne({ _id: application._id }, { store_id: openStore._id, user_id: null });
+
+    // Seller ka identity sirf Employee (admin_users) — na ho to ab banao.
+    let sellerEmployee = await Employee.findOne(sellerEmployeeFilter(application)).setOptions({ skipTenantScope: true });
+    if (!sellerEmployee) {
+      const username = String(application.username || "").trim().toLowerCase() || (await uniqueUsername(application.name, application.email));
+      sellerEmployee = await Employee.create({
+        name: application.name,
+        username,
+        email: application.email,
+        phone: application.phone || "",
+        password: application.passwordHash,
+        role: OWNER_ROLE,
+        status: "active",
+        storeId: openStore._id,
+        seller_pending: false,
+      });
+    } else {
+      await Employee.updateOne(
+        { _id: sellerEmployee._id },
         { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: openStore._id }
       ).setOptions({ skipTenantScope: true });
-      await notifySeller(
-        sendApplicationApprovedEmail,
-        { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(openStore) },
-        "Approval",
-        application._id
-      );
-      return res.json({ success: true, message: "Seller approved and account activated.", data: { storeId: openStore?._id || null, userId: existingUser._id } });
     }
-
-    const openStore = store || (application.store_name
-      ? await Store.create({
-          store_name: application.store_name,
-          email: application.email,
-          phone: application.phone || "",
-          store_status: "open",
-        })
-      : await Store.create({
-          store_name: [application.name, "Store"].filter(Boolean).join(" "),
-          email: application.email,
-          phone: application.phone || "",
-          store_status: "open",
-        }));
-    const storeFinal = openStore;
-
-    let username = String(application.username || "").trim();
-    const localPart = String(application.email).split("@")[0] || "";
-    if (!username) {
-      username = localPart.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20) || `user${Date.now().toString(36)}`;
-    }
-    if (await User.exists({ username })) {
-      let i = 1;
-      while (await User.exists({ username: `${username}${i}` }) && i < 100) i += 1;
-      username = `${username}${i}`;
-    }
-
-    const user = await User.create({
-      name: application.name,
-      username,
-      email: application.email,
-      phone: application.phone || "",
-      password: application.passwordHash,
-      role: "user",
-      storeId: storeFinal._id,
-      emailVerified: true,
-      status: "active",
-    });
-
-    await SellerApplication.updateOne(
-      { _id: application._id },
-      { store_id: storeFinal._id, user_id: user._id }
-    );
-
-    await Employee.findOneAndUpdate(
-      sellerEmployeeFilter(application),
-      { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: storeFinal._id }
-    ).setOptions({ skipTenantScope: true });
-
 
     await notifySeller(
       sendApplicationApprovedEmail,
-      { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(storeFinal) },
+      { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(openStore) },
       "Approval",
       application._id
     );
 
     return res.json({
       success: true,
-      message: "Seller approved and store provisioned.",
-      data: { storeId: storeFinal._id, userId: user._id },
+      message: "Seller approved and store opened.",
+      data: { storeId: openStore._id },
     });
   } catch (error) {
     log.error("[super-admin] approve error:", error.message);
@@ -699,11 +638,11 @@ const listStores = async (req, res) => {
       Store.countDocuments(filter),
     ]);
 
-    // Resolve owner (User with storeId → that store)
+    // Owner = store ka Employee (seller) — customer_users me seller nahi hota
     const storeIds = stores.map((s) => s._id);
-    // Owner = seller account (application wala) — customer ka bhi storeId hota hai
-    const owners = await User.find({ storeId: { $in: storeIds }, _id: { $in: await sellerUserIds() } })
-      .select("name username email storeId")
+    const owners = await Employee.find({ storeId: { $in: storeIds }, role: OWNER_ROLE })
+      .select("name username email storeId seller_pending")
+      .setOptions(CROSS_STORE)
       .lean();
     const ownerByStore = new Map();
     owners.forEach((o) => ownerByStore.set(String(o.storeId), o));
@@ -732,7 +671,7 @@ const listStores = async (req, res) => {
         url: storeAdminBaseUrl(s),
         createdAt: s.createdAt,
         status: s.store_status || "open",
-        approvalStatus: s.store_status === "closed" ? "suspended" : "active",
+        approvalStatus: owner?.seller_pending ? "pending" : s.store_status === "closed" ? "suspended" : "active",
       };
     });
 
@@ -749,11 +688,11 @@ const getStore = async (req, res) => {
   try {
     const store = await Store.findById(req.params.id).lean();
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
-    const ownerIds = await sellerUserIds();
-    const owner = await User.findOne({ storeId: store._id, _id: { $in: ownerIds } })
-      .select("name username email phone status createdAt")
+    const owner = await Employee.findOne({ storeId: store._id, role: OWNER_ROLE })
+      .select("name username email phone status seller_pending createdAt")
+      .setOptions(CROSS_STORE)
       .lean();
-    return res.json({ success: true, data: { ...store, id: store._id, status: store.store_status || "open", logo_url: store.logo?.img_url || "", url: storeAdminBaseUrl(store), owner: owner || null } });
+    return res.json({ success: true, data: { ...store, id: store._id, status: store.store_status || "open", approvalStatus: owner?.seller_pending ? "pending" : store.store_status === "closed" ? "suspended" : "active", logo_url: store.logo?.img_url || "", url: storeAdminBaseUrl(store), owner: owner || null } });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to load store." });
   }
@@ -770,12 +709,15 @@ const setStoreStatus = async (req, res) => {
     const previous = store.store_status;
     store.store_status = status;
     await store.save();
+    if (previous !== status) await pushStoreActivity(store._id, req, "status_changed", `Store status changed from ${previous} to ${status}`, { from: previous, to: status });
 
-    // Sync the seller account so suspension actually blocks their login
+    // Sync accounts: customer login block + seller (Employee) admin login block
     if (status === "closed") {
       await User.updateMany({ storeId: store._id }, { status: "blocked" });
+      await Employee.updateMany({ storeId: store._id }, { status: "inactive" }).setOptions(CROSS_STORE);
     } else if (status === "open") {
       await User.updateMany({ storeId: store._id, status: "blocked" }, { status: "active" });
+      await Employee.updateMany({ storeId: store._id, status: "inactive" }, { status: "active" }).setOptions(CROSS_STORE);
     }
 
 
@@ -827,20 +769,21 @@ const createSellerStore = async (req, res) => {
   if (subError) errors.subdomain = subError;
 
   try {
-    // Uniqueness — signup jaisi checks (platform accounts + pending signups + applications)
-    const [emailUser, emailPending, emailApp, phoneUser, nameUser, subStore, subPending] = await Promise.all([
+    // Uniqueness — seller ka identity Employee me hai (customer_users me nahi)
+    const [emailUser, emailEmp, emailPending, emailApp, phoneEmp, usernameEmp, subStore, subPending] = await Promise.all([
       errors.email ? null : User.exists({ email }).setOptions(CROSS_STORE),
+      errors.email ? null : Employee.exists({ email }).setOptions(CROSS_STORE),
       errors.email ? null : PendingRegistration.exists({ email, expiresAt: { $gt: new Date() } }),
       errors.email ? null : SellerApplication.exists({ email, status: "pending" }),
-      errors.phone ? null : User.exists({ phone }).setOptions(CROSS_STORE),
-      !usernameIn || errors.username ? null : User.exists({ username: usernameIn }).setOptions(CROSS_STORE),
+      errors.phone ? null : Employee.exists({ phone }).setOptions(CROSS_STORE),
+      !usernameIn || errors.username ? null : Employee.exists({ username: usernameIn }).setOptions(CROSS_STORE),
       errors.subdomain ? null : Store.exists({ subdomain }).setOptions(CROSS_STORE),
       errors.subdomain ? null : PendingRegistration.exists({ subdomain, expiresAt: { $gt: new Date() } }),
     ]);
-    if (emailUser) errors.email = "An account with this email already exists.";
+    if (emailUser || emailEmp) errors.email = "An account with this email already exists.";
     else if (emailPending || emailApp) errors.email = "This email has a signup in progress — review it under Signup Requests.";
-    if (phoneUser) errors.phone = "This phone number is already registered.";
-    if (nameUser) errors.username = "This username is already taken.";
+    if (phoneEmp) errors.phone = "This phone number is already registered.";
+    if (usernameEmp) errors.username = "This username is already taken.";
     if (subStore || subPending) errors.subdomain = "This store address is already taken.";
     if (Object.keys(errors).length) {
       return res.status(400).json({ success: false, message: Object.values(errors)[0], errors });
@@ -868,10 +811,6 @@ const createSellerStore = async (req, res) => {
         tax_rate: 17,
         weight_unit: "kg",
       });
-      created.user = await User.create({
-        name, username, email, phone, password: passwordHash,
-        role: "user", storeId: created.store._id, emailVerified: true, status: "active",
-      });
       created.employee = await Employee.create({
         name, username, email, phone, password: passwordHash,
         role: OWNER_ROLE, status: "active", storeId: created.store._id, seller_pending: false,
@@ -886,7 +825,7 @@ const createSellerStore = async (req, res) => {
         status: "approved",
         reviewed_by: req.superAdmin._id,
         reviewed_at: new Date(),
-        user_id: created.user._id,
+        user_id: null,
         store_id: created.store._id,
       });
     } catch (err) {
@@ -894,7 +833,6 @@ const createSellerStore = async (req, res) => {
       await Promise.allSettled([
         created.application && SellerApplication.deleteOne({ _id: created.application._id }),
         created.employee && Employee.deleteOne({ _id: created.employee._id }).setOptions(CROSS_STORE),
-        created.user && User.deleteOne({ _id: created.user._id }).setOptions(CROSS_STORE),
         created.store && Store.deleteOne({ _id: created.store._id }).setOptions(CROSS_STORE),
       ]);
       if (err?.code === 11000) {
@@ -907,13 +845,14 @@ const createSellerStore = async (req, res) => {
     }
 
     const storeUrl = storeAdminBaseUrl(created.store);
+    await pushStoreActivity(created.store._id, req, "created", "Store created by Super Admin", { storeName });
     if (b.notify === true) {
       await notifySeller(sendApplicationApprovedEmail, { name, email, storeName, storeUrl }, "Approval", created.application._id);
     }
     return res.status(201).json({
       success: true,
       message: `${storeName} is live — ${name} can sign in with ${email}.`,
-      data: { storeId: created.store._id, userId: created.user._id, subdomain, url: storeUrl },
+      data: { storeId: created.store._id, subdomain, url: storeUrl },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to create the store." });
@@ -926,6 +865,7 @@ const createStore = async (req, res) => {
     if (!String(store_name || "").trim()) return res.status(400).json({ success: false, message: "Store name is required." });
     if (!["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
     const store = await Store.create({ store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : "individual", description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim(), logo: { img_url: String(logo_url || "").trim(), public_id: "" } });
+    await pushStoreActivity(store._id, req, "created", "Store created by Super Admin", { storeName: store.store_name });
     return res.status(201).json({ success: true, message: "Store created.", data: store });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
@@ -940,9 +880,12 @@ const updateStore = async (req, res) => {
     if (store_status && !["open", "closed", "maintenance"].includes(String(store_status))) return res.status(400).json({ success: false, message: "Invalid store status." });
     const store = await Store.findById(req.params.id);
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    const before = store.toObject();
     Object.assign(store, { store_name: String(store_name).trim(), email: String(email || "").trim(), phone: String(phone || "").trim(), subdomain: String(subdomain || "").trim().toLowerCase() || undefined, store_status: store_status || store.store_status, business_category: String(business_category || "").trim(), business_type: ["individual", "registered_business"].includes(String(business_type)) ? business_type : store.business_type, description: String(description || "").trim(), country: String(country || "").trim(), city: String(city || "").trim(), address: String(address || "").trim(), zip_code: String(zip_code || "").trim() });
     if (logo_url !== undefined) store.logo = { ...(store.logo?.toObject?.() || store.logo || {}), img_url: String(logo_url || "").trim() };
     await store.save();
+    const changes = getChanges(before, store.toObject(), ["store_name", "email", "phone", "business_category", "description", "country", "city", "address", "zip_code", "store_status"]);
+    await pushStoreActivity(store._id, req, "updated", "Store details updated by Super Admin", { changes });
     return res.json({ success: true, message: "Store updated.", data: store });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ success: false, message: "That subdomain is already in use." });
@@ -956,6 +899,7 @@ const deleteStore = async (req, res) => {
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
     await Store.deleteOne({ _id: store._id });
     await User.updateMany({ storeId: store._id }, { $unset: { storeId: 1 }, status: "inactive" });
+    await Employee.deleteMany({ storeId: store._id }).setOptions(CROSS_STORE);
     return res.json({ success: true, message: "Store deleted." });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to delete store." });
@@ -966,11 +910,8 @@ const deleteStore = async (req, res) => {
    USERS — list + block/unblock
    ========================================== */
 
-/* Seller vs customer — dono User collection me hain aur DONO ke paas storeId hai
-   (customer ka storeId = jis store par usne account banaya). Isliye storeId se seller
-   pehchanna ghalat hai. Seller = jis User ki SellerApplication hai (har signup path user_id set karta hai). */
-const sellerUserIds = () => SellerApplication.distinct("user_id", { user_id: { $ne: null } });
-const isSellerUser = async (user) => Boolean(user && (await SellerApplication.exists({ user_id: user._id })));
+/* Users page = sirf customers. Seller ka account Employee (admin_users) me hota hai,
+   customer_users me nahi — isliye yahan seller filter ki zarurat nahi. */
 
 const listUsers = async (req, res) => {
   try {
@@ -978,7 +919,7 @@ const listUsers = async (req, res) => {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
     // Users page = sirf customers; sellers Stores page par (owner) manage hote hain
-    const base = { is_deleted: { $ne: true }, _id: { $nin: await sellerUserIds() } };
+    const base = { is_deleted: { $ne: true } };
     const filter = { ...base };
     if (role && String(role) === "user") filter.role = "user";
     if (status && ["active", "blocked", "inactive"].includes(String(status))) filter.status = String(status);
@@ -1044,6 +985,176 @@ const listUsers = async (req, res) => {
   }
 };
 
+/* ==========================================
+   STORE ADMINS — store ke owner/admin accounts (Employee / admin_users).
+   Seller ka customer User nahi hota — yahi asli store-admin list hai.
+   ========================================== */
+const listStoreAdmins = async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 20 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 20));
+
+    const base = { role: { $in: ADMIN_ROLES }, is_deleted: { $ne: true } };
+    const filter = { ...base };
+    if (["active", "inactive"].includes(String(status))) filter.status = String(status);
+    if (search) {
+      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: pattern }, { email: pattern }, { username: pattern }, { phone: pattern }];
+    }
+
+    const [items, total, counts] = await Promise.all([
+      Employee.find(filter)
+        .select("name username email phone role status seller_pending storeId created_at")
+        .populate({ path: "storeId", select: "store_name subdomain store_status", options: CROSS_STORE })
+        .sort({ created_at: -1 })
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum)
+        .setOptions(CROSS_STORE)
+        .lean(),
+      Employee.countDocuments(filter).setOptions(CROSS_STORE),
+      Promise.all([
+        Employee.countDocuments(base).setOptions(CROSS_STORE),
+        Employee.countDocuments({ ...base, status: "active" }).setOptions(CROSS_STORE),
+        Employee.countDocuments({ ...base, status: "inactive" }).setOptions(CROSS_STORE),
+      ]).then(([all, active, inactive]) => ({ all, active, inactive })),
+    ]);
+
+    const mapped = items.map((e) => {
+      const store = e.storeId && typeof e.storeId === "object" ? e.storeId : null;
+      return {
+        id: e._id,
+        name: e.name,
+        username: e.username || "",
+        email: e.email,
+        phone: e.phone || "",
+        role: e.role,
+        status: e.status || "active",
+        sellerPending: !!e.seller_pending,
+        store: store
+          ? { id: store._id, name: store.store_name, subdomain: store.subdomain || "", status: store.store_status || "open", url: storeAdminBaseUrl(store) }
+          : null,
+        created_at: e.created_at,
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: { items: mapped, total, counts, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load store admins." });
+  }
+};
+
+const getStoreAdmin = async (req, res) => {
+  try {
+    const admin = await Employee.findOne({ _id: req.params.id, role: { $in: ADMIN_ROLES }, is_deleted: { $ne: true } })
+      .select("name username email phone avatar role status seller_pending storeId created_at updated_at activities")
+      .populate({ path: "storeId", select: "store_name subdomain store_status business_category logo created_at", options: CROSS_STORE })
+      .setOptions(CROSS_STORE)
+      .lean();
+    if (!admin) return res.status(404).json({ success: false, message: "Store admin not found." });
+    const store = admin.storeId && typeof admin.storeId === "object" ? admin.storeId : null;
+    const application = await SellerApplication.findOne({ $or: [{ store_id: store?._id }, { email: admin.email }] })
+      .select("status created_at reviewed_at reviewed_by rejection_reason")
+      .populate("reviewed_by", "name email")
+      .lean();
+    return res.json({
+      success: true,
+      data: {
+        admin: {
+          id: admin._id,
+          name: admin.name,
+          username: admin.username || "",
+          email: admin.email,
+          phone: admin.phone || "",
+          avatar: admin.avatar || "",
+          role: admin.role,
+          status: admin.status || "active",
+          sellerPending: !!admin.seller_pending,
+          created_at: admin.created_at,
+          updated_at: admin.updated_at,
+          activities: Array.isArray(admin.activities) ? admin.activities.slice(0, 100) : [],
+          approval: application ? { status: application.status, requestedAt: application.created_at, reviewedAt: application.reviewed_at, reviewedBy: application.reviewed_by || null, rejectionReason: application.rejection_reason || "" } : null,
+        },
+        store: store
+          ? { id: store._id, name: store.store_name, subdomain: store.subdomain || "", status: store.store_status || "open", business_category: store.business_category || "", logo: store.logo?.img_url || "", created_at: store.created_at, url: storeAdminBaseUrl(store) }
+          : null,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load the store admin." });
+  }
+};
+
+const resetStoreAdminPassword = async (req, res) => {
+  try {
+    const password = String(req.body?.password || "");
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: "Password must be at least 8 characters.", errors: { password: "Password must be at least 8 characters." } });
+    }
+    const admin = await Employee.findOne({ _id: req.params.id, role: { $in: ADMIN_ROLES }, is_deleted: { $ne: true } }).setOptions(CROSS_STORE);
+    if (!admin) return res.status(404).json({ success: false, message: "Store admin not found." });
+    admin.password = await bcrypt.hash(password, 10);
+    await admin.save();
+    await tokens.revokeAllForSubject("admin", admin._id);
+    return res.json({ success: true, message: `Password updated for ${admin.name}. All their sessions have been signed out.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to reset the password." });
+  }
+};
+
+const updateStoreAdmin = async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const phone = String(req.body?.phone || "").trim();
+    const status = String(req.body?.status || "active");
+    const password = String(req.body?.password || "");
+    const confirmPassword = String(req.body?.confirmPassword || "");
+    if (name.length < 2) return res.status(400).json({ success: false, message: "Name must be at least 2 characters." });
+    if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ success: false, message: "Enter a valid email address." });
+    if (!["active", "inactive"].includes(status)) return res.status(400).json({ success: false, message: "Invalid account status." });
+    if (password && (password.length < 8 || password !== confirmPassword)) return res.status(400).json({ success: false, message: password.length < 8 ? "Password must be at least 8 characters." : "Passwords do not match." });
+    const duplicate = await Employee.exists({ email, _id: { $ne: req.params.id } }).setOptions(CROSS_STORE);
+    if (duplicate) return res.status(409).json({ success: false, message: "That email is already in use." });
+    const admin = await Employee.findOne({ _id: req.params.id, role: { $in: ADMIN_ROLES }, is_deleted: { $ne: true } }).setOptions(CROSS_STORE);
+    if (!admin) return res.status(404).json({ success: false, message: "Store admin not found." });
+    const changes = [];
+    [["name", admin.name, name], ["email", admin.email, email], ["phone", admin.phone, phone], ["status", admin.status, status]].forEach(([field, before, after]) => { if (String(before || "") !== String(after || "")) changes.push({ field, oldValue: before || "empty", newValue: after || "empty" }); });
+    admin.name = name; admin.email = email; admin.phone = phone; admin.status = status;
+    if (password) { admin.password = await bcrypt.hash(password, 10); changes.push({ field: "password", oldValue: "••••••••", newValue: "changed" }); }
+    await admin.save();
+    if (changes.length) {
+      await Employee.updateOne(
+        { _id: admin._id },
+        { $push: { activities: { $each: [{ action: "Store admin profile updated by Super Admin", category: "Employee Management", performedBy: null, performedByName: req.superAdmin?.name || "Super Admin", details: { changes }, timestamp: new Date() }], $position: 0, $slice: 100 } } },
+      ).setOptions(CROSS_STORE);
+    }
+    return res.json({ success: true, message: "Store admin updated.", data: admin });
+  } catch (error) { return res.status(500).json({ success: false, message: "Failed to update the store admin." }); }
+};
+
+const setStoreAdminStatus = async (req, res) => {
+  try {
+    const status = String(req.body?.status || "");
+    if (!["active", "inactive"].includes(status)) {
+      return res.status(400).json({ success: false, message: "status must be active or inactive." });
+    }
+    const admin = await Employee.findOneAndUpdate(
+      { _id: req.params.id, role: { $in: ADMIN_ROLES }, is_deleted: { $ne: true } },
+      { status },
+      { new: true }
+    ).setOptions(CROSS_STORE);
+    if (!admin) return res.status(404).json({ success: false, message: "Store admin not found." });
+    if (status === "inactive") await tokens.revokeAllForSubject("admin", admin._id);
+    return res.json({ success: true, message: status === "inactive" ? `${admin.name} can no longer sign in.` : `${admin.name} can sign in again.`, data: { status: admin.status } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to update the status." });
+  }
+};
+
 // User detail — profile + store (seller) + application + admin access + orders + audit history
 const getUser = async (req, res) => {
   try {
@@ -1054,12 +1165,9 @@ const getUser = async (req, res) => {
       .lean();
     if (!user) return res.status(404).json({ success: false, message: "User not found." });
 
-    const isSeller = await isSellerUser(user);
     // Customer ke liye store = jis store par shopping account hai (admin access nahi)
     const store = user.storeId && typeof user.storeId === "object" ? user.storeId : null;
-    const [application, employee, orderStats, recentOrders] = await Promise.all([
-      SellerApplication.findOne({ user_id: user._id }).select("status reviewed_at created_at store_name").sort({ created_at: -1 }).lean(),
-      isSeller && store ? Employee.findOne({ email: user.email, storeId: store._id }).select("status seller_pending role").setOptions(CROSS_STORE).lean() : null,
+    const [orderStats, recentOrders] = await Promise.all([
       Order.aggregate([
         { $match: { user_id: user._id } },
         { $group: { _id: null, count: { $sum: 1 }, total: { $sum: "$total" }, last_at: { $max: "$created_at" } } },
@@ -1080,7 +1188,7 @@ const getUser = async (req, res) => {
           provider: user.provider || "local",
           emailVerified: !!user.emailVerified,
           status: user.status || "active",
-          type: isSeller ? "Seller" : "Customer",
+          type: "Customer",
           avatar: user.avatar || "",
           dob: user.dob || "",
           created_at: user.created_at,
@@ -1089,8 +1197,8 @@ const getUser = async (req, res) => {
         store: store
           ? { id: store._id, name: store.store_name, subdomain: store.subdomain || "", status: store.store_status || "open", category: store.business_category || "", logo: store.logo?.img_url || "", url: storeAdminBaseUrl(store), created_at: store.created_at }
           : null,
-        application: application ? { id: application._id, status: application.status, reviewed_at: application.reviewed_at, created_at: application.created_at, store_name: application.store_name } : null,
-        adminAccess: employee ? { status: employee.status, pending: !!employee.seller_pending, role: employee.role } : null,
+        application: null,
+        adminAccess: null,
         orders: { count: stats.count || 0, total: stats.total || 0, last_at: stats.last_at || null },
         recentOrders: recentOrders.map((o) => ({ id: o._id, order_number: o.order_number, total: o.total, status: o.status, created_at: o.created_at, store: o.storeId && typeof o.storeId === "object" ? { id: o.storeId._id, name: o.storeId.store_name } : null })),
       },
@@ -1141,16 +1249,7 @@ const updateUser = async (req, res) => {
     if (Object.keys(errors).length) return res.status(400).json({ success: false, message: Object.values(errors)[0], errors });
     if (!changed.length) return res.json({ success: true, message: "No changes to save." });
 
-    const previousEmail = (await User.findById(user._id).select("email").lean())?.email;
     await user.save();
-    // Seller ka store-admin login bhi same rakho (naam / email / phone)
-    if (user.storeId && (await isSellerUser(user))) {
-      const sync = {};
-      if (changed.includes("name")) sync.name = user.name;
-      if (changed.includes("email")) sync.email = user.email;
-      if (changed.includes("phone")) sync.phone = user.phone;
-      if (Object.keys(sync).length) await Employee.updateOne({ storeId: user.storeId, email: previousEmail }, { $set: sync }).setOptions(CROSS_STORE);
-    }
     return res.json({ success: true, message: "User updated." });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ success: false, message: "That email or username is already in use." });
@@ -1158,7 +1257,7 @@ const updateUser = async (req, res) => {
   }
 };
 
-// Naya password set karo (purana dikh nahi sakta — bcrypt hash hai). Seller ka store-admin login bhi same.
+// Naya password set karo (purana dikh nahi sakta — bcrypt hash hai).
 const setUserPassword = async (req, res) => {
   try {
     const password = String(req.body?.password || "");
@@ -1168,15 +1267,13 @@ const setUserPassword = async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     user.password = hash;
     await user.save();
-    const seller = user.storeId && (await isSellerUser(user));
-    if (seller) await Employee.updateOne({ storeId: user.storeId, email: user.email }, { $set: { password: hash } }).setOptions(CROSS_STORE);
     return res.json({ success: true, message: `Password updated for ${user.name}.` });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to set the password." });
   }
 };
 
-// Delete user (soft delete) — seller ho to store-admin login bhi band; store khud delete nahi hota
+// Delete customer user (soft delete) — store khud delete nahi hota
 const deleteUser = async (req, res) => {
   try {
     const user = await User.findOne({ _id: req.params.id, is_deleted: { $ne: true } });
@@ -1185,10 +1282,6 @@ const deleteUser = async (req, res) => {
     user.deleted_at = new Date();
     user.status = "blocked";
     await user.save();
-    const seller = user.storeId && (await isSellerUser(user));
-    if (seller) {
-      await Employee.updateOne({ storeId: user.storeId, email: user.email }, { $set: { status: "inactive" } }).setOptions(CROSS_STORE);
-    }
     return res.json({ success: true, message: `${user.name}'s account has been deleted.` });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to delete the user." });
@@ -1279,7 +1372,13 @@ const publicMember = (m, me) => ({
   isSeed: isSeedAccount(m),
   isSelf: String(m._id) === String(me?._id),
   canManage: !manageBlockReason(m, me),
+  activities: Array.isArray(m.activities) ? m.activities.slice(0, 100) : [],
 });
+
+const recordSuperAdminActivity = async (req, action, category = "System", details = {}) => {
+  if (!req?.superAdmin?._id) return;
+  await SuperAdmin.updateOne({ _id: req.superAdmin._id }, { $push: { activities: { $each: [{ action, category, details, timestamp: new Date() }], $position: 0, $slice: 100 } } });
+};
 
 // Aakhri active super admin ko demote/deactivate/delete nahi karne dete — warna koi Team manage nahi kar sakega
 const otherActiveSuperAdmins = (excludeId) =>
@@ -1327,6 +1426,7 @@ const createTeamMember = async (req, res) => {
       status: "active",
       createdBy: req.superAdmin._id,
     });
+    await recordSuperAdminActivity(req, `Added team member ${member.name}`, "Employee Management", { memberId: member._id });
     return res.status(201).json({ success: true, message: `${member.name} has been added to the team.`, data: publicMember(member.toObject(), req.superAdmin) });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ success: false, message: "A team member with this email already exists." });
@@ -1364,6 +1464,7 @@ const updateTeamMember = async (req, res) => {
     if (!changed.length) return res.json({ success: true, message: "No changes to save.", data: publicMember(member.toObject(), req.superAdmin) });
 
     await member.save();
+    await recordSuperAdminActivity(req, `Updated team member ${member.name}`, "Employee Management", { changed });
     return res.json({ success: true, message: "Team member updated.", data: publicMember(member.toObject(), req.superAdmin) });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to update the team member." });
@@ -1388,6 +1489,7 @@ const setTeamMemberStatus = async (req, res) => {
     if (member.status === status) return res.json({ success: true, message: "No change.", data: publicMember(member.toObject(), req.superAdmin) });
     member.status = status;
     await member.save();
+    await recordSuperAdminActivity(req, `${status === "active" ? "Activated" : "Deactivated"} team member ${member.name}`, "Employee Management", { memberId: member._id });
     return res.json({ success: true, message: `${member.name} is now ${status}.`, data: publicMember(member.toObject(), req.superAdmin) });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to update the status." });
@@ -1406,6 +1508,7 @@ const resetTeamMemberPassword = async (req, res) => {
     if (blocked) return res.status(403).json({ success: false, message: blocked });
     member.passwordHash = await bcrypt.hash(password, 10);
     await member.save();
+    await recordSuperAdminActivity(req, `Reset password for ${member.name}`, "Employee Management", { memberId: member._id });
     return res.json({ success: true, message: `Password updated for ${member.name}.` });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to reset the password." });
@@ -1482,4 +1585,10 @@ module.exports = {
   // users
   listUsers,
   setUserStatus,
+  // store admins
+  listStoreAdmins,
+  getStoreAdmin,
+  resetStoreAdminPassword,
+  updateStoreAdmin,
+  setStoreAdminStatus,
 };

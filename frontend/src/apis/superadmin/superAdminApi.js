@@ -125,6 +125,14 @@ export const superAdminApi = {
   setUserStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
 
+  // Store admins (store ke owner/admin — admin_users)
+  listStoreAdmins: (params = {}) =>
+    superAdminHttp.get("/super-admin/store-admins", { params }).then((r) => r.data),
+  getStoreAdmin: (id) => superAdminHttp.get(`/super-admin/store-admins/${id}`).then((r) => r.data),
+  updateStoreAdmin: (id, payload) => superAdminHttp.patch(`/super-admin/store-admins/${id}`, payload).then((r) => r.data),
+  resetStoreAdminPassword: (id, password) => superAdminHttp.post(`/super-admin/store-admins/${id}/password`, { password }).then((r) => r.data),
+  setStoreAdminStatus: (id, status) => superAdminHttp.patch(`/super-admin/store-admins/${id}/status`, { status }).then((r) => r.data),
+
   // Team (super admin + staff accounts) — super admin only
   listTeam: () => superAdminHttp.get("/super-admin/team").then((r) => r.data),
   getTeamMember: (id) => superAdminHttp.get(`/super-admin/team/${id}`).then((r) => r.data),

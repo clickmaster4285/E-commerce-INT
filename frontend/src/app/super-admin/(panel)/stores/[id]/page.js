@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store as StoreIcon, Globe, ExternalLink, MapPin, Mail, Phone, CalendarDays, Pencil, LayoutDashboard, CirclePause, CirclePlay, FileText } from "lucide-react";
+import { Store as StoreIcon, Globe, ExternalLink, MapPin, Mail, Phone, CalendarDays, Pencil, LayoutDashboard, CirclePause, FileText, History } from "lucide-react";
 import { Alert, Avatar, Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, Skeleton, StatusBadge } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { assetUrl, formatDateTime, timeAgo } from "@/lib/superadminFormat";
@@ -50,12 +50,12 @@ export default function StoreDetailPage() {
       <PageHeader
         title={store.store_name || "Store details"}
         description={`Store profile · Created ${timeAgo(store.createdAt) || "date unavailable"}`}
-        badge={<StatusBadge value={status} />}
+        badge={<StatusBadge value={store.approvalStatus === "pending" ? "pending" : status} />}
         backHref="/super-admin/stores"
         backLabel="Back to stores"
         actions={<>
           <Button variant="secondary" icon={Pencil} onClick={() => setEditing(true)}>Edit details</Button>
-          <Button variant={status === "closed" ? "success" : "danger-outline"} icon={status === "closed" ? CirclePlay : CirclePause} loading={statusMutation.isPending} onClick={() => statusMutation.mutate(status === "closed" ? "open" : "closed")}>{status === "closed" ? "Activate store" : "Suspend store"}</Button>
+          {status !== "closed" && <Button variant="danger-outline" icon={CirclePause} loading={statusMutation.isPending} onClick={() => statusMutation.mutate("closed")}>Suspend store</Button>}
         </>}
       />
       {notice && <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>}
@@ -65,7 +65,7 @@ export default function StoreDetailPage() {
           <div className="flex min-w-0 items-center gap-4">
             <Avatar name={store.store_name} shape="square" size="lg" src={store.logo_url ? assetUrl(store.logo_url) : undefined} />
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-semibold text-[var(--text-primary)]">{store.store_name}</h2><StatusBadge value={status} /></div>
+              <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-xl font-semibold text-[var(--text-primary)]">{store.store_name}</h2><StatusBadge value={store.approvalStatus === "pending" ? "pending" : status} /></div>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">{store.tagline || store.business_category || "Store profile"}</p>
               <p className="mt-1 flex min-w-0 items-start gap-1.5 break-all text-xs text-[var(--text-muted)]"><MapPin size={13} className="mt-0.5 shrink-0" />{location || "Location not provided"}</p>
               {store.url && <a href={store.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex max-w-full min-w-0 items-start gap-1.5 break-all text-xs font-medium text-[var(--accent)] hover:underline"><Globe size={13} className="mt-0.5 shrink-0" />{hostFromUrl(store.url)}<ExternalLink size={12} className="mt-0.5 shrink-0" /></a>}
@@ -98,6 +98,9 @@ export default function StoreDetailPage() {
             <Detail icon={MapPin} label="City" value={store.city} />
             <Detail icon={MapPin} label="ZIP code" value={store.zip_code} />
           </CardBody></Card>
+          <Card><CardHeader title="Recent activity" description="Actions performed by Super Admin and store employees" icon={History} /><CardBody>
+            {store.activity?.length ? <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">{store.activity.slice(0, 20).map((entry, index) => <li key={`${entry.at}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" /><p className="text-[13px] font-medium text-[var(--text-primary)]">{entry.summary || entry.action}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{entry.actorName || "System"} · {entry.actorType === "superadmin" ? "Super Admin" : entry.actorType === "employee" ? "Employee" : "System"} · {formatDateTime(entry.at)}</p>{entry.details?.changes?.length ? <ul className="mt-2 space-y-1.5">{entry.details.changes.map((change, changeIndex) => <li key={`${change.field}-${changeIndex}`} className="text-[12px] leading-5 text-[var(--text-secondary)]"><span className="font-semibold text-[var(--text-primary)]">{formatField(change.field)}:</span> {displayValue(change.oldValue ?? change.before)} <span className="px-1 text-[var(--text-muted)]">→</span> {displayValue(change.newValue ?? change.after)}</li>)}</ul> : entry.details?.from !== undefined ? <p className="mt-2 text-[12px] text-[var(--text-secondary)]"><span className="font-semibold text-[var(--text-primary)]">Status:</span> {entry.details.from} <span className="px-1 text-[var(--text-muted)]">→</span> {entry.details.to}</p> : null}</li>)}</ol> : <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>}
+          </CardBody></Card>
         </div>
         <aside className="space-y-5">
           <Card><CardHeader title="Store status" description="Manage storefront availability" icon={CirclePause} /><CardBody className="space-y-4"><div className="flex items-center justify-between gap-2"><span className="text-sm text-[var(--text-secondary)]">Current status</span><StatusBadge value={status} /></div><p className="text-xs leading-5 text-[var(--text-muted)]">Use the action above to activate or suspend this storefront.</p></CardBody></Card>
@@ -114,5 +117,7 @@ function Detail({ icon: Icon, label, value, href, external, multiline, badge }) 
   return <div className="min-w-0"><dt className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--text-muted)]"><Icon size={13} />{label}</dt><dd className={`mt-1.5 min-w-0 break-words text-[13px] font-medium text-[var(--text-primary)] ${multiline ? "whitespace-pre-wrap leading-5" : ""}`}>{value ? href ? <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="inline-flex max-w-full min-w-0 items-start gap-1 break-all text-[var(--accent)] hover:underline">{value}{external && <ExternalLink size={12} className="mt-0.5 shrink-0" />}</a> : badge !== null && badge !== undefined ? <Badge tone={badge ? "success" : "warning"}>{value}</Badge> : value : <span className="font-normal text-[var(--text-muted)]">Not provided</span>}</dd></div>;
 }
 function Setting({ label, children }) { return <div className="flex items-center justify-between gap-3 px-5 py-3"><span className="text-[12px] text-[var(--text-muted)]">{label}</span><span className="text-right text-[12px] font-medium text-[var(--text-primary)]">{children}</span></div>; }
+function formatField(value) { return String(value || "Field").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function displayValue(value) { return value === "" || value === null || value === undefined ? "empty" : String(value); }
 function hostFromUrl(value) { return value?.replace(/^https?:\/\//i, "").replace(/\/$/, "") || ""; }
 function StoreDetailSkeleton() { return <div className="space-y-5" aria-busy="true" aria-label="Loading store details"><div className="space-y-2"><Skeleton className="h-7 w-64" /><Skeleton className="h-4 w-48" /></div><Skeleton className="h-52 rounded-xl" /><div className="grid grid-cols-1 gap-5 xl:grid-cols-3"><div className="space-y-5 xl:col-span-2"><Skeleton className="h-64 rounded-xl" /><Skeleton className="h-48 rounded-xl" /></div><Skeleton className="h-80 rounded-xl" /></div></div>; }

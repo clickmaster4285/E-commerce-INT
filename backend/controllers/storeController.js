@@ -1,7 +1,7 @@
 const Store = require("../models/Store");
 const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { pushGlobalActivity, pushStoreActivity, getChanges } = require("../utils/activityHelper");
 const { validatePhone } = require("../utils/phoneValidator");
 const log = require("../utils/logger");
 
@@ -127,6 +127,7 @@ const updateStoreInfo = async (req, res) => {
             performedByName: performerName,
             details: { changes },
         }, performerId);
+        await pushStoreActivity(updatedStore._id, req, "updated", `${performerName} updated store settings`, { changes });
     }
 
     try {

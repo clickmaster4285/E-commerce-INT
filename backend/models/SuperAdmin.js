@@ -22,6 +22,7 @@ const superAdminSchema = new mongoose.Schema(
     lastLoginAt: { type: Date, default: null },
     // Har request par (max 1/min) update — "Online now" / "Last seen" ke liye
     lastActiveAt: { type: Date, default: null },
+    activities: [{ action: { type: String, required: true }, category: { type: String, default: "System" }, details: { type: mongoose.Schema.Types.Mixed, default: {} }, timestamp: { type: Date, default: Date.now } }],
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },

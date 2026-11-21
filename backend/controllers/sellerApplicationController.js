@@ -5,6 +5,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const SellerApplication = require("../models/SellerApplication");
 const User = require("../models/User");
+const Employee = require("../models/Employee");
 const Store = require("../models/Store");
 const log = require("../utils/logger");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
@@ -61,8 +62,10 @@ const sellerApply = async (req, res) => {
       return res.status(400).json({ success: false, message: "Please provide a valid email address." });
     }
 
-    const existingUser = await User.findOne({ email: cleanEmail }).select("_id role status storeId").lean();
-    if (existingUser && !(existingUser.role === "user" && existingUser.status === "blocked")) {
+    // Customer account already is email par hai to seller application nahi — seller
+    // ka identity sirf Employee (admin_users) me hota hai.
+    const existingUser = await User.findOne({ email: cleanEmail }).select("_id").lean();
+    if (existingUser) {
       return res.status(400).json({ success: false, message: "An account already exists with this email." });
     }
     const existingApp = await SellerApplication.findOne({ email: cleanEmail }).lean();
@@ -80,8 +83,7 @@ const sellerApply = async (req, res) => {
           message: "An application for this email is already under review.",
         });
       }
-      // Rejected → clean slate: drop the old blocked user + rejected application
-      if (existingUser) await User.deleteOne({ _id: existingUser._id });
+      // Rejected → clean slate: purani rejected application hatao
       await SellerApplication.deleteOne({ _id: existingApp._id });
     }
 
@@ -91,24 +93,15 @@ const sellerApply = async (req, res) => {
     // Diya hua username (unique banao) — warna naam se professional username (hamza.asif)
     const requested = String(username || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20).toLowerCase();
     let finalUsername = requested;
-    for (let i = 1; finalUsername && (await User.exists({ username: finalUsername })) && i < 100; i += 1) {
+    const usernameTaken = async (value) =>
+      (await Employee.exists({ username: value }).setOptions({ skipTenantScope: true })) ||
+      (await SellerApplication.exists({ username: value }));
+    for (let i = 1; finalUsername && (await usernameTaken(finalUsername)) && i < 100; i += 1) {
       finalUsername = `${requested}${i}`;
     }
     if (!finalUsername) finalUsername = await require("../utils/username").uniqueUsername(name, cleanEmail);
 
-    // Account is created right away — but BLOCKED (can't login) until approval.
-    const user = await User.create({
-      name: String(name).trim(),
-      username: finalUsername,
-      email: cleanEmail,
-      phone: cleanPhone,
-      password: passwordHash,
-      role: "user",
-      storeId: null,
-      emailVerified: false,
-      status: "blocked",
-    });
-
+    // Seller ka account Employee (admin_users) me banta hai — customer_users me kuch nahi.
     const application = await SellerApplication.create({
       name: String(name).trim(),
       email: cleanEmail,
@@ -117,7 +110,7 @@ const sellerApply = async (req, res) => {
       passwordHash,
       store_name: String(storeName).trim(),
       store_description: String(storeDescription || "").trim().slice(0, 500),
-      user_id: user._id,
+      user_id: null,
     });
 
     // Best-effort — a failed email must not block the application flow
