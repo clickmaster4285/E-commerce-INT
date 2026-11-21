@@ -185,7 +185,7 @@ export default function ApplicationDetailPage() {
           ) : null}
         </div>
 
-        {/* RIGHT — access + activity */}
+        {/* RIGHT — access + timeline */}
         <div className="space-y-4">
           {isPending && (
             <Card className="border-[color-mix(in_srgb,var(--warning)_45%,var(--border-card))]">
@@ -220,7 +220,7 @@ export default function ApplicationDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Activity" icon={Hash} />
+            <CardHeader title="Timeline" icon={Hash} />
             <CardBody className="py-4">
               <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">
                 {timeline.map((entry, i) => (
@@ -299,16 +299,10 @@ export default function ApplicationDetailPage() {
   );
 }
 
-/* Submitted + super admin actions (audit log) + review — newest first */
+/* Request ki apni dates se timeline (signup → review) — newest first */
 function buildTimeline(item) {
   const entries = [{ title: "Signed up and verified email", at: item.created_at, color: "var(--accent)" }];
-  for (const a of item.activity || []) {
-    const action = String(a.action || "");
-    const color = /approved/i.test(action) ? "var(--success)" : /rejected|deleted/i.test(action) ? "var(--danger)" : /info/i.test(action) ? "var(--warning)" : "var(--text-muted)";
-    entries.push({ title: action.replace(/\s—\s.*$/, ""), at: a.created_at, by: a.actor?.name, color });
-  }
-  // Purane records jinke liye audit log nahi bana
-  if (item.reviewed_at && !(item.activity || []).some((a) => /approved|rejected/i.test(a.action))) {
+  if (item.reviewed_at && ["approved", "rejected"].includes(item.status)) {
     entries.push({ title: item.status === "approved" ? "Seller approved" : "Seller rejected", at: item.reviewed_at, color: item.status === "approved" ? "var(--success)" : "var(--danger)" });
   }
   return entries.sort((a, b) => new Date(b.at) - new Date(a.at));

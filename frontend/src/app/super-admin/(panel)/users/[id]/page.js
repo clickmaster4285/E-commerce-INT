@@ -56,6 +56,7 @@ export default function UserDetailPage() {
 
   const blocked = user.status === "blocked";
   const isSeller = user.type === "Seller";
+  const back = isSeller ? { href: "/super-admin/stores", label: "Back to stores" } : { href: LIST, label: "Back to users" };
   const store = d.store;
 
   return (
@@ -64,11 +65,11 @@ export default function UserDetailPage() {
         title={user.name}
         description={`@${user.username} · ${user.email}`}
         badge={<span className="inline-flex items-center gap-2"><StatusBadge value={isSeller ? "seller" : "customer"} dot={false} /><StatusBadge value={user.status} /></span>}
-        backHref={LIST}
-        backLabel="Back to users"
+        backHref={back.href}
+        backLabel={back.label}
         actions={
           <>
-            {store?.url && <Button variant="secondary" icon={LayoutDashboard} loading={openingId === String(store.id)} onClick={() => openStoreAdmin(store.id)}>Admin panel</Button>}
+            {isSeller && store?.url && <Button variant="secondary" icon={LayoutDashboard} loading={openingId === String(store.id)} onClick={() => openStoreAdmin(store.id)}>Admin panel</Button>}
             <Button variant="primary" icon={Pencil} onClick={() => setEditing(true)}>Edit details</Button>
             <DropdownMenu
               label="More actions"
@@ -158,7 +159,7 @@ export default function UserDetailPage() {
           )}
         </div>
 
-        {/* RIGHT — orders + history */}
+        {/* RIGHT — orders */}
         <div className="space-y-4 lg:col-span-2">
           <Card>
             <CardHeader title="Recent orders" description={d.orders.count ? `Latest ${d.recentOrders.length} of ${d.orders.count} orders · ${money(d.orders.total)} total` : "Orders placed by this user across all stores"} icon={ShoppingBag} />
@@ -178,26 +179,6 @@ export default function UserDetailPage() {
                   </li>
                 ))}
               </ul>
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader title="Account history" description="Actions taken on this account by the Super Admin team" icon={History} />
-            {d.history.length === 0 ? (
-              <EmptyState icon={History} title="No actions recorded" description="Blocks and unblocks will be listed here." compact />
-            ) : (
-              <CardBody className="py-4">
-                <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">
-                  {d.history.map((h) => (
-                    <li key={h.id} className="relative">
-                      <span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" aria-hidden="true" />
-                      <p className="text-[13px] font-medium leading-5 text-[var(--text-primary)]">{h.title || h.action}</p>
-                      {h.description && <p className="mt-0.5 text-[12.5px] leading-5 text-[var(--text-muted)]">{h.description}</p>}
-                      <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{formatDateTime(h.at)}{h.by ? ` · by ${h.by}` : ""}</p>
-                    </li>
-                  ))}
-                </ol>
-              </CardBody>
             )}
           </Card>
         </div>

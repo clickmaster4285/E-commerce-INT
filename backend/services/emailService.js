@@ -1,5 +1,4 @@
 const { sendEmail, isSmtpConfigured } = require("../utils/sendEmail");
-const { logActivity } = require("../utils/superAdminActivity");
 const {
   escapeHtml: esc,
   platformName,
@@ -21,7 +20,7 @@ const {
 // Design utils/emailLayout.js me hai (OTP email bhi wahi use karti hai).
 // Delivery is attempted twice; failure never throws — the caller (apply /
 // approve / reject) must not fail because an email could not be sent.
-// Final failures are logged via logActivity() for audit.
+// Final failures are reported to the console.
 
 const frontendBase = () => String(process.env.CLIENT_URL || "").replace(/\/+$/, "");
 const hostOf = (url) => String(url || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -40,12 +39,6 @@ const sendWithRetry = async ({ to, subject, html, text, action, entityId }) => {
       const message = error?.message || String(error);
       console.error(`[emailService] ${action} → ${to} attempt ${attempt + 1} failed:`, message);
       if (attempt === 1) {
-        await logActivity({
-          action: `${action} email delivery failed`,
-          entityType: "seller_application",
-          entityId: String(entityId || ""),
-          details: { to, error: message },
-        }).catch(() => {});
         return { delivered: false, reason: "send_failed", error: message };
       }
     }

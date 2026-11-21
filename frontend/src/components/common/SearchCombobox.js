@@ -36,30 +36,32 @@ export default function SearchCombobox({ id, value, onChange, options, loading, 
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [draft, setDraft] = useState(null); // allowCustom=false: null = selected value dikhao, string = user type kar raha hai
+  const [typed, setTyped] = useState(false); // khulte waqt poori list — filter sirf type karne par
+  const [dropUp, setDropUp] = useState(false); // neeche jagah kam ho to list upar khule
   const listRef = useRef(null);
   const shown = allowCustom ? value : (draft ?? value);
-  const query = shown.trim().toLowerCase();
+  const query = typed ? shown.trim().normalize("NFC").toLowerCase() : "";
 
   // "starts with" pehle, phir "contains"; khali query par pinned (e.g. Pakistan) sab se upar
   const { matches, total } = useMemo(() => {
     if (!options.length) return { matches: [], total: 0 };
     if (!query) {
-      const pin = pinned.filter((p) => options.includes(p));
+      const pin = [...new Set([...pinned, value])].filter((p) => p && options.includes(p));
       const rest = pin.length ? options.filter((o) => !pin.includes(o)) : options;
       return { matches: [...pin, ...rest].slice(0, COMBO_RENDER_LIMIT), total: options.length };
     }
     const starts = [];
     const contains = [];
     for (const o of options) {
-      const l = o.toLowerCase();
+      const l = o.normalize("NFC").toLowerCase();
       if (l.startsWith(query)) starts.push(o);
       else if (l.includes(query)) contains.push(o);
     }
     const all = starts.concat(contains);
     return { matches: all.slice(0, COMBO_RENDER_LIMIT), total: all.length };
-  }, [options, query, pinned]);
+  }, [options, query, pinned, value]);
 
-  const exactMatch = options.some((o) => o.toLowerCase() === query);
+  const exactMatch = options.some((o) => o.normalize("NFC").toLowerCase() === query);
   const listId = `${id}-listbox`;
 
   useEffect(() => {
@@ -67,9 +69,20 @@ export default function SearchCombobox({ id, value, onChange, options, loading, 
     listRef.current.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
+  const openList = () => {
+    if (open) return;
+    const rect = document.getElementById(id)?.getBoundingClientRect();
+    setDropUp(Boolean(rect && window.innerHeight - rect.bottom < 270 && rect.top > 270));
+    setOpen(true);
+    setTyped(false);
+    // selected option list me nazar aaye
+    window.requestAnimationFrame(() => listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }));
+  };
+
   const choose = (name) => {
     onChange(name);
     setDraft(null);
+    setTyped(false);
     setOpen(false);
     setActive(-1);
   };
@@ -77,7 +90,7 @@ export default function SearchCombobox({ id, value, onChange, options, loading, 
   const onKeyDown = (e) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (!open) setOpen(true);
+      if (!open) openList();
       setActive((i) => Math.min(i + 1, matches.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
@@ -106,13 +119,18 @@ export default function SearchCombobox({ id, value, onChange, options, loading, 
         aria-activedescendant={open && active >= 0 ? `${id}-opt-${active}` : undefined}
         aria-invalid={invalid ? "true" : undefined}
         aria-describedby={describedBy}
-        autoComplete="off"
+        // Chrome "Country/City" label dekh kar address autofill popup khol deta hai (off ignore karta hai) —
+        // unknown token se band hota hai; apni list hi dikhe
+        autoComplete="nope"
+        name={`${id}-search`}
+        data-lpignore="true"
+        data-1p-ignore="true"
         value={shown}
         placeholder={placeholder}
-        onChange={(e) => { if (allowCustom) onChange(e.target.value); else setDraft(e.target.value); setOpen(true); setActive(-1); }}
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onBlur={() => { setOpen(false); setDraft(null); }}
+        onChange={(e) => { if (allowCustom) onChange(e.target.value); else setDraft(e.target.value); setTyped(true); setOpen(true); setActive(-1); }}
+        onFocus={openList}
+        onClick={openList}
+        onBlur={() => { setOpen(false); setDraft(null); setTyped(false); }}
         onKeyDown={onKeyDown}
         className={inputClassName}
       />
@@ -120,7 +138,7 @@ export default function SearchCombobox({ id, value, onChange, options, loading, 
         type="button"
         tabIndex={-1}
         aria-label={open ? `Close ${itemLabel} list` : `Open ${itemLabel} list`}
-        onMouseDown={(e) => { e.preventDefault(); document.getElementById(id)?.focus(); setOpen((o) => !o); }}
+        onMouseDown={(e) => { e.preventDefault(); document.getElementById(id)?.focus(); if (open) setOpen(false); else openList(); }}
         className={`absolute end-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg transition ${theme.toggle}`}
       >
         {loading ? (
@@ -136,7 +154,7 @@ export default function SearchCombobox({ id, value, onChange, options, loading, 
           id={listId}
           role="listbox"
           aria-label={itemLabel === "country" ? "Countries" : "Cities"}
-          className={`absolute left-0 right-0 top-full z-30 mt-1.5 max-h-60 overflow-y-auto overscroll-contain py-1.5 ${theme.list}`}
+          className={`absolute left-0 right-0 z-30 max-h-60 ${dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} overflow-y-auto overscroll-contain py-1.5 ${theme.list}`}
         >
           {matches.map((name, i) => (
             <li

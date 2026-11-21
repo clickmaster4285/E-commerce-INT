@@ -92,7 +92,7 @@ export default function TeamMemberDialog({ member, onClose, onSaved }) {
         <FormSection title="Details">
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <TextInput label="Full name" required value={form.name} onChange={set("name")} error={errors.name} autoFocus={!editing} placeholder="e.g. Ayesha Khan" />
-            <TextInput label="Phone" value={form.phone} onChange={set("phone")} error={errors.phone} inputMode="numeric" placeholder="03001234567" />
+            <TextInput label="Phone" value={form.phone} onChange={(e) => { const value = e.target.value.replace(/\D/g, "").slice(0, 16); setForm((p) => ({ ...p, phone: value })); setErrors((p) => ({ ...p, phone: "" })); }} error={errors.phone} inputMode="numeric" pattern="[0-9]*" maxLength={16} placeholder="03001234567" />
           </div>
           <TextInput label="Email" type="email" required value={form.email} onChange={set("email")} error={errors.email} disabled={editing} hint={editing ? "Login email — cannot be changed." : "They sign in with this email."} placeholder="name@company.com" autoComplete="off" />
         </FormSection>

@@ -21,6 +21,20 @@ const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 const { suggestUsernames, uniqueUsername } = require("../utils/username");
+const { validateStoreAddress, slugifySubdomain } = require("../utils/tenantHost");
+
+/* Store web address check — format, reserved, kisi store ya doosre pending signup ne to nahi liya?
+   @returns {{ error: string|null, suggestion: string }} */
+const checkStoreSubdomain = async (raw, email) => {
+  const sub = String(raw || "").trim().toLowerCase();
+  const formatError = validateStoreAddress(sub);
+  if (formatError) return { error: formatError, suggestion: "" };
+  const taken =
+    (await Store.exists({ subdomain: sub }).setOptions({ skipTenantScope: true })) ||
+    (await PendingRegistration.exists({ subdomain: sub, email: { $ne: email || "" }, expiresAt: { $gt: new Date() } }));
+  if (!taken) return { error: null, suggestion: "" };
+  return { error: "This store address is already taken.", suggestion: await Store.generateUniqueSubdomain(sub) };
+};
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -84,18 +98,14 @@ const checkRegistration = async (req, res) => {
     let code;
 
     if (email && isValidEmail(email)) {
-      const existingUser = await User.findOne({ email }).select("status emailVerified").lean();
-      if (existingUser && existingUser.emailVerified !== false) {
-        const pendingApp =
-          existingUser.status === "blocked"
-            ? await SellerApplication.findOne({ email, status: "pending" }).select("_id").lean()
-            : null;
-        if (pendingApp) {
-          code = "SELLER_PENDING";
-          errors.email = "An application for this email is already under review. Sign in to continue where you left off.";
-        } else {
-          errors.email = "This email is already registered";
-        }
+      // Seller ka account Employee me hota hai — pending application email se pakdo
+      const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("_id").lean();
+      if (pendingApp) {
+        code = "SELLER_PENDING";
+        errors.email = "An application for this email is already under review. Sign in to continue where you left off.";
+      } else {
+        const existingUser = await User.findOne({ email }).select("emailVerified").lean();
+        if (existingUser && existingUser.emailVerified !== false) errors.email = "This email is already registered";
       }
     }
 
@@ -113,13 +123,23 @@ const checkRegistration = async (req, res) => {
       if (clash) errors.phone = "This phone number is already registered";
     }
 
+    // Store web address (seller signup step 2)
+    let subdomainSuggestion = "";
+    if (typeof req.body?.subdomain === "string" && req.body.subdomain.trim()) {
+      const { error, suggestion } = await checkStoreSubdomain(req.body.subdomain, email);
+      if (error) errors.subdomain = error;
+      subdomainSuggestion = suggestion;
+    } else if (typeof req.body?.storeName === "string" && slugifySubdomain(req.body.storeName).length >= 3) {
+      subdomainSuggestion = await Store.generateUniqueSubdomain(req.body.storeName);
+    }
+
     // Username taken ho, ya khali ho aur naam mil gaya ho → naam se professional suggestions
     const name = String(req.body?.name || "").trim();
     const suggestions = errors.username || (!cleanUsername && name.length >= 2)
       ? await suggestUsernames(name, email, { excludeEmail: email })
       : [];
 
-    return res.json({ success: true, available: Object.keys(errors).length === 0, errors, suggestions, ...(code ? { code } : {}) });
+    return res.json({ success: true, available: Object.keys(errors).length === 0, errors, suggestions, ...(subdomainSuggestion ? { subdomainSuggestion } : {}), ...(code ? { code } : {}) });
   } catch (error) {
     log.error("[register/check] error:", error.message);
     return res.status(500).json({ success: false, message: "Could not check availability. Please try again." });
@@ -148,6 +168,7 @@ const createUser = async (req, res) => {
       });
     }
     const storeName = String(req.body.storeName || "").trim().slice(0, 140);
+    const storeSubdomain = String(req.body.subdomain || "").trim().toLowerCase();
     const storeDescription = String(req.body.storeDescription || "").trim().slice(0, 2000);
     const businessCategory = String(req.body.businessCategory || "").trim();
     const businessType = ["individual", "registered_business"].includes(String(req.body.businessType || ""))
@@ -187,6 +208,11 @@ const createUser = async (req, res) => {
       if (!country) errors.country = "Please select a country.";
       if (!city || city.trim().length < 2) errors.city = "Please enter your city.";
       if (!address || address.trim().length < 5) errors.address = "Please enter a complete store address.";
+      if (!storeSubdomain) errors.subdomain = "Please choose your store web address.";
+      else {
+        const { error } = await checkStoreSubdomain(storeSubdomain, email);
+        if (error) errors.subdomain = error;
+      }
     if (Object.keys(errors).length > 0)
       return res.status(400).json({ success: false, message: "Registration failed", errors });
     }
@@ -194,62 +220,38 @@ const createUser = async (req, res) => {
     // Username khali ho to naam se professional username (hamza.asif), email-prefix+random nahi
     const finalUsername = cleanUsername || (await uniqueUsername(cleanName, email, { excludeEmail: email }));
 
-    // ✅ Verified User ka email dobara register nahi ho sakta
-    // (purane users me emailVerified undefined hota hai — unhe verified maana jata hai)
+    // ✅ Verified customer ka email dobara register nahi ho sakta
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.emailVerified !== false) {
-      // Blocked + pending application → same email + password as signup means
-      // "continue where I left off" → welcome → read-only admin panel until approval.
-      try {
-        const pendingApp = await SellerApplication.findOne({ email, status: "pending" })
-          .select("status store_id")
-          .lean();
-        if (existingUser.status === "blocked" && pendingApp) {
-          const passwordMatches = await bcrypt.compare(String(password), existingUser.password || "");
-          if (passwordMatches) {
-            // Resume — make sure a pending-seller employee exists for the admin panel
-            // Email ab sirf store ke andar unique — isi application ke store ka employee
-            let employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
-              .setOptions({ skipTenantScope: true });
-            if (!employee) {
-              employee = await Employee.create({
-                name: existingUser.name,
-                username: existingUser.username,
-                email,
-                phone: existingUser.phone || "",
-                password: existingUser.password, // already bcrypt-hashed
-                role: OWNER_ROLE, // store owner
-                status: "active",
-                storeId: pendingApp.store_id || null,
-                seller_pending: true,
-              });
-            } else if (!employee.seller_pending || employee.status !== "active") {
-              employee.seller_pending = true;
-              employee.status = "active";
-              await employee.save();
-            }
-            // User + admin sessions alag cookies me (pehle employee wale user cookies overwrite kar dete the)
-            await tokens.issueSession(req, res, "user", existingUser);
-            await tokens.issueSession(req, res, "admin", employee);
-            return res.json({
-              success: true,
-              pendingApproval: true,
-              message: "Your application is under review. You can explore your admin panel in read-only mode until it is approved.",
-            });
-          }
-          return res.status(403).json({
-            success: false,
-            code: "SELLER_PENDING",
-            message: "Your application is already under review. You will be notified by email once it is approved.",
-          });
-        }
-      } catch (lookupError) {
-        console.error("[register] pending seller application lookup failed:", lookupError.message);
-      }
       return res.status(400).json({
         success: false,
         message: "Registration failed",
         errors: { email: "This email is already registered" },
+      });
+    }
+    // Pending seller (sirf Employee + SellerApplication) — same password par
+    // "continue where I left off" → read-only admin panel until approval.
+    const pendingApp = await SellerApplication.findOne({ email, status: "pending" })
+      .select("store_id")
+      .lean();
+    if (pendingApp) {
+      const employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
+        .setOptions({ skipTenantScope: true });
+      if (employee) {
+        const passwordMatches = await bcrypt.compare(String(password), employee.password || "");
+        if (passwordMatches) {
+          await tokens.issueSession(req, res, "admin", employee);
+          return res.json({
+            success: true,
+            pendingApproval: true,
+            message: "Your application is under review. You can explore your admin panel in read-only mode until it is approved.",
+          });
+        }
+      }
+      return res.status(403).json({
+        success: false,
+        code: "SELLER_PENDING",
+        message: "Your application is already under review. You will be notified by email once it is approved.",
       });
     }
     // Option A: ek seller email sirf ek store ka owner (kisi bhi store ka admin / pending seller)
@@ -333,6 +335,7 @@ const createUser = async (req, res) => {
       existingPending.lastSentAt = new Date();
       existingPending.storeId = signupStoreId;
       existingPending.storeName = wantsStore ? storeName : "";
+      existingPending.subdomain = wantsStore ? storeSubdomain : "";
       existingPending.storeDescription = storeDescription;
       existingPending.businessCategory = businessCategory;
       existingPending.businessType = businessType;
@@ -355,6 +358,7 @@ const createUser = async (req, res) => {
         lastSentAt: new Date(),
         storeId: signupStoreId,
         storeName: wantsStore ? storeName : "",
+        subdomain: wantsStore ? storeSubdomain : "",
         storeDescription,
         businessCategory,
         businessType,

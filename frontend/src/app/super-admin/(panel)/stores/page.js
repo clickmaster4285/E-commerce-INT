@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard } from "lucide-react";
+import { Store as StoreIcon, Plus, Pencil, Trash2, ExternalLink, Ban, CircleCheck, Loader2, LayoutDashboard, UserCog } from "lucide-react";
 import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDate, timeAgo, assetUrl } from "@/lib/superadminFormat";
@@ -23,6 +24,7 @@ const STATUS_TABS = [
 const PAGE_SIZE = 20;
 
 export default function StoresPage() {
+  const router = useRouter();
   const qc = useQueryClient();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -70,16 +72,19 @@ export default function StoresPage() {
     { key: "store", header: "Store", cell: (s) => <EntityCell avatar={<Avatar name={s.store_name} shape="square" src={s.logo_url ? assetUrl(s.logo_url) : undefined} />} primary={s.store_name} secondary={hostOf(storefrontUrl(s)) || s.business_category || "No subdomain yet"} maxWidth={320} /> },
     { key: "owner", header: "Owner", cell: (s) => s.owner_name ? <EntityCell avatar={<Avatar name={s.owner_name} size="sm" />} primary={s.owner_name} secondary={s.owner_email} maxWidth={260} /> : <span className="text-[var(--text-muted)]">No owner</span> },
     { key: "created", header: "Created", className: "whitespace-nowrap", cell: (s) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(s.createdAt)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(s.createdAt)}</p></>) },
-    { key: "status", header: "Status", cell: (s) => <StatusBadge value={s.status} /> },
+    { key: "status", header: "Status", cell: (s) => <StatusBadge value={s.approvalStatus === "pending" ? "pending" : s.status} /> },
     {
-      key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56,
+      key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56, stopRowClick: true,
       cell: (s) => (
         <DropdownMenu
           label={`Actions for ${s.store_name}`}
           items={[
+            { label: "View store details", icon: StoreIcon, href: `/super-admin/stores/${s.id}` },
+            { separator: true },
             { label: "Visit storefront", icon: ExternalLink, href: storefrontUrl(s), external: true, disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { label: "Open admin panel", icon: LayoutDashboard, onClick: () => openStoreAdmin(s.id), disabled: !storefrontUrl(s), hint: "This store has no subdomain yet" },
             { separator: true },
+            { label: "Manage owner", icon: UserCog, href: s.owner_id ? `/super-admin/store-admins/${s.owner_id}` : undefined, disabled: !s.owner_id, hint: "This store has no owner account" },
             { label: "Edit store", icon: Pencil, onClick: () => setFormStore(s) },
             s.status === "closed"
               ? { label: "Activate store", icon: CircleCheck, onClick: () => setStatusTarget({ ...s, next: "open" }) }
@@ -97,7 +102,7 @@ export default function StoresPage() {
       <PageHeader
         title="Stores"
         description={isLoading ? "Every storefront on the platform." : `${total.toLocaleString()} storefront${total === 1 ? "" : "s"} on the platform.`}
-        actions={<Button variant="primary" icon={Plus} onClick={() => setFormStore("new")}>Add store</Button>}
+        actions={<Button variant="primary" icon={Plus} href="/super-admin/stores/new">Add store</Button>}
       />
 
       {notice && <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>}
@@ -112,9 +117,10 @@ export default function StoresPage() {
           columns={columns}
           rows={items}
           rowKey={(s) => s.id}
+          onRowClick={(s) => router.push(`/super-admin/stores/${s.id}`)}
           loading={isLoading}
           error={isError ? { title: "Couldn't load stores", action: <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button> } : null}
-          empty={{ icon: StoreIcon, title: debounced ? "No stores match your search" : "No stores yet", description: debounced ? "Try a different store name or email." : "Approve a seller request or add a store manually.", action: !debounced && <Button size="sm" variant="primary" icon={Plus} onClick={() => setFormStore("new")}>Add store</Button> }}
+          empty={{ icon: StoreIcon, title: debounced ? "No stores match your search" : "No stores yet", description: debounced ? "Try a different store name or email." : "Approve a seller request or add a store manually.", action: !debounced && <Button size="sm" variant="primary" icon={Plus} href="/super-admin/stores/new">Add store</Button> }}
         />
         <Pagination page={page} pages={pages} total={total} pageSize={PAGE_SIZE} onChange={setPage} itemLabel="stores" />
       </Card>

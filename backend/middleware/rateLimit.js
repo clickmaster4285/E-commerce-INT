@@ -276,6 +276,13 @@ const limiters = {
     max: num(process.env.RATE_LIMIT_REGISTER_MAX),
     keyBy: "ip",
   }),
+  // Signup ke live availability checks (email / username / phone / store address) —
+  // type karte waqt chalte hain, is liye alag aur zyada narm bucket (register limit kharch na ho)
+  registerCheck: createRateLimiter({
+    name: "register-check",
+    max: num(process.env.RATE_LIMIT_REGISTER_CHECK_MAX) || 120,
+    keyBy: "ip",
+  }),
   sendEmailOtp: createRateLimiter({
     name: "send-email-otp",
     max: num(process.env.RATE_LIMIT_SEND_EMAIL_OTP_MAX),

@@ -1,6 +1,18 @@
 const User = require("../models/User");
 const log = require("./logger");
 
+const pushStoreActivity = async (storeId, req, action, summary, details = null) => {
+  if (!storeId) return;
+  const actor = req?.superAdmin || req?.user;
+  const actorType = req?.superAdmin ? "superadmin" : req?.user ? "employee" : "system";
+  const actorName = actor?.name || actor?.email || (actorType === "superadmin" ? "Super Admin" : actorType === "employee" ? "Employee" : "System");
+  const Store = require("../models/Store");
+  await Store.updateOne(
+    { _id: storeId },
+    { $push: { activity: { $each: [{ action, summary, actorType, actorId: actor?._id || actor?.id || null, actorName, at: new Date(), details }], $position: 0, $slice: 100 } } },
+  ).setOptions({ skipTenantScope: true });
+};
+
 /**
  * Pushes activity to a specific user's array
  */
@@ -121,6 +133,7 @@ const isSameList = (a, b) => {
 };
 
 module.exports = {
+  pushStoreActivity,
   pushActivityToUser,
   pushGlobalActivity,
   getChanges,

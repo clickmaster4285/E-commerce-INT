@@ -15,7 +15,6 @@ router.use(requireSuperAdmin);
 router.get("/auth/me", superAdminController.meSuperAdmin);
 
 router.get("/dashboard", superAdminController.getDashboard);
-router.get("/activity/me", superAdminController.myActivity);
 
 router.get("/requests", superAdminController.listRequests);
 router.get("/requests/:id", superAdminController.getRequest);
@@ -26,10 +25,18 @@ router.post("/requests/:id/reject", superAdminController.rejectRequest);
 router.post("/requests/:id/request-info", superAdminController.requestInfo);
 
 router.get("/stores", superAdminController.listStores);
+router.get("/stores/:id", superAdminController.getStore);
 router.post("/stores", superAdminController.createStore);
+router.post("/stores/with-owner", superAdminController.createSellerStore); // Add store page — store + owner
 router.patch("/stores/:id", superAdminController.updateStore);
 router.delete("/stores/:id", superAdminController.deleteStore);
 router.patch("/stores/:id/status", superAdminController.setStoreStatus);
+
+router.get("/store-admins", superAdminController.listStoreAdmins);
+router.get("/store-admins/:id", superAdminController.getStoreAdmin);
+router.patch("/store-admins/:id", superAdminController.updateStoreAdmin);
+router.post("/store-admins/:id/password", superAdminController.resetStoreAdminPassword);
+router.patch("/store-admins/:id/status", superAdminController.setStoreAdminStatus);
 
 router.get("/users", superAdminController.listUsers);
 router.get("/users/:id", superAdminController.getUser);
@@ -44,7 +51,6 @@ router.patch("/users/:id/status", superAdminController.setUserStatus);
 router.get("/team", superAdminController.listTeam);
 router.post("/team", superAdminController.createTeamMember);
 router.get("/team/:id", superAdminController.getTeamMember);
-router.get("/team/:id/activity", superAdminController.teamMemberActivity);
 router.patch("/team/:id", superAdminController.updateTeamMember);
 router.patch("/team/:id/status", superAdminController.setTeamMemberStatus);
 router.post("/team/:id/password", superAdminController.resetTeamMemberPassword);

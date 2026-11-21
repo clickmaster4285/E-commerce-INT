@@ -86,6 +86,18 @@ function validateSubdomain(sub) {
   return null;
 }
 
+/* Naye store address (signup / Add store) ki product limit — DNS label 63 tak allow karta hai,
+   lekin customers ke type/yaad rakhne ke liye 3–30 rakha hai. Purane lambe addresses chalte rahte hain. */
+const STORE_ADDRESS_MIN = 3;
+const STORE_ADDRESS_MAX = 30;
+/** @returns {string|null} — naye store address ke liye (format + reserved + length 3–30) */
+function validateStoreAddress(sub) {
+  const err = validateSubdomain(sub);
+  if (err) return err.replace(/subdomain/gi, "store address").replace(/^./, (c) => c.toUpperCase());
+  if (sub.length > STORE_ADDRESS_MAX) return `Store address can be at most ${STORE_ADDRESS_MAX} characters.`;
+  return null;
+}
+
 /** Root domain ya uska koi subdomain? (CORS ke liye, sync check) */
 function isPlatformFamilyHost(hostname) {
   const host = normalizeHost(hostname);
@@ -100,5 +112,8 @@ module.exports = {
   parseTenantHost,
   slugifySubdomain,
   validateSubdomain,
+  validateStoreAddress,
+  STORE_ADDRESS_MIN,
+  STORE_ADDRESS_MAX,
   isPlatformFamilyHost,
 };

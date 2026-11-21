@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mail, Phone, Pencil, KeyRound, Ban, CircleCheck, Trash2, ShieldCheck, UserCog, Clock, CalendarPlus, Activity, LogIn, Hash, ClipboardList, Store, Users, Settings, MoreHorizontal, Check, Wifi } from "lucide-react";
+import { Mail, Phone, Pencil, KeyRound, Ban, CircleCheck, Trash2, ShieldCheck, UserCog, Clock, CalendarPlus, Activity, LogIn, Hash, ClipboardList, Store, Users, Settings, MoreHorizontal, Check, Wifi, History } from "lucide-react";
 import { PageHeader, Card, CardHeader, CardBody, Button, StatusBadge, Badge, Avatar, Alert, Skeleton, DropdownMenu, ConfirmDialog, EmptyState, StatCard } from "@/components/superadmin/ui";
 import TeamMemberDialog, { ResetPasswordDialog } from "@/components/superadmin/TeamMemberDialog";
-import ActivityFeed from "@/components/superadmin/ActivityFeed";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDateTime, timeAgo } from "@/lib/superadminFormat";
 
@@ -23,7 +22,6 @@ export default function TeamMemberPage() {
   // har minute refresh — Online / Last seen up to date rahe
   const { data, isLoading, isError } = useQuery({ queryKey: ["superadmin-team-member", String(id)], queryFn: () => superAdminApi.getTeamMember(id), enabled: !!id, retry: 1, refetchInterval: 60 * 1000 });
   const member = data?.data?.member || null;
-  const stats = data?.data?.stats || {};
 
   const refresh = () => { qc.invalidateQueries({ queryKey: ["superadmin-team-member", String(id)] }); qc.invalidateQueries({ queryKey: ["superadmin-team"] }); };
   const close = () => setDialog(null);
@@ -88,13 +86,13 @@ export default function TeamMemberPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Status" value={member.online ? "Online now" : member.lastActiveAt ? "Offline" : "Never active"} icon={Wifi} tone={member.online ? "success" : "neutral"} hint={member.online ? "Active in the last 5 minutes" : member.lastActiveAt ? `Last seen ${timeAgo(member.lastActiveAt)}` : "Has never signed in"} />
-        <StatCard label="Sign-ins" value={stats.logins ?? 0} icon={LogIn} tone="info" hint={member.lastLoginAt ? `Last ${timeAgo(member.lastLoginAt)}` : "Has never signed in"} />
-        <StatCard label="Actions performed" value={stats.actions ?? 0} icon={Activity} tone="accent" hint="Approvals, edits, status changes…" />
+        <StatCard label="Last sign-in" value={member.lastLoginAt ? timeAgo(member.lastLoginAt) : "Never"} icon={LogIn} tone="info" hint={member.lastLoginAt ? formatDateTime(member.lastLoginAt) : "Has never signed in"} />
+        <StatCard label="Member since" value={member.created_at ? timeAgo(member.created_at).replace(/ ago$/, "") : "—"} icon={CalendarPlus} tone="neutral" hint={member.created_at ? formatDateTime(member.created_at) : undefined} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* LEFT — profile + access */}
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        {/* Profile + access */}
+        <div className="contents">
           <Card>
             <CardBody className="flex flex-col items-center text-center">
               <Avatar name={member.name} size="xl" />
@@ -137,17 +135,14 @@ export default function TeamMemberPage() {
           </Card>
         </div>
 
-        {/* RIGHT — activity */}
-        <div className="space-y-4 lg:col-span-2">
-          <ActivityFeed
-            queryKey={["superadmin-team-activity", String(id)]}
-            fetcher={(params) => superAdminApi.teamMemberActivity(id, params)}
-            title="Activity"
-            description={`When ${member.isSelf ? "you" : member.name} signed in and out, and everything done in the panel`}
-            who={member.isSelf ? "you" : member.name}
-          />
-        </div>
       </div>
+
+      <Card>
+        <CardHeader title="Recent activity" description="Actions performed by this Super Admin employee" icon={History} />
+        <CardBody>
+          {member.activities?.length ? <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">{member.activities.slice(0, 30).map((entry, index) => <li key={`${entry.timestamp}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" /><p className="text-[13px] font-medium text-[var(--text-primary)]">{entry.action}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{entry.category || "System"} · {formatDateTime(entry.timestamp)}</p></li>)}</ol> : <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>}
+        </CardBody>
+      </Card>
 
       {dialog === "edit" && <TeamMemberDialog member={member} onClose={close} onSaved={ok("Team member updated.")} />}
       {dialog === "password" && <ResetPasswordDialog member={member} onClose={close} onSaved={ok("Password updated.")} />}
@@ -164,7 +159,7 @@ export default function TeamMemberPage() {
       <ConfirmDialog
         open={dialog === "delete"}
         title={`Remove ${member.name} from the team?`}
-        message="Their Super Admin login is deleted permanently. Activity they performed stays in the log."
+        message="Their Super Admin login is deleted permanently."
         confirmLabel="Remove member"
         confirmTone="danger"
         loading={deleteMut.isPending}

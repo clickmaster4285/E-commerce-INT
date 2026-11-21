@@ -8,7 +8,6 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
-const SuperAdminActivity = require("../models/SuperAdminActivity");
 
 const appId = new mongoose.Types.ObjectId();
 const storeId = new mongoose.Types.ObjectId();
@@ -69,27 +68,26 @@ test("deleteRequest refuses approved sellers", async () => {
   } finally { restore(); }
 });
 
-test("deleteRequest removes the pending request with its closed store and signup accounts", async () => {
+test("deleteRequest removes the pending request with its closed store and admin account (no customer user)", async () => {
   const calls = {};
+  const originalUserDeleteOne = User.deleteOne;
+  User.deleteOne = () => { throw new Error("deleteRequest must not touch customer_users"); };
   const restore = stubAll([
     [SellerApplication, "findById", () => q(baseApp())],
     [SellerApplication, "findOneAndDelete", (filter) => { calls.app = filter; return q(baseApp()); }],
     [Store, "deleteOne", (filter) => { calls.store = filter; return q({ deletedCount: 1 }); }],
     [Employee, "deleteMany", (filter) => { calls.employees = filter; return q({ deletedCount: 1 }); }],
-    [User, "deleteOne", (filter) => { calls.user = filter; return q({ deletedCount: 1 }); }],
-    [SuperAdminActivity, "create", async () => ({})],
   ]);
   try {
     const res = mockRes();
     await controller.deleteRequest({ params: { id: String(appId) }, superAdmin }, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body.data.removed, { store: 1, adminAccounts: 1, userAccount: 1 });
-    // Guards: approved never deleted, open store never deleted, only the blocked signup user
+    assert.deepEqual(res.body.data.removed, { store: 1, adminAccounts: 1 });
+    // Guards: approved never deleted, open store never deleted, customer_users untouched
     assert.deepEqual(calls.app.status, { $ne: "approved" });
     assert.deepEqual(calls.store.store_status, { $ne: "open" });
-    assert.equal(calls.user.status, "blocked");
     assert.equal(String(calls.employees.storeId), String(storeId));
-  } finally { restore(); }
+  } finally { restore(); User.deleteOne = originalUserDeleteOne; }
 });
 
 test("updateRequest only edits pending requests", async () => {
@@ -115,7 +113,6 @@ test("updateRequest saves changes and syncs the linked store", async () => {
     [SellerApplication, "findById", () => q(baseApp({ city: "Lahore" }))],
     [SellerApplication, "findOneAndUpdate", (filter, update) => { calls.app = { filter, update }; return q(baseApp({ ...update.$set })); }],
     [Store, "updateOne", (filter, update) => { calls.store = update; return q({}); }],
-    [SuperAdminActivity, "create", async () => ({})],
   ]);
   try {
     const res = mockRes();
