@@ -1,6 +1,10 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Dev host — e.g. "192.168.88.53.nip.io" → IP "192.168.88.53"
+const DEV_ROOT = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "").trim().replace(/:\d+$/, "");
+const DEV_IP = DEV_ROOT.replace(/\.nip\.io$/, "");
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ==========================================
@@ -26,16 +30,16 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
+  // IP .env (NEXT_PUBLIC_ROOT_DOMAIN) se — IP badle to sirf .env update karo
   allowedDevOrigins: [
-    '192.168.88.35',
-    '192.168.88.35',
+    DEV_IP,
     'localhost',
     '127.0.0.1',
     // Multi-tenant dev: nip.io root + har store subdomain + hosts-file custom domains (*.test)
-    '192.168.88.35.nip.io',
-    '*.192.168.88.35.nip.io',
+    DEV_ROOT,
+    `*.${DEV_ROOT}`,
     '*.test',
-  ],
+  ].filter(Boolean),
 
   turbopack: {
     root: __dirname,
@@ -66,10 +70,15 @@ const nextConfig = {
         destination: '/super-admin/dashboard',
         permanent: false,
       },
-      // /super-admin/activity ab real page hai ("My activity") — purana alias wahan bhejo
+      // Activity log feature hata diya — purane links dashboard par
       {
         source: '/super-admin/activity-logs',
-        destination: '/super-admin/activity',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/activity',
+        destination: '/super-admin/dashboard',
         permanent: false,
       },
     ];

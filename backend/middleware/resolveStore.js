@@ -41,6 +41,7 @@ const PLATFORM_EXACT = new Set([
   "/store/check-subdomain",
   // Seller signup (landing/signup)
   "/users/register",
+  "/users/register/check", // signup: email / username / phone / store address availability
   "/users/send-email-otp",
   "/users/verify-email-otp",
   "/users/google-customer-login",

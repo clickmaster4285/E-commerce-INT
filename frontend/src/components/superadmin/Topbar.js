@@ -12,7 +12,7 @@ const useBreadcrumbs = (pathname) => {
   const section = NAV.find((n) => pathname === n.href || pathname?.startsWith(`${n.href}/`));
   if (!section) return [];
   const crumbs = [{ label: section.label, href: section.href }];
-  if (pathname !== section.href) crumbs.push({ label: "Details" });
+  if (pathname !== section.href) crumbs.push({ label: pathname.endsWith("/new") ? `Add ${section.label.replace(/s$/, "").toLowerCase()}` : "Details" });
   return crumbs;
 };
 

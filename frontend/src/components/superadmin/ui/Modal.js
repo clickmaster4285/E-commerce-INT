@@ -29,13 +29,15 @@ export default function Modal({
 }) {
   const titleId = useId();
   const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   // Escape + body scroll lock + initial focus
   useEffect(() => {
     if (!open) return undefined;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e) => { if (e.key === "Escape" && !busy) onClose?.(); };
+    const onKey = (e) => { if (e.key === "Escape" && !busy) onCloseRef.current?.(); };
     document.addEventListener("keydown", onKey);
     const frame = requestAnimationFrame(() => {
       const first = panelRef.current?.querySelector("[autofocus], input:not([disabled]), textarea, select, button:not([data-close])");
@@ -46,7 +48,7 @@ export default function Modal({
       document.removeEventListener("keydown", onKey);
       cancelAnimationFrame(frame);
     };
-  }, [open, busy, onClose]);
+  }, [open, busy]);
 
   if (!open) return null;
 

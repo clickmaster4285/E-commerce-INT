@@ -26,10 +26,18 @@ router.post("/requests/:id/reject", superAdminController.rejectRequest);
 router.post("/requests/:id/request-info", superAdminController.requestInfo);
 
 router.get("/stores", superAdminController.listStores);
+router.get("/stores/:id", superAdminController.getStore);
 router.post("/stores", superAdminController.createStore);
+router.post("/stores/with-owner", superAdminController.createSellerStore); // Add store page — store + owner
 router.patch("/stores/:id", superAdminController.updateStore);
 router.delete("/stores/:id", superAdminController.deleteStore);
 router.patch("/stores/:id/status", superAdminController.setStoreStatus);
+
+router.get("/store-admins", superAdminController.listStoreAdmins);
+router.get("/store-admins/:id", superAdminController.getStoreAdmin);
+router.patch("/store-admins/:id", superAdminController.updateStoreAdmin);
+router.post("/store-admins/:id/password", superAdminController.resetStoreAdminPassword);
+router.patch("/store-admins/:id/status", superAdminController.setStoreAdminStatus);
 
 router.get("/users", superAdminController.listUsers);
 router.get("/users/:id", superAdminController.getUser);

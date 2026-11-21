@@ -68,6 +68,16 @@ const storeSchema = new mongoose.Schema({
   quote_terms_translations: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   invoice_terms_translations: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
 
+  activity: [{
+    action: { type: String, required: true },
+    summary: { type: String, required: true },
+    actorType: { type: String, enum: ["superadmin", "employee", "system"], default: "system" },
+    actorId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    actorName: { type: String, default: "System" },
+    at: { type: Date, default: Date.now },
+    details: { type: mongoose.Schema.Types.Mixed, default: null },
+  }],
+
 }, { timestamps: true });
 
 // Unique sirf un docs par jahan field set hai (purane stores bina subdomain ke chal sakte hain)

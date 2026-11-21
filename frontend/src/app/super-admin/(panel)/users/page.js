@@ -3,17 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users as UsersIcon, Ban, CircleCheck, Loader2, Eye, ExternalLink, Store as StoreIcon, Phone, Mail, ShoppingBag, Pencil, Trash2, LayoutDashboard } from "lucide-react";
+import { Users as UsersIcon, Ban, CircleCheck, Loader2, Eye, ExternalLink, Store as StoreIcon, Phone, Mail, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, Pagination, Avatar, StatusBadge, Badge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
 import EditUserDialog from "@/components/superadmin/EditUserDialog";
-import useOpenStoreAdmin from "@/components/superadmin/useOpenStoreAdmin";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDate, timeAgo } from "@/lib/superadminFormat";
 
+// Users = sirf customers (sellers Stores page par — owner)
 const FILTERS = [
   { value: "", label: "All", countKey: "all" },
-  { value: "customer", label: "Customers", countKey: "customer" },
-  { value: "seller", label: "Sellers", countKey: "seller" },
+  { value: "active", label: "Active", countKey: "active" },
   { value: "blocked", label: "Blocked", countKey: "blocked" },
 ];
 const PAGE_SIZE = 20;
@@ -30,19 +29,17 @@ export default function UsersPage() {
   const [notice, setNotice] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const { openStoreAdmin } = useOpenStoreAdmin({ onError: (text) => setNotice({ tone: "danger", text }) });
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebounced(search.trim()), 250);
     return () => window.clearTimeout(id);
   }, [search]);
 
-  const type = filter === "customer" || filter === "seller" ? filter : "";
-  const queryStatus = filter === "blocked" ? "blocked" : "";
+  const queryStatus = filter;
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
-    queryKey: ["superadmin-users", type, queryStatus, debounced, page],
-    queryFn: () => superAdminApi.listUsers({ type, status: queryStatus, search: debounced, page, limit: PAGE_SIZE }),
+    queryKey: ["superadmin-users", queryStatus, debounced, page],
+    queryFn: () => superAdminApi.listUsers({ status: queryStatus, search: debounced, page, limit: PAGE_SIZE }),
     retry: 1,
     placeholderData: (prev) => prev,
   });
@@ -70,7 +67,7 @@ export default function UsersPage() {
 
   const columns = [
     {
-      key: "user", header: "User",
+      key: "user", header: "Customer",
       cell: (u) => <EntityCell avatar={<Avatar name={u.name} />} primary={u.name} secondary={u.username ? `@${u.username}` : null} maxWidth={240} />,
     },
     {
@@ -82,15 +79,15 @@ export default function UsersPage() {
         </div>
       ),
     },
-    { key: "type", header: "Type", cell: (u) => <StatusBadge value={u.type === "Seller" ? "seller" : "customer"} dot={false} /> },
     {
-      key: "store", header: "Store",
+      // Customer ne kis store par account banaya
+      key: "store", header: "Shops at",
       cell: (u) => u.store ? (
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><StoreIcon size={14} aria-hidden="true" /></span>
           <div className="min-w-0">
             <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{u.store.name}</p>
-            <p className="flex items-center gap-1.5 truncate text-[12px] text-[var(--text-muted)]">{u.store.subdomain ? `${u.store.subdomain}.…` : "No subdomain"}<StatusBadge value={u.store.status} /></p>
+            <p className="truncate text-[12px] text-[var(--text-muted)]">{u.store.subdomain ? `${u.store.subdomain}.…` : "No subdomain"}</p>
           </div>
         </div>
       ) : <span className="text-[var(--text-muted)]">—</span>,
@@ -114,7 +111,6 @@ export default function UsersPage() {
             ...(u.store?.url ? [
               { separator: true },
               { label: "Visit store", icon: ExternalLink, href: u.store.url, external: true },
-              { label: "Open admin panel", icon: LayoutDashboard, onClick: () => openStoreAdmin(u.store.id) },
             ] : []),
             { separator: true },
             u.status === "blocked"
@@ -129,7 +125,7 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Users" description={isLoading ? "Every customer and seller account on the platform." : `${total.toLocaleString()} account${total === 1 ? "" : "s"} across the platform.`} />
+      <PageHeader title="Users" description={isLoading ? "Customer accounts across every store. Sellers are managed from Stores." : `${total.toLocaleString()} customer${total === 1 ? "" : "s"} across every store · sellers are managed from Stores.`} />
 
       {notice && <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>}
 
@@ -146,7 +142,7 @@ export default function UsersPage() {
           loading={isLoading}
           onRowClick={(u) => router.push(`/super-admin/users/${u.id}`)}
           error={isError ? { title: "Couldn't load users", action: <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button> } : null}
-          empty={{ icon: filter === "seller" ? ShoppingBag : UsersIcon, title: debounced ? "No users match your search" : "No users found", description: debounced ? "Try a different name, email or username." : undefined }}
+          empty={{ icon: UsersIcon, title: debounced ? "No customers match your search" : filter === "blocked" ? "No blocked customers" : "No customers yet", description: debounced ? "Try a different name, email or username." : filter ? undefined : "Customers appear here when they create an account on any store." }}
         />
         <Pagination page={page} pages={pages} total={total} pageSize={PAGE_SIZE} onChange={setPage} itemLabel="users" />
       </Card>
@@ -164,7 +160,7 @@ export default function UsersPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title={deleteTarget ? `Delete ${deleteTarget.name}'s account?` : ""}
-        message={deleteTarget?.store ? `They can no longer sign in, and their admin login for “${deleteTarget.store.name}” is deactivated. The store and its orders are kept — manage them from Stores.` : "They can no longer sign in. Their past orders are kept for your records."}
+        message="They can no longer sign in. Their past orders are kept for your records."
         confirmLabel="Delete account"
         confirmTone="danger"
         loading={deleteMutation.isPending}

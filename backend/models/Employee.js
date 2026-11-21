@@ -145,6 +145,8 @@ const employeeSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+    // Collection: admin_users (pehle "employees") — scripts/renameAuthCollections.js
+    collection: "admin_users",
   }
 );
 

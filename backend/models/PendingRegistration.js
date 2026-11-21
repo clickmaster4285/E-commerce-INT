@@ -25,6 +25,8 @@ const pendingRegistrationSchema = new mongoose.Schema(
     // Verify isi store par hota hai — store A ka code store B / platform par nahi.
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
     storeName: { type: String, default: "", trim: true },
+    // Seller ka chuna hua store web address — "ahmed-electronics" → ahmed-electronics.<ROOT_DOMAIN>
+    subdomain: { type: String, default: "", trim: true, lowercase: true },
     storeDescription: { type: String, default: "", trim: true },
     businessCategory: { type: String, default: "", trim: true },
     businessType: { type: String, enum: ["individual", "registered_business"], default: "individual" },

@@ -87,8 +87,6 @@ export const superAdminApi = {
 
   // Dashboard
   getDashboard: () => superAdminHttp.get("/super-admin/dashboard").then((r) => r.data),
-  // Logged-in member ki apni activity (time + description)
-  myActivity: (params = {}) => superAdminHttp.get("/super-admin/activity/me", { params }).then((r) => r.data),
 
   // Requests
   listRequests: (params = {}) =>
@@ -106,7 +104,10 @@ export const superAdminApi = {
   // Stores
   listStores: (params = {}) =>
     superAdminHttp.get("/super-admin/stores", { params }).then((r) => r.data),
+  getStore: (id) => superAdminHttp.get(`/super-admin/stores/${id}`).then((r) => r.data),
   createStore: (payload) => superAdminHttp.post("/super-admin/stores", payload).then((r) => r.data),
+  // Add store page — signup jaise fields se store + owner (seedha approved)
+  createSellerStore: (payload) => superAdminHttp.post("/super-admin/stores/with-owner", payload).then((r) => r.data),
   updateStore: (id, payload) => superAdminHttp.patch(`/super-admin/stores/${id}`, payload).then((r) => r.data),
   deleteStore: (id) => superAdminHttp.delete(`/super-admin/stores/${id}`).then((r) => r.data),
   setStoreStatus: (id, status) =>
@@ -124,10 +125,17 @@ export const superAdminApi = {
   setUserStatus: (id, status) =>
     superAdminHttp.patch(`/super-admin/users/${id}/status`, { status }).then((r) => r.data),
 
+  // Store admins (store ke owner/admin — admin_users)
+  listStoreAdmins: (params = {}) =>
+    superAdminHttp.get("/super-admin/store-admins", { params }).then((r) => r.data),
+  getStoreAdmin: (id) => superAdminHttp.get(`/super-admin/store-admins/${id}`).then((r) => r.data),
+  updateStoreAdmin: (id, payload) => superAdminHttp.patch(`/super-admin/store-admins/${id}`, payload).then((r) => r.data),
+  resetStoreAdminPassword: (id, password) => superAdminHttp.post(`/super-admin/store-admins/${id}/password`, { password }).then((r) => r.data),
+  setStoreAdminStatus: (id, status) => superAdminHttp.patch(`/super-admin/store-admins/${id}/status`, { status }).then((r) => r.data),
+
   // Team (super admin + staff accounts) — super admin only
   listTeam: () => superAdminHttp.get("/super-admin/team").then((r) => r.data),
   getTeamMember: (id) => superAdminHttp.get(`/super-admin/team/${id}`).then((r) => r.data),
-  teamMemberActivity: (id, params = {}) => superAdminHttp.get(`/super-admin/team/${id}/activity`, { params }).then((r) => r.data),
   createTeamMember: (payload) => superAdminHttp.post("/super-admin/team", payload).then((r) => r.data),
   updateTeamMember: (id, payload) => superAdminHttp.patch(`/super-admin/team/${id}`, payload).then((r) => r.data),
   setTeamMemberStatus: (id, status) =>
@@ -135,6 +143,9 @@ export const superAdminApi = {
   resetTeamMemberPassword: (id, password) =>
     superAdminHttp.post(`/super-admin/team/${id}/password`, { password }).then((r) => r.data),
   deleteTeamMember: (id) => superAdminHttp.delete(`/super-admin/team/${id}`).then((r) => r.data),
+  // Logged-in member ki apni activity (time + description)
+  myActivity: (params = {}) => superAdminHttp.get("/super-admin/activity/me", { params }).then((r) => r.data),
+  teamMemberActivity: (id, params = {}) => superAdminHttp.get(`/super-admin/team/${id}/activity`, { params }).then((r) => r.data),
 
   // Plans (platform subscription catalog)
   listPlans: (params = {}) =>
