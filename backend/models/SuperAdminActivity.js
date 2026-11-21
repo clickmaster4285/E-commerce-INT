@@ -10,7 +10,7 @@ const superAdminActivitySchema = new mongoose.Schema(
     },
     entityType: {
       type: String,
-      enum: ["seller_application", "store", "user", "superadmin", "auth", "settings", "system"],
+      enum: ["seller_application", "store", "user", "superadmin", "auth", "settings", "system", "plan"],
       default: "system",
       index: true,
     },

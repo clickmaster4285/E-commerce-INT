@@ -135,4 +135,16 @@ export const superAdminApi = {
   resetTeamMemberPassword: (id, password) =>
     superAdminHttp.post(`/super-admin/team/${id}/password`, { password }).then((r) => r.data),
   deleteTeamMember: (id) => superAdminHttp.delete(`/super-admin/team/${id}`).then((r) => r.data),
+
+  // Plans (platform subscription catalog)
+  listPlans: (params = {}) =>
+    superAdminHttp.get("/super-admin/plans", { params }).then((r) => r.data),
+  getPlan: (id) => superAdminHttp.get(`/super-admin/plans/${id}`).then((r) => r.data),
+  planActivity: (id, params = {}) =>
+    superAdminHttp.get(`/super-admin/plans/${id}/activity`, { params }).then((r) => r.data),
+  createPlan: (payload) => superAdminHttp.post("/super-admin/plans", payload).then((r) => r.data),
+  updatePlan: (id, payload) => superAdminHttp.patch(`/super-admin/plans/${id}`, payload).then((r) => r.data),
+  setPlanStatus: (id, status) =>
+    superAdminHttp.patch(`/super-admin/plans/${id}/status`, { status }).then((r) => r.data),
+  deletePlan: (id) => superAdminHttp.delete(`/super-admin/plans/${id}`).then((r) => r.data),
 };

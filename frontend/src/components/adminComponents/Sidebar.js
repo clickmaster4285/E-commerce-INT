@@ -23,32 +23,12 @@ import { useTranslation } from "../../i18n/LanguageProvider";
 import adminHttp from "@/apis/axiosInstance";
 
 import {
-  FolderOpen,
-  Tag,
-  Package,
-  LayoutDashboard,
   X,
-  Store,
-  User,
-  Users,
-  Gift,
-  Image as ImageIcon,
   Menu,
   ChevronsLeft,
   ChevronsRight,
-  ShoppingCart,
-  Truck,
-  Percent,
-  Boxes,
-  Star, // Added for Featured Products
-  SlidersHorizontal, // Added for Attributes
-  MessageSquareText, // Reviews
-  MessageCircle,
-  ContactRound,
-  FileText,
-  Receipt,
-  DollarSign,
 } from "lucide-react";
+import { getNavModules, getSidebarSections } from "@/lib/adminModules";
 
 // ============================================================
 // STORE LOGO / MARK
@@ -97,88 +77,9 @@ function StoreMark({
   );
 }
 
-// ============================================================
-// SIDEBAR SECTIONS (logical grouping for UI)
-// ============================================================
-
-const sidebarSections = [
-  {
-    title: "OVERVIEW",
-    items: ["Dashboard"],
-  },
-  {
-    title: "CATALOG",
-    items: ["Brands", "Categories", "Attributes", "Products", "Featured Products", "Reviews"],
-  },
-  {
-    title: "SALES & MARKETING",
-    items: ["Discounts", "Deals", "Banners"],
-  },
-  {
-    title: "OPERATIONS",
-    items: ["Manage Stock", "Orders", "Chats", "Shipping"],
-  },
-  {
-    title: "PURCHASING",
-    items: ["Vendors", "Purchase Orders"],
-  },
-  {
-    title: "POS & CUSTOMER MANAGEMENT",
-    items: ["POS", "Customers", "Leads", "Quotes", "Invoices"],
-  },
-  {
-    title: "FINANCE",
-    items: ["Finance"],
-  },
-  {
-    title: "STORE",
-    items: ["Store Info", "Terms & Conditions"],
-  },
-  {
-    title: "TEAM & ACCOUNT",
-    items: ["Employees", "Profile"],
-  },
-];
-
-// ============================================================
-// MENU ITEMS
-// ============================================================
-
-const allMenuItems = [
-  { name: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard", permissionKey: "dashboard" },
-  { name: "Finance", icon: DollarSign, path: "/admin/finance", permissionKey: "finance" },
-  { name: "Brands", icon: Tag, path: "/admin/brands", permissionKey: "brands" },
-  { name: "Categories", icon: FolderOpen, path: "/admin/categories", permissionKey: "categories" },
-  { 
-    name: "Attributes", 
-    icon: SlidersHorizontal, 
-    path: "/admin/attributes", 
-    permissionKey: "attribute" 
-  },
-  { name: "Products", icon: Package, path: "/admin/products", permissionKey: "products" },
-  // ✅ Featured Products — alag permission (legacy staff: products se fallback)
-  { name: "Featured Products", icon: Star, path: "/admin/featured-products", permissionKey: "featuredProducts", fallbackKey: "products" },
-  // ✅ Reviews — alag permission (legacy staff: products se fallback)
-  { name: "Reviews", icon: MessageSquareText, path: "/admin/reviews", permissionKey: "reviews", fallbackKey: "products" },
-  { name: "Employees", icon: Users, path: "/admin/employees", permissionKey: "employees" },
-  { name: "Discounts", icon: Percent, path: "/admin/discounts", permissionKey: "discounts" },
-  { name: "Deals", icon: Gift, path: "/admin/deals", permissionKey: "deals" },
-  { name: "Banners", icon: ImageIcon, path: "/admin/banners", permissionKey: "banners" },
-  { name: "Manage Stock", icon: Boxes, path: "/admin/manage-stock", permissionKey: "manageStock" },
-  { name: "Orders", icon: ShoppingCart, path: "/admin/orders", permissionKey: "order" },
-  { name: "Chats", icon: MessageCircle, path: "/admin/chats", permissionKey: "order" },
-  { name: "Shipping", icon: Truck, path: "/admin/shipping", permissionKey: "shipping" },
-  { name: "Vendors", icon: Users, path: "/admin/vendors", permissionKey: "vendors" },
-  { name: "Purchase Orders", icon: Package, path: "/admin/purchase-orders", permissionKey: "purchaseOrders" },
-  { name: "Customers", icon: Users, path: "/admin/customers", permissionKey: "customers" },
-  { name: "Leads", icon: ContactRound, path: "/admin/leads", permissionKey: "leads" },
-  { name: "Quotes", icon: FileText, path: "/admin/quotes", permissionKey: "quotes" },
-  { name: "Invoices", icon: Receipt, path: "/admin/invoices", permissionKey: "invoices", fallbackKey: "quotes" },
-  { name: "POS", icon: ShoppingCart, path: "/admin/pos", permissionKey: "pos" },
-  { name: "Store Info", icon: Store, path: "/admin/store-info", permissionKey: "store" },
-  { name: "Terms & Conditions", icon: FileText, path: "/admin/terms-conditions", permissionKey: "store" },
-  { name: "Profile", icon: User, path: "/admin/profile", permissionKey: "profile" },
-];
+// Modules catalog — shared with Super Admin Plans (`@/lib/adminModules`)
+const sidebarSections = getSidebarSections();
+const allMenuItems = getNavModules();
 
 // ============================================================
 // SIDEBAR SOCKET
@@ -782,20 +683,21 @@ export default function Sidebar({ onNavigate, userData }) {
           className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-2"}`}
         >
           {sidebarSections.map((section) => {
+            const sectionTitle = section.sidebarTitle || section.title;
             const sectionItems = visibleMenuItems.filter((item) => section.items.includes(item.name));
             if (sectionItems.length === 0) return null;
             return (
-              <div key={section.title} className="mb-1.5">
+              <div key={section.id || sectionTitle} className="mb-1.5">
                 {iconOnly ? (
                   <div
                     aria-hidden="true"
                     className="mx-auto my-2 h-px w-6 rounded-full"
                     style={{ backgroundColor: "var(--sidebar-divider)" }}
                   />
-                ) : section.title !== "POS & CUSTOMER MANAGEMENT" ? (
+                ) : !section.hideSidebarHeading ? (
                   <div className="px-2.5 pt-1.5 pb-1">
                     <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
-                      {navLabel("section", section.title)}
+                      {navLabel("section", sectionTitle)}
                     </span>
                   </div>
                 ) : null}

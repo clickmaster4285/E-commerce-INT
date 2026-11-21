@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, ClipboardList, Store, Users, UserCog, LogIn, LogOut, Settings, Loader2, ArrowUpRight } from "lucide-react";
+import { Activity, ClipboardList, Store, Users, UserCog, LogIn, LogOut, Settings, Loader2, ArrowUpRight, BadgeDollarSign } from "lucide-react";
 import { Card, CardHeader, CardToolbar, SearchInput, Pagination, Badge, Button, EmptyState, Skeleton } from "@/components/superadmin/ui";
 import { formatDate, formatTime, formatDateTime, timeAgo } from "@/lib/superadminFormat";
 
@@ -13,6 +13,7 @@ const ENTITY = {
   store: { icon: Store, href: () => "/super-admin/stores" },
   user: { icon: Users, href: (id) => `/super-admin/users/${id}` },
   superadmin: { icon: UserCog, href: (id) => `/super-admin/team/${id}` },
+  plan: { icon: BadgeDollarSign, href: (id) => `/super-admin/plans/${id}` },
   auth: { icon: LogIn, href: null },
   settings: { icon: Settings, href: null },
   system: { icon: Settings, href: null },

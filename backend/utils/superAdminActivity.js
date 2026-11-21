@@ -28,6 +28,7 @@ const ENTITY_LABELS = {
   auth: "Sign-in",
   settings: "Settings",
   system: "System",
+  plan: "Plan",
 };
 const humanize = (key) => String(key).replace(/([A-Z])/g, " $1").replace(/[_-]+/g, " ").trim().replace(/^./, (c) => c.toUpperCase());
 const KNOWN = new Set(["changed", "previous", "next", "status", "storeName", "email", "role", "reason", "message", "device", "ip"]);

@@ -379,6 +379,12 @@ exports.getEmployeeActivities = async (req, res) => {
 
 exports.createEmployee = async (req, res) => {
   try {
+    const { assertWithinLimit } = require("../utils/planLimits");
+    const planBlock = await assertWithinLimit("staff");
+    if (planBlock) {
+      return res.status(planBlock.status).json({ success: false, message: planBlock.message });
+    }
+
     const {
       name,
       email,

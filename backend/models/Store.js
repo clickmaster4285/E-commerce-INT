@@ -34,6 +34,9 @@ const storeSchema = new mongoose.Schema({
   weight_unit: { type: String, default: "kg" },
   store_status: { type: String, default: "open" }, // open, closed, maintenance
   maintenance_message: { type: String, default: "" },
+
+  // Platform subscription plan (super-admin Plans module) — optional
+  planId: { type: mongoose.Schema.Types.ObjectId, ref: "Plan", default: null, index: true },
   
   // Branding
   logo: { 
@@ -108,17 +111,24 @@ storeSchema.pre("validate", async function () {
 storeSchema.plugin(tenantScope, { field: "_id", stamp: false });
 
 // Naya store → uske apne default attributes (Attribute ab per-store hai).
+// Sirf create par. Update (status, plan, profile) dubara seed nahi karta.
 // Background me — signup / approval request iska intezar nahi karti.
 storeSchema.pre("save", function () {
   this.$locals.wasNew = this.isNew;
 });
 storeSchema.post("save", function (doc) {
-  if (!doc.$locals?.wasNew) return;
+  const created = Boolean(this.$locals?.wasNew || doc?.$locals?.wasNew);
+  const storeId = doc?._id || this._id;
+  if (!created || !storeId) return;
   setImmediate(() => {
     const { seedAttributesForStore } = require("../scripts/seedAttributes");
-    seedAttributesForStore(doc._id).catch((error) =>
-      require("../utils/logger").error("[store] attribute seed failed:", error.message),
-    );
+    seedAttributesForStore(storeId)
+      .then((result) => {
+        console.log(`🌍 Attributes seeded for new store ${storeId} — created ${result?.created ?? 0}, updated ${result?.updated ?? 0}.`);
+      })
+      .catch((error) => {
+        console.error("[store] attribute seed failed:", error.message);
+      });
   });
 });
 

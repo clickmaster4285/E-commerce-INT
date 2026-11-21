@@ -69,6 +69,13 @@ export default function StoresPage() {
   const columns = [
     { key: "store", header: "Store", cell: (s) => <EntityCell avatar={<Avatar name={s.store_name} shape="square" src={s.logo_url ? assetUrl(s.logo_url) : undefined} />} primary={s.store_name} secondary={hostOf(storefrontUrl(s)) || s.business_category || "No subdomain yet"} maxWidth={320} /> },
     { key: "owner", header: "Owner", cell: (s) => s.owner_name ? <EntityCell avatar={<Avatar name={s.owner_name} size="sm" />} primary={s.owner_name} secondary={s.owner_email} maxWidth={260} /> : <span className="text-[var(--text-muted)]">No owner</span> },
+    {
+      key: "plan",
+      header: "Plan",
+      cell: (s) => s.plan?.name
+        ? <span className="text-[var(--text-primary)]">{s.plan.name}{s.plan.status === "inactive" ? <span className="ms-1 text-[12px] text-[var(--text-muted)]">(inactive)</span> : null}</span>
+        : <span className="text-[var(--text-muted)]">—</span>,
+    },
     { key: "created", header: "Created", className: "whitespace-nowrap", cell: (s) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(s.createdAt)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(s.createdAt)}</p></>) },
     { key: "status", header: "Status", cell: (s) => <StatusBadge value={s.status} /> },
     {

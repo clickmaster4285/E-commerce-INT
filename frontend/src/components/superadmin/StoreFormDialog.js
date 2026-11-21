@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Store as StoreIcon, Loader2, ImagePlus, Upload, X } from "lucide-react";
 import { Modal, Button, IconButton, Alert, TextInput, TextArea, SelectInput, FormSection, Field } from "@/components/superadmin/ui";
 import SearchCombobox, { COMBO_THEME_ADMIN } from "@/components/common/SearchCombobox";
@@ -11,7 +11,7 @@ import { compressImage } from "@/utils/compressImage";
 import { assetUrl } from "@/lib/superadminFormat";
 
 const STATUS_OPTIONS = [{ value: "open", label: "Open" }, { value: "maintenance", label: "Maintenance" }, { value: "closed", label: "Suspended" }];
-const EMPTY_FORM = { store_name: "", email: "", phone: "", description: "", business_category: "", country: DEFAULT_COUNTRY, city: "", address: "", zip_code: "", logo_url: "", store_status: "open" };
+const EMPTY_FORM = { store_name: "", email: "", phone: "", description: "", business_category: "", country: DEFAULT_COUNTRY, city: "", address: "", zip_code: "", logo_url: "", store_status: "open", planId: "" };
 
 // Signup jaisa hi store form — same fields, same rules (identity, description, location, branding)
 export default function StoreFormDialog({ store, onClose, onSaved }) {
@@ -21,12 +21,24 @@ export default function StoreFormDialog({ store, onClose, onSaved }) {
     const f = { ...EMPTY_FORM };
     for (const k of Object.keys(EMPTY_FORM)) if (store[k] != null && store[k] !== "") f[k] = store[k];
     f.store_status = store.status || "open"; // list row me status "status" naam se aata hai
+    f.planId = store.planId ? String(store.planId) : "";
     return f;
   });
   const [errors, setErrors] = useState({});
   const [error, setError] = useState("");
   const [logoBusy, setLogoBusy] = useState(false);
   const [geo, setGeo] = useState(null);
+
+  const { data: plansData } = useQuery({
+    queryKey: ["superadmin-plans"],
+    queryFn: () => superAdminApi.listPlans(),
+    staleTime: 60_000,
+  });
+  const planOptions = useMemo(() => {
+    const items = plansData?.data?.items || [];
+    // Inactive plans bhi dikhao agar store pe already assigned ho
+    return items.filter((p) => p.status === "active" || String(p.id) === String(form.planId));
+  }, [plansData, form.planId]);
 
   // Country + city list signup wali library se — dialog khulne par lazy load
   useEffect(() => {
@@ -96,6 +108,7 @@ export default function StoreFormDialog({ store, onClose, onSaved }) {
       zip_code: form.zip_code.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
+      planId: form.planId || null,
       // update endpoint subdomain khali milne par hata deta hai — existing wapas bhejo
       ...(editing ? { subdomain: store.subdomain || "", business_type: store.business_type } : {}),
     });
@@ -222,6 +235,22 @@ export default function StoreFormDialog({ store, onClose, onSaved }) {
             <TextInput label="Store email" type="email" value={form.email} onChange={set("email")} error={errors.email} placeholder="owner@store.com" />
             <TextInput label="Phone" value={form.phone} onChange={set("phone")} error={errors.phone} inputMode="tel" placeholder="03001234567" />
           </div>
+        </FormSection>
+
+        <FormSection title="Subscription plan">
+          <SelectInput
+            label="Plan"
+            value={form.planId}
+            onChange={set("planId")}
+            hint="Limits and feature tiers from this plan apply to the store."
+          >
+            <option value="">No plan</option>
+            {planOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}{p.status === "inactive" ? " (inactive)" : ""}
+              </option>
+            ))}
+          </SelectInput>
         </FormSection>
       </div>
     </Modal>
