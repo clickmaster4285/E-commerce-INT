@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Otp = require("../models/Otp");
@@ -6,6 +7,9 @@ const User = require("../models/User");
 const PendingRegistration = require("../models/PendingRegistration");
 const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
+const SellerApplication = require("../models/SellerApplication");
+const { sendApplicationReceivedEmail } = require("../services/emailService");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
@@ -27,43 +31,16 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () =>
   String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 
-// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
-// jwt.sign invalid expiresIn ("NaNd") pe THROW kar deta hai → OTP verify ke
-// baad login fail. Is liye validated fallback.
-const getUserAccessDays = () => {
-  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 7;
-};
+// ✅ Sessions utils/tokens.js se — customer (aud "user") aur seller admin
+// (aud "admin") ke alag secrets + cookies. Pehle yahan hard-coded
+// secure:false / 7-din wale employee tokens the.
+const tokens = require("../utils/tokens");
 
-const getRefreshTokenDays = () => {
-  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 30;
-};
+const setAuthCookies = (req, res, user) => tokens.issueSession(req, res, "user", user);
 
-const setAuthCookies = (res, userId, role) => {
-  const accessToken = jwt.sign(
-    { userId, role, type: "user" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getUserAccessDays()}d` },
-  );
-  const refreshToken = jwt.sign(
-    { userId, role, type: "user" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getRefreshTokenDays()}d` },
-  );
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
-  });
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getRefreshTokenDays() * 24 * 60 * 60 * 1000,
-  });
-};
+// Seller admin session. Pending sellers get this too, so they can open the
+// admin panel read-only until the Super Admin approves them.
+const setEmployeeAuthCookies = (req, res, employee) => tokens.issueSession(req, res, "admin", employee);
 
 // ==========================================
 // 🔁 ISSUE + SEND OTP (shared)
@@ -335,22 +312,34 @@ const verifyEmailVerificationOtp = async (req, res) => {
           .json({ success: false, message: `Incorrect code. ${left} attempt${left === 1 ? "" : "s"} remaining.` });
       }
 
-      // ✅ Sahi OTP — ab User banao (is se pehle User exist nahi karta)
+      // ✅ Sahi OTP — ab identity banao (customer = User, seller = Employee)
+      const Employee = require("../models/Employee");
       const existingUser = await User.findOne({ email });
       if (existingUser && existingUser.emailVerified !== false) {
+        const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("status").lean();
+        if (pendingApp) {
+          await PendingRegistration.deleteOne({ _id: pending._id });
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your application is already under review. You will be notified by email once it is approved.",
+          });
+        }
         await PendingRegistration.deleteOne({ _id: pending._id });
         return res
           .status(400)
           .json({ success: false, message: "This email is already registered. Please log in." });
       }
       if (existingUser && existingUser.emailVerified === false) {
-        // Legacy adhoora record — naye verified User ke liye jagah banao
+        // Legacy adhoora record — naye account ke liye jagah banao
         await User.deleteOne({ _id: existingUser._id });
       }
+      // Seller ka identity Employee (admin_users) me hai — username/phone wahan check karo
       if (pending.username) {
-        const clash = await User.findOne({
-          username: String(pending.username).toLowerCase().trim(),
-        });
+        const uname = String(pending.username).toLowerCase().trim();
+        const clash = pending.storeId
+          ? await User.findOne({ username: uname })
+          : await Employee.findOne({ username: uname }).setOptions({ skipTenantScope: true });
         if (clash) {
           return res
             .status(400)
@@ -358,54 +347,190 @@ const verifyEmailVerificationOtp = async (req, res) => {
         }
       }
       if (pending.phone) {
-        const phoneClash = await User.findOne({ phone: String(pending.phone).trim() });
+        const phone = String(pending.phone).trim();
+        const phoneClash = pending.storeId
+          ? await User.findOne({ phone })
+          : await Employee.findOne({ phone }).setOptions({ skipTenantScope: true });
         if (phoneClash) {
           return res
             .status(400)
             .json({ success: false, message: "This phone number is already registered." });
         }
       }
-      const defaultStore = await Store.findOne();
-      const user = await User.create({
+      // ── Store customer signup (storefront register) ──
+      // Seller approval / SellerApplication / blocked status sirf platform seller
+      // signup ke liye — customer foran active hota hai aur login ho jata hai.
+      if (pending.storeId) {
+        if (!req.store || String(req.store._id) !== String(pending.storeId)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Please verify your email on the store where you registered." });
+        }
+        const customer = await User.create({
+          name: pending.name,
+          username: pending.username,
+          phone: pending.phone || "",
+          email: pending.email,
+          // ✅ passwordHash pehle se bcrypt-hashed hai — dobara hash nahi karna
+          password: pending.passwordHash,
+          storeId: req.store._id,
+          role: "user",
+          emailVerified: true,
+          status: "active",
+        });
+        await PendingRegistration.deleteOne({ _id: pending._id });
+        await setAuthCookies(req, res, customer);
+
+        const io = req.io || getIO();
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${customer.name} verified their email`,
+            category: "Authentication",
+            performedBy: customer._id,
+            performedByName: customer.name,
+            details: { email: customer.email },
+          },
+          customer._id,
+        );
+
+        return res.json({
+          success: true,
+          message: "Email verified. Welcome!",
+          user: {
+            id: customer._id,
+            name: customer.name,
+            username: customer.username,
+            phone: customer.phone,
+            email: customer.email,
+            role: customer.role,
+            avatar: customer.avatar || null,
+          },
+        });
+      }
+
+      // ── Platform seller signup (naya store, Super Admin approval) ──
+      if (req.store) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Please verify your seller account on the main signup page." });
+      }
+      const isSeller = !!(pending.storeName && String(pending.storeName).trim().length >= 3);
+
+      const Store = require("../models/Store");
+
+      // Seller store is created up-front (closed) and stays read-only until approval.
+      let store = null;
+      if (isSeller) {
+        // Seller ka chuna hua address — beech me kisi ne le liya ho to us se milta-julta free address
+        let subdomain = String(pending.subdomain || "").trim().toLowerCase();
+        if (!subdomain || (await Store.exists({ subdomain }).setOptions({ skipTenantScope: true }))) {
+          subdomain = await Store.generateUniqueSubdomain(subdomain || pending.storeName);
+        }
+        store = await Store.create({
+          store_name: pending.storeName,
+          subdomain,
+          tagline: "Welcome to our store",
+          description: pending.storeDescription || "",
+          business_category: pending.businessCategory || "",
+          business_type: pending.businessType || "individual",
+          logo: pending.storeLogoUrl
+            ? { img_url: pending.storeLogoUrl, public_id: "" }
+            : { img_url: "", public_id: "" },
+          email: pending.email,
+          phone: pending.phone || "",
+          country: pending.country || "PK",
+          city: pending.city || "",
+          address: pending.address || "",
+          zip_code: pending.zipCode || "",
+          store_status: "closed",
+          currency: "PKR",
+          tax_rate: 17,
+          weight_unit: "kg",
+        });
+      }
+
+      // Seller ka identity sirf Employee (admin_users) + SellerApplication hai —
+      // customer_users me seller ka duplicate account nahi banta.
+
+      // Seller application queue — Super Admin reviews from here (everything supplied at signup)
+      const application = await SellerApplication.create({
+        name: pending.name,
+        email: pending.email,
+        phone: pending.phone || "",
+        username: pending.username || "",
+        passwordHash: pending.passwordHash,
+        store_name: isSeller ? pending.storeName : `${String(pending.name || "").trim().slice(0, 40) || "New"}'s Store`,
+        store_description: isSeller ? pending.storeDescription || "" : "",
+        logo: isSeller && pending.storeLogoUrl
+          ? { img_url: pending.storeLogoUrl, public_id: "" }
+          : { img_url: "", public_id: "" },
+        business_category: isSeller ? pending.businessCategory || "" : "",
+        business_type: isSeller ? pending.businessType || "individual" : "individual",
+        country: isSeller ? pending.country || "" : "",
+        city: isSeller ? pending.city || "" : "",
+        address: isSeller ? pending.address || "" : "",
+        zip_code: isSeller ? pending.zipCode || "" : "",
+        status: "pending",
+        user_id: null,
+        store_id: isSeller ? store._id : null,
+      });
+
+      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable).
+      // Store owner = "admin" role (full panel access); read-only is enforced by seller_pending, not role.
+      const employee = await Employee.create({
         name: pending.name,
         username: pending.username,
-        phone: pending.phone || "",
         email: pending.email,
-        // ✅ passwordHash pehle se bcrypt-hashed hai — dobara hash nahi karna
+        phone: pending.phone || "",
         password: pending.passwordHash,
-        storeId: defaultStore?._id,
-        role: "user",
-        emailVerified: true,
+        role: OWNER_ROLE,
+        status: "active",
+        storeId: isSeller ? store._id : null,
+        seller_pending: true,
       });
+
       await PendingRegistration.deleteOne({ _id: pending._id });
+      const storeName = isSeller ? pending.storeName : ((application.store_name) || "Your store");
+      // Best-effort — failure must not block signup
+      try {
+        await sendApplicationReceivedEmail({
+          name: pending.name,
+          email: pending.email,
+          storeName,
+          adminUrl: storeAdminBaseUrl(store), // store null ho to null → generic link
+        });
+      } catch (emailError) {
+        console.error("[signup] pending-approval email failed:", emailError.message);
+      }
 
-      // ✅ Verified hone par seedha login karwa dete hain
-      setAuthCookies(res, user._id, user.role);
-
+      // Pending approval — sirf read-only employee session (customer account nahi banta).
+      await setEmployeeAuthCookies(req, res, employee);
       const io = req.io || getIO();
       await pushGlobalActivity(
         io,
         {
-          action: `${user.name} verified their email`,
+          action: `${employee.name} verified their email`,
           category: "Authentication",
-          performedBy: user._id,
-          performedByName: user.name,
-          details: { email: user.email },
+          performedBy: employee._id,
+          performedByName: employee.name,
+          details: { email: employee.email },
         },
-        user._id,
+        employee._id,
       );
 
       return res.json({
         success: true,
-        message: "Email verified successfully",
+        pendingApproval: true,
+        message: "Your application is pending Super Admin approval. We'll email you once it is approved.",
         user: {
-          id: user._id,
-          name: user.name,
-          username: user.username,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar || null,
+          id: employee._id,
+          name: employee.name,
+          username: employee.username,
+          phone: employee.phone,
+          email: employee.email,
+          role: employee.role,
+          avatar: employee.avatar || null,
         },
       });
     }
@@ -426,7 +551,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
     await record.save();
 
     // ✅ Verified hone par seedha login karwa dete hain
-    setAuthCookies(res, user._id, user.role);
+    await setAuthCookies(req, res, user);
 
     const io = req.io || getIO();
     await pushGlobalActivity(
@@ -525,8 +650,9 @@ const verifyForgotPasswordOtp = async (req, res) => {
     record.verified = true;
     await record.save();
 
+    // storeId token me — reset sirf usi store (host) par complete hoga
     const resetToken = jwt.sign(
-      { email, purpose: "password_reset", otpId: String(record._id) },
+      { email, purpose: "password_reset", otpId: String(record._id), storeId: req.store?._id ? String(req.store._id) : null },
       process.env.JWT_SECRET,
       { expiresIn: `${RESET_TOKEN_EXPIRE_MINUTES}m` },
     );
@@ -570,7 +696,12 @@ const resetPasswordWithOtp = async (req, res) => {
         .json({ success: false, message: "Reset link expired. Please start again." });
     }
 
-    if (payload.purpose !== "password_reset" || normalizeEmail(payload.email) !== email)
+    const requestStoreId = req.store?._id ? String(req.store._id) : null;
+    if (
+      payload.purpose !== "password_reset" ||
+      normalizeEmail(payload.email) !== email ||
+      (payload.storeId || null) !== requestStoreId // store A ka reset store B par nahi
+    )
       return res
         .status(400)
         .json({ success: false, message: "Invalid reset request. Please start again." });
@@ -611,9 +742,9 @@ const resetPasswordWithOtp = async (req, res) => {
       user._id,
     );
 
-    // ✅ Security: purane sessions invalid karne ke liye cookies clear
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    // ✅ Security: is account ke SAARE sessions (har device) band + cookies clear
+    await tokens.revokeAllForSubject("user", user._id, { reason: "password_reset" });
+    tokens.clearAuthCookies(res, "user");
 
     return res.json({
       success: true,

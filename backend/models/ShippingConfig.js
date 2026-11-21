@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const shippingConfigSchema = new mongoose.Schema(
   {
@@ -23,5 +24,9 @@ shippingConfigSchema.statics.getConfig = async function () {
   if (!cfg) cfg = await this.create({});
   return cfg;
 };
+
+
+// ── Multi-tenant ──
+shippingConfigSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("ShippingConfig", shippingConfigSchema);

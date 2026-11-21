@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 // Image information
 const imageSchema = new mongoose.Schema(
@@ -38,7 +39,6 @@ const variantSchema = new mongoose.Schema(
     sku: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     title: {
@@ -149,5 +149,10 @@ const variantSchema = new mongoose.Schema(
 // wala { created_at: 1, _id: 1 } sort bhi index se aaye (in-memory
 // filesort nahi) — $first hamesha deterministic rehta hai.
 variantSchema.index({ product_id: 1, is_deleted: 1, created_at: 1, _id: 1 });
+
+
+// ── Multi-tenant ──
+variantSchema.plugin(tenantScope); // har store ka data alag (storeId)
+variantSchema.index({ storeId: 1, sku: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("Variant", variantSchema);

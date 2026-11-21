@@ -1,4 +1,4 @@
-const path = require("path");
+﻿const path = require("path");
 const fs = require("fs");
 const dotenv = require("dotenv");
 const backendEnvPath = path.join(__dirname, ".env");
@@ -16,10 +16,11 @@ const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
 const log = require("./utils/logger");
 const User = require("./models/User");
-const Employee = require("./models/Employee");
-const Store = require("./models/Store");
 const ChatConversation = require("./models/ChatConversation");
+const SuperAdmin = require("./models/SuperAdmin");
 const { initSocket } = require("./utils/socket");
+const { resolveStore, resolveStoreByHost } = require("./middleware/resolveStore");
+const { isPlatformFamilyHost, ROOT_DOMAIN } = require("./utils/tenantHost");
 
 // ✅ Seed script ko import karein (Data yahan nahi, wahan rahega)
 const { seedAttributes } = require("./scripts/seedAttributes");
@@ -82,7 +83,6 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR;
 const STORE_UPLOAD_SUBDIR = process.env.STORE_UPLOAD_SUBDIR;
 const BUNDLE_UPLOAD_SUBDIR = process.env.BUNDLE_UPLOAD_SUBDIR;
 const REVIEW_UPLOAD_SUBDIR = process.env.REVIEW_UPLOAD_SUBDIR;
-const DEFAULT_ADMIN_ROLE = process.env.DEFAULT_ADMIN_ROLE;
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
 
 // ==========================================
@@ -120,7 +120,15 @@ app.use(cors({
         if (isPrivate) return callback(null, true);
       } catch (error) { return callback(new Error("Invalid request origin")); }
     }
-    return callback(new Error("Not allowed by CORS"));
+
+    // Multi-tenant: platform root + uske saare store subdomains
+    // (dev: *.192.168.88.35.nip.io, prod: *.eccomerce.com) + registered custom domains
+    let originHost;
+    try { originHost = new URL(origin).hostname; } catch (error) { return callback(new Error("Invalid request origin")); }
+    if (isPlatformFamilyHost(originHost)) return callback(null, true);
+    return resolveStoreByHost(originHost)
+      .then(({ store }) => (store ? callback(null, true) : callback(new Error("Not allowed by CORS"))))
+      .catch(() => callback(new Error("Not allowed by CORS")));
   },
   credentials: true,
 }));
@@ -141,11 +149,37 @@ app.use(
 app.use(express.json({ limit: REQUEST_SIZE_LIMIT }));
 app.use(express.urlencoded({ extended: true, limit: REQUEST_SIZE_LIMIT }));
 app.use(cookieParser());
+// Multi-tenant: Host header → req.tenant / req.store (block nahi karta)
+app.use(API_PREFIX, resolveStore);
 
 const uploadDir = path.join(__dirname, UPLOAD_DIR);
 const storeUploadDir = path.join(uploadDir, STORE_UPLOAD_SUBDIR);
+// 🔒 KYC documents (uploads/documents) PRIVATE — sirf super admin session (sa_at).
+// Path normalize karke check (".../x/../documents/..." jaisa chakkar bhi pakda jata
+// hai), warna neeche wala public static inhe kisi ko bhi de deta tha.
+const { requireSuperAdmin } = require("./middleware/superAdminAuth");
+const documentsDir = path.join(uploadDir, "documents");
+app.use("/uploads", (req, res, next) => {
+  let normalized;
+  try {
+    normalized = path.posix.normalize(decodeURIComponent(req.path));
+  } catch {
+    return res.status(400).json({ success: false, message: "Bad path." });
+  }
+  if (normalized !== "/documents" && !normalized.startsWith("/documents/")) return next();
+  return requireSuperAdmin(req, res, () => {
+    res.set("Cache-Control", "private, no-store");
+    const fileName = normalized.slice("/documents/".length);
+    if (!fileName || fileName.includes("/")) return res.status(404).json({ success: false, message: "Not found." });
+    return res.sendFile(fileName, { root: documentsDir, dotfiles: "deny" }, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ success: false, message: "Not found." });
+    });
+  });
+});
+
 // ✅ /uploads: saari filenames Date.now/uuid wali hain (overwrite par naya
 // naam banta hai) → 1y immutable safe. Webp pehle se compressed hai.
+// Naye uploads store ke folder me: /uploads/stores/<storeId>/... (utils/uploadPaths.js)
 app.use(
   "/uploads",
   express.static(uploadDir, {
@@ -236,6 +270,10 @@ app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 app.use(`${API_PREFIX}/chats`, chatRoutes);
+// ── Super Admin module (separate namespace + auth) ──
+app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
+// ── Public seller application (pending-review queue) ──
+app.use(`${API_PREFIX}/seller`, require("./routes/sellerApplicationRoutes"));
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
@@ -261,62 +299,45 @@ const createUploadDirectories = () => {
 
 const seedDefaultData = async () => {
   try {
-    // 1. Store Seed
-    const storeName = process.env.DEFAULT_STORE_NAME;
-    if (storeName) {
-      let defaultStore = await Store.findOne({ store_name: storeName });
-      if (!defaultStore) {
-        await Store.create({
-          store_name: storeName,
-          tagline: process.env.DEFAULT_STORE_TAGLINE,
-          email: process.env.DEFAULT_STORE_EMAIL,
-          phone: process.env.DEFAULT_STORE_PHONE,
-          support_email: process.env.DEFAULT_STORE_SUPPORT_EMAIL,
-          support_phone: process.env.DEFAULT_STORE_SUPPORT_PHONE,
-          country: process.env.DEFAULT_STORE_COUNTRY,
-          state: process.env.DEFAULT_STORE_STATE,
-          city: process.env.DEFAULT_STORE_CITY,
-          zip_code: process.env.DEFAULT_STORE_ZIP_CODE,
-          address: process.env.DEFAULT_STORE_ADDRESS,
-          currency: process.env.DEFAULT_STORE_CURRENCY,
-          tax_rate: Number(process.env.DEFAULT_STORE_TAX_RATE),
-          weight_unit: process.env.DEFAULT_STORE_WEIGHT_UNIT,
-          store_status: process.env.DEFAULT_STORE_STATUS,
-        });
-        log.info("✅ Default Store Created");
-      }
+    // Default store / store-admin auto-seed HATA diya gaya hai (multi-tenant):
+    // stores sirf seller signup se bante hain (Super Admin approval ke baad).
+    // Startup par sirf Super Admin + attributes seed hote hain.
 
-      // 2. Admin Seed (Employees collection only)
-      const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
-      const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
-      if (adminEmail && adminPassword) {
-        let admin = await Employee.findOne({ email: adminEmail });
-        if (!admin) {
-          const hashedPassword = await bcrypt.hash(adminPassword, SALT_ROUNDS);
-          await Employee.create({
-            name: process.env.DEFAULT_ADMIN_NAME,
-            username: process.env.DEFAULT_ADMIN_USERNAME,
-            email: adminEmail,
-            password: hashedPassword,
-            role: DEFAULT_ADMIN_ROLE,
-            status: "active",
-            storeId: defaultStore?._id || null,
-            permissions: {
-              products: true, brands: true, categories: true,
-              users: true, orders: true, settings: true,
-              profile: true, employees: true, discounts: true,
-              deals: true, bundles: true, store: true, banners: true,
-              manageStock: true, shipping: true, order: true, attribute: true,
-              vendors: true, purchaseOrders: true, customers: true, pos: true, leads: true, quotes: true,
-            },
-          });
-          log.info("✅ Default Admin Employee Created (employees collection)");
+    // 1. Super Admin Seed (development convenience; production requires a strong password)
+    const saEmail = process.env.SUPER_ADMIN_EMAIL;
+    const saPassword = process.env.SUPER_ADMIN_PASSWORD;
+    if (saEmail && saPassword) {
+      const emailSa = String(saEmail).toLowerCase().trim();
+      const saName = process.env.SUPER_ADMIN_NAME || emailSa.split("@")[0];
+      const isProduction = String(process.env.NODE_ENV || "").toLowerCase() === "production";
+      const minPasswordLength = Number(process.env.SUPER_ADMIN_MIN_PASSWORD_LENGTH);
+      const passwordTooWeak =
+        !Number.isFinite(minPasswordLength) ||
+        minPasswordLength < 1 ||
+        String(saPassword).length < minPasswordLength;
+      if (isProduction && passwordTooWeak) {
+        log.warn(
+          "[superadmin] Refusing to seed: set SUPER_ADMIN_MIN_PASSWORD_LENGTH and a SUPER_ADMIN_PASSWORD of at least that length in production."
+        );
+      } else {
+        try {
+          const existing = await SuperAdmin.findOne({ email: emailSa });
+          if (existing) {
+            log.info("[superadmin] Super Admin already seeded; keeping existing credentials.");
+          } else {
+            const hashed = await bcrypt.hash(String(saPassword), SALT_ROUNDS);
+            await SuperAdmin.create({ name: saName, email: emailSa, passwordHash: hashed, status: "active" });
+            log.info("[superadmin] Super Admin seeded.");
+          }
+        } catch (e) {
+          log.error("[superadmin] Seed error:", e.message);
         }
       }
+    } else {
+      log.warn("[superadmin] SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD not set; /super-admin will be unavailable.");
     }
-
-    // ✅ 3. Attributes Auto-Seed (Imported Function Call)
-    await seedAttributes(); 
+    // 2. Attributes Auto-Seed
+    await seedAttributes();
 
   } catch (error) {
     log.error("❌ Seed Error:", error.message);
@@ -370,6 +391,9 @@ const startServer = async () => {
         for (const ip of localIPv4s) console.log(`📡 Network: http://${ip}:${PORT}${apiPath}`);
       }
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
+      if (ROOT_DOMAIN) {
+        console.log(`🏬 Platform: http://${ROOT_DOMAIN}  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}`);
+      }
     });
   } catch (error) {
     // ✅ Pehle ye bhi silent tha — ab reason dikhegi

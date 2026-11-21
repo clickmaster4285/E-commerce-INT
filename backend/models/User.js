@@ -1,13 +1,13 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    username: { type: String, required: true, unique: true, trim: true },
+    username: { type: String, required: true, trim: true },
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
     },
@@ -18,7 +18,9 @@ const userSchema = new mongoose.Schema(
     google_id: { type: String, default: null },
     provider: { type: String, default: "local", enum: ["local", "google"] },
     phone: { type: String, default: "" },
-    role: { type: String, default: "user", enum: ["user", "admin", "staff"] },
+    // Account status — super admin can block a seller without deleting data
+    status: { type: String, default: "active", enum: ["active", "blocked"], index: true },
+    role: { type: String, default: "user", enum: ["user"] },
 
     // ✅ Account page fields — ye pehle schema mein the hi nahi,
     // isliye avatar save aur preferences silently drop ho rahe the
@@ -50,7 +52,8 @@ const userSchema = new mongoose.Schema(
     is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
   },
-  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
+  // Collection: customer_users (pehle "users") — scripts/renameAuthCollections.js
+  { timestamps: { createdAt: "created_at", updatedAt: "updated_at" }, collection: "customer_users" },
 );
 
 userSchema.methods.softDelete = function (userId) {
@@ -59,5 +62,11 @@ userSchema.methods.softDelete = function (userId) {
   this.deletedby = userId;
   return this.save();
 };
+
+
+// ── Multi-tenant ──
+userSchema.plugin(tenantScope); // har store ka data alag (storeId)
+userSchema.index({ storeId: 1, username: 1 }, { unique: true }); // unique per store
+userSchema.index({ storeId: 1, email: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("User", userSchema);

@@ -1,9 +1,45 @@
 const path = require("path");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("./roles");
 const fs = require("fs");
 const crypto = require("crypto");
 const log = require("./logger");
+const { isPlatformFamilyHost } = require("./tenantHost");
+// Lazy: middleware/resolveStore → models/Store; circular require se bachne ke liye function ke andar
+const resolveStoreByHost = (host) => require("../middleware/resolveStore").resolveStoreByHost(host);
+
+const { runWithStore, getStoreId } = require("./tenantContext");
 
 let io = null;
+
+// ==========================================
+// TENANT-AWARE IO (multi-tenant broadcasts)
+// ------------------------------------------
+// Store context (HTTP request / socket event jo kisi store host par ho) me:
+//   io.emit(ev)          → sirf usi store ke sockets  (room "store:<id>")
+//   io.to("chat:admins") → sirf usi store ke admins   (room "chat:admins:<id>")
+// Baaki rooms (employee:<id>, chat:conversation:<id> ...) pehle se unique IDs hain.
+// Platform context (super admin) me sab kuch pehle jaisa global.
+// ==========================================
+const storeRoom = (storeId) => `store:${storeId}`;
+const SHARED_ROOMS = new Set(["chat:admins"]);
+const mapRoom = (room, storeId) =>
+  typeof room === "string" && SHARED_ROOMS.has(room) ? `${room}:${storeId}` : room;
+
+function createTenantIO(server) {
+  return new Proxy(server, {
+    get(target, prop) {
+      const storeId = getStoreId();
+      if (storeId) {
+        if (prop === "emit") return (...args) => target.to(storeRoom(storeId)).emit(...args);
+        if (prop === "to" || prop === "in") {
+          return (room) => target.to(Array.isArray(room) ? room.map((r) => mapRoom(r, storeId)) : mapRoom(room, storeId));
+        }
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
 
 // ==========================================
 // HELPER: COMPRESS & SAVE LOGO
@@ -21,9 +57,11 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
   const maxSize = configuredMaxSize * 1024 * 1024;
   if (rawBuffer.length > maxSize) throw new Error(`Image too large (max ${configuredMaxSize}MB)`);
 
-  const uploadDir = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
-  const storeDir = path.join(uploadDir, process.env.STORE_UPLOAD_SUBDIR || "store");
+  // Store ka apna folder: uploads/stores/<storeId>/store (socket event runWithStore me chalta hai)
+  const { uploadDirFor, uploadUrlFor } = require("./uploadPaths");
+  const storeDir = uploadDirFor(null, process.env.STORE_UPLOAD_SUBDIR || "store");
   if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
+  const relativeFor = (filePath) => uploadUrlFor(filePath).slice(1);
 
   const safeName = (fileName || "logo")
     .replace(/\s+/g, "-")
@@ -42,7 +80,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     const filePath = path.join(storeDir, finalName);
     fs.writeFileSync(filePath, rawBuffer);
     verifyFile(filePath, "SVG");
-    return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: `uploads/store/${finalName}` };
+    return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: relativeFor(filePath) };
   }
 
   // ⚠️ WEBP (alpha support) — JPEG me alpha channel nahi hota, is liye transparent
@@ -58,7 +96,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
       .webp({ quality: 88, alphaQuality: 100, effort: 4 })
       .toFile(filePath);
     const savedSize = verifyFile(filePath, "WebP");
-    return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: `uploads/store/${finalName}` };
+    return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: relativeFor(filePath) };
   } catch (err) {
     log.warn("⚠️ Sharp compression failed, saving raw:", err.message);
     const fallbackExt = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
@@ -66,7 +104,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     const fallbackPath = path.join(storeDir, fallbackName);
     fs.writeFileSync(fallbackPath, rawBuffer);
     const savedSize = verifyFile(fallbackPath, "Raw fallback");
-    return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: savedSize, relativePath: `uploads/store/${fallbackName}` };
+    return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: savedSize, relativePath: relativeFor(fallbackPath) };
   }
 };
 
@@ -113,17 +151,10 @@ const deleteOldLogo = async (logoUrlOverride) => {
     if (existing?.logo?.img_url) {
       const imgUrl = logoUrlOverride ?? existing.logo.img_url;
       if (!imgUrl) return;
-      const uploadDir = path.resolve(__dirname, "..", process.env.UPLOAD_DIR || "uploads");
-      const storeSubdirectory = process.env.STORE_UPLOAD_SUBDIR || "store";
-      const fileName = path.basename(imgUrl);
-      const possiblePaths = [
-        path.join(uploadDir, storeSubdirectory, fileName),
-        path.join(__dirname, "..", "uploads", "store", fileName),
-        path.isAbsolute(imgUrl) ? imgUrl : null,
-      ].filter(Boolean);
-      for (const p of possiblePaths) {
-        if (fs.existsSync(p)) { fs.unlinkSync(p); break; }
-      }
+      // Sirf isi store ki (ya purani shared uploads/store) file — pehle absolute
+      // path bhi maana jata tha (img_url se koi bhi server file mit sakti thi)
+      const filePath = require("./uploadPaths").localPathForUrl(null, imgUrl);
+      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
   } catch (e) { log.error("❌ deleteOldLogo error:", e.message); }
 };
@@ -186,7 +217,6 @@ const needsPermissionMigration = (perms) => {
 // ==========================================
 const initSocket = (server) => {
   const { Server } = require("socket.io");
-  const jwt = require("jsonwebtoken");
 
   const uploadDir = path.join(__dirname, "../uploads");
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -198,7 +228,7 @@ const initSocket = (server) => {
     .join(",");
   const allowedOrigins = allowedOriginsEnv.split(",").map(u => u.trim()).filter(Boolean);
 
-  io = new Server(server, {
+  io = createTenantIO(new Server(server, {
     cors: {
       origin: (origin, callback) => {
         if (!origin) return callback(null, true);
@@ -206,7 +236,13 @@ const initSocket = (server) => {
         if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$/.test(origin)) {
           return callback(null, true);
         }
-        callback(new Error("CORS not allowed"));
+        // Multi-tenant: *.<ROOT_DOMAIN> store subdomains + registered custom domains
+        let originHost;
+        try { originHost = new URL(origin).hostname; } catch { return callback(new Error("CORS not allowed")); }
+        if (isPlatformFamilyHost(originHost)) return callback(null, true);
+        resolveStoreByHost(originHost)
+          .then(({ store }) => (store ? callback(null, true) : callback(new Error("CORS not allowed"))))
+          .catch(() => callback(new Error("CORS not allowed")));
       },
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization"],
@@ -216,89 +252,46 @@ const initSocket = (server) => {
     pingTimeout: 60000,
     pingInterval: 25000,
     transports: ["polling", "websocket"],
+  }));
+
+  // ==========================================
+  // TENANT RESOLUTION — handshake Host se store
+  // (socket bhi page ke hostname par connect hota hai: alistore.<root>:5000)
+  // ==========================================
+  io.use(async (socket, next) => {
+    try {
+      const { tenant, store } = await resolveStoreByHost(socket.handshake.headers.host);
+      if (tenant.type !== "platform" && !store) return next(new Error("Store not found"));
+      socket.tenantStoreId = store ? String(store._id) : null;
+      return next();
+    } catch (error) {
+      return next(error);
+    }
   });
 
   // ==========================================
-  // ✅ GUEST-FRIENDLY AUTH MIDDLEWARE
-  // Connection pe sab ko allow, token optional
+  // ✅ GUEST-FRIENDLY AUTH MIDDLEWARE (store-bound)
+  // Connection pe sab ko allow, token optional. Identity DB se isi store ke
+  // context me load hoti hai (utils/socketAuth.js) — dusre store ka token,
+  // deleted/blocked account ya platform host → guest.
   // ==========================================
-  io.use((socket, next) => {
-    const rawCookie = socket.handshake.headers.cookie;
-
-    // ✅ Agar cookie/token nahi → guest user allow karo
-    if (!rawCookie) {
-      socket.userId = null;
-      socket.userRole = "guest";
-      socket.storeId = null;
-      socket.userName = "Guest";
-      socket.userPermissions = {};
-      return next();
-    }
-
-    const cookies = Object.fromEntries(
-      rawCookie.split("; ").map((c) => {
-        const [k, ...v] = c.split("=");
-        return [k.trim(), v.join("=")];
-      })
-    );
-
-    // ✅ Access token expire ho jaye toh refresh token se identity recover karo
-    // (REST interceptor bhi yehi karta hai — warna socket reconnect pe "guest" ban jata hai)
-    const tryRefreshAuth = () => {
-      const rt = cookies.refreshToken;
-      if (!rt) return false;
-      try {
-        const rDecoded = jwt.verify(rt, process.env.JWT_SECRET);
-        if (!rDecoded.userId && !rDecoded.id) return false;
-        socket.userId = rDecoded.userId || rDecoded.id;
-        socket.userType = rDecoded.type || "user";
-        socket.userRole = (rDecoded.role || "user").toLowerCase();
-        socket.storeId = rDecoded.storeId || null;
-        socket.userName = rDecoded.name || "User";
-        socket.userPermissions = rDecoded.permissions || {};
-        return true;
-      } catch (e) {
-        return false;
-      }
-    };
-
-    const token = cookies.accessToken || cookies.auth_token || cookies.access_token;
-
-    // ✅ Token nahi → refresh se try, warna guest allow
-    if (!token) {
-      if (!tryRefreshAuth()) {
-        socket.userId = null;
-        socket.userRole = "guest";
-        socket.storeId = null;
-        socket.userName = "Guest";
-        socket.userPermissions = {};
-      }
-      return next();
-    }
-
+  const { resolveSocketIdentity } = require("./socketAuth");
+  io.use(async (socket, next) => {
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (!decoded.userId && !decoded.id) {
-        return next(new Error("Invalid token payload"));
-      }
-      socket.userId = decoded.userId || decoded.id;
-      socket.userType = decoded.type || 'user';
-      socket.userRole = (decoded.role || "user").toLowerCase();
-      socket.storeId = decoded.storeId || null;
-      socket.userName = decoded.name || "User";
-      socket.userPermissions = decoded.permissions || {};
-      next();
+      const identity = await resolveSocketIdentity({
+        cookieHeader: socket.handshake.headers.cookie,
+        tenantStoreId: socket.tenantStoreId,
+        // Client batata hai kaun sa session: admin panel "admin", storefront "user"
+        aud: socket.handshake.auth?.aud,
+      });
+      Object.assign(socket, identity);
     } catch (error) {
-      // ✅ Access token expired/invalid → refresh token se try, warna guest
-      if (!tryRefreshAuth()) {
-        socket.userId = null;
-        socket.userRole = "guest";
-        socket.storeId = null;
-        socket.userName = "Guest";
-        socket.userPermissions = {};
-      }
-      next();
+      Object.assign(socket, {
+        userId: null, userType: "guest", userRole: "guest", userName: "Guest",
+        userPermissions: {}, storeId: null, sellerPending: false, sessionId: null, needsRefresh: null,
+      });
     }
+    return next();
   });
 
   // ==========================================
@@ -313,8 +306,21 @@ const initSocket = (server) => {
     return true;
   };
 
+  const SELLER_PENDING_ERR = {
+    success: false,
+    code: "SELLER_PENDING",
+    message: "Your seller application is pending Super Admin approval. Changes are locked until it is approved.",
+  };
+
   const requireRole = (socket, allowedRoles, callback) => {
-    if (!allowedRoles.includes(socket.userRole)) {
+    if (socket.sellerPending) {
+      if (typeof callback === "function") callback(SELLER_PENDING_ERR);
+      return false;
+    }
+    // "admin" = koi bhi full-access role (owner "storehandler" + admin — utils/roles.js)
+    const allowed =
+      allowedRoles.includes(socket.userRole) || (allowedRoles.includes("admin") && isAdminRole(socket.userRole));
+    if (!allowed) {
       const err = { success: false, message: "Unauthorized — admin/employee access only" };
       if (typeof callback === "function") callback(err);
       return false;
@@ -332,7 +338,6 @@ const initSocket = (server) => {
   // - non-strict (REST checkPermission jaisa): sirf === false par deny
   // - NOTE: khud ki permission change karna updateEmployee me alag se blocked hai
   // ==========================================
-  const STAFF_ROLES = ["admin", "staff", "manager"];
 
   const requireSocketPermission = async (socket, permissionKey, callback, opts = {}) => {
     const role = String(socket.userRole || "guest").toLowerCase();
@@ -341,18 +346,30 @@ const initSocket = (server) => {
       if (typeof callback === "function") callback(err);
       return { allowed: false };
     }
-    if (role === "admin") {
-      return { allowed: true, permissions: socket.userPermissions || {}, name: socket.userName };
+    if (socket.sellerPending) {
+      if (typeof callback === "function") callback(SELLER_PENDING_ERR);
+      return { allowed: false };
     }
     try {
+      // Har event par DB se fresh (isi store ke context me — tenantScope).
+      // Admin bhi: connect ke baad demote / deactivate ho to foran asar.
       const Model = socket.userType === "employee"
         ? require("../models/Employee")
         : require("../models/User");
-      const doc = await Model.findById(socket.userId).select("name permissions").lean();
-      if (!doc) {
+      const doc = await Model.findById(socket.userId).select("name role permissions status is_deleted").lean();
+      if (!doc || doc.is_deleted || doc.status === "inactive" || doc.status === "blocked") {
         const err = { success: false, message: "User not found" };
         if (typeof callback === "function") callback(err);
         return { allowed: false };
+      }
+      const freshRole = String(doc.role || "").toLowerCase();
+      if (!STAFF_ROLES.includes(freshRole)) {
+        const err = { success: false, message: "Unauthorized — admin/employee access only" };
+        if (typeof callback === "function") callback(err);
+        return { allowed: false };
+      }
+      if (isAdminRole(freshRole)) {
+        return { allowed: true, permissions: doc.permissions || {}, name: doc.name || socket.userName };
       }
       const perms = doc.permissions || {};
       const ok = opts.strict
@@ -414,10 +431,19 @@ const initSocket = (server) => {
     };
   }
 
+  // Aakhri middleware: connection handler isi store ke context me chale
+  io.use((socket, next) => runWithStore(socket.tenantStoreId, next));
+
   // ==========================================
   // CONNECTION HANDLER
   // ==========================================
   io.on("connection", (socket) => {
+    // Har event handler bhi isi store ke context me (tenantScope plugin queries scope karta hai)
+    socket.use((packet, next) => runWithStore(socket.tenantStoreId, next));
+    if (socket.tenantStoreId) socket.join(storeRoom(socket.tenantStoreId));
+    // Access token expire tha (session marker maujood) → client refresh + reconnect kare
+    if (socket.needsRefresh) socket.emit("auth:refresh-needed", { aud: socket.needsRefresh });
+
     if (socket.userId) socket.join(`employee:${socket.userId}`);
     if (socket.userId && socket.userType === "user" && String(socket.userRole || "").toLowerCase() === "user") {
       socket.join(`chat:customer:${socket.userId}`);
@@ -425,13 +451,13 @@ const initSocket = (server) => {
 
     // Chat rooms are always joined through authenticated, server-side authorization.
     socket.on("chat:inbox:join", async (callback) => {
-      if (socket.userType !== "employee" || !["admin", "manager", "staff"].includes(String(socket.userRole || "").toLowerCase())) {
+      if (socket.userType !== "employee" || !STAFF_ROLES.includes(String(socket.userRole || "").toLowerCase())) {
         if (typeof callback === "function") callback({ success: false, message: "Support access required" });
         return;
       }
       const gate = await requireSocketPermission(socket, "order", callback);
       if (!gate.allowed) return;
-      socket.join("chat:admins");
+      socket.join(socket.tenantStoreId ? `chat:admins:${socket.tenantStoreId}` : "chat:admins");
       try {
         const ChatConversation = require("../models/ChatConversation");
         const [row] = await ChatConversation.aggregate([{ $group: { _id: null, total: { $sum: "$unread_admin_count" } } }]);
@@ -456,7 +482,7 @@ const initSocket = (server) => {
           return;
         }
         let allowed = socket.userType === "user" && String(conversation.customer_id) === String(socket.userId);
-        if (socket.userType === "employee" && ["admin", "manager", "staff"].includes(String(socket.userRole || "").toLowerCase())) {
+        if (socket.userType === "employee" && STAFF_ROLES.includes(String(socket.userRole || "").toLowerCase())) {
           const gate = await requireSocketPermission(socket, "order", callback);
           allowed = gate.allowed;
         }
@@ -508,7 +534,18 @@ const initSocket = (server) => {
       socket.to(room).emit("chat:typing", { conversation_id: id, sender_type: senderType, isTyping: payload.isTyping });
     });
 
-    socket.on("join:employee", (employeeId) => socket.join(`employee:${employeeId}`));
+    // Employee room me private events (permissionsUpdated waghera) jaate hain →
+    // sirf apna room, ya admin isi store ke kisi employee ka (scoped lookup).
+    socket.on("join:employee", async (employeeId) => {
+      try {
+        const id = String(employeeId || "");
+        if (!id || socket.userType !== "employee") return;
+        if (id === String(socket.userId)) return socket.join(`employee:${id}`);
+        if (!isAdminRole(socket.userRole) || !require("mongoose").isValidObjectId(id)) return;
+        const exists = await require("../models/Employee").exists({ _id: id });
+        if (exists) socket.join(`employee:${id}`);
+      } catch (e) { /* ignore */ }
+    });
     socket.on("leave:employee", (employeeId) => socket.leave(`employee:${employeeId}`));
 
     // ========== SHIPPING EVENTS (Admin-only for write, public for read) ==========
@@ -698,6 +735,8 @@ const initSocket = (server) => {
 
     socket.on("updateProfile", async (payload, callback) => {
       if (!requireAuth(socket, callback)) return;
+      // REST jaisa: pending seller sirf dekh sakta hai, badal nahi sakta
+      if (socket.sellerPending) { if (typeof callback === "function") callback(SELLER_PENDING_ERR); return; }
       try {
         const { updateProfileInfo } = require("../controllers/userController");
         const req = {
@@ -715,11 +754,15 @@ const initSocket = (server) => {
 
     socket.on("changePassword", async (payload, callback) => {
       if (!requireAuth(socket, callback)) return;
+      // REST jaisa: pending seller sirf dekh sakta hai, badal nahi sakta
+      if (socket.sellerPending) { if (typeof callback === "function") callback(SELLER_PENDING_ERR); return; }
       try {
         const { changePasswordSocket } = require("../controllers/userController");
         const req = {
           user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
           userType: socket.userType || 'user',
+          // Password badalne par baaki sessions revoke — ye wala (current) bacha rahe
+          sessionId: socket.sessionId || null,
           body: payload, io
         };
         const res = { status: () => ({ json: (d) => { if (callback) callback(d); } }), json: (d) => { if (callback) callback(d); } };
@@ -979,19 +1022,24 @@ const initSocket = (server) => {
     });
 
     // ========== RELAY EVENTS ==========
-    socket.on("productCreated", (p) => socket.broadcast.emit("productCreated", p));
-    socket.on("productUpdated", (p) => socket.broadcast.emit("productUpdated", p));
-    socket.on("productDeleted", (id) => socket.broadcast.emit("productDeleted", id));
-    socket.on("employeeRelayCreated", (d) => socket.broadcast.emit("employeeCreated", { success: true, data: d }));
-    socket.on("employeeRelayUpdated", (d) => socket.broadcast.emit("employeeUpdated", { success: true, data: d }));
-    socket.on("employeeRelayDeleted", (id) => socket.broadcast.emit("employeeDeleted", { success: true, data: { id } }));
-    socket.on("employeeRelayStatusToggled", (d) => socket.broadcast.emit("employeeStatusToggled", { success: true, data: d }));
+    socket.on("productCreated", (p) => relayToStore(socket).emit("productCreated", p));
+    socket.on("productUpdated", (p) => relayToStore(socket).emit("productUpdated", p));
+    socket.on("productDeleted", (id) => relayToStore(socket).emit("productDeleted", id));
+    socket.on("employeeRelayCreated", (d) => relayToStore(socket).emit("employeeCreated", { success: true, data: d }));
+    socket.on("employeeRelayUpdated", (d) => relayToStore(socket).emit("employeeUpdated", { success: true, data: d }));
+    socket.on("employeeRelayDeleted", (id) => relayToStore(socket).emit("employeeDeleted", { success: true, data: { id } }));
+    socket.on("employeeRelayStatusToggled", (d) => relayToStore(socket).emit("employeeStatusToggled", { success: true, data: d }));
 
     socket.on("disconnect", (reason) => {});
   });
 
   return io;
 };
+
+/** socket.broadcast ka store-safe version: sirf usi store ke baaki sockets */
+function relayToStore(socket) {
+  return socket.tenantStoreId ? socket.to(storeRoom(socket.tenantStoreId)) : socket.broadcast;
+}
 
 const getIO = () => {
   if (!io) throw new Error("Socket.IO not initialized! Call initSocket(server) first.");

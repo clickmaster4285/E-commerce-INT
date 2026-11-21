@@ -41,7 +41,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useSelector } from "react-redux";
 import { DEFAULT_LOCALE, isRtl } from "@/i18n/config";
-import { translate } from "@/i18n/translations";
+import { translate, loadLocale, isLocaleLoaded } from "@/i18n/translations";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -73,6 +73,21 @@ export default function LanguageTransition({
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState("cover");
   const [logoFailed, setLogoFailed] = useState(false);
+
+  // The "switching language" label is shown in the TARGET language. Start
+  // downloading that language as soon as the curtain opens (this also warms
+  // the cache so changeLocale() in onSwitch resolves instantly), then
+  // re-render once it is ready.
+  const [, setTargetLoaded] = useState(() => isLocaleLoaded(locale));
+  useEffect(() => {
+    let alive = true;
+    loadLocale(locale).then(() => {
+      if (alive) setTargetLoaded(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [locale]);
 
   // Store identity is optional to pass — fall back to the same Redux slice the
   // sidebar and login pages read, so callers can render this with nothing.

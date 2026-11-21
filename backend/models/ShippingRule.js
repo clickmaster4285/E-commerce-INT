@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const shippingRuleSchema = new mongoose.Schema(
   {
@@ -16,5 +17,9 @@ const shippingRuleSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+
+// ── Multi-tenant ──
+shippingRuleSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("ShippingRule", shippingRuleSchema);

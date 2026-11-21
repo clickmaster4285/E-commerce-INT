@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const employeeSchema = new mongoose.Schema(
   {
@@ -12,21 +13,26 @@ const employeeSchema = new mongoose.Schema(
     },
     translation_source: { name: { type: String, default: "" } },
     translation_status: { name: { type: String, default: "pending" } },
-    username: { type: String, required: true, unique: true, trim: true },
+    // Multi-tenant: unique sirf store ke andar ({storeId, username} / {storeId, email}
+    // neeche). Seller OWNER email phir bhi poore platform me ek hi store ka — utils/sellerOwnership.js
+    username: { type: String, required: true, trim: true },
     email: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
       lowercase: true,
     },
     password: { type: String, required: true, minlength: 6 },
     phone: { type: String, default: "", trim: true },
+    // storehandler = store owner (seller signup). Dekho utils/roles.js
     role: {
       type: String,
       default: "staff",
-      enum: ["user", "admin", "staff", "manager"],
+      enum: ["storehandler", "admin", "manager", "staff"],
     },
+    // Seller-owner account created at signup stays pending until Super Admin approves.
+    // While pending: the admin panel opens in read-only mode (GETs allowed, mutations blocked).
+    seller_pending: { type: Boolean, default: false, index: true },
     status: { type: String, default: "active", enum: ["active", "inactive"] },
     // Profile picture — optimized data URL (Employees form se set hoti hai)
     avatar: { type: String, default: "" },
@@ -81,14 +87,14 @@ const employeeSchema = new mongoose.Schema(
     address: { type: String, default: "", trim: true },
 
     // --- HR & Organizational Details ---
-    employeeCode: { type: String, default: "", trim: true },
-    department: { type: String, default: "", trim: true },
+    employeeCode: { type: String, trim: true },
+    department: { type: String, trim: true },
 
-    // --- Performance & Stats ---
-    ordersHandled: { type: Number, default: 0 },
-    salesGenerated: { type: Number, default: 0 },
-    productsAdded: { type: Number, default: 0 },
-    performanceRating: { type: Number, default: 0 },
+    // --- Performance & Stats (only present once actually used) ---
+    ordersHandled: { type: Number },
+    salesGenerated: { type: Number },
+    productsAdded: { type: Number },
+    performanceRating: { type: Number },
 
     // --- Activities Log ---
     activities: [
@@ -139,10 +145,21 @@ const employeeSchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+    // Collection: admin_users (pehle "employees") — scripts/renameAuthCollections.js
+    collection: "admin_users",
   }
 );
 
 employeeSchema.index({ "activities.timestamp": -1 });
 employeeSchema.index({ storeId: 1, department: 1 });
+// Per-store unique (purane global unique indexes migrateTenantIndexes.js hatata hai)
+employeeSchema.index({ storeId: 1, email: 1 }, { unique: true });
+employeeSchema.index({ storeId: 1, username: 1 }, { unique: true });
+// Platform login (seller owner by email, saare stores)
+employeeSchema.index({ email: 1 });
+
+
+// ── Multi-tenant ──
+employeeSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Employee", employeeSchema);

@@ -9,6 +9,8 @@ export const authApi = {
   // 🔑 Login / Register
   login: (data) => userHttp.post("/users/login", data).then((res) => res.data),
   register: (data) => userHttp.post("/users/register", data).then((res) => res.data),
+  // Signup step 1 — email/username/phone already taken? → { available, errors: { email?, username?, phone? }, code? }
+  checkRegistration: (data) => userHttp.post("/users/register/check", data).then((res) => res.data),
   googleCustomerLogin: (credential) =>
     userHttp.post("/users/google-customer-login", { credential }).then((res) => res.data),
 

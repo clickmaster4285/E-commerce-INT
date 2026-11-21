@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const invoiceItemSchema = new mongoose.Schema({
   product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
@@ -65,7 +66,7 @@ const invoiceActivitySchema = new mongoose.Schema({
 }, { _id: true });
 
 const invoiceSchema = new mongoose.Schema({
-  invoice_number: { type: String, unique: true, required: true, trim: true, index: true },
+  invoice_number: { type: String, required: true, trim: true, index: true },
   
   // Customer Reference (Only Customers, no Leads)
   customer_id: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true, index: true },
@@ -114,5 +115,10 @@ const invoiceSchema = new mongoose.Schema({
 
 invoiceSchema.index({ status: 1, due_date: 1, created_at: -1 });
 invoiceSchema.index({ customer_name: 1 });
+
+
+// ── Multi-tenant ──
+invoiceSchema.plugin(tenantScope); // har store ka data alag (storeId)
+invoiceSchema.index({ storeId: 1, invoice_number: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("Invoice", invoiceSchema);

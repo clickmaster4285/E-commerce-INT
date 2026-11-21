@@ -1,5 +1,6 @@
 
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const posSaleItemSchema = new mongoose.Schema(
   {
@@ -83,7 +84,6 @@ const posSaleSchema = new mongoose.Schema(
     sale_number: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
 
@@ -231,5 +231,10 @@ const posSaleSchema = new mongoose.Schema(
 
 posSaleSchema.index({ customer_id: 1, created_at: -1 });
 posSaleSchema.index({ created_at: -1 });
+
+
+// ── Multi-tenant ──
+posSaleSchema.plugin(tenantScope); // har store ka data alag (storeId)
+posSaleSchema.index({ storeId: 1, sale_number: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("PosSale", posSaleSchema);

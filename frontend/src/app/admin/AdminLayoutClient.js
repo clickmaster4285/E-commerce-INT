@@ -1,16 +1,21 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { isAdminRole } from "@/lib/roles";
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Sidebar from '../../components/adminComponents/Sidebar';
 import Navbar from '../../components/adminComponents/Navbar';
 import adminHttp from '@/apis/axiosInstance';
+import { notifySellerPendingLocked } from '@/apis/sellerPendingToast';
+import { toast } from 'sonner';
 import Cookies from 'js-cookie';
 import { useStoreSocketSync } from '../../hooks/admin/useStoreSocketSync';
 import { useShippingSocketSync } from '../../hooks/admin/useShippingSocketSync';
 import { useOrderSocketSync } from '../../hooks/admin/useOrderSocketSync';
 import { io } from 'socket.io-client';
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { useTranslation } from '../../i18n/LanguageProvider';
 
 // ==========================================
@@ -52,6 +57,11 @@ const KNOWN_ADMIN_ROUTE_PREFIXES = [
   '/admin/access-denied',
 ];
 
+// Pending seller = view-only. Writes are blocked by the click guard below AND
+// by the API (403 SELLER_PENDING). Leading glyphs/icons ignored: "+ Add Brand".
+const SELLER_PENDING_ACTION_REGEX =
+  /^[^a-z0-9]*(add|create|new|save|update|edit|delete|remove|archive|duplicate|approve|publish|submit|confirm|refund|ship|send|assign|restore|reset|import|upload|bulk)\b/i;
+
 // ==========================================
 // SINGLETON SOCKET
 // ==========================================
@@ -62,15 +72,17 @@ function getLayoutPermSocket() {
     return layoutPermSocket;
   }
 
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
 
   layoutPermSocket = io(SOCKET_URL, {
     withCredentials: true,
+    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,
   });
+  attachSocketAuthSync(layoutPermSocket, "admin");
 
   return layoutPermSocket;
 }
@@ -187,7 +199,10 @@ export default function AdminLayout({ children }) {
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     retry: false,
-    refetchOnWindowFocus: false,
+    // Pending seller: approval check (har 45s + tab focus par) taake approve hote hi
+    // panel khud unlock ho jaye. Approved users par koi polling nahi.
+    refetchInterval: (query) => (query.state.data?.seller_pending ? 45 * 1000 : false),
+    refetchOnWindowFocus: (query) => (query.state.data?.seller_pending ? 'always' : false),
   });
 
   // ==========================================
@@ -228,7 +243,7 @@ export default function AdminLayout({ children }) {
     // ==========================================
     const role = userData?.role?.toLowerCase();
 
-    if (role === 'admin') {
+    if (isAdminRole(role)) {
       return {
         isAuthenticated: true,
         checkComplete: true,
@@ -346,6 +361,93 @@ export default function AdminLayout({ children }) {
   }, [authResult, router, userQueryError]);
 
   // ==========================================
+  // PENDING SELLER LOCK — view-only panel
+  // Clicks on any write action (Add/Save/Delete/Send/…) are swallowed here and
+  // answered with a professional "awaiting approval" notice. Icon-only buttons
+  // that can't be label-matched are still stopped by the API-layer 403 toast.
+  // ==========================================
+  const pendingLock = !!userData?.seller_pending;
+
+  // Pending → approved (isi session me) — seller ko batao ke store live hai
+  const wasPendingRef = useRef(false);
+  useEffect(() => {
+    if (!userData) return;
+    if (wasPendingRef.current && !pendingLock) {
+      toast.success('Your store has been approved!', {
+        id: 'seller-approved',
+        description: 'Your store is now live and your admin panel is fully unlocked. You can start adding products.',
+        duration: 8000,
+      });
+    }
+    wasPendingRef.current = pendingLock;
+  }, [pendingLock, userData]);
+
+  useEffect(() => {
+    if (!pendingLock) return undefined;
+    const onClickCapture = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const control = target.closest(
+        'button, [role="button"], a, input[type="submit"], input[type="button"]'
+      );
+      if (!control) return;
+      const label = (
+        control.textContent ||
+        control.getAttribute('aria-label') ||
+        control.getAttribute('value') ||
+        control.getAttribute('title') ||
+        ''
+      )
+        .trim()
+        .slice(0, 90);
+      if (!label) return;
+      if (SELLER_PENDING_ACTION_REGEX.test(label)) {
+        event.preventDefault();
+        event.stopPropagation();
+        notifySellerPendingLocked();
+      }
+    };
+    document.addEventListener('click', onClickCapture, true);
+    return () => document.removeEventListener('click', onClickCapture, true);
+  }, [pendingLock]);
+
+  // ==========================================
+  // PENDING SELLER WELCOME DIALOG
+  // Signup ke baad admin panel khulte hi ek baar (har browser session) batao ke
+  // account approval ka wait kar raha hai. Banner neeche hamesha rehta hai.
+  // ==========================================
+  const [pendingNoticeClosed, setPendingNoticeClosed] = useState(false);
+  const pendingNoticeKey = userData?._id ? `seller-pending-notice:${userData._id}` : null;
+  const pendingNoticeSeen = (() => {
+    if (!pendingNoticeKey || typeof window === 'undefined') return true;
+    try {
+      return window.sessionStorage.getItem(pendingNoticeKey) === '1';
+    } catch {
+      return false;
+    }
+  })();
+  const showPendingNotice = pendingLock && !isLoginPage && !pendingNoticeClosed && !pendingNoticeSeen;
+
+  const closePendingNotice = () => {
+    try {
+      if (pendingNoticeKey) window.sessionStorage.setItem(pendingNoticeKey, '1');
+    } catch {
+      // storage blocked — sirf is render ke liye band
+    }
+    setPendingNoticeClosed(true);
+  };
+
+  useEffect(() => {
+    if (!showPendingNotice) return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') closePendingNotice();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPendingNotice]);
+
+  // ==========================================
   // USER LOG
   // ==========================================
   useEffect(() => {
@@ -387,7 +489,7 @@ export default function AdminLayout({ children }) {
     if (
       isLoginPage ||
       !userData?._id ||
-      userData?.role?.toLowerCase() === 'admin'
+      isAdminRole(userData?.role)
     ) {
       return;
     }
@@ -441,7 +543,7 @@ export default function AdminLayout({ children }) {
         return undefined;
       };
       const routeRevoked =
-        String(nextRole).toLowerCase() !== 'admin' &&
+        !isAdminRole(nextRole) &&
         matchedRoute &&
         (matchedRoute[1] === 'dashboard'
           ? nextPermissions.dashboard === false
@@ -691,6 +793,73 @@ export default function AdminLayout({ children }) {
           onMenuClick={toggleSidebar}
           userData={userData}
         />
+
+        {/* Pending approval banner — seller account until the Super Admin approves it */}
+        {userData?.seller_pending ? (
+          <div
+            role="status"
+            className="mx-3 mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-[12px] font-medium text-amber-900"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-400/25 text-amber-700">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </span>
+            <p>
+              <strong className="font-bold">Your store application is pending Super Admin approval.</strong>{" "}
+              You can view all pages but cannot create or edit anything yet — we&apos;ll email you once it&apos;s approved.
+            </p>
+          </div>
+        ) : null}
+
+        {showPendingNotice ? (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) closePendingNotice();
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="seller-pending-title"
+              aria-describedby="seller-pending-desc"
+              className="w-full max-w-md rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-6 text-[var(--text-primary)] shadow-[0_24px_60px_-12px_rgba(15,23,42,0.45)] sm:p-7"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-400/15 text-amber-600" aria-hidden="true">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
+              <h2 id="seller-pending-title" className="mt-4 text-[19px] font-bold leading-tight">
+                Your account is pending approval
+              </h2>
+              <p id="seller-pending-desc" className="mt-2 text-[13.5px] leading-6 text-[var(--text-muted)]">
+                Welcome to your store admin panel. Your seller account has been created and is waiting for approval from our team.
+              </p>
+              <ul className="mt-4 space-y-2.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-secondary)] p-4 text-[13px] leading-5">
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 text-emerald-600" aria-hidden="true">✓</span>
+                  <span>You can explore every page of your admin panel.</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 text-amber-600" aria-hidden="true">●</span>
+                  <span>Creating and editing are locked until your account is approved.</span>
+                </li>
+                <li className="flex gap-2.5">
+                  <span className="mt-0.5 text-[#f57224]" aria-hidden="true">✉</span>
+                  <span>
+                    We&apos;ll email you{userData?.email ? <> at <strong className="font-semibold">{userData.email}</strong></> : null} as soon as you&apos;re approved.
+                  </span>
+                </li>
+              </ul>
+              <button
+                type="button"
+                autoFocus
+                onClick={closePendingNotice}
+                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl bg-[#f57224] px-5 text-[14px] font-semibold text-white transition hover:bg-[#e8651a] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/30"
+              >
+                Got it, let me explore
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Page */}
         {/* Keep the scrollport LTR so switching to an RTL locale does not move

@@ -1,5 +1,8 @@
 import axios from "axios";
 import { toast } from "sonner";
+import { notifySellerPendingLocked } from "@/apis/sellerPendingToast";
+import { alignBackendUrl } from "@/lib/tenantHost";
+import { hasAuthSession } from "@/lib/authSession";
 
 // ==========================================================
 // API BASE URL — single source of truth (frontend/.env driven)
@@ -27,33 +30,18 @@ if (!API_BASE_URL && typeof window !== "undefined") {
   );
 }
 
-const isLocalNetworkHost = (hostname) =>
-  hostname === "localhost" ||
-  hostname === "127.0.0.1" ||
-  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
-  /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
-  /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname);
-
-const getBaseURL = () => {
-  if (!API_BASE_URL || typeof window === "undefined") return API_BASE_URL;
-  try {
-    const apiUrl = new URL(API_BASE_URL);
-    const pageHost = window.location.hostname;
-    // Keep local development frontend and API on the same hostname. This makes
-    // localhost:3000 use localhost:5000 and LAN access use the same LAN IP,
-    // so the browser can send the HttpOnly auth cookies to both apps.
-    if (isLocalNetworkHost(apiUrl.hostname) && isLocalNetworkHost(pageHost)) {
-      apiUrl.hostname = pageHost;
-    }
-    return apiUrl.toString().replace(/\/+$/, "");
-  } catch {
-    return API_BASE_URL;
-  }
-};
+// Local development: API ko PAGE ke hostname par call karo (sirf port alag).
+// localhost:3000 → localhost:5000, 192.168.88.35:3000 → 192.168.88.35:5000,
+// alistore.192.168.88.35.nip.io:3000 → alistore.192.168.88.35.nip.io:5000
+// Is se HttpOnly auth cookies dono apps ko jaati hain aur backend Host se
+// store pehchanta hai. Logic: src/lib/tenantHost.js → alignBackendUrl
+const getBaseURL = () => alignBackendUrl(API_BASE_URL);
 
 const PUBLIC_AUTH_PATHS = [
   "/users/login",
   "/users/admin/login",
+  "/users/google-login",
+  "/users/admin/handoff/exchange",
   "/users/register",
   "/users/logout",
   "/users/send-email-otp",
@@ -64,6 +52,34 @@ const PUBLIC_AUTH_PATHS = [
 ];
 
 const USER_PUBLIC_AUTH_PATHS = PUBLIC_AUTH_PATHS.filter((path) => path !== "/users/admin/login");
+
+// Sirf logged-in customer ke endpoints. Guest (u_sess marker nahi) par request
+// bheji hi nahi jati — pehle har page par profile/wishlist 401 + refresh 401 aate the.
+const USER_ONLY_PATHS = [
+  "/users/profile",
+  "/users/me",
+  "/users/wishlist",
+  "/users/phone",
+  "/users/password",
+  "/users/change-password",
+  "/users/checkout-drafts",
+  "/cart",
+  "/orders/my",
+  "/addresses",
+  "/reviews/my",
+];
+const pathOf = (url) => String(url || "").split("?")[0];
+const isUserOnlyPath = (url) =>
+  USER_ONLY_PATHS.some((path) => pathOf(url) === path || pathOf(url).startsWith(`${path}/`));
+
+// Network ke baghair 401 jaisa error — callers pehle se 401 (guest) handle karte hain
+const guestError = (config) => {
+  const error = new Error("Not logged in");
+  error.config = config;
+  error.isGuest = true;
+  error.response = { status: 401, data: { success: false, message: "Not logged in" }, config };
+  return error;
+};
 const FRIENDLY_SESSION_EXPIRED = "Session expired. Please log in again.";
 
 const notifyUserSessionExpired = () => {
@@ -74,15 +90,26 @@ const notifyUserSessionExpired = () => {
   }
 };
 
-function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
+function createAuthHttp({ refreshUrl, publicAuthPaths, mode, guestBlockedPaths = null }) {
   const http = axios.create({ withCredentials: true });
   let refreshPromise = null;
 
   const startRefresh = () => {
     if (!refreshPromise) {
-      refreshPromise = http.post(refreshUrl, undefined, { timeout: 15000 }).finally(() => {
-        refreshPromise = null;
-      });
+      refreshPromise = http
+        .post(refreshUrl, undefined, { timeout: 15000 })
+        .then((response) => {
+          // Sockets naye access token ke saath reconnect karein (lib/socketAuthSync.js)
+          try {
+            window.dispatchEvent(new CustomEvent("auth-refreshed", { detail: { mode } }));
+          } catch {
+            // server rendering
+          }
+          return response;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
     }
     return refreshPromise;
   };
@@ -110,6 +137,11 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
   http.interceptors.request.use(
     (config) => {
       config.baseURL = getBaseURL();
+      // Backend ko batao kaun sa session (a_at admin / u_at customer) use kare —
+      // ek hi browser me customer + admin dono logged-in reh sakte hain
+      config.headers = config.headers || {};
+      config.headers["X-Auth-Aud"] = mode;
+      if (guestBlockedPaths?.(config.url) && !hasAuthSession(mode)) return Promise.reject(guestError(config));
       return config;
     },
     (error) => Promise.reject(error),
@@ -119,6 +151,11 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+
+      if (error.response?.status === 403 && error.response?.data?.code === "SELLER_PENDING") {
+        notifySellerPendingLocked();
+        return Promise.reject(error);
+      }
 
       const isChatRequest = originalRequest?.url?.includes("/chats/");
       if (error.response?.status === 429 && error.response?.data?.code !== "CHAT_MESSAGE_RATE_LIMIT" && !isChatRequest) {
@@ -130,8 +167,16 @@ function createAuthHttp({ refreshUrl, publicAuthPaths, mode }) {
         );
       }
 
+      if (error?.isGuest) return Promise.reject(error);
+
       const isPublicAuthRequest = publicAuthPaths.some((path) => originalRequest?.url?.includes(path));
       if (isPublicAuthRequest) return Promise.reject(error);
+
+      // Koi session hi nahi (marker nahi) → refresh ka fayda nahi, seedha 401
+      if (error.response?.status === 401 && !hasAuthSession(mode)) {
+        if (mode === "admin") redirectToAdminLogin();
+        return Promise.reject(error);
+      }
 
       if (error.response?.status === 401 && !originalRequest?._retry) {
         if (originalRequest?.url === refreshUrl) {
@@ -180,6 +225,7 @@ export const userHttp = createAuthHttp({
   refreshUrl: "/users/refresh-token",
   publicAuthPaths: USER_PUBLIC_AUTH_PATHS,
   mode: "user",
+  guestBlockedPaths: isUserOnlyPath,
 });
 
 export default axiosInstance;

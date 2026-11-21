@@ -1,5 +1,9 @@
 const crypto = require("crypto");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs");
+const sharp = require("sharp");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
@@ -9,12 +13,28 @@ const CheckoutDraft = require("../models/CheckoutDraft");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Employee = require("../models/Employee");
+const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
+const { suggestUsernames, uniqueUsername } = require("../utils/username");
+const { validateStoreAddress, slugifySubdomain } = require("../utils/tenantHost");
+
+/* Store web address check — format, reserved, kisi store ya doosre pending signup ne to nahi liya?
+   @returns {{ error: string|null, suggestion: string }} */
+const checkStoreSubdomain = async (raw, email) => {
+  const sub = String(raw || "").trim().toLowerCase();
+  const formatError = validateStoreAddress(sub);
+  if (formatError) return { error: formatError, suggestion: "" };
+  const taken =
+    (await Store.exists({ subdomain: sub }).setOptions({ skipTenantScope: true })) ||
+    (await PendingRegistration.exists({ subdomain: sub, email: { $ne: email || "" }, expiresAt: { $gt: new Date() } }));
+  if (!taken) return { error: null, suggestion: "" };
+  return { error: "This store address is already taken.", suggestion: await Store.generateUniqueSubdomain(sub) };
+};
 
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
@@ -24,73 +44,41 @@ const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "0");
 
-// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
-// jwt.sign "NaNm" jaise invalid expiresIn pe THROW kar deta hai (login/refresh
-// dono 500/401 → user logout). Is liye har value validated fallback ke saath.
-const getUserAccessDays = () => {
-  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 7;
+// Decode a base64 data URL (image) → sharp → uploads/store-logos/<name>.webp
+const STORE_LOGO_DIR = path.join(__dirname, "..", "uploads", "store-logos");
+const saveStoreLogoFromBase64 = async (raw) => {
+  const match = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(raw || "").trim());
+  if (!match) return null;
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > 4 * 1024 * 1024) return null;
+  if (!fs.existsSync(STORE_LOGO_DIR)) fs.mkdirSync(STORE_LOGO_DIR, { recursive: true });
+  const fileName = `logo-${Date.now()}-${crypto.randomBytes(6).toString("hex")}.webp`;
+  await sharp(buffer, { limitInputPixels: 20_000_000 })
+    .rotate()
+    .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 86 })
+    .toFile(path.join(STORE_LOGO_DIR, fileName));
+  return `/uploads/store-logos/${fileName}`;
 };
 
-const getAdminAccessMinutes = () => {
-  const minutes = Number(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES);
-  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
+// ✅ Tokens / cookies / sessions — har audience (user | admin) ke alag secrets,
+// cookies aur DB-backed rotating refresh sessions (utils/tokens.js)
+const tokens = require("../utils/tokens");
+const { findPlatformEmployee, sellerEmailTaken, SELLER_EMAIL_TAKEN_MESSAGE } = require("../utils/sellerOwnership");
+const { verifyGoogleIdToken } = require("../utils/googleAuth");
+
+// Frontend axios instance `X-Auth-Aud` bhejta hai — logout sirf usi session ka
+const audFromHeader = (req) => {
+  const hint = String(req.headers?.["x-auth-aud"] || "").trim().toLowerCase();
+  return hint === "admin" || hint === "user" ? hint : null;
 };
+const audForUserType = (userType) => (userType === "employee" ? "admin" : "user");
 
-const getRefreshTokenDays = () => {
-  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 30;
-};
-
-// type=user + role=user → lamba (din), baaki sab (employee type ya admin/staff/manager role) → minutes
-const isLongLivedUserToken = (type, role) =>
-  String(type || "user").toLowerCase() !== "employee" &&
-  String(role || "").toLowerCase() === "user";
-
-const getAccessExpiry = (type, role) =>
-  isLongLivedUserToken(type, role)
-    ? `${getUserAccessDays()}d`
-    : `${getAdminAccessMinutes()}m`;
-
-// ⚠️ Ye value JWT expiry se EXACTLY match karti hai. Pehle admin ke liye
-// hardcoded 1 ghanta tha jabki JWT sirf 10 min ka tha — mismatch se cookie
-// zinda rehta tha par token expire ho jata tha, aur har 401 pe refresh chain
-// race karke admin ko logout kar deta tha.
-const getAccessCookieMaxAge = (type, role) =>
-  isLongLivedUserToken(type, role)
-    ? getUserAccessDays() * 24 * 60 * 60 * 1000
-    : getAdminAccessMinutes() * 60 * 1000;
-
-const getRefreshCookieMaxAge = () => getRefreshTokenDays() * 24 * 60 * 60 * 1000;
-
-const generateTokens = (userId, role, type = 'user') => {
-  const accessToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: getAccessExpiry(type, role),
-  });
-  const refreshToken = jwt.sign({ userId, role, type }, process.env.JWT_SECRET, {
-    expiresIn: `${getRefreshTokenDays()}d`,
-  });
-  return { accessToken, refreshToken };
-};
-
-const getCookieOptions = (maxAge) => {
-  const requestedSameSite = String(process.env.AUTH_COOKIE_SAME_SITE || "lax").toLowerCase();
-  const sameSite = ["strict", "lax", "none"].includes(requestedSameSite) ? requestedSameSite : "lax";
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production" || sameSite === "none",
-    sameSite,
-    maxAge,
-    path: "/",
-  };
-};
-
-const clearAuthCookies = (res) => {
-  const { httpOnly, secure, sameSite, path } = getCookieOptions(0);
-  const options = { httpOnly, secure, sameSite, path };
-  res.clearCookie("accessToken", options);
-  res.clearCookie("refreshToken", options);
-};
+// Password badla → is account ke baaki sab sessions band (current wala bacha rahe)
+const revokeOtherSessions = (req, userType, subjectId) =>
+  tokens
+    .revokeAllForSubject(audForUserType(userType), subjectId, { exceptFamilyId: req.sessionId || null })
+    .catch((e) => log.error("revoke sessions failed:", e.message));
 
 // ==========================================
 // REGISTER (Customer only)
@@ -98,6 +86,66 @@ const clearAuthCookies = (res) => {
 // ==========================================
 // REGISTER (Customer only)
 // ==========================================
+// Public — signup Step 1 ke liye: email / username / phone pehle se liye hue to hain nahi?
+// Rules bilkul createUser wale hain (verified User, pending seller, PendingRegistration clashes)
+// taake user ko aakhri step ke bajaye pehle step par hi pata chal jaye.
+const checkRegistration = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const cleanUsername = String(req.body?.username || "").trim().toLowerCase();
+    const cleanPhone = normalizePhone(typeof req.body?.phone === "string" ? req.body.phone : "");
+    const errors = {};
+    let code;
+
+    if (email && isValidEmail(email)) {
+      // Seller ka account Employee me hota hai — pending application email se pakdo
+      const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("_id").lean();
+      if (pendingApp) {
+        code = "SELLER_PENDING";
+        errors.email = "An application for this email is already under review. Sign in to continue where you left off.";
+      } else {
+        const existingUser = await User.findOne({ email }).select("emailVerified").lean();
+        if (existingUser && existingUser.emailVerified !== false) errors.email = "This email is already registered";
+      }
+    }
+
+    if (cleanUsername) {
+      const clash =
+        (await User.findOne({ username: cleanUsername }).select("_id").lean()) ||
+        (await PendingRegistration.findOne({ username: cleanUsername, email: { $ne: email } }).select("_id").lean());
+      if (clash) errors.username = "This username is already taken";
+    }
+
+    if (cleanPhone) {
+      const clash =
+        (await User.findOne({ phone: cleanPhone }).select("_id").lean()) ||
+        (await PendingRegistration.findOne({ phone: cleanPhone, email: { $ne: email } }).select("_id").lean());
+      if (clash) errors.phone = "This phone number is already registered";
+    }
+
+    // Store web address (seller signup step 2)
+    let subdomainSuggestion = "";
+    if (typeof req.body?.subdomain === "string" && req.body.subdomain.trim()) {
+      const { error, suggestion } = await checkStoreSubdomain(req.body.subdomain, email);
+      if (error) errors.subdomain = error;
+      subdomainSuggestion = suggestion;
+    } else if (typeof req.body?.storeName === "string" && slugifySubdomain(req.body.storeName).length >= 3) {
+      subdomainSuggestion = await Store.generateUniqueSubdomain(req.body.storeName);
+    }
+
+    // Username taken ho, ya khali ho aur naam mil gaya ho → naam se professional suggestions
+    const name = String(req.body?.name || "").trim();
+    const suggestions = errors.username || (!cleanUsername && name.length >= 2)
+      ? await suggestUsernames(name, email, { excludeEmail: email })
+      : [];
+
+    return res.json({ success: true, available: Object.keys(errors).length === 0, errors, suggestions, ...(subdomainSuggestion ? { subdomainSuggestion } : {}), ...(code ? { code } : {}) });
+  } catch (error) {
+    log.error("[register/check] error:", error.message);
+    return res.status(500).json({ success: false, message: "Could not check availability. Please try again." });
+  }
+};
+
 const createUser = async (req, res) => {
   try {
     const { name, username, phone, email: rawEmail, password } = req.body;
@@ -106,6 +154,31 @@ const createUser = async (req, res) => {
     const rawPhone = typeof phone === "string" ? phone : "";
     const cleanPhone = normalizePhone(rawPhone);
     const cleanName = String(name || "").trim();
+
+    // Store host par signup = HAMESHA isi store ka customer (store-setup fields nahi).
+    // Seller signup (naya store) sirf platform host (landing/signup) par.
+    // Pehle wantsStore default true tha → storefront register form (jo store fields
+    // bhejta hi nahi) "Please enter your store name" 400 deta tha.
+    const signupStoreId = req.store?._id || null;
+    const wantsStore = !signupStoreId && String(req.body.wantsStore ?? true) !== "false";
+    if (!signupStoreId && !wantsStore) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer accounts are created on a store's website.",
+      });
+    }
+    const storeName = String(req.body.storeName || "").trim().slice(0, 140);
+    const storeSubdomain = String(req.body.subdomain || "").trim().toLowerCase();
+    const storeDescription = String(req.body.storeDescription || "").trim().slice(0, 2000);
+    const businessCategory = String(req.body.businessCategory || "").trim();
+    const businessType = ["individual", "registered_business"].includes(String(req.body.businessType || ""))
+      ? String(req.body.businessType)
+      : "individual";
+    const country = String(req.body.country || "").trim();
+    const city = String(req.body.city || "").trim();
+    const address = String(req.body.address || "").trim().slice(0, 300);
+    const zipCode = String(req.body.zipCode || "").trim().slice(0, 20);
+    const storeLogo = typeof req.body.storeLogo === "string" ? req.body.storeLogo : "";
 
     // ✅ Basic validation — User NAHI banega, sirf 400 milega
     const errors = {};
@@ -128,17 +201,65 @@ const createUser = async (req, res) => {
     }
     if (Object.keys(errors).length > 0)
       return res.status(400).json({ success: false, message: "Registration failed", errors });
+    if (wantsStore) {
+      if (!storeName || storeName.length < 1) errors.storeName = "Please enter your store name.";
+      if (!storeDescription) errors.storeDescription = "Please describe your store.";
+      if (!businessCategory) errors.businessCategory = "Please select a business category.";
+      if (!country) errors.country = "Please select a country.";
+      if (!city || city.trim().length < 2) errors.city = "Please enter your city.";
+      if (!address || address.trim().length < 5) errors.address = "Please enter a complete store address.";
+      if (!storeSubdomain) errors.subdomain = "Please choose your store web address.";
+      else {
+        const { error } = await checkStoreSubdomain(storeSubdomain, email);
+        if (error) errors.subdomain = error;
+      }
+    if (Object.keys(errors).length > 0)
+      return res.status(400).json({ success: false, message: "Registration failed", errors });
+    }
 
-    const finalUsername = cleanUsername || email.split("@")[0] + Math.floor(Math.random() * 9999);
+    // Username khali ho to naam se professional username (hamza.asif), email-prefix+random nahi
+    const finalUsername = cleanUsername || (await uniqueUsername(cleanName, email, { excludeEmail: email }));
 
-    // ✅ Verified User ka email dobara register nahi ho sakta
-    // (purane users me emailVerified undefined hota hai — unhe verified maana jata hai)
+    // ✅ Verified customer ka email dobara register nahi ho sakta
     const existingUser = await User.findOne({ email });
     if (existingUser && existingUser.emailVerified !== false) {
       return res.status(400).json({
         success: false,
         message: "Registration failed",
         errors: { email: "This email is already registered" },
+      });
+    }
+    // Pending seller (sirf Employee + SellerApplication) — same password par
+    // "continue where I left off" → read-only admin panel until approval.
+    const pendingApp = await SellerApplication.findOne({ email, status: "pending" })
+      .select("store_id")
+      .lean();
+    if (pendingApp) {
+      const employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
+        .setOptions({ skipTenantScope: true });
+      if (employee) {
+        const passwordMatches = await bcrypt.compare(String(password), employee.password || "");
+        if (passwordMatches) {
+          await tokens.issueSession(req, res, "admin", employee);
+          return res.json({
+            success: true,
+            pendingApproval: true,
+            message: "Your application is under review. You can explore your admin panel in read-only mode until it is approved.",
+          });
+        }
+      }
+      return res.status(403).json({
+        success: false,
+        code: "SELLER_PENDING",
+        message: "Your application is already under review. You will be notified by email once it is approved.",
+      });
+    }
+    // Option A: ek seller email sirf ek store ka owner (kisi bhi store ka admin / pending seller)
+    if (wantsStore && (await sellerEmailTaken(email))) {
+      return res.status(400).json({
+        success: false,
+        message: "Registration failed",
+        errors: { email: SELLER_EMAIL_TAKEN_MESSAGE },
       });
     }
     // ✅ Legacy adhoora User (fix se pehle OTP ke bina bana) — pending flow ke liye hata do
@@ -188,6 +309,15 @@ const createUser = async (req, res) => {
       await PendingRegistration.deleteOne({ _id: existingPending._id });
     }
 
+    let storeLogoUrl = "";
+    if (wantsStore && storeLogo) {
+      try {
+        storeLogoUrl = await saveStoreLogoFromBase64(storeLogo);
+      } catch (logoError) {
+        return res.status(400).json({ success: false, message: "Store logo could not be processed. Please upload a smaller JPG, PNG or WEBP image." });
+      }
+    }
+
     // ✅ OTP + hashes — DB me plain text kuch nahi jayega
     const code = generateOtpCode();
     const passwordHash = await bcrypt.hash(String(password), 10);
@@ -203,6 +333,17 @@ const createUser = async (req, res) => {
       existingPending.expiresAt = expiresAt;
       existingPending.attempts = 0;
       existingPending.lastSentAt = new Date();
+      existingPending.storeId = signupStoreId;
+      existingPending.storeName = wantsStore ? storeName : "";
+      existingPending.subdomain = wantsStore ? storeSubdomain : "";
+      existingPending.storeDescription = storeDescription;
+      existingPending.businessCategory = businessCategory;
+      existingPending.businessType = businessType;
+      existingPending.country = country;
+      existingPending.city = city;
+      existingPending.address = address;
+      existingPending.zipCode = zipCode;
+      if (storeLogoUrl) existingPending.storeLogoUrl = storeLogoUrl;
       await existingPending.save();
     } else {
       await PendingRegistration.create({
@@ -215,6 +356,17 @@ const createUser = async (req, res) => {
         expiresAt,
         attempts: 0,
         lastSentAt: new Date(),
+        storeId: signupStoreId,
+        storeName: wantsStore ? storeName : "",
+        subdomain: wantsStore ? storeSubdomain : "",
+        storeDescription,
+        businessCategory,
+        businessType,
+        country,
+        city,
+        address,
+        zipCode,
+        storeLogoUrl,
       });
     }
 
@@ -289,13 +441,27 @@ const loginUser = async (req, res) => {
           success: false,
           message: "This login is only for customers. Please use admin panel.",
         });
-    if (user.status === "inactive" || user.is_deleted)
+    if (user.status === "inactive" || user.status === "blocked" || user.is_deleted) {
+      // If it's a pending seller, tell them the application is under review
+      try {
+        const app = await SellerApplication.findOne({ email: user.email }).select("status").lean();
+        if (user.status === "blocked" && app && String(app.status).toLowerCase() === "pending") {
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your seller application is under review. You will be notified by email once it is approved.",
+          });
+        }
+      } catch (lookupError) {
+        console.error("[login] seller application lookup failed:", lookupError.message);
+      }
       return res
         .status(403)
         .json({
           success: false,
           message: "Your account is inactive. Please contact administrator.",
         });
+    }
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid)
       return res
@@ -325,13 +491,7 @@ const loginUser = async (req, res) => {
       },
       user._id,
     );
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role, 'user');
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(getRefreshCookieMaxAge()),
-    );
+    await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
       message: "Login successful",
@@ -361,7 +521,21 @@ const loginAdmin = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Please provide email and password" });
-    const employee = await Employee.findOne({ email }).select("-activities");
+    // Store host: isi store ka staff (tenant-scoped, email per-store unique).
+    // Platform host: koi store nahi → sirf seller OWNER (Option A: ek email ek store).
+    let employee;
+    if (req.store) {
+      employee = await Employee.findOne({ email: String(email).toLowerCase().trim() }).select("-activities");
+    } else {
+      const found = await findPlatformEmployee(email);
+      if (found.ambiguous) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is linked to more than one store. Please sign in from your store's address.",
+        });
+      }
+      employee = found.employee;
+    }
     if (!employee)
       return res
         .status(401)
@@ -370,7 +544,7 @@ const loginAdmin = async (req, res) => {
       return res
         .status(401)
         .json({ success: false, message: "Password incorrect" });
-    if (!["admin", "staff", "manager"].includes(employee.role))
+    if (!isStaffRole(employee.role))
       return res
         .status(403)
         .json({
@@ -403,13 +577,7 @@ const loginAdmin = async (req, res) => {
       },
       employee._id,
     );
-    const { accessToken, refreshToken } = generateTokens(employee._id, employee.role, 'employee');
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('employee', employee.role)));
-    res.cookie(
-      "refreshToken",
-      refreshToken,
-      getCookieOptions(getRefreshCookieMaxAge()),
-    );
+    await tokens.issueSession(req, res, "admin", employee);
     res.json({
       success: true,
       message: "Admin login successful",
@@ -429,80 +597,42 @@ const loginAdmin = async (req, res) => {
   }
 };
 
+// Customer refresh — u_rt (path-restricted cookie) rotate hota hai
 const refreshAccessToken = async (req, res) => {
   try {
-    const token = req.cookies.refreshToken;
-    if (!token)
-      return res
-        .status(401)
-        .json({ success: false, message: "Refresh token required" });
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userType = decoded.type || 'user';
-    const Model = userType === 'employee' ? Employee : User;
-    const user = await Model.findById(decoded.userId);
-    if (!user)
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    const { accessToken } = generateTokens(decoded.userId, user.role, userType);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge(userType, user.role)));
+    const result = await tokens.rotateSession(req, res, "user", async (id) => {
+      const user = await User.findById(id).select("_id role status is_deleted storeId").lean();
+      if (!user || user.is_deleted || user.status === "blocked" || user.status === "inactive") return null;
+      return user;
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
     log.error("refreshAccessToken error:", error);
     return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
-// Admin refresh alias. Explicit employee tokens and signed legacy admin tokens
-// are accepted; customer tokens are rejected.
+// Admin/employee refresh — a_rt rotate hota hai
 const refreshAdminAccessToken = async (req, res) => {
-  let decoded;
   try {
-    const token = req.cookies.refreshToken;
-    if (!token)
-      return res
-        .status(401)
-        .json({ success: false, message: "Refresh token required" });
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const adminRoles = ["admin", "staff", "manager"];
-    // Older admin sessions did not always include the `type` claim. Their
-    // signed role and matching Employee record let us safely migrate them.
-    if (decoded.type && decoded.type !== "employee") {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid refresh token" });
-    }
-    if (!decoded.type && !adminRoles.includes(String(decoded.role || "").toLowerCase())) {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "Invalid refresh token" });
-    }
-    const user = await Employee.findById(decoded.userId);
-    if (!user || user.is_deleted || user.status === "inactive" || !["admin", "staff", "manager"].includes(user.role)) {
-      clearAuthCookies(res);
-      return res
-        .status(401)
-        .json({ success: false, message: "User not found" });
-    }
-    const { accessToken } = generateTokens(decoded.userId, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
+    const result = await tokens.rotateSession(req, res, "admin", async (id) => {
+      const employee = await Employee.findById(id).select("_id role status is_deleted storeId").lean();
+      if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return null;
+      // Owner ("storehandler") / admin / manager / staff — utils/roles.js
+      if (!isStaffRole(employee.role)) return null;
+      return employee;
+    });
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
     res.json({ success: true, message: "Token refreshed" });
   } catch (error) {
-    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
-      clearAuthCookies(res);
-      return res.status(401).json({ success: false, message: "Invalid refresh token" });
-    }
     log.error("refreshAdminAccessToken error:", error);
     return res.status(500).json({ success: false, message: "Could not refresh session" });
   }
 };
 
 const logoutUser = async (req, res) => {
+  const auds = audFromHeader(req) ? [audFromHeader(req)] : ["admin", "user"];
   try {
     if (req.user?._id) {
       const io = req.io || getIO();
@@ -517,10 +647,13 @@ const logoutUser = async (req, res) => {
         req.user._id,
       );
     }
-    clearAuthCookies(res);
+    for (const aud of auds) {
+      await tokens.revokeCurrentSession(req, aud).catch((e) => log.error("logout revoke failed:", e.message));
+      tokens.clearAuthCookies(res, aud);
+    }
     res.json({ success: true, message: "Logged out successfully" });
   } catch (error) {
-    clearAuthCookies(res);
+    for (const aud of auds) tokens.clearAuthCookies(res, aud);
     res.json({ success: true, message: "Logged out successfully" });
   }
 };
@@ -572,17 +705,18 @@ const getMe = async (req, res) => {
       } catch (e) { /* ignore, fallback below */ }
       if (!storeDoc) storeDoc = entity.storeId || {};
     }
-    res.json({
-      success: true,
-      user: {
-        _id: entity._id,
-        name: entity.name,
-        username: entity.username,
-        email: entity.email,
-        phone: entity.phone || "",
-        role: entity.role,
-        status: entity.is_deleted ? "Inactive" : "Active",
-        avatar: entity.avatar || null,
+     res.json({
+       success: true,
+       user: {
+         _id: entity._id,
+         name: entity.name,
+         username: entity.username,
+         email: entity.email,
+         phone: entity.phone || "",
+         role: entity.role,
+         status: entity.is_deleted ? "Inactive" : "Active",
+         seller_pending: !!entity.seller_pending,
+         avatar: entity.avatar || null,
         permissions: entity.permissions || {
           dashboard: true, products: true, brands: true, categories: true,
           employees: true, discounts: true, deals: true, banners: true,
@@ -634,7 +768,7 @@ const updateProfile = async (req, res) => {
     await Model.findByIdAndUpdate(userId, update);
     // ✅ Store fields sirf 'store' permission par (admin bypass)
     const canEditStoreHere =
-      String(req.user?.role || "").toLowerCase() === "admin" ||
+      isAdminRole(req.user?.role) ||
       !!req.user?.permissions?.store;
     if (store && req.user.storeId && canEditStoreHere) {
       await Store.findByIdAndUpdate(req.user.storeId, {
@@ -679,6 +813,7 @@ const changePassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = req.user._id;
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     const io = req.io || getIO();
     await pushGlobalActivity(
       io,
@@ -785,7 +920,7 @@ const updateProfileInfo = async (req, res) => {
     // Socket path par req.user.permissions stale ho sakte hain — fresh load karo.
     let requesterRole = req.user?.role || "";
     let requesterStorePerm = req.user?.permissions?.store;
-    if (String(requesterRole).toLowerCase() !== "admin" && requesterStorePerm === undefined) {
+    if (!isAdminRole(requesterRole) && requesterStorePerm === undefined) {
       try {
         const reqDoc = await Model.findById(userId).select("role permissions").lean();
         if (reqDoc) {
@@ -795,7 +930,7 @@ const updateProfileInfo = async (req, res) => {
       } catch (e) { /* ignore — neeche deny hoga */ }
     }
     const canEditStore =
-      String(requesterRole).toLowerCase() === "admin" || !!requesterStorePerm;
+      isAdminRole(requesterRole) || !!requesterStorePerm;
     const userUpdateFields = {};
     if (name !== undefined) userUpdateFields.name = name;
     if (email !== undefined)
@@ -805,7 +940,7 @@ const updateProfileInfo = async (req, res) => {
     if (address !== undefined) userUpdateFields.address = address;
     userUpdateFields.updatedby = userId;
     const updatedUser = await Model.findByIdAndUpdate(userId, userUpdateFields, {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     })
       .select("-password")
@@ -839,10 +974,11 @@ const updateProfileInfo = async (req, res) => {
         ? await Store.findById(updatedUser.storeId)
         : null;
       if (!store) store = await Store.findOne();
-      if (!store) store = await Store.create({});
-      
-      Object.assign(store, storeUpdateFields);
-      updatedStore = await store.save();
+      // Blank store khud se nahi banta (multi-tenant)
+      if (store) {
+        Object.assign(store, storeUpdateFields);
+        updatedStore = await store.save();
+      }
       
       if (!updatedUser.storeId && updatedStore) {
         updatedUser.storeId = updatedStore._id;
@@ -889,6 +1025,7 @@ const changePasswordSocket = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     user.updatedby = userId;
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     return res.json({
       success: true,
       message: "Password changed successfully",
@@ -899,68 +1036,77 @@ const changePasswordSocket = async (req, res) => {
   }
 };
 
+// ==========================================
+// ADMIN / STAFF GOOGLE LOGIN
+// ------------------------------------------
+// Pehle token ka payload bina signature check decode hota tha (koi bhi email
+// likh kar bhej sakta tha) aur customer (User) collection me dhoonda jata tha.
+// Ab: Google se verify (utils/googleAuth.js) → isi store ka Employee
+// (platform par sirf seller owner) → loginAdmin jaisi checks → admin session.
+// Naya account kabhi nahi banta.
+// ==========================================
 const googleLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential)
-      return res.status(400).json({ message: "Google credential missing" });
-    const payload = JSON.parse(
-      Buffer.from(credential.split(".")[1], "base64").toString(),
-    );
-    const { email, name, picture } = payload;
-    if (!email)
-      return res
-        .status(400)
-        .json({ message: "No email found in Google account" });
-    let user = await User.findOne({ email });
-    if (!user) {
-      // ✅ SECURITY FIX: Naye Google users ko direct access NAHI milega
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access Denied. Your email is not registered as Staff/Admin. Please contact administrator." 
-      });
+    let google;
+    try {
+      google = await verifyGoogleIdToken(req.body?.credential);
+    } catch (error) {
+      return res.status(401).json({ success: false, message: error.message || "Invalid Google token" });
     }
 
-    // ✅ EXISTING USER ROLE CHECK
-    if (!["admin", "staff", "manager"].includes(user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Only administrators, managers and staff members can log in.",
-      });
+    let employee;
+    if (req.store) {
+      // Tenant-scoped: sirf isi store ka staff
+      employee = await Employee.findOne({ email: google.email }).select("-activities");
     } else {
-      if (user.role !== "user")
-        return res
-          .status(403)
-          .json({ message: "Admin/Staff cannot use customer Google login." });
-      if (!user.avatar && picture) {
-        user.avatar = picture;
-        await user.save();
+      const found = await findPlatformEmployee(google.email);
+      if (found.ambiguous) {
+        return res.status(409).json({
+          success: false,
+          message: "This email is linked to more than one store. Please sign in from your store's address.",
+        });
       }
+      employee = found.employee;
     }
-    // ⚠️ Pehle `type` payload me nahi tha → authMiddleware ise "user" maan kar
-    // User collection me dhoondta (Employee hai → "User not found" 401), aur
-    // admin refresh endpoint bhi is token ko reject kar deta tha. Ab type
-    // set hai + expiry/cookie dono ek hi helper se aate hain.
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role, "employee");
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge("employee", user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+
+    const denied = () =>
+      res.status(403).json({ success: false, message: "This Google account is not a staff member of this store." });
+    if (!employee || employee.is_deleted) return denied();
+    // Owner ("storehandler") / admin / manager / staff — utils/roles.js
+    if (!isStaffRole(employee.role)) return denied();
+    if (employee.status === "inactive")
+      return res.status(403).json({ success: false, message: "Your account is inactive. Please contact administrator." });
+
+    const io = req.io || getIO();
+    void pushGlobalActivity(
+      io,
+      {
+        action: `${employee.name} (${employee.role}) logged in to admin panel via Google`,
+        category: "Authentication",
+        performedBy: employee._id,
+        performedByName: employee.name,
+        details: { ip: req.ip, role: employee.role, provider: "google" },
+      },
+      employee._id,
+    );
+
+    await tokens.issueSession(req, res, "admin", employee);
     return res.json({
       success: true,
       message: "Google login successful",
       user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
+        id: employee._id,
+        name: employee.name,
+        username: employee.username,
+        phone: employee.phone,
+        email: employee.email,
+        role: employee.role,
+        avatar: employee.avatar || (google.picture || null),
       },
     });
   } catch (error) {
-    return res
-      .status(500)
-      .json({ message: "Google login failed", error: error.message });
+    log.error("googleLogin error:", error);
+    return res.status(500).json({ success: false, message: "Google login failed" });
   }
 };
 
@@ -969,28 +1115,15 @@ const googleLogin = async (req, res) => {
 // ==========================================
 const googleCustomerLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential)
-      return res.status(400).json({ success: false, message: "Google credential missing" });
-
-    let payload;
+    // Shared verify (aud + iss + exp + email_verified) — utils/googleAuth.js
+    let google;
     try {
-      const tokenRes = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
-      );
-      if (!tokenRes.ok)
-        return res.status(401).json({ success: false, message: "Invalid Google token" });
-      payload = await tokenRes.json();
-    } catch {
-      return res.status(401).json({ success: false, message: "Invalid Google token" });
+      google = await verifyGoogleIdToken(req.body?.credential);
+    } catch (error) {
+      return res.status(401).json({ success: false, message: error.message || "Invalid Google token" });
     }
-
-    if (payload.aud !== process.env.GOOGLE_CLIENT_ID)
-      return res.status(401).json({ success: false, message: "Invalid Google token" });
-
-    const { sub: googleId, email, name, picture, email_verified } = payload;
-    if (!email)
-      return res.status(400).json({ success: false, message: "Google account did not return an email" });
+    const { sub: googleId, email, name, picture } = google;
+    const email_verified = true; // verifyGoogleIdToken sirf verified email par aage jane deta hai
 
     let user = await User.findOne({ $or: [{ email }, { google_id: googleId }] });
 
@@ -1004,10 +1137,11 @@ const googleCustomerLogin = async (req, res) => {
       user = await User.findById(user._id);
     } else {
       const randomPassword = await bcrypt.hash(require("crypto").randomBytes(32).toString("hex"), 10);
-      const defaultStore = await Store.findOne();
+      // Customer isi host ke store ka hai; platform par koi store nahi (random store nahi)
+      const defaultStore = req.store || null;
       user = await User.create({
         name: name || email.split("@")[0],
-        username: email.split("@")[0] + Math.floor(Math.random() * 99999),
+        username: await uniqueUsername(name || email.split("@")[0], email),
         email,
         password: randomPassword,
         role: "user",
@@ -1033,9 +1167,7 @@ const googleCustomerLogin = async (req, res) => {
       user._id,
     );
 
-    const { accessToken, refreshToken } = generateTokens(user._id, user.role);
-    res.cookie("accessToken", accessToken, getCookieOptions(getAccessCookieMaxAge('user', user.role)));
-    res.cookie("refreshToken", refreshToken, getCookieOptions(getRefreshCookieMaxAge()));
+    await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
       message: "Google login successful",
@@ -1241,7 +1373,7 @@ const createCheckoutDraft = async (req, res) => {
     const checkoutDoc = await CheckoutDraft.findOneAndUpdate(
       { user_id: req.user._id },
       { $setOnInsert: { user_id: req.user._id } },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
     );
     const cutoff = new Date(now.getTime() - CHECKOUT_DRAFT_MAX_AGE_MS);
     const completedDrafts = checkoutDoc.drafts.filter((draft) => draft.status === "completed");
@@ -1436,7 +1568,7 @@ const updateProfileREST = async (req, res) => {
     if (name) update.name = name;
     if (username) update.username = username;
     const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
+    const user = await Model.findByIdAndUpdate(req.user._id, update, { returnDocument: "after" }).select("-password");
     res.json({ success: true, user });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
@@ -1451,10 +1583,87 @@ const changePasswordREST = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     await user.save();
+    await revokeOtherSessions(req, req.userType, user._id);
     res.json({ success: true, message: "Password changed successfully" });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
+// ==========================================
+// 🔀 STORE ADMIN HANDOFF (platform → store subdomain)
+// ------------------------------------------
+// Cookies host-only hain: platform (192.168.88.35.nip.io) par login/signup
+// ke baad seller store subdomain (alistore.192.168.88.35.nip.io) par logged-in
+// nahi hota. Platform par ek 2-minute, ek-baar wala token banta hai; store
+// subdomain ka /admin/handoff page usay exchange karke wahan cookies set karta hai.
+// ==========================================
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
+
+const { claimOnce } = require("../utils/oneTimeToken");
+
+const HANDOFF_TTL_SECONDS = 120;
+
+// @route POST /api/users/admin/handoff   (logged-in employee, platform host)
+const createStoreHandoff = async (req, res) => {
+  try {
+    if (req.userType !== "employee") {
+      return res.status(403).json({ success: false, message: "Only store staff can open a store admin panel." });
+    }
+    if (!req.user?.storeId) {
+      return res.status(404).json({ success: false, message: "No store is linked to this account." });
+    }
+    const store = await Store.findById(req.user.storeId).select("subdomain store_name").lean();
+    const baseUrl = storeAdminBaseUrl(store);
+    if (!baseUrl) return res.status(404).json({ success: false, message: "Store address is not configured." });
+
+    const token = jwt.sign(
+      { type: "store_handoff", employeeId: String(req.user._id), storeId: String(store._id), jti: crypto.randomUUID() },
+      process.env.JWT_SECRET,
+      { expiresIn: HANDOFF_TTL_SECONDS },
+    );
+    // Token URL ke #fragment me — server logs / Referer me nahi jata
+    res.json({
+      success: true,
+      data: { storeUrl: baseUrl, subdomain: store.subdomain, url: `${baseUrl}/admin-handoff#token=${encodeURIComponent(token)}` },
+    });
+  } catch (error) {
+    log.error("Create store handoff error:", error);
+    res.status(500).json({ success: false, message: "Could not open the store admin panel." });
+  }
+};
+
+// @route POST /api/users/admin/handoff/exchange   body: { token }   (store host, public)
+const exchangeStoreHandoff = async (req, res) => {
+  const invalid = () => res.status(401).json({ success: false, message: "This sign-in link is invalid or has expired. Please log in again." });
+  try {
+    if (!req.store) return invalid();
+    let decoded;
+    try {
+      decoded = jwt.verify(String(req.body?.token || ""), process.env.JWT_SECRET);
+    } catch {
+      return invalid();
+    }
+    if (decoded.type !== "store_handoff" || String(decoded.storeId) !== String(req.store._id)) return invalid();
+
+    // Single-use — Redis (ya Mongo fallback): restart / dusre server par bhi dobara nahi chalta
+    const remaining = decoded.exp - Math.floor(Date.now() / 1000);
+    if (!(await claimOnce("handoff", decoded.jti, remaining))) return invalid();
+
+    // Tenant-scoped: sirf isi store ka employee milega
+    const employee = await Employee.findById(decoded.employeeId).select("_id role status is_deleted name storeId").lean();
+    if (!employee || employee.is_deleted || employee.status === "inactive" || employee.status === "blocked") return invalid();
+
+    // Store host ka admin session — storeId isi store ka
+    await tokens.issueSession(req, res, "admin", { ...employee, storeId: req.store._id });
+    res.json({ success: true, message: "Signed in to your store." });
+  } catch (error) {
+    log.error("Exchange store handoff error:", error);
+    res.status(500).json({ success: false, message: "Could not sign in to the store." });
+  }
+};
+
 module.exports = {
+  createStoreHandoff,
+  exchangeStoreHandoff,
+  checkRegistration,
   createUser,
   loginUser,
   loginAdmin,

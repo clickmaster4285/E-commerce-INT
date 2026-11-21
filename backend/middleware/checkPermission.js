@@ -1,7 +1,14 @@
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 /**
  * Unified Permission Middleware
  * Compatible with separated User/Employee architecture
  */
+
+// Customer (userType "user") bhi isi middleware se guzarta hai sirf apni profile
+// ke liye (PUT /users/profile, /users/password). Baaki har key staff ki hai —
+// pehle customer ke paas permissions object hi nahi tha → `=== false` kabhi
+// true nahi hota tha aur customer token admin APIs par chal jata tha.
+const CUSTOMER_ALLOWED_KEYS = new Set(["profile"]);
 
 // ✅ Specific permission check
 const checkPermission = (permissionKey) => {
@@ -13,8 +20,16 @@ const checkPermission = (permissionKey) => {
       });
     }
 
+    if (req.userType !== "employee") {
+      if (CUSTOMER_ALLOWED_KEYS.has(permissionKey)) return next();
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Staff account required.",
+      });
+    }
+
     // Admin bypass
-    if (req.user.role?.toLowerCase() === "admin") {
+    if (isAdminRole(req.user.role)) {
       return next();
     }
 
@@ -37,7 +52,7 @@ const staffPermissionCheck = (req, res, next) => {
   }
 
   const role = req.user.role?.toLowerCase();
-  if (role === "admin" || role === "manager" || role === "staff") {
+  if (isStaffRole(role)) {
     return next();
   }
 
@@ -56,7 +71,7 @@ const adminMiddleware = (req, res, next) => {
     });
   }
 
-  if (req.user.role?.toLowerCase() === "admin") {
+  if (isAdminRole(req.user.role)) {
     return next();
   }
 

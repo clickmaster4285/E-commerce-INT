@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 // ==========================================
 // ⭐ PRODUCT REVIEW (delivered orders only)
@@ -99,5 +100,9 @@ const reviewSchema = new mongoose.Schema(
 // ✅ One active review per user per product (repeat POST returns 409, use PUT to edit)
 reviewSchema.index({ product_id: 1, user_id: 1 }, { unique: true });
 reviewSchema.index({ product_id: 1, status: 1, is_deleted: 1, created_at: -1 });
+
+
+// ── Multi-tenant ──
+reviewSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Review", reviewSchema);

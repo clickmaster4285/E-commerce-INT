@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { useQueryClient } from "@tanstack/react-query";
 
 /* ==========================================================
@@ -25,48 +27,19 @@ const num = (value, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-/** Backend ka origin — sirf env se, koi guess/fallback host nahi. */
-const getSocketOrigin = () => {
-  const explicit = (process.env.NEXT_PUBLIC_SOCKET_URL || "").trim();
-  if (explicit) return explicit.replace(/\/+$/, "");
-
-  const serverUrl = (process.env.NEXT_PUBLIC_SERVERURL || "").trim();
-  if (serverUrl) return serverUrl.replace(/\/+$/, "").replace(/\/api\/?$/, "");
-
-  return "";
-};
-
 /**
- * Client par socket URL.
+ * Client par socket URL — backend origin, PAGE ke hostname par aligned.
  *
- * Auth cookie `httpOnly` + `sameSite=lax` hai — agar socket ka host page
- * ke host se alag ho to cookie nahi jaati, socket "guest" reh jata hai aur
- * role-gated events `Unauthorized` dete hain. Is liye env URL tabhi use
- * hoti hai jab uska hostname page ke hostname se match kare.
+ * Auth cookie `httpOnly` + `sameSite=lax` hai — socket ka host page ke host
+ * se alag ho to cookie nahi jaati aur socket "guest" reh jata hai. Isi liye
+ * alistore.192.168.88.35.nip.io:3000 → alistore.192.168.88.35.nip.io:5000.
+ * Logic: src/lib/tenantHost.js → getBackendOrigin
  */
-const getSocketUrl = () => {
-  const origin = getSocketOrigin();
-
-  // SSR — sirf env, koi hard-coded fallback nahi
-  if (typeof window === "undefined") return origin || null;
-
-  if (origin) {
-    try {
-      if (new URL(origin).hostname === window.location.hostname) return origin;
-    } catch {
-      // env URL malformed → neeche dynamic path
-    }
-  }
-
-  const port = process.env.NEXT_PUBLIC_SERVER_PORT;
-  if (!port) return null;
-
-  // Protocol page wala — hardcoded `http://` HTTPS par mixed-content block karta hai
-  return `${window.location.protocol}//${window.location.hostname}:${port}`;
-};
+const getSocketUrl = () => getBackendOrigin();
 
 const SOCKET_OPTIONS = {
   withCredentials: true,
+  auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
   transports: (process.env.NEXT_PUBLIC_SOCKET_TRANSPORTS || "websocket,polling")
     .split(",")
     .map((t) => t.trim())
@@ -130,6 +103,7 @@ export function getAdminSocket() {
     adminSocket.on("connect_error", () => {
       // Silent — reconnection waise hi chalegi
     });
+    attachSocketAuthSync(adminSocket, "admin");
   }
 
   return adminSocket;

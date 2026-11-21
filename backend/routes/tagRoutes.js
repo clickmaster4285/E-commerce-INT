@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 // Middleware Imports
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 // const { checkPermission } = require("../middleware/checkPermission"); // ❌ Removed for now
 
 // Controller Imports

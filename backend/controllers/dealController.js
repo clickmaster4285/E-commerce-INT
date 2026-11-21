@@ -770,7 +770,8 @@ const uploadDealImage = async (req, res) => {
       });
     }
 
-    const url = `/uploads/deals/${req.file.filename}`;
+    // Asal saved path se (store folder: /uploads/stores/<storeId>/deals/...)
+    const url = require("../utils/uploadPaths").uploadUrlFor(req.file.path);
 
     res.status(201).json({
       success: true,

@@ -353,9 +353,9 @@ const deleteReviewMediaFiles = async (review) => {
   ];
   for (const url of urls) {
     try {
-      const clean = String(url || "").replace(/^\/+/, "");
-      const filePath = path.join(process.cwd(), clean);
-      if (await fs.pathExists(filePath)) await fs.remove(filePath);
+      // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ null
+      const filePath = require("../utils/uploadPaths").localPathForUrl(null, url);
+      if (filePath && (await fs.pathExists(filePath))) await fs.remove(filePath);
     } catch (err) {
       log.error("Review media delete error:", err.message);
     }
@@ -471,7 +471,7 @@ const deleteReviewResponse = async (req, res) => {
     const review = await Review.findOneAndUpdate(
       { _id: req.params.id, is_deleted: { $ne: true } },
       { $unset: { storeResponse: 1 } },
-      { new: false },
+      { returnDocument: "after" },
     );
     if (!review) return res.status(404).json({ success: false, message: "Review not found" });
     emitSocketEvent("reviewUpdated", {

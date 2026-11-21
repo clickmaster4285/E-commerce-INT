@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission, staffPermissionCheck } = require("../middleware/checkPermission");
 const { listLeads, getLead, createLead, updateLead, updateStatus, addActivity, deleteLead } = require("../controllers/leadController");
 

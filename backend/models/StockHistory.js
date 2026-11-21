@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const stockHistorySchema = new mongoose.Schema(
   {
@@ -106,6 +107,10 @@ const stockHistorySchema = new mongoose.Schema(
     },
   }
 );
+
+
+// ── Multi-tenant ──
+stockHistorySchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model(
   "StockHistory",

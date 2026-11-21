@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const orderSchema = new mongoose.Schema(
   {
-    order_number: { type: String, unique: true, required: true },
+    order_number: { type: String, required: true },
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -60,7 +61,7 @@ const orderSchema = new mongoose.Schema(
     },
     payment: {
       method: { type: String, enum: ["cod", "bank", "card"], required: true },
-      status: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
+      status: { type: String, enum: ["pending", "paid", "failed", "refunded"], default: "pending" },
     },
 
     subtotal: { type: Number, required: true },
@@ -114,5 +115,10 @@ const orderSchema = new mongoose.Schema(
 
 // ✅ My-orders (user + status filter + newest-first sort) isi index se serve hote hain.
 orderSchema.index({ user_id: 1, status: 1, created_at: -1 });
+
+
+// ── Multi-tenant ──
+orderSchema.plugin(tenantScope); // har store ka data alag (storeId)
+orderSchema.index({ storeId: 1, order_number: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("Order", orderSchema);

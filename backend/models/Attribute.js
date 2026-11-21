@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const attributeValueSchema = new mongoose.Schema(
   {
@@ -63,7 +64,10 @@ const attributeSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-// ✅ Updated unique index without tenant_id
-attributeSchema.index({ code: 1, is_deleted: 1 }, { unique: true });
+// ── Multi-tenant ── har store ke apne attributes (pehle global the aur koi bhi
+// store admin dusre stores ke attributes badal / delete kar sakta tha).
+// Purane global docs: node scripts/migrateAttributesPerStore.js
+attributeSchema.plugin(tenantScope);
+attributeSchema.index({ storeId: 1, code: 1, is_deleted: 1 }, { unique: true });
 
 module.exports = mongoose.model("Attribute", attributeSchema);

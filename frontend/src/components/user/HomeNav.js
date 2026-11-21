@@ -170,6 +170,7 @@ export default function HomeNav() {
 
   const visibleParents = parentCategories.slice(0, PARENT_LIMIT);
   const hiddenParents = parentCategories.slice(PARENT_LIMIT);
+  const hasMoreCategories = hiddenParents.length > 0;
 
   const positionPanel = useCallback((key) => {
     const anchor = key === "more" ? moreRef.current : document.querySelector(`[data-panel-id="${key}"]`);
@@ -187,6 +188,7 @@ export default function HomeNav() {
   }, []);
 
   const openMorePanel = () => {
+    if (!hasMoreCategories) return;
     if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
     positionPanel("more");
     setPanel("more");
@@ -314,26 +316,28 @@ export default function HomeNav() {
             </Link>
           ))}
 
-          {/* MORE — only dropdown */}
-          <div className="relative shrink-0" ref={moreRef}>
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={panel === "more"}
-              onClick={toggleMorePanel}
-              onMouseEnter={() => {
-                if (!morePinnedRef.current) openMorePanel();
-              }}
-              onMouseLeave={scheduleMoreClose}
-              className={`${itemClass(panel === "more")} gap-1.5`}
-            >
-              {t("storefront.navigation.moreCategories")}
-              <ChevronDown
-                size={14}
-                className={`transition-transform duration-200 ${panel === "more" ? "rotate-180" : ""}`}
-              />
-            </button>
-          </div>
+          {/* MORE — only dropdown (jab extra categories ho'n tabhi dikhaye) */}
+          {hasMoreCategories ? (
+            <div className="relative shrink-0" ref={moreRef}>
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={panel === "more"}
+                onClick={toggleMorePanel}
+                onMouseEnter={() => {
+                  if (!morePinnedRef.current) openMorePanel();
+                }}
+                onMouseLeave={scheduleMoreClose}
+                className={`${itemClass(panel === "more")} gap-1.5`}
+              >
+                {t("storefront.navigation.moreCategories")}
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${panel === "more" ? "rotate-180" : ""}`}
+                />
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 

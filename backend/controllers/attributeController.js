@@ -390,7 +390,7 @@ const updateAttribute = async (req, res) => {
     const attribute = await Attribute.findOneAndUpdate(
       { _id: req.params.id, is_deleted: { $ne: true } },
       { ...data, updatedby: req.user?._id || null },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!attribute) {
       return res.status(404).json({ success: false, message: "Attribute not found" });
@@ -545,7 +545,7 @@ const deleteAttribute = async (req, res) => {
     const attribute = await Attribute.findOneAndUpdate(
       { _id: req.params.id, is_deleted: { $ne: true } },
       { is_deleted: true, deleted_at: new Date(), deletedby: req.user?._id || null },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!attribute) {
       return res.status(404).json({ success: false, message: "Attribute not found" });

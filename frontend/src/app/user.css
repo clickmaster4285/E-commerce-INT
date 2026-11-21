@@ -302,14 +302,8 @@
 
 /* ==========================================
    SCROLLBAR UTILITIES
-========================================== */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+   (.scrollbar-hide alias globals.css ke .no-scrollbar ka — definition wahan hai)
+   ========================================== */
 
 .user-theme ::-webkit-scrollbar {
   width: 8px;
@@ -434,12 +428,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .deal-picker-panel {
-    animation: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
+  .deal-picker-panel,
   .cart-item-in,
   .cart-qty-pop {
     animation: none;
@@ -472,35 +461,14 @@
                         lagne lagte hain).
    ========================================== */
 
-/* ---------- 1) FLUID SHELL ----------
-   Home page (aur poora storefront) 2560px tak FULL-WIDTH responsive hai —
-   koi 1400px cap nahi. Har screen par content viewport ki poori chaudai
-   istemal karta hai (sirf component-level side padding rehta hai:
-   px-3 / lg:px-8). Mobile → laptop → 1080p → 1440p (2560px) sab par koi
-   side gap / center cap nahi. 2560px ke BAAD section (4) ka cap lagta hai. */
-.user-shell {
-  width: 100%;
-  max-width: none;
-  margin-inline: 0;
-}
-
-@media (min-width: 1921px) {
-  .user-shell {
-    max-width: none;
-  }
-}
-
-/* Bundles page ka apna wide shell — full-width responsive */
+/* Home page (aur poora storefront) FULL-WIDTH responsive hai —
+   koi 1400px cap nahi. Component-level side padding hi kaafi hai.
+   Bundles page bhi yahi class use karta hai (pehle .user-shell-1600 ke naam se). */
+.user-shell,
 .user-shell-1600 {
   width: 100%;
   max-width: none;
   margin-inline: 0;
-}
-
-@media (min-width: 1921px) {
-  .user-shell-1600 {
-    max-width: none;
-  }
 }
 
 /* ---------- 2) UI SCALE (root font-size) ---------- */
@@ -543,6 +511,18 @@ html:has(.user-theme) {
 .user-theme {
   font-size: calc(14px * var(--user-ui-scale));
 }
+
+/* Signup reference page keeps the light reference palette while honoring dark mode. */
+/* Full-panel layout: poora right panel hi surface hai (form ke gird koi card/box nahi) */
+:root.user-dark .signup-reference-page { background: var(--user-bg-card) !important; }
+:root.user-dark .signup-reference-page > div:last-child { background: var(--user-bg-card) !important; }
+:root.user-dark .signup-reference-page > div:last-child > footer { border-color: var(--user-border); }
+:root.user-dark .signup-reference-page > div:last-child > header button { background: transparent; color: var(--user-text); border-color: var(--user-border); }
+/* [data-tone] wale elements (errors, stepper, accents) apna rang rakhte hain */
+:root.user-dark .signup-reference-page > div:last-child > div :is(h2, h3, label, p, span):not([data-tone], [data-tone] *) { color: var(--user-text); }
+:root.user-dark .signup-reference-page > div:last-child > div :is(input, select, textarea):not([aria-invalid="true"]) { background: var(--user-bg-input); color: var(--user-text); border-color: var(--user-border); }
+:root.user-dark .signup-reference-page > div:last-child > div :is(input, textarea)::placeholder { color: var(--user-text-subtle); }
+:root.user-dark .signup-reference-page > div:last-child > header :is(span) { color: var(--user-text); }
 
 /* ---------- 3) LUCIDE ICONS (numeric size) ---------- */
 /* Sirf woh icons jinpar explicit width attribute hai (lucide numeric size).
@@ -916,10 +896,6 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
 .checkout-premium :is(button, a, [role="button"]):not(.primary-btn):active {
   box-shadow: none !important;
   transform: none !important;
-  opacity: 1 !important;
-}
-
-.checkout-premium :is(button, a, [role="button"]):not(.primary-btn):hover {
   opacity: 1 !important;
 }
 

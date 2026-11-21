@@ -40,15 +40,14 @@
     "country-state-city": "^3.2.1",
     "currency-codes": "^2.2.0",
     "dompurify": "^3.4.17",
+    "framer-motion": "^14.14.0",
     "html2canvas": "^1.4.1",
     "js-cookie": "^3.0.8",
     "jspdf": "^4.2.1",
     "libphonenumber-js": "^1.13.15",
     "lucide-react": "^1.28.0",
-    "multer": "^2.2.0",
     "next": "16.2.12",
     "next-themes": "^0.4.6",
-    "node-cron": "^4.6.0",
     "radix-ui": "^1.6.7",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -57,7 +56,6 @@
     "react-redux": "^9.3.0",
     "react-select": "^5.10.2",
     "recharts": "^3.10.1",
-    "shadcn": "^4.16.0",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
@@ -69,6 +67,7 @@
     "@types/node": "26.2.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "shadcn": "^4.16.0",
     "tailwindcss": "^4"
   }
 }

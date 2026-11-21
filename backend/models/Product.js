@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const productSchema = new mongoose.Schema(
   {
@@ -170,5 +171,9 @@ productSchema.index({ is_featured: 1, is_deleted: 1, featured_at: -1, _id: -1 })
 //    serve hota hai (bina in-memory sort), aur _id tie-break pages ko overlap hone
 //    se rokta hai jab kai products ka created_at same ho.
 productSchema.index({ created_at: -1, _id: -1 });
+
+
+// ── Multi-tenant ──
+productSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Product", productSchema);

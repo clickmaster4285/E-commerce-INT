@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const checkoutDraftSchema = new mongoose.Schema(
   {
@@ -6,7 +7,6 @@ const checkoutDraftSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
       index: true,
     },
     drafts: [
@@ -31,5 +31,10 @@ const checkoutDraftSchema = new mongoose.Schema(
   },
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );
+
+
+// ── Multi-tenant ──
+checkoutDraftSchema.plugin(tenantScope); // har store ka data alag (storeId)
+checkoutDraftSchema.index({ storeId: 1, user_id: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("CheckoutDraft", checkoutDraftSchema);

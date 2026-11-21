@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole, isStaffRole } from "@/lib/roles";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -13,6 +14,8 @@ import {
 } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { useQueryClient } from "@tanstack/react-query";
 import { slugKey } from "@/utils/slugKey";
@@ -184,12 +187,13 @@ const allMenuItems = [
 let sidebarSocket = null;
 
 function getSidebarSocket() {
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
 
   if (sidebarSocket) return sidebarSocket;
 
   sidebarSocket = io(SOCKET_URL, {
     withCredentials: true,
+    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
     transports: ["websocket", "polling"],
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -204,6 +208,7 @@ function getSidebarSocket() {
   });
 
   sidebarSocket.on("disconnect", (reason) => {});
+  attachSocketAuthSync(sidebarSocket, "admin");
 
   return sidebarSocket;
 }
@@ -414,7 +419,7 @@ export default function Sidebar({ onNavigate, userData }) {
 
       // Force redirect if current page permission is revoked
       const role = String(permissionData.role || socketRole).toLowerCase();
-      if (role !== "admin") {
+      if (!isAdminRole(role)) {
         const currentItem = allMenuItems.find(
           (item) => item.path === pathname && item.permissionKey
         );
@@ -471,7 +476,7 @@ export default function Sidebar({ onNavigate, userData }) {
 
   useEffect(() => {
     const role = String(socketRole || "").toLowerCase();
-    if (!(["admin", "manager", "staff"].includes(role)) || (role !== "admin" && socketPermissions?.order === false)) return undefined;
+    if (!isStaffRole(role) || (!isAdminRole(role) && socketPermissions?.order === false)) return undefined;
     const socket = getSidebarSocket();
     const refresh = () => {
       adminHttp.get("/chats/admin/unread-count").then((response) => setUnreadChats(Number(response.data?.data?.count) || 0)).catch(() => {});
@@ -510,7 +515,7 @@ export default function Sidebar({ onNavigate, userData }) {
     const role = socketProfileLoaded ? socketRole : "";
     const normalizedRole = String(role).toLowerCase();
 
-    if (normalizedRole === "admin") return allMenuItems;
+    if (isAdminRole(normalizedRole)) return allMenuItems;
 
     return allMenuItems.filter((item) => {
       if (!item.permissionKey) return true;
@@ -839,7 +844,7 @@ export default function Sidebar({ onNavigate, userData }) {
                           }`}
                         />
                         {!iconOnly && <span className="min-w-0 flex-1 truncate">{navLabel("item", item.name)}</span>}
-                        {item.name === "Chats" && ["admin", "manager", "staff"].includes(String(socketRole || "").toLowerCase()) && (String(socketRole || "").toLowerCase() === "admin" || socketPermissions?.order !== false) && unreadChats > 0 && (
+                        {item.name === "Chats" && isStaffRole(socketRole) && (isAdminRole(socketRole) || socketPermissions?.order !== false) && unreadChats > 0 && (
                           <span className={`flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ${iconOnly ? "absolute -right-0.5 -top-0.5" : "ml-auto"}`}>
                             {unreadChats > 99 ? "99+" : unreadChats}
                           </span>

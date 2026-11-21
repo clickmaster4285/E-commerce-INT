@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  checkRegistration,
   createUser,
   loginUser,
   loginAdmin,
@@ -22,8 +23,11 @@ const {
   toggleWishlist,
   updateProfileREST,
   changePasswordREST,
+  createStoreHandoff,
+  exchangeStoreHandoff,
 } = require("../controllers/userController");
 const authMiddleware = require("../middleware/authMiddleware");
+const { allowPendingSeller } = require("../middleware/allowPendingSeller");
 const { checkPermission } = require("../middleware/checkPermission");
 const { limiters } = require("../middleware/rateLimit");
 const {
@@ -40,7 +44,9 @@ const router = express.Router();
 // ==========================================
 //  PUBLIC ROUTES
 // ==========================================
-router.post("/register", limiters.register, createUser);
+router.post("/register", createUser);
+// Signup step 1 — email/username/phone pehle se liye hue? (same limiter as register)
+router.post("/register/check", limiters.registerCheck, checkRegistration);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
@@ -48,6 +54,10 @@ router.post("/refresh-token", refreshAccessToken);
 // employee-type refresh token accept karta hai (user going admin panel
 // ke liye nahi). Shape/logic purani jaisi.
 router.post("/admin/refresh-token", refreshAdminAccessToken);
+// Multi-tenant: platform par login ke baad store subdomain ke admin panel me bhejna
+// Pending sellers need this right after signup to reach their (view-only) admin panel
+router.post("/admin/handoff", allowPendingSeller, authMiddleware.requireAdmin, createStoreHandoff);
+router.post("/admin/handoff/exchange", limiters.adminLogin, exchangeStoreHandoff);
 router.post("/logout", logoutUser);
 router.post("/google-login", limiters.adminLogin, googleLogin);
 router.post("/google-customer-login", limiters.googleLogin, googleCustomerLogin);
@@ -60,8 +70,8 @@ router.get("/email-health", getEmailHealth);
 // ==========================================
 // 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
 // ==========================================
-router.post("/send-email-otp", limiters.sendEmailOtp, sendEmailVerificationOtp);
-router.post("/verify-email-otp", limiters.verifyEmailOtp, verifyEmailVerificationOtp);
+router.post("/send-email-otp", sendEmailVerificationOtp);
+router.post("/verify-email-otp", verifyEmailVerificationOtp);
 
 // ==========================================
 // 🔐 FORGOT PASSWORD (OTP — 5 min expiry)
@@ -87,19 +97,19 @@ router.put(
   checkPermission("profile"),
   changePassword,
 );
-router.put("/phone", authMiddleware, updatePhone);
+router.put("/phone", authMiddleware.requireUser, updatePhone);
 
 // ✅ MULTIPLE CHECKOUT DRAFTS
-router.post("/checkout-drafts", authMiddleware, createCheckoutDraft);
-router.get("/checkout-drafts", authMiddleware, getCheckoutDrafts);
-router.get("/checkout-drafts/:id", authMiddleware, getCheckoutDraft);
-router.put("/checkout-drafts/:id", authMiddleware, updateCheckoutDraft);
-router.delete("/checkout-drafts/:id", authMiddleware, deleteCheckoutDraft);
+router.post("/checkout-drafts", authMiddleware.requireUser, createCheckoutDraft);
+router.get("/checkout-drafts", authMiddleware.requireUser, getCheckoutDrafts);
+router.get("/checkout-drafts/:id", authMiddleware.requireUser, getCheckoutDraft);
+router.put("/checkout-drafts/:id", authMiddleware.requireUser, updateCheckoutDraft);
+router.delete("/checkout-drafts/:id", authMiddleware.requireUser, deleteCheckoutDraft);
 // ✅ NEW: Wishlist routes
-router.get("/wishlist", authMiddleware, getWishlist);
-router.put("/wishlist/toggle", authMiddleware, toggleWishlist);
-router.put("/profile", authMiddleware, updateProfileREST);
-router.post("/change-password", authMiddleware, changePasswordREST);
+router.get("/wishlist", authMiddleware.requireUser, getWishlist);
+router.put("/wishlist/toggle", authMiddleware.requireUser, toggleWishlist);
+router.put("/profile", authMiddleware.requireUser, updateProfileREST);
+router.post("/change-password", authMiddleware.requireUser, changePasswordREST);
 // ==========================================
 // 🛡️ 404 HANDLER
 // ==========================================

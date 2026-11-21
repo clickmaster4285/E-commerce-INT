@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const auditChangeSchema = new mongoose.Schema({ field: String, before: String, after: String }, { _id: false });
 const activitySchema = new mongoose.Schema({ type: { type: String, required: true }, at: { type: Date, default: Date.now }, actor_id: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null }, actor_name: { type: String, default: "Administrator" }, changes: { type: [auditChangeSchema], default: [] } }, { _id: false });
@@ -63,7 +64,7 @@ const vendorSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-vendorSchema.index({ vendor_code: 1, is_deleted: 1 }, { unique: true });
+vendorSchema.index({ storeId: 1, vendor_code: 1, is_deleted: 1 }, { unique: true });
 vendorSchema.index({ name: 1, is_deleted: 1 });
 vendorSchema.index({ city: 1, is_deleted: 1 });
 
@@ -84,5 +85,9 @@ vendorSchema.methods.restore = async function () {
   this.deletedby = null;
   return this.save();
 };
+
+
+// ── Multi-tenant ──
+vendorSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Vendor", vendorSchema);

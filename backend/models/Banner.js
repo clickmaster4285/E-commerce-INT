@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const buttonSchema = new mongoose.Schema({
   text: { type: String, default: "" },
@@ -92,5 +93,9 @@ const bannerSchema = new mongoose.Schema(
 
 // ✅ Active hero list (status + position order) isi index se serve hoti hai.
 bannerSchema.index({ status: 1, position: 1 });
+
+
+// ── Multi-tenant ──
+bannerSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Banner", bannerSchema);

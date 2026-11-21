@@ -1,6 +1,7 @@
 'use client';
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole } from "@/lib/roles";
 import { useState, useEffect, useRef } from 'react';
 import {
   Menu, Sun, Moon, LogOut, User, ChevronDown
@@ -10,6 +11,8 @@ import Link from 'next/link';
 import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { io } from "socket.io-client";
+import { attachSocketAuthSync } from "@/lib/socketAuthSync";
+import { getBackendOrigin } from "@/lib/tenantHost";
 import { disconnectSidebarSocket } from "./Sidebar";
 import AdminLanguageSwitcher from "@/components/adminComponents/AdminLanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
@@ -20,15 +23,17 @@ let navbarSocket = null;
 function getNavbarSocket() {
   if (navbarSocket && navbarSocket.connected) return navbarSocket;
 
-  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
+  const SOCKET_URL = getBackendOrigin(); // page host ke saath aligned (tenantHost.js)
 
   navbarSocket = io(SOCKET_URL, {
     withCredentials: true,
+    auth: { aud: "admin" }, // backend isi session ka cookie dekhta hai (a_at / u_at)
     transports: ["websocket", "polling"],
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,
   });
+  attachSocketAuthSync(navbarSocket, "admin");
 
   return navbarSocket;
 }
@@ -153,7 +158,7 @@ export default function Navbar({ theme, toggleTheme, onMenuClick, userData }) {
   const displayName = currentUser.name || "User";
   const displayEmail = currentUser.email || "";
   const userRole = currentUser.role || userData?.role || "";
-  const isAdmin = userRole?.toLowerCase() === "admin";
+  const isAdmin = isAdminRole(userRole);
 
   useEffect(() => {
     const handler = (e) => {
