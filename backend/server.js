@@ -267,6 +267,7 @@ app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 app.use(`${API_PREFIX}/chats`, chatRoutes);
+app.use(`${API_PREFIX}/loyalty`, require("./routes/loyaltyRoutes"));
 // ── Super Admin module (separate namespace + auth) ──
 app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
 // ── Public seller application (pending-review queue) ──

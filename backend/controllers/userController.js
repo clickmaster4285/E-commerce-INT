@@ -1,3 +1,4 @@
+const loyalty = require("../utils/loyaltyService");
 const crypto = require("crypto");
 const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const mongoose = require("mongoose");
@@ -1152,6 +1153,8 @@ const googleCustomerLogin = async (req, res) => {
         // ✅ Google se aayi email already verified hoti hai
         emailVerified: email_verified !== false,
       });
+      // ✅ Naya Google customer → loyalty welcome bonus
+      await loyalty.awardSignupBonus(user._id);
     }
 
     const io = req.io || getIO();

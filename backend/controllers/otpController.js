@@ -1,3 +1,4 @@
+const loyalty = require("../utils/loyaltyService");
 const crypto = require("crypto");
 const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const bcrypt = require("bcryptjs");
@@ -379,6 +380,8 @@ const verifyEmailVerificationOtp = async (req, res) => {
           status: "active",
         });
         await PendingRegistration.deleteOne({ _id: pending._id });
+        // ✅ Loyalty welcome bonus (program off ho to kuch nahi hota)
+        await loyalty.awardSignupBonus(customer._id);
         await setAuthCookies(req, res, customer);
 
         const io = req.io || getIO();
@@ -546,6 +549,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
 
     user.emailVerified = true;
     await user.save();
+    if (user.role === "user" && user.storeId) await loyalty.awardSignupBonus(user._id);
     record.verified = true;
     record.consumed = true;
     await record.save();

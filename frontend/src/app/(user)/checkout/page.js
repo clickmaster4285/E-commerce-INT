@@ -37,6 +37,9 @@ import {
   matchShippingRule,
 } from "@/utils/dealCalculator";
 import { shippingApi } from "@/apis/user/shippingApi";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import { pointsForAmount, quoteRedemption } from "@/lib/loyalty";
+import { PointsRedeemCard, PointsSummaryRow } from "@/components/user/LoyaltyCheckout";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useLocalized } from "@/i18n/localize";
@@ -374,7 +377,7 @@ const CardPreview = ({ number, name, expiry, t }) => (
 function CheckoutContent() {
   const router = useRouter();
   const { text } = useLocalized();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const urlDraftId = searchParams.get("draftId");
@@ -448,6 +451,17 @@ function CheckoutContent() {
   useEffect(() => {
     if (!userLoading && !user) router.replace("/login?redirect=/checkout");
   }, [user, userLoading, router]);
+
+  // ✅ Loyalty — balance + program rules (points use karne ke liye)
+  const { data: rewards = null, refetch: refetchRewards } = useQuery({
+    queryKey: ["myRewards", "checkout"],
+    queryFn: () => loyaltyApi.me({ limit: 1 }),
+    enabled: Boolean(user),
+    retry: false,
+    staleTime: 30 * 1000,
+  });
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsWanted, setPointsWanted] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -803,7 +817,30 @@ function CheckoutContent() {
     : (shipQuote?.reason || "");
 
   const tax = Math.round(itemsWithDiscounts.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.tax || 0) / 100), 0));
-  const grandTotal = Math.round(subtotal + shipping + tax);
+  // ✅ Loyalty — server wala hi formula (lib/loyalty); aakhri hisaab server karta hai
+  const loyaltyProgram = rewards?.program;
+  const pointsBalance = rewards?.account?.balance || 0;
+  const maxPointsQuote = quoteRedemption(loyaltyProgram, { balance: pointsBalance, subtotal, requested: pointsBalance });
+  const pointsQuote = usePoints
+    ? quoteRedemption(loyaltyProgram, { balance: pointsBalance, subtotal, requested: pointsWanted || maxPointsQuote.points })
+    : { ok: false, points: 0, discount: 0 };
+  const pointsDiscount = pointsQuote.ok ? pointsQuote.discount : 0;
+  const pointsToEarn = pointsForAmount(loyaltyProgram, subtotal - pointsDiscount);
+  const grandTotal = Math.round(subtotal + shipping + tax - pointsDiscount);
+  const pointsCardProps = {
+    rewards,
+    usePoints,
+    points: pointsQuote.ok ? pointsQuote.points : pointsWanted,
+    quote: pointsQuote,
+    maxQuote: maxPointsQuote,
+    earnPoints: pointsToEarn,
+    onPoints: setPointsWanted,
+    onToggle: (on) => {
+      setUsePoints(on);
+      // Pehli dafa on karne par max points (sab se zyada bachat)
+      if (on && !pointsWanted) setPointsWanted(maxPointsQuote.points);
+    },
+  };
   const draftDiscount = itemsWithDiscounts.reduce((sum, item) => {
     const originalPrice = Number(item.originalPrice) || 0;
     const salePrice = Number(item.displayPrice) || 0;
@@ -925,17 +962,19 @@ function CheckoutContent() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);
     try {
-      await orderApi.place({
+      const placed = await orderApi.place({
         items: itemsWithDiscounts,
         address_id: selectedAddressId,
         payment_method: paymentMethod,
         shipping_method: shippingMethod,
         shipping,
         checkout_draft_id: currentDraftId || null,
+        loyalty_points: pointsQuote.ok ? pointsQuote.points : 0,
         bank_sender_name: paymentMethod === "bank" ? bankForm.senderName.trim() : null,
         bank_transaction_ref: paymentMethod === "bank" ? bankForm.transactionRef.trim() : null,
       });
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["myRewards"] });
       if (currentDraftId) {
         queryClient.setQueryData(["checkoutDrafts"], (drafts = []) =>
           drafts.filter((draft) => String(draft._id) !== String(currentDraftId)),
@@ -949,9 +988,20 @@ function CheckoutContent() {
       removeItems(orderedKeys);
       setDraftItems([]);
       setCurrentDraftId(null);
+      // ✅ Loyalty — kamaye hue points ka celebration toast
+      if (Number(placed?.loyalty_points_earned) > 0) {
+        toast.success(t("rewards.orderEarned", { points: Number(placed.loyalty_points_earned).toLocaleString(locale) }), {
+          description: t("rewards.orderEarnedText"),
+          icon: "🎉",
+          duration: 6000,
+          action: { label: t("rewards.orderEarnedView"), onClick: () => router.push("/account?tab=rewards") },
+        });
+      }
       router.push("/orders");
     } catch (e) {
       toast.error(e.response?.data?.message || t("checkout.order.placeFailed"));
+      // Points balance badal gaya ho to taza lao
+      if (pointsQuote.ok) refetchRewards();
       placingRef.current = false;
       setPlacing(false);
     }
@@ -1049,6 +1099,7 @@ function CheckoutContent() {
             <span className="text-[var(--user-text)] font-bold">Rs. {tax.toLocaleString()}</span>
           </div>
         )}
+        <PointsSummaryRow discount={pointsDiscount} points={pointsQuote.points} />
         <div className="checkout-summary-total-row flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
           <span className={`${review ? "text-sm" : "text-base"} font-black text-[var(--user-text)]`}>{t("cart.total")}</span>
           <p className={`${review ? "text-lg" : "text-xl"} checkout-summary-total-value font-black text-[var(--user-accent)]`}>Rs. {grandTotal.toLocaleString()}</p>
@@ -1473,6 +1524,7 @@ function CheckoutContent() {
                     </div>
                   )}
                 </div>
+                <PointsRedeemCard {...pointsCardProps} className="xl:col-span-2" />
                 </div>
               </div>
 
@@ -1884,6 +1936,8 @@ function CheckoutContent() {
               </div>
             </div>
 
+            <PointsRedeemCard {...pointsCardProps} compact />
+
             {/* Card 4: Payment (compact icon chips — equal-width grid) */}
             <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm space-y-3">
               <div className="flex items-center gap-3 border-b border-[var(--user-border)] pb-3">
@@ -2045,6 +2099,7 @@ function CheckoutContent() {
                     <span className="font-bold text-[var(--user-text)]">Rs. {tax.toLocaleString()}</span>
                   </div>
                 )}
+                <PointsSummaryRow discount={pointsDiscount} points={pointsQuote.points} />
                 <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-[var(--user-border)]">
                   <span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span>
                   <span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span>
@@ -2193,6 +2248,7 @@ function CheckoutContent() {
                       <span className="font-bold text-[var(--user-text)]">Rs. {tax.toLocaleString()}</span>
                     </div>
                   )}
+                  <PointsSummaryRow discount={pointsDiscount} points={pointsQuote.points} />
                   <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-[var(--user-border)]">
                     <span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span>
                     <span className="text-lg font-black text-[var(--user-text)]">Rs. {grandTotal.toLocaleString()}</span>
@@ -2245,6 +2301,7 @@ function CheckoutContent() {
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
                     {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">{t("checkout.summary.youSave")}</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
                     <div className="flex justify-between text-[var(--user-text-muted)]"><span>{t("cart.shipping")}</span><span className="font-bold">{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}</span></div>
+                    <PointsSummaryRow discount={pointsDiscount} points={pointsQuote.points} />
                     <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
                   </div>
                 </div>

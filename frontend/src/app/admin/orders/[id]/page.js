@@ -747,10 +747,24 @@ export default function OrderDetailPage({ params }) {
                   <TotalRow label={t("admin.orders.detail.subtotalAfter")} value={formatCurrency(order.subtotal, locale)} />
                   <TotalRow label={t("admin.orders.detail.shippingCharges")} value={formatCurrency(order.shipping, locale)} />
                   <TotalRow label={`+ ${t("admin.orders.detail.tax")}`} value={formatCurrency(order.tax, locale)} />
+                  {Number(order.loyalty_discount) > 0 && (
+                    <TotalRow
+                      label={t("admin.orders.detail.pointsRedeemed", { points: Number(order.loyalty_points_redeemed || 0).toLocaleString(locale) })}
+                      value={`− ${formatCurrency(order.loyalty_discount, locale)}`}
+                      accent="var(--success-text)"
+                    />
+                  )}
                   <div className="flex justify-between text-[15px] font-bold pt-2 mt-1" style={{ borderTop: "1px solid var(--border-color)" }}>
                     <span>{t("admin.orders.detail.totalAmount")}</span>
                     <span>{formatCurrency(order.total, locale)}</span>
                   </div>
+                  {Number(order.loyalty_points_earned) > 0 && (
+                    <p className="pt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
+                      {t(order.status === "cancelled" ? "admin.orders.detail.pointsReversed" : "admin.orders.detail.pointsEarned", {
+                        points: Number(order.loyalty_points_earned).toLocaleString(locale),
+                      })}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 pt-3 mt-3 md:pt-0 md:mt-0 md:border-l md:pl-6"

@@ -39,11 +39,12 @@ const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
 import OrdersView from "../orders/page";
 import WishlistView from "../wishlist/page";
 import MyReviews from "@/components/user/MyReviews";
+import RewardsView from "@/components/user/RewardsView";
 import {
   User, Package, Heart, MapPin, Settings, LogOut, Phone, Mail, Calendar,
   Plus, Pencil, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Loader2, X,
   CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Star, Save,
-  ChevronRight, SlidersHorizontal, KeyRound, Globe,
+  ChevronRight, SlidersHorizontal, KeyRound, Globe, Gift,
 } from "lucide-react";
 
 /* ============ HELPERS ============ */
@@ -74,6 +75,7 @@ const NAV_ITEMS = [
   { id: "profile", label: "My Profile", icon: User },
   { id: "orders", label: "My Orders", icon: Package },
   { id: "reviews", label: "My Reviews", icon: Star },
+  { id: "rewards", label: "Rewards", icon: Gift },
   { id: "wishlist", label: "Wishlist", icon: Heart },
   { id: "address", label: "Address", icon: MapPin },
   { id: "settings", label: "Setting", icon: Settings },
@@ -83,6 +85,7 @@ const TAB_TITLES = {
   profile: "My Profile",
   orders: "My Orders",
   reviews: "My Reviews",
+  rewards: "Rewards",
   wishlist: "Wishlist",
   address: "Address",
   settings: "Setting",
@@ -922,6 +925,9 @@ export default function AccountPage() {
               {tab === "orders" && <OrdersView compact />}
 
               {tab === "reviews" && <MyReviews />}
+
+              {/* ============ REWARDS — loyalty points ============ */}
+              {tab === "rewards" && <RewardsView />}
 
               {/* ============ WISHLIST — wishlist page wala hi design (reuse) ============ */}
               {tab === "wishlist" && <WishlistView compact />}

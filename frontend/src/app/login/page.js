@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import LanguageSwitcher from "@/components/user/LanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import { SignupBonusBanner } from "@/components/user/LoyaltyCheckout";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -46,6 +48,8 @@ export default function UserLoginPage() {
   const { t } = useTranslation();
   const { nameOf } = useLocalized();
   const [isLogin, setIsLogin] = useState(true);
+  // Loyalty welcome bonus banner (register mode) — program off ho to kuch nahi dikhta
+  const { data: loyaltyProgram } = useQuery({ queryKey: ["loyaltyProgram"], queryFn: loyaltyApi.program, staleTime: 5 * 60 * 1000, retry: false });
 
   // Open directly in register mode when linked with ?mode=register
   const [approvedInfo, setApprovedInfo] = useState(false);
@@ -553,6 +557,8 @@ export default function UserLoginPage() {
                 <p className="text-[var(--user-danger)] text-sm">{generalError}</p>
               </div>
             )}
+
+            {!isLogin && <SignupBonusBanner program={loyaltyProgram} className="mb-4" />}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>

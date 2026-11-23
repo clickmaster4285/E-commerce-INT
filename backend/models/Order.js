@@ -67,6 +67,10 @@ const orderSchema = new mongoose.Schema(
     subtotal: { type: Number, required: true },
     shipping: { type: Number, required: true },
     tax: { type: Number, default: 0 },
+    // Loyalty — total = subtotal + shipping + tax − loyalty_discount
+    loyalty_points_redeemed: { type: Number, default: 0 },
+    loyalty_discount: { type: Number, default: 0 },
+    loyalty_points_earned: { type: Number, default: 0 },
     total: { type: Number, required: true },
 
     status: {

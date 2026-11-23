@@ -47,6 +47,7 @@ import {
   Package,
   Settings,
   MessageCircle,
+  Gift,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -749,6 +750,24 @@ export default function Header() {
                   </div>
                   <span className="text-xs font-medium text-[var(--user-text)]">
                     {t("header.orderSupport")}
+                  </span>
+                </Link>
+
+                <Link
+                  href="/account?tab=rewards"
+                  onClick={() => {
+                    setOpen(false);
+                    window.dispatchEvent(
+                      new CustomEvent("account:tab", { detail: "rewards" }),
+                    );
+                  }}
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                    <Gift size={18} className="text-[var(--user-accent)]" />
+                  </div>
+                  <span className="text-xs font-medium text-[var(--user-text)]">
+                    {t("header.rewards")}
                   </span>
                 </Link>
 

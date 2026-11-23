@@ -26,6 +26,7 @@ import {
   FileText,
   Receipt,
   DollarSign,
+  Award,
 } from "lucide-react";
 
 /** Section order — sidebarTitle uppercase labels i18n keys ke liye */
@@ -57,6 +58,7 @@ export const ADMIN_MODULES = [
   { key: "discounts", name: "Discounts", section: "sales", path: "/admin/discounts", permissionKey: "discounts", icon: Percent, countable: true, nav: true },
   { key: "deals", name: "Deals", section: "sales", path: "/admin/deals", permissionKey: "deals", icon: Gift, countable: true, nav: true },
   { key: "banners", name: "Banners", section: "sales", path: "/admin/banners", permissionKey: "banners", icon: ImageIcon, countable: true, nav: true },
+  { key: "loyalty", name: "Loyalty", section: "sales", path: "/admin/loyalty", permissionKey: "loyalty", icon: Award, countable: false, nav: true },
   { key: "manageStock", name: "Manage Stock", section: "operations", path: "/admin/manage-stock", permissionKey: "manageStock", icon: Boxes, countable: false, nav: true },
   { key: "orders", name: "Orders", section: "operations", path: "/admin/orders", permissionKey: "order", icon: ShoppingCart, countable: true, nav: true },
   { key: "chats", name: "Chats", section: "operations", path: "/admin/chats", permissionKey: "order", icon: MessageCircle, countable: true, nav: true },

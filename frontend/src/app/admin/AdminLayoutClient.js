@@ -42,6 +42,7 @@ const ROUTE_PERMISSIONS = {
   '/admin/discounts': 'discounts',
   '/admin/deals': 'deals',
   '/admin/banners': 'banners',
+  '/admin/loyalty': 'loyalty',
   '/admin/manage-stock': 'manageStock',
   '/admin/vendors': 'vendors',
   '/admin/purchase-orders': 'purchaseOrders',
