@@ -319,17 +319,30 @@ export default function SignupPage() {
     return () => window.clearTimeout(id);
   }, [subdomain, step, email]);
 
-  // Web address seller khud likhta hai — store naam se auto-fill nahi
+  // Web address store naam se khud banta hai — jab tak seller use khud na badle.
+  // Seller address poora mita de to auto-fill phir se chalu.
+  const [subdomainTouched, setSubdomainTouched] = useState(false);
+  const setCleanSubdomain = (clean) => {
+    setSubdomain(clean);
+    setErrors((p) => ({ ...p, subdomain: "" }));
+    setSubdomainCheck({ state: "idle", value: "", suggestion: "" });
+  };
   const changeStoreName = (value) => {
     setStoreName(value);
     setErrors((p) => ({ ...p, storeName: "" }));
+    if (!subdomainTouched) {
+      // "Ahmed Electronics" → "ahmed-electronics"
+      const slug = String(value).toLowerCase().trim()
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "")
+        .slice(0, STORE_ADDRESS_MAX).replace(/-+$/, "");
+      setCleanSubdomain(slug);
+    }
   };
   const changeSubdomain = (value) => {
     // Sirf a-z 0-9 aur hyphen — type karte waqt hi saaf
     const clean = String(value).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, STORE_ADDRESS_MAX);
-    setSubdomain(clean);
-    setErrors((p) => ({ ...p, subdomain: "" }));
-    setSubdomainCheck({ state: "idle", value: "", suggestion: "" });
+    setSubdomainTouched(clean !== "");
+    setCleanSubdomain(clean);
   };
 
   const fieldCls = (field, withToggle = false) =>

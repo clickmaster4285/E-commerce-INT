@@ -760,7 +760,7 @@ export default function OrderDetailPage({ params }) {
                   </div>
                   {Number(order.loyalty_points_earned) > 0 && (
                     <p className="pt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                      {t(order.status === "cancelled" ? "admin.orders.detail.pointsReversed" : "admin.orders.detail.pointsEarned", {
+                      {t(order.status === "cancelled" ? "admin.orders.detail.pointsReversed" : order.status === "delivered" ? "admin.orders.detail.pointsEarned" : "admin.orders.detail.pointsPending", {
                         points: Number(order.loyalty_points_earned).toLocaleString(locale),
                       })}
                     </p>

@@ -212,6 +212,23 @@ export default function SettingsTab() {
   const discount = p.redeem.enabled && quote.ok ? quote.discount : 0;
   const earned = p.earn.enabled ? pointsForAmount(program, sampleAmount - discount) : 0;
 
+  // Save / Discard buttons — card ke andar hi (alag dabba nahi)
+  const discard = () => { setDraft(null); setErrors({}); };
+  const actions = (
+    <div className="flex items-center gap-2">
+      <button type="button" className={secondaryBtn} onClick={discard} disabled={!dirty || save.isPending}>{t("admin.loyalty.settings.discard")}</button>
+      <button type="button" className={primaryBtn} style={primaryStyle} onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
+        {save.isPending && <Loader2 size={14} className="animate-spin" />}{t("admin.loyalty.settings.save")}
+      </button>
+    </div>
+  );
+  const status = (
+    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium" style={{ color: dirty ? "var(--warning-text)" : "var(--text-muted)" }}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: dirty ? "var(--warning)" : "var(--success)" }} aria-hidden="true" />
+      {dirty ? t("admin.loyalty.settings.unsaved") : t("admin.loyalty.settings.allSaved")}
+    </span>
+  );
+
   return (
     <div>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -219,7 +236,7 @@ export default function SettingsTab() {
           {/* Program on/off + naam + guide */}
           <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: "linear-gradient(135deg, #f59e0b, #f97316)" }}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: "var(--accent)" }}>
                 <Coins size={19} aria-hidden="true" />
               </span>
               <div className="min-w-0">
@@ -245,8 +262,7 @@ export default function SettingsTab() {
 
           {/* Guide banner — "pehli dafa? yahan se samjhein" */}
           <button type="button" onClick={() => setGuideOpen(true)}
-            className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-[var(--bg-row-hover)]"
-            style={{ background: "linear-gradient(90deg, var(--accent-soft), transparent 70%)" }}>
+            className="flex w-full items-center gap-3 px-4 py-3 text-start transition hover:bg-[var(--bg-row-hover)]">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: "var(--accent)" }}><BookOpen size={16} /></span>
             <span className="min-w-0 flex-1">
               <span className="block text-[13.5px] font-semibold text-[var(--text-primary)]">{t("admin.loyalty.guide.bannerTitle")}</span>
@@ -331,6 +347,11 @@ export default function SettingsTab() {
               <Explain>{t("admin.loyalty.settings.redeemExplain", { min: fmtPoints(p.redeem.minPoints, locale), pct: p.redeem.maxPercent, cap: fmtRs(Math.floor((5000 * p.redeem.maxPercent) / 100), locale) })}</Explain>
             </Section>
           </div>
+          {/* Save bar stays in the settings card flow so it never floats over the page while scrolling. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3">
+            {status}
+            {actions}
+          </div>
         </Card>
 
         {/* Right: summary + calculator */}
@@ -393,18 +414,6 @@ export default function SettingsTab() {
         </aside>
       </div>
 
-      {/* Save bar — sirf jab kuch badla ho */}
-      {dirty && (
-        <div className="sticky bottom-3 z-30 mt-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]/95 shadow-lg backdrop-blur">
-          <div className="flex items-center justify-end gap-2 px-4 py-2.5">
-            <p className="me-auto text-[12.5px] font-medium text-[var(--text-secondary)]">{t("admin.loyalty.settings.unsaved")}</p>
-            <button type="button" className={secondaryBtn} onClick={() => { setDraft(null); setErrors({}); }} disabled={save.isPending}>{t("admin.loyalty.settings.discard")}</button>
-            <button type="button" className={primaryBtn} style={primaryStyle} onClick={() => save.mutate()} disabled={save.isPending}>
-              {save.isPending && <Loader2 size={14} className="animate-spin" />}{t("admin.loyalty.settings.save")}
-            </button>
-          </div>
-        </div>
-      )}
 
       <SetupGuide open={guideOpen} onClose={closeGuide} payload={p} onApplyRecommended={applyRecommended} />
     </div>

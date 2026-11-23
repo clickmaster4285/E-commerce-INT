@@ -30,6 +30,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
     ? store.logo.img_url.startsWith("http")
       ? store.logo.img_url
       : `${API_ORIGIN}/${store.logo.img_url}`
+      
     : null;
   const letter = (store?.store_name || "C").charAt(0).toUpperCase();
 
@@ -174,6 +175,7 @@ export default function UserLoginPage() {
         window.location.href = "/";
         return;
       }
+      console.log("Login successful");
 
       // ✅ REGISTER → User NAHI banta, sirf pending + OTP jata hai, phir verify screen
       const res = await authApi.register({ name, username, phone, email, password });

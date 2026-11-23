@@ -6,7 +6,9 @@
 // hai, is liye koi bhi event (signup, order earn, refund) do baar nahi lagta.
 //
 // Order ke points ka safar:
-//   placeOrder      → earn txn foran "available" (balance +)
+//   placeOrder      → earn txn "pending" (account.pending +) — kharch nahi ho sakte
+//   delivered       → "available" (pending −, balance +)
+//   delivered → wapas (shipped waghera) → dobara "pending" (balance minus nahi)
 //   cancelled       → "reversed" — balance se wapas (minus kabhi nahi)
 //                     + is order me kharch kiye points refund
 //   delete (pending)→ wahi jo cancel me
@@ -212,8 +214,8 @@ async function takeBack(userId, points, extra = {}) {
 }
 
 /**
- * Order bante hi uske points foran "available" (abhi ke liye delivery ka
- * intezar nahi). Cancel / delete par wapas liye jaate hain.
+ * Order bante hi uske points "pending" — kharch nahi ho sakte.
+ * Delivered par "available" hote hain; cancel / delete par hat jaate hain.
  */
 async function addOrderEarn(order) {
   try {
@@ -225,14 +227,14 @@ async function addOrderEarn(order) {
       user_id: order.user_id,
       type: "earn",
       points,
-      status: "available",
+      status: "pending",
       source_key: `earn:${order._id}`,
       order_id: order._id,
       order_number: order.order_number,
       note: `Order ${order.order_number}`,
     });
-    await inc(order.user_id, { balance: points, lifetimeEarned: points });
-    // tag order — UI "X points mile" dikha sake
+    await inc(order.user_id, { pending: points });
+    // tag order — UI "X points milenge" dikha sake
     await mongoose.model("Order").updateOne({ _id: order._id }, { $set: { loyalty_points_earned: points } });
     order.loyalty_points_earned = points;
     return points;
@@ -288,15 +290,50 @@ async function reverseEarn(order) {
   return taken;
 }
 
-/** Cancel se wapas active kiya → reverse hue points dobara available. */
-async function restoreEarn(order) {
+/**
+ * Cancel se wapas active kiya → reverse hue points dobara chalu.
+ * Delivered par seedha "available", warna "pending" (delivery ka intezar).
+ */
+async function restoreEarn(order, delivered) {
+  const to = delivered ? "available" : "pending";
   const txn = await LoyaltyTransaction.findOneAndUpdate(
     { source_key: `earn:${order._id}`, status: "reversed" },
-    { $set: { status: "available", note: `Order ${order.order_number}` } },
+    { $set: { status: to, note: `Order ${order.order_number}` } },
     { returnDocument: "before" },
   ).lean();
   if (!txn) return 0;
-  await inc(order.user_id, { balance: txn.points, lifetimeEarned: txn.points });
+  await inc(order.user_id, delivered ? { balance: txn.points, lifetimeEarned: txn.points } : { pending: txn.points });
+  return txn.points;
+}
+
+/** Delivered → pending points ab kharch ho sakte hain. */
+async function releaseEarn(order) {
+  const txn = await LoyaltyTransaction.findOneAndUpdate(
+    { source_key: `earn:${order._id}`, status: "pending" },
+    { $set: { status: "available" } },
+    { returnDocument: "before" },
+  ).lean();
+  if (!txn) return 0;
+  await inc(order.user_id, { pending: -txn.points, balance: txn.points, lifetimeEarned: txn.points });
+  return txn.points;
+}
+
+/** Delivered se ghalti se wapas (shipped waghera) → points dobara pending (balance minus nahi). */
+async function holdEarn(order) {
+  const txn = await LoyaltyTransaction.findOneAndUpdate(
+    { source_key: `earn:${order._id}`, status: "available" },
+    { $set: { status: "pending" } },
+    { returnDocument: "before" },
+  ).lean();
+  if (!txn) return 0;
+  const taken = await takeBack(order.user_id, txn.points, { lifetimeEarned: -txn.points });
+  await inc(order.user_id, { pending: txn.points });
+  if (taken < txn.points) {
+    await LoyaltyTransaction.updateOne(
+      { _id: txn._id },
+      { $set: { note: `Order ${order.order_number} · ${txn.points - taken} points were already spent` } },
+    );
+  }
   return txn.points;
 }
 
@@ -352,20 +389,18 @@ async function onOrderStatusChange(order, prevStatus, nextStatus) {
       }
       return;
     }
+    const delivered = nextStatus === "delivered";
     if (prevStatus === "cancelled") {
-      const restored = await restoreEarn(order);
+      const restored = await restoreEarn(order, delivered);
       const recharged = await undoRefund(order);
       if (restored || recharged) {
         await notifyCustomer(order.user_id, { kind: "order_restored", refunded: recharged, reversed: restored, order_id: order._id, order_number: order.order_number });
       }
+      return;
     }
-    // Purane orders jin ke points pending the (delivery wala pehla qaida) → ab available
-    const old = await LoyaltyTransaction.findOneAndUpdate(
-      { source_key: `earn:${order._id}`, status: "pending" },
-      { $set: { status: "available" } },
-      { returnDocument: "before" },
-    ).lean();
-    if (old) await inc(order.user_id, { pending: -old.points, balance: old.points, lifetimeEarned: old.points });
+    // Delivered par hi points kharch ke qabil
+    if (delivered) await releaseEarn(order);
+    else if (prevStatus === "delivered") await holdEarn(order);
   } catch (err) {
     log.error("[loyalty] status sync failed:", err.message);
   }

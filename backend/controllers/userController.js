@@ -372,7 +372,8 @@ const createUser = async (req, res) => {
     }
 
     // 📧 Verification OTP bhejo. Dev me SMTP offline/slow ho to signup block nahi hota:
-    // 4s se zyada wait nahi — OTP console par dikhta hai, pending registration banti rehti hai.
+    // 12s se zyada wait nahi (Gmail ka pehla connection 4–6s le leta hai) — phir OTP
+    // console par dikhta hai, pending registration banti rehti hai.
     const emailArgs = {
       to: email,
       otp: code,
@@ -383,7 +384,7 @@ const createUser = async (req, res) => {
     if (process.env.NODE_ENV !== "production") {
       delivery = await Promise.race([
         sendOtpEmail(emailArgs).catch((e) => ({ delivered: false, reason: e?.code || "smtp_failed" })),
-        new Promise((resolve) => setTimeout(() => resolve({ delivered: false, reason: "smtp_timeout" }), 4000)),
+        new Promise((resolve) => setTimeout(() => resolve({ delivered: false, reason: "smtp_timeout" }), 12000)),
       ]);
     } else {
       try {
@@ -407,7 +408,7 @@ const createUser = async (req, res) => {
       success: true,
       message: delivery.delivered
         ? `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
-        : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein. (expires in ${REGISTER_OTP_EXPIRE_MINUTES} min)`,
+        : `We couldn't email your verification code right now. Please try "Resend code" in a moment. (Development: the code is printed in the backend console. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.)`,
       requireVerification: true,
       otpSent: true,
       delivered: delivery.delivered,

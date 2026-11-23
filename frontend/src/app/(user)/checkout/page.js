@@ -40,7 +40,7 @@ import { shippingApi } from "@/apis/user/shippingApi";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import { pointsForAmount, quoteRedemption } from "@/lib/loyalty";
 import { requestRewardClaim } from "@/lib/rewardClaim";
-import { PointsRedeemCard, PointsSummaryRow } from "@/components/user/LoyaltyCheckout";
+import { RewardsSummaryBox, PointsSummaryRow } from "@/components/user/LoyaltyCheckout";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useLocalized } from "@/i18n/localize";
@@ -1084,6 +1084,8 @@ function CheckoutContent() {
         ))}
       </div>}
 
+      <RewardsSummaryBox {...pointsCardProps} readOnly={review} className="mt-3" />
+
       <div className={`checkout-summary-totals shrink-0 space-y-2 ${review ? "text-xs" : "text-sm"} ${showItems ? "pt-3 border-t border-[var(--user-border)]" : ""}`}>
         <div className="flex justify-between">
           <span className="text-[var(--user-text)] font-medium">{t("cart.subtotal")} ({t("cart.itemsCount", { count: itemsWithDiscounts.reduce((count, item) => count + item.qty, 0) })})</span>
@@ -1530,7 +1532,6 @@ function CheckoutContent() {
                     </div>
                   )}
                 </div>
-                <PointsRedeemCard {...pointsCardProps} className="xl:col-span-2" />
                 </div>
               </div>
 
@@ -1942,8 +1943,6 @@ function CheckoutContent() {
               </div>
             </div>
 
-            <PointsRedeemCard {...pointsCardProps} compact />
-
             {/* Card 4: Payment (compact icon chips — equal-width grid) */}
             <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm space-y-3">
               <div className="flex items-center gap-3 border-b border-[var(--user-border)] pb-3">
@@ -2082,6 +2081,7 @@ function CheckoutContent() {
               <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
                 <PackageCheck size={13} /> {t("checkout.summary.title")}
               </p>
+              <RewardsSummaryBox {...pointsCardProps} />
               <div className="space-y-1.5 text-[0.75rem]">
                 <div className="flex justify-between text-[var(--user-text-muted)]">
                   <span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>

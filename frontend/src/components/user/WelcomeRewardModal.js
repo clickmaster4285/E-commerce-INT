@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Check, Coins, Gift, ShoppingBag, TicketPercent } from "lucide-react";
+import { ArrowRight, Check, Coins, Gift, Package, ShoppingBag, TicketPercent, Truck } from "lucide-react";
 import { userHttp } from "@/apis/axiosInstance";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
@@ -259,37 +259,8 @@ export default function WelcomeRewardModal() {
 
   useEffect(() => () => coinLayerRef.current?.remove(), []);
 
-  // Order mode: coins already credited — sirf animation + success dikhana hai.
-  useEffect(() => {
-    if (!orderReward) return undefined;
-    let cancelled = false;
-    const creditToHeader = () => {
-      window.dispatchEvent(new CustomEvent("loyalty:coins-incoming", {
-        detail: { points: orderReward.points },
-      }));
-    };
-
-    if (reducedMotion()) {
-      creditToHeader();
-      const id = window.setTimeout(() => setPhase("success"), 0);
-      return () => window.clearTimeout(id);
-    }
-
-    const startTimer = window.setTimeout(() => {
-      setPhase("flying");
-      flyCoins({
-        fromEl: rewardRef.current,
-        toEl: document.querySelector("[data-loyalty-coin-target]"),
-        onArrive: creditToHeader,
-        onLayer: (layer) => { coinLayerRef.current = layer; },
-      }).then(() => {
-        if (cancelled) return;
-        coinLayerRef.current = null;
-        setPhase("success");
-      });
-    }, 0);
-    return () => { cancelled = true; window.clearTimeout(startTimer); };
-  }, [orderReward]);
+  // Order mode: points PENDING hain (delivery par milenge) — balance me nahi
+  // daalte, coins header ki taraf nahi udte. Popup timeline dikhata hai.
 
   const handleClaim = async () => {
     if (phase !== "idle" || !bonus) return;
@@ -381,7 +352,7 @@ export default function WelcomeRewardModal() {
           <>
             <div className="border-b border-[var(--user-border)] px-6 pb-7 pt-8 text-center" style={{ background: "linear-gradient(180deg, var(--user-bg-card) 0%, color-mix(in srgb, var(--user-accent) 4%, var(--user-bg-card)) 100%)" }}>
               <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-accent-soft)] text-[var(--user-accent)] motion-safe:animate-[rewardGiftIn_.5s_cubic-bezier(.16,1.02,.3,1)_.12s_both]">
-                <Gift size={20} strokeWidth={1.75} />
+                {mode === "order" ? <Package size={20} strokeWidth={1.75} /> : <Gift size={20} strokeWidth={1.75} />}
               </span>
               <p className="mt-4 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[var(--user-text-muted)] motion-safe:animate-[rewardRise_.45s_ease-out_.2s_both]">
                 {mode === "order" ? t("rewards.orderEarned.eyebrow") : mode === "preorder" ? t("rewards.claim.preorder.eyebrow") : t("rewards.welcome.eyebrow")}
@@ -447,10 +418,47 @@ export default function WelcomeRewardModal() {
                   )}
                 </button>
               ) : (
-                <div className="mt-5 flex items-center justify-center gap-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-surface)] px-4 py-3 text-sm font-medium text-[var(--user-text-secondary)]">
-                  <Coins size={16} strokeWidth={1.75} className="animate-pulse text-[var(--user-accent)]" />
-                  {t("rewards.orderEarned.adding")}
-                </div>
+                <>
+                  {/* Coins ka safar — order se delivery tak */}
+                  <ol className="mt-5 rounded-xl border border-[var(--user-border)] px-4 py-3.5" aria-label={t("rewards.orderEarned.timeline")}>
+                    {[
+                      { icon: Check, title: t("rewards.orderEarned.step1"), text: t("rewards.orderEarned.step1Text"), state: "done" },
+                      { icon: Truck, title: t("rewards.orderEarned.step2"), text: t("rewards.orderEarned.step2Text"), state: "current" },
+                      { icon: Coins, title: t("rewards.orderEarned.step3", { points: n(displayPoints) }), text: t("rewards.orderEarned.step3Text"), state: "next" },
+                    ].map(({ icon: Icon, title, text, state }, i, arr) => (
+                      <li key={title} className="relative flex gap-3 pb-3.5 last:pb-0">
+                        {i < arr.length - 1 && (
+                          <span aria-hidden="true" className={`absolute start-[13px] top-7 h-[calc(100%-1.25rem)] w-px ${state === "done" ? "bg-emerald-500" : "bg-[var(--user-border)]"}`} />
+                        )}
+                        <span
+                          className={`relative z-[1] flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                            state === "done" ? "bg-emerald-500 text-white"
+                              : state === "current" ? "bg-[var(--user-accent-soft)] text-[var(--user-accent)] ring-2 ring-[var(--user-accent)]/30"
+                                : "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
+                          }`}
+                        >
+                          <Icon size={14} strokeWidth={2} className={state === "current" ? "motion-safe:animate-pulse" : ""} />
+                        </span>
+                        <span className="min-w-0 pt-0.5 text-start">
+                          <span className="block text-[0.8125rem] font-semibold text-[var(--user-text)]">{title}</span>
+                          <span className="block text-[0.75rem] leading-5 text-[var(--user-text-muted)]">{text}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
+                    <Link href="/orders" onClick={close}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-medium text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                      <Truck size={15} strokeWidth={1.75} />
+                      {t("rewards.orderEarned.track")}
+                    </Link>
+                    <Link href="/shop" onClick={close}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-all duration-300 hover:bg-[var(--user-accent-hover)] hover:shadow-md active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                      {t("rewards.orderEarned.shop")}
+                      <ArrowRight size={15} strokeWidth={1.75} />
+                    </Link>
+                  </div>
+                </>
               )}
 
               {error && <p role="alert" className="mt-2 text-center text-xs text-[var(--user-danger)]">{error}</p>}
