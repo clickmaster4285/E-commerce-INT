@@ -1,33 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BarChart3, History, Settings2, Users } from "lucide-react";
+import { History, Settings2, Users } from "lucide-react";
 import AdminPageHeader from "@/components/adminComponents/AdminPageHeader";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import OverviewTab from "./_components/OverviewTab";
 import MembersTab from "./_components/MembersTab";
 import HistoryTab from "./_components/HistoryTab";
 import SettingsTab from "./_components/SettingsTab";
 import MemberDrawer from "./_components/MemberDrawer";
 
 const TABS = [
-  { id: "overview", icon: BarChart3 },
+  { id: "settings", icon: Settings2 },
   { id: "members", icon: Users },
   { id: "history", icon: History },
-  { id: "settings", icon: Settings2 },
 ];
 const isTab = (v) => TABS.some((x) => x.id === v);
 
 export default function LoyaltyPage() {
   const { t, dir } = useTranslation();
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("settings");
   const [memberId, setMemberId] = useState(null);
 
   // ?tab= URL ke saath sync — refresh / back button par wahi tab
   useEffect(() => {
     const read = () => {
       const v = new URLSearchParams(window.location.search).get("tab");
-      setTab(isTab(v) ? v : "overview");
+      setTab(isTab(v) ? v : "settings");
     };
     read();
     window.addEventListener("popstate", read);
@@ -37,8 +35,7 @@ export default function LoyaltyPage() {
   const go = useCallback((next) => {
     setTab(next);
     const url = new URL(window.location.href);
-    if (next === "overview") url.searchParams.delete("tab");
-    else url.searchParams.set("tab", next);
+    url.searchParams.set("tab", next);
     window.history.pushState({}, "", url);
   }, []);
 
@@ -62,7 +59,6 @@ export default function LoyaltyPage() {
         })}
       </div>
 
-      {tab === "overview" && <OverviewTab onGoTo={go} onOpenMember={setMemberId} />}
       {tab === "members" && <MembersTab onOpenMember={setMemberId} />}
       {tab === "history" && <HistoryTab onOpenMember={setMemberId} />}
       {tab === "settings" && <SettingsTab />}

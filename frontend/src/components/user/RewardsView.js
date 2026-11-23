@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Clock, Coins, Gift, History, Loader2, RotateCcw, ShoppingBag, SlidersHorizontal, Sparkles, TicketPercent } from "lucide-react";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import AccountPageHeader from "@/components/user/AccountPageHeader";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { pointsToValue } from "@/lib/loyalty";
 
@@ -25,7 +26,7 @@ export default function RewardsView() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl space-y-4">
+      <div className="w-full space-y-4">
         <div className="h-12 w-56 rounded-lg bg-[var(--user-bg-hover)] animate-pulse" />
         <div className="h-40 rounded-xl bg-[var(--user-bg-hover)] animate-pulse" />
         <div className="h-56 rounded-xl bg-[var(--user-bg-hover)] animate-pulse" />
@@ -35,7 +36,7 @@ export default function RewardsView() {
 
   if (isError || !data) {
     return (
-      <div className="mx-auto w-full max-w-4xl rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-8 text-center">
+      <div className="w-full rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-8 text-center">
         <p className="text-sm font-medium text-[var(--user-text)]">{t("rewards.loadError")}</p>
         <button type="button" onClick={() => refetch()} className="mt-3 text-sm font-medium text-[var(--user-accent)] hover:underline">{t("rewards.retry")}</button>
       </div>
@@ -47,7 +48,7 @@ export default function RewardsView() {
 
   if (!program.enabled) {
     return (
-      <div className="mx-auto w-full max-w-4xl">
+      <div className="w-full">
         <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-8 text-center">
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"><Gift size={20} strokeWidth={1.7} /></span>
           <p className="mt-4 text-base font-semibold text-[var(--user-text)]">{t("rewards.offTitle")}</p>
@@ -76,11 +77,8 @@ export default function RewardsView() {
   ].filter(Boolean);
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-[var(--user-text)] sm:text-2xl">{t("rewards.pageTitle")}</h1>
-        <p className="mt-1 text-[0.8125rem] text-[var(--user-text-muted)]">{t("rewards.pageSubtitle")}</p>
-      </div>
+    <div className="w-full space-y-4">
+      <AccountPageHeader title={t("rewards.pageTitle")} subtitle={t("rewards.pageSubtitle")} />
 
       {/* Balance */}
       <section className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 sm:p-6">

@@ -148,7 +148,9 @@ async function redeemForCheckout(userId, { requested, subtotal, orderId }) {
     const err = new Error(
       q.reason === "min_points"
         ? `You need at least ${s.redeem.minPoints} points to redeem.`
-        : "Points can't be used on this order.",
+        : q.reason === "order_small"
+          ? `Add more items to use points — they can pay up to ${s.redeem.maxPercent}% of the items total.`
+          : "Points can't be used on this order.",
     );
     err.status = 400;
     throw err;

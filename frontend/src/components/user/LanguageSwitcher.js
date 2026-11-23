@@ -80,19 +80,11 @@ export default function LanguageSwitcher({ className = "" }) {
         aria-label={t("switcher.label")}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex h-8 items-center gap-1.5 rounded-lg px-2 transition-all duration-150 active:scale-95"
-        style={{ color: "var(--user-text-muted)" }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "var(--user-bg-hover)";
-          e.currentTarget.style.color = "var(--user-text)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
-          e.currentTarget.style.color = "var(--user-text-muted)";
-        }}
+        className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-full border border-[var(--user-border)] px-2.5 text-[13px] font-medium transition-all duration-200 hover:border-[var(--user-border-hover)] hover:bg-[var(--user-bg-hover)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--user-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--user-bg-card)] pointer-coarse:h-10 sm:h-10"
+        style={{ color: "var(--user-text)" }}
       >
-        <Languages size={16} strokeWidth={2} />
-        <span className="hidden text-[12px] font-semibold sm:inline">
+        <Languages size={16} strokeWidth={1.8} style={{ color: "var(--user-text-muted)" }} />
+        <span className="hidden sm:inline">
           {current.nativeLabel}
         </span>
       </button>

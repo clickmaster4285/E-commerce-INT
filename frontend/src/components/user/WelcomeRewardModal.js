@@ -127,6 +127,7 @@ export default function WelcomeRewardModal() {
   const { t, locale } = useTranslation();
   const [dismissed, setDismissed] = useState(null);
   const [orderReward, setOrderReward] = useState(null);
+  const [preorderClaim, setPreorderClaim] = useState(null); // { points, resolve }
   const [phase, setPhase] = useState("idle"); // idle | claiming | flying | success
   const [error, setError] = useState(null);
   const [claimedPoints, setClaimedPoints] = useState(0);
@@ -134,7 +135,7 @@ export default function WelcomeRewardModal() {
   const closeRef = useRef(null);
   const rewardRef = useRef(null);
   const coinLayerRef = useRef(null);
-  const stateRef = useRef({ bonus: null, orderReward: null, phase: "idle" });
+  const stateRef = useRef({ bonus: null, orderReward: null, preorderClaim: null, phase: "idle" });
 
   const { data: user = null } = useQuery({
     queryKey: ["userProfile"],
@@ -167,40 +168,64 @@ export default function WelcomeRewardModal() {
     return txn;
   }, [rewards]);
 
-  // Order placed → checkout yahan event bhejta hai (toast ki jagah).
+  // Checkout: order place karne se PEHLE yahi popup claim ke liye kholta hai.
   useEffect(() => {
+    window.__rewardClaimListener = true;
+    const onClaimRequest = (e) => {
+      const points = Number(e.detail?.points) || 0;
+      const resolve = e.detail?.resolve;
+      if (points <= 0) { resolve?.(true); return; }
+      setError(null);
+      setPhase("idle");
+      setPreorderClaim({ points, resolve });
+    };
     const onOrderEarned = (e) => {
       const points = Number(e.detail?.points) || 0;
       const id = String(e.detail?.orderId || `${points}-${Date.now()}`);
       if (points <= 0 || seenOrder(id)) return;
       markOrderSeen(id);
+      setPreorderClaim(null);
       setError(null);
       setOrderReward({ points, id });
     };
+    window.addEventListener("loyalty:claim-request", onClaimRequest);
     window.addEventListener("loyalty:order-earned", onOrderEarned);
-    return () => window.removeEventListener("loyalty:order-earned", onOrderEarned);
+    return () => {
+      delete window.__rewardClaimListener;
+      window.removeEventListener("loyalty:claim-request", onClaimRequest);
+      window.removeEventListener("loyalty:order-earned", onOrderEarned);
+    };
   }, []);
 
   const welcomeOpen = Boolean(bonus) && dismissed !== bonus?._id;
   const orderOpen = Boolean(orderReward);
-  const open = welcomeOpen || orderOpen;
-  const mode = orderOpen ? "order" : "welcome";
-  const displayPoints = mode === "order" ? orderReward.points : (bonus?.points || 0);
+  const preorderOpen = Boolean(preorderClaim);
+  const open = welcomeOpen || orderOpen || preorderOpen;
+  const mode = preorderOpen ? "preorder" : orderOpen ? "order" : "welcome";
+  const displayPoints = mode === "preorder" ? preorderClaim.points : mode === "order" ? orderReward.points : (bonus?.points || 0);
   const count = useCountUp(displayPoints, open);
   const successPoints = mode === "order" ? orderReward.points : claimedPoints;
 
   useEffect(() => {
-    stateRef.current = { bonus, orderReward, phase };
-  }, [bonus, orderReward, phase]);
+    stateRef.current = { bonus, orderReward, preorderClaim, phase };
+  }, [bonus, orderReward, preorderClaim, phase]);
 
   const close = useCallback(() => {
     const s = stateRef.current;
     if (s.phase === "claiming" || s.phase === "flying") return;
+    if (s.preorderClaim) { s.preorderClaim.resolve?.(false); setPreorderClaim(null); return; }
     if (s.orderReward) { setOrderReward(null); return; }
     if (!s.bonus) return;
     markSeen(s.bonus._id);
     setDismissed(s.bonus._id);
   }, []);
+
+  // Pre-order claim → checkout ko continue karne deta hai (order ab place hota hai).
+  const handlePreorderClaim = () => {
+    if (!preorderClaim) return;
+    preorderClaim.resolve?.(true);
+    setPreorderClaim(null);
+  };
 
   // Focus / Escape / scroll-lock — modal khulte hi.
   useEffect(() => {
@@ -359,10 +384,10 @@ export default function WelcomeRewardModal() {
                 <Gift size={20} strokeWidth={1.75} />
               </span>
               <p className="mt-4 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[var(--user-text-muted)] motion-safe:animate-[rewardRise_.45s_ease-out_.2s_both]">
-                {mode === "order" ? t("rewards.orderEarned.eyebrow") : t("rewards.welcome.eyebrow")}
+                {mode === "order" ? t("rewards.orderEarned.eyebrow") : mode === "preorder" ? t("rewards.claim.preorder.eyebrow") : t("rewards.welcome.eyebrow")}
               </p>
               <h2 id="welcome-reward-title" className="mx-auto mt-2 max-w-[19rem] text-xl font-semibold leading-snug tracking-tight text-[var(--user-text)] motion-safe:animate-[rewardRise_.45s_ease-out_.26s_both] sm:text-[1.375rem]">
-                {mode === "order" ? t("rewards.orderEarned", { points: n(displayPoints) }) : t("rewards.claim.title")}
+                {mode === "order" ? t("rewards.orderEarned", { points: n(displayPoints) }) : mode === "preorder" ? t("rewards.claim.preorder.title", { points: n(displayPoints) }) : t("rewards.claim.title")}
               </h2>
 
               <p ref={rewardRef} className="mt-5 flex items-baseline justify-center gap-1.5 motion-safe:animate-[rewardRise_.5s_ease-out_.32s_both]">
@@ -372,14 +397,14 @@ export default function WelcomeRewardModal() {
 
               {redeem.enabled && (
                 <span className="mt-3 inline-flex items-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-1 text-xs font-medium text-[var(--user-text-muted)] motion-safe:animate-[rewardRise_.45s_ease-out_.46s_both]">
-                  {t("rewards.welcome.worth", { value: n(pointsToValue(program, mode === "order" ? displayPoints : balance)) })}
+                  {t("rewards.welcome.worth", { value: n(pointsToValue(program, mode === "welcome" ? balance : displayPoints)) })}
                 </span>
               )}
             </div>
 
             <div className="px-6 pb-6 pt-5">
               <p id="welcome-reward-desc" className="text-center text-[0.8125rem] leading-6 text-[var(--user-text-muted)]">
-                {mode === "order" ? t("rewards.orderEarnedText") : t("rewards.welcome.text")}
+                {mode === "order" ? t("rewards.orderEarnedText") : mode === "preorder" ? t("rewards.claim.preorder.text") : t("rewards.welcome.text")}
               </p>
 
               {mode === "welcome" && perks.length > 0 && (
@@ -393,7 +418,14 @@ export default function WelcomeRewardModal() {
                 </ul>
               )}
 
-              {mode === "welcome" ? (
+              {mode === "preorder" ? (
+                <button type="button" onClick={handlePreorderClaim}
+                  className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-[var(--user-accent-hover)] hover:shadow-md active:translate-y-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                  <Gift size={15} strokeWidth={1.75} />
+                  {t("rewards.claim.button")}
+                  <ArrowRight size={15} strokeWidth={1.75} />
+                </button>
+              ) : mode === "welcome" ? (
                 <button type="button" onClick={handleClaim} disabled={busy}
                   className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-[var(--user-accent-hover)] hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
                   {phase === "claiming" ? (

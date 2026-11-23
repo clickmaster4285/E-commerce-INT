@@ -39,6 +39,7 @@ import {
 import { shippingApi } from "@/apis/user/shippingApi";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import { pointsForAmount, quoteRedemption } from "@/lib/loyalty";
+import { requestRewardClaim } from "@/lib/rewardClaim";
 import { PointsRedeemCard, PointsSummaryRow } from "@/components/user/LoyaltyCheckout";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
@@ -958,6 +959,11 @@ function CheckoutContent() {
     }
     const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
     if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
+    // ✅ Order place karne se PEHLE wahi welcome-style claim popup (coins available ho to).
+    if (pointsToEarn > 0) {
+      const claimed = await requestRewardClaim(pointsToEarn);
+      if (!claimed) return; // user ne claim nahi kiya → order place nahi hoga
+    }
     placingRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);

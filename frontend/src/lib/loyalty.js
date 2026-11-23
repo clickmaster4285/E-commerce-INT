@@ -33,11 +33,12 @@ export function quoteRedemption(program, { balance, subtotal, requested }) {
   const maxPoints = Math.min(bal, Math.floor((maxDiscount * per) / value));
   if (bal < minPoints) return { ok: false, points: 0, discount: 0, maxPoints, reason: "min_points" };
   if (want === 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "nothing" };
-  let points = Math.min(want, maxPoints);
-  const discount = Math.floor((points * value) / per);
-  if (discount <= 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "nothing" };
-  points = Math.ceil((discount * per) / value);
-  if (points < minPoints) return { ok: false, points: 0, discount: 0, maxPoints, reason: "min_points" };
+  if (maxPoints < minPoints || maxPoints <= 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "order_small" };
+  const chosen = Math.max(minPoints, Math.min(want, maxPoints));
+  const discount = Math.floor((chosen * value) / per);
+  if (discount <= 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "order_small" };
+  const needed = Math.ceil((discount * per) / value);
+  const points = Math.min(chosen, Math.max(minPoints, needed));
   return { ok: true, points, discount, maxPoints, reason: "" };
 }
 

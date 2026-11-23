@@ -58,11 +58,9 @@ export default function PointsBadge({ points = 0, href = "/account?tab=rewards",
   }
 
   const className = [
-    "relative inline-flex h-9 shrink-0 items-center gap-2 rounded-full border ps-1.5 pe-3",
-    "border-[color-mix(in_srgb,var(--user-accent)_28%,transparent)] bg-[var(--user-accent-soft)]",
-    "transition-all duration-200 ease-out hover:-translate-y-px active:scale-[0.97]",
-    "hover:border-[color-mix(in_srgb,var(--user-accent)_55%,transparent)]",
-    "hover:bg-[color-mix(in_srgb,var(--user-accent)_16%,transparent)]",
+    "relative inline-flex h-9 shrink-0 items-center gap-2 rounded-full ps-1 pe-2",
+    "bg-transparent transition-all duration-200 ease-out hover:-translate-y-px active:scale-[0.97]",
+    "hover:bg-[var(--user-bg-hover)]",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--user-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--user-bg-card)]",
     "pointer-coarse:h-10 sm:h-10",
     boost ? "motion-safe:animate-[coinBoostGlow_1.4s_ease-out]" : "",
@@ -77,7 +75,6 @@ export default function PointsBadge({ points = 0, href = "/account?tab=rewards",
         <span className="min-[380px]:hidden">{abbreviate(display)}</span>
         <span className="hidden min-[380px]:inline">{fmt(display)}</span>
       </span>
-      <span className="hidden text-xs font-medium text-[var(--user-text-muted)] sm:inline">{t("rewards.points")}</span>
       {delta !== null && Number(delta) > 0 && (
         <span aria-hidden="true" className="pointer-events-none absolute -top-2 end-0 rounded-full bg-[var(--user-accent)] px-1.5 py-0.5 text-[0.625rem] font-bold leading-none text-[var(--user-accent-text)] motion-safe:animate-[pointsDeltaIn_1.2s_ease-out_both]">
           +{fmt(delta)}

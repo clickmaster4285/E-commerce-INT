@@ -73,3 +73,19 @@ test("bad input never produces negative or fractional points", () => {
   assert.equal(q.points, 0);
   assert.equal(q.discount, 0);
 });
+
+test("balance exactly at minimum still redeems when rounding would drop below it", () => {
+  // 99 points = Rs 10, min 100: 100 points → Rs 10; rounding wants 99 but min is 100
+  const s = on({ redeem: { redeemPoints: 99, redeemValue: 10, minPoints: 100, maxPercent: 50 } });
+  const q = quoteRedemption(s, { balance: 100, subtotal: 50000, requested: 100 });
+  assert.equal(q.ok, true);
+  assert.equal(q.points, 100);
+  assert.equal(q.discount, 10);
+});
+
+test("order too small for the minimum reports order_small", () => {
+  // subtotal 100 → 50% = Rs 50 → max 500 points, but min is 1000
+  const q = quoteRedemption(on({ redeem: { minPoints: 1000 } }), { balance: 5000, subtotal: 100, requested: 5000 });
+  assert.equal(q.ok, false);
+  assert.equal(q.reason, "order_small");
+});

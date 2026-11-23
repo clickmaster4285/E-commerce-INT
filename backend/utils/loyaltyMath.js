@@ -76,14 +76,17 @@ function quoteRedemption(settings, { balance, subtotal, requested }) {
   }
   if (want === 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "nothing" };
 
-  let points = Math.min(want, maxPoints);
-  const discount = Math.floor((points * s.redeem.redeemValue) / s.redeem.redeemPoints);
-  if (discount <= 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "nothing" };
-  // Sirf utne points kaato jitne is discount ke liye chahiye (rounding me points zaya na hon)
-  points = Math.ceil((discount * s.redeem.redeemPoints) / s.redeem.redeemValue);
-  if (points < s.redeem.minPoints) {
-    return { ok: false, points: 0, discount: 0, maxPoints, reason: "min_points" };
+  // Order itna chhota ke minimum points bhi is par nahi lag sakte
+  if (maxPoints < s.redeem.minPoints || maxPoints <= 0) {
+    return { ok: false, points: 0, discount: 0, maxPoints, reason: "order_small" };
   }
+  const chosen = Math.max(s.redeem.minPoints, Math.min(want, maxPoints));
+  const discount = Math.floor((chosen * s.redeem.redeemValue) / s.redeem.redeemPoints);
+  if (discount <= 0) return { ok: false, points: 0, discount: 0, maxPoints, reason: "order_small" };
+  // Sirf utne points kaato jitne is discount ke liye chahiye (rounding me points zaya na hon),
+  // lekin minimum se kam kabhi nahi (warna 100 points wala customer reject ho jata tha)
+  const needed = Math.ceil((discount * s.redeem.redeemPoints) / s.redeem.redeemValue);
+  const points = Math.min(chosen, Math.max(s.redeem.minPoints, needed));
   return { ok: true, points, discount, maxPoints, reason: "" };
 }
 
