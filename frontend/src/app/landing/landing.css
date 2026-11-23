@@ -6,6 +6,9 @@
    ============================================================ */
 
 .user-theme.landing-page {
+  /* next/font/google hata diya gaya (offline build) — same stacks, ab pure CSS. */
+  --font-body: "Inter";
+  --font-heading: "Plus Jakarta Sans";
   background: var(--user-bg);
   color: var(--user-text);
   font-family: var(--font-body), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

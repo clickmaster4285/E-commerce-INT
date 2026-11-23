@@ -1,6 +1,5 @@
 import "./landing.css";
 
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
 import TrustStrip from "@/components/landing/TrustStrip";
@@ -13,18 +12,6 @@ import FinalCta from "@/components/landing/FinalCta";
 import Footer from "@/components/landing/Footer";
 import FloatingButtons from "@/components/landing/FloatingButtons";
 import { FAQS, SITE } from "@/components/landing/content";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-heading",
-  display: "swap",
-});
 
 export const metadata = {
   metadataBase: new URL(SITE.url),
@@ -83,9 +70,7 @@ const faqJsonLd = {
 
 export default function LandingPage() {
   return (
-    <main
-      className={`${inter.variable} ${plusJakarta.variable} user-theme landing-page min-h-screen`}
-    >
+    <main className="user-theme landing-page min-h-screen">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify([organizationJsonLd, faqJsonLd]) }}

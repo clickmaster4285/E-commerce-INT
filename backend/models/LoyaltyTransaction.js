@@ -23,6 +23,7 @@ const loyaltyTransactionSchema = new mongoose.Schema(
     order_id: { type: mongoose.Schema.Types.ObjectId, ref: "Order", default: null },
     order_number: { type: String, default: "" },
     note: { type: String, trim: true, default: "", maxlength: 300 },
+    claimed_at: { type: Date, default: null }, // welcome bonus customer ne claim kiya (balance already credited)
     actor_id: { type: mongoose.Schema.Types.ObjectId, default: null },
     actor_name: { type: String, default: "" },
   },

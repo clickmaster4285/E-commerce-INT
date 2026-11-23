@@ -96,6 +96,40 @@ async function awardSignupBonus(userId) {
   }
 }
 
+// ── Welcome claim ──────────────────────────────────────────
+/**
+ * Welcome bonus signup par hi "available" balance me credit ho chuka hota hai.
+ * Claim sirf usi transaction ko mark karta hai — balance DObara nahi badhta.
+ * Conditional update se concurrent clicks bhi idempotent rehte hain.
+ */
+async function claimWelcomeBonus(userId) {
+  const [account, txn] = await Promise.all([
+    getAccount(userId),
+    LoyaltyTransaction.findOne({
+      user_id: userId,
+      type: "signup",
+      source_key: `signup:${userId}`,
+      status: "available",
+    }).lean(),
+  ]);
+  const balance = account.balance || 0;
+  if (!txn) return { ok: false, claimed: false, points: 0, balance };
+  if (txn.claimed_at) return { ok: true, claimed: false, alreadyClaimed: true, points: txn.points || 0, balance };
+
+  const updated = await LoyaltyTransaction.findOneAndUpdate(
+    { _id: txn._id, claimed_at: null },
+    { $set: { claimed_at: new Date() } },
+    { lean: true },
+  );
+  return {
+    ok: true,
+    claimed: Boolean(updated),
+    alreadyClaimed: !updated,
+    points: txn.points || 0,
+    balance,
+  };
+}
+
 // ── Checkout ───────────────────────────────────────────────
 /**
  * Order banne se PEHLE points kaat lo (atomic: balance >= points shart ke saath).
@@ -392,6 +426,7 @@ module.exports = {
   getAccount,
   ensureAccount,
   awardSignupBonus,
+  claimWelcomeBonus,
   redeemForCheckout,
   rollbackRedemption,
   addOrderEarn,

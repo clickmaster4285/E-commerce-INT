@@ -180,18 +180,17 @@ export default function UserLoginPage() {
       setOtpEmail(res?.email || email);
       setStep("verify-email");
       toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
-      setLoading(false);
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen dikhao
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
         toast.info(t("auth.login.verifyEmail"));
-        setLoading(false);
         return;
       }
       parseBackendError(err);
       toast.error(getApiErrorMessage(err, t(isLogin ? "auth.login.loginFailed" : "auth.login.registrationFailed")));
+    } finally {
       setLoading(false);
     }
   };

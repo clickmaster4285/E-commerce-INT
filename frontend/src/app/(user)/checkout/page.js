@@ -988,14 +988,14 @@ function CheckoutContent() {
       removeItems(orderedKeys);
       setDraftItems([]);
       setCurrentDraftId(null);
-      // ✅ Loyalty — kamaye hue points ka celebration toast
+      // ✅ Loyalty — order confirm par animated reward popup (layout me mounted hai).
       if (Number(placed?.loyalty_points_earned) > 0) {
-        toast.success(t("rewards.orderEarned", { points: Number(placed.loyalty_points_earned).toLocaleString(locale) }), {
-          description: t("rewards.orderEarnedText"),
-          icon: "🎉",
-          duration: 6000,
-          action: { label: t("rewards.orderEarnedView"), onClick: () => router.push("/account?tab=rewards") },
-        });
+        window.dispatchEvent(new CustomEvent("loyalty:order-earned", {
+          detail: {
+            points: Number(placed.loyalty_points_earned),
+            orderId: String(placed._id || placed.order_number || Date.now()),
+          },
+        }));
       }
       router.push("/orders");
     } catch (e) {

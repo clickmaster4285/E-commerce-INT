@@ -189,16 +189,15 @@ export default function LoginModal({ isOpen, onClose }) {
       const res = await authApi.register({ name, username, phone, email, password });
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      setLoading(false);
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
-        setLoading(false);
         return;
       }
       parseBackendError(err);
+    } finally {
       setLoading(false);
     }
   };

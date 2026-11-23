@@ -131,6 +131,26 @@ const markMyNoticesSeen = async (req, res) => {
     fail(res, err, "Could not update notices");
   }
 };
+// POST /loyalty/me/welcome/claim — bonus signup par already credited hota hai,
+// yahan sirf us transaction ko claimed mark karte hain (balance unchanged).
+const claimWelcomeBonus = async (req, res) => {
+  try {
+    const result = await loyalty.claimWelcomeBonus(req.user._id);
+    if (!result.ok) return res.status(404).json({ success: false, message: "No welcome reward is available." });
+    res.json({
+      success: true,
+      data: {
+        claimed: result.claimed,
+        alreadyClaimed: Boolean(result.alreadyClaimed),
+        points: result.points,
+        account: mapAccount({ balance: result.balance }),
+      },
+    });
+  } catch (err) {
+    fail(res, err, "Could not claim your reward");
+  }
+};
+
 // ── Admin: settings ────────────────────────────────────────
 // GET /loyalty/admin/settings
 const getSettings = async (req, res) => {
@@ -388,6 +408,7 @@ module.exports = {
   getMyRewards,
   getMyNotices,
   markMyNoticesSeen,
+  claimWelcomeBonus,
   getSettings,
   updateSettings,
   getOverview,

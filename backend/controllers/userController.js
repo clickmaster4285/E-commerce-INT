@@ -371,26 +371,35 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 📧 Verification OTP bhejo — SMTP khaali ho to dev console fallback (sendEmail ke andar)
+    // 📧 Verification OTP bhejo. Dev me SMTP offline/slow ho to signup block nahi hota:
+    // 4s se zyada wait nahi — OTP console par dikhta hai, pending registration banti rehti hai.
+    const emailArgs = {
+      to: email,
+      otp: code,
+      purpose: "email_verification",
+      expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
+    };
     let delivery;
-    try {
-      delivery = await sendOtpEmail({
-        to: email,
-        otp: code,
-        purpose: "email_verification",
-        expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
-      });
-    } catch (emailError) {
-      await PendingRegistration.deleteOne({ email }).catch(() => {});
-      log.error("createUser otp error:", emailError.cause || emailError);
-      return res.status(500).json({ success: false, message: emailError.message });
+    if (process.env.NODE_ENV !== "production") {
+      delivery = await Promise.race([
+        sendOtpEmail(emailArgs).catch((e) => ({ delivered: false, reason: e?.code || "smtp_failed" })),
+        new Promise((resolve) => setTimeout(() => resolve({ delivered: false, reason: "smtp_timeout" }), 4000)),
+      ]);
+    } else {
+      try {
+        delivery = await sendOtpEmail(emailArgs);
+      } catch (emailError) {
+        await PendingRegistration.deleteOne({ email }).catch(() => {});
+        log.error("createUser otp error:", emailError.cause || emailError);
+        return res.status(500).json({ success: false, message: emailError.message });
+      }
     }
 
-    // 🧪 DEV ONLY — SMTP off ho to bhi flow test ho sake (prod me kabhi OTP expose nahi hoga)
+    // 🧪 DEV ONLY — logger no-op hai, isliye seedha console (prod me OTP kabhi print nahi hota).
     const debugOtp =
       !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
-      log.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
     }
 
     // ⚠️ Is step par User NAHI bana — sirf pending + OTP. Cookies verify ke baad milenge.

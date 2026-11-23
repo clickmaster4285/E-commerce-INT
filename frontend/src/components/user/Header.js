@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import { userHttp } from "@/apis/axiosInstance";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
@@ -48,6 +49,7 @@ import {
   Settings,
   MessageCircle,
   Gift,
+  Coins,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -252,6 +254,11 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState("light");
   const [isMobile, setIsMobile] = useState(false);
+  const [coinAnimValue, setCoinAnimValue] = useState(null);
+  const [coinBoost, setCoinBoost] = useState(false);
+  const [coinDelta, setCoinDelta] = useState(null);
+  const coinAnimRef = useRef(null);
+  const coinTimersRef = useRef([]);
   const { count, setIsCartOpen } = useCart();
   const { count: wishlistCount } = useWishlist();
   const queryClient = useQueryClient();
@@ -308,6 +315,61 @@ export default function Header() {
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Loyalty balance for the header coin indicator (checkout redemption refreshes this key).
+  const { data: coinBalance = null } = useQuery({
+    queryKey: ["myRewards", "header"],
+    queryFn: () => loyaltyApi.me({ limit: 1 }),
+    enabled: Boolean(user),
+    retry: false,
+    staleTime: 60 * 1000,
+    select: (d) => (d?.program?.enabled ? d.account?.balance || 0 : null),
+  });
+
+  // Reward modal ke coins yahan pahunchte hain — sirf yahi ek counter animate hota hai.
+  useEffect(() => {
+    const onCoinsIncoming = (event) => {
+      const points = Math.max(0, Number(event.detail?.points) || 0);
+      const target = Number(coinBalance) || 0;
+      if (!points) return;
+
+      cancelAnimationFrame(coinAnimRef.current);
+      coinTimersRef.current.forEach(clearTimeout);
+      coinTimersRef.current = [];
+      setCoinDelta(points);
+      setCoinBoost(true);
+
+      const scheduleReset = () => {
+        coinTimersRef.current.push(window.setTimeout(() => setCoinBoost(false), 1400));
+        coinTimersRef.current.push(window.setTimeout(() => setCoinDelta(null), 1900));
+      };
+
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        setCoinAnimValue(null);
+        scheduleReset();
+        return;
+      }
+
+      const from = Math.max(0, target - points);
+      const start = performance.now();
+      const tick = (now) => {
+        const p = Math.min(1, (now - start) / 900);
+        const value = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+        setCoinAnimValue(p < 1 ? value : null);
+        if (p < 1) coinAnimRef.current = requestAnimationFrame(tick);
+      };
+      coinAnimRef.current = requestAnimationFrame(tick);
+      scheduleReset();
+    };
+
+    window.addEventListener("loyalty:coins-incoming", onCoinsIncoming);
+    return () => {
+      window.removeEventListener("loyalty:coins-incoming", onCoinsIncoming);
+      cancelAnimationFrame(coinAnimRef.current);
+      coinTimersRef.current.forEach(clearTimeout);
+      setCoinAnimValue(null);
+    };
+  }, [coinBalance]);
 
   const { data: store = null } = useQuery({
     queryKey: ["storeInfo"],
@@ -416,13 +478,20 @@ export default function Header() {
   };
 
   const storeName = store?.store_name || "";
+  const n = (v) => Number(v || 0).toLocaleString(locale);
+  const showCoins = Boolean(user) && coinBalance !== null;
+  const coinsShown = coinAnimValue ?? coinBalance;
 
   const iconBtn =
     "relative flex h-9 w-9 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-[0.96] lg:h-10 lg:w-10";
 
   return (
     <>
-      <style>{`@keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }`}</style>
+      <style>{`
+        @keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+        @keyframes coinDeltaIn { 0% { opacity: 0; transform: translateY(6px) } 18% { opacity: 1; transform: translateY(0) } 72% { opacity: 1 } 100% { opacity: 0; transform: translateY(-8px) } }
+        @keyframes coinGlow { 0%, 100% { box-shadow: 0 0 0 0 transparent } 45% { box-shadow: 0 0 0 5px var(--user-accent-soft) } }
+      `}</style>
 
       {open && (
         <div
@@ -477,6 +546,31 @@ export default function Header() {
               </button>
 
               <LanguageSwitcher />
+
+              {showCoins && (
+                <Link
+                  data-loyalty-coin-target=""
+                  href="/account?tab=rewards"
+                  title={t("header.rewards")}
+                  aria-label={t("header.coinBalance", { points: n(coinsShown) })}
+                  className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-all duration-200 hover:bg-[var(--user-bg-hover)] active:scale-[0.96] sm:h-10 sm:w-auto sm:gap-1.5 sm:rounded-full sm:bg-[var(--user-bg-surface)] sm:px-3 sm:hover:bg-[var(--user-bg-hover)] ${coinBoost ? "scale-105 motion-safe:animate-[coinGlow_1.4s_ease-out]" : ""}`}
+                >
+                  <Coins size={16} strokeWidth={1.8} className="shrink-0 text-[var(--user-accent)]" />
+                  <span
+                    className="absolute right-0.5 top-0.5 flex h-[0.9375rem] min-w-[0.9375rem] items-center justify-center rounded-full border-2 border-[var(--user-bg-elevated)] bg-[var(--user-accent)] px-1 text-[0.5625rem] font-semibold text-[var(--user-accent-text)] sm:static sm:h-auto sm:min-w-0 sm:border-0 sm:bg-transparent sm:px-0 sm:text-sm sm:font-medium sm:tabular-nums sm:text-[var(--user-text)]"
+                  >
+                    {n(coinsShown)}
+                  </span>
+                  <span className="hidden text-xs font-normal text-[var(--user-text-muted)] lg:inline">
+                    {t("rewards.points")}
+                  </span>
+                  {coinDelta !== null && (
+                    <span aria-hidden="true" className="pointer-events-none absolute -top-2 end-0 rounded-full bg-[var(--user-accent)] px-1.5 py-0.5 text-[0.625rem] font-semibold leading-none text-[var(--user-accent-text)] motion-safe:animate-[coinDeltaIn_1.9s_ease-out_both]">
+                      +{n(coinDelta)}
+                    </span>
+                  )}
+                </Link>
+              )}
 
               <button
                 onClick={toggleTheme}
@@ -761,11 +855,16 @@ export default function Header() {
                       new CustomEvent("account:tab", { detail: "rewards" }),
                     );
                   }}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item relative flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
                     <Gift size={18} className="text-[var(--user-accent)]" />
                   </div>
+                  {showCoins && (
+                    <span className="absolute end-2 top-2 rounded-full bg-[var(--user-accent)] px-1.5 py-0.5 text-[0.625rem] font-medium leading-none text-[var(--user-accent-text)]">
+                      {n(coinBalance)}
+                    </span>
+                  )}
                   <span className="text-xs font-medium text-[var(--user-text)]">
                     {t("header.rewards")}
                   </span>

@@ -12,6 +12,7 @@ router.get("/program", c.getProgram);
 router.get("/me", authMiddleware.requireUser, c.getMyRewards);
 router.get("/me/notices", authMiddleware.requireUser, c.getMyNotices);
 router.post("/me/notices/seen", authMiddleware.requireUser, c.markMyNoticesSeen);
+router.post("/me/welcome/claim", authMiddleware.requireUser, c.claimWelcomeBonus);
 
 // ADMIN — sirf admin session (a_at) + 'loyalty' permission
 const admin = [authMiddleware.requireAdmin, checkPermission("loyalty")];
