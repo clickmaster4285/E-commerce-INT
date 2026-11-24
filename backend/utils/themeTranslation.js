@@ -52,6 +52,11 @@ function collectThemeTexts(theme) {
   walkMenu("footer", theme.menus?.footer);
 
   for (const key of translatableKeys(GLOBAL_SETTINGS.announcement)) push(`a.${key}`, theme.settings?.announcement?.[key]);
+  // Baaki global groups (header / footer ...) → g.<group>.<field>
+  for (const [group, fields] of Object.entries(GLOBAL_SETTINGS)) {
+    if (group === "announcement") continue;
+    for (const key of translatableKeys(fields)) push(`g.${group}.${key}`, theme.settings?.[group]?.[key]);
+  }
 
   // Product page template blocks → p.<zone>.<blockId>.<field>
   const product = theme.templates?.product;

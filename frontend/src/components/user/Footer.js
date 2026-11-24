@@ -79,7 +79,20 @@ export default function Footer() {
   });
 
   const storeName = store?.store_name || "";
-  const tagline = fieldOf(store, "tagline") || t("store.defaultTagline");
+  // Store editor Theme → Footer (khali text / missing = purana footer)
+  const { theme: storeTheme } = useStoreTheme();
+  const footerCfg = storeTheme?.settings?.footer || {};
+  const showCategories = footerCfg.showCategories !== false;
+  const showHelp = footerCfg.showHelp !== false;
+  const showSocials = footerCfg.showSocials !== false;
+  const showBadges = footerCfg.showBadges !== false;
+  const paymentMethods = String(footerCfg.paymentMethods || "")
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 16);
+
+  const tagline = footerCfg.aboutText || fieldOf(store, "tagline") || t("store.defaultTagline");
   const supportEmail = store?.support_email || store?.email || "";
   const supportPhone = store?.support_phone || store?.phone || "";
   const country = store?.country || "";
@@ -100,8 +113,7 @@ export default function Footer() {
 
   const footerCategories = categories.slice(0, 5);
 
-  const { theme } = useStoreTheme();
-  const footerMenu = (theme?.menus?.footer || [])
+  const footerMenu = (storeTheme?.menus?.footer || [])
     .map((item) => ({ id: item.id, label: item.label, href: resolveThemeLink(item.link) }))
     .filter((item) => item.label && item.href);
 
@@ -147,6 +159,7 @@ export default function Footer() {
           </div>
 
           {/* CATEGORIES — apni categories */}
+          {showCategories && (
           <div>
             <h3 className="text-user-fg font-medium text-sm mb-3">{t("footer.customerService")}</h3>
             <ul className="space-y-2">
@@ -163,10 +176,12 @@ export default function Footer() {
               )}
             </ul>
           </div>
+          )}
 
           {/* SUPPORT — apne support links */}
+          {showHelp && (
           <div>
-            <h3 className="text-user-fg font-medium text-sm mb-3">{t("footer.help")}</h3>
+            <h3 className="text-user-fg font-medium text-sm mb-3">{footerCfg.helpTitle || t("footer.help")}</h3>
             <ul className="space-y-2">
               {supportEmail && (
                 <li>
@@ -196,8 +211,10 @@ export default function Footer() {
               <li><Link href="/account" className={linkCls}>{t("footer.myAccount")}</Link></li>
             </ul>
           </div>
+          )}
 
           {/* SOCIALS — sirf apne socials, app buttons nahi (app hamare paas nahi hai) */}
+          {showSocials && (
           <div className="col-span-2 lg:col-span-1">
             <h4 className="text-user-fg font-medium text-sm mb-3">
               {t("footer.connectWith", { name: storeName || "us" })}
@@ -217,9 +234,11 @@ export default function Footer() {
               ))}
             </div>
           </div>
+          )}
         </div>
 
         {/* MIDDLE — image wali strip, sirf layout (koi store data nahi hota isme) */}
+        {showBadges && (
         <div className="grid gap-6 border-t border-user-line-soft pt-5 mt-6 lg:grid-cols-2">
           <div>
             <h4 className="text-user-fg font-medium text-sm mb-2.5">{t("footer.securityCertification")}</h4>
@@ -236,6 +255,14 @@ export default function Footer() {
 
           <div>
             <h4 className="text-user-fg font-medium text-sm mb-2.5">{t("footer.weAccept")}</h4>
+            {paymentMethods.length > 0 ? (
+              /* Store editor: seller ke apne payment methods */
+              <div className="flex flex-wrap gap-2">
+                {paymentMethods.map((method) => (
+                  <span key={method} className={badgeCls}>{method}</span>
+                ))}
+              </div>
+            ) : (
             <div className="flex flex-wrap gap-2">
               <span className={badgeCls}>JazzCash</span>
               <span className={badgeCls}>easypaisa</span>
@@ -254,15 +281,17 @@ export default function Footer() {
                 <span className="font-bold">G</span> Pay
               </span>
             </div>
+            )}
           </div>
         </div>
+        )}
 
         {/* BOTTOM — apna store naam */}
         <div className="border-t border-user-line-soft mt-6 pt-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="text-xs text-user-fg-muted text-center sm:text-left">
-              Â© {new Date().getFullYear()}{" "}
-              <span className="text-user-fg-secondary font-medium">{storeName}</span>. {t("header.allRightsReserved")}
+              © {new Date().getFullYear()}{" "}
+              <span className="text-user-fg-secondary font-medium">{storeName}</span>. {footerCfg.copyright || t("header.allRightsReserved")}
             </p>
             <div className="flex items-center gap-4 text-xs text-user-fg-muted">
               <Link href="#" className="hover:text-user-accent transition-colors">{t("footer.privacyPolicy")}</Link>

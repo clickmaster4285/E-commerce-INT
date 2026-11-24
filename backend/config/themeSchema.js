@@ -282,6 +282,24 @@ const GLOBAL_SETTINGS = {
     { key: "text", type: "text", label: "Text", default: "", translatable: true },
     { key: "link", type: "link", label: "Link", default: { type: "none" } },
   ],
+  // ── Header (default = aaj ka header) ──
+  header: [
+    { key: "sticky", type: "checkbox", label: "Sticky header (stays on top while scrolling)", default: true },
+    { key: "logoSize", type: "select", label: "Logo size", options: ["default", "small", "large"], default: "default" },
+    { key: "showStoreName", type: "checkbox", label: "Show store name next to logo", default: true },
+    { key: "showSearch", type: "checkbox", label: "Show search bar", default: true },
+  ],
+  // ── Footer (default = aaj ka footer; text khali = built-in text) ──
+  footer: [
+    { key: "aboutText", type: "textarea", label: "About text (empty = store tagline)", default: "", translatable: true },
+    { key: "showCategories", type: "checkbox", label: "Show categories column", default: true },
+    { key: "showHelp", type: "checkbox", label: "Show help / footer menu column", default: true },
+    { key: "helpTitle", type: "text", label: "Help column title (empty = default)", default: "", translatable: true },
+    { key: "showSocials", type: "checkbox", label: "Show social icons", default: true },
+    { key: "showBadges", type: "checkbox", label: "Show payment & security badges", default: true },
+    { key: "paymentMethods", type: "textarea", label: "Payment methods, one per line (empty = default badges)", default: "", showIf: { key: "showBadges", equals: true } },
+    { key: "copyright", type: "text", label: "Copyright text (empty = default)", default: "", translatable: true },
+  ],
 };
 
 const DEFAULT_ORDER = [

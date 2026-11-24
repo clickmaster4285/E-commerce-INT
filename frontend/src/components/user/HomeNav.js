@@ -129,8 +129,16 @@ export default function HomeNav() {
   const themeMenu = useMemo(
     () =>
       (theme?.menus?.main || [])
-        .map((item) => ({ id: item.id, label: item.label, href: resolveThemeLink(item.link) }))
-        .filter((item) => item.label && item.href),
+        .map((item) => ({
+          id: item.id,
+          label: item.label,
+          href: resolveThemeLink(item.link),
+          children: (item.children || [])
+            .map((c) => ({ id: c.id, label: c.label, href: resolveThemeLink(c.link) }))
+            .filter((c) => c.label && c.href),
+        }))
+        // Parent ka link na ho tab bhi sub-links ho to dropdown dikhao
+        .filter((item) => item.label && (item.href || item.children.length)),
     [theme],
   );
   const activeTab = searchParams?.get("tab");
@@ -227,6 +235,30 @@ export default function HomeNav() {
     openMorePanel();
   };
 
+  /* Store editor menu dropdowns — key "menu-<id>" (positionPanel data-panel-id se anchor dhoondta hai) */
+  const openMenuPanel = (key) => {
+    if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+    morePinnedRef.current = false;
+    positionPanel(key);
+    setPanel(key);
+  };
+  const scheduleMenuClose = (key) => {
+    if (morePinnedRef.current) return;
+    if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+    moreCloseTimerRef.current = setTimeout(() => {
+      const anchor = document.querySelector(`[data-panel-id="${key}"]`);
+      if (!anchor?.matches(":hover") && !panelRef.current?.matches(":hover")) closePanel();
+    }, 150);
+  };
+  const toggleMenuPanel = (key) => {
+    if (panel === key && morePinnedRef.current) {
+      closePanel();
+      return;
+    }
+    openMenuPanel(key);
+    morePinnedRef.current = true; // touch / click → hover band hone par bhi khula rahe
+  };
+
   /* Best Offers / New Arrivals: ?tab= URL me set + Featured section tak
      smooth scroll + wahi tab select (event se, taake same-page click par
      bhi foran kaam kare). Home: tab clear + top par scroll. */
@@ -306,7 +338,24 @@ export default function HomeNav() {
         >
           {/* STORE EDITOR MAIN MENU — seller ne banaya ho to purane plain links ki jagah */}
           {themeMenu.map((item) =>
-            isExternalHref(item.href) ? (
+            item.children.length ? (
+              <button
+                key={item.id}
+                type="button"
+                data-panel-id={`menu-${item.id}`}
+                aria-haspopup="menu"
+                aria-expanded={panel === `menu-${item.id}`}
+                onClick={() => toggleMenuPanel(`menu-${item.id}`)}
+                onMouseEnter={() => {
+                  if (!morePinnedRef.current) openMenuPanel(`menu-${item.id}`);
+                }}
+                onMouseLeave={() => scheduleMenuClose(`menu-${item.id}`)}
+                className={`${itemClass(panel === `menu-${item.id}`)} gap-1.5`}
+              >
+                {item.label}
+                <ChevronDown size={14} className={`transition-transform duration-200 ${panel === `menu-${item.id}` ? "rotate-180" : ""}`} />
+              </button>
+            ) : isExternalHref(item.href) ? (
               <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" className={itemClass(false)}>
                 {item.label}
               </a>
@@ -364,6 +413,49 @@ export default function HomeNav() {
           ) : null}
         </div>
       </div>
+
+      {/* STORE EDITOR MENU DROPDOWN */}
+      {panel?.startsWith("menu-") && panelStyle
+        ? (() => {
+            const item = themeMenu.find((m) => `menu-${m.id}` === panel);
+            if (!item) return null;
+            const links = item.href ? [{ id: `${item.id}-self`, label: item.label, href: item.href }, ...item.children] : item.children;
+            return (
+              <DropdownPanel
+                panelRef={panelRef}
+                style={panelStyle}
+                onMouseEnter={() => {
+                  if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+                }}
+                onMouseLeave={() => scheduleMenuClose(panel)}
+              >
+                {links.map((link) =>
+                  isExternalHref(link.href) ? (
+                    <a
+                      key={link.id}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={closePanel}
+                      className="block rounded-xl px-2.5 py-2 text-[0.8125rem] font-medium text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-fg"
+                    >
+                      {link.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={link.id}
+                      href={link.href}
+                      onClick={closePanel}
+                      className="block rounded-xl px-2.5 py-2 text-[0.8125rem] font-medium text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-fg"
+                    >
+                      {link.label}
+                    </Link>
+                  ),
+                )}
+              </DropdownPanel>
+            );
+          })()
+        : null}
 
       {/* MORE PANEL */}
       {panel === "more" && panelStyle ? (

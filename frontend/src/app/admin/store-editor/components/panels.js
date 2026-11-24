@@ -304,6 +304,8 @@ const GROUP_LABELS = {
   layout: "Layout",
   branding: "Branding",
   announcement: "Announcement bar",
+  header: "Header",
+  footer: "Footer",
 };
 const COLOR_LABELS = {
   accent: "Accent (buttons, links)",
@@ -368,7 +370,7 @@ export function ThemeSettings({ schema }) {
           {group === "colors" ? (
             <p className="text-[11px] text-fg-muted">Empty = built-in color. Dark mode keeps its own surfaces automatically.</p>
           ) : null}
-          {fields.map((field) => (
+          {fields.filter((field) => isVisible(field, draft.settings?.[group], fields)).map((field) => (
             <SettingField
               key={field.key}
               field={group === "colors" ? { ...field, label: COLOR_LABELS[field.key] || field.label } : field}
@@ -384,10 +386,14 @@ export function ThemeSettings({ schema }) {
 }
 
 // ───────────────────────── Menus ─────────────────────────
-function MenuList({ menuKey, title, hint, maxItems }) {
+function MenuList({ menuKey, title, hint, maxItems, allowChildren = false }) {
   const { draft, setMenu } = useThemeEditorStore();
   const items = draft?.menus?.[menuKey] || [];
-  const totalItems = Object.values(draft?.menus || {}).reduce((n, list) => n + (list?.length || 0), 0);
+  // Validator har menu item (children bhi) gin-ta hai — yahan bhi wahi
+  const countItems = (list) => (list || []).reduce((n, it) => n + 1 + countItems(it.children), 0);
+  const totalItems = Object.values(draft?.menus || {}).reduce((n, list) => n + countItems(list), 0);
+  const patchChild = (i, j, next) =>
+    patch(i, { children: (items[i].children || []).map((c, k) => (k === j ? { ...c, ...next } : c)) });
   const patch = (i, next) => setMenu(menuKey, items.map((it, j) => (j === i ? { ...it, ...next } : it)));
   const move = (i, d) => {
     const j = i + d;
@@ -417,6 +423,42 @@ function MenuList({ menuKey, title, hint, maxItems }) {
             </button>
           </div>
           <LinkInput value={item.link} onChange={(link) => patch(i, { link })} />
+          {allowChildren ? (
+            <div className="space-y-2 border-s-2 border-line ps-3">
+              {(item.children || []).map((child, j) => (
+                <div key={child.id} className="space-y-1.5">
+                  <div className="flex items-center gap-1">
+                    <input
+                      className={inputCls}
+                      placeholder="Sub-link label"
+                      maxLength={60}
+                      value={child.label}
+                      onChange={(e) => patchChild(i, j, { label: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      className={`${iconBtn} hover:text-danger`}
+                      onClick={() => patch(i, { children: item.children.filter((_, k) => k !== j) })}
+                      aria-label="Remove sub-link"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                  <LinkInput value={child.link} onChange={(link) => patchChild(i, j, { link })} />
+                </div>
+              ))}
+              <button
+                type="button"
+                disabled={totalItems >= maxItems}
+                onClick={() =>
+                  patch(i, { children: [...(item.children || []), { id: randomId("m"), label: "", link: { type: "home" }, children: [] }] })
+                }
+                className="inline-flex h-7 items-center gap-1 text-[11px] font-semibold text-accent disabled:opacity-50"
+              >
+                <Plus size={12} /> Add sub-link (dropdown)
+              </button>
+            </div>
+          ) : null}
         </div>
       ))}
       <button
@@ -436,6 +478,7 @@ export function MenuEditor({ schema }) {
     <div className="space-y-6">
       <MenuList
         menuKey="main"
+        allowChildren
         title="Main menu"
         hint="Shown in the navigation bar under the header. Empty = default links (Home, Best offers, New)."
         maxItems={schema.limits.maxMenuItems}

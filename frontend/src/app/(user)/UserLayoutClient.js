@@ -18,6 +18,7 @@ import { initThemeFromCookie } from "@/lib/theme";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import SupportChatWidget from "@/components/chat/SupportChatWidget";
 import AnnouncementBar from "@/storefront/AnnouncementBar";
+import { useStoreTheme } from "@/storefront/ThemeProvider";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
@@ -110,6 +111,9 @@ export default function UserLayoutClient({ children }) {
   const { dir, locale } = useTranslation();
   const pathname = usePathname();
   const queryClient = useQueryClient();
+  // Store editor: header sticky off → neeche wale sticky bars ka offset user.css adjust karta hai
+  const { theme: storeTheme } = useStoreTheme();
+  const headerSticky = storeTheme?.settings?.header?.sticky !== false;
 
   // Session expired / guest 401: switch UI to logged-out state silently.
   // NOTE: setQueryData (not invalidate) to avoid a refetch loop —
@@ -148,6 +152,7 @@ export default function UserLayoutClient({ children }) {
         <QuickBuyProvider>
         <div
           id="user-theme"
+          data-header-sticky={headerSticky ? "true" : "false"}
           dir={dir}
           lang={locale}
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-user-page text-user-fg"

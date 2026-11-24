@@ -286,3 +286,23 @@ test("product template text is collected for translation", () => {
   assert.ok(keys.includes("p.info.wa.label"));
   assert.ok(!keys.some((k) => k.endsWith(".phone")));
 });
+
+// ───────────────────────── Header / footer settings ─────────────────────────
+test("header & footer settings default to today's layout and validate", () => {
+  const r = validate(buildDefaultTheme());
+  assert.deepEqual(r.data.settings.header, { sticky: true, logoSize: "default", showStoreName: true, showSearch: true });
+  assert.equal(r.data.settings.footer.showBadges, true);
+  assert.equal(r.data.settings.footer.copyright, "");
+
+  const bad = buildDefaultTheme();
+  bad.settings.header.logoSize = "huge";
+  assert.equal(validate(bad).ok, false);
+
+  const { collectThemeTexts } = require("../utils/themeTranslation");
+  const theme = buildDefaultTheme();
+  theme.settings.footer.aboutText = "Best electronics in town";
+  theme.settings.footer.copyright = "All rights reserved";
+  const keys = collectThemeTexts(validate(theme).data).map((e) => e.key);
+  assert.ok(keys.includes("g.footer.aboutText"));
+  assert.ok(keys.includes("g.footer.copyright"));
+});

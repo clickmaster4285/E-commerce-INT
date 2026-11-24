@@ -1264,3 +1264,16 @@ html:has([lang="ar"])
 .user-rich-text a { color: var(--user-accent); text-decoration: underline; text-underline-offset: 2px; }
 .user-rich-text blockquote { border-inline-start: 3px solid var(--user-border); padding-inline-start: 1em; color: var(--user-text-muted); }
 .user-rich-text strong, .user-rich-text b { font-weight: 700; color: var(--user-text); }
+
+/* ==========================================
+   STORE EDITOR — header sticky OFF
+   Header (h-14 / lg:h-16) ab scroll ho jata hai, is liye uske NEECHE
+   chipakne wale bars ka top offset header ki height jitna kam.
+========================================== */
+#user-theme[data-header-sticky="false"] .top-14 { top: 0; }
+#user-theme[data-header-sticky="false"] .top-\[3\.5625rem\] { top: 0; }
+#user-theme[data-header-sticky="false"] .top-\[6\.75rem\] { top: 2.75rem; }
+#user-theme[data-header-sticky="false"] .top-\[7\.25rem\] { top: 3.25rem; }
+@media (min-width: 64rem) {
+  #user-theme[data-header-sticky="false"] .lg\:top-16 { top: 0; }
+}

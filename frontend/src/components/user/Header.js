@@ -18,6 +18,7 @@ import Cookies from "js-cookie";
 import LoginModal from "./LoginModal";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useStoreTheme } from "@/storefront/ThemeProvider";
 import { useLocalized } from "@/i18n/localize";
 
 import {
@@ -239,8 +240,22 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
   );
 }
 
+// Store editor Theme → Header (default = purana header)
+const LOGO_SIZES = {
+  small: "w-7 h-7 lg:w-8 lg:h-8",
+  default: "w-8 h-8 lg:w-9 lg:h-9",
+  large: "w-10 h-10 lg:w-12 lg:h-12",
+};
+
 export default function Header() {
   const router = useRouter();
+  // ⚠️ "theme" yahan light/dark state hai — store theme alag naam se
+  const { theme: storeTheme } = useStoreTheme();
+  const headerCfg = storeTheme?.settings?.header || {};
+  const isSticky = headerCfg.sticky !== false;
+  const showSearch = headerCfg.showSearch !== false;
+  const showStoreName = headerCfg.showStoreName !== false;
+  const logoSizeClass = LOGO_SIZES[headerCfg.logoSize] || LOGO_SIZES.default;
   const { t, dir, locale } = useTranslation();
   const { fieldOf } = useLocalized();
   const [open, setOpen] = useState(false);
@@ -431,7 +446,7 @@ export default function Header() {
       )}
 
       <header
-        className={`sticky top-0 z-50 border-b border-user-line transition-shadow duration-300 ${
+        className={`${isSticky ? "sticky top-0" : "relative"} z-50 border-b border-user-line transition-shadow duration-300 ${
           scrolled ? "shadow-[var(--user-shadow-md)]" : ""
         }`}
       >
@@ -449,14 +464,16 @@ export default function Header() {
               </button>
 
               <Link href="/" className="flex min-w-0 items-center gap-2">
-                <StoreLogo store={store} />
-                <span className="hidden max-w-[10rem] truncate text-base font-semibold tracking-tight text-user-fg sm:block lg:max-w-[14rem] lg:text-lg">
-                  {storeName}
-                </span>
+                <StoreLogo store={store} sizeClass={logoSizeClass} />
+                {showStoreName ? (
+                  <span className="hidden max-w-[10rem] truncate text-base font-semibold tracking-tight text-user-fg sm:block lg:max-w-[14rem] lg:text-lg">
+                    {storeName}
+                  </span>
+                ) : null}
               </Link>
             </div>
 
-            <div className="mx-auto hidden max-w-2xl flex-1 md:block">
+            <div className={`mx-auto hidden max-w-2xl flex-1 ${showSearch ? "md:block" : ""}`}>
               <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -470,7 +487,7 @@ export default function Header() {
               <button
                 onClick={() => setMobileSearchOpen((v) => !v)}
                 aria-label={mobileSearchOpen ? t("header.closeSearch") : t("header.openSearch")}
-                className={`${iconBtn} md:hidden`}
+                className={`${iconBtn} md:hidden ${showSearch ? "" : "!hidden"}`}
               >
                 {mobileSearchOpen ? <X size={18} strokeWidth={1.7} /> : <Search size={18} strokeWidth={1.7} />}
               </button>
@@ -603,7 +620,7 @@ export default function Header() {
             </div>
           </div>
 
-          {mobileSearchOpen && (
+          {showSearch && mobileSearchOpen && (
             <div className="md:hidden pb-3">
               <SearchBox
                 value={searchTerm}
