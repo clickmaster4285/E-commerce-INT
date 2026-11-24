@@ -11,6 +11,7 @@ const { buildDefaultTheme, publicSchema } = require("../config/themeSchema");
 const { validateThemeData } = require("../utils/themeValidator");
 const { invalidate } = require("../utils/publicCache");
 const { storeIdFor } = require("../utils/uploadPaths");
+const { publicTranslations, queueThemeTranslationSync } = require("../utils/themeTranslation");
 
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 
@@ -52,9 +53,11 @@ const emitTheme = (req, event, payload) => {
 exports.getPublicTheme = async (req, res) => {
   try {
     if (!req.store?._id) return fail(res, 404, "Store not found");
-    const doc = await StoreTheme.findOne().select("published publishedVersion").lean();
+    const doc = await StoreTheme.findOne().select("published publishedVersion translations translationsUpdatedAt").lean();
     const version = doc?.publishedVersion || 0;
-    const etag = `"${String(req.store._id)}-v${version}"`;
+    // Translations publish ke baad async aate hain → ETag me unka stamp bhi
+    const tStamp = doc?.translationsUpdatedAt ? new Date(doc.translationsUpdatedAt).getTime() : 0;
+    const etag = `"${String(req.store._id)}-v${version}-t${tStamp}"`;
 
     res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     res.set("Vary", "Origin, Host");
@@ -63,7 +66,8 @@ exports.getPublicTheme = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: { theme: doc?.published || buildDefaultTheme(), version },
+      // translations: { "<key>": { ur, ar } } — storefront current locale par apply karta hai
+      data: { theme: doc?.published || buildDefaultTheme(), version, translations: publicTranslations(doc?.translations) },
     });
   } catch (error) {
     return fail(res, 500, "Failed to load theme");
@@ -151,6 +155,8 @@ exports.publish = async (req, res) => {
 
     invalidate(["theme"]);
     emitTheme(req, "themePublished", { version: doc.publishedVersion, publishedAt: doc.publishedAt });
+    // Seller text → ur/ar (background, response block nahi hota)
+    queueThemeTranslationSync(storeIdFor(req));
 
     return res.status(200).json({ success: true, data: adminView(doc) });
   } catch (error) {

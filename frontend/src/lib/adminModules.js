@@ -28,6 +28,7 @@ import {
   DollarSign,
   Paintbrush,
   Files,
+  Mail,
 } from "lucide-react";
 
 /** Section order — sidebarTitle uppercase labels i18n keys ke liye */
@@ -67,6 +68,7 @@ export const ADMIN_MODULES = [
   { key: "purchaseOrders", name: "Purchase Orders", section: "purchasing", path: "/admin/purchase-orders", permissionKey: "purchaseOrders", icon: Package, countable: true, nav: true },
   { key: "pos", name: "POS", section: "pos", path: "/admin/pos", permissionKey: "pos", icon: ShoppingCart, countable: false, nav: true },
   { key: "customers", name: "Customers", section: "pos", path: "/admin/customers", permissionKey: "customers", icon: Users, countable: true, nav: true },
+  { key: "subscribers", name: "Subscribers", section: "pos", path: "/admin/subscribers", permissionKey: "customers", icon: Mail, countable: false, nav: true },
   { key: "leads", name: "Leads", section: "pos", path: "/admin/leads", permissionKey: "leads", icon: ContactRound, countable: true, nav: true },
   { key: "quotes", name: "Quotes", section: "pos", path: "/admin/quotes", permissionKey: "quotes", icon: FileText, countable: true, nav: true },
   { key: "invoices", name: "Invoices", section: "pos", path: "/admin/invoices", permissionKey: "invoices", fallbackKey: "quotes", icon: Receipt, countable: true, nav: true },

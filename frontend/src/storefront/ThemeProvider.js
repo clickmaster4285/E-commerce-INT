@@ -20,6 +20,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildThemeCss, themeFontsHref } from "./themeCss";
 import { buildDefaultTheme } from "./themeDefaults";
+import { localizeTheme } from "./themeI18n";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const ThemeContext = createContext({ theme: null, isPreview: false, selectedSectionId: null });
 
@@ -46,8 +48,9 @@ const noopSubscribe = () => () => {};
 
 const isThemeShape =(t) => t && typeof t === "object" && Array.isArray(t.order) && t.sections && typeof t.sections === "object";
 
-export function StoreThemeProvider({ initialTheme = null, children }) {
-  const [theme, setTheme] = useState(() => (isThemeShape(initialTheme) ? initialTheme : buildDefaultTheme()));
+export function StoreThemeProvider({ initialTheme = null, translations = null, children }) {
+  const [rawTheme, setTheme] = useState(() => (isThemeShape(initialTheme) ? initialTheme : buildDefaultTheme()));
+  const { locale } = useTranslation();
   // Server par hamesha false (hydration same), client par iframe/URL se
   const isPreview = useSyncExternalStore(noopSubscribe, detectPreview, () => false);
   const [selectedSectionId, setSelectedSectionId] = useState(null);
@@ -65,6 +68,12 @@ export function StoreThemeProvider({ initialTheme = null, children }) {
     window.parent.postMessage({ type: PREVIEW_MESSAGE.ready }, window.location.origin);
     return () => window.removeEventListener("message", onMessage);
   }, [isPreview]);
+
+  // Preview me draft (abhi translate nahi hua) → seller ka original text
+  const theme = useMemo(
+    () => (isPreview ? rawTheme : localizeTheme(rawTheme, translations, locale)),
+    [rawTheme, translations, locale, isPreview],
+  );
 
   const css = useMemo(() => buildThemeCss(theme), [theme]);
   const fontsHref = useMemo(() => themeFontsHref(theme), [theme]);

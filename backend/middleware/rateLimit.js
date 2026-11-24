@@ -338,6 +338,12 @@ const limiters = {
     max: Number(process.env.RATE_LIMIT_CHAT_MAX) || 300,
     keyBy: "ip",
   }),
+  // Newsletter signup (public) — spam / email bombing se bachao, per IP
+  newsletter: createRateLimiter({
+    name: "newsletter",
+    max: Number(process.env.RATE_LIMIT_NEWSLETTER_MAX) || 20,
+    keyBy: "ip",
+  }),
   // Store editor autosave (~1.5s debounce) + image uploads — narm bucket, per user
   themeWrite: createRateLimiter({
     name: "theme-write",

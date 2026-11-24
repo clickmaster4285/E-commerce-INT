@@ -17,6 +17,7 @@ import { useUserSocketSync } from "../../hooks/user/useUserSocketSync";
 import { initThemeFromCookie } from "@/lib/theme";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import SupportChatWidget from "@/components/chat/SupportChatWidget";
+import AnnouncementBar from "@/storefront/AnnouncementBar";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
@@ -132,9 +133,9 @@ export default function UserLayoutClient({ children }) {
     initThemeFromCookie();
   }, []);
 
-  useEffect(() => {
-    if (store?.store_name) document.title = store.store_name;
-  }, [store]);
+  // ⚠️ document.title yahan set NAHI hota — (user)/layout.js ka generateMetadata
+  // store SEO title + template deta hai (custom pages ka apna title overwrite na ho)
+  void store;
 
   const hideFooter =
     pathname === "/cart" || pathname?.startsWith("/cart/") ||
@@ -151,6 +152,7 @@ export default function UserLayoutClient({ children }) {
           lang={locale}
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-user-page text-user-fg"
         >
+          <AnnouncementBar />
           <Header />
           <main className="w-full min-w-0">{children}</main>
           {!hideFooter && <Footer />}

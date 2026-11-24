@@ -1,4 +1,8 @@
 {
+  "storefront.newsletter.placeholder": "آپ کا ای میل ایڈریس",
+  "storefront.newsletter.subscribe": "سبسکرائب کریں",
+  "storefront.newsletter.thanks": "سبسکرائب کرنے کا شکریہ!",
+  "storefront.newsletter.error": "سبسکرائب نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
   "auth.signup.eyebrow": "اپنا کھاتہ بنائیں",
   "auth.signup.title": "اپنا کھاتہ بنائیں",
   "auth.signup.headline": "منٹوں میں اپنا اسٹور بنائیں۔",
@@ -1642,6 +1646,7 @@
   "admin.nav.item.termsConditions": "شرائط و ضوابط",
   "admin.nav.item.storeEditor": "اسٹور ایڈیٹر",
   "admin.nav.item.pages": "صفحات",
+  "admin.nav.item.subscribers": "سبسکرائبرز",
   "admin.nav.item.banners": "بینرز",
   "admin.nav.item.brands": "برانڈز",
   "admin.nav.item.categories": "زمرے",

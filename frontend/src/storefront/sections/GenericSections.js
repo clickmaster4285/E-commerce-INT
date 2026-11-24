@@ -16,6 +16,9 @@ import { productApi } from "@/apis/user/productApi";
 import ProductCard from "@/components/user/ProductCard";
 import SectionHeading from "@/components/user/SectionHeading";
 import { resolveThemeLink } from "../themeLinks";
+import { useStoreTheme } from "../ThemeProvider";
+import { newsletterApi } from "@/apis/user/newsletterApi";
+import { useTranslation } from "@/i18n/LanguageProvider";
 
 const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
 const imageSrc = (url) => (!url ? "" : /^https?:/i.test(url) ? url : `${API_ORIGIN}${url}`);
@@ -112,38 +115,59 @@ export function ProductCarouselSection({ settings = {} }) {
 }
 
 export function NewsletterSection({ settings = {} }) {
-  const [done, setDone] = useState(false);
+  const { t, locale } = useTranslation();
+  const { isPreview } = useStoreTheme();
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState("idle"); // idle | sending | done | error
+  const [error, setError] = useState("");
+
+  const submit = async (event) => {
+    event.preventDefault();
+    // Editor preview me asli subscriber na bane
+    if (isPreview) return setState("done");
+    setState("sending");
+    setError("");
+    try {
+      await newsletterApi.subscribe({ email, locale });
+      setState("done");
+    } catch (err) {
+      setError(err?.response?.data?.message || t("storefront.newsletter.error"));
+      setState("error");
+    }
+  };
+
   return (
     <section className="rounded-2xl bg-user-accent-soft p-6 text-center sm:p-10">
       {settings.heading ? <h2 className="text-xl font-black text-user-fg sm:text-2xl">{settings.heading}</h2> : null}
       {settings.subheading ? (
         <p className="mx-auto mt-2 max-w-xl text-sm text-user-fg-secondary">{settings.subheading}</p>
       ) : null}
-      {done ? (
-        <p className="mt-5 text-sm font-bold text-user-accent">✓</p>
+      {state === "done" ? (
+        <p role="status" className="mt-5 text-sm font-bold text-user-success">
+          {t("storefront.newsletter.thanks")}
+        </p>
       ) : (
-        <form
-          className="mx-auto mt-5 flex max-w-md gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            // TODO(store-editor): newsletter subscribers endpoint (Phase 5)
-            setDone(true);
-          }}
-        >
+        <form className="mx-auto mt-5 flex max-w-md flex-col gap-2 sm:flex-row" onSubmit={submit}>
           <input
             type="email"
             required
-            aria-label="Email"
-            className="h-11 min-w-0 flex-1 rounded-xl border border-user-line bg-user-input px-3 text-sm text-user-fg"
+            maxLength={254}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder={t("storefront.newsletter.placeholder")}
+            aria-label={t("storefront.newsletter.placeholder")}
+            className="h-11 min-w-0 flex-1 rounded-xl border border-user-line bg-user-input px-3 text-sm text-user-fg placeholder:text-user-fg-subtle"
           />
           <button
             type="submit"
-            className="h-11 shrink-0 rounded-xl bg-user-accent px-5 text-sm font-bold text-user-accent-fg hover:bg-user-accent-hover"
+            disabled={state === "sending"}
+            className="h-11 shrink-0 rounded-xl bg-user-accent px-5 text-sm font-bold text-user-accent-fg hover:bg-user-accent-hover disabled:opacity-60"
           >
-            {settings.buttonLabel || "Subscribe"}
+            {settings.buttonLabel || t("storefront.newsletter.subscribe")}
           </button>
         </form>
       )}
+      {state === "error" ? <p role="alert" className="mt-2 text-xs font-medium text-user-danger">{error}</p> : null}
     </section>
   );
 }

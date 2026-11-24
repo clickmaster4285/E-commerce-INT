@@ -28,6 +28,11 @@ const storeThemeSchema = new mongoose.Schema(
     draftUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
     publishedAt: { type: Date, default: null },
     publishedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+
+    // Published theme ke seller text ka translation (utils/themeTranslation.js)
+    // { "<key>": { h: md5, ur: "...", ar: "..." } } — publish ke baad async bharta hai
+    translations: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    translationsUpdatedAt: { type: Date, default: null },
   },
   { timestamps: true, minimize: false, collection: "store_themes" },
 );

@@ -1,4 +1,8 @@
 {
+  "storefront.newsletter.placeholder": "Your email address",
+  "storefront.newsletter.subscribe": "Subscribe",
+  "storefront.newsletter.thanks": "Thanks for subscribing!",
+  "storefront.newsletter.error": "Could not subscribe. Please try again.",
   "auth.signup.eyebrow": "Create your account",
   "auth.signup.title": "Create your account",
   "auth.signup.headline": "Create your store in minutes.",
@@ -1642,6 +1646,7 @@
   "admin.nav.item.termsConditions": "Terms & Conditions",
   "admin.nav.item.storeEditor": "Store Editor",
   "admin.nav.item.pages": "Pages",
+  "admin.nav.item.subscribers": "Subscribers",
   "admin.nav.item.banners": "Banners",
   "admin.nav.item.brands": "Brands",
   "admin.nav.item.categories": "Categories",

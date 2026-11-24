@@ -14,6 +14,7 @@
 
 // next/headers ki wajah se ye module sirf server components me chalta hai
 import { headers } from "next/headers";
+import { cache } from "react";
 
 // Har storefront SSR is par wait karta hai — backend slow ho to jaldi default par
 const DEFAULT_TIMEOUT_MS = 1500;
@@ -46,8 +47,25 @@ export async function serverApiGet(path, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}
   }
 }
 
-/** Published store theme — fail / missing → null (StoreThemeProvider default use karta hai) */
-export async function getPublishedTheme() {
+/**
+ * Published store theme + translations — fail / missing → { theme: null, translations: {} }
+ * (StoreThemeProvider default use karta hai). React cache(): layout + generateMetadata
+ * ek hi request share karte hain.
+ */
+export const getPublishedThemeData = cache(async () => {
   const body = await serverApiGet("/theme/public");
-  return body?.data?.theme || null;
+  return { theme: body?.data?.theme || null, translations: body?.data?.translations || {} };
+});
+
+export async function getPublishedTheme() {
+  return (await getPublishedThemeData()).theme;
 }
+
+/** Public store info (name, SEO, logo) — metadata ke liye; fail → null */
+export const getPublicStore = cache(async () => {
+  const body = await serverApiGet("/store/public");
+  return body?.data || null;
+});
+
+/** Browser-facing uploads origin (NEXT_PUBLIC_SERVERURL bina /api) */
+export const PUBLIC_ASSET_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");

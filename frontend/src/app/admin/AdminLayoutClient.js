@@ -39,6 +39,8 @@ const ROUTE_PERMISSIONS = {
   // ✅ Store editor + custom pages (legacy records me missing → store se fallback)
   '/admin/store-editor': 'storeEditor',
   '/admin/pages': 'storeEditor',
+  // ✅ Newsletter subscribers = customer data
+  '/admin/subscribers': 'customers',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',

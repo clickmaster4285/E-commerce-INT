@@ -1,4 +1,8 @@
 {
+  "storefront.newsletter.placeholder": "بريدك الإلكتروني",
+  "storefront.newsletter.subscribe": "اشترك",
+  "storefront.newsletter.thanks": "شكرًا لاشتراكك!",
+  "storefront.newsletter.error": "تعذر الاشتراك. حاول مرة أخرى.",
   "admin.finance.title": "المالية",
   "admin.finance.overview": "نظرة عامة على الأعمال",
   "admin.finance.intro": "الأموال المستلمة والمدفوعات والأرصدة المطلوب تحصيلها أو دفعها.",
@@ -1614,6 +1618,7 @@
   "admin.nav.item.termsConditions": "الشروط والأحكام",
   "admin.nav.item.storeEditor": "محرر المتجر",
   "admin.nav.item.pages": "الصفحات",
+  "admin.nav.item.subscribers": "المشتركون",
   "admin.nav.item.banners": "اللافتات",
   "admin.nav.item.brands": "العلامات التجارية",
   "admin.nav.item.categories": "الفئات",

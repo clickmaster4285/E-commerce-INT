@@ -90,9 +90,9 @@ test("public theme never returns the draft", async (t) => {
   const res = mockRes();
   await ctrl.getPublicTheme({ store: { _id: STORE }, headers: {} }, res);
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(Object.keys(res.body.data).sort(), ["theme", "version"]);
+  assert.deepEqual(Object.keys(res.body.data).sort(), ["theme", "translations", "version"]);
   assert.equal(res.body.data.version, 3);
-  assert.equal(res.headers.ETag, `"${STORE}-v3"`);
+  assert.equal(res.headers.ETag, `"${STORE}-v3-t0"`);
 });
 
 test("public theme falls back to defaults and supports 304", async (t) => {
@@ -102,7 +102,7 @@ test("public theme falls back to defaults and supports 304", async (t) => {
   assert.deepEqual(res.body.data.theme, buildDefaultTheme());
 
   const res304 = mockRes();
-  await ctrl.getPublicTheme({ store: { _id: STORE }, headers: { "if-none-match": `"${STORE}-v0"` } }, res304);
+  await ctrl.getPublicTheme({ store: { _id: STORE }, headers: { "if-none-match": `"${STORE}-v0-t0"` } }, res304);
   assert.equal(res304.statusCode, 304);
 });
 
@@ -169,4 +169,37 @@ test("page body: content sanitized, slug from title, partial title keeps slug", 
 
   const badSlug = parsePageBody({ title: "ہمارے بارے میں" });
   assert.ok(badSlug.errors.slug);
+});
+
+// ───────────────────────── Newsletter ─────────────────────────
+test("Subscriber is tenant-scoped with per-store unique email", () => {
+  const Subscriber = require("../models/Subscriber");
+  assert.equal(Subscriber.schema.$tenantScopeField, "storeId");
+  assert.ok(Subscriber.schema.indexes().some(([k, o]) => o.unique && k.storeId === 1 && k.email === 1));
+});
+
+test("subscribe validates email and upserts lowercase", async (t) => {
+  const Subscriber = require("../models/Subscriber");
+  const sub = require("../controllers/subscriberController");
+  let call = null;
+  stub(t, Subscriber, "updateOne", async (filter, update, opts) => { call = { filter, update, opts }; return {}; });
+
+  const bad = mockRes();
+  await sub.subscribe({ store: { _id: STORE }, body: { email: "nope" } }, bad);
+  assert.equal(bad.statusCode, 400);
+  assert.equal(call, null);
+
+  const ok = mockRes();
+  await sub.subscribe({ store: { _id: STORE }, body: { email: "  Ali@Example.COM ", locale: "ur" } }, ok);
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(call.filter, { email: "ali@example.com" });
+  assert.equal(call.opts.upsert, true);
+  assert.equal(call.update.$set.locale, "ur");
+});
+
+test("CSV cells are escaped against formula injection", () => {
+  const { csvCell } = require("../controllers/subscriberController")._internal;
+  assert.equal(csvCell("=HYPERLINK(1)"), "'=HYPERLINK(1)");
+  assert.equal(csvCell('a,"b"'), '"a,""b"""');
+  assert.equal(csvCell("ok@x.co"), "ok@x.co");
 });
