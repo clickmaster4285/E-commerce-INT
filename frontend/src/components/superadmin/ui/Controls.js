@@ -7,7 +7,7 @@ import { cx } from "./cx";
 /** Underline tabs — status filters wagaira. items: [{ value, label, count? }] */
 export function Tabs({ items, value, onChange, label = "Filter", className }) {
   return (
-    <div role="tablist" aria-label={label} className={cx("flex gap-6 overflow-x-auto overflow-y-hidden border-b border-[var(--border-color)] px-5 [scrollbar-width:none]", className)}>
+    <div role="tablist" aria-label={label} className={cx("flex gap-6 overflow-x-auto overflow-y-hidden border-b border-line px-5 [scrollbar-width:none]", className)}>
       {items.map((item) => {
         const active = item.value === value;
         return (
@@ -25,10 +25,10 @@ export function Tabs({ items, value, onChange, label = "Filter", className }) {
 export function SearchInput({ value, onChange, placeholder = "Search…", label = "Search", className }) {
   return (
     <div className={cx("relative min-w-[200px] flex-1", className)}>
-      <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
+      <Search size={16} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
       <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className="sa-input ps-9 pe-9 [&::-webkit-search-cancel-button]:hidden" />
       {value ? (
-        <button type="button" onClick={() => onChange("")} aria-label="Clear search" className="absolute end-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]">
+        <button type="button" onClick={() => onChange("")} aria-label="Clear search" className="absolute end-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-fg-muted hover:bg-subtle hover:text-fg">
           <X size={14} aria-hidden="true" />
         </button>
       ) : null}
@@ -41,16 +41,16 @@ export function Field({ label, hint, error, required, htmlFor, className, childr
   return (
     <div className={className}>
       {label ? (
-        <label htmlFor={htmlFor} className="mb-1.5 block text-[12.5px] font-semibold text-[var(--text-secondary)]">
+        <label htmlFor={htmlFor} className="mb-1.5 block text-[12.5px] font-semibold text-fg-secondary">
           {label}
-          {required ? <span className="ms-0.5 text-[var(--danger-text)]">*</span> : null}
+          {required ? <span className="ms-0.5 text-danger">*</span> : null}
         </label>
       ) : null}
       {children}
       {error ? (
-        <p className="mt-1.5 text-[12px] font-medium text-[var(--danger-text)]">{error}</p>
+        <p className="mt-1.5 text-[12px] font-medium text-danger">{error}</p>
       ) : hint ? (
-        <p className="mt-1.5 text-[12px] text-[var(--text-muted)]">{hint}</p>
+        <p className="mt-1.5 text-[12px] text-fg-muted">{hint}</p>
       ) : null}
     </div>
   );
@@ -92,7 +92,7 @@ export function SelectInput({ label, hint, error, className, id, children, ...pr
 export function FormSection({ title, children }) {
   return (
     <fieldset className="space-y-3.5">
-      <legend className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{title}</legend>
+      <legend className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">{title}</legend>
       {children}
     </fieldset>
   );

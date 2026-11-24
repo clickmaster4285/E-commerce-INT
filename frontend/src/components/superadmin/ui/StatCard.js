@@ -34,16 +34,16 @@ export default function StatCard({ label, value, hint, icon: Icon, tone = "accen
               <Icon size={17} aria-hidden="true" />
             </span>
           ) : null}
-          <p className="truncate text-[13px] font-medium text-[var(--text-secondary)]">{label}</p>
+          <p className="truncate text-[13px] font-medium text-fg-secondary">{label}</p>
         </div>
         {href ? (
-          <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-[var(--accent)] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+          <span className="flex shrink-0 items-center gap-1 text-[12px] font-semibold text-accent opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
             {linkLabel} <ArrowRight size={13} aria-hidden="true" className="rtl:rotate-180" />
           </span>
         ) : null}
       </div>
-      <p className="mt-3.5 text-[28px] font-semibold leading-8 tracking-tight text-[var(--text-primary)] tabular-nums">{value}</p>
-      {hint ? <p className="mt-1 truncate text-[12.5px] text-[var(--text-muted)]">{hint}</p> : null}
+      <p className="mt-3.5 text-[28px] font-semibold leading-8 tracking-tight text-fg tabular-nums">{value}</p>
+      {hint ? <p className="mt-1 truncate text-[12.5px] text-fg-muted">{hint}</p> : null}
     </>
   );
 
@@ -52,7 +52,7 @@ export default function StatCard({ label, value, hint, icon: Icon, tone = "accen
     return (
       <Link
         href={href}
-        className={cx(cls, "group transition-[border-color,box-shadow] duration-150 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--border-card))] hover:shadow-[var(--shadow-pop)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]")}
+        className={cx(cls, "group transition-[border-color,box-shadow] duration-150 hover:border-[color-mix(in_srgb,var(--accent)_40%,var(--border-card))] hover:shadow-[var(--shadow-pop)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent")}
       >
         {body}
       </Link>

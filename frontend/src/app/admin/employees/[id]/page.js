@@ -395,7 +395,7 @@ function EmployeeOverview({
           >
             <button
               onClick={() => router.push("/admin/employees")}
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors hover:bg-subtle"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> {t("admin.employees.title")}
             </button>
@@ -854,7 +854,7 @@ function EmployeeOverview({
                       <ActivityIcon category={activity.category} size="sm" />
                     </span>
 
-                    <div className="min-w-0 flex-1 rounded-lg py-1.5 pl-2 pr-1 transition-colors hover:bg-[var(--bg-card-alt)]">
+                    <div className="min-w-0 flex-1 rounded-lg py-1.5 pl-2 pr-1 transition-colors hover:bg-card-alt">
                       <p
                         className="text-[12px] font-semibold leading-snug"
                         style={{ color: "var(--text-primary)" }}
@@ -2189,7 +2189,7 @@ export default function EmployeeDetailPage() {
                 >
                   {t("admin.employees.detail.editingPermissionsFor")} {" "}
                   for{" "}
-                  <span className="font-semibold text-[var(--text-primary)]">
+                  <span className="font-semibold text-fg">
                     {name}
                   </span>
                 </p>

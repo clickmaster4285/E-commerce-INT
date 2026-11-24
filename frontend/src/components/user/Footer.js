@@ -18,6 +18,8 @@ import {
 import { FaXTwitter } from "react-icons/fa6";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { useStoreTheme } from "@/storefront/ThemeProvider";
+import { resolveThemeLink, isExternalHref } from "@/storefront/themeLinks";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -31,7 +33,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 
   if (!logoUrl) {
     return (
-    <span className={`${sizeClass} rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text)] font-semibold text-lg flex items-center justify-center shrink-0`}>
+    <span className={`${sizeClass} rounded-lg border border-user-line bg-user-card text-user-fg font-semibold text-lg flex items-center justify-center shrink-0`}>
         {letter}
       </span>
     );
@@ -41,7 +43,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
     <FallbackImage
       src={logoUrl}
       alt={store?.store_name || "Store"}
-      className={`${sizeClass} rounded-lg object-cover shrink-0 bg-[var(--user-bg-card)]`}
+      className={`${sizeClass} rounded-lg object-cover shrink-0 bg-user-card`}
     />
   );
 }
@@ -57,9 +59,9 @@ const SOCIAL_ICONS = {
 };
 
 const linkCls =
-  "block text-[13px] leading-5 text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition-colors";
+  "block text-[13px] leading-5 text-user-fg-muted hover:text-user-accent transition-colors";
 const badgeCls =
-  "inline-flex h-7 items-center rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 text-[9px] font-medium text-[var(--user-text-muted)]";
+  "inline-flex h-7 items-center rounded-md border border-user-line bg-user-card px-2 text-[9px] font-medium text-user-fg-muted";
 
 export default function Footer() {
   const { t } = useTranslation();
@@ -98,25 +100,30 @@ export default function Footer() {
 
   const footerCategories = categories.slice(0, 5);
 
+  const { theme } = useStoreTheme();
+  const footerMenu = (theme?.menus?.footer || [])
+    .map((item) => ({ id: item.id, label: item.label, href: resolveThemeLink(item.link) }))
+    .filter((item) => item.label && item.href);
+
   return (
-    <footer className="storefront-footer mt-8 border-t border-[var(--user-border-soft)] text-[var(--user-text-secondary)]">
+    <footer className="storefront-footer mt-8 border-t border-user-line-soft text-user-fg-secondary">
       <div className="mx-auto w-full max-w-7xl px-4 pt-7 pb-5 sm:px-6 lg:px-8">
         {/* TOP — 4 columns, image jaisa dark layout, data apna */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-[1.3fr_1fr_1fr_1.35fr]">
           {/* COMPANY INFO — apna store data */}
           <div className="col-span-2 sm:col-span-1 lg:col-span-1">
-            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">{t("footer.companyInfo")}</h3>
+            <h3 className="text-user-fg font-medium text-sm mb-3">{t("footer.companyInfo")}</h3>
             <Link href="/" className="inline-flex items-center gap-2.5 mb-2.5">
               <StoreLogo store={store} />
-              <span className="font-semibold text-base tracking-tight text-[var(--user-text)]">{storeName}</span>
+              <span className="font-semibold text-base tracking-tight text-user-fg">{storeName}</span>
             </Link>
             {tagline && (
-              <p className="text-[13px] leading-5 text-[var(--user-text-muted)] max-w-xs mb-3">{tagline}</p>
+              <p className="text-[13px] leading-5 text-user-fg-muted max-w-xs mb-3">{tagline}</p>
             )}
-            <ul className="space-y-2 text-[13px] text-[var(--user-text-muted)]">
+            <ul className="space-y-2 text-[13px] text-user-fg-muted">
               {supportEmail && (
                 <li>
-                  <a href={`mailto:${supportEmail}`} className="flex items-center gap-2 hover:text-[var(--user-accent)] transition-colors">
+                  <a href={`mailto:${supportEmail}`} className="flex items-center gap-2 hover:text-user-accent transition-colors">
                     <Mail size={14} className="shrink-0" />
                     <span className="truncate">{supportEmail}</span>
                   </a>
@@ -124,7 +131,7 @@ export default function Footer() {
               )}
               {supportPhone && (
                 <li>
-                  <a href={phoneHref} className="flex items-center gap-2 hover:text-[var(--user-accent)] transition-colors">
+                  <a href={phoneHref} className="flex items-center gap-2 hover:text-user-accent transition-colors">
                     <Phone size={14} className="shrink-0" />
                     <span>{supportPhone}</span>
                   </a>
@@ -141,7 +148,7 @@ export default function Footer() {
 
           {/* CATEGORIES — apni categories */}
           <div>
-            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">{t("footer.customerService")}</h3>
+            <h3 className="text-user-fg font-medium text-sm mb-3">{t("footer.customerService")}</h3>
             <ul className="space-y-2">
               {footerCategories.length > 0 ? (
                 footerCategories.map((cat) => (
@@ -152,14 +159,14 @@ export default function Footer() {
                   </li>
                 ))
               ) : (
-                <li className="text-[13px] text-[var(--user-text-subtle)]">{t("footer.noCategories")}</li>
+                <li className="text-[13px] text-user-fg-subtle">{t("footer.noCategories")}</li>
               )}
             </ul>
           </div>
 
           {/* SUPPORT — apne support links */}
           <div>
-            <h3 className="text-[var(--user-text)] font-medium text-sm mb-3">{t("footer.help")}</h3>
+            <h3 className="text-user-fg font-medium text-sm mb-3">{t("footer.help")}</h3>
             <ul className="space-y-2">
               {supportEmail && (
                 <li>
@@ -168,16 +175,31 @@ export default function Footer() {
                   </Link>
                 </li>
               )}
-              <li><Link href="#" className={linkCls}>{t("footer.privacyPolicy")}</Link></li>
-              <li><Link href="#" className={linkCls}>{t("footer.termsConditions")}</Link></li>
-              <li><Link href="#" className={linkCls}>{t("footer.returns")}</Link></li>
+              {/* Store editor footer menu — ho to placeholder (#) links ki jagah */}
+              {footerMenu.length > 0 ? (
+                footerMenu.map((item) => (
+                  <li key={item.id}>
+                    {isExternalHref(item.href) ? (
+                      <a href={item.href} target="_blank" rel="noopener noreferrer" className={linkCls}>{item.label}</a>
+                    ) : (
+                      <Link href={item.href} className={linkCls}>{item.label}</Link>
+                    )}
+                  </li>
+                ))
+              ) : (
+                <>
+                  <li><Link href="#" className={linkCls}>{t("footer.privacyPolicy")}</Link></li>
+                  <li><Link href="#" className={linkCls}>{t("footer.termsConditions")}</Link></li>
+                  <li><Link href="#" className={linkCls}>{t("footer.returns")}</Link></li>
+                </>
+              )}
               <li><Link href="/account" className={linkCls}>{t("footer.myAccount")}</Link></li>
             </ul>
           </div>
 
           {/* SOCIALS — sirf apne socials, app buttons nahi (app hamare paas nahi hai) */}
           <div className="col-span-2 lg:col-span-1">
-            <h4 className="text-[var(--user-text)] font-medium text-sm mb-3">
+            <h4 className="text-user-fg font-medium text-sm mb-3">
               {t("footer.connectWith", { name: storeName || "us" })}
             </h4>
             <div className="flex items-center gap-3">
@@ -188,7 +210,7 @@ export default function Footer() {
                   target={url?.startsWith("http") ? "_blank" : undefined}
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--user-border)] text-[var(--user-text-muted)] hover:border-[var(--user-border-hover)] hover:bg-[var(--user-bg-card)] hover:text-[var(--user-accent)] transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-user-line text-user-fg-muted hover:border-user-line-hover hover:bg-user-card hover:text-user-accent transition-colors"
                 >
                   <Icon size={17} />
                 </a>
@@ -198,9 +220,9 @@ export default function Footer() {
         </div>
 
         {/* MIDDLE — image wali strip, sirf layout (koi store data nahi hota isme) */}
-        <div className="grid gap-6 border-t border-[var(--user-border-soft)] pt-5 mt-6 lg:grid-cols-2">
+        <div className="grid gap-6 border-t border-user-line-soft pt-5 mt-6 lg:grid-cols-2">
           <div>
-            <h4 className="text-[var(--user-text)] font-medium text-sm mb-2.5">{t("footer.securityCertification")}</h4>
+            <h4 className="text-user-fg font-medium text-sm mb-2.5">{t("footer.securityCertification")}</h4>
             <div className="flex flex-wrap gap-2">
               <span className={badgeCls}>PCI DSS</span>
               <span className={`${badgeCls} italic`}>VISA</span>
@@ -213,7 +235,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="text-[var(--user-text)] font-medium text-sm mb-2.5">{t("footer.weAccept")}</h4>
+            <h4 className="text-user-fg font-medium text-sm mb-2.5">{t("footer.weAccept")}</h4>
             <div className="flex flex-wrap gap-2">
               <span className={badgeCls}>JazzCash</span>
               <span className={badgeCls}>easypaisa</span>
@@ -236,16 +258,16 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM — apna store naam */}
-        <div className="border-t border-[var(--user-border-soft)] mt-6 pt-4">
+        <div className="border-t border-user-line-soft mt-6 pt-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p className="text-xs text-[var(--user-text-muted)] text-center sm:text-left">
+            <p className="text-xs text-user-fg-muted text-center sm:text-left">
               Â© {new Date().getFullYear()}{" "}
-              <span className="text-[var(--user-text-secondary)] font-medium">{storeName}</span>. {t("header.allRightsReserved")}
+              <span className="text-user-fg-secondary font-medium">{storeName}</span>. {t("header.allRightsReserved")}
             </p>
-            <div className="flex items-center gap-4 text-xs text-[var(--user-text-muted)]">
-              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.privacyPolicy")}</Link>
-              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.termsConditions")}</Link>
-              <Link href="#" className="hover:text-[var(--user-accent)] transition-colors">{t("footer.cookies")}</Link>
+            <div className="flex items-center gap-4 text-xs text-user-fg-muted">
+              <Link href="#" className="hover:text-user-accent transition-colors">{t("footer.privacyPolicy")}</Link>
+              <Link href="#" className="hover:text-user-accent transition-colors">{t("footer.termsConditions")}</Link>
+              <Link href="#" className="hover:text-user-accent transition-colors">{t("footer.cookies")}</Link>
             </div>
           </div>
         </div>

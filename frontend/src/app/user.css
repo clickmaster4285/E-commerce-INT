@@ -71,6 +71,34 @@
   background-color: color-mix(in srgb, var(--user-accent) 8%, var(--user-bg-card)) !important;
 }
 
+/* Shared chat components (ChatThread / OrderDetails) admin tokens use karte
+   hain (bg-card, text-fg, border-line, text-success ...). Storefront ke andar
+   (#user-theme) wahi tokens customer theme par map — light + user-dark dono,
+   bina kisi `dark:` class ke. Admin panel par ye scope lagta hi nahi. */
+#user-theme .user-chat-thread {
+  --bg-card: var(--user-bg-card);
+  --bg-card-alt: var(--user-bg-elevated);
+  --bg-input: var(--user-bg-input);
+  --bg-tertiary: var(--user-bg-hover);
+  --text-primary: var(--user-text);
+  --text-secondary: var(--user-text-secondary);
+  --text-muted: var(--user-text-muted);
+  --border-color: var(--user-border);
+  --border-card: var(--user-border);
+}
+:root.user-dark #user-theme .user-chat-thread {
+  --success-text: #34d399;
+  --success-soft: rgba(16, 185, 129, 0.15);
+  --danger-text: #f87171;
+  --danger-soft: rgba(239, 68, 68, 0.15);
+  --warning-text: #fbbf24;
+  --warning-soft: rgba(245, 158, 11, 0.15);
+  --info-text: #60a5fa;
+  --info-soft: rgba(59, 130, 246, 0.15);
+  --purple-text: #c084fc;
+  --purple-soft: rgba(139, 92, 246, 0.15);
+}
+
 /* Storefront chat surfaces follow the customer theme (Tailwind's `dark`
    variant is reserved for the admin panel and does not use `user-dark`). */
 :root.user-dark .user-chat-thread {
@@ -344,7 +372,7 @@
    FIX: Accent buttons ka text hamesha sahi
    (~ = sirf EXACT class match, group-hover safe)
 ========================================== */
-[class~="text-[var(--user-accent-text)]"] {
+[class~="text-user-accent-fg"] {
   color: var(--user-accent-text) !important;
 }
 
@@ -792,43 +820,43 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
 
 /* ✅ `.primary-btn` (shared PrimaryButton) in overrides se exempt hai —
    naye glow/gradient states yahan flatten NAHI hone chahiye. */
-.checkout-premium [class~="bg-[var(--user-accent)]"]:not(.primary-btn) {
+.checkout-premium [class~="bg-user-accent"]:not(.primary-btn) {
   background-color: var(--checkout-subtle-surface) !important;
 }
 
-.checkout-premium [class*=" bg-[var(--user-accent)]/5"],
-.checkout-premium [class*=" bg-[var(--user-accent)]/10"],
-.checkout-premium [class^="bg-[var(--user-accent)]/5"],
-.checkout-premium [class^="bg-[var(--user-accent)]/10"] {
+.checkout-premium [class*=" bg-user-accent/5"],
+.checkout-premium [class*=" bg-user-accent/10"],
+.checkout-premium [class^="bg-user-accent/5"],
+.checkout-premium [class^="bg-user-accent/10"] {
   background-color: var(--checkout-neutral-surface) !important;
 }
 
-.checkout-premium [class*="border-[var(--user-accent)]"] {
+.checkout-premium :is([class~="border-user-accent"],[class*=":border-user-accent "],[class$=":border-user-accent"],[class*="border-user-accent/"]) {
   border-color: var(--checkout-border-strong) !important;
 }
 
-.checkout-premium [class*="text-[var(--user-accent)]"] {
+.checkout-premium :is([class~="text-user-accent"],[class*=":text-user-accent "],[class$=":text-user-accent"],[class*="text-user-accent/"]) {
   color: var(--checkout-accent-text) !important;
 }
 
-.checkout-premium [class*="text-[var(--user-accent-text)]"] {
+.checkout-premium :is([class~="text-user-accent-fg"],[class*=":text-user-accent-fg "],[class$=":text-user-accent-fg"],[class*="text-user-accent-fg/"]) {
   color: var(--checkout-icon-text) !important;
 }
 
-.checkout-premium [class*="text-[var(--user-success)]"],
+.checkout-premium :is([class~="text-user-success"],[class*=":text-user-success "],[class$=":text-user-success"],[class*="text-user-success/"]),
 .checkout-premium [class*="text-emerald-"],
 .checkout-premium [class*="text-orange-"],
 .checkout-premium [class*="text-green-"] {
   color: var(--checkout-status-text) !important;
 }
 
-.checkout-premium [class*="bg-[var(--user-success)]"],
+.checkout-premium :is([class~="bg-user-success"],[class*=":bg-user-success "],[class$=":bg-user-success"],[class*="bg-user-success/"]),
 .checkout-premium [class*="bg-orange-"],
 .checkout-premium [class*="bg-green-"] {
   background-color: var(--checkout-subtle-surface) !important;
 }
 
-.checkout-premium [class*="border-[var(--user-success)]"],
+.checkout-premium :is([class~="border-user-success"],[class*=":border-user-success "],[class$=":border-user-success"],[class*="border-user-success/"]),
 .checkout-premium [class*="border-orange-"],
 .checkout-premium [class*="border-green-"] {
   border-color: var(--checkout-border) !important;
@@ -845,14 +873,14 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
   box-shadow: none !important;
 }
 
-.checkout-premium div[class*="h-0.5"][class*="bg-[var(--user-accent)]"] {
+.checkout-premium div[class*="h-0.5"]:is([class~="bg-user-accent"],[class*=":bg-user-accent "],[class$=":bg-user-accent"],[class*="bg-user-accent/"]) {
   background-color: var(--checkout-connector) !important;
 }
 
-.checkout-premium [class*=" bg-[var(--user-accent)]/"],
-.checkout-premium [class*=" bg-[var(--user-success)]/"],
-.checkout-premium [class^="bg-[var(--user-accent)]/"],
-.checkout-premium [class^="bg-[var(--user-success)]/"] {
+.checkout-premium [class*=" bg-user-accent/"],
+.checkout-premium [class*=" bg-user-success/"],
+.checkout-premium [class^="bg-user-accent/"],
+.checkout-premium [class^="bg-user-success/"] {
   background-color: var(--checkout-neutral-surface) !important;
 }
 
@@ -870,15 +898,15 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
   color: inherit !important;
 }
 
-.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-muted)]"]:hover:not(.primary-btn) {
+.checkout-premium [class*="hover:text-"]:is([class~="text-user-fg-muted"],[class*=":text-user-fg-muted "],[class$=":text-user-fg-muted"],[class*="text-user-fg-muted/"]):hover:not(.primary-btn) {
   color: var(--checkout-neutral-text) !important;
 }
 
-.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text-secondary)]"]:hover:not(.primary-btn) {
+.checkout-premium [class*="hover:text-"]:is([class~="text-user-fg-secondary"],[class*=":text-user-fg-secondary "],[class$=":text-user-fg-secondary"],[class*="text-user-fg-secondary/"]):hover:not(.primary-btn) {
   color: var(--user-text-secondary) !important;
 }
 
-.checkout-premium [class*="hover:text-"][class*="text-[var(--user-text)]"]:hover:not(.primary-btn) {
+.checkout-premium [class*="hover:text-"]:is([class~="text-user-fg"],[class*=":text-user-fg "],[class$=":text-user-fg"],[class*="text-user-fg/"]):hover:not(.primary-btn) {
   color: var(--user-text) !important;
 }
 
@@ -928,7 +956,7 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
   outline-offset: 2px;
 }
 
-.cart-premium :is(a, button)[class*="bg-[var(--user-accent)]"] {
+.cart-premium :is(a, button):is([class~="bg-user-accent"],[class*=":bg-user-accent "],[class$=":bg-user-accent"],[class*="bg-user-accent/"]) {
   border-radius: 9px;
   box-shadow: none !important;
   font-weight: 500 !important;
@@ -937,7 +965,7 @@ html:has([lang="ur"]) .checkout-premium .checkout-phone-required button {
   transform: none !important;
 }
 
-.cart-premium :is(a, button)[class*="bg-[var(--user-accent)]"]:hover {
+.cart-premium :is(a, button):is([class~="bg-user-accent"],[class*=":bg-user-accent "],[class$=":bg-user-accent"],[class*="bg-user-accent/"]):hover {
   background-color: var(--user-accent-hover) !important;
   opacity: 1 !important;
 }
@@ -1220,3 +1248,19 @@ html:has([lang="ar"])
     background: color-mix(in srgb, var(--user-text-muted) 65%, transparent);
   }
 }
+
+/* ==========================================
+   STORE EDITOR RICH TEXT (custom pages + rich_text sections)
+   Tailwind preflight headings/lists reset karta hai — yahan wapas.
+   Colors sirf --user-* tokens (store theme + dark mode khud).
+========================================== */
+.user-rich-text > * + * { margin-top: 0.85em; }
+.user-rich-text h2 { font-size: 1.375rem; font-weight: 800; color: var(--user-text); margin-top: 1.4em; }
+.user-rich-text h3 { font-size: 1.125rem; font-weight: 700; color: var(--user-text); margin-top: 1.2em; }
+.user-rich-text h4 { font-size: 1rem; font-weight: 700; color: var(--user-text); }
+.user-rich-text ul { list-style: disc; padding-inline-start: 1.4em; }
+.user-rich-text ol { list-style: decimal; padding-inline-start: 1.4em; }
+.user-rich-text li + li { margin-top: 0.3em; }
+.user-rich-text a { color: var(--user-accent); text-decoration: underline; text-underline-offset: 2px; }
+.user-rich-text blockquote { border-inline-start: 3px solid var(--user-border); padding-inline-start: 1em; color: var(--user-text-muted); }
+.user-rich-text strong, .user-rich-text b { font-weight: 700; color: var(--user-text); }

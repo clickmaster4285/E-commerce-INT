@@ -124,18 +124,18 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
           if (e.key === "Enter") submit();
         }}
         placeholder={t("header.searchPlaceholder")}
-        className="h-10 w-full rounded-md border border-[var(--user-border)] bg-[var(--user-bg-input)] pl-4 pr-14 text-[0.8125rem] font-normal text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-accent)] focus:ring-0"
+        className="h-10 w-full rounded-md border border-user-line bg-user-input pl-4 pr-14 text-[0.8125rem] font-normal text-user-fg outline-none transition-colors placeholder:text-user-fg-subtle focus:border-user-accent focus:ring-0"
       />
       <button
         onClick={submit}
         aria-label={t("common.search")}
-        className="absolute right-0 flex h-10 w-11 items-center justify-center rounded-r-md border-l border-[var(--user-border)] bg-[var(--user-accent)]/10 text-[var(--user-accent)] transition-colors hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
+        className="absolute right-0 flex h-10 w-11 items-center justify-center rounded-r-md border-l border-user-line bg-user-accent/10 text-user-accent transition-colors hover:bg-user-accent hover:text-user-accent-fg"
       >
         <Search size={14} strokeWidth={1.7} />
       </button>
 
       {show && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 rounded-xl border border-user-line bg-user-card shadow-2xl overflow-hidden">
           <div className="max-h-80 overflow-y-auto">
             {results.map((p) => {
               const img =
@@ -153,7 +153,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                 <button
                   key={p._id || p.id}
                   onClick={() => pick(p)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--user-bg-hover)] transition text-left"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-user-hover transition text-left"
                 >
                   <FallbackImage nextImage
                     src={getImageUrl(img)}
@@ -161,17 +161,17 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
                     width={40}
                     height={40}
                     loader={smartImageLoader}
-                    className="rounded-lg object-cover border border-[var(--user-border)] shrink-0"
+                    className="rounded-lg object-cover border border-user-line shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--user-text)]">
+                    <p className="truncate text-sm font-medium text-user-fg">
                       {productNameOf(p)}
                     </p>
-                    <p className="text-[0.6875rem] text-[var(--user-text-muted)] capitalize truncate">
+                    <p className="text-[0.6875rem] text-user-fg-muted capitalize truncate">
                       {fieldOf(p.brand_id, "name") || p.brand || ""}
                     </p>
                   </div>
-                  <span className="whitespace-nowrap text-sm font-medium text-[var(--user-accent)]">
+                  <span className="whitespace-nowrap text-sm font-medium text-user-accent">
                     Rs. {price.toLocaleString()}
                   </span>
                 </button>
@@ -192,7 +192,7 @@ function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
   if (!url || failed) {
     return (
       <div
-        className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] font-medium text-[var(--user-text)] ${textClass}`}
+        className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full border border-user-line bg-user-hover font-medium text-user-fg ${textClass}`}
       >
         {letter}
       </div>
@@ -205,7 +205,7 @@ function Avatar({ user, sizeClass = "w-9 h-9", textClass = "text-sm" }) {
       alt={user?.name || "User"}
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
-      className={`${sizeClass} shrink-0 rounded-full border border-[var(--user-border)] object-cover`}
+      className={`${sizeClass} shrink-0 rounded-full border border-user-line object-cover`}
     />
   );
 }
@@ -222,7 +222,7 @@ function StoreLogo({ store, sizeClass = "w-8 h-8 lg:w-9 lg:h-9" }) {
   if (!logoUrl || failed) {
     return (
       <span
-        className={`${sizeClass} flex items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-medium text-[var(--user-text)]`}
+        className={`${sizeClass} flex items-center justify-center rounded-lg border border-user-line bg-user-hover text-sm font-medium text-user-fg`}
       >
         {letter}
       </span>
@@ -417,7 +417,7 @@ export default function Header() {
   const storeName = store?.store_name || "";
 
   const iconBtn =
-    "relative flex h-9 w-9 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-[0.96] lg:h-10 lg:w-10";
+    "relative flex h-9 w-9 items-center justify-center rounded-xl text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-fg active:scale-[0.96] lg:h-10 lg:w-10";
 
   return (
     <>
@@ -431,11 +431,11 @@ export default function Header() {
       )}
 
       <header
-        className={`sticky top-0 z-50 border-b border-[var(--user-border)] transition-shadow duration-300 ${
+        className={`sticky top-0 z-50 border-b border-user-line transition-shadow duration-300 ${
           scrolled ? "shadow-[var(--user-shadow-md)]" : ""
         }`}
       >
-        <div         className="pointer-events-none absolute inset-0 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md" />
+        <div         className="pointer-events-none absolute inset-0 bg-user-elevated/95 backdrop-blur-md" />
 
         <div className="relative w-full max-w-none px-3.5 sm:px-5 lg:px-7 xl:px-9 2xl:px-12">
           <div className="flex h-14 items-center gap-2 sm:gap-3 lg:h-16 lg:gap-4">
@@ -443,14 +443,14 @@ export default function Header() {
               <button
                 onClick={() => setOpen(true)}
                 aria-label={t("header.openMenu")}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-[0.96] lg:h-10 lg:w-10"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-fg active:scale-[0.96] lg:h-10 lg:w-10"
               >
                 <Menu size={19} strokeWidth={1.7} />
               </button>
 
               <Link href="/" className="flex min-w-0 items-center gap-2">
                 <StoreLogo store={store} />
-                <span className="hidden max-w-[10rem] truncate text-base font-semibold tracking-tight text-[var(--user-text)] sm:block lg:max-w-[14rem] lg:text-lg">
+                <span className="hidden max-w-[10rem] truncate text-base font-semibold tracking-tight text-user-fg sm:block lg:max-w-[14rem] lg:text-lg">
                   {storeName}
                 </span>
               </Link>
@@ -496,7 +496,7 @@ export default function Header() {
                 {wishlistCount > 0 && (
                   <span
                     key={wishlistCount}
-                    className="absolute right-0.5 top-0.5 flex h-[0.9375rem] min-w-[0.9375rem] items-center justify-center rounded-full border-2 border-[var(--user-bg-elevated)] bg-[var(--user-danger)] px-1 text-[0.5625rem] font-medium text-white"
+                    className="absolute right-0.5 top-0.5 flex h-[0.9375rem] min-w-[0.9375rem] items-center justify-center rounded-full border-2 border-user-elevated bg-user-danger px-1 text-[0.5625rem] font-medium text-white"
                     style={{ animation: "badgePop .25s ease-out" }}
                   >
                     {wishlistCount}
@@ -516,7 +516,7 @@ export default function Header() {
                 {count > 0 && (
                   <span
                     key={count}
-                    className="absolute right-0.5 top-0.5 flex h-[0.9375rem] min-w-[0.9375rem] items-center justify-center rounded-full border-2 border-[var(--user-bg-elevated)] bg-[var(--user-accent)] px-1 text-[0.5625rem] font-medium text-[var(--user-accent-text)]"
+                    className="absolute right-0.5 top-0.5 flex h-[0.9375rem] min-w-[0.9375rem] items-center justify-center rounded-full border-2 border-user-elevated bg-user-accent px-1 text-[0.5625rem] font-medium text-user-accent-fg"
                     style={{ animation: "badgePop .25s ease-out" }}
                   >
                     {count}
@@ -529,7 +529,7 @@ export default function Header() {
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
                     aria-label={t("header.accountMenu")}
-                    className="flex items-center gap-1 rounded-xl p-1 transition-colors hover:bg-[var(--user-bg-hover)] active:scale-[0.96]"
+                    className="flex items-center gap-1 rounded-xl p-1 transition-colors hover:bg-user-hover active:scale-[0.96]"
                   >
                     <Avatar
                       user={user}
@@ -538,7 +538,7 @@ export default function Header() {
                     />
                     <ChevronDown
                       size={12}
-                      className={`hidden lg:block text-[var(--user-text-muted)] transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
+                      className={`hidden lg:block text-user-fg-muted transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`}
                     />
                   </button>
 
@@ -548,41 +548,41 @@ export default function Header() {
                         className="fixed inset-0 z-40"
                         onClick={() => setProfileOpen(false)}
                       />
-                      <div dir={dir} lang={locale} className="absolute end-0 top-11 z-50 w-60 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 shadow-[var(--user-shadow-lg)]">
-                        <div className="px-3 py-2.5 border-b border-[var(--user-border)] mb-1">
-                          <p className="truncate text-sm font-medium text-[var(--user-text)]">
+                      <div dir={dir} lang={locale} className="absolute end-0 top-11 z-50 w-60 rounded-2xl border border-user-line bg-user-card p-2 shadow-[var(--user-shadow-lg)]">
+                        <div className="px-3 py-2.5 border-b border-user-line mb-1">
+                          <p className="truncate text-sm font-medium text-user-fg">
                             {user.name || user.username}
                           </p>
-                          <p className="text-[var(--user-text-muted)] text-xs truncate">
+                          <p className="text-user-fg-muted text-xs truncate">
                             {user.email}
                           </p>
                         </div>
                         <Link
                           href="/account"
                           onClick={() => setProfileOpen(false)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] text-sm transition"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-user-fg-secondary hover:bg-user-hover hover:text-user-fg text-sm transition"
                         >
                           <User
                             size={16}
-                            className="text-[var(--user-accent)]"
+                            className="text-user-accent"
                           />
                           {t("header.myAccount")}
                         </Link>
                         <Link
                           href="/orders"
                           onClick={() => setProfileOpen(false)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] text-sm transition"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-user-fg-secondary hover:bg-user-hover hover:text-user-fg text-sm transition"
                         >
                           <Package
                             size={16}
-                            className="text-[var(--user-accent)]"
+                            className="text-user-accent"
                           />
                           {t("header.myOrders")}
                         </Link>
-                        <div className="h-px bg-[var(--user-border)] my-1" />
+                        <div className="h-px bg-user-line my-1" />
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--user-danger)] hover:bg-red-500/10 text-sm transition"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-user-danger hover:bg-red-500/10 text-sm transition"
                         >
                           <LogOut size={16} />
                           {t("header.logout")}
@@ -594,7 +594,7 @@ export default function Header() {
               ) : (
                 <button
                   onClick={() => setLoginOpen(true)}
-                  className="ml-1 flex h-8 items-center gap-1.5 rounded-xl border border-[var(--user-accent)]/25 bg-[var(--user-accent-soft)] px-2.5 text-xs font-medium text-[var(--user-accent)] transition-colors hover:bg-[var(--user-accent)]/15 active:scale-[0.96] lg:px-3"
+                  className="ml-1 flex h-8 items-center gap-1.5 rounded-xl border border-user-accent/25 bg-user-accent-soft px-2.5 text-xs font-medium text-user-accent transition-colors hover:bg-user-accent/15 active:scale-[0.96] lg:px-3"
                 >
                   <User size={13} />
                   {t("header.login")}
@@ -620,7 +620,7 @@ export default function Header() {
       <div
         dir={dir}
         lang={locale}
-        className={`fixed top-0 ${dir === "rtl" ? "right-0 left-auto" : "left-0 right-auto"} h-full w-[85%] max-w-[21.25rem] bg-[var(--user-bg-elevated)] z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
+        className={`fixed top-0 ${dir === "rtl" ? "right-0 left-auto" : "left-0 right-auto"} h-full w-[85%] max-w-[21.25rem] bg-user-elevated z-50 shadow-2xl transition-transform duration-500 ease-out flex flex-col ${
           open ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full"
         }`}
         style={{ transformOrigin: dir === "rtl" ? "right center" : "left center" }}
@@ -645,7 +645,7 @@ export default function Header() {
           .sidebar-item:nth-child(5) { animation-delay: 0.25s; }
         `}</style>
 
-        <div className="px-4 py-2.5 border-b border-[var(--user-border)] shrink-0 bg-gradient-to-br from-[var(--user-bg-card)] to-[var(--user-bg-hover)]">
+        <div className="px-4 py-2.5 border-b border-user-line shrink-0 bg-gradient-to-br from-user-card to-user-hover">
           <div className="flex items-center justify-between">
             <Link
               href="/"
@@ -654,13 +654,13 @@ export default function Header() {
             >
               <div className="relative shrink-0">
                 <StoreLogo store={store} sizeClass="w-8 h-8" />
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[var(--user-success)] rounded-full border-2 border-[var(--user-bg-elevated)]" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-user-success rounded-full border-2 border-user-elevated" />
               </div>
               <div className="min-w-0">
-                <span className="block truncate text-sm font-medium leading-tight tracking-tight text-[var(--user-text)]">
+                <span className="block truncate text-sm font-medium leading-tight tracking-tight text-user-fg">
                   {storeName}
                 </span>
-                <span className="text-[0.5625rem] font-medium uppercase tracking-wider text-[var(--user-text-muted)]">
+                <span className="text-[0.5625rem] font-medium uppercase tracking-wider text-user-fg-muted">
                   {t("header.shopPremium")}
                 </span>
               </div>
@@ -668,11 +668,11 @@ export default function Header() {
             <button
               onClick={() => setOpen(false)}
               aria-label={t("header.closeMenu")}
-              className="w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center hover:bg-[var(--user-danger)] hover:border-[var(--user-danger)] hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90 shrink-0"
+              className="w-8 h-8 rounded-full bg-user-card border border-user-line flex items-center justify-center hover:bg-user-danger hover:border-user-danger hover:text-white transition-all duration-300 hover:rotate-90 active:scale-90 shrink-0"
             >
               <X
                 size={14}
-                className="text-[var(--user-text)] hover:text-white"
+                className="text-user-fg hover:text-white"
               />
             </button>
           </div>
@@ -683,7 +683,7 @@ export default function Header() {
                 setOpen(false);
                 setLoginOpen(true);
               }}
-              className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] text-xs font-medium text-[var(--user-accent-text)] transition hover:opacity-90 active:scale-[0.98]"
+              className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-user-accent text-xs font-medium text-user-accent-fg transition hover:opacity-90 active:scale-[0.98]"
             >
               <User size={14} />
               {t("header.loginSignUp")}
@@ -693,17 +693,17 @@ export default function Header() {
 
         <div className="flex-1 overflow-y-auto overscroll-contain">
           {user && (
-            <div className="p-5 border-b border-[var(--user-border)]">
+            <div className="p-5 border-b border-user-line">
               <div className="grid grid-cols-2 gap-2.5">
                 <Link
                   href="/account"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                    <User size={18} className="text-[var(--user-accent)]" />
+                  <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
+                    <User size={18} className="text-user-accent" />
                   </div>
-                  <span className="text-xs font-medium text-[var(--user-text)]">
+                  <span className="text-xs font-medium text-user-fg">
                     {t("header.account")}
                   </span>
                 </Link>
@@ -711,12 +711,12 @@ export default function Header() {
                 <Link
                   href="/orders"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                    <Package size={18} className="text-[var(--user-accent)]" />
+                  <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
+                    <Package size={18} className="text-user-accent" />
                   </div>
-                  <span className="text-xs font-medium text-[var(--user-text)]">
+                  <span className="text-xs font-medium text-user-fg">
                     {t("header.orders")}
                   </span>
                 </Link>
@@ -724,17 +724,17 @@ export default function Header() {
                 <Link
                   href="/wishlist"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center relative">
-                    <Heart size={18} className="text-[var(--user-accent)]" />
+                  <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center relative">
+                    <Heart size={18} className="text-user-accent" />
                     {wishlistCount > 0 && (
-                      <span className="absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-[var(--user-danger)] px-1 text-[0.5625rem] font-medium text-white">
+                      <span className="absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-user-danger px-1 text-[0.5625rem] font-medium text-white">
                         {wishlistCount}
                       </span>
                     )}
                   </div>
-                  <span className="text-xs font-medium text-[var(--user-text)]">
+                  <span className="text-xs font-medium text-user-fg">
                     {t("header.wishlist")}
                   </span>
                 </Link>
@@ -742,12 +742,12 @@ export default function Header() {
                 <Link
                   href="/chats"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                    <MessageCircle size={18} className="text-[var(--user-accent)]" />
+                  <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
+                    <MessageCircle size={18} className="text-user-accent" />
                   </div>
-                  <span className="text-xs font-medium text-[var(--user-text)]">
+                  <span className="text-xs font-medium text-user-fg">
                     {t("header.orderSupport")}
                   </span>
                 </Link>
@@ -760,12 +760,12 @@ export default function Header() {
                       new CustomEvent("account:tab", { detail: "settings" }),
                     );
                   }}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                    <Settings size={18} className="text-[var(--user-accent)]" />
+                  <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
+                    <Settings size={18} className="text-user-accent" />
                   </div>
-                  <span className="text-xs font-medium text-[var(--user-text)]">
+                  <span className="text-xs font-medium text-user-fg">
                     {t("header.settings")}
                   </span>
                 </Link>
@@ -773,9 +773,9 @@ export default function Header() {
             </div>
           )}
 
-          <div className="p-5 border-b border-[var(--user-border)]">
+          <div className="p-5 border-b border-user-line">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-[var(--user-text)]">
+              <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-user-fg">
                 {t("header.topCategories")}
               </h3>
             </div>
@@ -785,32 +785,32 @@ export default function Header() {
                   key={category._id}
                   href={`/filtering-product?category=${category._id}`}
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
+                  className="sidebar-item flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gradient-to-r hover:from-user-accent/10 hover:to-user-accent/5 transition-all duration-300 group active:scale-[0.98]"
                   style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
                 >
-                  <span className="w-10 h-10 rounded-lg bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center text-[var(--user-accent)] group-hover:bg-[var(--user-accent)] group-hover:text-[var(--user-accent-text)] group-hover:shadow-md transition-all duration-300 shrink-0">
+                  <span className="w-10 h-10 rounded-lg bg-user-card border border-user-line flex items-center justify-center text-user-accent group-hover:bg-user-accent group-hover:text-user-accent-fg group-hover:shadow-md transition-all duration-300 shrink-0">
                     {getIcon(fieldOf(category, "name"))}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <span className="block truncate text-sm font-medium capitalize text-[var(--user-text)] transition-colors group-hover:text-[var(--user-accent)]">
+                    <span className="block truncate text-sm font-medium capitalize text-user-fg transition-colors group-hover:text-user-accent">
                       {fieldOf(category, "name")}
                     </span>
-                    <span className="text-[0.625rem] text-[var(--user-text-muted)]">
+                    <span className="text-[0.625rem] text-user-fg-muted">
                       {t("header.productsCount", { count: category.count })}
                     </span>
                   </div>
                   <ChevronRight
                     size={14}
-                    className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0"
+                    className="text-user-fg-subtle group-hover:text-user-accent group-hover:translate-x-1 transition-all shrink-0"
                   />
                 </Link>
               ))}
             </div>
           </div>
 
-          <div className="p-5 border-b border-[var(--user-border)]">
+          <div className="p-5 border-b border-user-line">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-[var(--user-text)]">
+              <h3 className="text-[0.6875rem] font-medium uppercase tracking-[0.16em] text-user-fg">
                 {t("header.topBrands")}
               </h3>
             </div>
@@ -824,7 +824,7 @@ export default function Header() {
                     key={brand._id}
                     href={`/filtering-product?brand=${brand._id}`}
                     onClick={() => setOpen(false)}
-                    className="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gradient-to-r hover:from-[var(--user-accent)]/10 hover:to-[var(--user-accent)]/5 transition-all duration-300 group active:scale-[0.98]"
+                    className="sidebar-item flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gradient-to-r hover:from-user-accent/10 hover:to-user-accent/5 transition-all duration-300 group active:scale-[0.98]"
                     style={{ animationDelay: `${0.05 * (idx + 1)}s` }}
                   >
                     {logoUrl ? (
@@ -839,21 +839,21 @@ export default function Header() {
                         />
                       </span>
                     ) : (
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-shadow group-hover:shadow-md">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-user-accent text-sm font-medium text-user-accent-fg transition-shadow group-hover:shadow-md">
                         {fieldOf(brand, "name")?.charAt(0).toUpperCase()}
                       </span>
                     )}
                     <div className="flex-1 min-w-0">
-                      <span className="block truncate text-sm font-medium capitalize text-[var(--user-text)] transition-colors group-hover:text-[var(--user-accent)]">
+                      <span className="block truncate text-sm font-medium capitalize text-user-fg transition-colors group-hover:text-user-accent">
                         {fieldOf(brand, "name")}
                       </span>
-                      <span className="text-[0.625rem] text-[var(--user-text-muted)]">
+                      <span className="text-[0.625rem] text-user-fg-muted">
                         {t("header.productsCount", { count: productCount })}
                       </span>
                     </div>
                     <ChevronRight
                       size={14}
-                      className="text-[var(--user-text-subtle)] group-hover:text-[var(--user-accent)] group-hover:translate-x-1 transition-all shrink-0"
+                      className="text-user-fg-subtle group-hover:text-user-accent group-hover:translate-x-1 transition-all shrink-0"
                     />
                   </Link>
                 );
@@ -862,8 +862,8 @@ export default function Header() {
           </div>
         </div>
 
-        <div className="p-4 border-t border-[var(--user-border)] shrink-0 bg-[var(--user-bg-card)]">
-          <p className="text-[0.625rem] text-[var(--user-text-subtle)] text-center">
+        <div className="p-4 border-t border-user-line shrink-0 bg-user-card">
+          <p className="text-[0.625rem] text-user-fg-subtle text-center">
             © 2026 {storeName}. {t("header.allRightsReserved")}
           </p>
         </div>

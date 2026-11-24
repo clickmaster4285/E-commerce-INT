@@ -48,11 +48,11 @@ const money = (value) =>
     maximumFractionDigits: 2,
   }).format(Number(value) || 0);
 const card =
-  "rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_8px_24px_rgba(15,23,42,0.045)]";
+  "rounded-2xl border border-line bg-card shadow-[0_8px_24px_rgba(15,23,42,0.045)]";
 const input =
-  "h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] hover:border-slate-300 focus:border-blue-500 focus:bg-[var(--bg-card)] focus:ring-4 focus:ring-blue-500/10";
+  "h-10 w-full rounded-xl border border-line bg-subtle px-3 text-xs text-fg outline-none transition placeholder:text-fg-muted hover:border-slate-300 focus:border-blue-500 focus:bg-card focus:ring-4 focus:ring-blue-500/10";
 const label =
-  "mb-1.5 block text-[11px] font-semibold text-[var(--text-secondary)]";
+  "mb-1.5 block text-[11px] font-semibold text-fg-secondary";
 const unwrapList = (value) =>
   Array.isArray(value)
     ? value
@@ -132,7 +132,7 @@ function QuotesNewContent() {
   if (quoteId && isLoading)
     return (
       <div
-        className={`${card} p-10 text-center text-sm text-[var(--text-muted)]`}
+        className={`${card} p-10 text-center text-sm text-fg-muted`}
       >
         {t("admin.quoteInvoice.ui.loading_quote_674da72a")}
       </div>
@@ -140,7 +140,7 @@ function QuotesNewContent() {
   if (quoteId && (isError || !["Pending", "Draft"].includes(quote?.status)))
     return (
       <div
-        className={`${card} p-8 text-center text-sm text-[var(--text-secondary)]`}
+        className={`${card} p-8 text-center text-sm text-fg-secondary`}
       >
         {isError
           ? t("admin.quoteDesigner.loadQuoteFailed")
@@ -148,7 +148,7 @@ function QuotesNewContent() {
         <button
           type="button"
           onClick={() => router.push("/admin/quotes")}
-          className="ml-2 font-semibold text-[var(--accent)]"
+          className="ml-2 font-semibold text-accent"
         >
           {t("admin.quoteInvoice.ui.back_to_quotes_433f26bf")}
         </button>
@@ -168,7 +168,7 @@ export default function NewQuotePage() {
   return (
     <Suspense
       fallback={
-        <div className="p-8 text-center text-sm text-[var(--text-muted)]">
+        <div className="p-8 text-center text-sm text-fg-muted">
           {t("admin.quoteInvoice.ui.loading_quote_form_25988561")}
         </div>
       }
@@ -725,7 +725,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
   return (
     <div
       id="quote-print-area"
-      className="w-full space-y-2.5 pb-5 text-[var(--text-primary)]"
+      className="w-full space-y-2.5 pb-5 text-fg"
     >
       {" "}
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -733,12 +733,12 @@ function QuoteEditor({ quoteId, quote, customerId }) {
         <div>
           <nav
             aria-label={t("admin.quoteInvoice.ui.breadcrumb_c766e665")}
-            className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-[var(--text-muted)]"
+            className="mb-1 flex items-center gap-1.5 text-[9px] font-medium text-fg-muted"
           >
             <button
               type="button"
               onClick={() => router.push("/admin/quotes")}
-              className="hover:text-[var(--accent)]"
+              className="hover:text-accent"
             >
               {t("admin.quoteInvoice.ui.quotes_7b0257ce")}
             </button>
@@ -748,7 +748,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
           <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">
             {quoteId ? "Edit Quote" : "Create New Quote"}
           </h1>
-          <p className="mt-0.5 text-[10px] text-[var(--text-muted)] sm:text-xs">
+          <p className="mt-0.5 text-[10px] text-fg-muted sm:text-xs">
             {t(
               "admin.quoteInvoice.ui.fill_in_the_details_below_to_create_a_professional_quote_b3892e96",
             )}
@@ -768,19 +768,19 @@ function QuoteEditor({ quoteId, quote, customerId }) {
       <div className="grid items-stretch gap-3 md:grid-cols-2">
         {" "}
         <section
-          className={`${card} overflow-visible bg-gradient-to-br from-white via-white to-slate-50/70 dark:from-[var(--bg-card)] dark:via-[var(--bg-card)] dark:to-[var(--bg-card-alt)]`}
+          className={`${card} overflow-visible bg-gradient-to-br from-card via-card to-card-alt`}
         >
           {" "}
-          <div className="mb-4 flex items-center gap-2.5 border-b border-[var(--border-color)] bg-gradient-to-r from-slate-50 to-white dark:from-[var(--bg-card-alt)] dark:to-[var(--bg-card)] px-4 py-3.5 sm:px-5">
+          <div className="mb-4 flex items-center gap-2.5 border-b border-line bg-gradient-to-r from-card-alt to-card px-4 py-3.5 sm:px-5">
             {" "}
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-[0_4px_10px_rgba(37,99,235,0.2)]">
               <UserRound size={15} />
             </span>{" "}
             <div>
-              <h2 className="text-sm font-extrabold tracking-tight text-[var(--text-primary)]">
+              <h2 className="text-sm font-extrabold tracking-tight text-fg">
                 {t("admin.quoteInvoice.ui.1_customer_information_c04df194")}
               </h2>
-              <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+              <p className="mt-0.5 text-[10px] text-fg-muted">
                 {t(
                   "admin.quoteInvoice.ui.select_a_customer_to_fill_in_their_contact_details_a4379f43",
                 )}
@@ -813,24 +813,24 @@ function QuoteEditor({ quoteId, quote, customerId }) {
               >
                 {" "}
                 <span
-                  className={`flex min-w-0 items-center gap-2.5 truncate ${form.customer_key ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}
+                  className={`flex min-w-0 items-center gap-2.5 truncate ${form.customer_key ? "text-fg" : "text-fg-muted"}`}
                 >
                   <UserRound size={15} className="shrink-0 text-blue-600" />
                   {form.customer_name || "Select a customer"}
                 </span>
                 <ChevronDown
                   size={15}
-                  className={`shrink-0 text-[var(--text-muted)] transition-transform ${customerPickerOpen ? "rotate-180" : ""}`}
+                  className={`shrink-0 text-fg-muted transition-transform ${customerPickerOpen ? "rotate-180" : ""}`}
                 />{" "}
               </button>{" "}
               {customerPickerOpen && (
-                <div className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+                <div className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-2xl border border-line bg-card shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
                   {" "}
-                  <div className="border-b border-[var(--border-color)] p-3">
+                  <div className="border-b border-line p-3">
                     <div className="relative">
                       <Search
                         size={14}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-muted"
                       />
                       <input
                         autoFocus
@@ -841,7 +841,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                         placeholder={t(
                           "admin.quoteInvoice.ui.search_by_customer_name_email_or_phone_b3268ad1",
                         )}
-                        className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] pl-9 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                        className="h-10 w-full rounded-xl border border-line bg-subtle pl-9 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                       />
                     </div>
                   </div>{" "}
@@ -865,10 +865,10 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                             {(customer.name || "C").slice(0, 1).toUpperCase()}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-semibold text-[var(--text-primary)]">
+                            <span className="block truncate text-xs font-semibold text-fg">
                               {customer.name}
                             </span>
-                            <span className="mt-0.5 block truncate text-[10px] text-[var(--text-muted)]">
+                            <span className="mt-0.5 block truncate text-[10px] text-fg-muted">
                               {[customer.email, customer.phone]
                                 .filter(Boolean)
                                 .join(" | ") || "No contact details"}
@@ -883,14 +883,14 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                         </button>
                       ))
                     ) : (
-                      <p className="px-4 py-5 text-center text-xs text-[var(--text-muted)]">
+                      <p className="px-4 py-5 text-center text-xs text-fg-muted">
                         {customers.length
                           ? "No customers match your search."
                           : "No customers found yet."}
                       </p>
                     )}
                   </div>{" "}
-                  <div className="border-t border-[var(--border-color)] bg-[var(--bg-tertiary)]/60 p-2.5">
+                  <div className="border-t border-line bg-subtle/60 p-2.5">
                     <button
                       type="button"
                       onClick={() => {
@@ -914,14 +914,14 @@ function QuoteEditor({ quoteId, quote, customerId }) {
               )}{" "}
             </div>{" "}
             {form.customer_key ? (
-              <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-blue-50/50 p-3 shadow-inner dark:border-[var(--border-color)] dark:from-[var(--bg-card-alt)] dark:to-[var(--bg-card)]">
+              <div className="rounded-2xl border border-line bg-gradient-to-br from-card-alt to-info-soft p-3 shadow-inner">
                 {" "}
                 <div className="mb-2 flex items-center gap-2 text-[9px] font-extrabold uppercase tracking-wider text-blue-700">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white">
                     <Bolt size={11} />
                   </span>
                   {t("admin.quoteInvoice.ui.customer_details_23312fdb")}{" "}
-                  <span className="font-medium normal-case tracking-normal text-slate-500 dark:text-[var(--text-muted)]">
+                  <span className="font-medium normal-case tracking-normal text-fg-muted">
                     {t(
                       "admin.quoteInvoice.ui.editable_for_this_quote_4bead005",
                     )}
@@ -984,17 +984,17 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                 </div>{" "}
               </div>
             ) : (
-              <div className="flex min-h-[88px] items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-3 dark:border-[var(--border-color)] dark:bg-[var(--bg-card-alt)]">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm dark:bg-[var(--bg-tertiary)] dark:text-blue-300">
+              <div className="flex min-h-[88px] items-center gap-3 rounded-xl border border-dashed border-line bg-card-alt px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-subtle text-info shadow-sm">
                   <UserRound size={16} />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                  <p className="text-xs font-semibold text-fg-secondary">
                     {t(
                       "admin.quoteInvoice.ui.choose_a_customer_to_continue_898d7c4d",
                     )}
                   </p>
-                  <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                  <p className="mt-0.5 text-[10px] text-fg-muted">
                     {t(
                       "admin.quoteInvoice.ui.their_name_and_contact_details_will_fill_in_automaticall_244a772e",
                     )}
@@ -1005,19 +1005,19 @@ function QuoteEditor({ quoteId, quote, customerId }) {
           </div>{" "}
         </section>{" "}
         <section
-          className={`${card} overflow-hidden bg-gradient-to-br from-white via-white to-slate-50/70 dark:from-[var(--bg-card)] dark:via-[var(--bg-card)] dark:to-[var(--bg-card-alt)]`}
+          className={`${card} overflow-hidden bg-gradient-to-br from-card via-card to-card-alt`}
         >
           {" "}
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--border-color)] bg-gradient-to-r from-slate-50 to-white dark:from-[var(--bg-card-alt)] dark:to-[var(--bg-card)] px-4 py-3.5 sm:px-5">
+          <div className="flex items-center justify-between gap-3 border-b border-line bg-gradient-to-r from-card-alt to-card px-4 py-3.5 sm:px-5">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-[0_4px_10px_rgba(37,99,235,0.2)]">
                 <CalendarDays size={15} />
               </span>
               <div>
-                <h2 className="text-sm font-extrabold tracking-tight text-[var(--text-primary)]">
+                <h2 className="text-sm font-extrabold tracking-tight text-fg">
                   {t("admin.quoteInvoice.ui.2_quote_details_2c6d4e50")}
                 </h2>
-                <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                <p className="mt-0.5 text-[10px] text-fg-muted">
                   {t(
                     "admin.quoteInvoice.ui.set_the_schedule_and_customer_facing_conditions_921205d8",
                   )}
@@ -1052,7 +1052,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                     className={`${input} pl-10`}
                   />
                 </div>
-                <p className="mt-1 text-[9px] text-[var(--text-muted)]">
+                <p className="mt-1 text-[9px] text-fg-muted">
                   {t(
                     "admin.quoteInvoice.ui.date_this_quote_is_issued_f85fc764",
                   )}
@@ -1078,7 +1078,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                     className={`${input} pl-10`}
                   />
                 </div>
-                <p className="mt-1 text-[9px] text-[var(--text-muted)]">
+                <p className="mt-1 text-[9px] text-fg-muted">
                   {t(
                     "admin.quoteInvoice.ui.the_offer_expires_after_this_date_d415dbd1",
                   )}
@@ -1130,10 +1130,10 @@ function QuoteEditor({ quoteId, quote, customerId }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="quote-variant-picker-title"
-            className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_24px_80px_rgba(15,23,42,0.35)]"
+            className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-line bg-card shadow-[0_24px_80px_rgba(15,23,42,0.35)]"
           >
             {" "}
-            <header className="shrink-0 border-b border-[var(--border-color)] bg-gradient-to-r from-[var(--bg-card-alt)] to-[var(--bg-tertiary)] px-4 py-4 sm:px-6">
+            <header className="shrink-0 border-b border-line bg-gradient-to-r from-card-alt to-subtle px-4 py-4 sm:px-6">
               {" "}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -1143,11 +1143,11 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                   <div>
                     <h2
                       id="quote-variant-picker-title"
-                      className="text-base font-extrabold tracking-tight text-[var(--text-primary)]"
+                      className="text-base font-extrabold tracking-tight text-fg"
                     >
                       {t("admin.quoteInvoice.ui.add_variants_e6eac24a")}
                     </h2>
-                    <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                    <p className="mt-0.5 text-[11px] text-fg-muted">
                       {t(
                         "admin.quoteInvoice.ui.select_product_variants_to_add_to_this_quote_11a3beff",
                       )}
@@ -1157,7 +1157,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                 <button
                   type="button"
                   onClick={() => setProductPickerOpen(false)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line bg-card text-fg-muted transition hover:text-fg"
                   aria-label={t(
                     "admin.quoteInvoice.ui.close_variant_picker_68daa0cb",
                   )}
@@ -1170,7 +1170,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                 <label className="relative block min-w-0">
                   <Search
                     size={14}
-                    className={`absolute ${dir === "rtl" ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-[var(--text-muted)]`}
+                    className={`absolute ${dir === "rtl" ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-fg-muted`}
                   />
                   <input
                     autoFocus
@@ -1182,7 +1182,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                     placeholder={t(
                       "admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d",
                     )}
-                    className={`h-10 w-full min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-xs outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 ${dir === "rtl" ? "pl-3 pr-9" : "pl-9 pr-3"}`}
+                    className={`h-10 w-full min-w-0 rounded-xl border border-line bg-card text-xs outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 ${dir === "rtl" ? "pl-3 pr-9" : "pl-9 pr-3"}`}
                   />
                 </label>{" "}
                 <select
@@ -1194,7 +1194,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                   aria-label={t(
                     "admin.quoteInvoice.ui.filter_variants_by_category_24e24ad7",
                   )}
-                  className="h-10 w-full min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  className="h-10 w-full min-w-0 rounded-xl border border-line bg-card px-3 text-xs text-fg outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 >
                   <option value="all">
                     {t("admin.quoteInvoice.ui.category_all_fa64de7f")}
@@ -1214,7 +1214,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                   aria-label={t(
                     "admin.quoteInvoice.ui.filter_variants_by_brand_a2a92101",
                   )}
-                  className="h-10 w-full min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  className="h-10 w-full min-w-0 rounded-xl border border-line bg-card px-3 text-xs text-fg outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 >
                   <option value="all">
                     {t("admin.quoteInvoice.ui.brand_all_e9ed4ce7")}
@@ -1227,10 +1227,10 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                 </select>{" "}
               </div>{" "}
             </header>{" "}
-            <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--bg-secondary)]/35 px-3 py-2 sm:px-4">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-page-alt/35 px-3 py-2 sm:px-4">
               {" "}
               {productsLoading ? (
-                <div className="p-10 text-center text-xs font-medium text-[var(--text-muted)]">
+                <div className="p-10 text-center text-xs font-medium text-fg-muted">
                   {t("admin.quoteInvoice.ui.loading_variants_6cd37794")}
                 </div>
               ) : visibleVariants.length ? (
@@ -1243,7 +1243,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                     return (
                       <label
                         key={variant.id}
-                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition sm:px-4 ${alreadyAdded ? "cursor-not-allowed border-emerald-200 bg-emerald-50/60 opacity-75" : checked ? "border-blue-300 bg-blue-50/80 shadow-sm" : "border-[var(--border-color)] bg-[var(--bg-card)] hover:border-blue-200 hover:bg-blue-50/40"}`}
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3 py-2.5 transition sm:px-4 ${alreadyAdded ? "cursor-not-allowed border-emerald-200 bg-emerald-50/60 opacity-75" : checked ? "border-blue-300 bg-blue-50/80 shadow-sm" : "border-line bg-card hover:border-blue-200 hover:bg-blue-50/40"}`}
                       >
                         {" "}
                         <input
@@ -1257,7 +1257,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                                 : current.filter((id) => id !== variant.id),
                             )
                           }
-                          className="h-4 w-4 shrink-0 rounded border-[var(--border-color)] accent-blue-600"
+                          className="h-4 w-4 shrink-0 rounded border-line accent-blue-600"
                           aria-label={`Select ${variant.name} ${variant.variant}`}
                         />{" "}
                         {variant.image ? (
@@ -1267,21 +1267,21 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                             width={44}
                             height={44}
                             unoptimized
-                            className="h-11 w-11 shrink-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)] object-cover"
+                            className="h-11 w-11 shrink-0 rounded-xl border border-line bg-subtle object-cover"
                           />
                         ) : (
-                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-subtle text-fg-muted">
                             <Package size={18} />
                           </span>
                         )}{" "}
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-bold text-[var(--text-primary)]">
+                          <span className="block truncate text-xs font-bold text-fg">
                             {variant.name}{" "}
-                            <span className="font-medium text-[var(--text-secondary)]">
+                            <span className="font-medium text-fg-secondary">
                               / {variant.variant}
                             </span>
                           </span>
-                          <span className="mt-1 block truncate text-[10px] font-medium text-[var(--text-muted)]">
+                          <span className="mt-1 block truncate text-[10px] font-medium text-fg-muted">
                             {[
                               variant.sku && `SKU ${variant.sku}`,
                               variant.stock != null &&
@@ -1294,10 +1294,10 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                           </span>
                         </span>{" "}
                         <span className="hidden shrink-0 text-right sm:block">
-                          <span className="block text-xs font-bold text-[var(--text-primary)]">
+                          <span className="block text-xs font-bold text-fg">
                             {money(variant.price)}
                           </span>
-                          <span className="text-[9px] text-[var(--text-muted)]">
+                          <span className="text-[9px] text-fg-muted">
                             {t("admin.quoteInvoice.ui.unit_price_3c6c777f")}
                           </span>
                         </span>{" "}
@@ -1312,10 +1312,10 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                 </div>
               ) : (
                 <div className="p-10 text-center">
-                  <p className="text-sm font-bold text-[var(--text-primary)]">
+                  <p className="text-sm font-bold text-fg">
                     {t("admin.quoteInvoice.ui.no_variants_found_3f4b71fc")}
                   </p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  <p className="mt-1 text-xs text-fg-muted">
                     {t(
                       "admin.quoteInvoice.ui.try_a_different_search_or_filter_4e653834",
                     )}
@@ -1323,11 +1323,11 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                 </div>
               )}{" "}
             </div>{" "}
-            <footer className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3 sm:px-5">
+            <footer className="shrink-0 border-t border-line bg-card px-4 py-3 sm:px-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium text-[var(--text-muted)]">
-                    <span className="rounded-lg bg-[var(--bg-tertiary)] px-2 py-1 font-semibold text-[var(--text-secondary)]">
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium text-fg-muted">
+                    <span className="rounded-lg bg-subtle px-2 py-1 font-semibold text-fg-secondary">
                       {t("admin.quoteInvoice.ui.page_fb06270f")} {productPage} /{" "}
                       {pickerPageCount}
                     </span>
@@ -1347,7 +1347,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                     onClick={() =>
                       setProductPage((page) => Math.max(1, page - 1))
                     }
-                    className="h-9 rounded-xl border border-[var(--border-color)] px-3 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-9 rounded-xl border border-line px-3 text-xs font-semibold text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {t("admin.quoteInvoice.ui.previous_50f94286")}
                   </button>
@@ -1364,7 +1364,7 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                         className={
                           productPage === page
                             ? "h-9 min-w-9 rounded-xl border border-blue-600 bg-blue-600 px-2.5 text-xs font-semibold text-white shadow-sm"
-                            : "h-9 min-w-9 rounded-xl border border-[var(--border-color)] px-2.5 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+                            : "h-9 min-w-9 rounded-xl border border-line px-2.5 text-xs font-semibold text-fg-secondary hover:bg-subtle"
                         }
                       >
                         {page}
@@ -1378,14 +1378,14 @@ function QuoteEditor({ quoteId, quote, customerId }) {
                         Math.min(pickerPageCount, page + 1),
                       )
                     }
-                    className="h-9 rounded-xl border border-[var(--border-color)] px-3 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-9 rounded-xl border border-line px-3 text-xs font-semibold text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {t("admin.quoteInvoice.ui.next_bc981983")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setProductPickerOpen(false)}
-                    className="h-9 rounded-xl border border-[var(--border-color)] px-3 text-xs font-semibold text-[var(--text-secondary)]"
+                    className="h-9 rounded-xl border border-line px-3 text-xs font-semibold text-fg-secondary"
                   >
                     {t("admin.quoteInvoice.ui.close_bbfa773e")}
                   </button>
@@ -1430,7 +1430,7 @@ function SectionTitle({ icon: Icon, title, trailing, className = "mb-3" }) {
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shadow-sm">
         <Icon size={15} />
       </span>
-      <h2 className="text-sm font-extrabold tracking-tight text-[var(--text-primary)]">
+      <h2 className="text-sm font-extrabold tracking-tight text-fg">
         {title}
       </h2>
       {trailing && <div className="ml-auto">{trailing}</div>}
@@ -1440,7 +1440,7 @@ function SectionTitle({ icon: Icon, title, trailing, className = "mb-3" }) {
 function PercentInput({ value, onChange, label: ariaLabel }) {
   const { t } = useTranslation();
   return (
-    <div className="flex h-9 w-[88px] items-center rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 shadow-sm transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10">
+    <div className="flex h-9 w-[88px] items-center rounded-xl border border-line bg-card px-2.5 shadow-sm transition focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10">
       <input
         type="number"
         min="0"
@@ -1448,10 +1448,10 @@ function PercentInput({ value, onChange, label: ariaLabel }) {
         step="0.01"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-full min-w-0 flex-1 bg-transparent text-xs text-[var(--text-primary)] outline-none"
+        className="h-full min-w-0 flex-1 bg-transparent text-xs text-fg outline-none"
         aria-label={ariaLabel}
       />
-      <span className="ml-1 text-[10px] font-medium text-[var(--text-muted)]">
+      <span className="ml-1 text-[10px] font-medium text-fg-muted">
         %
       </span>
     </div>
@@ -1461,7 +1461,7 @@ function SummaryRow({ label: title, value }) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[9px] text-[var(--text-secondary)]">{title}</span>
+      <span className="text-[9px] text-fg-secondary">{title}</span>
       <span className="text-[9px] font-semibold">{value}</span>
     </div>
   );

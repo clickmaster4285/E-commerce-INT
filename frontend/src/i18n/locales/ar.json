@@ -1612,6 +1612,8 @@
   "admin.manageStock.toast.updated": "تم تحديث المخزون بنجاح",
   "admin.nav.item.attributes": "السمات",
   "admin.nav.item.termsConditions": "الشروط والأحكام",
+  "admin.nav.item.storeEditor": "محرر المتجر",
+  "admin.nav.item.pages": "الصفحات",
   "admin.nav.item.banners": "اللافتات",
   "admin.nav.item.brands": "العلامات التجارية",
   "admin.nav.item.categories": "الفئات",

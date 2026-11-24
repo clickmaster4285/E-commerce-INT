@@ -22,7 +22,7 @@ export default function ResetPasswordCard({
   const [error, setError] = useState("");
 
   const inputCls =
-    "w-full h-12 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] pl-11 pr-11 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15 transition";
+    "w-full h-12 rounded-xl bg-user-input border border-user-line pl-11 pr-11 text-sm text-user-fg placeholder:text-user-fg-subtle outline-none focus:border-user-accent focus:ring-2 focus:ring-user-accent/15 transition";
 
   const rules = [
     { label: t("auth.reset.minLength"), ok: password.length >= 6 },
@@ -54,20 +54,20 @@ export default function ResetPasswordCard({
     <div>
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
-          <KeyRound size={16} className="text-[var(--user-accent)]" />
-          <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+          <KeyRound size={16} className="text-user-accent" />
+          <span className="text-user-accent text-[0.625rem] font-bold uppercase tracking-widest">
             {t("auth.reset.newPassword")}
           </span>
         </div>
-        <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">{t("auth.reset.setPassword")}</h2>
-        <p className="text-[var(--user-text-muted)] text-sm">
-          {t("auth.reset.choosePasswordFor")} <span className="font-semibold text-[var(--user-text)]">{email}</span>
+        <h2 className="text-2xl font-black text-user-fg mb-1">{t("auth.reset.setPassword")}</h2>
+        <p className="text-user-fg-muted text-sm">
+          {t("auth.reset.choosePasswordFor")} <span className="font-semibold text-user-fg">{email}</span>
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <div className="relative">
-          <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+          <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
           <input
             type={showPassword ? "text" : "password"}
             required
@@ -83,7 +83,7 @@ export default function ResetPasswordCard({
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] hover:text-[var(--user-text)] transition"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-user-fg-subtle hover:text-user-fg transition"
             aria-label={showPassword ? t("auth.reset.hidePassword") : t("auth.reset.showPassword")}
           >
             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -91,7 +91,7 @@ export default function ResetPasswordCard({
         </div>
 
         <div className="relative">
-          <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+          <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
           <input
             type={showPassword ? "text" : "password"}
             required
@@ -111,7 +111,7 @@ export default function ResetPasswordCard({
             <span
               key={rule.label}
               className={`flex items-center gap-1.5 text-[0.6875rem] font-semibold ${
-                rule.ok ? "text-[var(--user-success)]" : "text-[var(--user-text-subtle)]"
+                rule.ok ? "text-user-success" : "text-user-fg-subtle"
               }`}
             >
               <CheckCircle2 size={12} /> {rule.label}
@@ -120,16 +120,16 @@ export default function ResetPasswordCard({
         </div>
 
         {error && (
-          <div className="px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
-            <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-            <p className="text-[var(--user-danger)] text-sm">{error}</p>
+          <div className="px-4 py-3 rounded-xl bg-user-danger/10 border border-user-danger/30 flex items-start gap-2">
+            <AlertCircle size={16} className="text-user-danger shrink-0 mt-0.5" />
+            <p className="text-user-danger text-sm">{error}</p>
           </div>
         )}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full h-12 rounded-xl bg-user-accent text-user-accent-fg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
           {loading ? t("auth.reset.saving") : t("auth.reset.resetPassword")}
@@ -141,7 +141,7 @@ export default function ResetPasswordCard({
           type="button"
           onClick={onBack}
           disabled={loading}
-          className="flex items-center gap-1.5 mt-4 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition disabled:opacity-50"
+          className="flex items-center gap-1.5 mt-4 text-[0.75rem] font-semibold text-user-fg-muted hover:text-user-accent transition disabled:opacity-50"
         >
           <ArrowLeft size={13} /> {backLabel}
         </button>

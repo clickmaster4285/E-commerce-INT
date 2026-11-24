@@ -50,18 +50,18 @@ const fmt = (n) => `Rs. ${Math.round(n).toLocaleString()}`;
 const OrderTimeline = ({ status, reason }) => {
   if (status === "cancelled") {
     return (
-      <div className="rounded-2xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-5">
+      <div className="rounded-2xl bg-user-danger/10 border border-user-danger/20 p-5">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--user-danger)] flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-user-danger flex items-center justify-center shrink-0">
             <XCircle size={22} className="text-white" />
           </div>
                    <div className="flex-1 min-w-0">
-            <p className="text-base font-black text-[var(--user-danger)]">Order Cancelled</p>
-            <p className="text-xs text-[var(--user-text-muted)] mt-1">Items have been restored to stock.</p>
+            <p className="text-base font-black text-user-danger">Order Cancelled</p>
+            <p className="text-xs text-user-fg-muted mt-1">Items have been restored to stock.</p>
             {reason && (
-              <div className="mt-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-danger)]/20 p-3">
-                <p className="text-[0.625rem] font-black text-[var(--user-danger)] uppercase tracking-wider mb-1">Cancellation Reason</p>
-                <p className="text-sm text-[var(--user-text)] leading-relaxed">{reason}</p>
+              <div className="mt-3 rounded-xl bg-user-card border border-user-danger/20 p-3">
+                <p className="text-[0.625rem] font-black text-user-danger uppercase tracking-wider mb-1">Cancellation Reason</p>
+                <p className="text-sm text-user-fg leading-relaxed">{reason}</p>
               </div>
             )}
           </div>
@@ -75,8 +75,8 @@ const OrderTimeline = ({ status, reason }) => {
   return (
     <>
       <div className="lg:hidden relative">
-        <div className="absolute left-[1.3125rem] top-6 bottom-6 w-[0.125rem] bg-[var(--user-border)] rounded-full" />
-        <div className="absolute left-[1.3125rem] top-6 w-[0.125rem] bg-[var(--user-accent)] rounded-full transition-all duration-700"
+        <div className="absolute left-[1.3125rem] top-6 bottom-6 w-[0.125rem] bg-user-line rounded-full" />
+        <div className="absolute left-[1.3125rem] top-6 w-[0.125rem] bg-user-accent rounded-full transition-all duration-700"
           style={{ height: `calc((100% - 48px) * ${idx / (STATUS_FLOW.length - 1)})` }} />
         <div className="space-y-7">
           {STATUS_FLOW.map((step, i) => {
@@ -88,19 +88,19 @@ const OrderTimeline = ({ status, reason }) => {
               <div key={step} className="flex gap-4 relative">
                 <div className="relative z-10 shrink-0">
                   <div className={`w-11 h-11 rounded-2xl flex items-center justify-center border-2 transition-all ${
-                    isCompleted ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-[var(--user-accent-text)]"
-                    : isCurrent ? "bg-[var(--user-bg-card)] border-[var(--user-accent)] text-[var(--user-text)] shadow-md"
-                    : "bg-[var(--user-bg-card)] border-[var(--user-border)] text-[var(--user-text-subtle)]"
+                    isCompleted ? "bg-user-accent border-user-accent text-user-accent-fg"
+                    : isCurrent ? "bg-user-card border-user-accent text-user-fg shadow-md"
+                    : "bg-user-card border-user-line text-user-fg-subtle"
                   }`}>
                     {isCompleted ? <CheckCircle2 size={19} /> : <Icon size={18} />}
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 pt-1">
                   <div className="flex items-center gap-2">
-                    <p className={`text-sm font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>{cfg.label}</p>
-                    {isCurrent && <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                    <p className={`text-sm font-black ${isCurrent || isCompleted ? "text-user-fg" : "text-user-fg-subtle"}`}>{cfg.label}</p>
+                    {isCurrent && <span className="text-[0.5625rem] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-user-accent text-user-accent-fg">Now</span>}
                   </div>
-                  <p className="text-xs text-[var(--user-text-muted)] mt-1 leading-relaxed">{cfg.desc}</p>
+                  <p className="text-xs text-user-fg-muted mt-1 leading-relaxed">{cfg.desc}</p>
                 </div>
               </div>
             );
@@ -109,8 +109,8 @@ const OrderTimeline = ({ status, reason }) => {
       </div>
 
       <div className="hidden lg:block relative">
-        <div className="absolute left-[10%] right-[10%] top-[1.5rem] h-[0.125rem] -translate-y-1/2 bg-[var(--user-border)] rounded-full" />
-        <div className="absolute left-[10%] top-[1.5rem] h-[0.125rem] -translate-y-1/2 bg-[var(--user-accent)] rounded-full transition-all duration-700"
+        <div className="absolute left-[10%] right-[10%] top-[1.5rem] h-[0.125rem] -translate-y-1/2 bg-user-line rounded-full" />
+        <div className="absolute left-[10%] top-[1.5rem] h-[0.125rem] -translate-y-1/2 bg-user-accent rounded-full transition-all duration-700"
           style={{ width: `${(idx / (STATUS_FLOW.length - 1)) * 80}%` }} />
         <div className="relative flex items-start">
           {STATUS_FLOW.map((step, i) => {
@@ -121,14 +121,14 @@ const OrderTimeline = ({ status, reason }) => {
             return (
               <div key={step} className="flex-1 flex flex-col items-center relative z-10">
                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 transition-all ${
-                  isCompleted ? "bg-[var(--user-accent)] border-[var(--user-accent)] text-[var(--user-accent-text)]"
-                  : isCurrent ? "bg-[var(--user-bg-card)] border-[var(--user-accent)] text-[var(--user-text)] shadow-md"
-                  : "bg-[var(--user-bg-card)] border-[var(--user-border)] text-[var(--user-text-subtle)]"
+                  isCompleted ? "bg-user-accent border-user-accent text-user-accent-fg"
+                  : isCurrent ? "bg-user-card border-user-accent text-user-fg shadow-md"
+                  : "bg-user-card border-user-line text-user-fg-subtle"
                 }`}>
                   {isCompleted ? <CheckCircle2 size={20} /> : <Icon size={19} />}
                 </div>
-                <p className={`mt-3 text-xs font-black uppercase tracking-wider ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>{cfg.label}</p>
-                {isCurrent && <span className="mt-1.5 text-[0.5625rem] font-black px-2.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                <p className={`mt-3 text-xs font-black uppercase tracking-wider ${isCurrent || isCompleted ? "text-user-fg" : "text-user-fg-subtle"}`}>{cfg.label}</p>
+                {isCurrent && <span className="mt-1.5 text-[0.5625rem] font-black px-2.5 py-0.5 rounded-full bg-user-accent text-user-accent-fg">Now</span>}
               </div>
             );
           })}
@@ -192,20 +192,20 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
     } finally { setSaving(false); setActionType(null); }
   };
 
-  const inputCls = "w-full h-11 px-3 rounded-xl text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)]";
-  const labelCls = "block text-xs font-bold text-[var(--user-text-secondary)] mb-1.5 uppercase tracking-wider";
-  const textareaCls = "w-full px-3 py-2 rounded-xl text-sm outline-none transition focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] resize-none";
+  const inputCls = "w-full h-11 px-3 rounded-xl text-sm outline-none transition focus:ring-2 focus:ring-user-accent/30 focus:border-user-accent bg-user-input border border-user-line text-user-fg placeholder:text-user-fg-subtle";
+  const labelCls = "block text-xs font-bold text-user-fg-secondary mb-1.5 uppercase tracking-wider";
+  const textareaCls = "w-full px-3 py-2 rounded-xl text-sm outline-none transition focus:ring-2 focus:ring-user-accent/30 focus:border-user-accent bg-user-input border border-user-line text-user-fg resize-none";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-[var(--user-bg-card)] border-t-2 sm:border-2 border-[var(--user-border)] shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl bg-user-card border-t-2 sm:border-2 border-user-line shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-user-line bg-user-card/95 backdrop-blur-sm">
           <div>
-            <h2 className="text-base font-black text-[var(--user-text)]">Edit Delivery Address</h2>
-            <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{order.order_number}</p>
+            <h2 className="text-base font-black text-user-fg">Edit Delivery Address</h2>
+            <p className="text-xs text-user-fg-muted mt-0.5">{order.order_number}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl border border-[var(--user-border)] text-[var(--user-text-muted)] hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"><X size={16} /></button>
+          <button onClick={onClose} className="p-2 rounded-xl border border-user-line text-user-fg-muted hover:text-user-fg hover:bg-user-hover transition"><X size={16} /></button>
         </div>
 
         {/* Form (current address pre-filled) */}
@@ -215,11 +215,11 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
             <div><label className={labelCls}>Phone *</label><input type="tel" value={form.phone} maxLength={14} onChange={e => setForm({...form, phone: e.target.value.replace(/\D/g,"").slice(0,14)})} placeholder="03001234567" className={inputCls} /></div>
           </div>
           <div><label className={labelCls}>Country *</label>
-            <div className="relative"><select value={form.country} onChange={e => setForm({...form, country: e.target.value, state:"", city:""})} className={inputCls+" appearance-none pr-10 cursor-pointer"}><option value="">Select country</option>{allCountries.map(c => <option key={c.isoCode} value={c.name}>{c.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" /></div>
+            <div className="relative"><select value={form.country} onChange={e => setForm({...form, country: e.target.value, state:"", city:""})} className={inputCls+" appearance-none pr-10 cursor-pointer"}><option value="">Select country</option>{allCountries.map(c => <option key={c.isoCode} value={c.name}>{c.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-user-fg-muted pointer-events-none" /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div><label className={labelCls}>State *</label><div className="relative"><select value={form.state} onChange={e => setForm({...form, state: e.target.value, city:""})} disabled={!form.country} className={inputCls+" appearance-none pr-10 cursor-pointer disabled:opacity-50"}><option value="">Select</option>{allStates.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" /></div></div>
-            <div><label className={labelCls}>City *</label><div className="relative"><select value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!form.state} className={inputCls+" appearance-none pr-10 cursor-pointer disabled:opacity-50"}><option value="">Select</option>{allCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none" /></div></div>
+            <div><label className={labelCls}>State *</label><div className="relative"><select value={form.state} onChange={e => setForm({...form, state: e.target.value, city:""})} disabled={!form.country} className={inputCls+" appearance-none pr-10 cursor-pointer disabled:opacity-50"}><option value="">Select</option>{allStates.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-user-fg-muted pointer-events-none" /></div></div>
+            <div><label className={labelCls}>City *</label><div className="relative"><select value={form.city} onChange={e => setForm({...form, city: e.target.value})} disabled={!form.state} className={inputCls+" appearance-none pr-10 cursor-pointer disabled:opacity-50"}><option value="">Select</option>{allCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-user-fg-muted pointer-events-none" /></div></div>
             <div><label className={labelCls}>ZIP</label><input value={form.zip_code} onChange={e => setForm({...form, zip_code: e.target.value})} placeholder="54000" className={inputCls} /></div>
           </div>
           <div><label className={labelCls}>Street Address *</label><textarea value={form.street_address1} onChange={e => setForm({...form, street_address1: e.target.value})} rows="2" placeholder="Street address" className={textareaCls} /></div>
@@ -227,13 +227,13 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
         </div>
 
         {/* ✅ COMPACT ACTION BAR — Left: Cancel | Right: 2 buttons */}
-        <div className="sticky bottom-0 px-5 py-3 border-t-2 border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
+        <div className="sticky bottom-0 px-5 py-3 border-t-2 border-user-line bg-user-card/95 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             {/* LEFT: Cancel */}
             <button
               onClick={onClose}
               disabled={saving}
-              className="h-10 px-4 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition disabled:opacity-50"
+              className="h-10 px-4 rounded-xl border border-user-line bg-user-card text-sm font-bold text-user-fg hover:bg-user-hover transition disabled:opacity-50"
             >
               Cancel
             </button>
@@ -245,7 +245,7 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
             <button
               onClick={() => handleSave("order_only")}
               disabled={saving}
-              className="h-10 px-3 sm:px-4 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.6875rem] sm:text-xs font-black flex items-center gap-1.5 hover:opacity-90 transition disabled:opacity-50"
+              className="h-10 px-3 sm:px-4 rounded-xl bg-user-accent text-user-accent-fg text-[0.6875rem] sm:text-xs font-black flex items-center gap-1.5 hover:opacity-90 transition disabled:opacity-50"
             >
               {saving && actionType === "order_only" ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
               <span className="whitespace-nowrap">Order only</span>
@@ -254,7 +254,7 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
             <button
               onClick={() => handleSave("update_saved")}
               disabled={saving}
-              className="h-10 px-3 sm:px-4 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] text-[0.6875rem] sm:text-xs font-bold hover:border-[var(--user-accent)]/40 transition disabled:opacity-40 flex items-center gap-1.5"
+              className="h-10 px-3 sm:px-4 rounded-xl border-2 border-user-line text-user-fg-secondary text-[0.6875rem] sm:text-xs font-bold hover:border-user-accent/40 transition disabled:opacity-40 flex items-center gap-1.5"
             >
               {saving && actionType === "update_saved" ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
               <span className="whitespace-nowrap">Save to address book</span>
@@ -269,17 +269,17 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
 /* ============ CANCEL MODAL ============ */
 const CancelConfirmModal = ({ orderNumber, canceling, onClose, onConfirm }) => (
   <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-    <div className="w-full max-w-sm bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+    <div className="w-full max-w-sm bg-user-card rounded-2xl border border-user-line shadow-2xl p-6" onClick={e => e.stopPropagation()}>
       <div className="flex flex-col items-center text-center mb-5">
-        <div className="w-16 h-16 rounded-2xl bg-[var(--user-danger)] flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-2xl bg-user-danger flex items-center justify-center mb-4">
           <XCircle size={28} className="text-white" />
         </div>
-        <h3 className="text-lg font-black text-[var(--user-text)]">Cancel “{orderNumber}”?</h3>
-        <p className="text-xs text-[var(--user-text-muted)] mt-2 leading-relaxed">Items will be restored to stock. This cannot be undone.</p>
+        <h3 className="text-lg font-black text-user-fg">Cancel “{orderNumber}”?</h3>
+        <p className="text-xs text-user-fg-muted mt-2 leading-relaxed">Items will be restored to stock. This cannot be undone.</p>
       </div>
       <div className="flex gap-3">
-        <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] transition">Keep Order</button>
-        <button onClick={onConfirm} disabled={canceling} className="flex-1 h-11 rounded-xl bg-[var(--user-danger)] text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
+        <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-user-line bg-user-hover text-sm font-semibold text-user-fg transition">Keep Order</button>
+        <button onClick={onConfirm} disabled={canceling} className="flex-1 h-11 rounded-xl bg-user-danger text-white text-sm font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
           {canceling ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />} Cancel
         </button>
       </div>
@@ -326,15 +326,15 @@ export default function OrderDetailPage({ params }) {
     return (
     <>
       <div className="hidden lg:block max-w-[68.75rem] mx-auto px-4 lg:px-6 py-10 space-y-5 animate-pulse">
-        <div className="h-4 w-32 bg-[var(--user-bg-hover)] rounded" />
-        <div className="h-72 bg-[var(--user-bg-card)] rounded-3xl border border-[var(--user-border)]" />
+        <div className="h-4 w-32 bg-user-hover rounded" />
+        <div className="h-72 bg-user-card rounded-3xl border border-user-line" />
         <div className="grid lg:grid-cols-[1fr_380px] gap-6">
-          <div className="h-96 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" />
-          <div className="space-y-5"><div className="h-52 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" /><div className="h-64 bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)]" /></div>
+          <div className="h-96 bg-user-card rounded-2xl border border-user-line" />
+          <div className="space-y-5"><div className="h-52 bg-user-card rounded-2xl border border-user-line" /><div className="h-64 bg-user-card rounded-2xl border border-user-line" /></div>
         </div>
       </div>
-      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]">
-        <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-user-page">
+        <Loader2 className="animate-spin text-user-accent" size={28} />
       </div>
     </>
     );
@@ -344,20 +344,20 @@ export default function OrderDetailPage({ params }) {
     return (
     <>
       <div className="hidden lg:block max-w-[31.25rem] mx-auto px-4 py-24 text-center">
-        <div className="w-24 h-24 mx-auto rounded-3xl bg-[var(--user-accent)] flex items-center justify-center mb-6 shadow-2xl">
-          <Package size={40} className="text-[var(--user-accent-text)]" />
+        <div className="w-24 h-24 mx-auto rounded-3xl bg-user-accent flex items-center justify-center mb-6 shadow-2xl">
+          <Package size={40} className="text-user-accent-fg" />
         </div>
-        <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Order Not Found</h1>
-        <p className="text-sm text-[var(--user-text-muted)] mb-7">This order does not exist or has been removed.</p>
-        <Link href="/orders" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition"><ArrowLeft size={16} /> Back to Orders</Link>
+        <h1 className="text-2xl font-black text-user-fg mb-2">Order Not Found</h1>
+        <p className="text-sm text-user-fg-muted mb-7">This order does not exist or has been removed.</p>
+        <Link href="/orders" className="inline-flex items-center gap-2 bg-user-accent text-user-accent-fg px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition"><ArrowLeft size={16} /> Back to Orders</Link>
       </div>
-      <div className="lg:hidden min-h-[60vh] flex flex-col items-center justify-center bg-[var(--user-bg)] px-4 text-center">
-        <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
-          <Package size={36} className="text-[var(--user-accent)]" />
+      <div className="lg:hidden min-h-[60vh] flex flex-col items-center justify-center bg-user-page px-4 text-center">
+        <div className="w-20 h-20 mx-auto rounded-full bg-user-card border-2 border-user-line flex items-center justify-center mb-5">
+          <Package size={36} className="text-user-accent" />
         </div>
-        <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">Order Not Found</h2>
-        <p className="text-xs text-[var(--user-text-muted)] mb-6 max-w-[17.5rem]">This order does not exist or has been removed.</p>
-        <Link href="/orders" className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+        <h2 className="text-lg font-black text-user-fg mb-1.5">Order Not Found</h2>
+        <p className="text-xs text-user-fg-muted mb-6 max-w-[17.5rem]">This order does not exist or has been removed.</p>
+        <Link href="/orders" className="w-full max-w-xs h-11 rounded-xl bg-user-accent text-user-accent-fg text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
           <ArrowLeft size={16} /> Back to Orders
         </Link>
       </div>
@@ -398,53 +398,53 @@ export default function OrderDetailPage({ params }) {
     {/* ============= DESKTOP — UNCHANGED ============= */}
     <div className="hidden lg:block">
     <main className="max-w-[68.75rem] mx-auto px-4 sm:px-5 lg:px-6 py-5 sm:py-8 lg:py-10 pb-40 md:pb-10">
-      <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-text)] transition mb-4 sm:mb-5 group">
+      <Link href="/orders" className="inline-flex items-center gap-1.5 text-xs font-semibold text-user-fg-muted hover:text-user-fg transition mb-4 sm:mb-5 group">
         <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" /> Back to Orders
       </Link>
 
       {/* HERO */}
-      <div className="relative overflow-hidden rounded-3xl border border-[var(--user-border)] bg-[var(--user-bg-card)] mb-5 sm:mb-6 shadow-lg">
-        <div className="h-1 bg-[var(--user-accent)]" />
+      <div className="relative overflow-hidden rounded-3xl border border-user-line bg-user-card mb-5 sm:mb-6 shadow-lg">
+        <div className="h-1 bg-user-accent" />
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-user-accent text-user-accent-fg shadow-md">
                 <StatusIcon size={14} />
                 <span className="text-xs font-black uppercase tracking-wider">{cfg.label}</span>
               </span>
               {totalSavings > 0 && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 text-[var(--user-success)]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-user-success/10 border border-user-success/20 text-user-success">
                   <Sparkles size={12} /><span className="text-[0.625rem] font-black">Saved {fmt(totalSavings)}</span>
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--user-text-muted)]">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-user-fg-muted">
               <Calendar size={13} /> {date}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 items-start mb-6">
             <div>
-              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Number</p>
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[var(--user-text)] tracking-tight break-all">{order.order_number}</h1>
-              <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mt-2 leading-relaxed max-w-md">{cfg.desc}</p>
+              <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-[0.2em] mb-1.5">Order Number</p>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-user-fg tracking-tight break-all">{order.order_number}</h1>
+              <p className="text-xs sm:text-sm text-user-fg-muted mt-2 leading-relaxed max-w-md">{cfg.desc}</p>
             </div>
             <div className="sm:text-right sm:flex sm:flex-col sm:items-end">
-              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-[0.2em] mb-1.5">Order Total</p>
-              <p className="text-3xl sm:text-4xl lg:text-5xl font-black text-[var(--user-text)]">{fmt(order.total)}</p>
-              <p className="text-xs text-[var(--user-text-muted)] mt-2 font-semibold inline-flex items-center gap-1.5">
-                <PayIcon size={13} className="text-[var(--user-accent)]" /> {pay.label}
-                {order.payment?.status === "paid" && <span className="text-[0.5625rem] font-black uppercase px-2 py-0.5 rounded-full bg-[var(--user-success)]/10 text-[var(--user-success)] border border-[var(--user-success)]/20">Paid</span>}
+              <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-[0.2em] mb-1.5">Order Total</p>
+              <p className="text-3xl sm:text-4xl lg:text-5xl font-black text-user-fg">{fmt(order.total)}</p>
+              <p className="text-xs text-user-fg-muted mt-2 font-semibold inline-flex items-center gap-1.5">
+                <PayIcon size={13} className="text-user-accent" /> {pay.label}
+                {order.payment?.status === "paid" && <span className="text-[0.5625rem] font-black uppercase px-2 py-0.5 rounded-full bg-user-success/10 text-user-success border border-user-success/20">Paid</span>}
               </p>
               <div className="hidden sm:block mt-4">
                 {canCancel ? (
-                  <button onClick={() => setShowCancelModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-black hover:bg-[var(--user-danger)]/10 transition">
+                  <button onClick={() => setShowCancelModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 border-user-danger/40 text-user-danger text-xs font-black hover:bg-user-danger/10 transition">
                     <XCircle size={14} /> Cancel Order
                   </button>
                 ) : (
-                  order.status !== "cancelled" && <p className="text-[0.625rem] text-[var(--user-text-muted)] inline-flex items-center gap-1.5"><Lock size={12} /> Order locked — cannot be modified</p>
+                  order.status !== "cancelled" && <p className="text-[0.625rem] text-user-fg-muted inline-flex items-center gap-1.5"><Lock size={12} /> Order locked — cannot be modified</p>
                 )}
-                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--user-border)] px-4 py-2.5 text-xs font-bold text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+                <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl border border-user-line px-4 py-2.5 text-xs font-bold text-user-fg transition hover:bg-user-hover">
                   <MessageCircle size={15} /> Chat about this order
                 </button>
               </div>
@@ -453,25 +453,25 @@ export default function OrderDetailPage({ params }) {
 
           {canCancel && (
             <div className="sm:hidden mb-5">
-              <button onClick={() => setShowCancelModal(true)} className="w-full h-11 rounded-xl border-2 border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-black hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-2">
+              <button onClick={() => setShowCancelModal(true)} className="w-full h-11 rounded-xl border-2 border-user-danger/40 text-user-danger text-xs font-black hover:bg-user-danger/10 transition flex items-center justify-center gap-2">
                 <XCircle size={14} /> Cancel Order
               </button>
             </div>
           )}
 
           {order.status !== "cancelled" && order.status !== "delivered" && (
-            <div className="rounded-2xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] p-4 mb-6">
+            <div className="rounded-2xl bg-user-hover border border-user-line p-4 mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--user-accent)] flex items-center justify-center shrink-0">
-                  <Truck size={22} className="text-[var(--user-accent-text)]" />
+                <div className="w-12 h-12 rounded-xl bg-user-accent flex items-center justify-center shrink-0">
+                  <Truck size={22} className="text-user-accent-fg" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Estimated Delivery</p>
-                  <p className="text-base lg:text-lg font-black text-[var(--user-text)] mt-0.5">{estimatedDelivery} working days</p>
+                  <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-wider">Estimated Delivery</p>
+                  <p className="text-base lg:text-lg font-black text-user-fg mt-0.5">{estimatedDelivery} working days</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping</p>
-                  <p className="text-sm font-black text-[var(--user-text)] mt-0.5 inline-flex items-center gap-1">
+                  <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-wider">Shipping</p>
+                  <p className="text-sm font-black text-user-fg mt-0.5 inline-flex items-center gap-1">
                     {order.shipping_method === "express" ? <><Zap size={14} /> Express</> : <><Truck size={14} /> Standard</>}
                   </p>
                 </div>
@@ -480,14 +480,14 @@ export default function OrderDetailPage({ params }) {
           )}
 
           {order.status === "delivered" && (
-            <div className="rounded-2xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 p-4 mb-6">
+            <div className="rounded-2xl bg-user-success/10 border border-user-success/20 p-4 mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--user-success)] flex items-center justify-center shrink-0">
+                <div className="w-12 h-12 rounded-xl bg-user-success flex items-center justify-center shrink-0">
                   <CheckCircle2 size={22} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-base lg:text-lg font-black text-[var(--user-success)]">Delivered Successfully!</p>
-                  <p className="text-xs text-[var(--user-text-muted)] mt-0.5">Thank you for shopping with us.</p>
+                  <p className="text-base lg:text-lg font-black text-user-success">Delivered Successfully!</p>
+                  <p className="text-xs text-user-fg-muted mt-0.5">Thank you for shopping with us.</p>
                 </div>
               </div>
             </div>
@@ -501,22 +501,22 @@ export default function OrderDetailPage({ params }) {
       <div className="grid lg:grid-cols-[1fr_380px] gap-5 lg:gap-6">
         {/* LEFT: ITEMS — right column ke barabar height, phir scroll */}
         <div className="relative">
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] overflow-hidden shadow-sm lg:absolute lg:inset-x-0 lg:top-0 lg:max-h-full lg:overflow-y-auto">
-                        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
+          <div className="rounded-2xl border border-user-line bg-user-card overflow-hidden shadow-sm lg:absolute lg:inset-x-0 lg:top-0 lg:max-h-full lg:overflow-y-auto">
+                        <div className="flex items-center justify-between px-4 sm:px-5 py-4 border-b border-user-line">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                  <Box size={18} className="text-[var(--user-accent-text)]" />
+                <div className="w-10 h-10 rounded-xl bg-user-accent flex items-center justify-center">
+                  <Box size={18} className="text-user-accent-fg" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-[var(--user-text)]">Order Items</h2>
-                  <p className="text-[0.625rem] text-[var(--user-text-muted)]">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
+                  <h2 className="text-sm font-black text-user-fg">Order Items</h2>
+                  <p className="text-[0.625rem] text-user-fg-muted">{order.items.length} {order.items.length === 1 ? "item" : "items"}</p>
                 </div>
               </div>
              
             </div>
 
             {/* ✅ ITEMS LIST — right column tak phailti hai, phir scroll */}
-            <div className="divide-y divide-[var(--user-border)]">
+            <div className="divide-y divide-user-line">
                             {order.items.map((i, idx) => {
                 const originalPrice = Number(i.original_price || 0);
                 const paidPrice = Number(i.price || 0);
@@ -526,17 +526,17 @@ export default function OrderDetailPage({ params }) {
                 const hasDiscount = originalPrice > 0 && originalPrice > paidPrice;
                 const itemSavings = (hasDiscount ? (originalPrice - paidPrice) * qty : 0) + Number(i.deal_savings || 0);
                 return (
-                  <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-[var(--user-bg-hover)]/30 transition-colors group">
+                  <div key={idx} className="flex gap-3 sm:gap-4 p-4 sm:p-5 hover:bg-user-hover/30 transition-colors group">
                     <div className="shrink-0 relative">
-                      <FallbackImage src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-[var(--user-border)]" />
-                      <div className="absolute -top-2 -right-2 min-w-[1.375rem] h-6 px-1.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-black flex items-center justify-center border-2 border-[var(--user-bg-card)]">×{qty}</div>
+                      <FallbackImage src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl object-cover border-2 border-user-line" />
+                      <div className="absolute -top-2 -right-2 min-w-[1.375rem] h-6 px-1.5 rounded-full bg-user-accent text-user-accent-fg text-[0.625rem] font-black flex items-center justify-center border-2 border-user-card">×{qty}</div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm sm:text-base font-bold text-[var(--user-text)] line-clamp-2 leading-snug">{text(i.name, i.translations?.name)}</h3>
-                      {i.variantTitle && <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-1">{i.variantTitle}</p>}
+                      <h3 className="text-sm sm:text-base font-bold text-user-fg line-clamp-2 leading-snug">{text(i.name, i.translations?.name)}</h3>
+                      {i.variantTitle && <p className="text-[0.6875rem] text-user-fg-muted mt-1">{i.variantTitle}</p>}
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {i.deal_id && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-text)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
-                        {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
+                        {i.deal_id && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-user-fg bg-user-hover border border-user-line px-2 py-0.5 rounded-md"><Sparkles size={10} /> {i.deal_type === 'buy_x_get_y' ? `Buy ${i.deal_buy_quantity || 2} Get ${i.deal_get_quantity || 1} Free` : (i.deal_name || 'Deal')}</span>}
+                        {freeItems > 0 && <span className="inline-flex items-center gap-1 text-[0.625rem] font-black text-user-success bg-user-success/10 border border-user-success/20 px-2 py-0.5 rounded-md"><CheckCircle2 size={10} /> +{freeItems} FREE</span>}
                       </div>
                       {canRate && (
                         <div className="mt-3 max-w-xs">
@@ -545,9 +545,9 @@ export default function OrderDetailPage({ params }) {
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      {hasDiscount && <p className="text-[0.6875rem] text-[var(--user-text-subtle)] line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
-                      <p className="text-sm sm:text-lg font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
-                      {itemSavings > 0 && <p className="text-[0.625rem] font-bold text-[var(--user-success)] mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
+                      {hasDiscount && <p className="text-[0.6875rem] text-user-fg-subtle line-through mb-0.5">{fmt(originalPrice * qty)}</p>}
+                      <p className="text-sm sm:text-lg font-black text-user-fg">{fmt(paidPrice * payableItems)}</p>
+                      {itemSavings > 0 && <p className="text-[0.625rem] font-bold text-user-success mt-1 flex items-center justify-end gap-1"><TrendingUp size={10} /> Save {fmt(itemSavings)}</p>}
                     </div>
                   </div>
                 );
@@ -559,66 +559,66 @@ export default function OrderDetailPage({ params }) {
         {/* RIGHT (unchanged) */}
         <div className="space-y-5">
           {/* ADDRESS — Pencil opens Edit Modal */}
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
+          <div className="rounded-2xl border border-user-line bg-user-card p-5 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center"><MapPin size={18} className="text-[var(--user-accent-text)]" /></div>
+                <div className="w-10 h-10 rounded-xl bg-user-accent flex items-center justify-center"><MapPin size={18} className="text-user-accent-fg" /></div>
                 <div>
-                  <h2 className="text-sm font-black text-[var(--user-text)]">Delivery Address</h2>
-                  <p className="text-[0.625rem] text-[var(--user-text-muted)]">Shipping to</p>
+                  <h2 className="text-sm font-black text-user-fg">Delivery Address</h2>
+                  <p className="text-[0.625rem] text-user-fg-muted">Shipping to</p>
                 </div>
               </div>
               {canCancel && (
-                <button onClick={() => setShowAddressModal(true)} className="w-9 h-9 rounded-xl text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center" title="Edit delivery address"><Pencil size={15} /></button>
+                <button onClick={() => setShowAddressModal(true)} className="w-9 h-9 rounded-xl text-user-fg-muted hover:text-user-accent hover:bg-user-accent/10 transition flex items-center justify-center" title="Edit delivery address"><Pencil size={15} /></button>
               )}
             </div>
-            <p className="text-sm font-bold text-[var(--user-text)]">{order.address_snapshot?.full_name}</p>
-            <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
+            <p className="text-sm font-bold text-user-fg">{order.address_snapshot?.full_name}</p>
+            <p className="text-xs text-user-fg-muted leading-relaxed mt-1">
               {order.address_snapshot?.street_address1}{order.address_snapshot?.street_address2 && <>, {order.address_snapshot.street_address2}</>}<br />
               {order.address_snapshot?.city}, {order.address_snapshot?.state}<br />
               {order.address_snapshot?.country} {order.address_snapshot?.zip_code}
             </p>
-            <div className="flex items-center gap-2 pt-3 mt-3 border-t border-[var(--user-border)]">
-              <Phone size={14} className="text-[var(--user-accent)]" />
-              <span className="text-sm font-semibold text-[var(--user-text)]">{order.address_snapshot?.phone}</span>
+            <div className="flex items-center gap-2 pt-3 mt-3 border-t border-user-line">
+              <Phone size={14} className="text-user-accent" />
+              <span className="text-sm font-semibold text-user-fg">{order.address_snapshot?.phone}</span>
             </div>
             {order.address_snapshot?.delivery_instructions && (
-              <div className="flex items-start gap-2 text-xs text-[var(--user-text-muted)] bg-[var(--user-bg-hover)] border border-[var(--user-border)] rounded-xl p-3 mt-3">
-                <FileText size={14} className="text-[var(--user-accent)] shrink-0 mt-0.5" /><span className="leading-relaxed">{order.address_snapshot.delivery_instructions}</span>
+              <div className="flex items-start gap-2 text-xs text-user-fg-muted bg-user-hover border border-user-line rounded-xl p-3 mt-3">
+                <FileText size={14} className="text-user-accent shrink-0 mt-0.5" /><span className="leading-relaxed">{order.address_snapshot.delivery_instructions}</span>
               </div>
             )}
           </div>
 
           {/* PAYMENT */}
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
+          <div className="rounded-2xl border border-user-line bg-user-card p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center"><CreditCard size={18} className="text-[var(--user-accent-text)]" /></div>
+              <div className="w-10 h-10 rounded-xl bg-user-accent flex items-center justify-center"><CreditCard size={18} className="text-user-accent-fg" /></div>
               <div>
-                <h2 className="text-sm font-black text-[var(--user-text)]">Payment Summary</h2>
-                <p className="text-[0.625rem] text-[var(--user-text-muted)]">{pay.label}</p>
+                <h2 className="text-sm font-black text-user-fg">Payment Summary</h2>
+                <p className="text-[0.625rem] text-user-fg-muted">{pay.label}</p>
               </div>
             </div>
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] mb-4">
-              <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-text)]"><PayIcon size={16} className="text-[var(--user-accent)]" /> {pay.label}</p>
-              <span className={`text-[0.625rem] font-black uppercase px-2.5 py-1 rounded-full border ${order.payment?.status === "paid" ? "text-[var(--user-success)] bg-[var(--user-success)]/10 border-[var(--user-success)]/20" : "text-amber-600 bg-amber-500/10 border-amber-500/20"}`}>{order.payment?.status || "Pending"}</span>
+            <div className="flex items-center justify-between p-3 rounded-xl bg-user-hover border border-user-line mb-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-user-fg"><PayIcon size={16} className="text-user-accent" /> {pay.label}</p>
+              <span className={`text-[0.625rem] font-black uppercase px-2.5 py-1 rounded-full border ${order.payment?.status === "paid" ? "text-user-success bg-user-success/10 border-user-success/20" : "text-amber-600 bg-amber-500/10 border-amber-500/20"}`}>{order.payment?.status || "Pending"}</span>
             </div>
             <div className="space-y-2.5 text-sm">
-              <div className="flex justify-between text-[var(--user-text-muted)]"><span>Subtotal</span><span className="font-semibold text-[var(--user-text)]">{fmt(order.subtotal)}</span></div>
-              {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="flex items-center gap-1.5 font-semibold"><Sparkles size={14} /> You Saved</span><span className="font-bold">-{fmt(totalSavings)}</span></div>}
-              <div className="flex justify-between text-[var(--user-text-muted)]"><span>Shipping</span><span className="font-semibold text-[var(--user-text)]">{order.shipping === 0 ? <span className="text-[var(--user-success)] font-bold">FREE</span> : fmt(order.shipping)}</span></div>
-              {order.tax > 0 && <div className="flex justify-between text-[var(--user-text-muted)]"><span>Tax</span><span className="font-semibold text-[var(--user-text)]">{fmt(order.tax)}</span></div>}
-              <div className="flex justify-between pt-3 mt-3 border-t-2 border-[var(--user-border)]"><span className="text-base font-bold text-[var(--user-text)]">Total Paid</span><span className="text-2xl font-black text-[var(--user-text)]">{fmt(order.total)}</span></div>
+              <div className="flex justify-between text-user-fg-muted"><span>Subtotal</span><span className="font-semibold text-user-fg">{fmt(order.subtotal)}</span></div>
+              {totalSavings > 0 && <div className="flex justify-between text-user-success"><span className="flex items-center gap-1.5 font-semibold"><Sparkles size={14} /> You Saved</span><span className="font-bold">-{fmt(totalSavings)}</span></div>}
+              <div className="flex justify-between text-user-fg-muted"><span>Shipping</span><span className="font-semibold text-user-fg">{order.shipping === 0 ? <span className="text-user-success font-bold">FREE</span> : fmt(order.shipping)}</span></div>
+              {order.tax > 0 && <div className="flex justify-between text-user-fg-muted"><span>Tax</span><span className="font-semibold text-user-fg">{fmt(order.tax)}</span></div>}
+              <div className="flex justify-between pt-3 mt-3 border-t-2 border-user-line"><span className="text-base font-bold text-user-fg">Total Paid</span><span className="text-2xl font-black text-user-fg">{fmt(order.total)}</span></div>
             </div>
           </div>
 
           {/* HELP */}
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 shadow-sm">
+          <div className="rounded-2xl border border-user-line bg-user-card p-5 shadow-sm">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center shrink-0"><Headphones size={20} className="text-[var(--user-accent-text)]" /></div>
+              <div className="w-12 h-12 rounded-2xl bg-user-accent flex items-center justify-center shrink-0"><Headphones size={20} className="text-user-accent-fg" /></div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-black text-[var(--user-text)]">Need Help?</h3>
-                <p className="text-xs text-[var(--user-text-muted)] mt-1 leading-relaxed">Questions about this order? Our support team is here 24/7.</p>
-                <button className="mt-3 inline-flex items-center gap-1.5 text-xs font-black text-[var(--user-accent)] hover:gap-2.5 transition-all"><MessageCircle size={14} /> Contact Support <ArrowLeft size={12} className="rotate-180" /></button>
+                <h3 className="text-sm font-black text-user-fg">Need Help?</h3>
+                <p className="text-xs text-user-fg-muted mt-1 leading-relaxed">Questions about this order? Our support team is here 24/7.</p>
+                <button className="mt-3 inline-flex items-center gap-1.5 text-xs font-black text-user-accent hover:gap-2.5 transition-all"><MessageCircle size={14} /> Contact Support <ArrowLeft size={12} className="rotate-180" /></button>
               </div>
             </div>
           </div>
@@ -626,11 +626,11 @@ export default function OrderDetailPage({ params }) {
       </div>
 
       {/* MOBILE STICKY BAR */}
-      <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+      <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-user-elevated/95 backdrop-blur-md border-t border-user-line px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
         <div className="flex gap-3">
-          <button className="flex-1 h-12 rounded-xl border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition"><MessageCircle size={16} /> Help</button>
+          <button className="flex-1 h-12 rounded-xl border-2 border-user-line text-user-fg-secondary text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition"><MessageCircle size={16} /> Help</button>
           {canCancel && (
-            <button onClick={() => setShowCancelModal(true)} className="flex-1 h-12 rounded-xl bg-[var(--user-danger)] text-white text-sm font-black flex items-center justify-center gap-2 active:scale-[0.98] transition"><XCircle size={16} /> Cancel Order</button>
+            <button onClick={() => setShowCancelModal(true)} className="flex-1 h-12 rounded-xl bg-user-danger text-white text-sm font-black flex items-center justify-center gap-2 active:scale-[0.98] transition"><XCircle size={16} /> Cancel Order</button>
           )}
         </div>
       </div>
@@ -641,19 +641,19 @@ export default function OrderDetailPage({ params }) {
     </div>
 
     {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
-    <div className="lg:hidden bg-[var(--user-bg)]">
+    <div className="lg:hidden bg-user-page">
       {/* Sticky top app bar */}
       <div
-        className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+        className="sticky top-0 z-30 bg-user-elevated/90 backdrop-blur-md border-b border-user-line"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="flex items-center gap-2 px-3 h-12">
-          <button type="button" onClick={() => router.push("/orders")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+          <button type="button" onClick={() => router.push("/orders")} aria-label="Back" className="flex h-9 w-9 items-center justify-center rounded-full text-user-fg hover:bg-user-hover active:scale-90 transition">
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-[0.9375rem] font-black text-[var(--user-text)] leading-none truncate">Order Details</p>
-            <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">#{order.order_number}</p>
+            <p className="text-[0.9375rem] font-black text-user-fg leading-none truncate">Order Details</p>
+            <p className="text-[0.625rem] text-user-fg-muted mt-0.5 truncate">#{order.order_number}</p>
           </div>
         </div>
       </div>
@@ -662,59 +662,59 @@ export default function OrderDetailPage({ params }) {
         {/* HERO STATUS BAND */}
         <div className={`rounded-2xl border shadow-sm p-4 ${
           order.status === "cancelled"
-            ? "bg-[var(--user-danger)]/12 border-[var(--user-danger)]/30"
+            ? "bg-user-danger/12 border-user-danger/30"
             : order.status === "delivered"
-            ? "bg-[var(--user-success)]/12 border-[var(--user-success)]/30"
-            : "bg-[var(--user-accent)]/12 border-[var(--user-accent)]/30"
+            ? "bg-user-success/12 border-user-success/30"
+            : "bg-user-accent/12 border-user-accent/30"
         }`}>
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
               order.status === "cancelled"
-                ? "bg-[var(--user-danger)] text-white"
+                ? "bg-user-danger text-white"
                 : order.status === "delivered"
-                ? "bg-[var(--user-success)] text-white"
-                : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                ? "bg-user-success text-white"
+                : "bg-user-accent text-user-accent-fg"
             }`}>
               <StatusIcon size={22} />
             </div>
             <div className="flex-1 min-w-0">
               <p className={`text-[1rem] font-black leading-tight ${
                 order.status === "cancelled"
-                  ? "text-[var(--user-danger)]"
+                  ? "text-user-danger"
                   : order.status === "delivered"
-                  ? "text-[var(--user-success)]"
-                  : "text-[var(--user-accent)]"
+                  ? "text-user-success"
+                  : "text-user-accent"
               }`}>{cfg.label}</p>
-              <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">#{order.order_number} · {date}</p>
+              <p className="text-[0.6875rem] text-user-fg-muted mt-0.5">#{order.order_number} · {date}</p>
             </div>
           </div>
           {order.status === "cancelled" && order.cancel_reason && (
-            <p className="text-[0.6875rem] text-[var(--user-text)] mt-3 pt-3 border-t border-[var(--user-danger)]/20 leading-relaxed">
-              <span className="font-black uppercase tracking-wider text-[var(--user-danger)]">Reason: </span>{order.cancel_reason}
+            <p className="text-[0.6875rem] text-user-fg mt-3 pt-3 border-t border-user-danger/20 leading-relaxed">
+              <span className="font-black uppercase tracking-wider text-user-danger">Reason: </span>{order.cancel_reason}
             </p>
           )}
         </div>
 
         {/* TIMELINE card */}
-        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
-          <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] mb-4 flex items-center gap-1.5">
+        <div className="rounded-2xl bg-user-card border border-user-line shadow-sm p-4">
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-user-fg-muted mb-4 flex items-center gap-1.5">
             <Clock size={11} /> Order Progress
           </p>
           {order.status === "cancelled" ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[var(--user-danger)] flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-full bg-user-danger flex items-center justify-center shrink-0">
                 <XCircle size={18} className="text-white" />
               </div>
               <div>
-                <p className="text-[0.8125rem] font-black text-[var(--user-danger)]">Cancelled</p>
-                <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5">This order has been cancelled</p>
+                <p className="text-[0.8125rem] font-black text-user-danger">Cancelled</p>
+                <p className="text-[0.625rem] text-user-fg-muted mt-0.5">This order has been cancelled</p>
               </div>
             </div>
           ) : (
             <div className="relative pl-7">
-              <div className="absolute left-[0.625rem] top-3 bottom-3 w-[0.125rem] bg-[var(--user-border)] rounded-full" />
+              <div className="absolute left-[0.625rem] top-3 bottom-3 w-[0.125rem] bg-user-line rounded-full" />
               <div
-                className="absolute left-[0.625rem] top-3 w-[0.125rem] bg-[var(--user-success)] rounded-full transition-all duration-700"
+                className="absolute left-[0.625rem] top-3 w-[0.125rem] bg-user-success rounded-full transition-all duration-700"
                 style={{ height: `calc((100% - 24px) * ${Math.max(0, STATUS_FLOW.indexOf(order.status)) / (STATUS_FLOW.length - 1)})` }}
               />
               <div className="space-y-4">
@@ -727,16 +727,16 @@ export default function OrderDetailPage({ params }) {
                   return (
                     <div key={step} className="relative">
                       <div className={`absolute -left-7 top-0 w-5 h-5 rounded-full flex items-center justify-center border-2 ${
-                        isCompleted ? "bg-[var(--user-success)] border-[var(--user-success)] text-white"
-                        : isCurrent ? "bg-[var(--user-bg-card)] border-[var(--user-accent)] text-[var(--user-accent)] ring-4 ring-[var(--user-accent)]/20"
-                        : "bg-[var(--user-bg-card)] border-[var(--user-border)] text-[var(--user-text-muted)]"
+                        isCompleted ? "bg-user-success border-user-success text-white"
+                        : isCurrent ? "bg-user-card border-user-accent text-user-accent ring-4 ring-user-accent/20"
+                        : "bg-user-card border-user-line text-user-fg-muted"
                       }`}>
                         {isCompleted ? <CheckCircle2 size={11} strokeWidth={3} /> : <Icon size={10} />}
                       </div>
-                      <p className={`text-[0.75rem] font-black ${isCurrent || isCompleted ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"}`}>
-                        {sCfg.label}{isCurrent && <span className="ml-2 text-[0.5625rem] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)]">Now</span>}
+                      <p className={`text-[0.75rem] font-black ${isCurrent || isCompleted ? "text-user-fg" : "text-user-fg-muted"}`}>
+                        {sCfg.label}{isCurrent && <span className="ml-2 text-[0.5625rem] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-user-accent text-user-accent-fg">Now</span>}
                       </p>
-                      <p className={`text-[0.625rem] mt-0.5 ${isCurrent || isCompleted ? "text-[var(--user-text-muted)]" : "text-[var(--user-text-muted)]/70"}`}>{sCfg.desc}</p>
+                      <p className={`text-[0.625rem] mt-0.5 ${isCurrent || isCompleted ? "text-user-fg-muted" : "text-user-fg-muted/70"}`}>{sCfg.desc}</p>
                     </div>
                   );
                 })}
@@ -746,28 +746,28 @@ export default function OrderDetailPage({ params }) {
         </div>
 
         {/* ADDRESS card */}
-        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
+        <div className="rounded-2xl bg-user-card border border-user-line shadow-sm p-4">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-              <MapPin size={14} className="text-[var(--user-accent)]" />
+            <div className="w-7 h-7 rounded-lg bg-user-accent/10 flex items-center justify-center">
+              <MapPin size={14} className="text-user-accent" />
             </div>
-            <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)]">Delivery Address</p>
+            <p className="text-[0.625rem] font-black uppercase tracking-wider text-user-fg-muted">Delivery Address</p>
           </div>
-          <p className="text-[0.8125rem] font-black text-[var(--user-text)]">{order.address_snapshot?.full_name} <span className="text-[var(--user-text-muted)] font-semibold">· {order.address_snapshot?.phone}</span></p>
-          <p className="text-[0.75rem] text-[var(--user-text-muted)] leading-relaxed mt-1 line-clamp-2">
+          <p className="text-[0.8125rem] font-black text-user-fg">{order.address_snapshot?.full_name} <span className="text-user-fg-muted font-semibold">· {order.address_snapshot?.phone}</span></p>
+          <p className="text-[0.75rem] text-user-fg-muted leading-relaxed mt-1 line-clamp-2">
             {order.address_snapshot?.street_address1}{order.address_snapshot?.street_address2 && <>, {order.address_snapshot.street_address2}</>}, {order.address_snapshot?.city}, {order.address_snapshot?.state} {order.address_snapshot?.zip_code}
           </p>
         </div>
 
         {/* ITEMS card */}
-        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4">
+        <div className="rounded-2xl bg-user-card border border-user-line shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+            <p className="text-[0.625rem] font-black uppercase tracking-wider text-user-fg-muted flex items-center gap-1.5">
               <Package size={12} /> Items ({order.items.length})
             </p>
-            <p className="text-[0.6875rem] font-bold text-[var(--user-text-muted)]">{fmt(order.subtotal)}</p>
+            <p className="text-[0.6875rem] font-bold text-user-fg-muted">{fmt(order.subtotal)}</p>
           </div>
-          <div className="divide-y divide-[var(--user-border)]">
+          <div className="divide-y divide-user-line">
             {order.items.map((i, idx) => {
               const originalPrice = Number(i.original_price || 0);
               const paidPrice = Number(i.price || 0);
@@ -779,14 +779,14 @@ export default function OrderDetailPage({ params }) {
               return (
                 <div key={idx} className="flex gap-3 py-3 first:pt-0 last:pb-0">
                   <div className="shrink-0 relative">
-                    <FallbackImage src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-14 h-14 rounded-xl object-cover border border-[var(--user-border)]" />
-                    <div className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-black flex items-center justify-center border border-[var(--user-bg-card)]">×{qty}</div>
+                    <FallbackImage src={getImgUrl(i.image)} alt={text(i.name, i.translations?.name)} className="w-14 h-14 rounded-xl object-cover border border-user-line" />
+                    <div className="absolute -top-1.5 -right-1.5 min-w-[1.25rem] h-5 px-1 rounded-full bg-user-accent text-user-accent-fg text-[0.5625rem] font-black flex items-center justify-center border border-user-card">×{qty}</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[0.8125rem] font-bold text-[var(--user-text)] line-clamp-2 leading-tight">{text(i.name, i.translations?.name)}</p>
-                    {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5 truncate">{i.variantTitle}</p>}
-                    <p className="text-[0.625rem] text-[var(--user-text-muted)] mt-0.5">x{qty}</p>
-                    {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[0.5625rem] font-black text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
+                    <p className="text-[0.8125rem] font-bold text-user-fg line-clamp-2 leading-tight">{text(i.name, i.translations?.name)}</p>
+                    {i.variantTitle && <p className="text-[0.625rem] text-user-fg-muted mt-0.5 truncate">{i.variantTitle}</p>}
+                    <p className="text-[0.625rem] text-user-fg-muted mt-0.5">x{qty}</p>
+                    {freeItems > 0 && <span className="inline-flex items-center gap-0.5 text-[0.5625rem] font-black text-user-success bg-user-success/10 border border-user-success/20 px-1.5 py-0.5 rounded mt-1">+{freeItems} FREE</span>}
                     {canRate && (
                       <div className="mt-2">
                         <ProductRating productId={String(i.product_id?._id || i.product_id || "")} productName={text(i.name, i.translations?.name)} review={reviewsMap.get(String(i.product_id?._id || i.product_id || "")) || null} variant="compact" showMedia />
@@ -794,9 +794,9 @@ export default function OrderDetailPage({ params }) {
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[0.8125rem] font-black text-[var(--user-text)]">{fmt(paidPrice * payableItems)}</p>
-                    {hasDiscount && <p className="text-[0.5625rem] text-[var(--user-text-muted)] line-through">{fmt(originalPrice * qty)}</p>}
-                    {itemSavings > 0 && <p className="text-[0.5625rem] font-bold text-[var(--user-success)] mt-0.5">Save {fmt(itemSavings)}</p>}
+                    <p className="text-[0.8125rem] font-black text-user-fg">{fmt(paidPrice * payableItems)}</p>
+                    {hasDiscount && <p className="text-[0.5625rem] text-user-fg-muted line-through">{fmt(originalPrice * qty)}</p>}
+                    {itemSavings > 0 && <p className="text-[0.5625rem] font-bold text-user-success mt-0.5">Save {fmt(itemSavings)}</p>}
                   </div>
                 </div>
               );
@@ -805,35 +805,35 @@ export default function OrderDetailPage({ params }) {
         </div>
 
         {/* PAYMENT & DELIVERY card */}
-        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-3">
-          <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+        <div className="rounded-2xl bg-user-card border border-user-line shadow-sm p-4 space-y-3">
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-user-fg-muted flex items-center gap-1.5">
             <CreditCard size={12} /> Payment & Delivery
           </p>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-              <PayIcon size={16} className="text-[var(--user-accent)]" />
+            <div className="w-9 h-9 rounded-lg bg-user-accent/10 flex items-center justify-center shrink-0">
+              <PayIcon size={16} className="text-user-accent" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Payment</p>
-              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] truncate">{pay.label}</p>
+              <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-wider">Payment</p>
+              <p className="text-[0.8125rem] font-bold text-user-fg truncate">{pay.label}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center shrink-0">
-              {order.shipping_method === "express" ? <Zap size={16} className="text-[var(--user-accent)]" /> : <Truck size={16} className="text-[var(--user-accent)]" />}
+            <div className="w-9 h-9 rounded-lg bg-user-accent/10 flex items-center justify-center shrink-0">
+              {order.shipping_method === "express" ? <Zap size={16} className="text-user-accent" /> : <Truck size={16} className="text-user-accent" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Method</p>
-              <p className="text-[0.8125rem] font-bold text-[var(--user-text)]">{order.shipping_method === "express" ? "Express" : "Standard"} <span className="text-[var(--user-text-muted)] font-semibold">· {estimatedDelivery} days</span></p>
+              <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-wider">Shipping Method</p>
+              <p className="text-[0.8125rem] font-bold text-user-fg">{order.shipping_method === "express" ? "Express" : "Standard"} <span className="text-user-fg-muted font-semibold">· {estimatedDelivery} days</span></p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--user-bg-hover)] flex items-center justify-center shrink-0">
-              <Tag size={16} className="text-[var(--user-text-secondary)]" />
+            <div className="w-9 h-9 rounded-lg bg-user-hover flex items-center justify-center shrink-0">
+              <Tag size={16} className="text-user-fg-secondary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[0.625rem] font-bold text-[var(--user-text-muted)] uppercase tracking-wider">Shipping Fee</p>
-              <p className={`text-[0.8125rem] font-black ${order.shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+              <p className="text-[0.625rem] font-bold text-user-fg-muted uppercase tracking-wider">Shipping Fee</p>
+              <p className={`text-[0.8125rem] font-black ${order.shipping === 0 ? "text-user-success" : "text-user-fg"}`}>
                 {order.shipping === 0 ? "FREE" : fmt(order.shipping)}
               </p>
             </div>
@@ -841,29 +841,29 @@ export default function OrderDetailPage({ params }) {
         </div>
 
         {/* SUMMARY card */}
-        <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-4 space-y-2 text-[0.8125rem]">
-          <p className="text-[0.625rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5 mb-2">
+        <div className="rounded-2xl bg-user-card border border-user-line shadow-sm p-4 space-y-2 text-[0.8125rem]">
+          <p className="text-[0.625rem] font-black uppercase tracking-wider text-user-fg-muted flex items-center gap-1.5 mb-2">
             <TrendingUp size={12} /> Order Summary
           </p>
           <div className="flex justify-between">
-            <span className="text-[var(--user-text-muted)]">Items Total</span>
-            <span className="font-bold text-[var(--user-text)]">{fmt(order.subtotal)}</span>
+            <span className="text-user-fg-muted">Items Total</span>
+            <span className="font-bold text-user-fg">{fmt(order.subtotal)}</span>
           </div>
           {totalSavings > 0 && (
             <div className="flex justify-between">
-              <span className="font-bold text-[var(--user-success)]">You Save</span>
-              <span className="font-black text-[var(--user-success)]">-{fmt(totalSavings)}</span>
+              <span className="font-bold text-user-success">You Save</span>
+              <span className="font-black text-user-success">-{fmt(totalSavings)}</span>
             </div>
           )}
           <div className="flex justify-between">
-            <span className="text-[var(--user-text-muted)]">Shipping Fee</span>
-            <span className={`font-bold ${order.shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+            <span className="text-user-fg-muted">Shipping Fee</span>
+            <span className={`font-bold ${order.shipping === 0 ? "text-user-success" : "text-user-fg"}`}>
               {order.shipping === 0 ? "FREE" : fmt(order.shipping)}
             </span>
           </div>
-          <div className="flex justify-between items-baseline pt-3 mt-1 border-t border-[var(--user-border)]">
-            <span className="text-[0.875rem] font-black text-[var(--user-text)]">Total</span>
-            <span className="text-xl font-black text-[var(--user-accent)]">{fmt(order.total)}</span>
+          <div className="flex justify-between items-baseline pt-3 mt-1 border-t border-user-line">
+            <span className="text-[0.875rem] font-black text-user-fg">Total</span>
+            <span className="text-xl font-black text-user-accent">{fmt(order.total)}</span>
           </div>
         </div>
 
@@ -871,12 +871,12 @@ export default function OrderDetailPage({ params }) {
         {canCancel && (
           <button
             onClick={() => setShowCancelModal(true)}
-            className="w-full h-12 rounded-2xl border-2 border-[var(--user-danger)]/40 text-[var(--user-danger)] text-sm font-black hover:bg-[var(--user-danger)]/10 active:scale-[0.98] transition flex items-center justify-center gap-2"
+            className="w-full h-12 rounded-2xl border-2 border-user-danger/40 text-user-danger text-sm font-black hover:bg-user-danger/10 active:scale-[0.98] transition flex items-center justify-center gap-2"
           >
             <XCircle size={16} /> Cancel Order
           </button>
         )}
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="w-full h-12 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-semibold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-2">
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="w-full h-12 rounded-2xl border border-user-line bg-user-card text-sm font-semibold text-user-fg hover:bg-user-hover transition flex items-center justify-center gap-2">
           <MessageCircle size={16} /> Chat about this order
         </button>
       </div>

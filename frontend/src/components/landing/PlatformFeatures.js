@@ -188,10 +188,10 @@ function QuoteMock() {
 
   return (
     <div>
-      <div className="flex items-center justify-between border-b border-[var(--user-border)] pb-3">
+      <div className="flex items-center justify-between border-b border-user-line pb-3">
         <div>
           <p className="pf-micro-label">Quotation</p>
-          <p className="pf-mono text-sm font-extrabold text-[var(--user-text)]">QT-00042</p>
+          <p className="pf-mono text-sm font-extrabold text-user-fg">QT-00042</p>
         </div>
         <span
           className={`pf-status-pill ${
@@ -209,10 +209,10 @@ function QuoteMock() {
         {items.map(([item, amount]) => (
           <li
             key={item}
-            className="flex items-center justify-between gap-3 border-b border-dashed border-[var(--user-border)] pb-2"
+            className="flex items-center justify-between gap-3 border-b border-dashed border-user-line pb-2"
           >
-            <span className="text-[var(--user-text-secondary)]">{item}</span>
-            <span className="pf-mono font-bold text-[var(--user-text)]">{amount}</span>
+            <span className="text-user-fg-secondary">{item}</span>
+            <span className="pf-mono font-bold text-user-fg">{amount}</span>
           </li>
         ))}
       </ul>
@@ -257,10 +257,10 @@ function InvoiceMock() {
   ];
   return (
     <div>
-      <div className="flex items-center justify-between border-b border-[var(--user-border)] pb-3">
+      <div className="flex items-center justify-between border-b border-user-line pb-3">
         <div className="flex items-center gap-2">
           <Receipt size={17} className="text-[#FF6A1F]" aria-hidden="true" />
-          <p className="pf-mono text-sm font-extrabold text-[var(--user-text)]">INV-000214</p>
+          <p className="pf-mono text-sm font-extrabold text-user-fg">INV-000214</p>
         </div>
         <span className="pf-status-pill bg-amber-500/15 text-amber-600">PARTIAL · Rs. 12,429 DUE</span>
       </div>
@@ -274,28 +274,28 @@ function InvoiceMock() {
         </thead>
         <tbody>
           {rows.map(([item, qty, amount]) => (
-            <tr key={item} className="border-t border-dashed border-[var(--user-border)]">
-              <td className="py-1.5 text-[var(--user-text-secondary)]">{item}</td>
-              <td className="py-1.5 text-[var(--user-text-secondary)]">{qty}</td>
-              <td className="pf-mono py-1.5 text-right font-bold text-[var(--user-text)]">{amount}</td>
+            <tr key={item} className="border-t border-dashed border-user-line">
+              <td className="py-1.5 text-user-fg-secondary">{item}</td>
+              <td className="py-1.5 text-user-fg-secondary">{qty}</td>
+              <td className="pf-mono py-1.5 text-right font-bold text-user-fg">{amount}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div className="mt-2 flex items-center justify-between border-t border-[var(--user-border)] pt-3">
+      <div className="mt-2 flex items-center justify-between border-t border-user-line pt-3">
         <span className="pf-micro-label">Grand Total</span>
         <span className="pf-mono text-xl font-extrabold text-[#FF6A1F]">
           <CountUp value={32429} prefix="Rs. " duration={1.2} />
         </span>
       </div>
-      <div className="mt-2.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-[var(--user-text-muted)]">
+      <div className="mt-2.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-user-fg-muted">
         <span>Paid Rs. 20,000 of Rs. 32,429</span>
         <span>Rs. 12,429 left</span>
       </div>
-      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[var(--user-bg-hover)]" role="progressbar" aria-label="Invoice paid so far" aria-valuenow={62} aria-valuemin={0} aria-valuemax={100}>
+      <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-user-hover" role="progressbar" aria-label="Invoice paid so far" aria-valuenow={62} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded-full bg-gradient-to-r from-[#FF6A1F] to-[#FFB25E]" style={{ width: "62%" }} />
       </div>
-      <p className="mt-2.5 text-[10px] font-semibold text-[var(--user-text-muted)]">
+      <p className="mt-2.5 text-[10px] font-semibold text-user-fg-muted">
         PDF emailed to customer · reconciles automatically on payment
       </p>
     </div>
@@ -326,11 +326,11 @@ function ShippingMock() {
   return (
     <div>
       {/* Header row */}
-      <div className="flex items-center justify-between border-b border-[var(--user-border)] pb-3">
+      <div className="flex items-center justify-between border-b border-user-line pb-3">
         <div className="flex items-center gap-2">
           <Truck size={17} className="text-[#FF6A1F]" aria-hidden="true" />
-          <p className="text-xs font-extrabold uppercase tracking-widest text-[var(--user-text-muted)]">Shipment</p>
-          <p className="pf-mono text-[11px] font-extrabold text-[var(--user-text)]">#ORD-000142</p>
+          <p className="text-xs font-extrabold uppercase tracking-widest text-user-fg-muted">Shipment</p>
+          <p className="pf-mono text-[11px] font-extrabold text-user-fg">#ORD-000142</p>
         </div>
         <span className="pf-status-pill bg-emerald-500/15 text-emerald-600">
           <span className="pf-live-dot" aria-hidden="true" />
@@ -355,7 +355,7 @@ function ShippingMock() {
           <span>Karachi</span>
         </div>
       </div>
-      <div className="mt-2.5 flex items-center justify-between text-[10px] font-bold text-[var(--user-text-muted)]">
+      <div className="mt-2.5 flex items-center justify-between text-[10px] font-bold text-user-fg-muted">
         <span className="flex items-center gap-1"><Clock size={11} aria-hidden="true" /> ETA 2 days · 1,214 km</span>
         <span className="tabular-nums">68% of route</span>
       </div>
@@ -380,35 +380,35 @@ function ShippingMock() {
                   <CheckCircle2 size={16} />
                 </span>
               </span>
-              <span className="mt-1 block text-left text-[12px] font-extrabold leading-5 text-[var(--user-text)]">
+              <span className="mt-1 block text-left text-[12px] font-extrabold leading-5 text-user-fg">
                 {option.desc}
               </span>
             </button>
           );
         })}
       </div>
-      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold text-[var(--user-text-secondary)]">
+      <div className="mt-2.5 flex items-center justify-between text-[11px] font-bold text-user-fg-secondary">
         <span>Delivery fee · {selected.label}</span>
         <span className="pf-mono">Rs. {selected.fee.toLocaleString()}</span>
       </div>
-      <div className="flex items-center justify-between border-t border-[var(--user-border)] pt-2 text-[13px] font-extrabold text-[var(--user-text)]">
+      <div className="flex items-center justify-between border-t border-user-line pt-2 text-[13px] font-extrabold text-user-fg">
         <span>Order total</span>
         <span className="pf-mono text-[#FF6A1F]">Rs. {orderTotal.toLocaleString()}</span>
       </div>
 
       {/* Free delivery progress */}
       <div className="mt-3">
-        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-[var(--user-text-muted)]">
-          <span>Add <span className="pf-mono text-[var(--user-text)]">Rs. {remaining.toLocaleString()}</span> more for free delivery</span>
+        <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-user-fg-muted">
+          <span>Add <span className="pf-mono text-user-fg">Rs. {remaining.toLocaleString()}</span> more for free delivery</span>
           <span className="tabular-nums">{Math.round(freeProgress)}%</span>
         </div>
-        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-[var(--user-bg-hover)]" role="progressbar" aria-label="Progress towards free delivery" aria-valuenow={freeProgress} aria-valuemin={0} aria-valuemax={100}>
+        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-user-hover" role="progressbar" aria-label="Progress towards free delivery" aria-valuenow={freeProgress} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full rounded-full bg-gradient-to-r from-[#FF6A1F] to-[#FFB25E]" style={{ width: `${freeProgress}%` }} />
         </div>
       </div>
 
       {/* Timeline */}
-      <ul className="mt-3 space-y-1.5 border-t border-[var(--user-border)] pt-3">
+      <ul className="mt-3 space-y-1.5 border-t border-user-line pt-3">
         {timeline.map(({ icon: Icon, label, time, state }) => (
           <li key={label} className="flex items-center gap-2 text-[11px]">
             <Icon
@@ -419,13 +419,13 @@ function ShippingMock() {
                   ? "text-emerald-500"
                   : state === "current"
                     ? "text-[#FF6A1F]"
-                    : "text-[var(--user-text-muted)]"
+                    : "text-user-fg-muted"
               }
             />
-            <span className={`font-semibold ${state === "pending" ? "text-[var(--user-text-muted)]" : "text-[var(--user-text-secondary)]"}`}>
+            <span className={`font-semibold ${state === "pending" ? "text-user-fg-muted" : "text-user-fg-secondary"}`}>
               {label}
             </span>
-            <span className="ms-auto text-[10px] font-medium text-[var(--user-text-muted)]">{time}</span>
+            <span className="ms-auto text-[10px] font-medium text-user-fg-muted">{time}</span>
           </li>
         ))}
       </ul>
@@ -458,29 +458,29 @@ function PaymentsMock() {
             <li
               key={label}
               className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-300 ${
-                active ? "border-[#FF6A1F] bg-[rgba(255,106,31,0.08)]" : "border-[var(--user-border)]"
+                active ? "border-[#FF6A1F] bg-[rgba(255,106,31,0.08)]" : "border-user-line"
               }`}
             >
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#FF6A1F] text-white" : "bg-[var(--user-bg-hover)] text-[var(--user-text-secondary)]"}`}>
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#FF6A1F] text-white" : "bg-user-hover text-user-fg-secondary"}`}>
                 <Icon size={19} aria-hidden="true" />
               </span>
               <span className="min-w-0">
-                <span className="block text-[12px] font-extrabold text-[var(--user-text)]">{label}</span>
-                <span className="block text-[10px] font-semibold text-[var(--user-text-muted)]">{detail}</span>
+                <span className="block text-[12px] font-extrabold text-user-fg">{label}</span>
+                <span className="block text-[10px] font-semibold text-user-fg-muted">{detail}</span>
               </span>
-              <span className="pf-mono ms-auto text-[11px] font-extrabold tabular-nums text-[var(--user-text-secondary)]">{amount}</span>
+              <span className="pf-mono ms-auto text-[11px] font-extrabold tabular-nums text-user-fg-secondary">{amount}</span>
             </li>
           );
         })}
       </ul>
-      <div className="mt-3 flex items-center justify-between gap-2 text-[10px] font-semibold text-[var(--user-text-muted)]">
+      <div className="mt-3 flex items-center justify-between gap-2 text-[10px] font-semibold text-user-fg-muted">
         <span>Invoice INV-000214 · Partial payment</span>
         <span className="pf-mono">Rs. 6,500 / Rs. 10,529</span>
       </div>
-      <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-[var(--user-bg-hover)]" role="progressbar" aria-label="Partial payment progress" aria-valuenow={62} aria-valuemin={0} aria-valuemax={100}>
+      <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-user-hover" role="progressbar" aria-label="Partial payment progress" aria-valuenow={62} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded-full bg-[#FF6A1F]" style={{ width: "62%" }} />
       </div>
-      <p className="mt-2.5 flex items-center gap-2 text-[10px] font-semibold text-[var(--user-text-muted)]">
+      <p className="mt-2.5 flex items-center gap-2 text-[10px] font-semibold text-user-fg-muted">
         <CheckCircle2 size={13} className="text-emerald-500" aria-hidden="true" />
         Rs. 6,500 recorded in ledger · status: Partial · balance Rs. 4,029
       </p>
@@ -497,7 +497,7 @@ function InventoryMock() {
   ];
   return (
     <div>
-      <div className="flex items-center justify-between border-b border-[var(--user-border)] pb-3">
+      <div className="flex items-center justify-between border-b border-user-line pb-3">
         <p className="pf-micro-label">Live Stock · 4 SKUs</p>
         <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-600">
           <span className="pf-live-dot" aria-hidden="true" />
@@ -515,10 +515,10 @@ function InventoryMock() {
         </thead>
         <tbody>
           {rows.map(({ sku, name, qty, status }) => (
-            <tr key={sku} className="border-t border-[var(--user-border)]">
-              <td className="pf-mono py-2 text-[10px] font-bold text-[var(--user-text-muted)]">{sku}</td>
-              <td className="py-2 pr-2 text-[11px] font-semibold leading-4 text-[var(--user-text-secondary)]">{name}</td>
-              <td className="pf-mono py-2 text-right text-[11px] font-bold tabular-nums text-[var(--user-text)]">{qty}</td>
+            <tr key={sku} className="border-t border-user-line">
+              <td className="pf-mono py-2 text-[10px] font-bold text-user-fg-muted">{sku}</td>
+              <td className="py-2 pr-2 text-[11px] font-semibold leading-4 text-user-fg-secondary">{name}</td>
+              <td className="pf-mono py-2 text-right text-[11px] font-bold tabular-nums text-user-fg">{qty}</td>
               <td className="py-2 text-right">
                 <span className={`pf-status-pill ${status === "Low" ? "bg-red-500/15 text-red-600" : "bg-emerald-500/15 text-emerald-600"}`}>
                   {status.toUpperCase()}
@@ -547,8 +547,8 @@ function ChatMock() {
     <div className="grid grid-cols-[1fr_auto] gap-3">
       {/* Chat column */}
       <div className="min-w-0">
-        <div className="flex items-center justify-between border-b border-[var(--user-border)] pb-2.5">
-          <p className="text-[10px] font-extrabold text-[var(--user-text)]">Support · #ORD-000142</p>
+        <div className="flex items-center justify-between border-b border-user-line pb-2.5">
+          <p className="text-[10px] font-extrabold text-user-fg">Support · #ORD-000142</p>
           <span className="pf-status-pill bg-emerald-500/15 text-emerald-600">LIVE</span>
         </div>
         <ul className="mt-2.5 space-y-2">
@@ -557,7 +557,7 @@ function ChatMock() {
               key={i}
               className={`max-w-[85%] rounded-2xl px-3 py-2 text-[11px] leading-5 ${
                 m.from === "customer"
-                  ? "rounded-bl-sm bg-[var(--user-bg-hover)] text-[var(--user-text-secondary)]"
+                  ? "rounded-bl-sm bg-user-hover text-user-fg-secondary"
                   : "ms-auto rounded-br-sm bg-[#FF6A1F] font-semibold text-white"
               }`}
             >
@@ -567,16 +567,16 @@ function ChatMock() {
         </ul>
       </div>
       {/* Order-context sidebar */}
-      <aside className="w-[104px] shrink-0 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-2.5 text-left">
+      <aside className="w-[104px] shrink-0 rounded-xl border border-user-line bg-user-hover p-2.5 text-left">
         <p className="pf-micro-label">Order</p>
-        <p className="pf-mono mt-1 text-[10px] font-extrabold text-[var(--user-text)]">#ORD-000142</p>
+        <p className="pf-mono mt-1 text-[10px] font-extrabold text-user-fg">#ORD-000142</p>
         <div className="mt-2 flex h-12 w-12 items-center justify-center rounded-lg bg-[#FF6A1F]/15 text-[#FF6A1F]">
           <Headphones size={22} aria-hidden="true" />
         </div>
-        <p className="mt-1.5 truncate text-[10px] font-bold text-[var(--user-text-secondary)]">Wireless Headphones</p>
-        <p className="pf-mono mt-1 text-[11px] font-extrabold text-[var(--user-text)]">Rs. 4,299</p>
-        <p className="mt-1.5 border-t border-[var(--user-border)] pt-1.5 text-[9px] font-semibold leading-3 text-[var(--user-text-muted)]">
-          COD · ETA <span className="font-extrabold text-[var(--user-text-secondary)]">Tomorrow</span>
+        <p className="mt-1.5 truncate text-[10px] font-bold text-user-fg-secondary">Wireless Headphones</p>
+        <p className="pf-mono mt-1 text-[11px] font-extrabold text-user-fg">Rs. 4,299</p>
+        <p className="mt-1.5 border-t border-user-line pt-1.5 text-[9px] font-semibold leading-3 text-user-fg-muted">
+          COD · ETA <span className="font-extrabold text-user-fg-secondary">Tomorrow</span>
         </p>
       </aside>
     </div>
@@ -604,14 +604,14 @@ function ReportsMock() {
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-extrabold text-[var(--user-text)]">Sales · Last 7 days</p>
+        <p className="text-[10px] font-extrabold text-user-fg">Sales · Last 7 days</p>
         <span className="pf-status-pill bg-emerald-500/15 text-emerald-600">+18.2% vs last week</span>
       </div>
       <div className="mt-2.5 grid grid-cols-3 gap-2 text-center">
         {[["Revenue", "Rs. 1.28M"], ["Orders", "214"], ["Avg. order", "Rs. 5,981"]].map(([label, value]) => (
-          <div key={label} className="rounded-xl bg-[var(--user-bg-hover)] px-2 py-2">
+          <div key={label} className="rounded-xl bg-user-hover px-2 py-2">
             <p className="pf-micro-label">{label}</p>
-            <p className="pf-mono mt-0.5 text-[13px] font-extrabold tabular-nums text-[var(--user-text)]">{value}</p>
+            <p className="pf-mono mt-0.5 text-[13px] font-extrabold tabular-nums text-user-fg">{value}</p>
           </div>
         ))}
       </div>
@@ -631,18 +631,18 @@ function ReportsMock() {
           <circle key={i} cx={x} cy={y} r={i === pts.length - 1 ? 3.4 : 2} fill={i === pts.length - 1 ? "#FF6A1F" : "var(--user-bg-card)"} stroke="#FF6A1F" strokeWidth="1.6" />
         ))}
       </svg>
-      <div className="flex justify-between px-1 text-[8px] font-bold text-[var(--user-text-muted)]">
+      <div className="flex justify-between px-1 text-[8px] font-bold text-user-fg-muted">
         {DAYS.map((d, i) => <span key={i}>{d}</span>)}
       </div>
       <p className="pf-micro-label mt-3">Top margin products</p>
       <ul className="mt-1.5 space-y-1.5">
         {MARGIN_PRODUCTS.map(([name, margin, width]) => (
           <li key={name} className="flex items-center gap-2 text-[10px]">
-            <span className="min-w-0 flex-1 truncate font-semibold text-[var(--user-text-secondary)]">{name}</span>
-            <span className="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--user-bg-hover)]">
+            <span className="min-w-0 flex-1 truncate font-semibold text-user-fg-secondary">{name}</span>
+            <span className="h-1.5 w-16 overflow-hidden rounded-full bg-user-hover">
               <span className="block h-full rounded-full bg-[#FF6A1F]/80" style={{ width: `${width}%` }} />
             </span>
-            <span className="pf-mono w-7 text-right font-extrabold text-[var(--user-text)]">{margin}</span>
+            <span className="pf-mono w-7 text-right font-extrabold text-user-fg">{margin}</span>
           </li>
         ))}
       </ul>

@@ -33,7 +33,7 @@ function MobileNav() {
   return (
     <nav
       aria-label="Mobile"
-      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)] shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-user-elevated/95 backdrop-blur-md border-t border-user-line shadow-[0_-4px_20px_rgba(0,0,0,0.12)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="grid grid-cols-5 h-16">
@@ -47,7 +47,7 @@ function MobileNav() {
               <span className="relative">
                 <Heart size={20} className={isActive("/wishlist") ? "fill-current" : ""} />
                 {wishlistCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-danger)] text-white text-[0.5625rem] font-bold min-w-[0.875rem] h-3.5 px-0.5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 bg-user-danger text-white text-[0.5625rem] font-bold min-w-[0.875rem] h-3.5 px-0.5 rounded-full flex items-center justify-center">
                     {wishlistCount}
                   </span>
                 )}
@@ -64,7 +64,7 @@ function MobileNav() {
               <span className="relative">
                 <ShoppingCart size={20} />
                 {count > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] font-bold min-w-[0.875rem] h-3.5 px-0.5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 bg-user-accent text-user-accent-fg text-[0.5625rem] font-bold min-w-[0.875rem] h-3.5 px-0.5 rounded-full flex items-center justify-center">
                     {count}
                   </span>
                 )}
@@ -92,12 +92,12 @@ function NavItem({ icon, label, active }) {
   return (
     <span className="relative flex flex-col items-center justify-center gap-1 w-full h-full">
       {active && (
-        <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--user-accent)]" />
+        <span className="absolute top-0 h-0.5 w-8 rounded-full bg-user-accent" />
       )}
-      <span className={`transition-transform duration-200 ${active ? "text-[var(--user-accent)] scale-110" : "text-[var(--user-text-muted)]"}`}>
+      <span className={`transition-transform duration-200 ${active ? "text-user-accent scale-110" : "text-user-fg-muted"}`}>
         {icon}
       </span>
-      <span className={`text-[0.5625rem] font-bold ${active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"}`}>
+      <span className={`text-[0.5625rem] font-bold ${active ? "text-user-accent" : "text-user-fg-muted"}`}>
         {label}
       </span>
     </span>
@@ -149,7 +149,7 @@ export default function UserLayoutClient({ children }) {
           id="user-theme"
           dir={dir}
           lang={locale}
-          className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-[var(--user-bg)] text-[var(--user-text)]"
+          className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-user-page text-user-fg"
         >
           <Header />
           <main className="w-full min-w-0">{children}</main>

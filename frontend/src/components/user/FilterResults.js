@@ -40,13 +40,13 @@ const GRID =
 
 function Chip({ label, onRemove }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--user-accent)]/40 bg-[var(--user-accent-soft)] py-1 ps-3 pe-1.5 text-[0.6875rem] font-bold text-[var(--user-text)]">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-user-accent/40 bg-user-accent-soft py-1 ps-3 pe-1.5 text-[0.6875rem] font-bold text-user-fg">
       <span className="min-w-0 break-words capitalize">{label}</span>
       <button
         type="button"
         onClick={onRemove}
         aria-label={`Remove filter ${label}`}
-        className="flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full bg-[var(--user-accent)] text-[var(--user-accent-text)] transition-opacity hover:opacity-80"
+        className="flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full bg-user-accent text-user-accent-fg transition-opacity hover:opacity-80"
       >
         <X size={10} />
       </button>
@@ -230,7 +230,7 @@ export default function FilterResults({
           {[...Array(10).keys()].map((index) => (
             <div
               key={index}
-              className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+              className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-user-line bg-user-card"
             />
           ))}
         </div>
@@ -242,16 +242,16 @@ export default function FilterResults({
     return (
       <section
         aria-label={t("admin.nav.item.products")}
-        className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]/60 p-3 sm:p-4"
+        className="rounded-2xl border border-user-line bg-user-card/60 p-3 sm:p-4"
       >
         <SectionHeading title={titleOverride || t("admin.nav.item.products")} subtitle={t("admin.shared.state.error")} icon={ListFilter} />
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
-          <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-          <p className="text-sm font-bold text-[var(--user-text)]">{t("admin.shared.toast.loadFailed")}</p>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-user-line bg-user-card px-4 py-12 text-center">
+          <PackageSearch size={30} className="text-user-fg-subtle" />
+          <p className="text-sm font-bold text-user-fg">{t("admin.shared.toast.loadFailed")}</p>
           <button
             type="button"
             onClick={() => refetch()}
-            className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+            className="mt-1 rounded-lg bg-user-accent px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-user-accent-fg transition-opacity hover:opacity-90"
           >
             {t("admin.shared.action.retry")}
           </button>
@@ -264,7 +264,7 @@ export default function FilterResults({
     <section
       ref={sectionRef}
       aria-label={t("admin.nav.item.products")}
-      className="rounded-2xl border border-[var(--user-accent)]/30 bg-[var(--user-bg-card)]/60 p-3 sm:p-4 scroll-mt-24"
+      className="rounded-2xl border border-user-accent/30 bg-user-card/60 p-3 sm:p-4 scroll-mt-24"
     >
       <SectionHeading
         title={titleOverride || t("admin.nav.item.products")}
@@ -274,7 +274,7 @@ export default function FilterResults({
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-user-line px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-user-fg-muted transition-colors hover:border-user-accent hover:text-user-accent"
         >
           <RotateCcw size={12} />
           {t("admin.shared.action.clearFilters")}
@@ -291,18 +291,18 @@ export default function FilterResults({
       ) : null}
 
       {total === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
-          <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-          <p className="text-sm font-bold text-[var(--user-text)]">
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-user-line bg-user-card px-4 py-12 text-center">
+          <PackageSearch size={30} className="text-user-fg-subtle" />
+          <p className="text-sm font-bold text-user-fg">
             {t("admin.featuredProducts.modal.noProducts")}
           </p>
-          <p className="text-[0.6875rem] text-[var(--user-text-muted)]">
+          <p className="text-[0.6875rem] text-user-fg-muted">
             {t("admin.shared.state.noResults")}
           </p>
           <button
             type="button"
             onClick={onClear}
-            className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+            className="mt-1 rounded-lg bg-user-accent px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-user-accent-fg transition-opacity hover:opacity-90"
           >
             {t("admin.shared.action.clearFilters")}
           </button>

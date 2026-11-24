@@ -31,6 +31,109 @@
 }
 
 /* ============================================================
+   DESIGN TOKENS → TAILWIND UTILITIES
+   ------------------------------------------------------------
+   Colors EK jagah define hote hain, JSX me sirf semantic class:
+     ❌ text-emerald-600 dark:text-emerald-400
+     ❌ text-[var(--text-muted)]
+     ✅ text-success            ✅ text-fg-muted
+     ✅ bg-card border-line     ✅ bg-user-accent text-user-accent-fg
+
+   Values kahan hain (light/dark wahin badalte hain, JSX me `dark:` nahi):
+     • Admin   → neeche :root + html.dark            (--bg-*, --text-*, --accent, --success ...)
+     • Store   → src/app/user.css :root + .user-dark  (--user-*)
+     • Seller  → store editor theme (DB) → src/storefront/themeCss.js
+                 runtime par --user-* override karta hai.
+
+   `@theme inline` → utility seedha var(--x) use karti hai, isliye
+   dark mode / store theme runtime par khud lagte hain. Opacity bhi:
+   bg-accent/10, border-success/30.
+
+   Naya color chahiye? Value :root / html.dark (ya user.css) me, aur
+   naam yahan --color-<name> — phir har jagah `bg-<name>`.
+   ============================================================ */
+@theme inline {
+  /* ── Admin: surfaces ── */
+  --color-page: var(--bg-primary);
+  --color-page-alt: var(--bg-secondary);
+  --color-subtle: var(--bg-tertiary);
+  --color-card: var(--bg-card);
+  --color-card-alt: var(--bg-card-alt);
+  --color-input: var(--bg-input);
+  --color-table: var(--bg-table);
+  --color-row-hover: var(--bg-row-hover);
+  --color-navbar: var(--bg-navbar);
+  --color-sidebar: var(--bg-sidebar);
+  --color-sidebar-hover: var(--bg-sidebar-hover);
+  --color-sidebar-active: var(--bg-sidebar-active);
+
+  /* ── Admin: text ── */
+  --color-fg: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
+  --color-fg-inverse: var(--text-inverse);
+  --color-sidebar-fg: var(--text-sidebar);
+  --color-sidebar-fg-muted: var(--text-sidebar-muted);
+
+  /* ── Admin: borders ── */
+  --color-line: var(--border-color);
+  --color-line-card: var(--border-card);
+  --color-line-strong: var(--border-strong);
+  --color-sidebar-line: var(--border-sidebar);
+
+  /* ── Admin: brand ── */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-text);
+  --color-accent-soft: var(--accent-soft);
+
+  /* ── Admin: status — text-success = readable text/icon,
+        bg-success-solid = filled badge/button, bg-success-soft = tint ── */
+  --color-success: var(--success-text);
+  --color-success-solid: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger-text);
+  --color-danger-solid: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning-text);
+  --color-warning-solid: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info-text);
+  --color-info-solid: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-purple: var(--purple-text);
+  --color-purple-solid: var(--purple);
+  --color-purple-soft: var(--purple-soft);
+
+  /* ── Storefront (user.css --user-*, store editor theme override) ── */
+  --color-user-page: var(--user-bg);
+  --color-user-base: var(--user-bg-base);
+  --color-user-card: var(--user-bg-card);
+  --color-user-elevated: var(--user-bg-elevated);
+  --color-user-hover: var(--user-bg-hover);
+  --color-user-input: var(--user-bg-input);
+  --color-user-soft: var(--user-bg-soft);
+  --color-user-fg: var(--user-text);
+  --color-user-fg-secondary: var(--user-text-secondary);
+  --color-user-fg-muted: var(--user-text-muted);
+  --color-user-fg-subtle: var(--user-text-subtle);
+  --color-user-fg-disabled: var(--user-text-disabled);
+  --color-user-icon: var(--user-icon-color);
+  --color-user-line: var(--user-border);
+  --color-user-line-soft: var(--user-border-soft);
+  --color-user-line-hover: var(--user-border-hover);
+  --color-user-accent: var(--user-accent);
+  --color-user-accent-hover: var(--user-accent-hover);
+  --color-user-accent-fg: var(--user-accent-text);
+  --color-user-accent-soft: var(--user-accent-soft);
+  --color-user-success: var(--user-success);
+  --color-user-danger: var(--user-danger);
+  --color-user-warning: var(--user-warning);
+  --color-user-info: var(--user-info);
+}
+
+/* ============================================================
    ADMIN PANEL — PROFESSIONAL DESIGN SYSTEM
    Light theme = default · Dark theme = html.dark
    ============================================================ */
@@ -69,6 +172,7 @@
   --border-sidebar: #16223a;
   --border-navbar: #e2e8f0;
   --border-card: #e5e9f0;
+  --border-strong: #cbd5e1;
 
   /* ---- Brand & status ---- */
   --accent: #2563eb;
@@ -142,6 +246,7 @@ html.dark {
   --border-sidebar: #1e2c47;
   --border-navbar: #1e2c47;
   --border-card: #243350;
+  --border-strong: #33476b;
 
   --accent: #3b82f6;
   --accent-hover: #60a5fa;

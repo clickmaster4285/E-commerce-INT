@@ -229,13 +229,13 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
                             setOpen(false);
                             setSearch("");
                           }}
-                          className="w-full px-3 py-2 text-left text-xs hover:bg-[var(--bg-tertiary)] transition flex items-center gap-2.5"
+                          className="w-full px-3 py-2 text-left text-xs hover:bg-subtle transition flex items-center gap-2.5"
                           style={{
                             color: isSelected ? "var(--accent)" : "var(--text-primary)",
                           }}
                         >
                           <span
-                            className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "bg-[var(--accent)] border-[var(--accent)]" : ""}`}
+                            className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "bg-accent border-accent" : ""}`}
                             style={{
                               borderColor: isSelected ? undefined : "var(--border-color)",
                             }}
@@ -258,7 +258,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
                 </div>
 
                 <div
-                  className="border-t shrink-0 bg-[var(--bg-card)]"
+                  className="border-t shrink-0 bg-card"
                   style={{ borderColor: "var(--border-color)" }}
                 >
                   <button
@@ -271,7 +271,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
                       setAddText("");
                       onChange("");
                     }}
-                    className="w-full px-3 py-2.5 text-left text-xs font-semibold transition hover:bg-[var(--bg-tertiary)] flex items-center gap-2"
+                    className="w-full px-3 py-2.5 text-left text-xs font-semibold transition hover:bg-subtle flex items-center gap-2"
                     style={{ color: "var(--accent)" }}
                   >
                     <span>+</span>
@@ -325,7 +325,7 @@ function SubAttributeSelect({ subAttribute, values, selectedValue, onChange }) {
           <button
             type="button"
             onClick={handleCancel}
-            className="h-10 px-3 rounded-lg text-xs font-medium inline-flex items-center transition hover:bg-[var(--bg-tertiary)] shrink-0"
+            className="h-10 px-3 rounded-lg text-xs font-medium inline-flex items-center transition hover:bg-subtle shrink-0"
             style={{
               backgroundColor: "transparent",
               border: "1px solid var(--border-color)",
@@ -945,7 +945,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                       value={variant.sku}
                       readOnly={!!variant._id}
                       onChange={(ev) => updateVariant("sku", ev.target.value)}
-                      className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-accent"
                       style={inputStyle}
                     />
                   </div>
@@ -959,7 +959,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                       placeholder={t("admin.productForm.titlePlaceholder")}
                       value={variant.title}
                       onChange={(ev) => updateVariant("title", ev.target.value)}
-                      className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                      className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-accent"
                       style={inputStyle}
                     />
                   </div>
@@ -974,7 +974,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                     placeholder={t("admin.productForm.descPlaceholder")}
                     value={variant.description}
                     onChange={(ev) => updateVariant("description", ev.target.value)}
-                    className="px-3 py-2.5 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-[var(--accent)]"
+                    className="px-3 py-2.5 rounded-lg text-sm w-full outline-none resize-none focus:ring-1 focus:ring-accent"
                     style={inputStyle}
                   />
                 </div>
@@ -1088,7 +1088,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                         value={variant[f]}
                         onKeyDown={(ev) => { if (f === "quantity" && [".", ",", "-", "+", "e", "E"].includes(ev.key)) ev.preventDefault(); }}
                         onChange={(ev) => updateVariant(f, f === "quantity" ? ((ev.target.value.includes(".") ? ev.target.value.slice(0, ev.target.value.indexOf(".")) : ev.target.value).replace(/[^0-9]/g, "")) : ev.target.value)}
-                        className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                        className="h-10 px-3 rounded-lg text-sm w-full outline-none focus:ring-1 focus:ring-accent"
                         style={inputStyle}
                       />
                     </div>
@@ -1117,7 +1117,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
 
                 {/* Professional Drag & Drop Image Uploader */}
                 <div
-                  className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200 ${isDragOver ? "border-[var(--accent)] bg-[var(--accent-soft)]/10 scale-[1.01]" : "border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/30"}`}
+                  className={`relative rounded-xl border-2 border-dashed p-6 text-center transition-all duration-200 ${isDragOver ? "border-accent bg-accent-soft/10 scale-[1.01]" : "border-line hover:border-accent hover:bg-subtle/30"}`}
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -1133,9 +1133,9 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
                     />
                     <div className="flex flex-col items-center gap-2.5">
                       <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isDragOver ? "bg-[var(--accent)]" : "bg-[var(--bg-tertiary)]"}`}
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isDragOver ? "bg-accent" : "bg-subtle"}`}
                       >
-                        <Upload className={`w-6 h-6 ${isDragOver ? "text-white" : "text-[var(--text-muted)]"}`} />
+                        <Upload className={`w-6 h-6 ${isDragOver ? "text-white" : "text-fg-muted"}`} />
                       </div>
                       <div className="space-y-0.5">
                         <p className="text-sm font-semibold" style={{ color: isDragOver ? "var(--accent)" : "var(--text-secondary)" }}>
@@ -1192,7 +1192,7 @@ export default function VariantForm({ productId: id, onSuccess, onCancel, editVa
               <button
                 type="button"
                 onClick={goBackToProduct}
-                className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition hover:bg-[var(--bg-tertiary)]"
+                className="h-9 px-4 rounded-lg text-sm font-medium inline-flex items-center gap-2 transition hover:bg-subtle"
                 style={{
                   backgroundColor: "transparent",
                   border: "1px solid var(--border-color)",

@@ -50,12 +50,12 @@ function ArrowBtn({ dir, onClick, disabled, onHover }) {
 function RowSkeleton() {
   return (
     <div className="user-shell mx-auto px-4 lg:px-6">
-      <div className="h-6 w-40 bg-[var(--user-bg-card)] rounded-full animate-pulse mb-4" />
+      <div className="h-6 w-40 bg-user-card rounded-full animate-pulse mb-4" />
       <div className="flex gap-3 lg:gap-4 overflow-hidden">
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="w-[10rem] sm:w-[12.5rem] lg:w-[14.375rem] shrink-0 aspect-[3/4] rounded-2xl bg-[var(--user-bg-card)] animate-pulse border border-[var(--user-border)]"
+            className="w-[10rem] sm:w-[12.5rem] lg:w-[14.375rem] shrink-0 aspect-[3/4] rounded-2xl bg-user-card animate-pulse border border-user-line"
           />
         ))}
       </div>
@@ -180,17 +180,17 @@ function ProductRow({ title, subtitle, href, products }) {
       <div className="flex items-center justify-between mb-3 lg:mb-4 gap-2">
         <div className="min-w-0">
           <Link href={href} className="group inline-block">
-            <h2 className="text-base lg:text-lg font-bold text-[var(--user-text)] capitalize group-hover:text-[var(--user-accent)] transition truncate">
+            <h2 className="text-base lg:text-lg font-bold text-user-fg capitalize group-hover:text-user-accent transition truncate">
               {title}
             </h2>
           </Link>
           {subtitle && (
-            <p className="text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)] mt-0.5">
+            <p className="text-[0.6875rem] lg:text-xs text-user-fg-muted mt-0.5">
               {subtitle}
             </p>
           )}
         </div>
-        <Link href={href} className="shrink-0 inline-flex items-center gap-1 text-[0.6875rem] lg:text-xs font-bold text-[var(--user-accent)] hover:opacity-80 transition">
+        <Link href={href} className="shrink-0 inline-flex items-center gap-1 text-[0.6875rem] lg:text-xs font-bold text-user-accent hover:opacity-80 transition">
           {t("admin.dashboard.topProducts.viewAll")} <ChevronRight size={12} />
         </Link>
       </div>

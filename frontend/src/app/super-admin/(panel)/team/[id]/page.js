@@ -97,20 +97,20 @@ export default function TeamMemberPage() {
           <Card>
             <CardBody className="flex flex-col items-center text-center">
               <Avatar name={member.name} size="xl" />
-              <p className="mt-3 text-[17px] font-semibold text-[var(--text-primary)]">{member.name}</p>
+              <p className="mt-3 text-[17px] font-semibold text-fg">{member.name}</p>
               <Badge tone={isSuper ? "accent" : "neutral"} dot={false} className="mt-2">
                 {isSuper ? <ShieldCheck size={12} aria-hidden="true" /> : <UserCog size={12} aria-hidden="true" />}
                 {isSuper ? "Super admin" : "Staff"}
               </Badge>
-              {member.isSeed && <p className="mt-2 text-[12px] text-[var(--text-muted)]">Primary account from server config</p>}
+              {member.isSeed && <p className="mt-2 text-[12px] text-fg-muted">Primary account from server config</p>}
             </CardBody>
-            <ul className="divide-y divide-[var(--border-color)] border-t border-[var(--border-color)]">
-              <Row icon={Mail} label="Email"><a href={`mailto:${member.email}`} className="truncate font-medium text-[var(--text-primary)] hover:text-[var(--accent)]">{member.email}</a></Row>
-              <Row icon={Phone} label="Phone">{member.phone ? <a href={`tel:${member.phone}`} className="font-medium tabular-nums text-[var(--text-primary)] hover:text-[var(--accent)]">{member.phone}</a> : <span className="text-[var(--text-muted)]">Not set</span>}</Row>
-              <Row icon={Wifi} label="Status">{member.online ? <span className="inline-flex items-center gap-1.5 font-medium text-[var(--success-text)]"><span className="h-2 w-2 rounded-full bg-[var(--success-text)]" aria-hidden="true" />Online now</span> : <span className="font-medium text-[var(--text-primary)]" title={member.lastActiveAt ? formatDateTime(member.lastActiveAt) : undefined}>{member.lastActiveAt ? `Last seen ${timeAgo(member.lastActiveAt)}` : "Never active"}</span>}</Row>
-              <Row icon={Clock} label="Last sign-in">{member.lastLoginAt ? <span title={formatDateTime(member.lastLoginAt)} className="font-medium text-[var(--text-primary)]">{timeAgo(member.lastLoginAt)}</span> : <span className="text-[var(--text-muted)]">Never</span>}</Row>
-              <Row icon={CalendarPlus} label="Member since"><span className="font-medium text-[var(--text-primary)]" title={member.created_at ? formatDateTime(member.created_at) : undefined}>{member.created_at ? timeAgo(member.created_at) : "—"}</span></Row>
-              <Row icon={CalendarPlus} label="Added by">{member.createdBy?.name ? <span className="font-medium text-[var(--text-primary)]">{member.createdBy.name}</span> : <span className="text-[var(--text-muted)]">{member.isSeed ? "Server config" : "—"}</span>}</Row>
+            <ul className="divide-y divide-line border-t border-line">
+              <Row icon={Mail} label="Email"><a href={`mailto:${member.email}`} className="truncate font-medium text-fg hover:text-accent">{member.email}</a></Row>
+              <Row icon={Phone} label="Phone">{member.phone ? <a href={`tel:${member.phone}`} className="font-medium tabular-nums text-fg hover:text-accent">{member.phone}</a> : <span className="text-fg-muted">Not set</span>}</Row>
+              <Row icon={Wifi} label="Status">{member.online ? <span className="inline-flex items-center gap-1.5 font-medium text-success"><span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />Online now</span> : <span className="font-medium text-fg" title={member.lastActiveAt ? formatDateTime(member.lastActiveAt) : undefined}>{member.lastActiveAt ? `Last seen ${timeAgo(member.lastActiveAt)}` : "Never active"}</span>}</Row>
+              <Row icon={Clock} label="Last sign-in">{member.lastLoginAt ? <span title={formatDateTime(member.lastLoginAt)} className="font-medium text-fg">{timeAgo(member.lastLoginAt)}</span> : <span className="text-fg-muted">Never</span>}</Row>
+              <Row icon={CalendarPlus} label="Member since"><span className="font-medium text-fg" title={member.created_at ? formatDateTime(member.created_at) : undefined}>{member.created_at ? timeAgo(member.created_at) : "—"}</span></Row>
+              <Row icon={CalendarPlus} label="Added by">{member.createdBy?.name ? <span className="font-medium text-fg">{member.createdBy.name}</span> : <span className="text-fg-muted">{member.isSeed ? "Server config" : "—"}</span>}</Row>
             </ul>
           </Card>
 
@@ -119,14 +119,14 @@ export default function TeamMemberPage() {
             <CardBody className="py-4">
               <ul className="space-y-2">
                 {STAFF_CAN.map((item) => (
-                  <li key={item} className="flex items-start gap-2 text-[13px] text-[var(--text-secondary)]"><Check size={14} className="mt-0.5 shrink-0 text-[var(--success-text)]" aria-hidden="true" />{item}</li>
+                  <li key={item} className="flex items-start gap-2 text-[13px] text-fg-secondary"><Check size={14} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />{item}</li>
                 ))}
-                <li className="flex items-start gap-2 text-[13px] text-[var(--text-secondary)]">
-                  <Check size={14} className="mt-0.5 shrink-0 text-[var(--success-text)]" aria-hidden="true" />
+                <li className="flex items-start gap-2 text-[13px] text-fg-secondary">
+                  <Check size={14} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
                   {isSuper ? "Team — add, edit and remove any member" : "Team — add and manage other staff"}
                 </li>
                 {!isSuper && (
-                  <li className="flex items-start gap-2 text-[13px] text-[var(--text-muted)]">
+                  <li className="flex items-start gap-2 text-[13px] text-fg-muted">
                     <Ban size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                     Cannot change their own account or any super admin
                   </li>
@@ -141,7 +141,7 @@ export default function TeamMemberPage() {
       <Card>
         <CardHeader title="Recent activity" description="Actions performed by this Super Admin employee" icon={History} />
         <CardBody>
-          {member.activities?.length ? <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">{member.activities.slice(0, 30).map((entry, index) => <li key={`${entry.timestamp}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" /><p className="text-[13px] font-medium text-[var(--text-primary)]">{entry.action}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{entry.category || "System"} · {formatDateTime(entry.timestamp)}</p></li>)}</ol> : <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>}
+          {member.activities?.length ? <ol className="relative space-y-4 border-s border-line ps-5">{member.activities.slice(0, 30).map((entry, index) => <li key={`${entry.timestamp}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-card" /><p className="text-[13px] font-medium text-fg">{entry.action}</p><p className="mt-0.5 text-[12px] text-fg-muted">{entry.category || "System"} · {formatDateTime(entry.timestamp)}</p></li>)}</ol> : <p className="text-sm text-fg-muted">No activity recorded yet.</p>}
         </CardBody>
       </Card>
 
@@ -182,7 +182,7 @@ export default function TeamMemberPage() {
 function Row({ icon: Icon, label, children }) {
   return (
     <li className="flex items-center justify-between gap-3 px-5 py-3 text-[13px]">
-      <span className="inline-flex shrink-0 items-center gap-2.5 text-[var(--text-muted)]"><Icon size={15} aria-hidden="true" />{label}</span>
+      <span className="inline-flex shrink-0 items-center gap-2.5 text-fg-muted"><Icon size={15} aria-hidden="true" />{label}</span>
       <span className="flex min-w-0 justify-end text-end">{children}</span>
     </li>
   );

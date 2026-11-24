@@ -8,13 +8,13 @@ import { attributeApi } from "@/apis/admin/attributeApi";
 import AttributeFormModal from "@/components/admin/AttributeFormModal";
 
 const ParentLockNotice = ({ title, children }) => (
-  <div className="flex items-start gap-2.5 rounded-[10px] border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-3 py-2.5">
-    <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--warning)] text-[var(--text-inverse)]">
+  <div className="flex items-start gap-2.5 rounded-[10px] border border-warning-solid/30 bg-warning-soft px-3 py-2.5">
+    <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-warning-solid text-fg-inverse">
       <svg className="w-[11px] h-[11px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     </span>
     <div className="min-w-0 space-y-0.5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--warning-text)]">{title}</p>
-      <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{children}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-warning">{title}</p>
+      <p className="text-[11px] leading-relaxed text-fg-secondary">{children}</p>
     </div>
   </div>
 );
@@ -338,27 +338,27 @@ function CategoryFormModal({ open, onClose, onCreated }) {
       <>
         <div className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
         <div
-          className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden"
+          className="fixed z-[9999] bg-page-alt border border-line rounded-lg shadow-2xl overflow-hidden"
           style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "240px" }}
         >
           <div className="overflow-y-auto" style={{ maxHeight: "240px" }}>
             <button type="button"
               onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }}
-              className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
+              className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-subtle transition-colors ${!formData.parent_category_id ? "bg-accent-soft/30 text-accent" : "text-fg"}`}>
               <span>None</span>
-              {!formData.parent_category_id && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)]" />}
+              {!formData.parent_category_id && <CheckIcon className="w-3.5 h-3.5 text-accent" />}
             </button>
             {categoriesLoading ? (
-              <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">Loading categories...</div>
+              <div className="px-3 py-3 text-[11px] text-fg-muted">Loading categories...</div>
             ) : rootCategories.length === 0 ? (
-              <div className="px-3 py-3 text-[11px] text-[var(--text-muted)]">No categories available</div>
+              <div className="px-3 py-3 text-[11px] text-fg-muted">No categories available</div>
             ) : (
               rootCategories.map((cat) => (
                 <button key={cat._id} type="button"
                   onClick={() => { setFormData({ ...formData, parent_category_id: cat._id }); setShowParentDropdown(false); }}
-                  className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${String(formData.parent_category_id) === String(cat._id) ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}>
+                  className={`w-full px-3 py-2 text-[12px] text-left flex items-center justify-between hover:bg-subtle transition-colors ${String(formData.parent_category_id) === String(cat._id) ? "bg-accent-soft/30 text-accent" : "text-fg"}`}>
                   <span className="truncate">{cat.name}</span>
-                  {String(formData.parent_category_id) === String(cat._id) && <CheckIcon className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
+                  {String(formData.parent_category_id) === String(cat._id) && <CheckIcon className="w-3.5 h-3.5 text-accent shrink-0" />}
                 </button>
               ))
             )}
@@ -373,32 +373,32 @@ function CategoryFormModal({ open, onClose, onCreated }) {
     if (!showAttrSelectModal) return null;
     return createPortal(
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
-          <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+        <div className="w-full max-w-md bg-page-alt rounded-xl border border-line shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
+          <div className="px-5 py-3.5 border-b border-line flex items-center justify-between shrink-0">
             <div>
-              <h3 className="text-[13px] font-bold text-[var(--text-primary)]">Select Attributes</h3>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Select attributes for products in this category.</p>
+              <h3 className="text-[13px] font-bold text-fg">Select Attributes</h3>
+              <p className="text-[11px] text-fg-muted mt-0.5">Select attributes for products in this category.</p>
             </div>
             <button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0">
+              className="w-7 h-7 flex items-center justify-center rounded-md text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0">
               <CloseIcon className="w-3.5 h-3.5" />
             </button>
           </div>
           {tempSelectedAttrIds.length > 0 && (
-            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
+            <div className="px-5 py-2.5 border-b border-line shrink-0">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Selected Attributes</span>
-                <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
+                <span className="text-[11px] font-semibold text-fg-secondary">Selected Attributes</span>
+                <span className="text-[10px] font-medium text-fg-muted bg-subtle px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
               </div>
               <div className="flex flex-wrap gap-1.5 max-h-[72px] overflow-y-auto">
                 {tempSelectedAttrIds.map((attrId) => {
                   const attr = allAttributes.find((a) => String(a._id) === String(attrId));
                   if (!attr) return null;
                   return (
-                    <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
+                    <span key={attrId} className="inline-flex items-center gap-1 h-7 pl-2.5 pr-1.5 text-[11px] font-medium bg-subtle text-fg-secondary rounded-md border border-line">
                       {attr.name}
                       <button type="button" onClick={() => toggleTempAttribute(attrId)}
-                        className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                        className="w-4 h-4 flex items-center justify-center rounded hover:bg-card transition-colors text-fg-muted hover:text-fg">
                         <CloseIcon className="w-2.5 h-2.5" />
                       </button>
                     </span>
@@ -407,12 +407,12 @@ function CategoryFormModal({ open, onClose, onCreated }) {
               </div>
             </div>
           )}
-          <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
+          <div className="px-5 py-2.5 border-b border-line shrink-0">
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><SearchIcon className="w-3.5 h-3.5" /></span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-muted"><SearchIcon className="w-3.5 h-3.5" /></span>
               <input type="text" placeholder="Search attributes..." value={attrSearch}
                 onChange={(e) => setAttrSearch(e.target.value)}
-                className="w-full h-9 pl-8 pr-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                className="w-full h-9 pl-8 pr-3 rounded-lg text-[12px] outline-none bg-input border border-line text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors"
                 autoFocus />
             </div>
           </div>
@@ -423,39 +423,39 @@ function CategoryFormModal({ open, onClose, onCreated }) {
                   const isChecked = tempSelectedAttrIds.includes(attr._id);
                   return (
                     <button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)}
-                      className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}>
-                      <div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>
+                      className={`w-full px-5 py-2.5 flex items-center gap-3 text-left transition-colors border-b border-line last:border-b-0 ${isChecked ? "bg-accent-soft/30" : "hover:bg-subtle"}`}>
+                      <div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-accent border-accent" : "border-line bg-input"}`}>
                         {isChecked && <CheckIcon className="w-3 h-3 text-white" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attr.name}</p>
-                        <p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {attr.data_type || "text"}</p>
+                        <p className="text-[12px] font-medium text-fg truncate">{attr.name}</p>
+                        <p className="text-[10px] text-fg-muted font-mono truncate">{attr.code} &middot; {attr.data_type || "text"}</p>
                       </div>
                       {attr.values && attr.values.length > 0 && (
-                        <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{attr.values.length} values</span>
+                        <span className="text-[10px] text-fg-muted shrink-0 tabular-nums">{attr.values.length} values</span>
                       )}
                     </button>
                   );
                 })
               ) : (
                 <div className="px-5 py-6 text-center">
-                  <p className="text-[12px] text-[var(--text-muted)] mb-1">No matching attributes found</p>
-                  <p className="text-[11px] text-[var(--text-muted)]">No attribute matches &quot;{attrSearch}&quot;</p>
+                  <p className="text-[12px] text-fg-muted mb-1">No matching attributes found</p>
+                  <p className="text-[11px] text-fg-muted">No attribute matches &quot;{attrSearch}&quot;</p>
                 </div>
               )
             ) : (
               <div className="px-5 py-8 text-center">
-                <p className="text-[12px] text-[var(--text-muted)] mb-1">No attributes available yet</p>
-                <p className="text-[11px] text-[var(--text-muted)] mb-3">Create an attribute to start defining product specifications.</p>
+                <p className="text-[12px] text-fg-muted mb-1">No attributes available yet</p>
+                <p className="text-[11px] text-fg-muted mb-3">Create an attribute to start defining product specifications.</p>
               </div>
             )}
           </div>
           {!showCreateAttrModal && (
-            <div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">
+            <div className="shrink-0 border-t border-line bg-page-alt">
               {attrSearch.trim() && filteredAllAttributes.length === 0 ? (
                 <div className="px-5 py-2.5">
                   <button type="button" onClick={() => setShowCreateAttrModal(true)}
-                    className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
+                    className="w-full flex items-center gap-2 text-left transition-colors hover:bg-subtle rounded-lg px-3 py-2 text-accent">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-[12px] font-medium">Create &quot;{attrSearch.trim()}&quot;</span>
                   </button>
@@ -463,7 +463,7 @@ function CategoryFormModal({ open, onClose, onCreated }) {
               ) : !attrSearch.trim() ? (
                 <div className="px-5 py-2.5">
                   <button type="button" onClick={() => setShowCreateAttrModal(true)}
-                    className="w-full flex items-center gap-2 text-left transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]">
+                    className="w-full flex items-center gap-2 text-left transition-colors hover:bg-subtle rounded-lg px-3 py-2 text-accent">
                     <PlusIcon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-[12px] font-medium">Create new attribute</span>
                   </button>
@@ -471,13 +471,13 @@ function CategoryFormModal({ open, onClose, onCreated }) {
               ) : null}
             </div>
           )}
-          <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
+          <div className="px-5 py-2.5 border-t border-line flex items-center justify-end gap-2 shrink-0">
             <button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }}
-              className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
+              className="h-8 px-3 text-[12px] font-medium text-fg-secondary bg-transparent border border-line rounded-lg hover:bg-subtle transition-colors">
               Cancel
             </button>
             <button type="button" onClick={applyAttributeSelection}
-              className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">
+              className="h-8 px-4 text-[12px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors shadow-sm">
               Apply{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}
             </button>
           </div>
@@ -489,19 +489,19 @@ function CategoryFormModal({ open, onClose, onCreated }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-[580px] max-h-[85vh] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden">
-        <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+      <div className="w-full max-w-[580px] max-h-[85vh] bg-page-alt rounded-xl border border-line shadow-2xl flex flex-col overflow-hidden">
+        <div className="px-6 py-3 border-b border-line flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-accent-soft flex items-center justify-center text-accent border border-accent/20 shrink-0">
               <FolderIcon className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-[14px] font-bold text-[var(--text-primary)]">Create Category</h2>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Define category details, attributes, and hierarchy.</p>
+              <h2 className="text-[14px] font-bold text-fg">Create Category</h2>
+              <p className="text-[11px] text-fg-muted mt-0.5">Define category details, attributes, and hierarchy.</p>
             </div>
           </div>
           <button type="button" onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0"
             aria-label="Close modal">
             <CloseIcon className="w-4 h-4" />
           </button>
@@ -510,41 +510,41 @@ function CategoryFormModal({ open, onClose, onCreated }) {
         <form id="category-shared-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0">
           <div className="p-5 space-y-4">
             <div className="space-y-3">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Basic Information</p>
+              <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">Basic Information</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Code</label>
+                  <label className="block text-[11px] font-semibold text-fg-secondary">Category Code</label>
                   <div className="relative">
                     <input type="text" value={formData.category_code} onChange={(e) => setFormData({ ...formData, category_code: e.target.value })}
-                      className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                      className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-input border border-line text-fg-secondary placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors"
                       placeholder="AUTO-GENERATED" />
-                    {loadingCode && <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--accent)]" />}
+                    {loadingCode && <Spinner className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-accent" />}
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Category Name <span className="text-red-500">*</span></label>
+                  <label className="block text-[11px] font-semibold text-fg-secondary">Category Name <span className="text-red-500">*</span></label>
                   <input type="text" value={formData.name} required autoFocus
                     onChange={(e) => {
                       const name = e.target.value;
                       const locked = getExistingParentNameMatchId({ name });
                       setFormData((prev) => ({ ...prev, name, parent_category_id: locked ? "" : prev.parent_category_id }));
                     }}
-                    className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                    className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-input border border-line text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors"
                     placeholder="e.g. Smartphones" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Description</label>
+                <label className="block text-[11px] font-semibold text-fg-secondary">Description</label>
                 <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2}
-                  className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                  className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-input border border-line text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors"
                   placeholder="Briefly describe what products belong in this category..." />
               </div>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Category Hierarchy</p>
+              <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">Category Hierarchy</p>
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Parent Category</label>
+                <label className="block text-[11px] font-semibold text-fg-secondary">Parent Category</label>
                 <div className="relative">
                   <button ref={parentDropdownRef} type="button"
                     disabled={parentDropdownDisabled}
@@ -557,49 +557,49 @@ function CategoryFormModal({ open, onClose, onCreated }) {
                       setShowParentDropdown(!showParentDropdown);
                     }}
                     title={parentDropdownDisabled ? NAME_PARENT_LOCK_TEXT : undefined}
-                    className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
+                    className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-line text-fg hover:border-accent focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-subtle text-fg-secondary cursor-not-allowed opacity-70" : "bg-input cursor-pointer"}`}>
                     <span className="flex items-center gap-2 min-w-0">
                       <span className="truncate text-left">{selectedParentName}</span>
                       {parentLockedByName && (
-                        <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">Locked to None</span>
+                        <span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-warning-soft text-warning border border-warning-solid/30 shrink-0 whitespace-nowrap">Locked to None</span>
                       )}
                     </span>
-                    <ChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
+                    <ChevronDownIcon className={`w-3.5 h-3.5 text-fg-muted shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
                   </button>
                 </div>
                 {parentLockedByName && (
                   <ParentLockNotice title="Parent Category locked to None">
-                    <span className="font-semibold text-[var(--text-primary)]">{matchedName}</span> already contains subcategories, so it can only stay a top-level category. To keep the hierarchy valid, Parent Category is locked to <span className="font-semibold text-[var(--text-primary)]">None</span>.
+                    <span className="font-semibold text-fg">{matchedName}</span> already contains subcategories, so it can only stay a top-level category. To keep the hierarchy valid, Parent Category is locked to <span className="font-semibold text-fg">None</span>.
                   </ParentLockNotice>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Product Attributes</p>
+              <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">Product Attributes</p>
               <div className="space-y-1.5">
-                <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">Attributes</label>
+                <label className="block text-[11px] font-semibold text-fg-secondary">Attributes</label>
                 <button type="button" onClick={openAttrSelectModal}
-                  className="w-full min-h-[38px] px-3 py-2 text-[12px] text-left outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors flex items-center justify-between gap-3">
+                  className="w-full min-h-[38px] px-3 py-2 text-[12px] text-left outline-none rounded-lg bg-input border border-line text-fg hover:border-accent focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 min-w-0">
-                    <LayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+                    <LayersIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
                     {formData.attributes.length === 0 ? (
-                      <span className="text-[var(--text-muted)]">Select Attributes</span>
+                      <span className="text-fg-muted">Select Attributes</span>
                     ) : (
-                      <span className="text-[var(--text-secondary)]">{formData.attributes.length} attribute{formData.attributes.length !== 1 ? "s" : ""} selected</span>
+                      <span className="text-fg-secondary">{formData.attributes.length} attribute{formData.attributes.length !== 1 ? "s" : ""} selected</span>
                     )}
                   </span>
-                  <span className="text-[var(--text-muted)] text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0">
+                  <span className="text-fg-muted text-[10px] font-medium px-2 py-0.5 rounded bg-subtle border border-line shrink-0">
                     Browse
                   </span>
                 </button>
                 {formData.attributes.length > 0 && (
                   <div className="flex flex-wrap gap-[6px] pt-1.5">
                     {formData.attributes.map((attr, i) => (
-                      <span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 pl-[10px] pr-[8px] py-[3px] text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-[5px] border border-[var(--border-color)] h-[28px]">
+                      <span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 pl-[10px] pr-[8px] py-[3px] text-[11px] font-medium bg-subtle text-fg-secondary rounded-[5px] border border-line h-[28px]">
                         {attr.seed_name || `Attribute ${i + 1}`}
                         <button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))}
-                          className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-[var(--bg-card)] transition-colors ml-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
+                          className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-card transition-colors ml-0.5 text-fg-muted hover:text-fg-secondary">
                           <CloseIcon className="w-[10px] h-[10px]" />
                         </button>
                       </span>
@@ -610,14 +610,14 @@ function CategoryFormModal({ open, onClose, onCreated }) {
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Status</p>
-              <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 h-[38px] max-w-xs">
+              <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">Status</p>
+              <div className="flex rounded-lg border border-line bg-input overflow-hidden p-0.5 h-[38px] max-w-xs">
                 {[{ id: "active", label: "Active" }, { id: "inactive", label: "Inactive" }].map((opt) => {
                   const isActive = formData.status === opt.id;
                   return (
                     <button key={opt.id} type="button" onClick={() => setFormData({ ...formData, status: opt.id })}
-                      className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                      className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-subtle text-fg shadow-sm" : "text-fg-muted hover:text-fg-secondary"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-fg-muted") : "bg-transparent"}`} />
                       {opt.label}
                     </button>
                   );
@@ -627,13 +627,13 @@ function CategoryFormModal({ open, onClose, onCreated }) {
           </div>
         </form>
 
-        <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
+        <div className="px-5 py-2.5 border-t border-line flex items-center justify-end gap-2 shrink-0">
           <button type="button" onClick={onClose}
-            className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">
+            className="h-9 px-4 text-[12px] font-medium text-fg-secondary bg-transparent border border-line rounded-lg hover:bg-subtle transition-colors">
             Cancel
           </button>
           <button type="submit" form="category-shared-form" disabled={isSaving}
-            className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            className="h-9 px-5 text-[12px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
             {isSaving ? <Spinner className="w-3.5 h-3.5" /> : <CheckIcon className="w-3.5 h-3.5" />}
             Create Category
           </button>

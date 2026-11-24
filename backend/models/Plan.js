@@ -62,6 +62,9 @@ const planSchema = new mongoose.Schema(
       analytics: { type: String, enum: FEATURE_TIERS, default: "basic" },
       pos: { type: Boolean, default: false },
       customDomain: { type: Boolean, default: false },
+      // Store editor (theme / homepage sections / menus / pages). Default ON taake
+      // purane plans par sellers ka access na toote; super admin plan se band kar sakta hai.
+      storeEditor: { type: Boolean, default: true },
     },
 
     // Kis super admin ne plan create kiya

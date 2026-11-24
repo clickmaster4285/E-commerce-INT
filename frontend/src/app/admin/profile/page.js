@@ -86,7 +86,7 @@ const InputField = ({ label, value, onChange, type = "text", icon: Icon, disable
         onChange={onChange}
         disabled={disabled}
         placeholder={placeholder}
-        className={`w-full h-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]/40 disabled:opacity-40 disabled:cursor-not-allowed ${Icon ? "pl-9 pr-3" : "px-3"}`}
+        className={`w-full h-9 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-accent/40 disabled:opacity-40 disabled:cursor-not-allowed ${Icon ? "pl-9 pr-3" : "px-3"}`}
         style={{
           backgroundColor: "var(--bg-tertiary)",
           border: "1px solid var(--border-color)",
@@ -109,7 +109,7 @@ const PasswordField = ({ label, value, onChange, show, toggle, disabled, placeho
         value={value || ""}
         onChange={onChange}
         disabled={disabled}
-        className="w-full h-9 rounded-lg px-3 pr-9 text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]/40 disabled:opacity-40 disabled:cursor-not-allowed"
+        className="w-full h-9 rounded-lg px-3 pr-9 text-[13px] outline-none transition focus:ring-1 focus:ring-accent/40 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
           backgroundColor: "var(--bg-tertiary)",
           border: "1px solid var(--border-color)",

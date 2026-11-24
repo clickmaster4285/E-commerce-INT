@@ -27,9 +27,9 @@ function CategoryCard({ category, tabIndex }) {
       tabIndex={tabIndex}
       aria-hidden={tabIndex === -1}
       draggable={false}
-      className="group flex h-auto w-[180px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-0 text-left shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-200 ease-out hover:-translate-y-[3px] hover:border-[var(--user-accent)]/35 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:-translate-y-[3px] focus-visible:border-[var(--user-accent)]/40 focus-visible:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] active:scale-[0.98]"
+      className="group flex h-auto w-[180px] shrink-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-user-line bg-user-card p-0 text-left shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-200 ease-out hover:-translate-y-[3px] hover:border-user-accent/35 hover:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:-translate-y-[3px] focus-visible:border-user-accent/40 focus-visible:shadow-[0_12px_24px_rgba(15,23,42,0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent active:scale-[0.98]"
     >
-      <span className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-t-xl bg-[var(--user-bg-hover)]">
+      <span className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-t-xl bg-user-hover">
         <FallbackImage
           nextImage
           src={image}
@@ -43,11 +43,11 @@ function CategoryCard({ category, tabIndex }) {
       </span>
 
       <span className="flex min-h-0 flex-col gap-1 px-3.5 py-3">
-        <span className="line-clamp-2 min-h-0 break-words text-sm font-semibold leading-snug tracking-[-0.01em] text-[var(--user-text)]">
+        <span className="line-clamp-2 min-h-0 break-words text-sm font-semibold leading-snug tracking-[-0.01em] text-user-fg">
           {categoryName}
         </span>
         {category.count != null && category.count !== "" ? (
-          <span className="text-[11px] font-normal leading-4 text-[var(--user-text-muted)]">
+          <span className="text-[11px] font-normal leading-4 text-user-fg-muted">
             {t("cart.itemsCount", { count: category.count })}
           </span>
         ) : null}
@@ -58,7 +58,7 @@ function CategoryCard({ category, tabIndex }) {
 
 function CategorySkeletonCard() {
   return (
-    <div aria-hidden="true" className="flex h-auto w-[180px] shrink-0 flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
+    <div aria-hidden="true" className="flex h-auto w-[180px] shrink-0 flex-col overflow-hidden rounded-xl border border-user-line bg-user-card shadow-[0_6px_18px_rgba(15,23,42,0.04)]">
       <span className="skeleton aspect-[16/10] w-full shrink-0 rounded-t-xl" />
       <span className="flex min-h-0 flex-col gap-1 px-3.5 py-3">
         <span className="skeleton mt-0.5 h-3 w-4/5 rounded" />
@@ -69,7 +69,7 @@ function CategorySkeletonCard() {
   );
 }
 
-export function CategoryCarousel({ categories = [], header, isLoading = false }) {
+export function CategoryCarousel({ categories = [], header, isLoading = false, heading = "" }) {
   const { t } = useTranslation();
   const viewportRef = useRef(null);
   const trackRef = useRef(null);
@@ -269,7 +269,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
   return (
     <div>
       <SectionHeading
-        title={t("home.exploreCategories")}
+        title={heading || t("home.exploreCategories")}
         titleId="home-categories-heading"
         subtitle={t("home.categoriesSubtitle")}
         className="mb-5 px-1"
@@ -277,14 +277,14 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
         <div className="flex shrink-0 items-end gap-4">
           <Link
             href="/filtering-product?allCategories=1"
-            className="group inline-flex items-center gap-1 text-[13px] font-medium text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+            className="group inline-flex items-center gap-1 text-[13px] font-medium text-user-fg-muted transition-colors duration-150 hover:text-user-accent focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
           >
             {t("common.viewAll")}
             <ArrowRight size={16} className="transition-transform duration-150 group-hover:translate-x-0.5" />
           </Link>
           <span
             aria-hidden="true"
-            className="hidden h-5 w-px bg-[var(--user-border)] sm:block"
+            className="hidden h-5 w-px bg-user-line sm:block"
           />
           <div className="hidden items-center gap-2 sm:flex">
             <button
@@ -292,7 +292,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
               onClick={() => scrollByCards(-1)}
               disabled={!canScrollLeft || categories.length < 2}
               aria-label={t("home.previousCategories")}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] shadow-sm transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-user-line bg-user-card text-user-fg-muted shadow-sm transition duration-150 hover:border-user-accent hover:bg-user-accent-soft hover:text-user-accent active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
             >
               <ChevronLeft size={16} strokeWidth={2} />
             </button>
@@ -301,7 +301,7 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
               onClick={() => scrollByCards(1)}
               disabled={!canScrollRight || categories.length < 2}
               aria-label={t("home.nextCategories")}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-muted)] shadow-sm transition duration-150 hover:border-[var(--user-accent)] hover:bg-[var(--user-accent-soft)] hover:text-[var(--user-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-user-line bg-user-card text-user-fg-muted shadow-sm transition duration-150 hover:border-user-accent hover:bg-user-accent-soft hover:text-user-accent active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
             >
               <ChevronRight size={16} strokeWidth={2} />
             </button>
@@ -370,7 +370,8 @@ export function CategoryCarousel({ categories = [], header, isLoading = false })
   );
 }
 
-export default function HomeCategories({ tiles = [], isLoading = false }) {
+// heading: store editor ka optional override (khali → default i18n title)
+export default function HomeCategories({ tiles = [], isLoading = false, heading = "" }) {
   const categories = tiles || [];
 
   if (!categories.length && !isLoading) return null;
@@ -378,9 +379,9 @@ export default function HomeCategories({ tiles = [], isLoading = false }) {
   return (
     <section
       aria-labelledby="home-categories-heading"
-      className="home-category-section w-full min-w-0 max-w-full rounded-[28px] bg-[var(--user-bg-soft)] px-2 pb-4 pt-2 sm:px-3"
+      className="home-category-section w-full min-w-0 max-w-full rounded-[28px] bg-user-soft px-2 pb-4 pt-2 sm:px-3"
     >
-      <CategoryCarousel categories={categories} isLoading={isLoading} />
+      <CategoryCarousel categories={categories} isLoading={isLoading} heading={heading} />
     </section>
   );
 }

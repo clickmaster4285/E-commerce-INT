@@ -154,15 +154,15 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
   return (
     <div
       ref={rootRef}
-      className="deal-picker-panel absolute inset-0 z-40 flex flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] font-normal shadow-lg"
+      className="deal-picker-panel absolute inset-0 z-40 flex flex-col overflow-hidden rounded-xl border border-user-line bg-user-card font-normal shadow-lg"
       role="listbox"
       aria-label="Available deals for this item"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--user-border)] bg-[var(--user-bg-hover)] px-3 py-2.5">
+      <div className="flex shrink-0 items-center justify-between border-b border-user-line bg-user-hover px-3 py-2.5">
         <div className="flex items-center gap-1.5">
-          <Sparkles size={14} className="text-[var(--user-text-muted)]" />
-          <span className="text-sm font-semibold text-[var(--user-text)]">Available offers</span>
+          <Sparkles size={14} className="text-user-fg-muted" />
+          <span className="text-sm font-semibold text-user-fg">Available offers</span>
         </div>
         <div className="flex items-center gap-1">
           {availableDeals.length > 1 && (
@@ -172,7 +172,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
                 onClick={() => scroll(-1)}
                 disabled={!canScrollLeft}
                 aria-label="Scroll offers left"
-                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-text)] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-user-fg-muted transition-colors duration-150 hover:bg-user-card hover:text-user-fg disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-line-hover"
               >
                 <ChevronLeft size={12} />
               </button>
@@ -181,7 +181,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
                 onClick={() => scroll(1)}
                 disabled={!canScrollRight}
                 aria-label="Scroll offers right"
-                className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--user-text-muted)] transition-colors duration-150 hover:bg-[var(--user-bg-card)] hover:text-[var(--user-text)] disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-border-hover)]"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-user-fg-muted transition-colors duration-150 hover:bg-user-card hover:text-user-fg disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-line-hover"
               >
                 <ChevronRight size={12} />
               </button>
@@ -213,33 +213,33 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
               onClick={() => handleSelect(deal)}
               className={`snap-start shrink-0 flex flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center transition-all min-w-[5.625rem] ${
                 isSelected
-                  ? "border-[var(--user-border-hover)] bg-[var(--user-bg-hover)]"
-                  : "border-[var(--user-border)] hover:border-[var(--user-border-hover)] hover:bg-[var(--user-bg-hover)]"
+                  ? "border-user-line-hover bg-user-hover"
+                  : "border-user-line hover:border-user-line-hover hover:bg-user-hover"
               }`}
             >
               <span
                 className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                  isSelected ? "bg-[var(--user-text)] text-[var(--user-bg-elevated)]" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"
+                  isSelected ? "bg-user-fg text-user-elevated" : "bg-user-hover text-user-fg-muted"
                 }`}
               >
                 {isSelected ? <Check size={14} strokeWidth={2} /> : <Icon size={14} />}
               </span>
-              <span className="line-clamp-2 text-sm font-medium leading-5 text-[var(--user-text)]">
+              <span className="line-clamp-2 text-sm font-medium leading-5 text-user-fg">
                 {fieldOf(deal, "name")}
               </span>
               {badgeText ? (
-                <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs font-normal text-[var(--user-text-muted)]">
+                <span className="rounded-full bg-user-hover px-2 py-0.5 text-xs font-normal text-user-fg-muted">
                   {badgeText}
                 </span>
               ) : null}
               {savingsText && (
-                <span className="text-xs font-normal text-[var(--user-text-muted)]">{savingsText}</span>
+                <span className="text-xs font-normal text-user-fg-muted">{savingsText}</span>
               )}
               {!meetsMin && (
-                <span className="text-xs font-normal text-[var(--user-text-muted)]">+{gap} more</span>
+                <span className="text-xs font-normal text-user-fg-muted">+{gap} more</span>
               )}
               {isSelected && (
-                <span className="text-xs font-medium text-[var(--user-text-muted)]">Applied</span>
+                <span className="text-xs font-medium text-user-fg-muted">Applied</span>
               )}
             </button>
           );
@@ -250,7 +250,7 @@ export default function DealInfoDropdown({ cartItem, onApplyDeal, open, onClose 
         <button
           type="button"
           onClick={() => { onApplyDeal?.(null); onClose?.(); }}
-          className="w-full shrink-0 border-t border-[var(--user-border)] px-3 py-2.5 text-center text-sm font-normal text-[var(--user-danger)] transition-colors duration-150 hover:bg-[var(--user-danger)]/5 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--user-danger)]"
+          className="w-full shrink-0 border-t border-user-line px-3 py-2.5 text-center text-sm font-normal text-user-danger transition-colors duration-150 hover:bg-user-danger/5 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-user-danger"
         >
           Remove Deal
         </button>

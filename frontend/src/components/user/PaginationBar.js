@@ -53,16 +53,16 @@ export default function PaginationBar({
   };
 
   const arrowClass =
-    "flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] transition-colors hover:border-[var(--user-accent)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[var(--user-border)]";
+    "flex h-9 w-9 items-center justify-center rounded-xl border border-user-line bg-user-card text-user-fg-secondary transition-colors hover:border-user-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-user-line";
 
   return (
     <div className={`mt-5 flex flex-col items-center gap-3 ${className}`}>
-      <p className="text-[0.6875rem] font-semibold text-[var(--user-text-subtle)]">
+      <p className="text-[0.6875rem] font-semibold text-user-fg-subtle">
         Showing{" "}
-        <span className="text-[var(--user-text)]">
+        <span className="text-user-fg">
           {rangeStart}–{rangeEnd}
         </span>{" "}
-        of <span className="text-[var(--user-text)]">{total}</span>{" "}
+        of <span className="text-user-fg">{total}</span>{" "}
         {total === 1 ? itemLabel.replace(/s$/, "") : itemLabel}
       </p>
 
@@ -81,7 +81,7 @@ export default function PaginationBar({
           item === "..." ? (
             <span
               key={`gap-${index}`}
-              className="px-1 text-xs text-[var(--user-text-muted)]"
+              className="px-1 text-xs text-user-fg-muted"
             >
               …
             </span>
@@ -93,8 +93,8 @@ export default function PaginationBar({
               aria-current={safePage === item ? "page" : undefined}
               className={`h-9 min-w-[2.25rem] rounded-xl px-2 text-[0.75rem] font-bold transition-colors ${
                 safePage === item
-                  ? "border border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
-                  : "border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]"
+                  ? "border border-user-accent bg-user-accent text-user-accent-fg"
+                  : "border border-user-line bg-user-card text-user-fg-secondary hover:border-user-accent"
               }`}
             >
               {item}

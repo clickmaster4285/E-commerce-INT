@@ -25,12 +25,12 @@ export default function SectionHeading({
       <div className="min-w-0">
         <h2
           id={titleId}
-          className={`truncate text-xl font-medium leading-tight tracking-[-0.01em] text-[var(--user-text)] sm:text-[22px] ${titleClassName}`}
+          className={`truncate text-xl font-medium leading-tight tracking-[-0.01em] text-user-fg sm:text-[22px] ${titleClassName}`}
         >
           {title}
         </h2>
         {subtitle ? (
-          <p className={`mt-1 truncate text-sm font-normal text-[var(--user-text-muted)] ${subtitleClassName}`}>{subtitle}</p>
+          <p className={`mt-1 truncate text-sm font-normal text-user-fg-muted ${subtitleClassName}`}>{subtitle}</p>
         ) : null}
       </div>
 
@@ -39,7 +39,7 @@ export default function SectionHeading({
         {href ? (
           <Link
             href={href}
-            className="group inline-flex items-center gap-1 text-[13px] font-medium text-[var(--user-text-muted)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+            className="group inline-flex items-center gap-1 text-[13px] font-medium text-user-fg-muted transition-colors duration-150 hover:text-user-accent focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
           >
             {linkLabel}
             <ArrowRight size={16} className="transition-transform duration-150 group-hover:translate-x-0.5" />

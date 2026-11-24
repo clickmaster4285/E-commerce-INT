@@ -125,8 +125,8 @@ export default function ApplicationDetailPage() {
             <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <Avatar name={item.store_name} shape="square" size="xl" src={item.logo?.img_url ? assetUrl(item.logo.img_url) : undefined} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[17px] font-semibold text-[var(--text-primary)]">{item.store_name}</p>
-                <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--text-muted)]">
+                <p className="truncate text-[17px] font-semibold text-fg">{item.store_name}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-fg-muted">
                   <span className="inline-flex items-center gap-1.5"><Tag size={13} aria-hidden="true" />{item.business_category || "No category"}</span>
                   <span className="inline-flex items-center gap-1.5"><Briefcase size={13} aria-hidden="true" />{item.business_type === "registered_business" ? "Registered business" : "Individual"}</span>
                   {location && <span className="inline-flex items-center gap-1.5"><MapPin size={13} aria-hidden="true" />{[item.city, item.country].filter(Boolean).join(", ")}</span>}
@@ -134,9 +134,9 @@ export default function ApplicationDetailPage() {
               </div>
             </CardBody>
             {item.store_description && (
-              <div className="border-t border-[var(--border-color)] px-5 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">About the store</p>
-                <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-6 text-[var(--text-secondary)]">{item.store_description}</p>
+              <div className="border-t border-line px-5 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">About the store</p>
+                <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-6 text-fg-secondary">{item.store_description}</p>
               </div>
             )}
           </Card>
@@ -147,8 +147,8 @@ export default function ApplicationDetailPage() {
               <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
                 <Detail label="Full name" value={item.name} />
                 <Detail label="Username" value={item.username ? `@${item.username}` : "—"} />
-                <Detail label="Email" value={<a href={`mailto:${item.email}`} className="inline-flex items-center gap-1.5 hover:text-[var(--accent)]"><Mail size={13} aria-hidden="true" />{item.email}</a>} />
-                <Detail label="Phone" value={item.phone ? <a href={`tel:${item.phone}`} className="inline-flex items-center gap-1.5 tabular-nums hover:text-[var(--accent)]"><Phone size={13} aria-hidden="true" />{item.phone}</a> : "—"} />
+                <Detail label="Email" value={<a href={`mailto:${item.email}`} className="inline-flex items-center gap-1.5 hover:text-accent"><Mail size={13} aria-hidden="true" />{item.email}</a>} />
+                <Detail label="Phone" value={item.phone ? <a href={`tel:${item.phone}`} className="inline-flex items-center gap-1.5 tabular-nums hover:text-accent"><Phone size={13} aria-hidden="true" />{item.phone}</a> : "—"} />
               </dl>
             </CardBody>
           </Card>
@@ -172,10 +172,10 @@ export default function ApplicationDetailPage() {
                 <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {item.documents.map((doc, idx) => (
                     <li key={`${doc.url}-${idx}`}>
-                      <a href={assetUrl(doc.url)} target="_blank" rel="noreferrer" title={doc.name} className="group flex items-center gap-3 rounded-lg border border-[var(--border-color)] px-3 py-2.5 transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)] group-hover:text-[var(--accent)]"><FileText size={15} aria-hidden="true" /></span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--text-primary)]">{doc.name}</span>
-                        <ExternalLink size={14} className="shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+                      <a href={assetUrl(doc.url)} target="_blank" rel="noreferrer" title={doc.name} className="group flex items-center gap-3 rounded-lg border border-line px-3 py-2.5 transition-colors hover:border-accent hover:bg-accent-soft">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-subtle text-fg-muted group-hover:text-accent"><FileText size={15} aria-hidden="true" /></span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-fg">{doc.name}</span>
+                        <ExternalLink size={14} className="shrink-0 text-fg-muted" aria-hidden="true" />
                       </a>
                     </li>
                   ))}
@@ -194,18 +194,18 @@ export default function ApplicationDetailPage() {
                 <Button variant="success" icon={CheckCircle2} fullWidth size="lg" onClick={() => setDialog("approve")}>Approve seller</Button>
                 <Button variant="secondary" icon={MessageSquare} fullWidth onClick={() => setDialog("info")}>Request information</Button>
                 <Button variant="danger-outline" icon={XCircle} fullWidth onClick={() => setDialog("reject")}>Reject request</Button>
-                <p className="pt-1 text-[12px] leading-5 text-[var(--text-muted)]">Approving opens the store, unlocks the seller&apos;s admin panel and emails them a confirmation.</p>
+                <p className="pt-1 text-[12px] leading-5 text-fg-muted">Approving opens the store, unlocks the seller&apos;s admin panel and emails them a confirmation.</p>
               </CardBody>
             </Card>
           )}
 
           <Card>
             <CardHeader title="Store & access" icon={KeyRound} />
-            <ul className="divide-y divide-[var(--border-color)]">
-              <AccessRow icon={StoreIcon} label="Store">{item.store ? <StatusBadge value={item.store.store_status} /> : <span className="text-[13px] text-[var(--text-muted)]">Not created</span>}</AccessRow>
+            <ul className="divide-y divide-line">
+              <AccessRow icon={StoreIcon} label="Store">{item.store ? <StatusBadge value={item.store.store_status} /> : <span className="text-[13px] text-fg-muted">Not created</span>}</AccessRow>
               {item.store?.url && (
                 <AccessRow icon={Globe} label="Store URL">
-                  <a href={item.store.url} target="_blank" rel="noreferrer" className="inline-flex max-w-[180px] items-center gap-1 truncate text-[13px] font-medium text-[var(--accent)] hover:underline">
+                  <a href={item.store.url} target="_blank" rel="noreferrer" className="inline-flex max-w-[180px] items-center gap-1 truncate text-[13px] font-medium text-accent hover:underline">
                     <span className="truncate">{item.store.url.replace(/^https?:\/\//, "")}</span><ExternalLink size={12} className="shrink-0" aria-hidden="true" />
                   </a>
                 </AccessRow>
@@ -213,21 +213,21 @@ export default function ApplicationDetailPage() {
               <AccessRow icon={LayoutDashboard} label="Admin panel">
                 {item.account?.adminAccess ? (
                   item.account.adminAccess.status === "inactive" ? <StatusBadge value="inactive" /> : item.account.adminAccess.pending ? <Badge tone="warning">View-only</Badge> : <Badge tone="success">Full access</Badge>
-                ) : <span className="text-[13px] text-[var(--text-muted)]">—</span>}
+                ) : <span className="text-[13px] text-fg-muted">—</span>}
               </AccessRow>
-              <AccessRow icon={ShieldCheck} label="Seller account">{item.account?.user ? <StatusBadge value={item.account.user.status} /> : <span className="text-[13px] text-[var(--text-muted)]">—</span>}</AccessRow>
+              <AccessRow icon={ShieldCheck} label="Seller account">{item.account?.user ? <StatusBadge value={item.account.user.status} /> : <span className="text-[13px] text-fg-muted">—</span>}</AccessRow>
             </ul>
           </Card>
 
           <Card>
             <CardHeader title="Timeline" icon={Hash} />
             <CardBody className="py-4">
-              <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">
+              <ol className="relative space-y-4 border-s border-line ps-5">
                 {timeline.map((entry, i) => (
                   <li key={`${entry.at}-${i}`} className="relative">
-                    <span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-[var(--bg-card)]" style={{ background: entry.color }} aria-hidden="true" />
-                    <p className="text-[13px] font-medium leading-5 text-[var(--text-primary)]">{entry.title}</p>
-                    <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{formatDateTime(entry.at)}{entry.by ? ` · ${entry.by}` : ""}</p>
+                    <span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-card" style={{ background: entry.color }} aria-hidden="true" />
+                    <p className="text-[13px] font-medium leading-5 text-fg">{entry.title}</p>
+                    <p className="mt-0.5 text-[12px] text-fg-muted">{formatDateTime(entry.at)}{entry.by ? ` · ${entry.by}` : ""}</p>
                   </li>
                 ))}
               </ol>
@@ -311,8 +311,8 @@ function buildTimeline(item) {
 function Detail({ label, value }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</dt>
-      <dd className="mt-1 break-words text-[13.5px] font-medium text-[var(--text-primary)]">{value}</dd>
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">{label}</dt>
+      <dd className="mt-1 break-words text-[13.5px] font-medium text-fg">{value}</dd>
     </div>
   );
 }
@@ -320,7 +320,7 @@ function Detail({ label, value }) {
 function AccessRow({ icon: Icon, label, children }) {
   return (
     <li className="flex items-center justify-between gap-3 px-5 py-3">
-      <span className="inline-flex items-center gap-2.5 text-[13px] text-[var(--text-secondary)]"><Icon size={15} className="text-[var(--text-muted)]" aria-hidden="true" />{label}</span>
+      <span className="inline-flex items-center gap-2.5 text-[13px] text-fg-secondary"><Icon size={15} className="text-fg-muted" aria-hidden="true" />{label}</span>
       <span className="flex min-w-0 justify-end">{children}</span>
     </li>
   );

@@ -1231,15 +1231,15 @@ const [viewMode, setViewMode] = useState(() => {
       {/* ================= ADD ATTRIBUTE MODAL (PROFESSIONAL DARK STYLE) ================= */}
       {showNewAttributeModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-card)] shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border-card)] flex items-start justify-between gap-3">
+          <div className="w-full max-w-md bg-page-alt rounded-xl border border-line-card shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-line-card flex items-start justify-between gap-3">
               <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
+                <div className="w-8 h-8 flex items-center justify-center bg-accent-soft text-accent rounded-lg border border-accent/20 shrink-0">
                   <Icons.FileText className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 pt-0.5">
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">{t("attr.createTitle")}</h3>
-                  <p className="text-[11px] text-[var(--text-muted)]">{t("attr.subtitle")}</p>
+                  <h3 className="text-base font-semibold text-fg">{t("attr.createTitle")}</h3>
+                  <p className="text-[11px] text-fg-muted">{t("attr.subtitle")}</p>
                 </div>
               </div>
               <button
@@ -1247,7 +1247,7 @@ const [viewMode, setViewMode] = useState(() => {
                 onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }}
                 aria-label={ts("action.close")}
                 title={ts("action.close")}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-subtle transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1255,19 +1255,19 @@ const [viewMode, setViewMode] = useState(() => {
 
             <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--bg-tertiary)]">
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.name")} <span className="text-[var(--danger)]">*</span></label>
+                <label className="block text-[10px] font-medium text-fg-muted uppercase tracking-wider">{t("attr.name")} <span className="text-danger-solid">*</span></label>
                 <input
                   type="text"
                   value={attributeFormData.name}
                   onChange={(e) => setAttributeFormData({ ...attributeFormData, name: e.target.value })}
                   autoFocus
-                  className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                  className="w-full h-[40px] px-3 text-sm outline-none bg-input border border-line rounded-lg text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft"
                   placeholder={t("attr.namePlaceholder")}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.dataType")}</label>
+                <label className="block text-[10px] font-medium text-fg-muted uppercase tracking-wider">{t("attr.dataType")}</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: "multi_select", label: t("attr.typeMulti"), icon: <Icons.Filter className="w-4 h-4" /> },
@@ -1279,7 +1279,7 @@ const [viewMode, setViewMode] = useState(() => {
                         key={type.id}
                         type="button"
                         onClick={() => setAttributeFormData({ ...attributeFormData, data_type: type.id })}
-                        className={`h-12 text-[11px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-colors ${isActive ? "bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/40" : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)]"}`}
+                        className={`h-12 text-[11px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-colors ${isActive ? "bg-accent-soft text-accent border-accent/40" : "bg-input text-fg-muted border-line hover:border-fg-muted"}`}
                       >
                         {type.icon}
                         <span>{type.label}</span>
@@ -1291,8 +1291,8 @@ const [viewMode, setViewMode] = useState(() => {
 
               {attributeFormData.data_type === "boolean" && (
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.defaultState")}</label>
-                  <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-1">
+                  <label className="block text-[10px] font-medium text-fg-muted uppercase tracking-wider">{t("attr.defaultState")}</label>
+                  <div className="flex rounded-lg border border-line bg-input overflow-hidden p-1">
                     {[{ id: true, label: t("attr.true") }, { id: false, label: t("attr.false") }].map((opt) => {
                       const isActive = attributeFormData.value === opt.id;
                       return (
@@ -1300,28 +1300,28 @@ const [viewMode, setViewMode] = useState(() => {
                           key={String(opt.id)}
                           type="button"
                           onClick={() => setAttributeFormData({ ...attributeFormData, value: opt.id, values: [{ label: opt.label, value: String(opt.id) }] })}
-                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+                          className={`flex-1 h-9 text-xs font-medium flex items-center justify-center gap-2 rounded-md transition-all ${isActive ? "bg-subtle text-fg shadow-sm" : "text-fg-muted hover:text-fg-secondary"}`}
                         >
-                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />
+                          <span className={`w-2 h-2 rounded-full transition-colors ${isActive ? (opt.id === true ? "bg-emerald-500" : "bg-fg-muted") : "bg-transparent"}`} />
                           {opt.label}
                         </button>
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">{t("attr.defaultStateHint")}</p>
+                  <p className="text-[10px] text-fg-muted">{t("attr.defaultStateHint")}</p>
                 </div>
               )}
 
               {attributeFormData.data_type === "multi_select" && (
                 <div className="space-y-2">
-                  <label className="block text-[10px] font-medium text-[var(--text-muted)] uppercase tracking-wider">{t("attr.predefinedOptions")}</label>
+                  <label className="block text-[10px] font-medium text-fg-muted uppercase tracking-wider">{t("attr.predefinedOptions")}</label>
                   <div className="space-y-1.5">
                     {(attributeFormData.values || []).map((opt, idx) => (
                       <div
                         key={`opt-${idx}`}
-                        className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg"
+                        className="flex items-center gap-2 px-2.5 py-1.5 bg-input border border-line rounded-lg"
                       >
-                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)] text-[10px] font-bold border border-[var(--accent)]/20">
+                        <span className="w-5 h-5 shrink-0 flex items-center justify-center rounded-md bg-accent-soft text-accent text-[10px] font-bold border border-accent/20">
                           {idx + 1}
                         </span>
                         <input 
@@ -1333,7 +1333,7 @@ const [viewMode, setViewMode] = useState(() => {
                             setAttributeFormData({ ...attributeFormData, values: newValues });
                           }}
                           placeholder={t("attr.optionPlaceholder", { n: idx + 1 })}
-                          className="flex-1 min-w-0 text-xs text-[var(--text-primary)] bg-transparent outline-none truncate"
+                          className="flex-1 min-w-0 text-xs text-fg bg-transparent outline-none truncate"
                         />
                         <button
                           type="button"
@@ -1341,7 +1341,7 @@ const [viewMode, setViewMode] = useState(() => {
                             const next = (attributeFormData.values || []).filter((_, i) => i !== idx);
                             setAttributeFormData({ ...attributeFormData, values: next });
                           }}
-                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                          className="w-6 h-6 shrink-0 flex items-center justify-center rounded-md text-fg-muted hover:text-danger-solid hover:bg-subtle transition-colors"
                           aria-label={t("attr.removeOption")}
                         >
                           <X className="w-3.5 h-3.5" />
@@ -1354,7 +1354,7 @@ const [viewMode, setViewMode] = useState(() => {
                       type="text"
                       id="new-attr-option-input"
                       placeholder={t("attr.optionInputPlaceholder")}
-                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)]"
+                      className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-input border border-line rounded-lg text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1379,21 +1379,21 @@ const [viewMode, setViewMode] = useState(() => {
                         setAttributeFormData({ ...attributeFormData, values: [...(attributeFormData.values || []), { label: val, value: val.toLowerCase() }] });
                         input.value = "";
                       }}
-                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors"
+                      className="h-[36px] px-3 text-[11px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg flex items-center gap-1 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> {t("attr.addOption")}
                     </button>
                   </div>
-                  <p className="text-[10px] text-[var(--text-muted)]">{t("attr.optionsHint")}</p>
+                  <p className="text-[10px] text-fg-muted">{t("attr.optionsHint")}</p>
                 </div>
               )}
             </div>
 
-            <div className="px-5 py-4 border-t border-[var(--border-card)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+            <div className="px-5 py-4 border-t border-line-card flex items-center justify-end gap-3 bg-page/30">
               <button
                 type="button"
                 onClick={() => { setShowNewAttributeModal(false); resetAttributeForm(); }}
-                className="h-9 px-4 text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
+                className="h-9 px-4 text-[11px] font-medium text-fg-secondary bg-subtle border border-line rounded-lg hover:bg-card-alt transition-colors"
               >
                 {ts("action.cancel")}
               </button>
@@ -1401,7 +1401,7 @@ const [viewMode, setViewMode] = useState(() => {
                 type="button"
                 onClick={(e) => handleAttributeSubmit(e)}
                 disabled={createAttributeMutation.isPending}
-                className="h-9 px-5 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                className="h-9 px-5 text-[11px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors shadow-sm disabled:opacity-50"
               >
                 {createAttributeMutation.isPending ? t("attr.creating") : t("attr.create")}
               </button>
@@ -1678,12 +1678,12 @@ function SelectFilter({ value, onChange, options, placeholder, searchable = fals
           </div>
           <div className="max-h-52 overflow-y-auto">
             {clearLabel && !search.trim() && (
-              <button type="button" onClick={() => handleSelect("all")} className="block w-full px-3 py-2 text-start text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === "all" ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === "all" ? 600 : 400 }}>{clearLabel}</button>
+              <button type="button" onClick={() => handleSelect("all")} className="block w-full px-3 py-2 text-start text-[13px] transition hover:bg-row-hover" style={{ color: String(value) === "all" ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === "all" ? 600 : 400 }}>{clearLabel}</button>
             )}
             {filteredOptions.length === 0 ? (
               <p className="px-3 py-3 text-center text-[12px]" style={{ color: "var(--text-muted)" }}>{t("filter.noMatch", { term: search.trim() })}</p>
             ) : filteredOptions.map((o) => (
-              <button type="button" key={o.value} onClick={() => handleSelect(o.value)} className="block w-full px-3 py-2 text-start text-[13px] transition hover:bg-[var(--bg-row-hover)]" style={{ color: String(value) === String(o.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(o.value) ? 600 : 400 }}>{o.label}</button>
+              <button type="button" key={o.value} onClick={() => handleSelect(o.value)} className="block w-full px-3 py-2 text-start text-[13px] transition hover:bg-row-hover" style={{ color: String(value) === String(o.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(o.value) ? 600 : 400 }}>{o.label}</button>
             ))}
           </div>
         </div>

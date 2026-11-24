@@ -59,7 +59,7 @@ const translationPageState = (records, field, locale) => {
 };
 
 function TranslationSkeleton({ className = "h-3 w-28" }) {
-  return <span aria-hidden="true" className={`inline-block animate-pulse rounded bg-[var(--bg-tertiary)] ${className}`} />;
+  return <span aria-hidden="true" className={`inline-block animate-pulse rounded bg-subtle ${className}`} />;
 }
 
 const localeTag = (locale) =>
@@ -558,7 +558,7 @@ function ManageFeaturedModal({ open, onClose, onSaved }) {
                 checked={allOnPageSelected}
                 onChange={toggleAllOnPage}
                 disabled={!selectableOnPage.length}
-                className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                className="h-4 w-4 cursor-pointer accent-accent"
               />
               {t("admin.featuredProducts.modal.selectAll")}
             </label>

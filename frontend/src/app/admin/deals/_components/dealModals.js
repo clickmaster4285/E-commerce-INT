@@ -179,7 +179,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
-    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
     style={style}
   />
 );
@@ -190,7 +190,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-accent/30 resize-none"
     style={style}
   />
 );
@@ -698,7 +698,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">{t("admin.promotions.ui.generated.562d9326316b")}</span>
                         <div
                           className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                            formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
+                            formData.has_min_quantity ? "bg-accent border-accent" : "border-line bg-transparent"
                           }`}
                         >
                           {formData.has_min_quantity && <CheckIcon className="w-3 h-3 text-white" />}
@@ -775,7 +775,7 @@ export function DealFormModal({ formType, formData, setFormData, editingDeal, sa
                         type="checkbox"
                         checked={formData.is_featured}
                         onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-                        className="w-4 h-4 accent-[var(--accent)] cursor-pointer"
+                        className="w-4 h-4 accent-accent cursor-pointer"
                       />
                       <span className="text-[13px] font-semibold">{t("admin.deals.form.featured")}</span>
                       <span className="text-[10px] ml-auto" style={{ color: "var(--text-muted)" }}>{t("admin.deals.form.highlight")}</span>
@@ -899,7 +899,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={`Search ${title.toLowerCase()}...`}
-              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
+              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] outline-none transition focus:ring-2 focus:ring-accent/30"
               style={inputStyle}
             />
           </div>

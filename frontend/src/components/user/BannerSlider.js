@@ -193,7 +193,7 @@ export default function BannerSlider({ initialBanners = null }) {
   if (isLoading) {
     return (
       <section className="w-full">
-        <div className="h-[13.125rem] w-full sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto bg-[var(--user-bg-card)] animate-pulse" />
+        <div className="h-[13.125rem] w-full sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto bg-user-card animate-pulse" />
       </section>
     );
   }
@@ -221,7 +221,7 @@ export default function BannerSlider({ initialBanners = null }) {
       {/* 1080p tak fixed height (jaisa tha), 2000px+ par 3:1 aspect —
           is liye bari screen par hero apne aap proportion me barhta hai */}
       <div
-        className="group relative w-full h-[13.125rem] sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto overflow-hidden bg-[var(--user-bg-card)]"
+        className="group relative w-full h-[13.125rem] sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto overflow-hidden bg-user-card"
         style={{ minHeight: "13.125rem", touchAction: "pan-y" }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -437,7 +437,7 @@ function ImageSlide({ banner, imgUrl, mountImage, isActive, priority, fallbackAl
           className={`object-cover ${isActive ? "animate-[kenBurns_8s_ease-out_forwards]" : ""}`}
         />
       ) : imgUrl ? (
-        <div className="h-full w-full bg-[var(--user-bg-card)]" />
+        <div className="h-full w-full bg-user-card" />
       ) : (
         <div className="h-full w-full" style={{ backgroundColor: banner.backgroundColor || "#1f2937" }} />
       )}

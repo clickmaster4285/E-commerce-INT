@@ -33,8 +33,8 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 
   if (!logoUrl) {
     return (
-      <div className={`${sizeClass} rounded-lg bg-[var(--user-accent)] flex items-center justify-center shrink-0`}>
-        <span className="text-[var(--user-accent-text)] font-black text-lg lg:text-xl">{letter}</span>
+      <div className={`${sizeClass} rounded-lg bg-user-accent flex items-center justify-center shrink-0`}>
+        <span className="text-user-accent-fg font-black text-lg lg:text-xl">{letter}</span>
       </div>
     );
   }
@@ -265,14 +265,14 @@ export default function UserLoginPage() {
   };
 
   const inputCls =
-    "w-full h-12 rounded-xl bg-[var(--user-bg-input)] border pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none transition";
+    "w-full h-12 rounded-xl bg-user-input border pl-11 pr-4 text-sm text-user-fg placeholder:text-user-fg-subtle outline-none transition";
 
   const getInputCls = (field) => {
     const hasError = errors[field];
     return `${inputCls} ${
       hasError
-        ? "border-[var(--user-danger)] focus:border-[var(--user-danger)] focus:ring-2 focus:ring-[var(--user-danger)]/15"
-        : "border-[var(--user-border)] focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15"
+        ? "border-user-danger focus:border-user-danger focus:ring-2 focus:ring-user-danger/15"
+        : "border-user-line focus:border-user-accent focus:ring-2 focus:ring-user-accent/15"
     }`;
   };
 
@@ -280,22 +280,22 @@ export default function UserLoginPage() {
     if (!errors[field]) return null;
     return (
       <div className="flex items-center gap-1.5 mt-1.5 px-1">
-        <AlertCircle size={12} className="text-[var(--user-danger)] shrink-0" />
-        <p className="text-[0.6875rem] font-semibold text-[var(--user-danger)]">{errors[field]}</p>
+        <AlertCircle size={12} className="text-user-danger shrink-0" />
+        <p className="text-[0.6875rem] font-semibold text-user-danger">{errors[field]}</p>
       </div>
     );
   };
 
   return (
-    <main className="user-theme h-screen flex bg-[var(--user-bg)] overflow-y-auto lg:overflow-hidden">
+    <main className="user-theme h-screen flex bg-user-page overflow-y-auto lg:overflow-hidden">
       <div className="fixed top-4 right-4 z-50">
         <LanguageSwitcher />
       </div>
       {/* ═══════════ LEFT — BRANDING (Desktop) ═══════════ */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 xl:p-14 bg-[var(--user-bg-elevated)] relative overflow-hidden border-r border-[var(--user-border)] shrink-0">
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 xl:p-14 bg-user-elevated relative overflow-hidden border-r border-user-line shrink-0">
         {/* Glows */}
-        <div className="absolute top-[-140px] left-[-140px] w-[26.25rem] h-[26.25rem] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
-        <div className="absolute bottom-[-140px] right-[-140px] w-[26.25rem] h-[26.25rem] rounded-full bg-[var(--user-accent)]/6 blur-3xl" />
+        <div className="absolute top-[-140px] left-[-140px] w-[26.25rem] h-[26.25rem] rounded-full bg-user-accent/6 blur-3xl" />
+        <div className="absolute bottom-[-140px] right-[-140px] w-[26.25rem] h-[26.25rem] rounded-full bg-user-accent/6 blur-3xl" />
 
         {/* Top: Logo */}
               {/* Top: Logo */}
@@ -306,27 +306,27 @@ export default function UserLoginPage() {
           aria-label={`${storeName} home page`}
         >
           <StoreLogo store={store} />
-          <span className="text-[var(--user-text)] font-black text-xl tracking-wide">{storeName}</span>
+          <span className="text-user-fg font-black text-xl tracking-wide">{storeName}</span>
         </button>
 
         {/* Middle: Content */}
         <div className="relative">
           <div className="flex items-center gap-2 mb-5">
-            <Sparkles size={14} className="text-[var(--user-accent)]" />
-            <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-[var(--user-accent)]">
+            <Sparkles size={14} className="text-user-accent" />
+            <span className="text-[0.6875rem] font-bold uppercase tracking-widest text-user-accent">
               {t("auth.login.trustedByCustomers")}
             </span>
           </div>
 
-          <h1 className="text-5xl xl:text-[3.4rem] font-black text-[var(--user-text)] mb-5 leading-[1.08] tracking-tight">
+          <h1 className="text-5xl xl:text-[3.4rem] font-black text-user-fg mb-5 leading-[1.08] tracking-tight">
             {t("auth.login.premiumShopping")}
             <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--user-accent)] to-emerald-300">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-user-accent to-emerald-300">
               {t("auth.login.experience")}
             </span>
           </h1>
 
-          <p className="text-[var(--user-text-muted)] text-base xl:text-lg mb-8 max-w-md leading-relaxed">
+          <p className="text-user-fg-muted text-base xl:text-lg mb-8 max-w-md leading-relaxed">
             {tagline}
           </p>
 
@@ -336,9 +336,9 @@ export default function UserLoginPage() {
               {topCategories.map((cat) => (
                 <div
                   key={cat._id}
-                  className="flex items-center gap-2.5 px-4 py-2.5 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl text-[var(--user-text-secondary)] text-sm"
+                  className="flex items-center gap-2.5 px-4 py-2.5 bg-user-card border border-user-line rounded-xl text-user-fg-secondary text-sm"
                 >
-                  <span className="w-6 h-6 rounded-md bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center text-xs font-black">
+                  <span className="w-6 h-6 rounded-md bg-user-accent/10 text-user-accent flex items-center justify-center text-xs font-black">
                     {nameOf(cat).charAt(0)}
                   </span>
                   {nameOf(cat)}
@@ -349,22 +349,22 @@ export default function UserLoginPage() {
 
           {/* Feature row */}
           <div className="flex items-center gap-7">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--user-text-muted)]">
-              <Truck size={15} className="text-[var(--user-accent)]" /> {t("auth.login.freeDelivery")}
+            <div className="flex items-center gap-2 text-xs font-semibold text-user-fg-muted">
+              <Truck size={15} className="text-user-accent" /> {t("auth.login.freeDelivery")}
             </div>
-            <div className="w-1 h-1 rounded-full bg-[var(--user-border)]" />
-            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--user-text-muted)]">
-              <ShieldCheck size={15} className="text-[var(--user-accent)]" /> {t("auth.login.securePayment")}
+            <div className="w-1 h-1 rounded-full bg-user-line" />
+            <div className="flex items-center gap-2 text-xs font-semibold text-user-fg-muted">
+              <ShieldCheck size={15} className="text-user-accent" /> {t("auth.login.securePayment")}
             </div>
-            <div className="w-1 h-1 rounded-full bg-[var(--user-border)]" />
-            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--user-text-muted)]">
-              <RotateCcw size={15} className="text-[var(--user-accent)]" /> {t("auth.login.easyReturns")}
+            <div className="w-1 h-1 rounded-full bg-user-line" />
+            <div className="flex items-center gap-2 text-xs font-semibold text-user-fg-muted">
+              <RotateCcw size={15} className="text-user-accent" /> {t("auth.login.easyReturns")}
             </div>
           </div>
         </div>
 
         {/* Bottom */}
-        <div className="text-[var(--user-text-subtle)] text-sm relative">
+        <div className="text-user-fg-subtle text-sm relative">
           © {new Date().getFullYear()} {storeName}. {t("auth.login.allRightsReserved")}
         </div>
       </div>
@@ -381,10 +381,10 @@ export default function UserLoginPage() {
             aria-label={`${storeName} home page`}
           >
             <StoreLogo store={store} sizeClass="w-9 h-9" />
-            <span className="text-[var(--user-text)] font-black text-lg tracking-wide">{storeName}</span>
+            <span className="text-user-fg font-black text-lg tracking-wide">{storeName}</span>
           </button>
 
-          <div className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl p-6 sm:p-8 shadow-[var(--user-shadow-lg)]">
+          <div className="bg-user-card border border-user-line rounded-2xl p-6 sm:p-8 shadow-[var(--user-shadow-lg)]">
 
             {/* ═══ STEP: EMAIL VERIFICATION OTP ═══ */}
             {step === "verify-email" && (
@@ -407,20 +407,20 @@ export default function UserLoginPage() {
               <div>
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <KeyRound size={16} className="text-[var(--user-accent)]" />
-                    <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                    <KeyRound size={16} className="text-user-accent" />
+                    <span className="text-user-accent text-[0.625rem] font-bold uppercase tracking-widest">
                       {t("auth.login.forgotPassword")}
                     </span>
                   </div>
-                  <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">{t("auth.login.resetPassword")}</h2>
-                  <p className="text-[var(--user-text-muted)] text-sm">
+                  <h2 className="text-2xl font-black text-user-fg mb-1">{t("auth.login.resetPassword")}</h2>
+                  <p className="text-user-fg-muted text-sm">
                     {t("auth.login.resetEmailHelp")}
                   </p>
                 </div>
 
                 <form onSubmit={handleForgotSubmit} className="space-y-3.5" noValidate>
                   <div className="relative">
-                    <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                    <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                     <input
                       type="email"
                       required
@@ -435,16 +435,16 @@ export default function UserLoginPage() {
                   </div>
 
                   {forgotError && (
-                    <div className="px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
-                      <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-                      <p className="text-[var(--user-danger)] text-sm">{forgotError}</p>
+                    <div className="px-4 py-3 rounded-xl bg-user-danger/10 border border-user-danger/30 flex items-start gap-2">
+                      <AlertCircle size={16} className="text-user-danger shrink-0 mt-0.5" />
+                      <p className="text-user-danger text-sm">{forgotError}</p>
                     </div>
                   )}
 
                   <button
                     type="submit"
                     disabled={forgotLoading}
-                    className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full h-12 rounded-xl bg-user-accent text-user-accent-fg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
                     {forgotLoading ? t("auth.login.sendingCode") : t("auth.login.sendResetCode")}
@@ -456,7 +456,7 @@ export default function UserLoginPage() {
                       setStep("auth");
                       setForgotError("");
                     }}
-                    className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition"
+                    className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-user-fg-muted hover:text-user-accent transition"
                   >
                     <ArrowLeft size={13} /> {t("auth.login.backToLogin")}
                   </button>
@@ -495,15 +495,15 @@ export default function UserLoginPage() {
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-3">
-                <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-                <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                <ShieldCheck size={16} className="text-user-accent" />
+                <span className="text-user-accent text-[0.625rem] font-bold uppercase tracking-widest">
                   {isLogin ? t("auth.login.userSignIn") : t("auth.login.createAccount")}
                 </span>
               </div>
-              <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">
+              <h2 className="text-2xl font-black text-user-fg mb-1">
                 {isLogin ? t("auth.login.welcomeBack") : t("auth.login.createAccount")}
               </h2>
-              <p className="text-[var(--user-text-muted)] py-2 text-sm">
+              <p className="text-user-fg-muted py-2 text-sm">
                 {isLogin ? t("auth.login.continueShoppingSubtitle") : t("auth.login.createAccountSubtitle")}
               </p>
             </div>
@@ -524,16 +524,16 @@ export default function UserLoginPage() {
                       text="continue_with"
                     />
                   ) : (
-                    <div className="w-full py-3 rounded-full border border-[var(--user-border)] text-center text-[var(--user-text-muted)] text-sm">
+                    <div className="w-full py-3 rounded-full border border-user-line text-center text-user-fg-muted text-sm">
                       {t("auth.login.googleUnavailable")}
                     </div>
                   )}
                 </div>
 
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="flex-1 h-px bg-[var(--user-border)]" />
-                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">{t("auth.login.orWithEmail")}</span>
-                  <div className="flex-1 h-px bg-[var(--user-border)]" />
+                  <div className="flex-1 h-px bg-user-line" />
+                  <span className="text-user-fg-subtle text-[0.625rem] uppercase tracking-widest font-semibold">{t("auth.login.orWithEmail")}</span>
+                  <div className="flex-1 h-px bg-user-line" />
                 </div>
               </>
             )}
@@ -548,9 +548,9 @@ export default function UserLoginPage() {
               </div>
             )}
             {generalError && (
-              <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
-                <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-                <p className="text-[var(--user-danger)] text-sm">{generalError}</p>
+              <div className="mb-4 px-4 py-3 rounded-xl bg-user-danger/10 border border-user-danger/30 flex items-start gap-2">
+                <AlertCircle size={16} className="text-user-danger shrink-0 mt-0.5" />
+                <p className="text-user-danger text-sm">{generalError}</p>
               </div>
             )}
 
@@ -560,21 +560,21 @@ export default function UserLoginPage() {
                 <>
                   <div>
                     <div className="relative">
-                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                       <input type="text" required value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }} placeholder={t("auth.login.fullName")} className={getInputCls("name")} />
                     </div>
                     {renderFieldError("name")}
                   </div>
                   <div>
                     <div className="relative">
-                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                       <input type="text" required value={username} onChange={(e) => { setUsername(e.target.value); setErrors((p) => ({ ...p, username: "" })); }} placeholder={t("auth.login.username")} className={getInputCls("username")} />
                     </div>
                     {renderFieldError("username")}
                   </div>
                   <div>
                     <div className="relative">
-                      <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                      <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                       <input
                         type="tel"
                         required
@@ -598,7 +598,7 @@ export default function UserLoginPage() {
 
               <div>
                 <div className="relative">
-                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                   <input
                     type="email"
                     suppressHydrationWarning
@@ -617,7 +617,7 @@ export default function UserLoginPage() {
 
               <div>
                 <div className="relative">
-                  <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                  <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                   <input type="password" required value={password} onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: "" })); }} placeholder={t("auth.login.password")} minLength={6} className={getInputCls("password")} />
                 </div>
                 {renderFieldError("password")}
@@ -634,7 +634,7 @@ export default function UserLoginPage() {
                       setForgotError("");
                       setStep("forgot");
                     }}
-                    className="text-[0.75rem] font-semibold text-[var(--user-accent)] hover:underline bg-transparent border-0 p-0 outline-none"
+                    className="text-[0.75rem] font-semibold text-user-accent hover:underline bg-transparent border-0 p-0 outline-none"
                   >
                     {t("auth.login.forgotPassword")}
                   </button>
@@ -644,18 +644,18 @@ export default function UserLoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+                className="w-full h-12 rounded-xl bg-user-accent text-user-accent-fg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed mt-1"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
                 {loading ? (isLogin ? t("auth.login.loggingIn") : t("auth.login.creatingAccount")) : isLogin ? t("auth.login.login") : t("auth.login.createAccount")}
               </button>
             </form>
 
-            <p className="text-center mt-5 text-[var(--user-text-muted)] text-sm">
+            <p className="text-center mt-5 text-user-fg-muted text-sm">
               {isLogin ? t("auth.login.noAccount") : t("auth.login.haveAccount")}{" "}
               <button
                 onClick={() => { setIsLogin(!isLogin); setErrors({}); setGeneralError(""); }}
-                className="text-[var(--user-accent)] pt-2 hover:underline font-semibold bg-transparent border-0 p-0 outline-none"
+                className="text-user-accent pt-2 hover:underline font-semibold bg-transparent border-0 p-0 outline-none"
               >
                 {isLogin ? t("auth.login.register") : t("auth.login.login")}
               </button>
@@ -664,7 +664,7 @@ export default function UserLoginPage() {
             )}
           </div>
 
-          <p className="text-center mt-4 text-[0.6875rem] text-[var(--user-text-subtle)]">
+          <p className="text-center mt-4 text-[0.6875rem] text-user-fg-subtle">
             {t("auth.login.termsNotice")}
           </p>
         </div>

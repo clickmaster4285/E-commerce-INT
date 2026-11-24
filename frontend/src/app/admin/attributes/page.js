@@ -268,33 +268,33 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
       />
 
       {/* Slide-in Drawer */}
-      <div dir={dir} lang={locale} className={`admin-attributes-detail-panel fixed top-0 right-0 bottom-0 z-[70] w-full sm:max-w-md bg-[var(--bg-secondary)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${visible ? "translate-x-0" : "translate-x-full"}`}>
+      <div dir={dir} lang={locale} className={`admin-attributes-detail-panel fixed top-0 right-0 bottom-0 z-[70] w-full sm:max-w-md bg-page-alt border-l border-line shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${visible ? "translate-x-0" : "translate-x-full"}`}>
         
         {/* Header — Panel title (Attribute Options) + Close */}
-        <div className="px-5 sm:px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between gap-3 bg-[var(--bg-card)]">
+        <div className="px-5 sm:px-6 py-3 border-b border-line flex items-center justify-between gap-3 bg-card">
           <div className="flex items-center gap-2 min-w-0">
-            <SlidersIcon className="w-4 h-4 text-[var(--accent)] shrink-0" />
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] truncate">{t("detailPanel.title")}</h3>
+            <SlidersIcon className="w-4 h-4 text-accent shrink-0" />
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-fg-muted truncate">{t("detailPanel.title")}</h3>
           </div>
           <button
             type="button"
             onClick={requestClose}
             aria-label={t("detailPanel.close")}
             title={t("detailPanel.close")}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             <CloseIcon className="w-5 h-5" />
           </button>
         </div>
 
         {/* Attribute identity — name + data type badge */}
-        <div className="px-5 sm:px-6 py-4 border-b border-[var(--border-color)] flex items-center gap-3 bg-[var(--bg-card)]">
-          <div className="w-10 h-10 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] shrink-0">
+        <div className="px-5 sm:px-6 py-4 border-b border-line flex items-center gap-3 bg-card">
+          <div className="w-10 h-10 rounded-lg bg-accent-soft flex items-center justify-center text-accent shrink-0">
             <SlidersIcon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-[16px] font-bold text-[var(--text-primary)] truncate">{nameReady ? nameOf(attr) : <span className="skeleton inline-block h-4 w-32 rounded" aria-label={t("common.loading")} />}</h4>
-            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 mt-1">
+            <h4 className="text-[16px] font-bold text-fg truncate">{nameReady ? nameOf(attr) : <span className="skeleton inline-block h-4 w-32 rounded" aria-label={t("common.loading")} />}</h4>
+            <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-accent-soft text-accent border border-accent/20 mt-1">
               {t(getDataTypeLabel(attr.data_type))}
             </span>
           </div>
@@ -305,37 +305,37 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
 
           {/* Summary Section — Code / Data Type / Status / Options Count */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("detailPanel.summary")}</h4>
+            <h4 className="text-xs font-bold text-fg-muted uppercase tracking-wider">{t("detailPanel.summary")}</h4>
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.code")}</span>
-                <span className="block text-xs font-mono font-semibold text-[var(--text-primary)] truncate">{attr.code || "—"}</span>
+              <div className="p-3 rounded-lg bg-input border border-line min-w-0">
+                <span className="block text-[10px] font-medium text-fg-muted mb-1">{t("detailPanel.code")}</span>
+                <span className="block text-xs font-mono font-semibold text-fg truncate">{attr.code || "—"}</span>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.dataType")}</span>
-                <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
+              <div className="p-3 rounded-lg bg-input border border-line min-w-0">
+                <span className="block text-[10px] font-medium text-fg-muted mb-1">{t("detailPanel.dataType")}</span>
+                <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-accent-soft text-accent border border-accent/20">
                   {t(getDataTypeLabel(attr.data_type))}
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.status")}</span>
+              <div className="p-3 rounded-lg bg-input border border-line min-w-0">
+                <span className="block text-[10px] font-medium text-fg-muted mb-1">{t("detailPanel.status")}</span>
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isActive ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   {isActive ? t("filter.active") : t("filter.inactive")}
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] min-w-0">
-                <span className="block text-[10px] font-medium text-[var(--text-muted)] mb-1">{t("detailPanel.optionsCount")}</span>
-                <span className="block text-xs font-bold text-[var(--text-primary)]">{options.length}</span>
+              <div className="p-3 rounded-lg bg-input border border-line min-w-0">
+                <span className="block text-[10px] font-medium text-fg-muted mb-1">{t("detailPanel.optionsCount")}</span>
+                <span className="block text-xs font-bold text-fg">{options.length}</span>
               </div>
             </div>
             
             {/* Variant Option Row */}
             {attr.category_config?.is_variant_option && (
-               <div className="p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] flex justify-between items-center">
-                 <span className="text-[10px] font-medium text-[var(--text-muted)]">{ t("detailPanel.variantOption") }</span>
-                  <span className="text-xs font-semibold text-[var(--accent)]">{ t("common.yes") }</span>
-                 <span className="text-xs font-semibold text-[var(--accent)]">{ t("common.yes") }</span>
+               <div className="p-3 rounded-lg bg-input border border-line flex justify-between items-center">
+                 <span className="text-[10px] font-medium text-fg-muted">{ t("detailPanel.variantOption") }</span>
+                  <span className="text-xs font-semibold text-accent">{ t("common.yes") }</span>
+                 <span className="text-xs font-semibold text-accent">{ t("common.yes") }</span>
                </div>
             )}
           </div>
@@ -343,10 +343,10 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
           {/* Options Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              <h4 className="text-xs font-bold text-fg-muted uppercase tracking-wider">
                 { isBoolean ? t("detailPanel.booleanValues") : t("detailPanel.availableOptions") }
               </h4>
-              <span className="text-[10px] font-medium bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full text-[var(--text-secondary)]">
+              <span className="text-[10px] font-medium bg-subtle px-2 py-0.5 rounded-full text-fg-secondary">
                 { t("detailPanel.itemsCount", { count: options.length }) }
               </span>
             </div>
@@ -356,13 +356,13 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
                 optionEntries.map(({ source, index, label: opt }, idx) => (
                   <div
                     key={`${opt}-${index}`}
-                    className="flex items-start justify-between p-3 rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] group hover:border-[var(--accent)]/30 transition-colors"
+                    className="flex items-start justify-between p-3 rounded-lg bg-input border border-line group hover:border-accent/30 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-6 h-6 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors shrink-0">
+                      <span className="w-6 h-6 flex items-center justify-center rounded bg-subtle text-[10px] font-bold text-fg-muted group-hover:bg-accent-soft group-hover:text-accent transition-colors shrink-0">
                         {idx + 1}
                       </span>
-                      <span className="min-w-0 flex-1 break-words text-end text-sm font-medium text-[var(--text-primary)] leading-[2] py-1">{optionReady(source) ? opt : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("common.loading")} />}</span>
+                      <span className="min-w-0 flex-1 break-words text-end text-sm font-medium text-fg leading-[2] py-1">{optionReady(source) ? opt : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("common.loading")} />}</span>
                     </div>
                     {isBoolean && (
                        <span className={`w-2 h-2 rounded-full shrink-0 ${opt.toLowerCase() === 'yes' || opt.toLowerCase() === 'true' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
@@ -370,9 +370,9 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
                   </div>
                 ))
               ) : (
-                <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
-                  <TagIcon className="w-8 h-8 mx-auto mb-2 text-[var(--text-muted)] opacity-50" />
-                  <p className="text-sm text-[var(--text-muted)]">{t("detailPanel.noOptions")}</p>
+                <div className="py-8 text-center border border-dashed border-line rounded-lg">
+                  <TagIcon className="w-8 h-8 mx-auto mb-2 text-fg-muted opacity-50" />
+                  <p className="text-sm text-fg-muted">{t("detailPanel.noOptions")}</p>
                 </div>
               )}
             </div>
@@ -389,19 +389,19 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submitNewOption(); } }}
                     placeholder={t("form.optionPlaceholder")}
                     disabled={isAddingOption}
-                    className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors disabled:opacity-60"
+                    className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-input border border-line rounded-lg text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors disabled:opacity-60"
                   />
                   <button
                     type="button"
                     onClick={submitNewOption}
                     disabled={isAddingOption || !newOption.trim()}
-                    className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-[36px] px-3 text-[11px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg flex items-center gap-1 transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isAddingOption ? <Spinner className="w-3 h-3" /> : <PlusIcon className="w-3 h-3" />}
                     <span>{isAddingOption ? "Adding..." : "Add Option"}</span>
                   </button>
                 </div>
-                <p className="text-[10px] text-[var(--text-muted)]">
+                <p className="text-[10px] text-fg-muted">
                 </p>
               </div>
             )}
@@ -409,14 +409,14 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
         </div>
 
         {/* Footer — panel actions */}
-        <div className="p-5 sm:p-6 border-t border-[var(--border-color)] bg-[var(--bg-card)]">
+        <div className="p-5 sm:p-6 border-t border-line bg-card">
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="button"
               onClick={handleAddAttribute}
               title={t("form.createTitle")}
               aria-label={t("form.createTitle")}
-              className="flex-1 h-10 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] hover:border-[var(--accent)]/40 hover:text-[var(--accent)] hover:bg-[var(--accent-soft)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+              className="flex-1 h-10 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 border border-line bg-input text-fg hover:border-accent/40 hover:text-accent hover:bg-accent-soft transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               <PlusIcon className="w-4 h-4" />
               <span>{t("form.create")}</span>
@@ -426,7 +426,7 @@ function AttributeOptionsPanel({ attr, onClose, onAddAttribute, onAddOption, isA
               onClick={requestClose}
               title={t("detailPanel.close")}
               aria-label={t("detailPanel.close")}
-              className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+              className="flex-1 h-10 rounded-lg text-[13px] font-semibold text-white bg-accent hover:bg-accent-hover transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               <span>{t("detailPanel.closePanel")}</span>
             </button>
@@ -964,7 +964,7 @@ export default function AttributesPage() {
               onClick={() => setShowAttributeModal(true)}
               title={t("form.createTitle")}
               aria-label={t("form.createTitle")}
-              className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 shadow-sm transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40"
+              className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center gap-2 shadow-sm transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}
             >
               <PlusIcon className="w-4 h-4" />
@@ -1225,7 +1225,7 @@ export default function AttributesPage() {
                 <TrashIcon className="w-5 h-5" style={{ color: "var(--danger-text)" }} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t("delete.titleOne", { name: deleteTarget.name })}</h3>
+                <h3 className="text-sm font-semibold text-fg">{t("delete.titleOne", { name: deleteTarget.name })}</h3>
                 <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("delete.body")}</p>
               </div>
             </div>

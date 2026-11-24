@@ -267,6 +267,9 @@ app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 app.use(`${API_PREFIX}/chats`, chatRoutes);
+// ── Store editor (theme draft/publish) + custom pages ──
+app.use(`${API_PREFIX}/theme`, require("./routes/themeRoutes"));
+app.use(`${API_PREFIX}/pages`, require("./routes/pageRoutes"));
 // ── Super Admin module (separate namespace + auth) ──
 app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
 // ── Public seller application (pending-review queue) ──
@@ -353,6 +356,10 @@ const startServer = async () => {
     
     if (typeof bannerScheduler === 'function') bannerScheduler();
     else if (bannerScheduler?.start) bannerScheduler.start();
+
+    // 🧹 Store editor: unused theme images (nightly, 24h grace) — multi-instance par
+    // ek saath chale to bhi safe (unlink idempotent)
+    require("./utils/themeImageCleanup").start();
 
     // 📧 SMTP check (chalta rehta hai, par print nahi — extra info nahi chahiye)
     try {

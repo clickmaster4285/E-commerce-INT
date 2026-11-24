@@ -68,23 +68,23 @@ function BrandRow({ brand, items }) {
   const visible = items.slice(safeStart, safeStart + visibleCount);
 
   return (
-    <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 sm:p-4">
+    <div className="rounded-2xl border border-user-line bg-user-card p-3 sm:p-4">
       {/* Brand header */}
       <div className="mb-3 flex items-center gap-3">
-        <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
+        <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-user-line bg-user-hover p-1.5">
           <FallbackImage nextImage src={logo} alt={brandDisplayName} fill loader={smartImageLoader} sizes="40px" className="object-contain" />
         </span>
         <div className="min-w-0 flex-1">
-          <p title={brandDisplayName} className="truncate text-sm font-medium capitalize text-[var(--user-text)]">
+          <p title={brandDisplayName} className="truncate text-sm font-medium capitalize text-user-fg">
             {brandDisplayName}
           </p>
-          <p className="text-xs font-normal text-[var(--user-text-muted)]">
+          <p className="text-xs font-normal text-user-fg-muted">
             {t("cart.itemsCount", { count: brand.count })}
           </p>
         </div>
         <Link
           href={`/filtering-product?brand=${brandId}`}
-          className="group inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-[var(--user-text-secondary)] transition-colors duration-150 hover:text-[var(--user-accent)] focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+          className="group inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-user-fg-secondary transition-colors duration-150 hover:text-user-accent focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
         >
           {t("admin.brands.detail.viewAll")}
           <ArrowRight size={13} className={`transition-transform ${dir === "rtl" ? "rotate-180 group-hover:-translate-x-0.5" : "group-hover:translate-x-0.5"}`} />
@@ -134,7 +134,8 @@ function BrandRowData({ brand }) {
   return <BrandRow brand={brand} items={items} />;
 }
 
-export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading = false }) {
+// heading: store editor ka optional override (khali → default i18n title)
+export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading = false, heading = "" }) {
   const { t, dir } = useTranslation();
   // ✅ Top brands server counts se (>=6 wali), items per-brand query se
   const rows = useMemo(() => {
@@ -148,12 +149,12 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
   if (isLoading && !rows.length) {
     return (
       <section dir={dir}>
-        <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
+        <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-user-card" />
         <div className="space-y-3">
           {[...Array(2).keys()].map((index) => (
             <div
               key={index}
-              className="h-[16rem] animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+              className="h-[16rem] animate-pulse rounded-2xl border border-user-line bg-user-card"
             />
           ))}
         </div>
@@ -173,7 +174,7 @@ export default function BrandShowcase({ brands = [], brandCounts = {}, isLoading
       `}</style>
 
       <SectionHeading
-        title={t("header.topBrands")}
+        title={heading || t("header.topBrands")}
         subtitle={t("admin.brands.page.title")}
         href="/brands"
         linkLabel={t("common.all")}

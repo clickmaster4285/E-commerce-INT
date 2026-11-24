@@ -1640,6 +1640,8 @@
   "admin.manageStock.toast.updated": "Stock updated successfully",
   "admin.nav.item.attributes": "Attributes",
   "admin.nav.item.termsConditions": "Terms & Conditions",
+  "admin.nav.item.storeEditor": "Store Editor",
+  "admin.nav.item.pages": "Pages",
   "admin.nav.item.banners": "Banners",
   "admin.nav.item.brands": "Brands",
   "admin.nav.item.categories": "Categories",

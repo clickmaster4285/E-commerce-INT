@@ -59,8 +59,8 @@ export default function StoreAdminsPage() {
       key: "contact", header: "Contact",
       cell: (a) => (
         <div className="min-w-0 space-y-0.5 text-[12.5px]">
-          <p className="flex items-center gap-1.5 truncate text-[var(--text-primary)]"><Mail size={12} className="shrink-0 text-[var(--text-muted)]" aria-hidden="true" />{a.email}</p>
-          <p className="flex items-center gap-1.5 text-[var(--text-muted)]"><Phone size={12} className="shrink-0" aria-hidden="true" />{a.phone ? <span className="tabular-nums">{a.phone}</span> : "No phone"}</p>
+          <p className="flex items-center gap-1.5 truncate text-fg"><Mail size={12} className="shrink-0 text-fg-muted" aria-hidden="true" />{a.email}</p>
+          <p className="flex items-center gap-1.5 text-fg-muted"><Phone size={12} className="shrink-0" aria-hidden="true" />{a.phone ? <span className="tabular-nums">{a.phone}</span> : "No phone"}</p>
         </div>
       ),
     },
@@ -68,19 +68,19 @@ export default function StoreAdminsPage() {
       key: "store", header: "Store",
       cell: (a) => a.store ? (
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)]"><StoreIcon size={14} aria-hidden="true" /></span>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><StoreIcon size={14} aria-hidden="true" /></span>
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">{a.store.name}</p>
-            <p className="truncate text-[12px] text-[var(--text-muted)]">{a.store.subdomain ? `${a.store.subdomain}.…` : "No subdomain"}</p>
+            <p className="truncate text-[13px] font-medium text-fg">{a.store.name}</p>
+            <p className="truncate text-[12px] text-fg-muted">{a.store.subdomain ? `${a.store.subdomain}.…` : "No subdomain"}</p>
             {a.sellerPending && <Badge tone="warning" dot={false} className="mt-1 !h-[18px] !px-1.5 !text-[10px]">Pending approval</Badge>}
           </div>
         </div>
-      ) : <span className="text-[var(--text-muted)]">—</span>,
+      ) : <span className="text-fg-muted">—</span>,
     },
     {
       key: "role", header: "Role",
       cell: (a) => (
-        <span className="inline-flex items-center rounded-md bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
+        <span className="inline-flex items-center rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
           {a.role === "storehandler" ? "Owner" : "Admin"}
         </span>
       ),
@@ -88,7 +88,7 @@ export default function StoreAdminsPage() {
     { key: "status", header: "Status", cell: (a) => <StatusBadge value={a.sellerPending ? "pending" : a.status} /> },
     {
       key: "joined", header: "Joined", className: "whitespace-nowrap",
-      cell: (a) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(a.created_at)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(a.created_at)}</p></>),
+      cell: (a) => (<><p className="font-medium text-fg">{formatDate(a.created_at)}</p><p className="mt-0.5 text-[12px] text-fg-muted">{timeAgo(a.created_at)}</p></>),
     },
     {
       key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56, stopRowClick: true,
@@ -118,7 +118,7 @@ export default function StoreAdminsPage() {
         <Tabs label="Filter store admins" value={filter} onChange={(v) => { setFilter(v); setPage(1); }} items={FILTERS.map((f) => ({ value: f.value, label: f.label, count: counts[f.countKey] }))} />
         <CardToolbar>
           <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search by name, email or username..." label="Search store admins" />
-          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
+          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-fg-muted" aria-label="Refreshing" />}
         </CardToolbar>
         <DataTable
           columns={columns}

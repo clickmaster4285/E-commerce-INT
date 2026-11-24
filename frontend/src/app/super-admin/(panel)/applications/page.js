@@ -65,11 +65,11 @@ export default function ApplicationsPage() {
     { key: "store", header: "Store", cell: (r) => <EntityCell avatar={<Avatar name={r.store_name} shape="square" src={r.logo?.img_url ? assetUrl(r.logo.img_url) : undefined} />} primary={r.store_name || "—"} secondary={r.business_category || "No category"} maxWidth={220} /> },
     {
       key: "location", header: "Location", className: "whitespace-nowrap",
-      cell: (r) => (r.city || r.country ? <span className="inline-flex items-center gap-1.5"><MapPin size={13} className="text-[var(--text-muted)]" aria-hidden="true" />{[r.city, r.country].filter(Boolean).join(", ")}</span> : <span className="text-[var(--text-muted)]">—</span>),
+      cell: (r) => (r.city || r.country ? <span className="inline-flex items-center gap-1.5"><MapPin size={13} className="text-fg-muted" aria-hidden="true" />{[r.city, r.country].filter(Boolean).join(", ")}</span> : <span className="text-fg-muted">—</span>),
     },
     {
       key: "created", header: "Submitted", className: "whitespace-nowrap",
-      cell: (r) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(r.created_at)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(r.created_at)}</p></>),
+      cell: (r) => (<><p className="font-medium text-fg">{formatDate(r.created_at)}</p><p className="mt-0.5 text-[12px] text-fg-muted">{timeAgo(r.created_at)}</p></>),
     },
     { key: "status", header: "Status", cell: (r) => <StatusBadge value={r.status} /> },
     {
@@ -107,7 +107,7 @@ export default function ApplicationsPage() {
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
           </select>
-          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
+          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-fg-muted" aria-label="Refreshing" />}
         </CardToolbar>
 
         <DataTable

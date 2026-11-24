@@ -1102,7 +1102,7 @@ export default function StoreInfoPage() {
                   </div>
                   <div className="flex flex-col items-center px-4 py-5">
                     <div
-                      className={`w-full rounded-xl border-2 border-dashed p-4 text-center transition-all duration-200 ${isLogoDragOver ? "border-[var(--accent)] bg-[var(--accent-soft)]/10 scale-[1.01]" : "border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]/30"}`}
+                      className={`w-full rounded-xl border-2 border-dashed p-4 text-center transition-all duration-200 ${isLogoDragOver ? "border-accent bg-accent-soft/10 scale-[1.01]" : "border-line hover:border-accent hover:bg-subtle/30"}`}
                       onDragEnter={handleLogoDragEnter}
                       onDragOver={handleLogoDragOver}
                       onDragLeave={handleLogoDragLeave}

@@ -186,6 +186,7 @@ const fixPermissions = (oldPerms) => {
     categories: oldPerms?.categories ?? defaults.categories,
     profile: oldPerms?.profile ?? defaults.profile,
     store: oldPerms?.store ?? defaults.store,
+    storeEditor: oldPerms?.storeEditor ?? oldPerms?.store ?? defaults.storeEditor ?? true,
     discounts: oldPerms?.discounts ?? defaults.discounts,
     deals: oldPerms?.deals ?? defaults.deals,
     bundles: oldPerms?.bundles ?? defaults.bundles,

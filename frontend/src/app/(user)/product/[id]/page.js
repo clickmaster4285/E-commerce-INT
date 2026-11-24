@@ -186,16 +186,16 @@ function useStickyBar() {
 const Breadcrumb = memo(({ categoryId, categoryName, productName }) => {
   const { t } = useTranslation();
   return (
-    <nav className="flex items-center gap-1 text-xs text-[var(--user-text-muted)] flex-wrap py-3">
-      <Link href="/" className="text-[var(--user-accent)] hover:underline">{t("mobileNav.home")}</Link>
+    <nav className="flex items-center gap-1 text-xs text-user-fg-muted flex-wrap py-3">
+      <Link href="/" className="text-user-accent hover:underline">{t("mobileNav.home")}</Link>
       {categoryName && (
         <>
           <ChevronRight size={12} className="opacity-50" />
-          <Link href={`/?category=${categoryId}`} className="text-[var(--user-accent)] hover:underline">{categoryName}</Link>
+          <Link href={`/?category=${categoryId}`} className="text-user-accent hover:underline">{categoryName}</Link>
         </>
       )}
       <ChevronRight size={12} className="opacity-50" />
-      <span className="text-[var(--user-text-secondary)] truncate max-w-[12rem] sm:max-w-[24rem] lg:max-w-[32rem]">{productName}</span>
+      <span className="text-user-fg-secondary truncate max-w-[12rem] sm:max-w-[24rem] lg:max-w-[32rem]">{productName}</span>
     </nav>
   );
 });
@@ -220,8 +220,8 @@ function ReviewComment({ comment }) {
   if (!comment) return null;
   return (
     <div>
-      <p className={`whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-4"}`}>{comment}</p>
-      {comment.length > 220 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? t("admin.reviews.ui.readLess") : t("admin.reviews.ui.readMore")}</button>}
+      <p className={`whitespace-pre-line break-words text-sm leading-[1.6] text-user-fg-secondary ${expanded ? "" : "line-clamp-4"}`}>{comment}</p>
+      {comment.length > 220 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-user-accent hover:underline">{expanded ? t("admin.reviews.ui.readLess") : t("admin.reviews.ui.readMore")}</button>}
     </div>
   );
 }
@@ -379,7 +379,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
       <div className="product-gallery-main relative">
       <div
         ref={imageFrameRef}
-        className="group relative aspect-square cursor-crosshair overflow-hidden border border-[var(--user-border)] bg-white"
+        className="group relative aspect-square cursor-crosshair overflow-hidden border border-user-line bg-white"
         onClick={() => mainImage && onZoom(mainImage)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -396,15 +396,15 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
           className="object-contain"
         />
         {stock === 0 && (
-          <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">{t("admin.productDetail.page.outOfStock")}</span>
+          <span className="absolute top-3 left-3 bg-user-danger text-white text-[11px] font-bold px-2.5 py-1">{t("admin.productDetail.page.outOfStock")}</span>
         )}
         {stock > 0 && stock < 5 && (
-          <span className="absolute top-3 left-3 bg-[var(--user-danger)] text-white text-[11px] font-bold px-2.5 py-1">Only {stock} left</span>
+          <span className="absolute top-3 left-3 bg-user-danger text-white text-[11px] font-bold px-2.5 py-1">Only {stock} left</span>
         )}
         <div
           ref={lensRef}
           aria-hidden="true"
-          className={`product-image-zoom-lens pointer-events-none absolute left-0 top-0 z-20 h-28 w-28 border border-[var(--user-accent)]/70 bg-[rgba(245,114,36,0.2)] transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          className={`product-image-zoom-lens pointer-events-none absolute left-0 top-0 z-20 h-28 w-28 border border-user-accent/70 bg-[rgba(245,114,36,0.2)] transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
           style={{ transform: "translate3d(-200px, -200px, 0)" }}
         />
         {!hasHovered && mainImage ? (
@@ -418,7 +418,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
         <div
           ref={zoomPanelRef}
           aria-hidden="true"
-          className={`product-image-zoom-panel pointer-events-none absolute ${dir === "rtl" ? "right-full left-auto" : "left-full right-auto"} top-0 z-50 h-full w-[min(560px,45vw)] border border-[var(--user-border)] bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
+          className={`product-image-zoom-panel pointer-events-none absolute ${dir === "rtl" ? "right-full left-auto" : "left-full right-auto"} top-0 z-50 h-full w-[min(560px,45vw)] border border-user-line bg-white shadow-xl transition-opacity duration-150 ${zoomVisible ? "opacity-100" : "opacity-0"}`}
           style={{ backgroundImage: `url("${mainImage}")`, backgroundRepeat: "no-repeat" }}
         >
           {!zoomLoaded ? (
@@ -433,7 +433,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
             type="button"
             onClick={() => stepImage(-1)}
             aria-label={t("admin.productDetail.page.previousImage")}
-            className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
+            className="flex h-12 w-6 shrink-0 items-center justify-center text-user-fg-muted hover:text-user-accent"
           >
             <ChevronLeft size={18} />
           </button>
@@ -446,7 +446,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
                 onClick={() => onImageSelect(url)}
                 aria-label={t("admin.productDetail.page.productImageNumber", { number: i + 1 })}
                 aria-current={url === mainImage}
-                className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-[var(--user-accent)]" : "border-[var(--user-border)] opacity-80 hover:opacity-100"}`}
+                className={`h-12 w-12 shrink-0 overflow-hidden border bg-white ${url === mainImage ? "border-user-accent" : "border-user-line opacity-80 hover:opacity-100"}`}
               >
                 <FallbackImage src={url} alt={`${productName}, image ${i + 1}`} loading="lazy" className="h-full w-full object-contain" />
               </button>
@@ -456,7 +456,7 @@ const Gallery = memo(({ productName, mainImage, images, onImageSelect, stock, on
             type="button"
             onClick={() => stepImage(1)}
             aria-label={t("admin.productDetail.page.nextImage")}
-            className="flex h-12 w-6 shrink-0 items-center justify-center text-[var(--user-text-muted)] hover:text-[var(--user-accent)]"
+            className="flex h-12 w-6 shrink-0 items-center justify-center text-user-fg-muted hover:text-user-accent"
           >
             <ChevronRight size={18} />
           </button>
@@ -495,7 +495,7 @@ const DetailImages = memo(({ productName, images, onZoom }) => {
           ))}
         </div>
         {collapsed && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[var(--user-bg-card)] to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-user-card to-transparent" />
         )}
       </div>
       {hasMore && (
@@ -504,7 +504,7 @@ const DetailImages = memo(({ productName, images, onZoom }) => {
             type="button"
             onClick={() => setExpanded((e) => !e)}
             aria-expanded={expanded}
-            className="border border-[var(--user-accent)] px-8 py-2 text-sm font-medium uppercase text-[var(--user-accent)] transition hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)]"
+            className="border border-user-accent px-8 py-2 text-sm font-medium uppercase text-user-accent transition hover:bg-user-accent hover:text-user-accent-fg"
           >
             {expanded ? t("admin.productDetail.page.showLess") : `${t("admin.productDetail.page.showMore")} (${images.length - 1})`}
           </button>
@@ -519,17 +519,17 @@ const StickyBar = memo(({ show, name, price, qty, stock, onAdd, isAdded }) => {
   const { t } = useTranslation();
   if (!show) return null;
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl md:hidden" style={{ animation: "slideUp .25s ease" }}>
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-user-line bg-user-card shadow-2xl md:hidden" style={{ animation: "slideUp .25s ease" }}>
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[11px] text-[var(--user-text-muted)]">{name}</p>
-          <p className="text-base font-bold text-[var(--user-accent)]">Rs. {(price * qty).toLocaleString()}</p>
+          <p className="truncate text-[11px] text-user-fg-muted">{name}</p>
+          <p className="text-base font-bold text-user-accent">Rs. {(price * qty).toLocaleString()}</p>
         </div>
         <button
           type="button"
           onClick={onAdd}
           disabled={stock < 1}
-          className={`flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"}`}
+          className={`flex h-10 flex-1 items-center justify-center gap-1.5 text-xs font-bold disabled:opacity-40 ${isAdded ? "bg-user-success text-white" : "bg-user-accent text-user-accent-fg"}`}
         >
           {isAdded ? <Check size={14} /> : <ShoppingCart size={14} />}
           {stock < 1 ? t("admin.productDetail.page.outOfStock") : t("product.addToCart")}
@@ -613,17 +613,17 @@ Lightbox.displayName = "Lightbox";
 
 const LoadingState = () => (
   <div className="user-shell px-3 lg:px-8 py-4">
-    <div className="h-4 w-64 bg-[var(--user-bg-hover)] rounded animate-pulse mb-3" />
+    <div className="h-4 w-64 bg-user-hover rounded animate-pulse mb-3" />
     <div className="grid lg:grid-cols-12 gap-3">
-      <div className="lg:col-span-9 bg-[var(--user-bg-card)] p-4 grid md:grid-cols-2 gap-6">
-        <div className="aspect-square bg-[var(--user-bg-hover)] animate-pulse" />
+      <div className="lg:col-span-9 bg-user-card p-4 grid md:grid-cols-2 gap-6">
+        <div className="aspect-square bg-user-hover animate-pulse" />
         <div className="space-y-3">
-          <div className="h-5 w-3/4 bg-[var(--user-bg-hover)] rounded animate-pulse" />
-          <div className="h-8 w-1/2 bg-[var(--user-bg-hover)] rounded animate-pulse" />
-          <div className="h-11 w-full bg-[var(--user-bg-hover)] rounded animate-pulse" />
+          <div className="h-5 w-3/4 bg-user-hover rounded animate-pulse" />
+          <div className="h-8 w-1/2 bg-user-hover rounded animate-pulse" />
+          <div className="h-11 w-full bg-user-hover rounded animate-pulse" />
         </div>
       </div>
-      <div className="lg:col-span-3 bg-[var(--user-bg-card)] p-4 h-48 animate-pulse" />
+      <div className="lg:col-span-3 bg-user-card p-4 h-48 animate-pulse" />
     </div>
   </div>
 );
@@ -632,12 +632,12 @@ const ErrorState = ({ isError }) => {
   const { t } = useTranslation();
   return (
   <div className="user-shell px-4 py-16 text-center">
-    <div className="w-14 h-14 mx-auto bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-4">
-      <Package size={24} className="text-[var(--user-accent)]" />
+    <div className="w-14 h-14 mx-auto bg-user-card border border-user-line flex items-center justify-center mb-4">
+      <Package size={24} className="text-user-accent" />
     </div>
-    <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">{isError ? t("admin.shared.toast.loadFailed") : t("admin.productDetail.page.notFound")}</h1>
-    <p className="text-[var(--user-text-muted)] text-sm mb-6 max-w-sm mx-auto">{isError ? t("admin.dashboard.state.loadFailedBody") : t("admin.productDetail.page.notFoundBody")}</p>
-    <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 text-sm font-bold hover:opacity-90 transition">{t("mobileNav.home")}</Link>
+    <h1 className="text-lg font-bold text-user-fg mb-2">{isError ? t("admin.shared.toast.loadFailed") : t("admin.productDetail.page.notFound")}</h1>
+    <p className="text-user-fg-muted text-sm mb-6 max-w-sm mx-auto">{isError ? t("admin.dashboard.state.loadFailedBody") : t("admin.productDetail.page.notFoundBody")}</p>
+    <Link href="/" className="inline-flex items-center gap-2 bg-user-accent text-user-accent-fg px-6 py-2.5 text-sm font-bold hover:opacity-90 transition">{t("mobileNav.home")}</Link>
   </div>
   );
 };
@@ -839,7 +839,7 @@ function ProductDetailContent({ params }) {
   if (isError || !product) return <ErrorState isError={isError} />;
 
   return (
-    <main dir={dir} lang={locale} className="min-h-screen bg-[var(--user-bg-hover)] pb-16 md:pb-8">
+    <main dir={dir} lang={locale} className="min-h-screen bg-user-hover pb-16 md:pb-8">
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
       `}</style>
@@ -849,7 +849,7 @@ function ProductDetailContent({ params }) {
 
         {/* ===== Top card: gallery + info + sold-by (Daraz 3-col) ===== */}
         <div dir={dir} className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          <section className="bg-[var(--user-bg-card)] p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
+          <section className="bg-user-card p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
               <Gallery
                 productName={productName}
@@ -864,14 +864,14 @@ function ProductDetailContent({ params }) {
               <div className="min-w-0" ref={sentinelRef}>
                 {/* Flash sale — sirf real deal par */}
                 {isDealMode && matchedDeal && (
-                  <div className="mb-2 flex items-stretch justify-between border border-[var(--user-accent)]/30">
-                    <div className="flex items-center gap-2 bg-[var(--user-accent)] px-3 py-1.5">
-                      <Zap size={14} className="fill-[var(--user-accent-text)] text-[var(--user-accent-text)]" />
-                      <span className="text-xs font-black italic tracking-wide text-[var(--user-accent-text)]">{t("admin.deals.page.offer")}</span>
+                  <div className="mb-2 flex items-stretch justify-between border border-user-accent/30">
+                    <div className="flex items-center gap-2 bg-user-accent px-3 py-1.5">
+                      <Zap size={14} className="fill-user-accent-fg text-user-accent-fg" />
+                      <span className="text-xs font-black italic tracking-wide text-user-accent-fg">{t("admin.deals.page.offer")}</span>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--user-text-secondary)]">
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] text-user-fg-secondary">
                       {countdown ? (
-                        <span className="font-bold text-[var(--user-accent)] tabular-nums">{countdown}</span>
+                        <span className="font-bold text-user-accent tabular-nums">{countdown}</span>
                       ) : (
                         <span className="font-semibold">{fieldOf(matchedDeal, "name") || t("admin.deals.page.offer")}</span>
                       )}
@@ -879,25 +879,25 @@ function ProductDetailContent({ params }) {
                   </div>
                 )}
 
-                <h1 className="text-lg sm:text-xl font-normal leading-snug text-[var(--user-text)] break-words">{productName}</h1>
+                <h1 className="text-lg sm:text-xl font-normal leading-snug text-user-fg break-words">{productName}</h1>
 
                 {/* Rating + wishlist */}
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Stars value={ratingAvg} />
-                    <span className="text-xs text-[var(--user-accent)]">
+                    <span className="text-xs text-user-accent">
                       {ratingCount > 0 ? `${ratingAvg}/5 (${ratingCount} ${t("admin.reviews.page.rating")})` : t("admin.reviews.ui.noReviews")}
                     </span>
                     {myReview && (
                       <span className="text-xs font-bold text-amber-500">· {t("admin.reviews.page.rating")}: {myReview.rating}/5</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-[var(--user-text-muted)]">
+                  <div className="flex items-center gap-3 text-user-fg-muted">
                     <button
                       type="button"
                       onClick={() => productId && toggleWishlist(productId)}
                       aria-label={liked ? t("header.wishlist") : t("header.wishlist")}
-                      className={`${liked ? "text-[var(--user-accent)]" : ""} hover:text-[var(--user-accent)] transition-colors`}
+                      className={`${liked ? "text-user-accent" : ""} hover:text-user-accent transition-colors`}
                     >
                       <Heart size={17} fill={liked ? "currentColor" : "none"} />
                     </button>
@@ -906,45 +906,45 @@ function ProductDetailContent({ params }) {
 
                 {/* Brand row — real brand/category */}
                 {(brandName || categoryName) && (
-                  <p className="mt-2 text-xs text-[var(--user-text-muted)]">
+                  <p className="mt-2 text-xs text-user-fg-muted">
                     {brandName && (
-                      <>{t("admin.productDetail.page.brand")}: <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName}</Link></>
+                      <>{t("admin.productDetail.page.brand")}: <Link href={`/?brand=${brandId}`} className="text-user-accent hover:underline">{brandName}</Link></>
                     )}
-                    {brandName && categoryName && <span className="mx-1.5 text-[var(--user-text-subtle)]">|</span>}
+                    {brandName && categoryName && <span className="mx-1.5 text-user-fg-subtle">|</span>}
                     {categoryName && (
-                      <>{t("admin.productDetail.page.category")}: {categoryName} · <Link href={`/?brand=${brandId}`} className="text-[var(--user-accent)] hover:underline">{brandName || storeName}</Link></>
+                      <>{t("admin.productDetail.page.category")}: {categoryName} · <Link href={`/?brand=${brandId}`} className="text-user-accent hover:underline">{brandName || storeName}</Link></>
                     )}
                   </p>
                 )}
 
-                <div className="my-3 border-t border-[var(--user-border)]" />
+                <div className="my-3 border-t border-user-line" />
 
                 {/* Price — real */}
                 <div>
-                  <p className="text-3xl font-medium text-[var(--user-accent)]">Rs. {activePrice.toLocaleString()}</p>
+                  <p className="text-3xl font-medium text-user-accent">Rs. {activePrice.toLocaleString()}</p>
                   {activeHasDiscount && activeOriginalPrice > activePrice && (
-                    <p className="mt-1 text-xs text-[var(--user-text-muted)]">
+                    <p className="mt-1 text-xs text-user-fg-muted">
                       <span className="line-through">Rs. {activeOriginalPrice.toLocaleString()}</span>
-                      <span className="ml-1.5 font-semibold text-[var(--user-text)]">-{discountPct}%</span>
+                      <span className="ml-1.5 font-semibold text-user-fg">-{discountPct}%</span>
                     </p>
                   )}
                 </div>
 
                 {/* Purchase options — 1) Regular (original + admin discount)  2) Deals dropdown */}
                 {hasDeal && (
-                  <div className="mt-3 border border-[var(--user-border)]">
+                  <div className="mt-3 border border-user-line">
                     {/* Option 1 — Regular */}
                     <button
                       type="button"
                       onClick={() => { userSelectedModeRef.current = true; setPurchaseMode("regular"); }}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${!isDealMode ? "bg-[var(--user-accent)]/5" : "hover:bg-[var(--user-bg-hover)]"}`}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${!isDealMode ? "bg-user-accent/5" : "hover:bg-user-hover"}`}
                     >
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${!isDealMode ? "border-[var(--user-accent)]" : "border-[var(--user-text-subtle)]"}`}>
-                        {!isDealMode && <span className="h-2 w-2 rounded-full bg-[var(--user-accent)]" />}
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${!isDealMode ? "border-user-accent" : "border-user-fg-subtle"}`}>
+                        {!isDealMode && <span className="h-2 w-2 rounded-full bg-user-accent" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-bold text-[var(--user-text)]">{t("admin.productDetail.page.sellingPrice")}</span>
-                        <span className="flex items-center gap-1 text-[11px] text-[var(--user-text-muted)]">
+                        <span className="block text-xs font-bold text-user-fg">{t("admin.productDetail.page.sellingPrice")}</span>
+                        <span className="flex items-center gap-1 text-[11px] text-user-fg-muted">
                           <Tag size={11} />
                           {regularHasDiscount && regularDisc.discountName
                             ? fieldOf(regularDisc.matchedDeal, "name") || regularDisc.discountName
@@ -952,9 +952,9 @@ function ProductDetailContent({ params }) {
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className="block text-sm font-bold text-[var(--user-text)]">Rs. {regularPrice.toLocaleString()}</span>
+                        <span className="block text-sm font-bold text-user-fg">Rs. {regularPrice.toLocaleString()}</span>
                         {regularHasDiscount && regularOriginalPrice > regularPrice && (
-                          <span className="block text-[11px] text-[var(--user-text-muted)] line-through">Rs. {regularOriginalPrice.toLocaleString()}</span>
+                          <span className="block text-[11px] text-user-fg-muted line-through">Rs. {regularOriginalPrice.toLocaleString()}</span>
                         )}
                       </span>
                     </button>
@@ -971,26 +971,26 @@ function ProductDetailContent({ params }) {
                           setDealsOpen((o) => !o);
                         }
                       }}
-                      className={`flex w-full items-center gap-2.5 border-t border-[var(--user-border)] px-3 py-2.5 text-left transition-colors ${isDealMode ? "bg-[var(--user-accent)]/5" : "hover:bg-[var(--user-bg-hover)]"}`}
+                      className={`flex w-full items-center gap-2.5 border-t border-user-line px-3 py-2.5 text-left transition-colors ${isDealMode ? "bg-user-accent/5" : "hover:bg-user-hover"}`}
                     >
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${isDealMode ? "border-[var(--user-accent)]" : "border-[var(--user-text-subtle)]"}`}>
-                        {isDealMode && <span className="h-2 w-2 rounded-full bg-[var(--user-accent)]" />}
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${isDealMode ? "border-user-accent" : "border-user-fg-subtle"}`}>
+                        {isDealMode && <span className="h-2 w-2 rounded-full bg-user-accent" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--user-text)]">
-                          <Sparkles size={12} className="text-[var(--user-accent)]" /> {t("admin.deals.page.offer")}
-                          <span className="bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[10px] font-bold text-[var(--user-accent)] tabular-nums">{allDeals.length}</span>
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-user-fg">
+                          <Sparkles size={12} className="text-user-accent" /> {t("admin.deals.page.offer")}
+                          <span className="bg-user-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-user-accent tabular-nums">{allDeals.length}</span>
                         </span>
-                        <span className="block text-[11px] text-[var(--user-text-muted)]">
+                        <span className="block text-[11px] text-user-fg-muted">
                           {isDealMode && matchedDeal ? (fieldOf(matchedDeal, "name") || getDealBadgeText(matchedDeal, t) || t("admin.deals.page.deal")) : t("admin.deals.page.deal")}
                         </span>
                       </span>
-                      <ChevronDown size={15} className={`shrink-0 text-[var(--user-text-muted)] transition-transform ${dealsOpen ? "rotate-180" : ""}`} />
+                      <ChevronDown size={15} className={`shrink-0 text-user-fg-muted transition-transform ${dealsOpen ? "rotate-180" : ""}`} />
                     </button>
 
                     {/* Dropdown — is product par lagi tamam real deals */}
                     {dealsOpen && (
-                      <div className="border-t border-[var(--user-border)]">
+                      <div className="border-t border-user-line">
                         <div className="max-h-44 space-y-1 overflow-y-auto p-2">
                           {allDeals.map((d) => {
                             const sel = isDealMode && String(d._id) === String(selectedDealId);
@@ -1005,17 +1005,17 @@ function ProductDetailContent({ params }) {
                                   setSelectedDealId(d._id);
                                   setPurchaseMode("deal");
                                 }}
-                                className={`flex w-full items-center gap-2 border px-2.5 py-2 text-left text-xs transition-colors ${sel ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/50"}`}
+                                className={`flex w-full items-center gap-2 border px-2.5 py-2 text-left text-xs transition-colors ${sel ? "border-user-accent bg-user-accent/5" : "border-user-line hover:border-user-accent/50"}`}
                               >
-                                <Sparkles size={13} className="shrink-0 text-[var(--user-accent)]" />
+                                <Sparkles size={13} className="shrink-0 text-user-accent" />
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate font-semibold text-[var(--user-text)]">{fieldOf(d, "name") || getDealBadgeText(d, t) || t("admin.deals.page.deal")}</span>
-                                  <span className="block text-[11px] text-[var(--user-text-muted)]">
+                                  <span className="block truncate font-semibold text-user-fg">{fieldOf(d, "name") || getDealBadgeText(d, t) || t("admin.deals.page.deal")}</span>
+                                  <span className="block text-[11px] text-user-fg-muted">
                                     Rs. {dd.discountedPrice.toLocaleString()}
-                                    {saveAmt > 0 && <span className="ml-1.5 font-semibold text-[var(--user-success)]">{t("common.save")} Rs. {saveAmt.toLocaleString()}</span>}
+                                    {saveAmt > 0 && <span className="ml-1.5 font-semibold text-user-success">{t("common.save")} Rs. {saveAmt.toLocaleString()}</span>}
                                   </span>
                                 </span>
-                                {sel && <Check size={14} className="shrink-0 text-[var(--user-accent)]" />}
+                                {sel && <Check size={14} className="shrink-0 text-user-accent" />}
                               </button>
                             );
                           })}
@@ -1028,8 +1028,8 @@ function ProductDetailContent({ params }) {
                 {/* Variant selector — real variants */}
                 {variants.length > 1 && (
                   <div className="mt-4">
-                    <p className="text-xs text-[var(--user-text-muted)]">
-                      {variantAttrName || t("admin.productDetail.page.selectOption")}: <span className="text-[var(--user-text)]">{fieldOf(currentVariant, "title") || currentVariant?.sku || `${t("admin.productDetail.page.selectOption")} ${variantIndex + 1}`}</span>
+                    <p className="text-xs text-user-fg-muted">
+                      {variantAttrName || t("admin.productDetail.page.selectOption")}: <span className="text-user-fg">{fieldOf(currentVariant, "title") || currentVariant?.sku || `${t("admin.productDetail.page.selectOption")} ${variantIndex + 1}`}</span>
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {variants.map((variant, index) => {
@@ -1043,7 +1043,7 @@ function ProductDetailContent({ params }) {
                             onClick={() => selectVariant(index)}
                             disabled={unavailable}
                             title={fieldOf(variant, "title") || variant.sku || `${t("admin.productDetail.page.selectOption")} ${index + 1}`}
-                            className={`flex h-11 min-w-11 items-center justify-center gap-2 border px-1.5 text-xs ${selected ? "border-[var(--user-accent)] ring-1 ring-[var(--user-accent)]" : "border-[var(--user-border)] hover:border-[var(--user-accent)]/60"} ${unavailable ? "cursor-not-allowed opacity-40" : ""}`}
+                            className={`flex h-11 min-w-11 items-center justify-center gap-2 border px-1.5 text-xs ${selected ? "border-user-accent ring-1 ring-user-accent" : "border-user-line hover:border-user-accent/60"} ${unavailable ? "cursor-not-allowed opacity-40" : ""}`}
                           >
                             <FallbackImage src={image} alt="" className="h-9 w-9 object-contain" loading="lazy" />
                           </button>
@@ -1072,8 +1072,8 @@ function ProductDetailContent({ params }) {
                         <Clock3 size={17} aria-hidden="true" />
                       </span>
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-[var(--user-text)]">{t("admin.productDetail.page.expiryAfterDelivery")}</p>
-                        <p className="mt-1 text-sm font-medium text-[var(--user-text)]">
+                        <p className="text-xs font-semibold text-user-fg">{t("admin.productDetail.page.expiryAfterDelivery")}</p>
+                        <p className="mt-1 text-sm font-medium text-user-fg">
                           {t("admin.productDetail.page.expiryAfterDeliveryNotice", { duration: expiryDuration, unit: expiryUnitLabel })}
                         </p>
                       </div>
@@ -1083,28 +1083,28 @@ function ProductDetailContent({ params }) {
 
                 {/* Quantity — real stock */}
                 <div className="mt-4 flex items-center gap-4">
-                  <span className="text-xs text-[var(--user-text-muted)]">{t("admin.productDetail.page.quantity")}</span>
+                  <span className="text-xs text-user-fg-muted">{t("admin.productDetail.page.quantity")}</span>
                   <div className="flex items-center">
                     <button
                       onClick={decrement}
                       disabled={quantity <= 1}
-                      className="flex h-7 w-7 items-center justify-center bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] hover:text-[var(--user-accent)] disabled:opacity-40"
+                      className="flex h-7 w-7 items-center justify-center bg-user-hover text-user-fg-muted hover:text-user-accent disabled:opacity-40"
                       aria-label={t("admin.productDetail.page.quantity")}
                     >
                       <Minus size={13} />
                     </button>
-                    <span className="w-10 text-center text-sm text-[var(--user-text)] tabular-nums">{quantity}</span>
+                    <span className="w-10 text-center text-sm text-user-fg tabular-nums">{quantity}</span>
                     <button
                       onClick={increment}
                       disabled={quantity >= Math.max(stock, 1)}
-                      className="flex h-7 w-7 items-center justify-center bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] hover:text-[var(--user-accent)] disabled:opacity-40"
+                      className="flex h-7 w-7 items-center justify-center bg-user-hover text-user-fg-muted hover:text-user-accent disabled:opacity-40"
                       aria-label={t("admin.productDetail.page.quantity")}
                     >
                       <Plus size={13} />
                     </button>
                   </div>
                   {stock < 1 ? (
-                    <span className="text-xs font-semibold text-[var(--user-accent)]">{t("admin.productDetail.page.outOfStock")}</span>
+                    <span className="text-xs font-semibold text-user-accent">{t("admin.productDetail.page.outOfStock")}</span>
                   ) : null}
                 </div>
 
@@ -1113,14 +1113,14 @@ function ProductDetailContent({ params }) {
                   <button
                     onClick={handleBuy}
                     disabled={stock < 1}
-                    className="flex h-11 items-center justify-center gap-1.5 border-2 border-[var(--user-accent)] text-sm font-medium text-[var(--user-accent)] hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] active:scale-[0.99] transition disabled:opacity-40"
+                    className="flex h-11 items-center justify-center gap-1.5 border-2 border-user-accent text-sm font-medium text-user-accent hover:bg-user-accent hover:text-user-accent-fg active:scale-[0.99] transition disabled:opacity-40"
                   >
                     {t("product.buyNow")}
                   </button>
                   <button
                     onClick={handleAdd}
                     disabled={stock < 1}
-                    className={`flex h-11 items-center justify-center gap-1.5 text-sm font-medium active:scale-[0.99] transition disabled:opacity-40 ${isAdded ? "bg-[var(--user-success)] text-white" : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:opacity-90"}`}
+                    className={`flex h-11 items-center justify-center gap-1.5 text-sm font-medium active:scale-[0.99] transition disabled:opacity-40 ${isAdded ? "bg-user-success text-white" : "bg-user-accent text-user-accent-fg hover:opacity-90"}`}
                   >
                     {isAdded ? <Check size={15} /> : null}
                     {stock < 1 ? t("admin.productDetail.page.outOfStock") : t("product.addToCart")}
@@ -1133,33 +1133,33 @@ function ProductDetailContent({ params }) {
 
           {/* ===== Right sidebar — sirf real data (no fake fees/location) ===== */}
           <aside className="space-y-3 lg:col-span-3 xl:col-span-2">
-            <div className="bg-[var(--user-bg-card)]">
-              <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">{t("common.brand")}</p>
+            <div className="bg-user-card">
+              <p className="border-b border-user-line px-3 py-2.5 text-xs font-semibold text-user-fg-muted">{t("common.brand")}</p>
               <div className="px-3 py-3">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center bg-[var(--user-accent)]/10">
-                    <Store size={17} className="text-[var(--user-accent)]" />
+                  <span className="flex h-9 w-9 items-center justify-center bg-user-accent/10">
+                    <Store size={17} className="text-user-accent" />
                   </span>
-                  {storeName && <p className="text-sm font-semibold text-[var(--user-text)]">{storeName}</p>}
+                  {storeName && <p className="text-sm font-semibold text-user-fg">{storeName}</p>}
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs">
-                  <ShieldCheck size={14} className={stock > 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"} />
+                  <ShieldCheck size={14} className={stock > 0 ? "text-user-success" : "text-user-fg-muted"} />
                   {stock > 0 ? (
-                    <span className="text-[var(--user-text-secondary)]">{t("admin.productDetail.page.inStock")}</span>
+                    <span className="text-user-fg-secondary">{t("admin.productDetail.page.inStock")}</span>
                   ) : (
-                    <span className="text-[var(--user-accent)] font-semibold">{t("admin.productDetail.page.outOfStock")}</span>
+                    <span className="text-user-accent font-semibold">{t("admin.productDetail.page.outOfStock")}</span>
                   )}
                 </div>
               </div>
             </div>
 
             {specEntries.length > 0 && (
-              <div className="hidden bg-[var(--user-bg-card)] lg:block">
-                <p className="border-b border-[var(--user-border)] px-3 py-2.5 text-xs font-semibold text-[var(--user-text-muted)]">{t("admin.productDetail.page.quickInfo")}</p>
+              <div className="hidden bg-user-card lg:block">
+                <p className="border-b border-user-line px-3 py-2.5 text-xs font-semibold text-user-fg-muted">{t("admin.productDetail.page.quickInfo")}</p>
                 <ul className="space-y-1.5 px-3 py-3">
                   {specEntries.slice(0, 4).map(([k, v]) => (
-                    <li key={k} className="text-xs text-[var(--user-text-secondary)]">
-                      <span className="font-semibold capitalize text-[var(--user-text)]">{k}: </span>{v}
+                    <li key={k} className="text-xs text-user-fg-secondary">
+                      <span className="font-semibold capitalize text-user-fg">{k}: </span>{v}
                     </li>
                   ))}
                 </ul>
@@ -1170,16 +1170,16 @@ function ProductDetailContent({ params }) {
 
         {/* ===== Product details — real description ===== */}
         {(shortDescription || fullDescription || productDescriptionOf(currentVariant)) && (
-          <section className="mt-3 bg-[var(--user-bg-card)]">
-            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+          <section className="mt-3 bg-user-card">
+            <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
               {t("admin.productDetail.page.productDetails")}: {shortDescription || productName}
             </h2>
-            <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-[var(--user-text)]">
+            <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-user-fg">
               {shortDescription && <p className="font-medium">{shortDescription}</p>}
-              {fullDescription && <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">{fullDescription}</p>}
+              {fullDescription && <p className="whitespace-pre-line break-words text-user-fg-secondary">{fullDescription}</p>}
               {productDescriptionOf(currentVariant) && (
-                <p className="whitespace-pre-line break-words text-[var(--user-text-secondary)]">
-                  <span className="font-semibold text-[var(--user-text)]">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
+                <p className="whitespace-pre-line break-words text-user-fg-secondary">
+                  <span className="font-semibold text-user-fg">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
                   {productDescriptionOf(currentVariant)}
                 </p>
               )}
@@ -1188,44 +1188,44 @@ function ProductDetailContent({ params }) {
         )}
 
         {/* ===== Specifications — sirf real fields ===== */}
-        <section className="mt-3 bg-[var(--user-bg-card)]">
-          <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+        <section className="mt-3 bg-user-card">
+          <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
             {t("admin.productDetail.page.attributes")}: {productName}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 px-3 sm:px-4 py-2">
             {brandName && (
-              <div className="border-b border-[var(--user-border)] py-3">
-                <p className="text-xs text-[var(--user-text-muted)]">{t("admin.productDetail.page.brand")}</p>
-                <p className="mt-0.5 text-sm text-[var(--user-text)]">{brandName}</p>
+              <div className="border-b border-user-line py-3">
+                <p className="text-xs text-user-fg-muted">{t("admin.productDetail.page.brand")}</p>
+                <p className="mt-0.5 text-sm text-user-fg">{brandName}</p>
               </div>
             )}
             {currentVariant?.sku && (
-              <div className="border-b border-[var(--user-border)] py-3">
-                <p className="text-xs text-[var(--user-text-muted)]">SKU</p>
-                <p className="mt-0.5 text-sm text-[var(--user-text)] break-all">{currentVariant.sku}</p>
+              <div className="border-b border-user-line py-3">
+                <p className="text-xs text-user-fg-muted">SKU</p>
+                <p className="mt-0.5 text-sm text-user-fg break-all">{currentVariant.sku}</p>
               </div>
             )}
             {specEntries.map(([k, v]) => (
-              <div key={k} className="border-b border-[var(--user-border)] py-3">
-                <p className="text-xs capitalize text-[var(--user-text-muted)]">{k}</p>
-                <p className="mt-0.5 text-sm text-[var(--user-text)] break-words">{v}</p>
+              <div key={k} className="border-b border-user-line py-3">
+                <p className="text-xs capitalize text-user-fg-muted">{k}</p>
+                <p className="mt-0.5 text-sm text-user-fg break-words">{v}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* ===== Ratings & Reviews — real summary + real reviews ===== */}
-        <section className="mt-3 bg-[var(--user-bg-card)]">
-          <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+        <section className="mt-3 bg-user-card">
+          <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
             {t("admin.reviews.page.rating")} &amp; {t("admin.nav.item.reviews")}: {productName}
           </h2>
           <div className="grid grid-cols-1 gap-6 px-3 sm:px-4 py-5 md:grid-cols-[12rem_1fr]">
             <div>
-              <p className="text-4xl font-medium text-[var(--user-text)]">
-                {ratingAvg}<span className="text-lg text-[var(--user-text-muted)]">/5</span>
+              <p className="text-4xl font-medium text-user-fg">
+                {ratingAvg}<span className="text-lg text-user-fg-muted">/5</span>
               </p>
               <div className="mt-2"><Stars value={ratingAvg} size={16} /></div>
-              <p className="mt-2 text-xs text-[var(--user-text-muted)]">{ratingCount} {t("admin.reviews.page.rating")}</p>
+              <p className="mt-2 text-xs text-user-fg-muted">{ratingCount} {t("admin.reviews.page.rating")}</p>
             </div>
             <div className="max-w-md space-y-1.5">
               {[5, 4, 3, 2, 1].map((star) => {
@@ -1234,24 +1234,24 @@ function ProductDetailContent({ params }) {
                 return (
                   <div key={star} className="flex items-center gap-2 text-xs">
                     <span className="w-14 shrink-0"><Stars value={star} size={11} /></span>
-                    <span className="h-2.5 flex-1 bg-[var(--user-bg-hover)]">
+                    <span className="h-2.5 flex-1 bg-user-hover">
                       <span className="block h-full bg-[#faca51]" style={{ width: `${pct}%` }} />
                     </span>
-                    <span className="w-6 shrink-0 text-right text-[var(--user-text-muted)] tabular-nums">{c}</span>
+                    <span className="w-6 shrink-0 text-right text-user-fg-muted tabular-nums">{c}</span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="border-t border-[var(--user-border)] px-3 sm:px-4 py-5">
+          <div className="border-t border-user-line px-3 sm:px-4 py-5">
             {myReview && (
               <div className="mb-4">
                 <ProductRating productId={productId} productName={productName} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
               </div>
             )}
             {reviewsToDisplay.length > 0 ? (
-              <ul className="divide-y divide-[var(--user-border)]">
+              <ul className="divide-y divide-user-line">
                 {reviewsToDisplay.map((r) => {
                   const reviewerName = r.user_id?.name || t("common.customer");
                   const localizedResponse = r.storeResponse?.message
@@ -1263,19 +1263,19 @@ function ProductDetailContent({ params }) {
                   return (
                     <li key={r._id} className="py-3 first:pt-0 last:pb-0">
                       <div className="flex items-start gap-3">
-                        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text-secondary)] ring-1 ring-[var(--user-border)]">
+                        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-user-hover text-sm font-semibold text-user-fg-secondary ring-1 ring-user-line">
                           {reviewerName.trim().charAt(0).toUpperCase() || "C"}
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                              <p className="text-sm font-semibold text-[var(--user-text)]">{reviewerName}</p>
-                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Check size={12} strokeWidth={2.5} /> {t("admin.reviews.ui.customer")}</span>}
+                              <p className="text-sm font-semibold text-user-fg">{reviewerName}</p>
+                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-user-success"><Check size={12} strokeWidth={2.5} /> {t("admin.reviews.ui.customer")}</span>}
                             </div>
-                            {reviewDate && <time className="text-xs text-[var(--user-text-muted)]">{reviewDate}</time>}
+                            {reviewDate && <time className="text-xs text-user-fg-muted">{reviewDate}</time>}
                           </div>
                           <div className="mt-2"><Stars value={r.rating} size={15} /></div>
-                          <p className="mt-1.5 text-base font-semibold text-[var(--user-text)]">{reviewTextOf(r, "title") || `${r.rating}/5`}</p>
+                          <p className="mt-1.5 text-base font-semibold text-user-fg">{reviewTextOf(r, "title") || `${r.rating}/5`}</p>
                           {r.comment && <div className="mt-1"><ReviewComment comment={reviewTextOf(r, "comment")} /></div>}
                           {(r.images?.length > 0 || r.videos?.length > 0) && <div className="mt-3"><ReviewMediaGallery images={r.images} videos={r.videos} /></div>}
                           {localizedResponse?.message && <div className="mt-3"><StoreResponse response={localizedResponse} /></div>}
@@ -1287,7 +1287,7 @@ function ProductDetailContent({ params }) {
               </ul>
             ) : !myReview ? (
               <div className="py-6 text-center">
-                <p className="text-sm text-[var(--user-text-muted)]">{t("admin.reviews.ui.noReviews")}</p>
+                <p className="text-sm text-user-fg-muted">{t("admin.reviews.ui.noReviews")}</p>
               </div>
             ) : null}
           </div>
@@ -1295,8 +1295,8 @@ function ProductDetailContent({ params }) {
 
         {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
         {allImages.length > 0 && (
-          <section className="mt-3 bg-[var(--user-bg-card)]">
-            <h2 className="border-b border-[var(--user-border)] px-3 sm:px-4 py-3 text-sm font-bold text-[var(--user-text)]">
+          <section className="mt-3 bg-user-card">
+            <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
               {t("admin.productDetail.page.productImages")}: {productName}
             </h2>
             <div className="px-3 sm:px-4 py-4">
@@ -1308,20 +1308,20 @@ function ProductDetailContent({ params }) {
         {/* ===== You may also like — real related ===== */}
         {related.length > 0 && (
           <section className="mt-6">
-            <h2 className="mb-3 text-base font-bold text-[var(--user-text)]">{t("admin.brands.detail.relatedProducts")}</h2>
+            <h2 className="mb-3 text-base font-bold text-user-fg">{t("admin.brands.detail.relatedProducts")}</h2>
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
               {related.slice(0, 10).map((p) => {
                 const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
                 const price = p?.variants?.[0]?.selling_price ?? p?.selling_price ?? p?.price;
                 const relatedName = productNameOf(p) || p?.name || "";
                 return (
-                  <Link key={p._id} href={`/product/${p._id}`} className="group bg-[var(--user-bg-card)] hover:shadow-lg transition-shadow">
+                  <Link key={p._id} href={`/product/${p._id}`} className="group bg-user-card hover:shadow-lg transition-shadow">
                     <div className="relative aspect-square overflow-hidden bg-white">
                       <FallbackImage src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
                     </div>
                     <div className="p-2.5">
-                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-[var(--user-text)]">{relatedName}</p>
-                      {price != null && <p className="mt-1.5 text-sm font-medium text-[var(--user-accent)]">Rs. {toNum(price).toLocaleString()}</p>}
+                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-user-fg">{relatedName}</p>
+                      {price != null && <p className="mt-1.5 text-sm font-medium text-user-accent">Rs. {toNum(price).toLocaleString()}</p>}
                       <div className="mt-1"><Stars value={0} size={10} /></div>
                     </div>
                   </Link>

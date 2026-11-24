@@ -490,7 +490,7 @@ function NewPOPage() {
   return (
     <div className="space-y-4">
       <div className="flex min-w-0 items-start gap-3">
-        <button type="button" onClick={() => router.push("/admin/purchase-orders")} aria-label={t("admin.purchaseOrders.page.title")} title={t("admin.purchaseOrders.page.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-[var(--bg-row-hover)]" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></button>
+        <button type="button" onClick={() => router.push("/admin/purchase-orders")} aria-label={t("admin.purchaseOrders.page.title")} title={t("admin.purchaseOrders.page.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-row-hover" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></button>
         <div className="min-w-0 flex-1"><AdminPageHeader title={t(editId ? "admin.purchaseOrders.create.editHeading" : "admin.purchaseOrders.create.heading")} subtitle={t(editId ? "admin.purchaseOrders.create.editSubtitle" : "admin.purchaseOrders.create.subtitle")} /></div>
       </div>
       <div className="grid gap-4 items-start xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -520,7 +520,7 @@ function NewPOPage() {
                     </div>
                     <div className="max-h-[240px] overflow-x-hidden overflow-y-auto py-1 px-2">
                       {vendorOptions.map((v) => (
-                        <button key={v._id} type="button" onClick={() => { setVendorId(v._id); setVendorOpen(false); setVendorSearch(""); pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: v.name })); }} className="w-full px-3 py-2.5 text-start text-[13px] transition-colors hover:bg-[var(--bg-row-hover)]" style={{ backgroundColor: v._id === vendorId ? "var(--accent-soft)" : "transparent" }}>
+                        <button key={v._id} type="button" onClick={() => { setVendorId(v._id); setVendorOpen(false); setVendorSearch(""); pushEvent(t("admin.purchaseOrders.create.event.vendorSelected", { name: v.name })); }} className="w-full px-3 py-2.5 text-start text-[13px] transition-colors hover:bg-row-hover" style={{ backgroundColor: v._id === vendorId ? "var(--accent-soft)" : "transparent" }}>
                           <div className="font-bold text-sm" style={{ color: v._id === vendorId ? "var(--accent)" : "var(--text-primary)" }}>{vendorNameOf(v)} <span className="font-mono font-normal text-[11px]" style={{ color: "var(--text-secondary)" }}>{v.vendor_code}</span></div>
                           <div className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>{[vendorCompanyOf(v), localizedStrictField(v.city, v.translations?.city, locale)].filter(Boolean).join(" · ")}</div>
                         </button>
@@ -528,7 +528,7 @@ function NewPOPage() {
                       {!vendorOptions.length && <p className="px-4 py-6 text-center text-sm font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.create.noVendor")}</p>}
                     </div>
                     <div className="border-t p-2" style={{ borderColor: "var(--border-color)" }}>
-                      <button type="button" onClick={() => { setVendorForm({ ...emptyVendorForm, country: "Pakistan" }); setVendorFormOpen(true); setVendorOpen(false); setVendorSearch(""); }} className="w-full h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:bg-[var(--bg-row-hover)]" style={{ color: "var(--accent)" }}>
+                      <button type="button" onClick={() => { setVendorForm({ ...emptyVendorForm, country: "Pakistan" }); setVendorFormOpen(true); setVendorOpen(false); setVendorSearch(""); }} className="w-full h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition hover:bg-row-hover" style={{ color: "var(--accent)" }}>
                         <Plus size={15} /> {t("admin.purchaseOrders.create.addVendor")}
                       </button>
                     </div>
@@ -818,7 +818,7 @@ function NewPOPage() {
                   const ticked = checkedProducts[String(g.product_id)] === true;
                   const stock = g.variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0);
                   return (
-                    <label key={g.product_id} className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-[var(--bg-row-hover)]" style={{ background: ticked ? "var(--accent-soft)" : "var(--bg-card)", borderColor: ticked ? "var(--accent)" : "var(--border-color)" }}>
+                    <label key={g.product_id} className="flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-row-hover" style={{ background: ticked ? "var(--accent-soft)" : "var(--bg-card)", borderColor: ticked ? "var(--accent)" : "var(--border-color)" }}>
                       <input type="checkbox" checked={ticked} onChange={(e) => setCheckedProducts((p) => ({ ...p, [String(g.product_id)]: e.target.checked }))} className="h-4 w-4 shrink-0 cursor-pointer rounded" style={{ accentColor: "var(--accent)" }} />
                       <Thumb src={g.image} alt={g.product_name} size="w-12 h-12" />
                       <div className="min-w-0 flex-1">
@@ -831,7 +831,7 @@ function NewPOPage() {
               {!stockLoading && !pickerRows.length && <div className="p-8 text-center"><div className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.purchaseOrders.create.noProductsMatch")}</div><div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>{t("admin.purchaseOrders.create.adjustFilters")}</div></div>}
             </div>
             <div className="px-4 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
-              <button onClick={() => setQcOpen(true)} className="w-full h-9 rounded-lg text-[13px] font-medium flex items-center justify-center gap-2 transition-colors hover:bg-[var(--bg-row-hover)]" style={{ background: "var(--bg-card)", color: "var(--accent)" }}><Plus size={15} /> {t("admin.purchaseOrders.create.createNewProduct")}</button>
+              <button onClick={() => setQcOpen(true)} className="w-full h-9 rounded-lg text-[13px] font-medium flex items-center justify-center gap-2 transition-colors hover:bg-row-hover" style={{ background: "var(--bg-card)", color: "var(--accent)" }}><Plus size={15} /> {t("admin.purchaseOrders.create.createNewProduct")}</button>
             </div>
             <div className="px-4 py-3 flex items-center justify-between text-xs font-medium" style={{ borderTop: "1px solid var(--border-color)", background: "var(--bg-card)", color: "var(--text-secondary)" }}>
               <span>{t("admin.purchaseOrders.create.pickerPage", { page: safePickerPage, pages: pickerPages, products: pickerFiltered.length, selected: tickedProducts })}</span>
@@ -839,7 +839,7 @@ function NewPOPage() {
                 <button disabled={safePickerPage <= 1} onClick={() => setPickerPage((p) => p - 1)} className="h-9 px-3 rounded-lg text-xs font-extrabold transition-all duration-200 hover:shadow-md disabled:opacity-30" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.purchaseOrders.create.previous")}</button>
                 <button disabled={safePickerPage >= pickerPages} onClick={() => setPickerPage((p) => p + 1)} className="h-9 px-3 rounded-lg text-xs font-extrabold transition-all duration-200 hover:shadow-md disabled:opacity-30" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("admin.purchaseOrders.create.next")}</button>
                 <button disabled={addingAll || !tickedProducts} onClick={addSelectedProducts} className="h-9 px-4 rounded-lg text-xs font-semibold transition hover:opacity-90 disabled:opacity-40" style={accentBtn}>{addingAll ? t("admin.purchaseOrders.create.adding") : t("admin.purchaseOrders.create.addSelected", { count: tickedProducts })}</button>
-                <button onClick={closePicker} className="h-9 px-4 rounded-lg text-xs font-medium transition hover:bg-[var(--bg-row-hover)]" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("common.close")}</button>
+                <button onClick={closePicker} className="h-9 px-4 rounded-lg text-xs font-medium transition hover:bg-row-hover" style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}>{t("common.close")}</button>
               </div>
             </div>
           </div>

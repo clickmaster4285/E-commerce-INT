@@ -117,7 +117,8 @@ function calcTime(endDate) {
   };
 }
 
-export default function DealsSection({ embedded = false }) {
+// heading: store editor ka optional override (khali → default i18n title)
+export default function DealsSection({ embedded = false, heading = "" }) {
   const { data: deals = [], isLoading } = useQuery({
     queryKey: ["activeDeals"],
     queryFn: dealApi.getActive,
@@ -298,9 +299,9 @@ function DealEngine({ deals }) {
     <div ref={sectionRef} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       {/* Header — flat, solid */}
       <div className="deal-anim" style={dealAnim("dealFadeIn", 0, 0.5)}>
-        <SectionHeading title={t("deals.hotDeals")} subtitle={t("deals.bestOffersLimited")}>
+        <SectionHeading title={heading || t("deals.hotDeals")} subtitle={t("deals.bestOffersLimited")}>
         <span
-          className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-[var(--user-text-muted)]"
+          className="inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium text-user-fg-muted"
           style={{ color: cfg.hex }}
         >
           <span
@@ -313,7 +314,7 @@ function DealEngine({ deals }) {
       </div>
 
       {/* ✅ FEATURED DEAL */}
-      <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl lg:rounded-3xl border border-user-line bg-user-card shadow-sm">
         {/* ═══════ HERO BANNER — podium showcase ═══════ */}
         <div
           className="relative overflow-hidden"
@@ -527,7 +528,7 @@ function DealEngine({ deals }) {
         {activeDealDetail ? (
           products.length > 0 ? (
             <div
-              className="relative border-t border-[var(--user-border)] p-2 sm:p-3"
+              className="relative border-t border-user-line p-2 sm:p-3"
               key={activeDeal._id}
               style={{ animation: "dealFadeIn .45s ease-out" }}
             >
@@ -560,13 +561,13 @@ export function BundleDealPanel({ deal, products, allProducts = [], variant = "d
       ? "mt-0 rounded-2xl border-2 border-indigo-500/30 bg-indigo-500/5 px-4 py-3.5"
       : "mt-4 rounded-2xl border border-white/20 bg-white/10 backdrop-blur px-3.5 py-3",
     label: isLight ? "text-indigo-600" : "text-white/95",
-    price: isLight ? "text-[var(--user-text)]" : "text-white",
+    price: isLight ? "text-user-fg" : "text-white",
     neutralBadge: isLight
       ? "bg-indigo-500/10 text-indigo-600 border-indigo-500/25"
       : "bg-white/15 text-white border-white/25",
-    hint: isLight ? "text-[var(--user-text-muted)]" : "text-white/85",
+    hint: isLight ? "text-user-fg-muted" : "text-white/85",
     cta: isLight
-      ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+      ? "bg-user-accent text-user-accent-fg"
       : "bg-white text-black",
   };
 
@@ -855,16 +856,16 @@ function ProductsRow({ products, deal, hex }) {
 
   if (products.length === 0) {
     return (
-      <div className="flex flex-col gap-3 border-t border-[var(--user-border)] px-4 py-4 sm:flex-row sm:items-center sm:px-6">
+      <div className="flex flex-col gap-3 border-t border-user-line px-4 py-4 sm:flex-row sm:items-center sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--user-bg-hover)]">
-            <PackageOpen className="h-5 w-5 text-[var(--user-text-muted)]" />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-user-hover">
+            <PackageOpen className="h-5 w-5 text-user-fg-muted" />
           </span>
-          <p className="text-sm font-semibold text-[var(--user-text)]">{t("deals.productsComingSoon")}</p>
+          <p className="text-sm font-semibold text-user-fg">{t("deals.productsComingSoon")}</p>
         </div>
         <Link
           href="/shop?allDeals=1"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--user-border)] px-5 py-2 text-sm font-medium text-[var(--user-text-secondary)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] sm:ml-auto sm:w-auto"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-user-line px-5 py-2 text-sm font-medium text-user-fg-secondary transition-colors hover:border-user-accent hover:text-user-accent sm:ml-auto sm:w-auto"
         >
           {t("deals.browseAll")}
           <ArrowRight size={14} />
@@ -893,7 +894,7 @@ function ProductsRow({ products, deal, hex }) {
         </h4>
         <span className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {headerDealSummary ? (
-            <span className="rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] px-2 py-1 text-[0.625rem] font-medium text-[var(--user-text-secondary)]">
+            <span className="rounded-full border border-user-line bg-user-hover px-2 py-1 text-[0.625rem] font-medium text-user-fg-secondary">
               {headerDealSummary}
             </span>
           ) : null}
@@ -914,7 +915,7 @@ function ProductsRow({ products, deal, hex }) {
             <button
               onClick={() => scroll("left")}
               aria-label={t("common.scrollLeft")}
-              className="hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] shadow-sm transition-colors hover:text-[var(--user-text)] sm:flex"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-user-line bg-user-card text-user-fg-secondary shadow-sm transition-colors hover:text-user-fg sm:flex"
             >
               <ChevronLeft size={15} />
             </button>
@@ -923,7 +924,7 @@ function ProductsRow({ products, deal, hex }) {
             <button
               onClick={() => scroll("right")}
               aria-label={t("common.scrollRight")}
-              className="hidden h-8 w-8 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text-secondary)] shadow-sm transition-colors hover:text-[var(--user-text)] sm:flex"
+              className="hidden h-8 w-8 items-center justify-center rounded-full border border-user-line bg-user-card text-user-fg-secondary shadow-sm transition-colors hover:text-user-fg sm:flex"
             >
               <ChevronRight size={15} />
             </button>
@@ -965,17 +966,17 @@ function DealsSkeleton({ embedded = false }) {
   return (
     <section className={embedded ? "w-full" : "user-shell mx-auto px-3 lg:px-6 py-5 lg:py-10"}>
       <div className="animate-pulse space-y-4">
-        <div className="flex items-center justify-between px-2.5 sm:px-4 py-2 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]/70 backdrop-blur-md">
+        <div className="flex items-center justify-between px-2.5 sm:px-4 py-2 rounded-2xl border border-user-line bg-user-card/70 backdrop-blur-md">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[var(--user-bg-card)]" />
+            <div className="w-9 h-9 rounded-xl bg-user-card" />
           </div>
-          <div className="h-7 w-20 rounded-full bg-[var(--user-bg-card)]" />
+          <div className="h-7 w-20 rounded-full bg-user-card" />
         </div>
-        <div className="rounded-3xl overflow-hidden border-2 border-[var(--user-border)]">
-          <div className="h-24 sm:h-30 bg-[var(--user-bg-card)]" />
+        <div className="rounded-3xl overflow-hidden border-2 border-user-line">
+          <div className="h-24 sm:h-30 bg-user-card" />
           <div className="flex gap-4 p-5">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="w-[19.2%] 4xl:w-[15.5%] 5xl:w-[12.8%] h-60 bg-[var(--user-bg-card)] rounded-2xl" />
+              <div key={i} className="w-[19.2%] 4xl:w-[15.5%] 5xl:w-[12.8%] h-60 bg-user-card rounded-2xl" />
             ))}
           </div>
         </div>

@@ -611,10 +611,10 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
   const validUntilLabel = formatDate(form?.[doc.dueField]);
 
   const currency = (value) => new Intl.NumberFormat(locale || "en-PK", { style: "currency", currency: design.currencySymbol || "PKR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0);
-  const labelClass = "block text-[10px] font-semibold text-[var(--text-secondary)]";
-  const inputClass = "h-9 w-full rounded-md border border-[var(--border-color)] bg-transparent px-2.5 text-xs text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20";
+  const labelClass = "block text-[10px] font-semibold text-fg-secondary";
+  const inputClass = "h-9 w-full rounded-md border border-line bg-transparent px-2.5 text-xs text-fg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20";
   const selectClass = inputClass + " cursor-pointer";
-  const buttonClass = (active) => `group flex flex-col gap-0.5 p-1.5 text-left transition ${active ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`;
+  const buttonClass = (active) => `group flex flex-col gap-0.5 p-1.5 text-left transition ${active ? "bg-accent-soft" : "hover:bg-subtle"}`;
 
   /* ------------------- Live preview article ---------------------- */
   const editorItems = form?.items?.length ? form.items : [EMPTY_ITEM_ROW];
@@ -758,13 +758,13 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
 
   /* ------------------- Component return ------------------------- */
   return (
-    <section className={`quote-template-designer ${previewOnly ? "quote-saved-preview " : ""}${cleanPreview ? "m-0 w-full rounded-none border-0 bg-[var(--bg-card)] p-0 shadow-none" : "mt-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_8px_24px_rgba(15,23,42,0.045)]"}`} aria-labelledby="doc-design-heading">
-      <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3`}>
+    <section className={`quote-template-designer ${previewOnly ? "quote-saved-preview " : ""}${cleanPreview ? "m-0 w-full rounded-none border-0 bg-card p-0 shadow-none" : "mt-3 rounded-2xl border border-line bg-card shadow-[0_8px_24px_rgba(15,23,42,0.045)]"}`} aria-labelledby="doc-design-heading">
+      <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-line px-4 py-3`}>
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-sm"><Palette size={16} /></span>
           <div>
-            <h2 id="doc-design-heading" className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-[var(--text-primary)]">{t("admin.quoteDesigner.documentDesign")}</h2>
-            <p className="text-[10px] text-[var(--text-muted)]">{t("admin.quoteDesigner.designHint")}</p>
+            <h2 id="doc-design-heading" className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-fg">{t("admin.quoteDesigner.documentDesign")}</h2>
+            <p className="text-[10px] text-fg-muted">{t("admin.quoteDesigner.designHint")}</p>
           </div>
         </div>
       </div>
@@ -772,7 +772,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
       <div className={`grid ${previewOnly ? "m-0 w-full gap-0 p-0" : "gap-3 p-3.5 lg:p-4"} ${previewOnly ? "grid-cols-1" : "lg:grid-cols-[minmax(300px,0.85fr)_minmax(0,1.35fr)]"}`}>
         {/* ---- Left panel ---- */}
         {!previewOnly && <div ref={settingsPanelRef} className="max-h-[min(82vh,900px)] overflow-y-auto">
-          <h3 className="px-3 pt-2 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[var(--text-secondary)]">{t("admin.quoteDesigner.templatesTypography")}</h3>
+          <h3 className="px-3 pt-2 text-[10px] font-extrabold uppercase tracking-[0.16em] text-fg-secondary">{t("admin.quoteDesigner.templatesTypography")}</h3>
           <div className="grid grid-cols-3 gap-x-1 gap-y-0.5 px-3 pt-1.5 sm:grid-cols-4 lg:grid-cols-5">
             {QUOTE_TEMPLATES.map((t) => {
               const active = (design.template || design.template || design.template || design.selected) === t.name.toLowerCase() || (design.template ? false : (design.selected || DEFAULT_DESIGN.template) === t.name);
@@ -780,10 +780,10 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 <button key={t.name} type="button" aria-pressed={active} onClick={() => setDesign((prev) => ({ ...prev, selected: t.name, template: t.name.toLowerCase(), accentColor: t.color, headerLayout: t.layout === "center" ? "centered" : t.layout }))} className={buttonClass(active)}>
                   <span className="mb-1 block h-2.5 w-full" style={{ background: t.color }} />
                   <span className="flex items-center justify-between gap-1">
-                    <span className="text-[11px] font-bold leading-tight text-[var(--text-primary)]">{t.name}</span>
+                    <span className="text-[11px] font-bold leading-tight text-fg">{t.name}</span>
                     {active && <Check size={11} className="shrink-0 text-slate-900" />}
                   </span>
-                  <span className="text-[9px] leading-tight text-[var(--text-muted)]">{t.subtitle}</span>
+                  <span className="text-[9px] leading-tight text-fg-muted">{t.subtitle}</span>
                 </button>
               );
             })}
@@ -795,7 +795,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
               <span className="relative h-5 w-5 shrink-0 overflow-hidden">
                 <input id="accent-color" type="color" value={design.accentColor || theme.color} onChange={(e) => setDesign((prev) => ({ ...prev, accentColor: e.target.value }))} aria-label="Accent color" className="absolute -left-2 -top-2 h-11 w-11 border-0 bg-transparent p-0 cursor-pointer" />
               </span>
-              <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--text-secondary)]">{design.accentColor || theme.color}</span>
+              <span className="font-mono text-[10px] uppercase tracking-wide text-fg-secondary">{design.accentColor || theme.color}</span>
             </label>
           </div>
 
@@ -823,11 +823,11 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 {PAPER_SIZE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <p className="mt-1 text-[9px] text-[var(--text-muted)]">{t("admin.quoteDesigner.pdfPageSize")}</p>
+            <p className="mt-1 text-[9px] text-fg-muted">{t("admin.quoteDesigner.pdfPageSize")}</p>
           </div>
 
           <div className="mt-2 px-3 pt-1.5">
-            <h3 className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{t("admin.quoteDesigner.typographySpacing")}</h3>
+            <h3 className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-fg-secondary">{t("admin.quoteDesigner.typographySpacing")}</h3>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
                 [t("admin.quoteDesigner.boldTitles"), "boldTitles"],
@@ -835,7 +835,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                 [t("admin.quoteDesigner.italicBody"), "italicBody"],
                 [t("admin.quoteDesigner.italicNotes"), "italicNotes"],
               ].map(([label, key]) => (
-                <label key={key} className="flex cursor-pointer items-center gap-2 px-1 py-1.5 text-[10px] font-medium text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]">
+                <label key={key} className="flex cursor-pointer items-center gap-2 px-1 py-1.5 text-[10px] font-medium text-fg-secondary transition hover:text-fg">
                   <input type="checkbox" checked={!!design[key]} onChange={(e) => setDesign((prev) => ({ ...prev, [key]: e.target.checked }))} className="h-3.5 w-3.5 rounded" />
                   {label}
                 </label>
@@ -844,44 +844,44 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
           </div>
 
           <details className="group mt-2 px-3 pt-1.5" open>
-            <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-extrabold uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+            <summary className="flex cursor-pointer list-none items-center justify-between text-[10px] font-extrabold uppercase tracking-[0.14em] text-fg-secondary">
               {t("admin.quoteDesigner.branding")}
-              <ChevronDown size={13} className="text-[var(--text-muted)] transition-transform group-open:rotate-180" />
+              <ChevronDown size={13} className="text-fg-muted transition-transform group-open:rotate-180" />
             </summary>
             <div className="mt-1.5 space-y-1">
-              <label className="flex cursor-pointer items-center gap-2 px-1 py-1.5 text-[11px] font-semibold text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]">
+              <label className="flex cursor-pointer items-center gap-2 px-1 py-1.5 text-[11px] font-semibold text-fg-secondary transition hover:text-fg">
                     <input type="checkbox" checked={design.watermark} onChange={(e) => { const enabled = e.target.checked; setDesign((prev) => ({ ...prev, watermark: enabled })); if (enabled) requestAnimationFrame(() => watermarkSettingsRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })); }} className="h-4 w-4 shrink-0 rounded accent-blue-600" /> {t("admin.quoteDesigner.showWatermark")}
               </label>
               {design.watermark && (
                 <div ref={watermarkSettingsRef} className="space-y-2 p-2">
                   <div className="flex items-center gap-2 pb-1">
                     <span aria-hidden="true" className="h-2 w-2 bg-blue-600" />
-                    <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-blue-900 dark:text-blue-200">{t("admin.quoteDesigner.watermarkSettings")}</p>
+                    <p className="text-[11px] font-extrabold uppercase tracking-[0.1em] text-info">{t("admin.quoteDesigner.watermarkSettings")}</p>
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 px-1 py-1 text-[11px] font-semibold text-[var(--text-primary)]">
+                  <label className="flex cursor-pointer items-center gap-2 px-1 py-1 text-[11px] font-semibold text-fg">
                     <input type="checkbox" checked={design.watermarkUseLogo} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkUseLogo: e.target.checked }))} className="h-4 w-4 shrink-0 rounded accent-blue-600" /> {t("admin.quoteDesigner.logoWatermark")}
                   </label>
                   {!design.watermarkUseLogo && (
-                    <label className="block text-[11px] font-medium text-[var(--text-secondary)]">
+                    <label className="block text-[11px] font-medium text-fg-secondary">
                       {t("admin.quoteDesigner.watermarkText")}
                       <input value={design.watermarkText || ""} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkText: e.target.value.slice(0, 40) }))} maxLength={40} className="mt-1 h-8 w-full bg-transparent px-2 text-[11px] outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="PAID" />
                     </label>
                   )}
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-fg-secondary">
                     {t("admin.quoteDesigner.watermarkOpacity")} ({design.watermarkOpacity || 14}%)
                     <input type="range" min="5" max="40" value={design.watermarkOpacity || 14} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkOpacity: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-fg-secondary">
                     {t("admin.quoteDesigner.watermarkSize")} ({design.watermarkSize || 50}%)
                     <input type="range" min="20" max="100" value={design.watermarkSize || 50} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkSize: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-fg-secondary">
                     {t("admin.quoteDesigner.watermarkRotation")} ({watermarkRotation}°)
                     <input type="range" min="-180" max="180" step="1" value={watermarkRotation} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkRotation: Number(e.target.value) }))} className="mt-1.5 block w-full" />
                   </label>
-                  <label className="block text-[11px] font-semibold text-[var(--text-secondary)]">
+                  <label className="block text-[11px] font-semibold text-fg-secondary">
                     {t("admin.quoteDesigner.watermarkPosition")}
-                    <select value={watermarkPosition} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkPosition: e.target.value }))} className="mt-1 h-9 w-full bg-transparent px-2.5 text-[11px] text-[var(--text-primary)] outline-none transition focus:ring-2 focus:ring-blue-500/20">
+                    <select value={watermarkPosition} onChange={(e) => setDesign((prev) => ({ ...prev, watermarkPosition: e.target.value }))} className="mt-1 h-9 w-full bg-transparent px-2.5 text-[11px] text-fg outline-none transition focus:ring-2 focus:ring-blue-500/20">
                       <option value="center">{t("admin.quoteDesigner.center")}</option>
                       <option value="diagonal">{t("admin.quoteDesigner.diagonal")}</option>
                       <option value="right">{t("admin.quoteDesigner.right")}</option>
@@ -900,46 +900,46 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         </div>}
 
         {/* ---- Right panel preview ---- */}
-        <div className={`m-0 w-full min-w-0 overflow-hidden p-0 ${!previewOnly && workspaceMode === "preview" ? "rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm" : ""}`}>
-          <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3`}>
+        <div className={`m-0 w-full min-w-0 overflow-hidden p-0 ${!previewOnly && workspaceMode === "preview" ? "rounded-2xl border border-line bg-card shadow-sm" : ""}`}>
+          <div className={`${previewOnly ? "quote-no-print " : ""}flex items-center justify-between gap-3 border-b border-line px-4 py-3`}>
             <div className="flex min-w-0 items-center gap-2">
-              <h3 className="truncate text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.livePreview")} · {theme.name}</h3>
-              {!previewOnly && workspaceMode === "preview" && <span className="hidden h-6 shrink-0 items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[10px] font-medium text-[var(--text-secondary)] sm:inline-flex">{t("admin.quoteDesigner.previewMode")}</span>}
+              <h3 className="truncate text-[11px] font-extrabold uppercase tracking-[0.12em] text-fg">{t("admin.quoteDesigner.livePreview")} · {theme.name}</h3>
+              {!previewOnly && workspaceMode === "preview" && <span className="hidden h-6 shrink-0 items-center rounded-md border border-line bg-card px-2 text-[10px] font-medium text-fg-secondary sm:inline-flex">{t("admin.quoteDesigner.previewMode")}</span>}
             </div>
             {!previewOnly && <div className="flex shrink-0 items-center gap-2" role="tablist" aria-label={t("admin.quoteDesigner.editDocument")}>
-              <button type="button" role="tab" aria-selected={workspaceMode === "edit"} onClick={() => setWorkspaceMode("edit")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "edit" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-slate-300 hover:text-[var(--text-primary)]"}`}><Pencil size={13} />{t("admin.quoteDesigner.edit")}</button>
-              <button type="button" role="tab" aria-selected={workspaceMode === "preview"} onClick={() => setWorkspaceMode("preview")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "preview" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:border-slate-300 hover:text-[var(--text-primary)]"}`}><Eye size={13} />{t("admin.quoteDesigner.preview")}</button>
+              <button type="button" role="tab" aria-selected={workspaceMode === "edit"} onClick={() => setWorkspaceMode("edit")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "edit" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-line bg-card text-fg-secondary hover:border-slate-300 hover:text-fg"}`}><Pencil size={13} />{t("admin.quoteDesigner.edit")}</button>
+              <button type="button" role="tab" aria-selected={workspaceMode === "preview"} onClick={() => setWorkspaceMode("preview")} className={`inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[11px] font-bold transition ${workspaceMode === "preview" ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700" : "border border-line bg-card text-fg-secondary hover:border-slate-300 hover:text-fg"}`}><Eye size={13} />{t("admin.quoteDesigner.preview")}</button>
             </div>}
           </div>
-          <div ref={previewCanvasRef} className={`no-scrollbar m-0 w-full min-w-0 overflow-x-hidden ${previewOnly ? "bg-white p-0" : workspaceMode === "preview" ? "max-h-[720px] overflow-y-auto bg-[var(--bg-secondary)] p-2" : "max-h-[720px] overflow-y-auto bg-[var(--bg-card)] p-0"}`}>
+          <div ref={previewCanvasRef} className={`no-scrollbar m-0 w-full min-w-0 overflow-x-hidden ${previewOnly ? "bg-white p-0" : workspaceMode === "preview" ? "max-h-[720px] overflow-y-auto bg-page-alt p-2" : "max-h-[720px] overflow-y-auto bg-card p-0"}`}>
             {!previewOnly && workspaceMode === "edit" ? (
               <div className="space-y-2.5 rounded-none border-0 bg-transparent p-2 sm:p-3">
-                <section className="bg-transparent p-2"><div className="mb-2 flex flex-wrap items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--accent)]"><Package size={15} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.productsItems")}</h5><span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[10px] font-semibold text-[var(--text-secondary)]">{editorItemCount} {t(editorItemCount === 1 ? "admin.finance.item" : "admin.quoteInvoice.ui.items_7316c8b2")}</span></div>
+                <section className="bg-transparent p-2"><div className="mb-2 flex flex-wrap items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center text-accent"><Package size={15} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-fg">{t("admin.quoteDesigner.productsItems")}</h5><span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line bg-card px-2 text-[10px] font-semibold text-fg-secondary">{editorItemCount} {t(editorItemCount === 1 ? "admin.finance.item" : "admin.quoteInvoice.ui.items_7316c8b2")}</span></div>
                   <div ref={itemsTableScrollRef} className="overflow-x-auto pb-1">
-                    <div className="min-w-[710px] overflow-hidden rounded-md border border-[var(--border-color)]">
+                    <div className="min-w-[710px] overflow-hidden rounded-md border border-line">
                     {(() => {
                       const itemGrid = "grid grid-cols-[1.25rem_minmax(180px,1.8fr)_4.25rem_5rem_5rem_4.25rem_4.25rem_2rem] items-center gap-0";
                       const headers = ["#", t("admin.quoteInvoice.ui.product_dd3b86d1"), "SKU", t("admin.quoteInvoice.ui.quantity_44f6af69"), t("admin.quoteInvoice.ui.unit_price_3c6c777f"), t("admin.quoteInvoice.ui.discount_b524936d"), t("admin.quoteInvoice.ui.tax_9be70f66"), ""];
                       return <>
-                        <div className={`${itemGrid} border-b border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 py-2`}>
-                          {headers.map((header, i) => <span key={i} className={`truncate border-e border-[var(--border-color)] px-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] last:border-e-0 ${i >= 2 && i <= 6 ? "text-center" : ""}`}>{header}</span>)}
+                        <div className={`${itemGrid} border-b border-line bg-subtle px-2.5 py-2`}>
+                          {headers.map((header, i) => <span key={i} className={`truncate border-e border-line px-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-secondary last:border-e-0 ${i >= 2 && i <= 6 ? "text-center" : ""}`}>{header}</span>)}
                         </div>
                         {editorItems.map((item, index) => {
                           const selectedOption = variantOptionsById.get(String(item.variant_id || ""));
                           const displayedName = selectedOption?.name || item.name;
-                          return <div key={item.row_id || item._id || index} className={`${itemGrid} border-b border-[var(--border-color)] last:border-b-0 bg-[var(--bg-card)] px-2 py-0`}>
-                          <span className="h-full border-e border-[var(--border-color)] py-2.5 text-center text-[9px] font-semibold tabular-nums text-[var(--text-muted)]">{index + 1}</span>
+                          return <div key={item.row_id || item._id || index} className={`${itemGrid} border-b border-line last:border-b-0 bg-card px-2 py-0`}>
+                          <span className="h-full border-e border-line py-2.5 text-center text-[9px] font-semibold tabular-nums text-fg-muted">{index + 1}</span>
                           <div className="relative flex min-w-0 flex-col justify-center">
                             <div className="relative">
-                              <button ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} type="button" onClick={(event) => { if (variantSearchOpen && activeVariantItemId === item.row_id) { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } else activateVariantSearch(item, event.currentTarget); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} className={`group flex h-9 w-full min-w-0 items-center gap-2 rounded-none border-e border-[var(--border-color)] px-2 text-left transition-colors duration-150 focus-visible:z-10 focus-visible:border-blue-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-500 focus-visible:outline-offset-[-1px] ${variantSearchOpen && activeVariantItemId === item.row_id ? "bg-white outline outline-1 outline-blue-500 outline-offset-[-1px] dark:bg-slate-900" : "bg-white hover:border-slate-400 dark:bg-slate-900 dark:hover:border-slate-600"}`} aria-label={t("admin.quoteInvoice.ui.product_dd3b86d1") + " " + (index + 1)} aria-haspopup="dialog" aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id}>
-                                <span title={displayedName || t("admin.quoteDesigner.selectOrTypeProduct")} className={`min-w-0 flex-1 truncate text-sm ${displayedName ? "font-semibold text-slate-900 dark:text-slate-100" : "font-normal text-slate-500"}`}>{displayedName || t("admin.quoteDesigner.selectOrTypeProduct")}</span>
+                              <button ref={(node) => { if (node) variantInputRefs.current.set(item.row_id, node); else variantInputRefs.current.delete(item.row_id); }} type="button" onClick={(event) => { if (variantSearchOpen && activeVariantItemId === item.row_id) { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } else activateVariantSearch(item, event.currentTarget); }} onKeyDown={(event) => { if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} className={`group flex h-9 w-full min-w-0 items-center gap-2 rounded-none border-e border-line px-2 text-left transition-colors duration-150 focus-visible:z-10 focus-visible:border-blue-500 focus-visible:outline focus-visible:outline-1 focus-visible:outline-blue-500 focus-visible:outline-offset-[-1px] ${variantSearchOpen && activeVariantItemId === item.row_id ? "bg-card outline outline-1 outline-blue-500 outline-offset-[-1px]" : "bg-card hover:border-line"}`} aria-label={t("admin.quoteInvoice.ui.product_dd3b86d1") + " " + (index + 1)} aria-haspopup="dialog" aria-expanded={variantSearchOpen && activeVariantItemId === item.row_id}>
+                                <span title={displayedName || t("admin.quoteDesigner.selectOrTypeProduct")} className={`min-w-0 flex-1 truncate text-sm ${displayedName ? "font-semibold text-fg" : "font-normal text-slate-500"}`}>{displayedName || t("admin.quoteDesigner.selectOrTypeProduct")}</span>
                                 <ChevronDown size={16} className={`shrink-0 text-slate-500 transition-transform duration-150 ${variantSearchOpen && activeVariantItemId === item.row_id ? "rotate-180" : ""}`} />
                               </button>
                             </div>
                           </div>
-                          <span className="h-full min-w-0 truncate border-e border-[var(--border-color)] px-1 py-2.5 text-center font-mono text-[11px] font-medium text-[var(--text-secondary)]" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
-                          {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full appearance-none rounded-none border-e border-[var(--border-color)] bg-[var(--bg-card)] px-1 text-center text-[11px] font-medium text-[var(--text-primary)] outline-none transition focus:z-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />)}
-                          <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-full w-full items-center justify-center justify-self-center border-s border-[var(--border-color)] text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13} /></button>
+                          <span className="h-full min-w-0 truncate border-e border-line px-1 py-2.5 text-center font-mono text-[11px] font-medium text-fg-secondary" title={item.sku ? `SKU ${item.sku}` : undefined}>{item.sku || "—"}</span>
+                          {[[t("admin.quoteInvoice.ui.quantity_44f6af69"), "quantity", 1], [t("admin.quoteInvoice.ui.unit_price_3c6c777f"), "unit_price", 0], [t("admin.quoteInvoice.ui.discount_b524936d"), "discount_rate", 0], [t("admin.quoteInvoice.ui.tax_9be70f66"), "tax_rate", 0]].map(([title, key, min]) => <input key={key} type="number" min={min} max={key.includes("rate") ? 100 : undefined} step={key === "quantity" ? 1 : 0.01} value={item[key] ?? 0} onChange={(event) => onUpdateItem(item.row_id, key, event.target.value)} aria-label={title} title={title} placeholder={title} className="h-9 w-full appearance-none rounded-none border-e border-line bg-card px-1 text-center text-[11px] font-medium text-fg outline-none transition focus:z-10 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15" />)}
+                          <button type="button" onClick={() => onRemoveItem(item.row_id)} aria-label={t("admin.quoteDesigner.remove")} title={t("admin.quoteDesigner.remove")} className="flex h-full w-full items-center justify-center justify-self-center border-s border-line text-danger transition hover:bg-danger-soft"><Trash2 size={13} /></button>
                         </div>;
                         })}
                       </>;
@@ -947,28 +947,28 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
                     </div>
                   </div>
                   <div className="mt-1.5">
-                    <button type="button" onClick={addManualItem} className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--border-color)] px-3 text-[10px] font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
+                    <button type="button" onClick={addManualItem} className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-line px-3 text-[10px] font-semibold text-fg-secondary transition hover:border-accent hover:bg-accent-soft hover:text-accent"><Plus size={13} />{t("admin.quoteDesigner.addItem")}</button>
                   </div>
                 </section>
                 <section className="bg-transparent p-2">
-                  <div className="mb-2 flex flex-wrap items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--accent)]"><Calculator size={15} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-primary)]">{t("admin.quoteDesigner.totals")}</h5></div>
+                  <div className="mb-2 flex flex-wrap items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center text-accent"><Calculator size={15} /></span><h5 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-fg">{t("admin.quoteDesigner.totals")}</h5></div>
                   <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,300px)]">
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className="mt-1 h-9 w-full rounded-md border border-[var(--border-color)] bg-transparent px-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label>
-                      <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteInvoice.ui.discount_b524936d")}<span className="relative mt-1 block"><input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className="h-9 w-full appearance-none rounded-md border border-[var(--border-color)] bg-transparent px-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" aria-label={t("admin.quoteInvoice.ui.discount_b524936d")} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs font-semibold text-[var(--text-secondary)]">%</span></span></label>
-                      <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteDesigner.additionalTax")}<span className="relative mt-1 block"><input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className="h-9 w-full appearance-none rounded-md border border-[var(--border-color)] bg-transparent px-2.5 text-sm text-[var(--text-primary)] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" aria-label={t("admin.quoteDesigner.additionalTax")} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs font-semibold text-[var(--text-secondary)]">%</span></span></label>
-                      <div className="mt-3 border-t border-[var(--border-color)] pt-3 sm:col-span-3">
+                      <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteDesigner.discountType")}<select value={discountType} onChange={(event) => onDiscountTypeChange(event.target.value)} className="mt-1 h-9 w-full rounded-md border border-line bg-transparent px-2.5 text-sm text-fg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"><option value="percent">{t("admin.quoteDesigner.percent")}</option><option value="flat">{t("admin.quoteDesigner.fixedAmount")}</option></select></label>
+                      <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteInvoice.ui.discount_b524936d")}<span className="relative mt-1 block"><input type="number" min="0" step="0.01" value={discountValue} onChange={(event) => onDiscountValueChange(event.target.value)} className="h-9 w-full appearance-none rounded-md border border-line bg-transparent px-2.5 text-sm text-fg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" aria-label={t("admin.quoteInvoice.ui.discount_b524936d")} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs font-semibold text-fg-secondary">%</span></span></label>
+                      <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteDesigner.additionalTax")}<span className="relative mt-1 block"><input type="number" min="0" max="100" step="0.01" value={taxRate} onChange={(event) => onTaxRateChange(event.target.value)} className="h-9 w-full appearance-none rounded-md border border-line bg-transparent px-2.5 text-sm text-fg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" aria-label={t("admin.quoteDesigner.additionalTax")} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-xs font-semibold text-fg-secondary">%</span></span></label>
+                      <div className="mt-3 border-t border-line pt-3 sm:col-span-3">
                         <label className={`${labelClass} text-xs font-semibold`}>{t("admin.quoteDesigner.notes")}</label>
-                        <textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} placeholder={t("admin.quoteDesigner.notesPlaceholder")} aria-label={t("admin.quoteDesigner.notes")} className="mt-1 w-full resize-y rounded-md border border-[var(--border-color)] bg-transparent p-3 text-sm leading-5 text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" />
+                        <textarea value={form?.notes || ""} onChange={(event) => onFieldChange("notes", event.target.value)} rows={3} maxLength={1000} placeholder={t("admin.quoteDesigner.notesPlaceholder")} aria-label={t("admin.quoteDesigner.notes")} className="mt-1 w-full resize-y rounded-md border border-line bg-transparent p-3 text-sm leading-5 text-fg outline-none transition placeholder:text-fg-muted focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10" />
                       </div>
                     </div>
                     <div className="p-3 lg:ps-5">
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center justify-between gap-3"><span className="text-[var(--text-secondary)]">{t("admin.quoteDesigner.subtotal")}:</span><span className="font-semibold text-[var(--text-primary)]">{currency(totals?.subtotal)}</span></div>
-                        <div className="flex items-center justify-between gap-3"><span className="text-[var(--text-secondary)]">{t("admin.quoteInvoice.ui.discount_b524936d")}:</span><span className="font-semibold text-[var(--text-primary)]">{currency(totals?.discount)}</span></div>
-                        <div className="flex items-center justify-between gap-3"><span className="text-[var(--text-secondary)]">{t("admin.quoteInvoice.ui.tax_9be70f66")}:</span><span className="font-semibold text-[var(--text-primary)]">{currency(totals?.tax)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span className="text-fg-secondary">{t("admin.quoteDesigner.subtotal")}:</span><span className="font-semibold text-fg">{currency(totals?.subtotal)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span className="text-fg-secondary">{t("admin.quoteInvoice.ui.discount_b524936d")}:</span><span className="font-semibold text-fg">{currency(totals?.discount)}</span></div>
+                        <div className="flex items-center justify-between gap-3"><span className="text-fg-secondary">{t("admin.quoteInvoice.ui.tax_9be70f66")}:</span><span className="font-semibold text-fg">{currency(totals?.tax)}</span></div>
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border-color)] px-3 py-3"><span className="text-sm font-bold text-[var(--accent)]">{t("admin.quoteDesigner.grandTotal")}</span><span className="font-mono text-base font-extrabold text-[var(--accent)]">{currency(totals?.total)}</span></div>
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-line px-3 py-3"><span className="text-sm font-bold text-accent">{t("admin.quoteDesigner.grandTotal")}</span><span className="font-mono text-base font-extrabold text-accent">{currency(totals?.total)}</span></div>
                     </div>
                   </div>
                 </section>
@@ -1175,20 +1175,20 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         </div>
       </div>
       {variantSearchOpen && activeVariantItem && variantDropdownPosition && createPortal(
-        <div ref={variantDropdownRef} role="dialog" aria-label={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")} className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900" style={{ position: "fixed", top: variantDropdownPosition.top, left: variantDropdownPosition.left, width: variantDropdownPosition.width, maxHeight: variantDropdownPosition.maxHeight, zIndex: 10050 }}>
-          <div className="shrink-0 border-b border-slate-200 p-2 dark:border-slate-700"><div className="relative"><Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" /><input autoFocus type="search" value={variantSearch} onChange={(event) => setVariantSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && matchedVariants[0]) { event.preventDefault(); selectVariantForItem(matchedVariants[0], activeVariantItem); } else if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} placeholder={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")} aria-label={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")} className="h-9 w-full rounded-lg border border-slate-300 bg-white ps-9 pe-3 text-xs text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" /></div></div>
+        <div ref={variantDropdownRef} role="dialog" aria-label={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")} className="flex flex-col overflow-hidden rounded-lg border border-line bg-card shadow-md" style={{ position: "fixed", top: variantDropdownPosition.top, left: variantDropdownPosition.left, width: variantDropdownPosition.width, maxHeight: variantDropdownPosition.maxHeight, zIndex: 10050 }}>
+          <div className="shrink-0 border-b border-line p-2"><div className="relative"><Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" /><input autoFocus type="search" value={variantSearch} onChange={(event) => setVariantSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && matchedVariants[0]) { event.preventDefault(); selectVariantForItem(matchedVariants[0], activeVariantItem); } else if (event.key === "Escape") { setVariantSearchOpen(false); setActiveVariantItemId(null); setVariantDropdownPosition(null); setVariantSearch(""); } }} placeholder={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")} aria-label={t("admin.quoteInvoice.ui.search_variant_product_or_sku_2d76140d")} className="h-9 w-full rounded-lg border border-line bg-card ps-9 pe-3 text-xs text-fg outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" /></div></div>
           <div role="listbox" aria-label={t("admin.quoteInvoice.ui.product_dd3b86d1")} className="min-h-0 flex-1 overflow-y-auto p-1">
-          {variantOptions.length === 0 ? <p className="px-3 py-3 text-center text-xs text-slate-500 dark:text-slate-400">{t("admin.quoteDesigner.searchVariantsUnavailable")}</p>
-            : matchedVariants.length === 0 ? <p className="px-3 py-3 text-center text-xs text-slate-500 dark:text-slate-400">{t("admin.quoteDesigner.noVariantsFound")}</p>
+          {variantOptions.length === 0 ? <p className="px-3 py-3 text-center text-xs text-fg-muted">{t("admin.quoteDesigner.searchVariantsUnavailable")}</p>
+            : matchedVariants.length === 0 ? <p className="px-3 py-3 text-center text-xs text-fg-muted">{t("admin.quoteDesigner.noVariantsFound")}</p>
             : matchedVariants.map((option) => (
-              <button key={option.id} type="button" role="option" aria-selected={String(activeVariantItem?.variant_id || "") === option.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectVariantForItem(option, activeVariantItem)} className={`flex w-full items-center gap-3 px-3 py-2 text-start transition-colors ${String(activeVariantItem?.variant_id || "") === option.id ? "bg-blue-50 dark:bg-blue-950/50" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`}>
+              <button key={option.id} type="button" role="option" aria-selected={String(activeVariantItem?.variant_id || "") === option.id} onMouseDown={(event) => event.preventDefault()} onClick={() => selectVariantForItem(option, activeVariantItem)} className={`flex w-full items-center gap-3 px-3 py-2 text-start transition-colors ${String(activeVariantItem?.variant_id || "") === option.id ? "bg-info-soft" : "hover:bg-subtle"}`}>
                 <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden"><Package size={14} className="absolute text-slate-400" />{option.image && <img src={option.image} alt={option.name || ""} loading="lazy" onError={(event) => { event.currentTarget.style.display = "none"; }} className="relative h-full w-full object-cover" />}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11px] font-semibold text-slate-900 dark:text-slate-100">{option.name}</span>
-                  <span className="block truncate text-[9px] text-slate-500 dark:text-slate-400">{option.variant || option.sku || "—"}{option.sku && option.variant ? ` · ${option.sku}` : ""}</span>
+                  <span className="block truncate text-[11px] font-semibold text-fg">{option.name}</span>
+                  <span className="block truncate text-[9px] text-fg-muted">{option.variant || option.sku || "—"}{option.sku && option.variant ? ` · ${option.sku}` : ""}</span>
                 </span>
-                <span className="shrink-0 text-[10px] font-bold text-slate-600 dark:text-slate-300">{money(option.price)}</span>
-                {String(activeVariantItem?.variant_id || "") === option.id && <Check size={16} className="shrink-0 text-blue-600 dark:text-blue-400" />}
+                <span className="shrink-0 text-[10px] font-bold text-fg-secondary">{money(option.price)}</span>
+                {String(activeVariantItem?.variant_id || "") === option.id && <Check size={16} className="shrink-0 text-info" />}
               </button>
             ))}
           </div>

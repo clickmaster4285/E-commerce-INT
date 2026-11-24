@@ -475,7 +475,7 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
                             disabled={!formData.isPerishable}
                             value={formData.expiryDuration}
                             onChange={(event) => setFormData((previous) => ({ ...previous, expiryDuration: event.target.value }))}
-                            className="h-11 w-full rounded-lg px-3.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:opacity-50"
+                            className="h-11 w-full rounded-lg px-3.5 text-sm outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
                             style={{ ...inputStyle, backgroundColor: "var(--bg-card)" }}
                           />
                           <select
@@ -483,7 +483,7 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
                             onChange={(event) => setFormData((previous) => ({ ...previous, expiryUnit: event.target.value }))}
                             aria-label={t("form.expiryUnitAria")}
                             disabled={!formData.isPerishable}
-                            className="h-11 w-full rounded-lg px-3 text-sm font-medium outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 disabled:opacity-50"
+                            className="h-11 w-full rounded-lg px-3 text-sm font-medium outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50"
                             style={{ ...inputStyle, backgroundColor: "var(--bg-card)" }}
                           >
                             <option value="days">{t("form.unitDays")}</option>

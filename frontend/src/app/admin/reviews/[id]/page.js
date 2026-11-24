@@ -74,12 +74,12 @@ function StarRating({ rating, size = 14, showValue = true }) {
           <Star
             key={star}
             size={size}
-            className={star <= r ? "fill-amber-400 text-amber-400" : "text-gray-300 dark:text-gray-600"}
+            className={star <= r ? "fill-amber-400 text-amber-400" : "text-fg-muted"}
           />
         ))}
       </div>
       {showValue && (
-        <span className="text-[10px] font-bold text-[var(--text-muted)]">{r}/5</span>
+        <span className="text-[10px] font-bold text-fg-muted">{r}/5</span>
       )}
     </div>
   );
@@ -218,12 +218,12 @@ export default function AdminReviewDetailPage() {
         <Link href="/admin/reviews" className="inline-flex items-center gap-2 text-[13px] font-semibold" style={{ color: "var(--accent)" }}>
           <ArrowLeft size={14} /> {t("admin.reviews.detail.back")}
         </Link>
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-card)] p-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-tertiary)]">
-            <MessageSquareText size={22} className="text-[var(--text-muted)]" />
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-line bg-card p-10 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-subtle">
+            <MessageSquareText size={22} className="text-fg-muted" />
           </div>
-          <h1 className="mt-3 text-base font-bold text-[var(--text-primary)]">{t("admin.reviews.detail.notFound")}</h1>
-          <p className="mt-1.5 max-w-xs text-xs text-[var(--text-muted)]">
+          <h1 className="mt-3 text-base font-bold text-fg">{t("admin.reviews.detail.notFound")}</h1>
+          <p className="mt-1.5 max-w-xs text-xs text-fg-muted">
             {t("admin.reviews.detail.notFoundBody")}
           </p>
           <Link href="/admin/reviews" className="mt-4 inline-flex h-9 items-center rounded-lg px-4 text-xs font-bold text-white" style={{ backgroundColor: "var(--accent)" }}>
@@ -266,20 +266,20 @@ export default function AdminReviewDetailPage() {
   return (
     <div dir={dir} lang={locale} className="w-full space-y-4 pb-6">
       {/* Header */}
-      <header className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3.5 sm:p-4">
+      <header className="rounded-lg border border-line bg-card p-3.5 sm:p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
               <Link
                 href="/admin/reviews"
                 aria-label={t("admin.reviews.detail.back")}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-color)] transition hover:opacity-70"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-line transition hover:opacity-70"
               style={{ color: "var(--text-secondary)" }}
             >
               <ArrowLeft size={15} />
             </Link>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[18px] font-bold tracking-tight text-[var(--text-primary)]">{t("admin.reviews.detail.reviewDetails")}</h1>
+                <h1 className="text-[18px] font-bold tracking-tight text-fg">{t("admin.reviews.detail.reviewDetails")}</h1>
                 <StatusPill hidden={hidden} size="md" t={t} />
               </div>
             </div>
@@ -288,7 +288,7 @@ export default function AdminReviewDetailPage() {
             {productId ? (
               <Link
                 href={`/admin/products/${productId}`}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3.5 text-xs font-semibold text-[var(--text-secondary)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3.5 text-xs font-semibold text-fg-secondary shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent"
               >
                 <Package size={14} /> {t("admin.reviews.detail.viewProduct")}
               </Link>
@@ -296,7 +296,7 @@ export default function AdminReviewDetailPage() {
             {orderId ? (
               <Link
                 href={`/admin/orders/${orderId}`}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-3.5 text-xs font-semibold text-[var(--text-secondary)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-line bg-card px-3.5 text-xs font-semibold text-fg-secondary shadow-sm transition hover:border-accent hover:bg-accent-soft hover:text-accent"
               >
                 <ShoppingCart size={14} /> {t("admin.reviews.detail.viewOrder")}
               </Link>
@@ -305,7 +305,7 @@ export default function AdminReviewDetailPage() {
                 type="button"
                 disabled
                 title={t("admin.reviews.detail.noOrder")}
-                className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3.5 text-xs font-semibold text-[var(--text-muted)] opacity-70"
+                className="inline-flex h-9 cursor-not-allowed items-center gap-2 rounded-lg border border-line bg-subtle px-3.5 text-xs font-semibold text-fg-muted opacity-70"
               >
                 <ShoppingCart size={14} /> {t("admin.reviews.detail.viewOrder")}
               </button>
@@ -329,7 +329,7 @@ export default function AdminReviewDetailPage() {
         {/* Left Column */}
         <main className="space-y-4">
           {/* Review Content */}
-          <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3.5 sm:p-4">
+          <div className="rounded-lg border border-line bg-card p-3.5 sm:p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div
@@ -340,7 +340,7 @@ export default function AdminReviewDetailPage() {
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[13px] font-bold text-[var(--text-primary)]">{reviewerName}</h2>
+                    <h2 className="text-[13px] font-bold text-fg">{reviewerName}</h2>
                   </div>
                   <div className="mt-1">
                     <StarRating rating={rating} size={15} showValue={false} />
@@ -350,14 +350,14 @@ export default function AdminReviewDetailPage() {
             </div>
 
             {reviewTitle && (
-              <div className="mt-3.5 rounded-md border-l-2 border-[var(--accent)] bg-[var(--bg-tertiary)]/60 px-3 py-2">
-                <h3 className="text-[13px] font-bold text-[var(--text-primary)]">{reviewTitle}</h3>
+              <div className="mt-3.5 rounded-md border-l-2 border-accent bg-subtle/60 px-3 py-2">
+                <h3 className="text-[13px] font-bold text-fg">{reviewTitle}</h3>
               </div>
             )}
 
             {reviewComment && (
               <div className="mt-3">
-                <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--text-secondary)]">
+                <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-fg-secondary">
                   {reviewComment}
                 </p>
               </div>
@@ -369,7 +369,7 @@ export default function AdminReviewDetailPage() {
                   {attachments.map((item) => (
                     <div
                       key={item.key}
-                      className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-[var(--border-color)] transition hover:border-[var(--accent)]/40"
+                      className="group relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-line transition hover:border-accent/40"
                       style={{ backgroundColor: "var(--bg-tertiary)" }}
                     >
                       {item.type === "image" ? (
@@ -396,7 +396,7 @@ export default function AdminReviewDetailPage() {
                           <video src={item.url} muted preload="metadata" className="h-full w-full object-cover" />
                           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/90">
-                              <Play size={12} className="ml-0.5 fill-[var(--text-primary)] text-[var(--text-primary)]" />
+                              <Play size={12} className="ml-0.5 fill-fg text-fg" />
                             </span>
                           </div>
                         </button>
@@ -410,15 +410,15 @@ export default function AdminReviewDetailPage() {
           </div>
 
           {/* Store Response */}
-          <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
-            <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-[var(--border-color)] px-3.5 py-2.5">
+          <div className="rounded-lg border border-line bg-card">
+            <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line px-3.5 py-2.5">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}>
                   <MessageSquareText size={14} />
                 </span>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-[12px] font-bold text-[var(--text-primary)]">{t("admin.reviews.detail.storeResponse")}</h2>
+                    <h2 className="text-[12px] font-bold text-fg">{t("admin.reviews.detail.storeResponse")}</h2>
                     {review.storeResponse?.message && (
                       <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}>
                         {t("admin.reviews.detail.published")}
@@ -438,7 +438,7 @@ export default function AdminReviewDetailPage() {
                         setIsEditingResponse(true);
                         document.getElementById("review-store-response")?.focus();
                       }}
-                      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border-color)] px-2 text-[10px] font-semibold transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line px-2 text-[10px] font-semibold transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-50"
                       style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}
                     >
                       <Pencil size={11} /> {t("admin.reviews.detail.edit")}
@@ -459,7 +459,7 @@ export default function AdminReviewDetailPage() {
                     type="button"
                     disabled={responseMutation.isPending}
                     onClick={() => initResponseDraft(buildSuggestedReply(review, user.name))}
-                    className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-[var(--accent-soft)] bg-[var(--accent-soft)] px-2 text-[10px] font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-accent-soft bg-accent-soft px-2 text-[10px] font-semibold transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                     style={{ color: "var(--accent)" }}
                   >
                     <Sparkles size={11} /> {t("admin.reviews.detail.suggestedReply")}
@@ -470,11 +470,11 @@ export default function AdminReviewDetailPage() {
 
             <div className="p-3.5 sm:p-4">
               {review.storeResponse?.message && !isEditingResponse ? (
-                <div className="rounded-md border-l-2 border-[var(--accent)] bg-[var(--bg-tertiary)] p-3">
-                  <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-[var(--text-primary)]">
+                <div className="rounded-md border-l-2 border-accent bg-subtle p-3">
+                  <p className="whitespace-pre-wrap break-words text-[12px] leading-5 text-fg">
                     {localizedStoreResponse}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-fg-muted">
                     <span className="inline-flex items-center gap-1">
                       <User size={9} />
                       {t("admin.reviews.detail.publishedBy", { name: review.storeResponse.responded_by_name || "Store Support" })}
@@ -502,11 +502,11 @@ export default function AdminReviewDetailPage() {
                     maxLength={1000}
                     rows={4}
                     placeholder={t("admin.reviews.detail.responsePlaceholder")}
-                    className="min-h-28 w-full resize-y rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 text-[12px] leading-5 text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1.5 focus:ring-[var(--accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-h-28 w-full resize-y rounded-md border border-line bg-card px-3 py-2.5 text-[12px] leading-5 text-fg outline-none transition placeholder:text-fg-muted focus:border-accent focus:ring-1.5 focus:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-[10px] text-[var(--text-muted)]">
-                      <span className="font-semibold text-[var(--text-secondary)]">{responseDraft.length}/1,000</span> {t("admin.reviews.detail.chars")}
+                    <div className="text-[10px] text-fg-muted">
+                      <span className="font-semibold text-fg-secondary">{responseDraft.length}/1,000</span> {t("admin.reviews.detail.chars")}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {review.storeResponse?.message && isEditingResponse && (
@@ -517,7 +517,7 @@ export default function AdminReviewDetailPage() {
                             initResponseDraft(review.storeResponse.message);
                             setIsEditingResponse(false);
                           }}
-                          className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-color)] px-2.5 text-[10px] font-semibold transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-line px-2.5 text-[10px] font-semibold transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-50"
                           style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}
                         >
                           <X size={11} /> {t("admin.reviews.detail.cancel")}
@@ -551,10 +551,10 @@ export default function AdminReviewDetailPage() {
 
           {/* All Reviews by This Customer */}
           {customerReviews.length > 0 && (
-            <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-3.5">
+            <div className="rounded-lg border border-line bg-card p-3.5">
               <div className="mb-2.5 flex items-center justify-between">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.allByCustomer")}</h3>
-                <span className="text-[10px] text-[var(--text-muted)]">{t("admin.reviews.detail.more", { count: customerReviews.length })}</span>
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">{t("admin.reviews.detail.allByCustomer")}</h3>
+                <span className="text-[10px] text-fg-muted">{t("admin.reviews.detail.more", { count: customerReviews.length })}</span>
               </div>
               <div className="space-y-2">
                 {customerReviews.map((customerReview) => {
@@ -566,21 +566,21 @@ export default function AdminReviewDetailPage() {
                     <Link
                       key={customerReview._id}
                       href={`/admin/reviews/${customerReview._id}`}
-                      className="flex flex-wrap items-center justify-between gap-2.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] p-2.5 transition hover:border-[var(--accent)]/30"
+                      className="flex flex-wrap items-center justify-between gap-2.5 rounded-md border border-line bg-card p-2.5 transition hover:border-accent/30"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(relatedProduct) || t("admin.reviews.detail.productUnavailable")}</p>
-                        <p className="mt-0.5 truncate text-[10px] text-[var(--text-muted)]">
+                        <p className="truncate text-[11px] font-bold text-fg">{productNameOf(relatedProduct) || t("admin.reviews.detail.productUnavailable")}</p>
+                        <p className="mt-0.5 truncate text-[10px] text-fg-muted">
                           {reviewTextOf(customerReview, "title") || reviewTextOf(customerReview, "comment") || t("admin.reviews.ui.ratingOnly")}
                         </p>
                         <div className="mt-1 flex items-center gap-1">
                           <StarRating rating={relatedRating} size={10} showValue={false} />
-                          <span className="text-[10px] font-semibold text-[var(--text-muted)]">{relatedRating}/5</span>
+                          <span className="text-[10px] font-semibold text-fg-muted">{relatedRating}/5</span>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <StatusPill hidden={customerReview.status === "hidden"} t={t} />
-                        <span className="text-[10px] text-[var(--text-muted)]">{formatDate(customerReview.created_at, locale)}</span>
+                        <span className="text-[10px] text-fg-muted">{formatDate(customerReview.created_at, locale)}</span>
                       </div>
                     </Link>
                   );
@@ -593,12 +593,12 @@ export default function AdminReviewDetailPage() {
         {/* Right Column */}
         <aside className="space-y-4">
           {/* Customer Information */}
-          <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
-            <div className="border-b border-[var(--border-color)] px-3.5 py-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.customerInformation")}</h3>
+          <div className="rounded-lg border border-line bg-card">
+            <div className="border-b border-line px-3.5 py-2.5">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">{t("admin.reviews.detail.customerInformation")}</h3>
             </div>
             <div className="p-3.5">
-              <div className="flex flex-col items-center gap-2.5 border-b border-[var(--border-color)] pb-3">
+              <div className="flex flex-col items-center gap-2.5 border-b border-line pb-3">
                 <div
                   className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full text-base font-bold"
                   style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
@@ -606,53 +606,53 @@ export default function AdminReviewDetailPage() {
                   {user.avatar ? <FallbackImage src={mediaUrl(user.avatar)} alt="" className="h-full w-full object-cover" /> : reviewerName.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-center">
-                  <p className="text-[12px] font-bold text-[var(--text-primary)]">{reviewerName}</p>
+                  <p className="text-[12px] font-bold text-fg">{reviewerName}</p>
                 </div>
               </div>
               <div className="mt-3 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-fg-muted">
                     <Mail size={10} /> {t("admin.reviews.detail.email")}
                   </span>
                   {user.email ? (
                     <a href={`mailto:${user.email}`} className="text-[11px] font-bold hover:underline" style={{ color: "var(--accent)" }}>{user.email}</a>
                   ) : (
-                    <span className="text-[11px] text-[var(--text-muted)]">—</span>
+                    <span className="text-[11px] text-fg-muted">—</span>
                   )}
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-fg-muted">
                     <Phone size={10} /> {t("admin.reviews.detail.phone")}
                   </span>
-                  <span className="text-[11px] font-bold text-[var(--text-primary)]">{user.phone || "—"}</span>
+                  <span className="text-[11px] font-bold text-fg">{user.phone || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--text-muted)]">
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold text-fg-muted">
                     <Calendar size={10} /> {t("admin.reviews.detail.joined")}
                   </span>
-                  <span className="text-[11px] font-bold text-[var(--text-primary)]">{user.created_at ? formatDate(user.created_at, locale) : "—"}</span>
+                  <span className="text-[11px] font-bold text-fg">{user.created_at ? formatDate(user.created_at, locale) : "—"}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Product Information */}
-          <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
-            <div className="border-b border-[var(--border-color)] px-3.5 py-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.productInformation")}</h3>
+          <div className="rounded-lg border border-line bg-card">
+            <div className="border-b border-line px-3.5 py-2.5">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">{t("admin.reviews.detail.productInformation")}</h3>
             </div>
             <div className="p-3.5">
               <div className="flex items-center gap-2.5">
                 <FallbackImage src={mediaUrl(product.image)} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-bold text-[var(--text-primary)]">{productNameOf(product) || t("admin.reviews.detail.productUnavailable")}</p>
-                  <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">ID: {productId || "—"}</p>
+                  <p className="truncate text-[11px] font-bold text-fg">{productNameOf(product) || t("admin.reviews.detail.productUnavailable")}</p>
+                  <p className="mt-0.5 text-[10px] text-fg-muted">ID: {productId || "—"}</p>
                 </div>
               </div>
               {productId && (
                 <Link
                   href={`/admin/products/${productId}`}
-                  className="mt-3 inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-[11px] font-semibold text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                  className="mt-3 inline-flex h-8 w-full items-center justify-center gap-2 rounded-lg border border-line bg-page-alt px-3 text-[11px] font-semibold text-fg-secondary transition hover:border-accent hover:bg-accent-soft hover:text-accent"
                 >
                   <Package size={13} /> {t("admin.reviews.detail.viewProduct")}
                 </Link>
@@ -661,21 +661,21 @@ export default function AdminReviewDetailPage() {
           </div>
 
           {/* Review Information */}
-          <div className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
-            <div className="border-b border-[var(--border-color)] px-3.5 py-2.5">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">{t("admin.reviews.detail.reviewInformation")}</h3>
+          <div className="rounded-lg border border-line bg-card">
+            <div className="border-b border-line px-3.5 py-2.5">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-fg-muted">{t("admin.reviews.detail.reviewInformation")}</h3>
             </div>
             <div className="p-3.5 space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.reviews.detail.postedOn")}</span>
-                <span className="text-[11px] font-bold text-[var(--text-primary)]">{formatDateTime(review.created_at, locale)}</span>
+                <span className="text-[10px] font-semibold text-fg-muted">{t("admin.reviews.detail.postedOn")}</span>
+                <span className="text-[11px] font-bold text-fg">{formatDateTime(review.created_at, locale)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.reviews.detail.reviewId")}</span>
-                <span className="text-[11px] font-bold text-[var(--text-primary)]">{review._id}</span>
+                <span className="text-[10px] font-semibold text-fg-muted">{t("admin.reviews.detail.reviewId")}</span>
+                <span className="text-[11px] font-bold text-fg">{review._id}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.reviews.detail.purchase")}</span>
+                <span className="text-[10px] font-semibold text-fg-muted">{t("admin.reviews.detail.purchase")}</span>
                 <VerifiedBadge verified={review.verifiedPurchase} t={t} />
               </div>
             </div>
@@ -687,7 +687,7 @@ export default function AdminReviewDetailPage() {
               type="button"
               disabled={statusMutation.isPending}
               onClick={() => statusMutation.mutate(hidden ? "active" : "hidden")}
-              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-[var(--border-color)] px-2 text-[10px] font-bold transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line px-2 text-[10px] font-bold transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-50"
               style={{ backgroundColor: "var(--bg-card)", color: hidden ? "var(--success-text)" : "var(--warning-text)" }}
             >
               {hidden ? <Eye size={11} /> : <EyeOff size={11} />}
@@ -695,7 +695,7 @@ export default function AdminReviewDetailPage() {
             </button>
             <Link
               href="/admin/reviews"
-              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-[var(--border-color)] px-2 text-[10px] font-bold transition hover:bg-[var(--bg-tertiary)]"
+              className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line px-2 text-[10px] font-bold transition hover:bg-subtle"
               style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)" }}
             >
               <MessageSquareText size={11} /> {t("admin.reviews.detail.allReviews")}
@@ -719,17 +719,17 @@ export default function AdminReviewDetailPage() {
             aria-modal="true"
             aria-labelledby="delete-response-title"
             aria-describedby="delete-response-description"
-            className="w-full max-w-sm rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-2xl"
+            className="w-full max-w-sm rounded-lg border border-line bg-card p-4 shadow-2xl"
           >
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: "var(--danger-soft)", color: "var(--danger-text)" }}>
                 <AlertTriangle size={18} />
               </span>
               <div className="min-w-0">
-                <h2 id="delete-response-title" className="text-[12px] font-bold text-[var(--text-primary)]">
+                <h2 id="delete-response-title" className="text-[12px] font-bold text-fg">
                   {t("admin.reviews.detail.deleteResponseTitle")}
                 </h2>
-                <p id="delete-response-description" className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                <p id="delete-response-description" className="mt-0.5 text-[10px] text-fg-muted">
                   {t("admin.reviews.detail.deleteResponseBody")}
                 </p>
               </div>

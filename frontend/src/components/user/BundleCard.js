@@ -123,10 +123,10 @@ export default function BundleCard({ bundle, className = "" }) {
 
   return (
     <div
-      className={`group relative flex flex-col h-full bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl overflow-hidden hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300 ${className}`}
+      className={`group relative flex flex-col h-full bg-user-card border border-user-line rounded-2xl overflow-hidden hover:border-user-accent/50 hover:-translate-y-0.5 hover:shadow-[var(--user-shadow-md)] transition-all duration-300 ${className}`}
     >
       {/* ✅ SIRF bundle ki manual cover image — individual product images nahi */}
-      <div className="relative aspect-square bg-[var(--user-bg-hover)] overflow-hidden shrink-0">
+      <div className="relative aspect-square bg-user-hover overflow-hidden shrink-0">
         <FallbackImage
           src={image}
           alt={name}
@@ -139,7 +139,7 @@ export default function BundleCard({ bundle, className = "" }) {
             <Layers size={9} /> BUNDLE
           </span>
           {percent > 0 && (
-            <span className="bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-user-accent text-user-accent-fg text-[0.625rem] font-bold px-2 py-0.5 rounded-full">
               {percent}% OFF
             </span>
           )}
@@ -153,16 +153,16 @@ export default function BundleCard({ bundle, className = "" }) {
       </div>
 
       <div className="p-3 lg:p-4 flex flex-col flex-1 min-w-0">
-        <p className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-wider font-bold mb-1 truncate">
+        <p className="text-user-fg-subtle text-[0.625rem] uppercase tracking-wider font-bold mb-1 truncate">
           Combo Deal
         </p>
 
-        <h3 className="text-[var(--user-text)] font-medium text-sm lg:text-[0.9375rem] line-clamp-2 leading-snug min-h-[2.6em]">
+        <h3 className="text-user-fg font-medium text-sm lg:text-[0.9375rem] line-clamp-2 leading-snug min-h-[2.6em]">
           {name}
         </h3>
 
         {description ? (
-          <p className="mt-1 text-[0.6875rem] line-clamp-1 text-[var(--user-text-subtle)]">
+          <p className="mt-1 text-[0.6875rem] line-clamp-1 text-user-fg-subtle">
             {description}
           </p>
         ) : null}
@@ -171,7 +171,7 @@ export default function BundleCard({ bundle, className = "" }) {
         <button
           type="button"
           onClick={() => setShowItems((v) => !v)}
-          className="mt-2 self-start text-[0.6875rem] font-semibold text-[var(--user-text-subtle)] hover:text-[var(--user-accent)] transition flex items-center gap-1"
+          className="mt-2 self-start text-[0.6875rem] font-semibold text-user-fg-subtle hover:text-user-accent transition flex items-center gap-1"
         >
           <ChevronDown
             size={12}
@@ -183,16 +183,16 @@ export default function BundleCard({ bundle, className = "" }) {
         {showItems && (
           <ul className="mt-1.5 mb-1 space-y-1">
             {items.length === 0 ? (
-              <li className="text-[0.6875rem] text-[var(--user-text-subtle)]">
+              <li className="text-[0.6875rem] text-user-fg-subtle">
                 Loading products…
               </li>
             ) : (
               items.map(({ product, quantity }) => (
                 <li
                   key={product._id || product.id}
-                  className="text-[0.6875rem] text-[var(--user-text-secondary)] flex items-start gap-1.5"
+                  className="text-[0.6875rem] text-user-fg-secondary flex items-start gap-1.5"
                 >
-                  <span className="text-[var(--user-accent)] font-bold">
+                  <span className="text-user-accent font-bold">
                     {quantity}×
                   </span>
                   <span className="truncate">{productNameOf(product)}</span>
@@ -204,15 +204,15 @@ export default function BundleCard({ bundle, className = "" }) {
 
         <div className="mt-auto pt-2.5 flex flex-col items-start min-w-0">
           {originalPrice > bundlePrice && (
-            <span className="text-[0.6875rem] lg:text-xs text-[var(--user-text-subtle)] line-through whitespace-nowrap">
+            <span className="text-[0.6875rem] lg:text-xs text-user-fg-subtle line-through whitespace-nowrap">
               Rs. {originalPrice.toLocaleString()}
             </span>
           )}
-          <h4 className="text-base lg:text-lg font-bold text-[var(--user-text)] whitespace-nowrap">
+          <h4 className="text-base lg:text-lg font-bold text-user-fg whitespace-nowrap">
             Rs. {bundlePrice.toLocaleString()}
           </h4>
           {savings > 0 && (
-            <span className="mt-1 text-[0.625rem] font-semibold text-[var(--user-success)] flex items-center gap-1 whitespace-nowrap">
+            <span className="mt-1 text-[0.625rem] font-semibold text-user-success flex items-center gap-1 whitespace-nowrap">
               <Sparkles size={10} /> Save Rs. {savings.toLocaleString()}
             </span>
           )}
@@ -224,8 +224,8 @@ export default function BundleCard({ bundle, className = "" }) {
           disabled={isLoading || !canAdd}
           className={`mt-3 w-full h-9 rounded-xl text-[0.75rem] font-bold flex items-center justify-center gap-1.5 transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed ${
             added
-              ? "bg-[var(--user-success)] text-white"
-              : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:brightness-110"
+              ? "bg-user-success text-white"
+              : "bg-user-accent text-user-accent-fg hover:brightness-110"
           }`}
         >
           {isLoading ? (

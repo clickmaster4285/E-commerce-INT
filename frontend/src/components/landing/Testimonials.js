@@ -106,7 +106,7 @@ function Stars({ rating, size = 16 }) {
           className={
             i < Math.round(rating)
               ? "fill-[#F5B942] text-[#F5B942]"
-              : "fill-[var(--user-border)] text-[var(--user-border)]"
+              : "fill-user-line text-user-line"
           }
         />
       ))}
@@ -140,7 +140,7 @@ function MiniCard({ person, hidden }) {
       <blockquote className="tt-text mt-3 flex-1 text-[14px] leading-6 line-clamp-4">
         &ldquo;{person.quote}&rdquo;
       </blockquote>
-      <figcaption className="mt-4 flex items-center gap-3 border-t border-[var(--user-border)] pt-3">
+      <figcaption className="mt-4 flex items-center gap-3 border-t border-user-line pt-3">
         <Avatar person={person} />
         <span className="min-w-0 leading-tight">
           <span className="tt-quote block truncate text-[13px] font-extrabold">{person.name}</span>

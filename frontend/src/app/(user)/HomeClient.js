@@ -38,32 +38,36 @@ import BannerSlider from "@/components/user/BannerSlider";
 import ViewportSection from "@/components/user/ViewportSection";
 import { useHomeCatalog } from "../../hooks/user/useHomeCatalog";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { useStoreTheme, selectSectionInEditor } from "@/storefront/ThemeProvider";
+import { hasCustomAccent } from "@/storefront/themeCss";
+import { DEFAULT_SECTION_ORDER } from "@/storefront/themeDefaults";
+import { GENERIC_SECTIONS } from "@/storefront/sections/registry";
 
 /* Below-fold sections — code-split (initial JS chhota → LCP/INP fast).
    ssr:true taake SEO same rahe, lekin alag chunk me load hon. */
 const HomeCategories = dynamic(() => import("@/components/user/HomeCategories"), {
   ssr: true,
-  loading: () => <div className="h-[10rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
+  loading: () => <div className="h-[10rem] animate-pulse rounded-2xl bg-user-card" />,
 });
 const DealsSection = dynamic(() => import("@/components/user/DealsSection"), {
   ssr: true,
-  loading: () => <div className="h-[22rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
+  loading: () => <div className="h-[22rem] animate-pulse rounded-2xl bg-user-card" />,
 });
 const FeaturedProducts = dynamic(() => import("@/components/user/FeaturedProducts"), {
   ssr: true,
-  loading: () => <div className="h-[30rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
+  loading: () => <div className="h-[30rem] animate-pulse rounded-2xl bg-user-card" />,
 });
 const PopularCategories = dynamic(() => import("@/components/user/PopularCategories"), {
   ssr: true,
-  loading: () => <div className="h-[12rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
+  loading: () => <div className="h-[12rem] animate-pulse rounded-2xl bg-user-card" />,
 });
 const BrandStrip = dynamic(() => import("@/components/user/BrandStrip"), {
   ssr: true,
-  loading: () => <div className="h-[7rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
+  loading: () => <div className="h-[7rem] animate-pulse rounded-2xl bg-user-card" />,
 });
 const BrandShowcase = dynamic(() => import("@/components/user/BrandShowcase"), {
   ssr: true,
-  loading: () => <div className="h-[26rem] animate-pulse rounded-2xl bg-[var(--user-bg-card)]" />,
+  loading: () => <div className="h-[26rem] animate-pulse rounded-2xl bg-user-card" />,
 });
 /* Mobile drawer: band ho to zero JS — sirf kholne par load. */
 const SidebarDrawer = dynamic(() => import("@/components/user/HomeSidebar"), {
@@ -71,18 +75,46 @@ const SidebarDrawer = dynamic(() => import("@/components/user/HomeSidebar"), {
   loading: () => (
     <div className="space-y-2 p-4">
       {[...Array(6).keys()].map((i) => (
-        <div key={i} className="h-7 animate-pulse rounded-lg bg-[var(--user-bg-hover)]" />
+        <div key={i} className="h-7 animate-pulse rounded-lg bg-user-hover" />
       ))}
     </div>
   ),
 });
 
+// Purana home-only orange accent. Store editor me seller apna accent set kare
+// to ye skip hota hai (theme CSS vars #user-theme se aate hain).
 const HOME_THEME = {
   "--user-accent": "#f97316",
   "--user-accent-hover": "#ea580c",
   "--user-accent-text": "#ffffff",
   "--user-accent-soft": "rgba(249, 115, 22, 0.14)",
 };
+
+function useHomeStyle() {
+  const { theme } = useStoreTheme();
+  return hasCustomAccent(theme) ? undefined : HOME_THEME;
+}
+
+/* Store editor preview: section par outline + click → editor me select.
+   Preview ke bahar sirf <Fragment> jaisa wrapper (koi extra DOM nahi). */
+function EditableSection({ id, isPreview, selected, children }) {
+  if (!isPreview) return children;
+  return (
+    <div
+      data-section-id={id}
+      onClickCapture={(event) => {
+        // Preview me links navigate na karein — click sirf select kare
+        if (event.target.closest?.("a")) event.preventDefault();
+        selectSectionInEditor(id);
+      }}
+      className={`relative rounded-2xl outline-offset-4 transition-[outline-color] ${
+        selected ? "outline outline-2 outline-user-accent" : "hover:outline hover:outline-1 hover:outline-user-line"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
 
 const FILTER_KEYS = [
   "category",
@@ -125,16 +157,17 @@ function buildFilteringQuery(base, patch) {
 }
 
 export default function HomeClient({ initialBanners = null }) {
+  const homeStyle = useHomeStyle();
   return (
     <Suspense
       fallback={
         <main
-          style={HOME_THEME}
-          className="min-h-screen w-full min-w-0 pb-2 text-[var(--user-text)]"
+          style={homeStyle}
+          className="min-h-screen w-full min-w-0 pb-2 text-user-fg"
         >
-          <div className="sticky top-14 z-40 h-11 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16 lg:h-12" />
+          <div className="sticky top-14 z-40 h-11 border-b border-user-line bg-user-elevated lg:top-16 lg:h-12" />
           <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
-            <div className="h-7 w-48 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
+            <div className="h-7 w-48 animate-pulse rounded-full bg-user-card" />
           </div>
         </main>
       }
@@ -169,6 +202,8 @@ function HomeParamsSync() {
 
 function HomeContent({ initialBanners = null }) {
   const { dir } = useTranslation();
+  const homeStyle = useHomeStyle();
+  const { theme, isPreview, selectedSectionId } = useStoreTheme();
   const {
     categories,
     brands,
@@ -292,10 +327,84 @@ function HomeContent({ initialBanners = null }) {
     onToggleAllDealsView: handleToggleAllDealsView,
   };
 
+  /* ── Store editor sections (theme order) ──
+     Default theme = purana order bilkul same. Disabled / unknown types skip. */
+  const sectionEntries = (Array.isArray(theme?.order) ? theme.order : DEFAULT_SECTION_ORDER)
+    .map((id) => [id, theme?.sections?.[id] || (theme ? null : { type: id, settings: {} })])
+    .filter(([, section]) => section && !section.disabled);
+
+  const renderBuiltin = (type, settings = {}) => {
+    const heading = settings.heading || "";
+    switch (type) {
+      case "hero_banners":
+        return (
+          <div className="overflow-hidden rounded-2xl border border-user-line">
+            <BannerSlider initialBanners={initialBanners} />
+          </div>
+        );
+      case "category_tiles":
+        return (
+          <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full">
+            <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} heading={heading} />
+          </ViewportSection>
+        );
+      case "deals":
+        return (
+          <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full">
+            <DealsSection embedded heading={heading} />
+          </ViewportSection>
+        );
+      case "featured_products":
+        return (
+          <ViewportSection minHeight={640}>
+            <FeaturedProducts hasOffers={hasOffers} titleOverride={heading || null} />
+          </ViewportSection>
+        );
+      case "popular_categories":
+        return (
+          <ViewportSection minHeight={260}>
+            <PopularCategories tiles={categoryTiles} isLoading={isLoading} heading={heading} />
+          </ViewportSection>
+        );
+      case "brand_strip":
+        return (
+          <ViewportSection minHeight={120}>
+            <BrandStrip brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
+          </ViewportSection>
+        );
+      case "brand_showcase":
+        return (
+          <ViewportSection minHeight={520}>
+            <BrandShowcase brands={brands} brandCounts={brandCounts} isLoading={isLoading} heading={heading} />
+          </ViewportSection>
+        );
+      default:
+        return undefined;
+    }
+  };
+
+  const renderSection = (id, section, index) => {
+    const builtin = renderBuiltin(section.type, section.settings);
+    let node = builtin;
+    if (builtin === undefined) {
+      const generic = GENERIC_SECTIONS[section.type];
+      if (!generic) return null; // unknown type (naya backend, purana frontend)
+      const { Component, minHeight, eager } = generic;
+      const inner = <Component settings={section.settings || {}} blocks={section.blocks || []} />;
+      // Pehla section lazy nahi (LCP); baaki viewport par mount
+      node = eager || index === 0 ? inner : <ViewportSection minHeight={minHeight}>{inner}</ViewportSection>;
+    }
+    return (
+      <EditableSection key={id} id={id} isPreview={isPreview} selected={selectedSectionId === id}>
+        {node}
+      </EditableSection>
+    );
+  };
+
   return (
     <main
-      style={HOME_THEME}
-      className="min-h-screen w-full min-w-0 pb-2 text-[var(--user-text)]"
+      style={homeStyle}
+      className="min-h-screen w-full min-w-0 pb-2 text-user-fg"
     >
       <HomeParamsSync />
       {/* HEADER ROW 2 — nav */}
@@ -318,17 +427,17 @@ function HomeContent({ initialBanners = null }) {
               <button
                 type="button"
                 onClick={() => setFiltersOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3.5 py-2 text-[0.75rem] font-bold text-[var(--user-text)]"
+                className="inline-flex items-center gap-2 rounded-xl border border-user-line bg-user-card px-3.5 py-2 text-[0.75rem] font-bold text-user-fg"
               >
-                <SlidersHorizontal size={14} className="text-[var(--user-accent)]" />
+                <SlidersHorizontal size={14} className="text-user-accent" />
                 Filters
                 {activeFilterCount > 0 ? (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--user-accent)] px-1 text-[0.625rem] font-black text-[var(--user-accent-text)]">
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-user-accent px-1 text-[0.625rem] font-black text-user-accent-fg">
                     {activeFilterCount}
                   </span>
                 ) : null}
               </button>
-              <span className="text-[0.6875rem] font-semibold text-[var(--user-text-subtle)]">
+              <span className="text-[0.6875rem] font-semibold text-user-fg-subtle">
                 {`${matchCount} products`}
               </span>
             </div>
@@ -337,42 +446,10 @@ function HomeContent({ initialBanners = null }) {
               /* Khal store — All Products sab se upar, baaki sections chhupe */
               <FeaturedProducts hasOffers={hasOffers} />
             ) : (
-              <>
-                {/* HERO BANNER */}
-                <div className="overflow-hidden rounded-2xl border border-[var(--user-border)]">
-                  <BannerSlider initialBanners={initialBanners} />
-                </div>
-
-                {/* CATEGORY TILES */}
-                <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full">
-                  <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} />
-                </ViewportSection>
-
-                {/* TODAY'S DEALS */}
-                <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full">
-                  <DealsSection embedded />
-                </ViewportSection>
-
-                {/* FEATURED PRODUCTS — server tabs */}
-                <ViewportSection minHeight={640}>
-                  <FeaturedProducts hasOffers={hasOffers} />
-                </ViewportSection>
-
-                {/* POPULAR CATEGORIES */}
-                <ViewportSection minHeight={260}>
-                  <PopularCategories tiles={categoryTiles} isLoading={isLoading} />
-                </ViewportSection>
-
-                {/* BRANDS */}
-                <ViewportSection minHeight={120}>
-                  <BrandStrip brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
-                </ViewportSection>
-
-                {/* BRAND SPOTLIGHT (LAST) */}
-                <ViewportSection minHeight={520}>
-                  <BrandShowcase brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
-                </ViewportSection>
-              </>
+              /* Store editor theme ka section order (default = purana:
+                 Hero → Category tiles → Deals → Featured → Popular categories
+                 → Brand strip → Brand spotlight) */
+              <>{sectionEntries.map(([id, section], index) => renderSection(id, section, index))}</>
             )}
           </div>
         </div>
@@ -385,16 +462,16 @@ function HomeContent({ initialBanners = null }) {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setFiltersOpen(false)}
           />
-          <div className="absolute right-0 top-0 h-full w-[88%] max-w-[21.25rem] overflow-y-auto border-l border-[var(--user-border)] bg-[var(--user-bg-elevated)]">
-            <div className="flex items-center justify-between border-b border-[var(--user-border)] px-4 py-3">
-              <span className="text-sm font-black uppercase tracking-wider text-[var(--user-text)]">
+          <div className="absolute right-0 top-0 h-full w-[88%] max-w-[21.25rem] overflow-y-auto border-l border-user-line bg-user-elevated">
+            <div className="flex items-center justify-between border-b border-user-line px-4 py-3">
+              <span className="text-sm font-black uppercase tracking-wider text-user-fg">
                 Filters
               </span>
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
                 aria-label="Close filters"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)]"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-user-fg-muted hover:bg-user-hover"
               >
                 <X size={17} />
               </button>

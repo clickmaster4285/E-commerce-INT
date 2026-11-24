@@ -151,13 +151,13 @@ export default function AddStorePage() {
         <PageHeader title="Add store" backHref={LIST} backLabel="Back to stores" />
         <Card className="mx-auto max-w-2xl">
           <CardBody className="flex flex-col items-center px-6 py-10 text-center">
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--success-bg,rgba(16,185,129,0.12))] text-[var(--success-text)]"><CheckCircle2 size={28} aria-hidden="true" /></span>
-            <h2 className="mt-4 text-[20px] font-semibold text-[var(--text-primary)]">{created.storeName} is live</h2>
-            <p className="mt-1.5 max-w-md text-[13.5px] leading-6 text-[var(--text-secondary)]">
-              {created.owner} can sign in to the store admin panel with <span className="font-medium text-[var(--text-primary)]">{created.email}</span> and the password you set.
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success"><CheckCircle2 size={28} aria-hidden="true" /></span>
+            <h2 className="mt-4 text-[20px] font-semibold text-fg">{created.storeName} is live</h2>
+            <p className="mt-1.5 max-w-md text-[13.5px] leading-6 text-fg-secondary">
+              {created.owner} can sign in to the store admin panel with <span className="font-medium text-fg">{created.email}</span> and the password you set.
             </p>
             {created.url && (
-              <a href={created.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[var(--bg-tertiary)] px-3 py-1.5 font-mono text-[12.5px] text-[var(--accent)] hover:underline">
+              <a href={created.url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-subtle px-3 py-1.5 font-mono text-[12.5px] text-accent hover:underline">
                 {created.url.replace(/^https?:\/\//, "")} <ExternalLink size={12} aria-hidden="true" />
               </a>
             )}
@@ -220,8 +220,8 @@ export default function AddStorePage() {
               </div>
 
               <Field label="Store web address" required htmlFor="sa-new-subdomain" error={errors.subdomain}>
-                <div className="flex items-stretch overflow-hidden rounded-[var(--radius-input,8px)] border border-[var(--border-input,var(--border-color))] bg-[var(--bg-input,var(--bg-card))] focus-within:border-[var(--accent)] focus-within:ring-2 focus-within:ring-[var(--accent-soft)]" data-invalid={errors.subdomain ? "true" : undefined}>
-                  <span className="flex items-center ps-3 text-[var(--text-muted)]"><Link2 size={15} aria-hidden="true" /></span>
+                <div className="flex items-stretch overflow-hidden rounded-[var(--radius-input,8px)] border border-line bg-input focus-within:border-accent focus-within:ring-2 focus-within:ring-accent-soft" data-invalid={errors.subdomain ? "true" : undefined}>
+                  <span className="flex items-center ps-3 text-fg-muted"><Link2 size={15} aria-hidden="true" /></span>
                   <input
                     id="sa-new-subdomain"
                     value={form.subdomain}
@@ -234,25 +234,25 @@ export default function AddStorePage() {
                     data-bwignore
                     spellCheck={false}
                     maxLength={STORE_ADDRESS_MAX}
-                    className="min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[13.5px] font-medium text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                    className="min-w-0 flex-1 bg-transparent px-2.5 py-2 text-[13.5px] font-medium text-fg outline-none placeholder:text-fg-muted"
                   />
-                  <span className="flex max-w-[55%] items-center truncate border-s border-[var(--border-color)] bg-[var(--bg-tertiary)] px-3 text-[12.5px] text-[var(--text-muted)]">.{ROOT_DOMAIN}</span>
+                  <span className="flex max-w-[55%] items-center truncate border-s border-line bg-subtle px-3 text-[12.5px] text-fg-muted">.{ROOT_DOMAIN}</span>
                 </div>
               </Field>
               {!errors.subdomain && (
                 <p className="-mt-2 flex items-center gap-1.5 text-[12px]" aria-live="polite">
-                  <span className={`order-last ms-auto tabular-nums ${sub.length >= STORE_ADDRESS_MAX ? "font-medium text-[var(--warning-text,#c2410c)]" : "text-[var(--text-muted)]"}`}>{form.subdomain.length}/{STORE_ADDRESS_MAX}</span>
+                  <span className={`order-last ms-auto tabular-nums ${sub.length >= STORE_ADDRESS_MAX ? "font-medium text-warning" : "text-fg-muted"}`}>{form.subdomain.length}/{STORE_ADDRESS_MAX}</span>
                   {sub.length < 3 ? (
-                    <span className="text-[var(--text-muted)]">Lowercase letters, numbers and hyphens · 3–{STORE_ADDRESS_MAX} characters.</span>
+                    <span className="text-fg-muted">Lowercase letters, numbers and hyphens · 3–{STORE_ADDRESS_MAX} characters.</span>
                   ) : subState === "checking" ? (
-                    <><Loader2 size={12} className="animate-spin text-[var(--text-muted)]" aria-hidden="true" /><span className="text-[var(--text-muted)]">Checking availability…</span></>
+                    <><Loader2 size={12} className="animate-spin text-fg-muted" aria-hidden="true" /><span className="text-fg-muted">Checking availability…</span></>
                   ) : subState === "available" ? (
-                    <><CheckCircle2 size={13} className="text-[var(--success-text)]" aria-hidden="true" /><span className="font-medium text-[var(--success-text)]">{sub}.{ROOT_DOMAIN} is available</span></>
+                    <><CheckCircle2 size={13} className="text-success" aria-hidden="true" /><span className="font-medium text-success">{sub}.{ROOT_DOMAIN} is available</span></>
                   ) : null}
                 </p>
               )}
               {errors.subdomain && subCheck.suggestion && subCheck.value === sub && (
-                <button type="button" onClick={() => changeSubdomain(subCheck.suggestion)} className="-mt-2 inline-flex items-center gap-1.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 py-1 text-[12px] font-semibold text-[var(--accent)] hover:border-[var(--accent)]">
+                <button type="button" onClick={() => changeSubdomain(subCheck.suggestion)} className="-mt-2 inline-flex items-center gap-1.5 rounded-md border border-line bg-subtle px-2.5 py-1 text-[12px] font-semibold text-accent hover:border-accent">
                   Use {subCheck.suggestion}.{ROOT_DOMAIN}
                 </button>
               )}
@@ -316,21 +316,21 @@ export default function AddStorePage() {
         <aside className="space-y-4 xl:sticky xl:top-4">
           <Card>
             <CardHeader title="Summary" icon={Sparkles} />
-            <ul className="divide-y divide-[var(--border-color)]">
+            <ul className="divide-y divide-line">
               <SummaryRow icon={StoreIcon} label="Store">{form.storeName.trim() || <Muted>Not set</Muted>}</SummaryRow>
               <SummaryRow icon={Globe} label="Web address">
-                <span className={`block truncate font-mono text-[12px] ${sub ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`} title={previewUrl}>{previewUrl}</span>
+                <span className={`block truncate font-mono text-[12px] ${sub ? "text-fg" : "text-fg-muted"}`} title={previewUrl}>{previewUrl}</span>
               </SummaryRow>
               <SummaryRow icon={UserRound} label="Owner">{form.name.trim() || <Muted>Not set</Muted>}</SummaryRow>
               <SummaryRow icon={Mail} label="Sign-in email"><span className="block truncate" title={form.email}>{form.email.trim() || <Muted>Not set</Muted>}</span></SummaryRow>
               <SummaryRow icon={MapPin} label="Location">{[form.city.trim(), form.country].filter(Boolean).join(", ") || <Muted>Not set</Muted>}</SummaryRow>
             </ul>
-            <div className="space-y-3 border-t border-[var(--border-color)] px-5 py-4">
-              <label className="flex cursor-pointer items-start gap-2.5 text-[13px] text-[var(--text-secondary)]">
-                <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+            <div className="space-y-3 border-t border-line px-5 py-4">
+              <label className="flex cursor-pointer items-start gap-2.5 text-[13px] text-fg-secondary">
+                <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
                 <span>
-                  <span className="font-medium text-[var(--text-primary)]">Email the owner</span>
-                  <span className="block text-[12px] text-[var(--text-muted)]">Send a confirmation with the store link. The password is never emailed.</span>
+                  <span className="font-medium text-fg">Email the owner</span>
+                  <span className="block text-[12px] text-fg-muted">Send a confirmation with the store link. The password is never emailed.</span>
                 </span>
               </label>
               <Button type="submit" variant="primary" icon={StoreIcon} fullWidth loading={mutation.isPending}>Create store</Button>
@@ -339,15 +339,15 @@ export default function AddStorePage() {
 
           <Card>
             <CardBody className="space-y-2.5 py-4">
-              <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]"><ShieldCheck size={14} aria-hidden="true" /> What happens</p>
+              <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-fg-muted"><ShieldCheck size={14} aria-hidden="true" /> What happens</p>
               {[
                 "The store opens right away at its web address.",
                 "The owner can sign in to the store admin panel with the email and password above.",
                 "It appears under Stores and as an approved request in Signup Requests.",
               ].map((t) => (
-                <p key={t} className="flex items-start gap-2 text-[12.5px] leading-5 text-[var(--text-secondary)]"><CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[var(--success-text)]" aria-hidden="true" />{t}</p>
+                <p key={t} className="flex items-start gap-2 text-[12.5px] leading-5 text-fg-secondary"><CheckCircle2 size={14} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />{t}</p>
               ))}
-              <p className="flex items-start gap-2 pt-1 text-[12px] leading-5 text-[var(--text-muted)]"><CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Share the password with the owner directly.</p>
+              <p className="flex items-start gap-2 pt-1 text-[12px] leading-5 text-fg-muted"><CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" />Share the password with the owner directly.</p>
             </CardBody>
           </Card>
         </aside>
@@ -359,12 +359,12 @@ export default function AddStorePage() {
 function SummaryRow({ icon: Icon, label, children }) {
   return (
     <li className="flex items-center justify-between gap-3 px-5 py-2.5 text-[13px]">
-      <span className="inline-flex shrink-0 items-center gap-2 text-[var(--text-muted)]"><Icon size={14} aria-hidden="true" />{label}</span>
-      <span className="min-w-0 max-w-[60%] text-end font-medium text-[var(--text-primary)]">{children}</span>
+      <span className="inline-flex shrink-0 items-center gap-2 text-fg-muted"><Icon size={14} aria-hidden="true" />{label}</span>
+      <span className="min-w-0 max-w-[60%] text-end font-medium text-fg">{children}</span>
     </li>
   );
 }
 
 function Muted({ children }) {
-  return <span className="font-normal text-[var(--text-muted)]">{children}</span>;
+  return <span className="font-normal text-fg-muted">{children}</span>;
 }

@@ -328,7 +328,7 @@ export default function ManageStockPage() {
   const showStockTranslationSkeletons = locale !== "en" && stockTranslationFields.length > 0 && untranslatedStockFieldCount / stockTranslationFields.length >= 0.8;
   const isMissingTranslation = (source, translation) => locale !== "en" && Boolean(source?.trim()) && !hasLocalizedText(translation);
   const translatedValueOrSkeleton = (source, translation, value, translationReady, width = "w-24") => showStockTranslationSkeletons && !translationReady && isMissingTranslation(source, translation)
-    ? <span className={`inline-block h-3 ${width} rounded bg-[var(--bg-tertiary)] animate-pulse align-middle`} aria-busy="true" />
+    ? <span className={`inline-block h-3 ${width} rounded bg-subtle animate-pulse align-middle`} aria-busy="true" />
     : value;
 
   const historyQueryKey = ["stock-history", "paginated", locale, historyPage, historyItemsPerPage];
@@ -616,7 +616,7 @@ export default function ManageStockPage() {
                   placeholder={t("admin.manageStock.page.search")}
                   value={search} 
                   onChange={(e) => handleSearchChange(e.target.value)} 
-                  className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent-soft)]" 
+                  className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-accent-soft" 
                   style={inputStyle} 
                 />
               </div>
@@ -659,8 +659,8 @@ export default function ManageStockPage() {
                           const categoryMissing = isMissingTranslation(item.category_name, item.category_translations?.[locale]);
                           const brandMissing = isMissingTranslation(item.brand_name, item.brand_translations?.[locale]);
                           const metaLine = [
-                            item.category_name?.trim() && (showStockTranslationSkeletons && !categoryTranslationsReady && categoryMissing ? <span key="category" className="inline-block h-2.5 w-16 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedField(item.category_name, item.category_translations, locale)),
-                            item.brand_name?.trim() && (showStockTranslationSkeletons && !brandTranslationsReady && brandMissing ? <span key="brand" className="inline-block h-2.5 w-16 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : nameOf({ name: item.brand_name, translations: { name: item.brand_translations }, brand_code: true })),
+                            item.category_name?.trim() && (showStockTranslationSkeletons && !categoryTranslationsReady && categoryMissing ? <span key="category" className="inline-block h-2.5 w-16 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : localizedField(item.category_name, item.category_translations, locale)),
+                            item.brand_name?.trim() && (showStockTranslationSkeletons && !brandTranslationsReady && brandMissing ? <span key="brand" className="inline-block h-2.5 w-16 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : nameOf({ name: item.brand_name, translations: { name: item.brand_translations }, brand_code: true })),
                           ].filter(Boolean);
                           return (
                             <tr key={item._id} className="transition" style={{ borderBottom: index < paginatedStockItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
@@ -745,7 +745,7 @@ export default function ManageStockPage() {
                           <button
                             onClick={() => openAdjustModal(item)}
                             disabled={adjustMutation.isPending}
-                            className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center text-[12px] font-semibold gap-1.5"
+                            className="flex-shrink-0 min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-subtle flex items-center justify-center text-[12px] font-semibold gap-1.5"
                             style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}
                           >
                             <EditIcon className="w-4 h-4" /> {t("admin.manageStock.page.adjust")}
@@ -807,13 +807,13 @@ export default function ManageStockPage() {
                         const isSet = h.adjustment_type === "set";
                         return (
                           <tr key={h._id} className="transition" style={{ borderBottom: index < paginatedHistoryItems.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: "var(--bg-card)" }}>
-                          <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{showHistoryTranslationSkeletons && isMissingTranslation(h.product_name, h.translations?.product_name?.[locale]) ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-busy="true" /> : stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)}</span></div></td>
+                          <td className="px-4 py-2.5"><div className="flex items-center gap-2.5"><Avatar name={stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)} /><span className="font-medium text-[13px] truncate max-w-[150px]">{showHistoryTranslationSkeletons && isMissingTranslation(h.product_name, h.translations?.product_name?.[locale]) ? <span className="inline-block h-3 w-24 rounded bg-subtle animate-pulse" aria-busy="true" /> : stockProductNameOf({ product_name: h.product_name, product_translations: h.translations?.product_name }, locale)}</span></div></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-mono truncate max-w-[110px] block" style={{ color: "var(--text-secondary)" }}>{h.sku}</span></td>
-                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{showHistoryTranslationSkeletons && isMissingTranslation(h.variant_title, h.translations?.variant_title?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-busy="true" /> : localizedField(h.variant_title, h.translations?.variant_title, locale)}</span></td>
+                            <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{showHistoryTranslationSkeletons && isMissingTranslation(h.variant_title, h.translations?.variant_title?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-subtle animate-pulse" aria-busy="true" /> : localizedField(h.variant_title, h.translations?.variant_title, locale)}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px]" style={{ color: "var(--text-muted)" }}>{formatNumber(h.previous_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold whitespace-nowrap" style={{ color: isSet ? "var(--warning)" : change > 0 ? "var(--success-text)" : change < 0 ? "var(--danger)" : "var(--text-muted)" }}>{change > 0 ? `+${change}` : change}</span></td>
                             <td className="px-4 py-2.5"><span className="text-[13px] font-semibold">{formatNumber(h.new_quantity, locale)} {t("admin.manageStock.page.units")}</span></td>
-                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{showHistoryTranslationSkeletons && isMissingTranslation(h.reason, h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-card)] animate-pulse" aria-busy="true" /> : localizedField(h.reason, h.translations?.reason, locale) || "—"}</span></td>
+                            <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[12px] px-2 py-1 rounded-md" style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{showHistoryTranslationSkeletons && isMissingTranslation(h.reason, h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-card animate-pulse" aria-busy="true" /> : localizedField(h.reason, h.translations?.reason, locale) || "—"}</span></td>
                             <td className="px-4 py-2.5 hidden lg:table-cell"><span className="text-[13px]" style={{ color: "var(--text-secondary)" }}>{h.performed_by_name}</span></td>
                             <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-[12px] whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{formatDateTime(h.created_at, locale)}</span></td>
                           </tr>
@@ -954,7 +954,7 @@ export default function ManageStockPage() {
                                 <span className="text-[13px] font-bold" style={{ color: changeColor(change) }}>
                                   {change > 0 ? `+${formatNumber(change, locale)}` : formatNumber(change, locale)} {t("admin.manageStock.page.units")}
                                 </span>
-                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{showDetailsHistoryTranslationSkeletons && isMissingTranslation(h.reason, h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-busy="true" /> : localizedField(h.reason, h.translations?.reason, locale) || h.adjustment_type || "—"}</span>
+                                <span className="text-[11px] px-2 py-0.5 rounded-md truncate max-w-[140px]" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border-color)" }}>{showDetailsHistoryTranslationSkeletons && isMissingTranslation(h.reason, h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-20 rounded bg-subtle animate-pulse" aria-busy="true" /> : localizedField(h.reason, h.translations?.reason, locale) || h.adjustment_type || "—"}</span>
                               </div>
                               <div className="grid grid-cols-2 gap-2 mt-2 text-[11px]">
                                 <span style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.previousStock")}: <span className="font-medium" style={{ color: "var(--text-secondary)" }}>{formatNumber(h.previous_quantity, locale)}</span></span>
@@ -965,7 +965,7 @@ export default function ManageStockPage() {
                               {/* ✅ Explanation — adjust form ka notes (full text, wrap ke sath) */}
                               <div className="mt-2.5 pt-2" style={{ borderTop: "1px dashed var(--border-color)" }}>
                                 <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>{t("admin.manageStock.page.explanation")}</span>
-                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{showDetailsHistoryTranslationSkeletons && isMissingTranslation(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation?.[locale] : h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-32 rounded bg-[var(--bg-card)] animate-pulse" aria-busy="true" /> : contentOf(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation : h.translations?.reason)}</p>
+                                <p className="text-[11px] mt-0.5 break-words" style={{ color: "var(--text-secondary)" }}>{showDetailsHistoryTranslationSkeletons && isMissingTranslation(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation?.[locale] : h.translations?.reason?.[locale]) ? <span className="inline-block h-3 w-32 rounded bg-card animate-pulse" aria-busy="true" /> : contentOf(explanationOf(h), h.explanation?.trim() ? h.translations?.explanation : h.translations?.reason)}</p>
                               </div>
                             </div>
                           );
@@ -1240,13 +1240,13 @@ export default function ManageStockPage() {
                                 setAdjustError("");
                                 setIsReasonOpen(false);
                               }}
-                              className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-[var(--bg-tertiary)]"
+                              className="w-full text-left px-3 py-2.5 text-[13px] transition flex items-center gap-2 hover:bg-subtle"
                               style={{ 
                                 backgroundColor: adjustForm.reason === r ? "var(--bg-tertiary)" : "transparent",
                                 color: "var(--text-primary)"
                               }}
                             >
-                              {adjustForm.reason === r && <span className="w-1.5 h-1.5 rounded-full bg-[var(--success-text)] shrink-0" />}
+                              {adjustForm.reason === r && <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />}
                               <span className={adjustForm.reason === r ? "font-medium" : ""}>
                                 {r === "__OTHER__" ? t("admin.manageStock.page.reasonOther") : t(`admin.manageStock.reason.${REASON_KEYS[r] || "other"}`)}
                               </span>

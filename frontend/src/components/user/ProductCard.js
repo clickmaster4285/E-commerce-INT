@@ -283,10 +283,10 @@ function ProductCardInner({
             : `/product/${productId}?source=deal`
           : `/product/${productId}`
       }
-      className={`product-card group relative flex min-w-0 flex-col overflow-hidden bg-[var(--user-bg-card)] transition-colors duration-200 ${dealCarousel ? "h-auto rounded-xl border border-[var(--user-border)] shadow-sm" : "h-full rounded-none border-0 shadow-none"}`}
+      className={`product-card group relative flex min-w-0 flex-col overflow-hidden bg-user-card transition-colors duration-200 ${dealCarousel ? "h-auto rounded-xl border border-user-line shadow-sm" : "h-full rounded-none border-0 shadow-none"}`}
     >
       <div
-        className={`relative w-full shrink-0 overflow-hidden bg-[var(--user-bg-card)] ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-48 @min-[220px]:h-56 @min-[260px]:h-64"}`}
+        className={`relative w-full shrink-0 overflow-hidden bg-user-card ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-48 @min-[220px]:h-56 @min-[260px]:h-64"}`}
       >
         <FallbackImage
           nextImage
@@ -303,7 +303,7 @@ function ProductCardInner({
         <div className={`absolute top-2 left-2 z-20 flex flex-col items-start gap-1.5 ${dealCarousel ? "right-14 max-w-[calc(100%_-_56px)]" : showDealPricing ? "right-11" : ""}`}>
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`flex max-w-full min-w-0 items-center gap-1 truncate ${dealCarousel ? "whitespace-nowrap rounded-full border border-white/10 bg-gray-900/75 px-2 py-[3px] text-[0.6875rem] font-medium leading-4 text-white shadow-sm backdrop-blur-sm" : showDealPricing ? "whitespace-nowrap rounded-full bg-orange-600 px-2.5 py-1 text-[0.6875rem] font-semibold leading-none text-white" : "rounded-full bg-[var(--user-accent-soft)] px-2 py-1 text-[0.6rem] text-[var(--user-accent)] font-normal"}`}
+              className={`flex max-w-full min-w-0 items-center gap-1 truncate ${dealCarousel ? "whitespace-nowrap rounded-full border border-white/10 bg-gray-900/75 px-2 py-[3px] text-[0.6875rem] font-medium leading-4 text-white shadow-sm backdrop-blur-sm" : showDealPricing ? "whitespace-nowrap rounded-full bg-orange-600 px-2.5 py-1 text-[0.6875rem] font-semibold leading-none text-white" : "rounded-full bg-user-accent-soft px-2 py-1 text-[0.6rem] text-user-accent font-normal"}`}
             >
               {badgeConfig?.icon ? (
                 <badgeConfig.icon size={dealCarousel ? 12 : 9} className="shrink-0" />
@@ -314,7 +314,7 @@ function ProductCardInner({
             </span>
           )}
           {activeDeal && requiredDealQty > 1 && !showDealPricing && (
-            <span className="rounded-full bg-[var(--user-bg-card)]/95 px-2 py-1 text-[0.6rem] font-bold text-[var(--user-text)] shadow-sm">
+            <span className="rounded-full bg-user-card/95 px-2 py-1 text-[0.6rem] font-bold text-user-fg shadow-sm">
               {t("admin.shared.label.quantity")} {requiredDealQty}
             </span>
           )}
@@ -332,13 +332,13 @@ function ProductCardInner({
 
           {out ? (
             <span
-              className={`rounded-full bg-[var(--user-danger)] px-2 py-1 text-[0.6rem] text-white font-normal`}
+              className={`rounded-full bg-user-danger px-2 py-1 text-[0.6rem] text-white font-normal`}
             >
               {t("product.outOfStock")}
             </span>
           ) : totalStock < 5 ? (
             <span
-              className={`rounded-full bg-[var(--user-warning)] px-2 py-1 text-[0.6rem] text-black font-normal`}
+              className={`rounded-full bg-user-warning px-2 py-1 text-[0.6rem] text-black font-normal`}
             >
               {t("admin.shared.status.lowStock")}
             </span>
@@ -352,14 +352,14 @@ function ProductCardInner({
             toggleWishlist(productId);
           }}
           aria-label={t("header.wishlist")}
-          className={`absolute right-2 top-2 z-20 flex items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-icon-color)] shadow-sm transition-colors hover:bg-[var(--user-bg-hover)] ${dealCarousel ? "h-8 w-8" : "h-7 w-7"}`}
+          className={`absolute right-2 top-2 z-20 flex items-center justify-center rounded-full border border-user-line bg-user-card text-user-icon shadow-sm transition-colors hover:bg-user-hover ${dealCarousel ? "h-8 w-8" : "h-7 w-7"}`}
         >
           <Heart
             size={14}
             className={
               liked
-                ? "text-[var(--user-danger)] fill-[var(--user-danger)]"
-                : "text-[var(--user-icon-color)]"
+                ? "text-user-danger fill-user-danger"
+                : "text-user-icon"
             }
           />
         </button>
@@ -372,7 +372,7 @@ function ProductCardInner({
                 type="button"
                 onClick={handleOpenOptions}
                 aria-label={displayName ? `${t("admin.attributes.action.viewOptions")}: ${displayName}` : undefined}
-                className="flex min-h-8 min-w-0 w-full items-center justify-center gap-1 rounded-md bg-[var(--user-accent)] px-2 py-0.5 text-center text-[11.5px] font-semibold leading-5 tracking-[0.1px] text-[var(--user-accent-text)] transition duration-150 hover:brightness-[0.92] active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                className="flex min-h-8 min-w-0 w-full items-center justify-center gap-1 rounded-md bg-user-accent px-2 py-0.5 text-center text-[11.5px] font-semibold leading-5 tracking-[0.1px] text-user-accent-fg transition duration-150 hover:brightness-[0.92] active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
               >
                 <SlidersHorizontal size={12} className="shrink-0" />
                 {t("admin.attributes.action.viewOptions")}
@@ -384,10 +384,10 @@ function ProductCardInner({
                   onClick={handleQuickAdd}
                   disabled={adding}
                   aria-label={displayName ? `${t("product.addToCart")}: ${displayName}` : undefined}
-                    className={`flex min-h-8 min-w-0 w-full items-center justify-center gap-1 rounded-md px-2 py-0.5 text-center text-[11px] font-semibold leading-5 tracking-[0.1px] transition duration-150 active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
+                    className={`flex min-h-8 min-w-0 w-full items-center justify-center gap-1 rounded-md px-2 py-0.5 text-center text-[11px] font-semibold leading-5 tracking-[0.1px] transition duration-150 active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent ${
                     added
-                      ? "bg-[var(--user-success)] text-white"
-                      : "bg-[var(--user-accent)] text-[var(--user-accent-text)] hover:brightness-[0.92]"
+                      ? "bg-user-success text-white"
+                      : "bg-user-accent text-user-accent-fg hover:brightness-[0.92]"
                   }`}
                 >
                   {adding ? (
@@ -403,7 +403,7 @@ function ProductCardInner({
                   type="button"
                   onClick={handleQuickBuy}
                   aria-label={displayName ? `${t("product.buyNow")}: ${displayName}` : undefined}
-                  className="flex min-h-8 min-w-0 w-full items-center justify-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-2 py-0.5 text-center text-[11px] font-semibold leading-5 tracking-[0.1px] text-gray-900 transition duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                  className="flex min-h-8 min-w-0 w-full items-center justify-center gap-1 rounded-md border border-[#E5E7EB] bg-white px-2 py-0.5 text-center text-[11px] font-semibold leading-5 tracking-[0.1px] text-gray-900 transition duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
                 >
                   <span className="min-w-0 whitespace-nowrap">{t("product.buyNow")}</span>
                 </button>
@@ -416,19 +416,19 @@ function ProductCardInner({
       <div className={`flex min-w-0 ${dealCarousel ? "flex-col px-2.5 py-2" : "flex-1 flex-col p-1"}`}>
         <p
           title={dealCarousel ? brandName || undefined : undefined}
-          className={`truncate text-[var(--user-text-subtle)] ${dealCarousel ? "mb-1 text-[0.6875rem] font-medium uppercase leading-4 tracking-[0.1em]" : "h-3 text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em]"}`}
+          className={`truncate text-user-fg-subtle ${dealCarousel ? "mb-1 text-[0.6875rem] font-medium uppercase leading-4 tracking-[0.1em]" : "h-3 text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em]"}`}
         >
           {brandName || ""}
         </p>
         <h3
           title={dealCarousel ? displayName || undefined : undefined}
-          className={`text-[var(--user-text)] ${dealCarousel ? "line-clamp-2 text-sm font-medium leading-5" : "line-clamp-2 h-7 text-[0.75rem] font-normal leading-[0.875rem] sm:text-[0.8125rem]"}`}
+          className={`text-user-fg ${dealCarousel ? "line-clamp-2 text-sm font-medium leading-5" : "line-clamp-2 h-7 text-[0.75rem] font-normal leading-[0.875rem] sm:text-[0.8125rem]"}`}
         >
           {displayName}
         </h3>
 
         {ratingCount > 0 ? (
-          <div className="mb-0.5 flex h-3 items-center gap-1 text-[0.625rem] text-[var(--user-text-muted)]">
+          <div className="mb-0.5 flex h-3 items-center gap-1 text-[0.625rem] text-user-fg-muted">
             <span className="flex items-center gap-px" aria-label={`${rating.toFixed(1)} out of 5 stars`}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
@@ -437,7 +437,7 @@ function ProductCardInner({
                   className={
                     star <= Math.round(rating)
                       ? "fill-amber-400 text-amber-400"
-                      : "text-[var(--user-border-hover)]"
+                      : "text-user-line-hover"
                   }
                 />
               ))}
@@ -449,16 +449,16 @@ function ProductCardInner({
 
         {dealCarousel ? (
           <div className="mt-1 min-w-0">
-            <h4 className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]">
+            <h4 className="truncate text-[0.9rem] font-medium leading-4 text-user-accent sm:text-[0.9375rem]">
               {price > 0 ? formatPrice(price) : `${t("common.price")} ${t("admin.shared.label.notAvailable")}`}
             </h4>
             {oldPrice > price && price > 0 ? (
               <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
-                <span className="truncate text-[var(--user-text-subtle)] line-through">
+                <span className="truncate text-user-fg-subtle line-through">
                   {formatPrice(oldPrice)}
                 </span>
                 {safeDiscountPercent > 0 ? (
-                  <span className="shrink-0 font-normal text-[var(--user-accent)]">
+                  <span className="shrink-0 font-normal text-user-accent">
                     -{safeDiscountPercent}%
                   </span>
                 ) : null}
@@ -466,7 +466,7 @@ function ProductCardInner({
             ) : null}
             {oldPrice > price && price > 0 ? (
               <div className="mt-1 flex h-3 min-w-0 items-center">
-                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
+                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-user-accent-soft px-1.5 py-0.5 text-[0.575rem] font-normal text-user-accent">
                   <Sparkles size={9} className="shrink-0" />
                   <span className="truncate">{t("admin.deals.page.deal")}</span>
                 </span>
@@ -475,17 +475,17 @@ function ProductCardInner({
           </div>
         ) : (
           <>
-            <h4 className="truncate text-[0.9rem] font-medium leading-4 text-[var(--user-accent)] sm:text-[0.9375rem]">
+            <h4 className="truncate text-[0.9rem] font-medium leading-4 text-user-accent sm:text-[0.9375rem]">
               {price > 0 ? formatPrice(price) : `${t("common.price")} ${t("admin.shared.label.notAvailable")}`}
             </h4>
             <div className="flex h-3 items-center gap-1.5 overflow-hidden text-[0.625rem]">
               {oldPrice > price && price > 0 ? (
                 <>
-                  <span className="truncate text-[var(--user-text-subtle)] line-through">
+                  <span className="truncate text-user-fg-subtle line-through">
                     {formatPrice(oldPrice)}
                   </span>
                   {safeDiscountPercent > 0 ? (
-                    <span className="shrink-0 font-normal text-[var(--user-accent)]">
+                    <span className="shrink-0 font-normal text-user-accent">
                       -{safeDiscountPercent}%
                     </span>
                   ) : null}
@@ -494,7 +494,7 @@ function ProductCardInner({
             </div>
             {mentionDeal && !showDealPricing ? (
               <div className="flex h-3 min-w-0 items-center">
-                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-[var(--user-accent-soft)] px-1.5 py-0.5 text-[0.575rem] font-normal text-[var(--user-accent)]">
+                <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-user-accent-soft px-1.5 py-0.5 text-[0.575rem] font-normal text-user-accent">
                   <Sparkles size={9} className="shrink-0" />
                   <span className="truncate">{t("admin.deals.page.deal")}</span>
                 </span>
@@ -509,7 +509,7 @@ function ProductCardInner({
                 type="button"
                 onClick={handleOpenOptions}
                 aria-label={displayName ? `${t("admin.attributes.action.viewOptions")}: ${displayName}` : undefined}
-                className="flex h-auto min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-2 py-1 text-center text-[13px] font-semibold leading-5 text-[var(--user-accent-text)] transition duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]"
+                className="flex h-auto min-h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-user-accent px-2 py-1 text-center text-[13px] font-semibold leading-5 text-user-accent-fg transition duration-150 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent"
               >
                 <SlidersHorizontal size={14} className="shrink-0" />
                 {t("admin.attributes.action.viewOptions")}
@@ -520,10 +520,10 @@ function ProductCardInner({
                 onClick={handleQuickAdd}
                 disabled={adding}
                 aria-label={displayName ? `${t("product.addToCart")}: ${displayName}` : undefined}
-                className={`flex h-auto min-h-10 w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1 text-center text-xs font-semibold leading-5 transition duration-150 active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] ${
+                className={`flex h-auto min-h-10 w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1 text-center text-xs font-semibold leading-5 transition duration-150 active:scale-[0.98] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent ${
                   added
-                    ? "bg-[var(--user-success)] text-white"
-                    : "bg-[var(--user-accent)] text-[var(--user-accent-text)]"
+                    ? "bg-user-success text-white"
+                    : "bg-user-accent text-user-accent-fg"
                 }`}
               >
                 {adding ? (

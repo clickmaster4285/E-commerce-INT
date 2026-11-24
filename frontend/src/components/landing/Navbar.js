@@ -68,7 +68,7 @@ export default function Navbar() {
             <a
               key={l.label}
               href={l.href}
-              className="landing-nav-link whitespace-nowrap text-sm font-semibold text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
+              className="landing-nav-link whitespace-nowrap text-sm font-semibold text-user-fg-secondary transition-colors hover:text-user-accent focus-visible:outline-2 focus-visible:outline-user-accent"
             >
               {l.label}
             </a>
@@ -80,14 +80,14 @@ export default function Navbar() {
             type="button"
             onClick={toggleTheme}
             aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)]"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-accent focus-visible:outline-2 focus-visible:outline-user-accent"
           >
             {theme === "dark" ? <Sun size={20} aria-hidden="true" /> : <Moon size={20} aria-hidden="true" />}
           </button>
 
           <Link
             href="/landing/signup"
-            className="hidden min-h-[44px] items-center gap-2 rounded-full bg-[var(--user-accent)] px-6 text-sm font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] md:inline-flex"
+            className="hidden min-h-[44px] items-center gap-2 rounded-full bg-user-accent px-6 text-sm font-bold text-user-accent-fg transition-colors hover:bg-user-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent md:inline-flex"
           >
             Sign Up
             <ArrowRight size={16} aria-hidden="true" />
@@ -98,7 +98,7 @@ export default function Navbar() {
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)] lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-user-fg transition-colors hover:bg-user-hover focus-visible:outline-2 focus-visible:outline-user-accent lg:hidden"
           >
             {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
           </button>
@@ -124,14 +124,14 @@ export default function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed right-0 top-0 z-[59] flex h-full w-[82vw] max-w-xs flex-col gap-1 overflow-y-auto bg-[var(--user-bg-card)] p-5 pt-20 lg:hidden"
+              className="fixed right-0 top-0 z-[59] flex h-full w-[82vw] max-w-xs flex-col gap-1 overflow-y-auto bg-user-card p-5 pt-20 lg:hidden"
             >
               {NAV_LINKS.map((l) => (
                 <a
                   key={l.label}
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-accent)]"
+                  className="flex min-h-[48px] items-center rounded-xl px-4 text-base font-semibold text-user-fg transition-colors hover:bg-user-hover hover:text-user-accent"
                 >
                   {l.label}
                 </a>
@@ -139,7 +139,7 @@ export default function Navbar() {
               <Link
                 href="/landing/signup"
                 onClick={() => setOpen(false)}
-                className="mt-3 flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-[var(--user-accent)] px-6 font-bold text-[var(--user-accent-text)] transition-colors hover:bg-[var(--user-accent-hover)]"
+                className="mt-3 flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-user-accent px-6 font-bold text-user-accent-fg transition-colors hover:bg-user-accent-hover"
               >
                 Sign Up
                 <ArrowRight size={17} aria-hidden="true" />

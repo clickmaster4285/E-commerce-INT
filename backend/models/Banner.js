@@ -69,6 +69,11 @@ const bannerSchema = new mongoose.Schema(
     position: { type: Number, default: 0 },
 
     desktopImage: { type: String, required: true },
+    // Controller ye fields pehle se bhejta tha par schema me na hone se Mongoose
+    // chupke se drop kar deta tha (strict mode) — ab save hote hain.
+    tabletImage: { type: String, default: "" },
+    mobileImage: { type: String, default: "" },
+    secondaryButton: { type: buttonSchema, default: () => ({}) },
    
     
 

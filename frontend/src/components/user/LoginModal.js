@@ -294,14 +294,14 @@ export default function LoginModal({ isOpen, onClose }) {
   };
 
   const inputCls =
-    "w-full h-11 rounded-xl bg-[var(--user-bg-input)] border pl-11 pr-4 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none transition";
+    "w-full h-11 rounded-xl bg-user-input border pl-11 pr-4 text-sm text-user-fg placeholder:text-user-fg-subtle outline-none transition";
 
   const getInputCls = (field) => {
     const hasError = errors[field];
     return `${inputCls} ${
       hasError
-        ? "border-[var(--user-danger)] focus:border-[var(--user-danger)] focus:ring-2 focus:ring-[var(--user-danger)]/15"
-        : "border-[var(--user-border)] focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15"
+        ? "border-user-danger focus:border-user-danger focus:ring-2 focus:ring-user-danger/15"
+        : "border-user-line focus:border-user-accent focus:ring-2 focus:ring-user-accent/15"
     }`;
   };
 
@@ -309,8 +309,8 @@ export default function LoginModal({ isOpen, onClose }) {
     if (!errors[field]) return null;
     return (
       <div className="flex items-center gap-1.5 mt-1.5 px-1">
-        <AlertCircle size={12} className="text-[var(--user-danger)] shrink-0" />
-        <p className="text-[0.6875rem] font-semibold text-[var(--user-danger)]">{errors[field]}</p>
+        <AlertCircle size={12} className="text-user-danger shrink-0" />
+        <p className="text-[0.6875rem] font-semibold text-user-danger">{errors[field]}</p>
       </div>
     );
   };
@@ -322,12 +322,12 @@ export default function LoginModal({ isOpen, onClose }) {
       <div onClick={handleClose} className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60]" />
 
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-        <div className="bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-2xl shadow-[var(--user-shadow-lg)] w-full max-w-md max-h-[90vh] overflow-y-auto relative">
+        <div className="bg-user-card border border-user-line rounded-2xl shadow-[var(--user-shadow-lg)] w-full max-w-md max-h-[90vh] overflow-y-auto relative">
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center hover:bg-[var(--user-danger)]/10 transition z-10"
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-user-hover flex items-center justify-center hover:bg-user-danger/10 transition z-10"
           >
-            <X size={16} className="text-[var(--user-text)]" />
+            <X size={16} className="text-user-fg" />
           </button>
 
           <div className="p-6 sm:p-8">
@@ -353,19 +353,19 @@ export default function LoginModal({ isOpen, onClose }) {
               <form onSubmit={handleForgotSubmit} noValidate>
                 <div className="mb-6 pr-8">
                   <div className="flex items-center gap-2 mb-3">
-                    <KeyRound size={16} className="text-[var(--user-accent)]" />
-                    <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                    <KeyRound size={16} className="text-user-accent" />
+                    <span className="text-user-accent text-[0.625rem] font-bold uppercase tracking-widest">
                       {t("auth.login.forgotPassword")}
                     </span>
                   </div>
-                  <h2 className="text-xl font-black text-[var(--user-text)] mb-1">{t("auth.login.resetPassword")}</h2>
-                  <p className="text-[var(--user-text-muted)] text-sm">
+                  <h2 className="text-xl font-black text-user-fg mb-1">{t("auth.login.resetPassword")}</h2>
+                  <p className="text-user-fg-muted text-sm">
                     {t("auth.login.resetEmailHelp")}
                   </p>
                 </div>
 
                 <div className="relative">
-                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                   <input
                     type="email"
                     value={email}
@@ -379,16 +379,16 @@ export default function LoginModal({ isOpen, onClose }) {
                 </div>
 
                 {forgotError && (
-                  <div className="flex items-start gap-2 mt-3 px-3 py-2.5 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30">
-                    <AlertCircle size={14} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-                    <p className="text-[var(--user-danger)] text-[0.75rem] font-semibold">{forgotError}</p>
+                  <div className="flex items-start gap-2 mt-3 px-3 py-2.5 rounded-xl bg-user-danger/10 border border-user-danger/30">
+                    <AlertCircle size={14} className="text-user-danger shrink-0 mt-0.5" />
+                    <p className="text-user-danger text-[0.75rem] font-semibold">{forgotError}</p>
                   </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={forgotLoading}
-                  className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-4"
+                  className="w-full h-11 rounded-xl bg-user-accent text-user-accent-fg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-4"
                 >
                   {forgotLoading ? <Loader2 size={18} className="animate-spin" /> : <KeyRound size={18} />}
                   {forgotLoading ? t("auth.login.sendingCode") : t("auth.login.sendResetCode")}
@@ -400,7 +400,7 @@ export default function LoginModal({ isOpen, onClose }) {
                     setStep("auth");
                     setForgotError("");
                   }}
-                  className="flex items-center gap-1.5 mt-4 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition"
+                  className="flex items-center gap-1.5 mt-4 text-[0.75rem] font-semibold text-user-fg-muted hover:text-user-accent transition"
                 >
                   <ArrowLeft size={13} /> {t("auth.login.backToLogin")}
                 </button>
@@ -438,23 +438,23 @@ export default function LoginModal({ isOpen, onClose }) {
               <>
             <div className="mb-6 pr-8">
               <div className="flex items-center gap-2 mb-3">
-                <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-                <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                <ShieldCheck size={16} className="text-user-accent" />
+                <span className="text-user-accent text-[0.625rem] font-bold uppercase tracking-widest">
                   {isLogin ? t("auth.login.userSignIn") : t("auth.login.createAccount")}
                 </span>
               </div>
-              <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">
+              <h2 className="text-2xl font-black text-user-fg mb-1">
                 {isLogin ? t("auth.login.welcomeBack") : t("auth.login.createAccount")}
               </h2>
-              <p className="text-[var(--user-text-muted)] text-sm">
+              <p className="text-user-fg-muted text-sm">
                 {isLogin ? t("auth.login.continueShoppingSubtitle") : t("auth.login.createAccountSubtitle")}
               </p>
             </div>
 
             {generalError && (
-              <div className="mb-5 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
-                <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-                <p className="text-[var(--user-danger)] text-sm">{generalError}</p>
+              <div className="mb-5 px-4 py-3 rounded-xl bg-user-danger/10 border border-user-danger/30 flex items-start gap-2">
+                <AlertCircle size={16} className="text-user-danger shrink-0 mt-0.5" />
+                <p className="text-user-danger text-sm">{generalError}</p>
               </div>
             )}
 
@@ -473,15 +473,15 @@ export default function LoginModal({ isOpen, onClose }) {
                       text="continue_with"
                     />
                   ) : (
-                    <div className="w-full py-3 rounded-full border border-[var(--user-border)] text-center text-[var(--user-text-muted)] text-sm">
+                    <div className="w-full py-3 rounded-full border border-user-line text-center text-user-fg-muted text-sm">
                       {t("auth.login.googleUnavailable")}
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="flex-1 h-px bg-[var(--user-border)]" />
-                  <span className="text-[var(--user-text-subtle)] text-[0.625rem] uppercase tracking-widest font-semibold">{t("auth.login.orWithEmail")}</span>
-                  <div className="flex-1 h-px bg-[var(--user-border)]" />
+                  <div className="flex-1 h-px bg-user-line" />
+                  <span className="text-user-fg-subtle text-[0.625rem] uppercase tracking-widest font-semibold">{t("auth.login.orWithEmail")}</span>
+                  <div className="flex-1 h-px bg-user-line" />
                 </div>
               </>
             )}
@@ -491,7 +491,7 @@ export default function LoginModal({ isOpen, onClose }) {
                 <>
                   <div>
                     <div className="relative">
-                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                       <input
                         type="text"
                         value={name}
@@ -505,7 +505,7 @@ export default function LoginModal({ isOpen, onClose }) {
 
                   <div>
                     <div className="relative">
-                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                      <User size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                       <input
                         type="text"
                         value={username}
@@ -519,7 +519,7 @@ export default function LoginModal({ isOpen, onClose }) {
 
                   <div>
                     <div className="relative">
-                      <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                      <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                       <input
                         type="tel"
                         inputMode="numeric"
@@ -537,7 +537,7 @@ export default function LoginModal({ isOpen, onClose }) {
 
               <div>
                 <div className="relative">
-                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                  <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                   <input
                     type="email"
                     value={email}
@@ -551,7 +551,7 @@ export default function LoginModal({ isOpen, onClose }) {
 
               <div>
                 <div className="relative">
-                  <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--user-accent)]" />
+                  <Lock size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-user-accent" />
                   <input
                     type="password"
                     value={password}
@@ -572,7 +572,7 @@ export default function LoginModal({ isOpen, onClose }) {
                       setForgotError("");
                       setStep("forgot");
                     }}
-                    className="text-[0.75rem] font-semibold text-[var(--user-accent)] hover:underline"
+                    className="text-[0.75rem] font-semibold text-user-accent hover:underline"
                   >
                     {t("auth.login.forgotPassword")}
                   </button>
@@ -582,16 +582,16 @@ export default function LoginModal({ isOpen, onClose }) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-1"
+                className="w-full h-11 rounded-xl bg-user-accent text-user-accent-fg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-1"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
                 {loading ? (isLogin ? t("auth.login.loggingIn") : t("auth.login.creatingAccount")) : isLogin ? t("auth.login.login") : t("auth.login.createAccount")}
               </button>
             </form>
 
-            <p className="text-center py-2 mt-5 text-[var(--user-text-muted)] text-sm">
+            <p className="text-center py-2 mt-5 text-user-fg-muted text-sm">
               {isLogin ? t("auth.login.noAccount") : t("auth.login.haveAccount")}{" "}
-              <button onClick={switchMode} className="text-[var(--user-accent)] hover:underline font-semibold">
+              <button onClick={switchMode} className="text-user-accent hover:underline font-semibold">
                 {isLogin ? t("auth.login.register") : t("auth.login.login")}
               </button>
             </p>

@@ -557,11 +557,11 @@ export default function Sidebar({ onNavigate, userData }) {
             fixed top-4 ${dir === "rtl" ? "right-4 left-auto" : "left-4 right-auto"} z-[60]
             flex h-10 w-10 items-center justify-center
             rounded-lg
-            bg-[var(--bg-sidebar)]
-            text-[var(--text-sidebar)]
+            bg-sidebar
+            text-sidebar-fg
             shadow-md
             transition-all duration-300
-            hover:bg-[var(--bg-sidebar-hover)]
+            hover:bg-sidebar-hover
             md:hidden
           `}
         >
@@ -593,9 +593,9 @@ export default function Sidebar({ onNavigate, userData }) {
         className={`
           fixed inset-y-0 ${dir === "rtl" ? "right-0 left-auto border-l border-r-0" : "left-0 right-auto border-r border-l-0"} z-50
           flex h-screen w-[280px] flex-col
-          border-[var(--border-sidebar)]
-          bg-[var(--bg-sidebar)]
-          text-[var(--text-sidebar)]
+          border-sidebar-line
+          bg-sidebar
+          text-sidebar-fg
           transition-[width,transform] duration-300 ease-in-out
           md:relative md:translate-x-0
           ${iconOnly ? "md:w-[64px]" : "md:w-[var(--sidebar-width)]"}
@@ -608,7 +608,7 @@ export default function Sidebar({ onNavigate, userData }) {
         <div
           className={`
             flex h-16 shrink-0 items-center
-            gap-2 border-b border-[var(--border-sidebar)]
+            gap-2 border-b border-sidebar-line
             px-3
             ${iconOnly ? "flex-col justify-center gap-0.5" : "justify-between"}
           `}
@@ -628,10 +628,10 @@ export default function Sidebar({ onNavigate, userData }) {
             />
             {!iconOnly && (
               <span className="flex min-w-0 flex-col leading-tight">
-                <span className="truncate text-[13.5px] font-semibold tracking-tight text-[var(--text-sidebar)]">
+                <span className="truncate text-[13.5px] font-semibold tracking-tight text-sidebar-fg">
                   {displayName}
                 </span>
-                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
+                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-fg-muted">
                   {t("admin.sidebar.adminPanel")}
                 </span>
               </span>
@@ -645,10 +645,10 @@ export default function Sidebar({ onNavigate, userData }) {
             aria-label={t("admin.sidebar.close")}
             className="
               shrink-0 rounded-md p-1
-              text-[var(--text-sidebar-muted)]
+              text-sidebar-fg-muted
               transition-colors
-              hover:bg-[var(--bg-sidebar-hover)]
-              hover:text-[var(--text-sidebar)]
+              hover:bg-sidebar-hover
+              hover:text-sidebar-fg
               md:hidden
             "
           >
@@ -664,10 +664,10 @@ export default function Sidebar({ onNavigate, userData }) {
             className="
               hidden h-7 w-7 shrink-0 items-center justify-center
               rounded-lg
-              text-[var(--text-sidebar-muted)]
+              text-sidebar-fg-muted
               transition-colors duration-150
-              hover:bg-[var(--bg-sidebar-hover)]
-              hover:text-[var(--text-sidebar)]
+              hover:bg-sidebar-hover
+              hover:text-sidebar-fg
               md:inline-flex
             "
           >
@@ -696,7 +696,7 @@ export default function Sidebar({ onNavigate, userData }) {
                   />
                 ) : !section.hideSidebarHeading ? (
                   <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
+                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-sidebar-fg-muted">
                       {navLabel("section", sectionTitle)}
                     </span>
                   </div>
@@ -726,8 +726,8 @@ export default function Sidebar({ onNavigate, userData }) {
                           ${iconOnly ? "justify-center px-0" : "px-2.5"}
                           ${
                             active
-                              ? "bg-[var(--bg-sidebar-active)] text-white"
-                              : "text-[var(--text-sidebar-muted)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)]"
+                              ? "bg-sidebar-active text-white"
+                              : "text-sidebar-fg-muted hover:bg-sidebar-hover hover:text-sidebar-fg"
                           }
                         `}
                       >
@@ -742,7 +742,7 @@ export default function Sidebar({ onNavigate, userData }) {
                           className={`shrink-0 transition-colors ${
                             active
                               ? "text-white"
-                              : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"
+                              : "text-sidebar-fg-muted group-hover:text-sidebar-fg"
                           }`}
                         />
                         {!iconOnly && <span className="min-w-0 flex-1 truncate">{navLabel("item", item.name)}</span>}
@@ -763,15 +763,15 @@ export default function Sidebar({ onNavigate, userData }) {
         {/* ==================================================
             FOOTER
         ================================================== */}
-        <div className="shrink-0 border-t border-[var(--border-sidebar)] px-3 py-2.5">
+        <div className="shrink-0 border-t border-sidebar-line px-3 py-2.5">
           {iconOnly ? (
-            <p className="text-center text-[9px] font-semibold text-[var(--text-sidebar-muted)]">
+            <p className="text-center text-[9px] font-semibold text-sidebar-fg-muted">
               v1.0
             </p>
           ) : (
-            <p className="text-center text-[10px] text-[var(--text-sidebar-muted)]">
+            <p className="text-center text-[10px] text-sidebar-fg-muted">
               {t("admin.sidebar.poweredBy")}{" "}
-              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> {t("admin.sidebar.version")}
+              <span className="font-semibold text-sidebar-fg">ClickMaster</span> {t("admin.sidebar.version")}
             </p>
           )}
         </div>

@@ -740,7 +740,7 @@ if (lastProductId !== productId) {
                                     boxShadow: "inset 2px 0 0 var(--accent)",
                                   } : undefined}>
                                   <OrderItemImage item={item} size={22} />
-                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{showOrderTranslationSkeletons && !orderProductsTranslationsReady && item.product_id?.name?.trim() && !item.product_id?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : productNameOf(item.product_id) || item.name}</span>
+                                  <span className={`truncate text-[12px] min-w-0 ${isMatch ? "font-bold" : ""}`} title={item.name}>{showOrderTranslationSkeletons && !orderProductsTranslationsReady && item.product_id?.name?.trim() && !item.product_id?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : productNameOf(item.product_id) || item.name}</span>
                                   <span className="shrink-0 text-[11px] font-bold whitespace-nowrap" style={{ color: isMatch ? "var(--accent)" : "var(--text-secondary)" }}>
                                     ×{item.qty}
                                   </span>
@@ -866,9 +866,9 @@ if (lastProductId !== productId) {
                                     }}>
                                     <OrderItemImage item={item} size={36} />
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-xs font-medium truncate" title={item.name}>{showOrderTranslationSkeletons && !orderProductsTranslationsReady && item.product_id?.name?.trim() && !item.product_id?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : productNameOf(item.product_id) || item.name}</p>
+                                      <p className="text-xs font-medium truncate" title={item.name}>{showOrderTranslationSkeletons && !orderProductsTranslationsReady && item.product_id?.name?.trim() && !item.product_id?.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : productNameOf(item.product_id) || item.name}</p>
                                       <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>
-                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{(item.variant_id?.title || item.variantTitle) ? <> · {showOrderTranslationSkeletons && !orderVariantsTranslationsReady && item.variant_id?.title?.trim() && !item.variant_id?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-2.5 w-16 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title)}</> : null}
+                                        {t("admin.orders.page.quantityPrice", { quantity: formatNumber(item.qty, locale), price: formatCurrency(item.price, locale) })}{(item.variant_id?.title || item.variantTitle) ? <> · {showOrderTranslationSkeletons && !orderVariantsTranslationsReady && item.variant_id?.title?.trim() && !item.variant_id?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-2.5 w-16 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : contentOf(item.variant_id?.title || item.variantTitle, item.variant_id?.translations?.title)}</> : null}
                                       </p>
                                       {(dealLabel(item, t) || Number(item.free_items) > 0 || item.bundle_name) && (
                                         <p className="flex flex-wrap items-center gap-1 mt-1">
@@ -1235,7 +1235,7 @@ function OrderCard({ order, shippingMethods = [], showShippingMethodTranslationS
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3 rounded-lg" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
         <PaymentBadge status={payStatus} />
         <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
-          {paymentMethodLabel(order.payment?.method, t)} • {showShippingMethodTranslationSkeletons && shippingMethods.some((method) => String(method._id) === String(order.shipping_method) && method.name?.trim() && !method.translations?.name?.[locale]?.trim()) ? <span className="inline-block h-2.5 w-20 rounded bg-[var(--bg-card)] animate-pulse align-middle" aria-busy="true" /> : shippingMethodLabel(order.shipping_method || "standard", t, shippingMethods, locale)}
+          {paymentMethodLabel(order.payment?.method, t)} • {showShippingMethodTranslationSkeletons && shippingMethods.some((method) => String(method._id) === String(order.shipping_method) && method.name?.trim() && !method.translations?.name?.[locale]?.trim()) ? <span className="inline-block h-2.5 w-20 rounded bg-card animate-pulse align-middle" aria-busy="true" /> : shippingMethodLabel(order.shipping_method || "standard", t, shippingMethods, locale)}
         </span>
       </div>
 

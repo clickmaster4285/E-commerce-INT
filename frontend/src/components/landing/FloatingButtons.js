@@ -22,7 +22,7 @@ export default function FloatingButtons() {
         aria-label="Back to top"
         aria-hidden={!showTop}
         tabIndex={showTop ? 0 : -1}
-        className={`flex h-12 w-12 items-center justify-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text)] shadow-lg transition-all duration-300 hover:border-[var(--user-accent)] hover:text-[var(--user-accent)] focus-visible:outline-2 focus-visible:outline-[var(--user-accent)] ${
+        className={`flex h-12 w-12 items-center justify-center rounded-full border border-user-line bg-user-card text-user-fg shadow-lg transition-all duration-300 hover:border-user-accent hover:text-user-accent focus-visible:outline-2 focus-visible:outline-user-accent ${
           showTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
         }`}
       >

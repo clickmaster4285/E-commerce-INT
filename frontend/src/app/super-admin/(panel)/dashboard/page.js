@@ -13,9 +13,9 @@ const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="sa-card px-3 py-2 text-[12px] shadow-[var(--shadow-pop)]">
-      <p className="font-semibold text-[var(--text-primary)]">{label}</p>
-      <p className="mt-0.5 text-[var(--text-muted)]">
-        <span className="font-semibold tabular-nums text-[var(--text-primary)]">{payload[0].value}</span> signup{payload[0].value === 1 ? "" : "s"}
+      <p className="font-semibold text-fg">{label}</p>
+      <p className="mt-0.5 text-fg-muted">
+        <span className="font-semibold tabular-nums text-fg">{payload[0].value}</span> signup{payload[0].value === 1 ? "" : "s"}
       </p>
     </div>
   );
@@ -120,21 +120,21 @@ export default function SuperAdminDashboardPage() {
               <EmptyState icon={ClipboardList} title="No requests yet" description="Outcomes appear once sellers start applying." compact />
             ) : (
               <>
-                <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-[var(--bg-tertiary)]" role="img" aria-label={`Approved ${pct(approved)}%, pending ${pct(pending)}%, rejected ${pct(rejected)}%`}>
+                <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full bg-subtle" role="img" aria-label={`Approved ${pct(approved)}%, pending ${pct(pending)}%, rejected ${pct(rejected)}%`}>
                   {split.map((s) => s.value > 0 && <div key={s.label} className="h-full first:rounded-s-full last:rounded-e-full" style={{ width: `${pct(s.value)}%`, background: s.color }} />)}
                 </div>
-                <ul className="mt-5 divide-y divide-[var(--border-color)]">
+                <ul className="mt-5 divide-y divide-line">
                   {split.map((s) => (
                     <li key={s.label} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden="true" />
-                      <span className="flex-1 text-[13px] text-[var(--text-secondary)]">{s.label}</span>
-                      <span className="text-[12px] tabular-nums text-[var(--text-muted)]">{pct(s.value)}%</span>
-                      <span className="w-8 text-end text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{s.value}</span>
+                      <span className="flex-1 text-[13px] text-fg-secondary">{s.label}</span>
+                      <span className="text-[12px] tabular-nums text-fg-muted">{pct(s.value)}%</span>
+                      <span className="w-8 text-end text-[13px] font-semibold tabular-nums text-fg">{s.value}</span>
                     </li>
                   ))}
                 </ul>
-                <p className="mt-4 border-t border-[var(--border-color)] pt-3 text-[12px] text-[var(--text-muted)]">
-                  <span className="font-semibold text-[var(--text-primary)]">{reviewTotal}</span> requests total
+                <p className="mt-4 border-t border-line pt-3 text-[12px] text-fg-muted">
+                  <span className="font-semibold text-fg">{reviewTotal}</span> requests total
                 </p>
               </>
             )}
@@ -151,16 +151,16 @@ export default function SuperAdminDashboardPage() {
           ) : recentRequests.length === 0 ? (
             <EmptyState icon={ClipboardList} title="No signup requests yet" compact />
           ) : (
-            <ul className="divide-y divide-[var(--border-color)]">
+            <ul className="divide-y divide-line">
               {recentRequests.map((r) => (
                 <li key={r._id}>
-                  <button type="button" onClick={() => router.push(`/super-admin/applications/${r._id}`)} className="flex w-full items-center gap-3 px-5 py-3 text-start transition-colors hover:bg-[var(--bg-row-hover)] focus-visible:bg-[var(--bg-row-hover)] focus-visible:outline-none">
+                  <button type="button" onClick={() => router.push(`/super-admin/applications/${r._id}`)} className="flex w-full items-center gap-3 px-5 py-3 text-start transition-colors hover:bg-row-hover focus-visible:bg-row-hover focus-visible:outline-none">
                     <Avatar name={r.name} size="md" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{r.store_name || r.name}</span>
-                      <span className="mt-0.5 block truncate text-[12px] text-[var(--text-muted)]">{r.name} · {r.email}</span>
+                      <span className="block truncate text-[13px] font-medium text-fg">{r.store_name || r.name}</span>
+                      <span className="mt-0.5 block truncate text-[12px] text-fg-muted">{r.name} · {r.email}</span>
                     </span>
-                    <span className="hidden shrink-0 text-[12px] text-[var(--text-muted)] sm:block">{timeAgo(r.created_at)}</span>
+                    <span className="hidden shrink-0 text-[12px] text-fg-muted sm:block">{timeAgo(r.created_at)}</span>
                     <StatusBadge value={r.status} />
                   </button>
                 </li>
@@ -176,15 +176,15 @@ export default function SuperAdminDashboardPage() {
           ) : recentUsers.length === 0 ? (
             <EmptyState icon={Users} title="No customers yet" compact />
           ) : (
-            <ul className="divide-y divide-[var(--border-color)]">
+            <ul className="divide-y divide-line">
               {recentUsers.map((u) => (
                 <li key={u._id} className="flex items-center gap-3 px-5 py-3">
                   <Avatar name={u.name} size="md" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{u.name}</span>
-                    <span className="mt-0.5 block truncate text-[12px] text-[var(--text-muted)]">{u.email}</span>
+                    <span className="block truncate text-[13px] font-medium text-fg">{u.name}</span>
+                    <span className="mt-0.5 block truncate text-[12px] text-fg-muted">{u.email}</span>
                   </span>
-                  <span className="hidden shrink-0 text-[12px] text-[var(--text-muted)] sm:block">{timeAgo(u.created_at)}</span>
+                  <span className="hidden shrink-0 text-[12px] text-fg-muted sm:block">{timeAgo(u.created_at)}</span>
                   <StatusBadge value={u.storeId ? "seller" : "customer"} dot={false} />
                 </li>
               ))}
@@ -198,7 +198,7 @@ export default function SuperAdminDashboardPage() {
 
 function ListSkeleton() {
   return (
-    <ul className="divide-y divide-[var(--border-color)]">
+    <ul className="divide-y divide-line">
       {Array.from({ length: 4 }).map((_, i) => (
         <li key={i} className="flex items-center gap-3 px-5 py-3">
           <Skeleton className="h-9 w-9 rounded-full" />

@@ -12,6 +12,7 @@ import {
   Infinity as InfinityIcon,
   MessageCircle,
   Package,
+  Paintbrush,
   Receipt,
   ShoppingCart,
   Users,
@@ -90,6 +91,7 @@ const EMPTY = {
   currency: "PKR",
   ...emptyLimits(),
   pos: false,
+  storeEditor: true,
 };
 
 const fromPlan = (plan) => {
@@ -110,6 +112,8 @@ const fromPlan = (plan) => {
     currency: plan.currency || "PKR",
     ...limits,
     pos: Boolean(plan.features?.pos),
+    // Missing (purane plans) = ON
+    storeEditor: plan.features?.storeEditor !== false,
   };
 };
 
@@ -258,7 +262,7 @@ export default function PlanForm({ plan = null }) {
       billingInterval: form.billingInterval,
       currency: form.currency.trim().toUpperCase(),
       limits,
-      features: { pos: form.pos },
+      features: { pos: form.pos, storeEditor: form.storeEditor },
     });
   };
 
@@ -339,7 +343,7 @@ export default function PlanForm({ plan = null }) {
                   {currencyOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </SelectInput>
               </div>
-              <p className="rounded-lg bg-[var(--bg-tertiary)] px-3.5 py-2.5 text-[13px] leading-5 text-[var(--text-secondary)]">
+              <p className="rounded-lg bg-subtle px-3.5 py-2.5 text-[13px] leading-5 text-fg-secondary">
                 {billingSentence(form.price, form.currency, form.billingInterval)}
               </p>
             </CardBody>
@@ -356,7 +360,7 @@ export default function PlanForm({ plan = null }) {
                 </Button>
               }
             />
-            <ul className="divide-y divide-[var(--border-color)]">
+            <ul className="divide-y divide-line">
               {LIMIT_FIELDS.map((field) => (
                 <LimitRow
                   key={field.key}
@@ -376,35 +380,47 @@ export default function PlanForm({ plan = null }) {
             <CardHeader title="Point of sale" description="In-store checkout for stores on this plan." icon={ShoppingCart} />
             <PosToggle checked={form.pos} onChange={set("pos")} />
           </Card>
+
+          <Card>
+            <CardHeader title="Store editor" description="Theme, homepage sections, menus and custom pages." icon={Paintbrush} />
+            <FeatureToggle
+              icon={Paintbrush}
+              title="Store editor access"
+              on="Sellers on this plan can customize their storefront."
+              off="Storefront customization stays off for this plan."
+              checked={form.storeEditor}
+              onChange={set("storeEditor")}
+            />
+          </Card>
         </div>
 
         <aside className="xl:sticky xl:top-4">
           <Card>
-            <div className="border-b border-[var(--border-color)] px-5 py-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Preview</p>
-              <h2 className="mt-1 truncate text-[18px] font-semibold tracking-tight text-[var(--text-primary)]">
+            <div className="border-b border-line px-5 py-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Preview</p>
+              <h2 className="mt-1 truncate text-[18px] font-semibold tracking-tight text-fg">
                 {form.name.trim() || "Untitled plan"}
               </h2>
-              <p className="mt-3 text-[26px] font-semibold leading-none tracking-tight tabular-nums text-[var(--text-primary)]">
+              <p className="mt-3 text-[26px] font-semibold leading-none tracking-tight tabular-nums text-fg">
                 {moneyLabel(form.price, form.currency)}
               </p>
-              <p className="mt-1.5 text-[12.5px] text-[var(--text-muted)]">{intervalLabel}</p>
+              <p className="mt-1.5 text-[12.5px] text-fg-muted">{intervalLabel}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <StatusBadge value={form.status} />
                 {form.pos ? <Badge tone="accent" dot={false}>POS</Badge> : <Badge tone="neutral" dot={false}>No POS</Badge>}
               </div>
             </div>
-            <ul className="divide-y divide-[var(--border-color)]">
+            <ul className="divide-y divide-line">
               {LIMIT_FIELDS.map(({ key, label, icon: Icon }) => {
                 const unlimited = form[`${key}Unlimited`];
                 const empty = !unlimited && form[key] === "";
                 return (
                   <li key={key} className="flex items-center justify-between gap-3 px-5 py-2.5 text-[12.5px]">
-                    <span className="inline-flex min-w-0 items-center gap-2 text-[var(--text-muted)]">
+                    <span className="inline-flex min-w-0 items-center gap-2 text-fg-muted">
                       <Icon size={13} aria-hidden="true" />
                       <span className="truncate">{label}</span>
                     </span>
-                    <span className={`shrink-0 tabular-nums ${unlimited || empty ? "text-[var(--text-muted)]" : errors[key] ? "font-semibold text-[var(--danger-text)]" : "font-semibold text-[var(--text-primary)]"}`}>
+                    <span className={`shrink-0 tabular-nums ${unlimited || empty ? "text-fg-muted" : errors[key] ? "font-semibold text-danger" : "font-semibold text-fg"}`}>
                       {unlimited ? "Unlimited" : empty ? "—" : form[key]}
                     </span>
                   </li>
@@ -425,10 +441,10 @@ export default function PlanForm({ plan = null }) {
 }
 
 function segmentClass(active) {
-  return `h-8 rounded-md px-3 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] ${
+  return `h-8 rounded-md px-3 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
     active
-      ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
-      : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+      ? "bg-card text-fg shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+      : "text-fg-muted hover:text-fg"
   }`;
 }
 
@@ -439,16 +455,16 @@ function LimitRow({ field, unlimited, onUnlimited, value, onChange, error, input
     <li className={error ? "bg-[color-mix(in_srgb,var(--danger)_7%,transparent)]" : undefined}>
       <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] ring-1 ring-[var(--border-color)]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-subtle text-fg-muted ring-1 ring-line">
             <Icon size={16} aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-[13.5px] font-semibold text-[var(--text-primary)]">{field.label}</p>
-            <p className="text-[12px] leading-5 text-[var(--text-muted)]">{field.hint}</p>
+            <p className="text-[13.5px] font-semibold text-fg">{field.label}</p>
+            <p className="text-[12px] leading-5 text-fg-muted">{field.hint}</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-          <div role="group" aria-label={`${field.label} allowance`} className="inline-flex rounded-lg bg-[var(--bg-tertiary)] p-0.5 ring-1 ring-[var(--border-color)]">
+          <div role="group" aria-label={`${field.label} allowance`} className="inline-flex rounded-lg bg-subtle p-0.5 ring-1 ring-line">
             <button type="button" aria-pressed={unlimited} onClick={() => onUnlimited(true)} className={segmentClass(unlimited)}>
               Unlimited
             </button>
@@ -457,7 +473,7 @@ function LimitRow({ field, unlimited, onUnlimited, value, onChange, error, input
             </button>
           </div>
           {unlimited ? (
-            <span className="inline-flex h-9 w-[6.75rem] items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] text-[12px] font-medium text-[var(--text-muted)]">
+            <span className="inline-flex h-9 w-[6.75rem] items-center justify-center rounded-lg border border-dashed border-line text-[12px] font-medium text-fg-muted">
               No cap
             </span>
           ) : (
@@ -479,7 +495,7 @@ function LimitRow({ field, unlimited, onUnlimited, value, onChange, error, input
         </div>
       </div>
       {error ? (
-        <p id={`${inputId}-error`} className="px-5 pb-3 text-[12px] font-medium text-[var(--danger-text)] sm:ps-[4.25rem]">
+        <p id={`${inputId}-error`} className="px-5 pb-3 text-[12px] font-medium text-danger sm:ps-[4.25rem]">
           {error}
         </p>
       ) : null}
@@ -487,21 +503,40 @@ function LimitRow({ field, unlimited, onUnlimited, value, onChange, error, input
   );
 }
 
+function FeatureToggle({ icon: Icon, title, on, off, checked, onChange }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-4 px-5 py-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+        <Icon size={18} aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13.5px] font-semibold text-fg">{title}</span>
+        <span className="mt-0.5 block text-[12.5px] leading-5 text-fg-muted">{checked ? on : off}</span>
+      </span>
+      <span className="relative inline-flex shrink-0">
+        <input type="checkbox" className="peer sr-only" checked={checked} onChange={onChange} />
+        <span className="block h-6 w-11 rounded-full bg-subtle ring-1 ring-line-strong transition-colors peer-checked:bg-accent peer-checked:ring-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card" />
+        <span className="pointer-events-none absolute start-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 rtl:peer-checked:-translate-x-5" />
+      </span>
+    </label>
+  );
+}
+
 function PosToggle({ checked, onChange }) {
   return (
     <label className="flex cursor-pointer items-center gap-4 px-5 py-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
         <ShoppingCart size={18} aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-semibold text-[var(--text-primary)]">POS access</span>
-        <span className="mt-0.5 block text-[12.5px] leading-5 text-[var(--text-muted)]">
+        <span className="block text-[13.5px] font-semibold text-fg">POS access</span>
+        <span className="mt-0.5 block text-[12.5px] leading-5 text-fg-muted">
           {checked ? "Stores on this plan can use in-store checkout." : "In-store checkout stays off for this plan."}
         </span>
       </span>
       <span className="relative inline-flex shrink-0">
         <input type="checkbox" className="peer sr-only" checked={checked} onChange={onChange} />
-        <span className="block h-6 w-11 rounded-full bg-[var(--bg-tertiary)] ring-1 ring-[var(--border-strong)] transition-colors peer-checked:bg-[var(--accent)] peer-checked:ring-[var(--accent)] peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--accent)] peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[var(--bg-card)]" />
+        <span className="block h-6 w-11 rounded-full bg-subtle ring-1 ring-line-strong transition-colors peer-checked:bg-accent peer-checked:ring-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card" />
         <span className="pointer-events-none absolute start-0.5 top-0.5 size-5 rounded-full bg-white shadow-sm transition-transform peer-checked:translate-x-5 rtl:peer-checked:-translate-x-5" />
       </span>
     </label>

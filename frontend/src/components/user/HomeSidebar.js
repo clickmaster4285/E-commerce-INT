@@ -61,25 +61,25 @@ function Section({ title, icon: Icon, hint, children }) {
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="border-b border-[var(--user-border)] last:border-b-0">
+    <div className="border-b border-user-line last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-4 py-2.5 text-start transition-colors hover:bg-[var(--user-bg-hover)]"
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-start transition-colors hover:bg-user-hover"
       >
-        {Icon ? <Icon size={13} className="shrink-0 text-[var(--user-accent)]" /> : null}
-        <span className="flex-1 text-xs font-normal text-[var(--user-text)]">
+        {Icon ? <Icon size={13} className="shrink-0 text-user-accent" /> : null}
+        <span className="flex-1 text-xs font-normal text-user-fg">
           {title}
         </span>
         {hint ? (
-          <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-normal text-[var(--user-text-subtle)]">
+          <span className="shrink-0 rounded-full bg-user-hover px-1.5 py-0.5 text-[0.625rem] font-normal text-user-fg-subtle">
             {hint}
           </span>
         ) : null}
         <ChevronDown
           size={13}
-          className={`shrink-0 text-[var(--user-text-muted)] transition-transform duration-200 ${
+          className={`shrink-0 text-user-fg-muted transition-transform duration-200 ${
             open ? "rotate-180" : ""
           }`}
         />
@@ -93,7 +93,7 @@ function LoadingRows({ count = 5 }) {
   return (
     <div className="space-y-1.5">
       {[...Array(count).keys()].map((index) => (
-        <div key={index} className="h-7 animate-pulse rounded-lg bg-[var(--user-bg-hover)]" />
+        <div key={index} className="h-7 animate-pulse rounded-lg bg-user-hover" />
       ))}
     </div>
   );
@@ -111,15 +111,15 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
         disabled
           ? "cursor-not-allowed opacity-45"
           : checked
-            ? "bg-[var(--user-accent-soft)]"
-            : "hover:bg-[var(--user-bg-hover)]"
+            ? "bg-user-accent-soft"
+            : "hover:bg-user-hover"
       }`}
     >
       <span
         className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border transition-colors ${
           checked
-            ? "border-[var(--user-accent)] bg-[var(--user-accent)] text-[var(--user-accent-text)]"
-            : "border-[var(--user-border-hover)]"
+            ? "border-user-accent bg-user-accent text-user-accent-fg"
+            : "border-user-line-hover"
         }`}
       >
         {checked ? <Check size={11} /> : null}
@@ -127,13 +127,13 @@ function CheckRow({ checked, label, title, count = null, icon = null, disabled =
       {icon}
       <span
         className={`min-w-0 flex-1 break-words text-[0.78125rem] font-normal capitalize ${
-          checked ? "text-[var(--user-text)]" : "text-[var(--user-text-muted)]"
+          checked ? "text-user-fg" : "text-user-fg-muted"
         }`}
       >
         {label}
       </span>
       {count !== null ? (
-        <span className="shrink-0 text-[0.625rem] font-normal tabular-nums text-[var(--user-text-subtle)]">
+        <span className="shrink-0 text-[0.625rem] font-normal tabular-nums text-user-fg-subtle">
           {count}
         </span>
       ) : null}
@@ -146,7 +146,7 @@ function ShowMore({ open, total, onClick, t }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-1 w-full rounded-md py-1.5 text-[0.6875rem] font-normal text-[var(--user-accent)] transition-colors hover:bg-[var(--user-bg-hover)]"
+      className="mt-1 w-full rounded-md py-1.5 text-[0.6875rem] font-normal text-user-accent transition-colors hover:bg-user-hover"
     >
       {open
         ? t("admin.productDetail.page.showLess")
@@ -160,10 +160,10 @@ const THUMB_CLASS =
   "pointer-events-none absolute inset-x-0 top-1/2 h-5 w-full -translate-y-1/2 appearance-none bg-transparent " +
   "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 " +
   "[&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full " +
-  "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[var(--user-bg-card)] [&::-webkit-slider-thumb]:bg-[var(--user-accent)] " +
+  "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-user-card [&::-webkit-slider-thumb]:bg-user-accent " +
   "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 " +
   "[&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:rounded-full " +
-  "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-[var(--user-accent)]";
+  "[&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-user-accent";
 
 function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease, t }) {
   const span = max - min;
@@ -179,9 +179,9 @@ function PriceRangeSlider({ min, max, value, step = 1, onChange, onRelease, t })
       onMouseUp={onRelease}
       onTouchEnd={onRelease}
     >
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--user-border)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-user-line" />
       <div
-        className="pointer-events-none absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[var(--user-accent)]"
+        className="pointer-events-none absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-user-accent"
         style={{ left: `${lowPercent}%`, right: `${100 - highPercent}%` }}
       />
       <input
@@ -279,18 +279,18 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply, t }) {
 
   if (span <= 0) {
     return (
-      <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">
+      <p className="px-2 py-3 text-[0.6875rem] text-user-fg-subtle">
         {t("admin.shared.state.noResults")}
       </p>
     );
   }
 
   const inputClass =
-    "h-9 w-full min-w-0 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] px-2 text-[0.75rem] font-normal tabular-nums text-[var(--user-text)] outline-none focus:border-[var(--user-accent)]";
+    "h-9 w-full min-w-0 rounded-lg border border-user-line bg-user-input px-2 text-[0.75rem] font-normal tabular-nums text-user-fg outline-none focus:border-user-accent";
 
   return (
     <div>
-      <p className="mb-2.5 flex items-center justify-between gap-2 text-[0.75rem] font-normal text-[var(--user-text)]">
+      <p className="mb-2.5 flex items-center justify-between gap-2 text-[0.75rem] font-normal text-user-fg">
         <span className="tabular-nums">
           {formatPrice(shownLow)} — {formatPrice(shownHigh)}
         </span>
@@ -308,7 +308,7 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply, t }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <label className="flex min-w-0 flex-col gap-1">
-          <span aria-hidden="true" className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">−</span>
+          <span aria-hidden="true" className="text-[0.625rem] font-normal uppercase text-user-fg-subtle">−</span>
           <input
             type="number"
             inputMode="numeric"
@@ -331,7 +331,7 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply, t }) {
           />
         </label>
         <label className="flex min-w-0 flex-col gap-1">
-          <span aria-hidden="true" className="text-[0.625rem] font-normal uppercase text-[var(--user-text-subtle)]">+</span>
+          <span aria-hidden="true" className="text-[0.625rem] font-normal uppercase text-user-fg-subtle">+</span>
           <input
             type="number"
             inputMode="numeric"
@@ -355,7 +355,7 @@ function PriceFilter({ bounds, filterMin, filterMax, onApply, t }) {
         </label>
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[0.625rem] font-normal text-[var(--user-text-subtle)]">
+      <div className="mt-2 flex items-center justify-between text-[0.625rem] font-normal text-user-fg-subtle">
         <span>{formatPrice(bounds.min)}</span>
         <span>{formatPrice(bounds.max)}</span>
       </div>
@@ -536,7 +536,7 @@ export default function HomeSidebar({
       <aside
         aria-label={t("admin.shared.action.filter")}
         title={t("admin.shared.action.filter")}
-        className={`user-home-sidebar isolate flex min-h-12 justify-center overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-2 text-[var(--user-text-muted)] ${className}`}
+        className={`user-home-sidebar isolate flex min-h-12 justify-center overflow-hidden rounded-2xl border border-user-line bg-user-card p-2 text-user-fg-muted ${className}`}
       >
         <div className="flex h-6 w-6 items-center justify-center">
           <SlidersHorizontal size={16} />
@@ -547,12 +547,12 @@ export default function HomeSidebar({
 
   if (isLoading) {
     return (
-      <aside className={`user-home-sidebar isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}>
-        <div className="flex items-center gap-2 border-b border-[var(--user-border)] px-4 py-3.5 pb-3">
+      <aside className={`user-home-sidebar isolate overflow-hidden rounded-2xl border border-user-line bg-user-card ${className}`}>
+        <div className="flex items-center gap-2 border-b border-user-line px-4 py-3.5 pb-3">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
             <SlidersHorizontal size={15} className="text-orange-500" />
           </span>
-          <h2 className="flex-1 text-base font-semibold tracking-tight text-[var(--user-text)]">
+          <h2 className="flex-1 text-base font-semibold tracking-tight text-user-fg">
             {t("admin.shared.action.filter")}
           </h2>
         </div>
@@ -568,7 +568,7 @@ export default function HomeSidebar({
 
   return (
     <aside dir={dir}
-      className={`user-home-sidebar isolate overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] ${className}`}
+      className={`user-home-sidebar isolate overflow-hidden rounded-2xl border border-user-line bg-user-card ${className}`}
     >
       <div
         className={
@@ -578,11 +578,11 @@ export default function HomeSidebar({
         }
       >
       {/* HEADER */}
-      <div className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-3 pb-3">
+      <div className="sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-user-line bg-user-card px-4 py-3 pb-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
           <SlidersHorizontal size={14} className="text-orange-500" />
         </span>
-        <h2 className="flex-1 text-base font-semibold tracking-tight text-[var(--user-text)]">
+        <h2 className="flex-1 text-base font-semibold tracking-tight text-user-fg">
           {t("admin.shared.action.filter")}
         </h2>
         <button
@@ -591,15 +591,15 @@ export default function HomeSidebar({
           disabled={!filtersActive}
           className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors ${
             filtersActive
-              ? "text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] hover:text-orange-500"
-              : "cursor-not-allowed text-[var(--user-text-disabled)]"
+              ? "text-user-fg-muted hover:bg-user-hover hover:text-orange-500"
+              : "cursor-not-allowed text-user-fg-disabled"
           }`}
         >
           <RotateCcw size={11} /> {t("admin.shared.action.clearFilters")}
         </button>
       </div>
 
-        <p className="border-b border-[var(--user-border)] px-4 py-2 text-xs text-[var(--user-text-muted)]">
+        <p className="border-b border-user-line px-4 py-2 text-xs text-user-fg-muted">
           {t("admin.dashboard.salesDistribution.productsCount", { count: matchCount })}
         </p>
 
@@ -614,12 +614,12 @@ export default function HomeSidebar({
                 checked={activeCategoryIds.includes(idOf(category._id))}
                 label={fieldOf(category, "name")}
                 count={category.count}
-                icon={<CategoryIcon name={fieldOf(category, "name")} size={13} className="shrink-0 text-[var(--user-accent)]" />}
+                icon={<CategoryIcon name={fieldOf(category, "name")} size={13} className="shrink-0 text-user-accent" />}
                 onClick={() => toggleCategory(category._id)}
               />
             ))}
             {!categoryList.length ? (
-              <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">{t("admin.shared.state.noResults")}</p>
+              <p className="px-2 py-3 text-[0.6875rem] text-user-fg-subtle">{t("admin.shared.state.noResults")}</p>
             ) : null}
           </div>
 
@@ -650,19 +650,19 @@ export default function HomeSidebar({
           <div className="relative mb-2">
             <Search
               size={13}
-              className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)]"
+              className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-user-fg-subtle"
             />
             <input
               value={brandQuery}
               onChange={(event) => setBrandQuery(event.target.value)}
               placeholder={t("admin.products.filter.searchBrand")}
               aria-label={t("admin.products.filter.searchBrand")}
-              className="w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-input)] py-1.5 ps-7 pe-2.5 text-start text-sm text-[var(--user-text)] outline-none transition-colors placeholder:text-[var(--user-text-disabled)] focus:border-[var(--user-accent)]"
+              className="w-full rounded-lg border border-user-line bg-user-input py-1.5 ps-7 pe-2.5 text-start text-sm text-user-fg outline-none transition-colors placeholder:text-user-fg-disabled focus:border-user-accent"
             />
           </div>
 
           {searchedBrands.length === 0 ? (
-            <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">{t("admin.shared.state.noResults")}</p>
+            <p className="px-2 py-3 text-[0.6875rem] text-user-fg-subtle">{t("admin.shared.state.noResults")}</p>
           ) : (
             <div className={showAllBrands ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pe-0.5" : "space-y-0.5"}>
               {visibleBrands.map((brand) => (
@@ -694,7 +694,7 @@ export default function HomeSidebar({
           {dealsLoading && !dealList.length ? (
             <LoadingRows count={4} />
           ) : !dealList.length ? (
-            <p className="px-2 py-3 text-[0.6875rem] text-[var(--user-text-subtle)]">
+            <p className="px-2 py-3 text-[0.6875rem] text-user-fg-subtle">
               {t("admin.shared.state.noResults")}
             </p>
           ) : (
@@ -708,17 +708,17 @@ export default function HomeSidebar({
                   label={
                     <span className="flex min-w-0 flex-col gap-0.5">
                       <span className="break-words font-normal">{t("common.all")} {t("admin.nav.item.deals")}</span>
-                      <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-[var(--user-accent)]">
+                      <span className="w-fit rounded-full bg-user-accent-soft px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-user-accent">
                         {t("common.all")} {t("admin.deals.page.offer")}
                       </span>
                     </span>
                   }
                   count={dealList.length || null}
-                  icon={<Flame size={13} className="shrink-0 text-[var(--user-accent)]" />}
+                  icon={<Flame size={13} className="shrink-0 text-user-accent" />}
                   onClick={() => onToggleAllDealsView?.(!showAllDealsView)}
                 />
               </div>
-              <div className="mx-2 my-1 border-t border-dashed border-[var(--user-border)]" />
+              <div className="mx-2 my-1 border-t border-dashed border-user-line" />
               {/* INDIVIDUAL DEALS — Brand ki tarah: expand par poora lamba
                   nahi hota, usi block me scrollbar ban jata hai. */}
               <div className={showAllDeals ? "max-h-[16.25rem] space-y-0.5 overflow-y-auto pe-0.5" : "space-y-0.5"}>
@@ -735,14 +735,14 @@ export default function HomeSidebar({
                         <span className="flex min-w-0 flex-col gap-0.5">
                           <span className="break-words">{fieldOf(deal, "name") || t("admin.nav.item.deals")}</span>
                           {badge ? (
-                            <span className="w-fit rounded-full bg-[var(--user-accent-soft)] px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-[var(--user-accent)]">
+                            <span className="w-fit rounded-full bg-user-accent-soft px-1.5 py-px text-[0.5625rem] font-normal uppercase tracking-wider text-user-accent">
                               {badge}
                             </span>
                           ) : null}
                         </span>
                       }
                       count={typeof deal.count === "number" ? deal.count : null}
-                      icon={<Flame size={13} className="shrink-0 text-[var(--user-accent)]" />}
+                      icon={<Flame size={13} className="shrink-0 text-user-accent" />}
                       disabled={(deal.count || 0) === 0 && !checked}
                       onClick={() => toggleDeal(deal._id)}
                     />

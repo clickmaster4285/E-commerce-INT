@@ -90,16 +90,16 @@ export default function PlansPage() {
       key: "price",
       header: "Price",
       className: "whitespace-nowrap",
-      cell: (p) => <span className="font-medium tabular-nums text-[var(--text-primary)]">{formatMoney(p.price, p.currency, p.billingInterval)}</span>,
+      cell: (p) => <span className="font-medium tabular-nums text-fg">{formatMoney(p.price, p.currency, p.billingInterval)}</span>,
     },
     {
       key: "limits",
       header: "Limits",
       cell: (p) => (
-        <div className="space-y-1 text-[12.5px] text-[var(--text-secondary)]">
-          <p className="inline-flex items-center gap-1.5"><Package size={13} className="text-[var(--text-muted)]" aria-hidden="true" />{limitLabel(p.limits?.maxProducts)} products · {limitLabel(p.limits?.maxOrders)} orders</p>
-          <p className="inline-flex items-center gap-1.5"><Users size={13} className="text-[var(--text-muted)]" aria-hidden="true" />{limitLabel(p.limits?.maxStaffAccounts)} staff · {limitLabel(p.limits?.maxChats)} chats</p>
-          <p className="text-[11.5px] text-[var(--text-muted)]">
+        <div className="space-y-1 text-[12.5px] text-fg-secondary">
+          <p className="inline-flex items-center gap-1.5"><Package size={13} className="text-fg-muted" aria-hidden="true" />{limitLabel(p.limits?.maxProducts)} products · {limitLabel(p.limits?.maxOrders)} orders</p>
+          <p className="inline-flex items-center gap-1.5"><Users size={13} className="text-fg-muted" aria-hidden="true" />{limitLabel(p.limits?.maxStaffAccounts)} staff · {limitLabel(p.limits?.maxChats)} chats</p>
+          <p className="text-[11.5px] text-fg-muted">
             Leads {limitLabel(p.limits?.maxLeads)} · Quotes {limitLabel(p.limits?.maxQuotes)} · Invoices {limitLabel(p.limits?.maxInvoices)}
           </p>
         </div>
@@ -110,20 +110,20 @@ export default function PlansPage() {
       header: "POS",
       cell: (p) => (p.features?.pos
         ? <Badge tone="accent" dot={false}>Included</Badge>
-        : <span className="text-[var(--text-muted)]">Not included</span>),
+        : <span className="text-fg-muted">Not included</span>),
     },
     {
       key: "stores",
       header: "Stores",
       className: "whitespace-nowrap",
-      cell: (p) => <span className="tabular-nums text-[var(--text-secondary)]">{p.storeCount ?? 0}</span>,
+      cell: (p) => <span className="tabular-nums text-fg-secondary">{p.storeCount ?? 0}</span>,
     },
     { key: "status", header: "Status", cell: (p) => <StatusBadge value={p.status} /> },
     {
       key: "added",
       header: "Created",
       className: "whitespace-nowrap",
-      cell: (p) => <span className="text-[var(--text-secondary)]">{formatDate(p.created_at)}</span>,
+      cell: (p) => <span className="text-fg-secondary">{formatDate(p.created_at)}</span>,
     },
     {
       key: "actions",
@@ -174,7 +174,7 @@ export default function PlansPage() {
       <Card>
         <CardToolbar>
           <SearchInput value={search} onChange={setSearch} placeholder="Search by name or description…" label="Search plans" />
-          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
+          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-fg-muted" aria-label="Refreshing" />}
         </CardToolbar>
         <DataTable
           columns={columns}

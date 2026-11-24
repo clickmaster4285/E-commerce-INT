@@ -16,7 +16,7 @@ export default function TrustStrip() {
   return (
     <div
       id="why"
-      className="scroll-mt-24 border-y border-[var(--user-border)] bg-[var(--user-bg-card)]"
+      className="scroll-mt-24 border-y border-user-line bg-user-card"
       aria-label="Why businesses choose Click Master Store"
     >
       <ul className="mx-auto grid max-w-7xl grid-cols-2 gap-x-4 gap-y-3 px-4 py-4 sm:grid-cols-3 sm:px-6 md:grid-cols-5 lg:px-8">
@@ -31,10 +31,10 @@ export default function TrustStrip() {
               transition={{ duration: 0.4, delay: i * 0.07 }}
               className="flex items-center gap-2"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--user-accent-soft)] text-[var(--user-accent)]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-user-accent-soft text-user-accent">
                 <Icon size={18} strokeWidth={1.9} aria-hidden="true" />
               </span>
-              <span className="text-[11px] font-bold leading-tight text-[var(--user-text-secondary)] sm:text-xs">
+              <span className="text-[11px] font-bold leading-tight text-user-fg-secondary sm:text-xs">
                 {text}
               </span>
             </motion.li>

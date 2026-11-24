@@ -22,7 +22,7 @@ const LIST = "/super-admin/store-admins";
 function Row({ icon: Icon, label, children }) {
   return (
     <li className="flex items-center justify-between gap-3 px-5 py-3 text-[13px]">
-      <span className="inline-flex shrink-0 items-center gap-2.5 text-[var(--text-muted)]"><Icon size={15} aria-hidden="true" />{label}</span>
+      <span className="inline-flex shrink-0 items-center gap-2.5 text-fg-muted"><Icon size={15} aria-hidden="true" />{label}</span>
       <span className="flex min-w-0 justify-end text-end">{children}</span>
     </li>
   );
@@ -128,15 +128,15 @@ export default function StoreAdminDetailPage() {
         <Card>
           <CardBody className="flex flex-col items-center text-center">
             <Avatar name={admin.name} src={admin.avatar || undefined} size="xl" />
-            <p className="mt-3 text-[17px] font-semibold text-[var(--text-primary)]">{admin.name}</p>
+            <p className="mt-3 text-[17px] font-semibold text-fg">{admin.name}</p>
             <Badge tone={isOwner ? "accent" : "neutral"} dot={false} className="mt-2">{isOwner ? "Store owner" : "Admin"}</Badge>
           </CardBody>
-          <ul className="divide-y divide-[var(--border-color)] border-t border-[var(--border-color)]">
-            <Row icon={Mail} label="Email"><a href={`mailto:${admin.email}`} className="truncate font-medium text-[var(--text-primary)] hover:text-[var(--accent)]">{admin.email}</a></Row>
-            {admin.phone && <Row icon={Phone} label="Phone"><a href={`tel:${admin.phone}`} className="font-medium tabular-nums text-[var(--text-primary)] hover:text-[var(--accent)]">{admin.phone}</a></Row>}
-            {admin.username && <Row icon={AtSign} label="Username"><span className="font-medium text-[var(--text-primary)]">@{admin.username}</span></Row>}
-            {admin.created_at && <Row icon={CalendarPlus} label="Joined"><span className="font-medium text-[var(--text-primary)]" title={formatDateTime(admin.created_at)}>{formatDate(admin.created_at)}</span></Row>}
-            {admin.updated_at && <Row icon={Clock} label="Last updated"><span className="font-medium text-[var(--text-primary)]" title={formatDateTime(admin.updated_at)}>{timeAgo(admin.updated_at)}</span></Row>}
+          <ul className="divide-y divide-line border-t border-line">
+            <Row icon={Mail} label="Email"><a href={`mailto:${admin.email}`} className="truncate font-medium text-fg hover:text-accent">{admin.email}</a></Row>
+            {admin.phone && <Row icon={Phone} label="Phone"><a href={`tel:${admin.phone}`} className="font-medium tabular-nums text-fg hover:text-accent">{admin.phone}</a></Row>}
+            {admin.username && <Row icon={AtSign} label="Username"><span className="font-medium text-fg">@{admin.username}</span></Row>}
+            {admin.created_at && <Row icon={CalendarPlus} label="Joined"><span className="font-medium text-fg" title={formatDateTime(admin.created_at)}>{formatDate(admin.created_at)}</span></Row>}
+            {admin.updated_at && <Row icon={Clock} label="Last updated"><span className="font-medium text-fg" title={formatDateTime(admin.updated_at)}>{timeAgo(admin.updated_at)}</span></Row>}
           </ul>
         </Card>
 
@@ -149,15 +149,15 @@ export default function StoreAdminDetailPage() {
                   <div className="mb-4 flex items-center gap-3">
                     <Avatar name={store.name} src={store.logo || undefined} shape="square" size="lg" />
                     <div className="min-w-0">
-                      <p className="truncate text-[15px] font-semibold text-[var(--text-primary)]">{store.name}</p>
-                      <p className="truncate text-[12px] text-[var(--text-muted)]">{store.subdomain ? `${store.subdomain}.…` : "No subdomain"}</p>
+                      <p className="truncate text-[15px] font-semibold text-fg">{store.name}</p>
+                      <p className="truncate text-[12px] text-fg-muted">{store.subdomain ? `${store.subdomain}.…` : "No subdomain"}</p>
                     </div>
                   </div>
-                  <ul className="divide-y divide-[var(--border-color)]">
+                  <ul className="divide-y divide-line">
                     <Row icon={ShieldCheck} label="Store status">{admin.sellerPending ? <Badge tone="warning">Pending approval</Badge> : <StatusBadge value={store.status} />}</Row>
-                    {store.business_category && <Row icon={Building2} label="Category"><span className="font-medium text-[var(--text-primary)]">{store.business_category}</span></Row>}
-                    {store.created_at && <Row icon={CalendarPlus} label="Created"><span className="font-medium text-[var(--text-primary)]">{formatDate(store.created_at)}</span></Row>}
-                    {store.url && <Row icon={ExternalLink} label="Storefront"><a href={store.url} target="_blank" rel="noreferrer" title={store.url} className="flex max-w-[260px] min-w-0 items-start gap-1 break-all text-start font-medium text-[var(--accent)] hover:underline">{hostFromUrl(store.url)}<ExternalLink size={12} className="mt-0.5 shrink-0" /></a></Row>}
+                    {store.business_category && <Row icon={Building2} label="Category"><span className="font-medium text-fg">{store.business_category}</span></Row>}
+                    {store.created_at && <Row icon={CalendarPlus} label="Created"><span className="font-medium text-fg">{formatDate(store.created_at)}</span></Row>}
+                    {store.url && <Row icon={ExternalLink} label="Storefront"><a href={store.url} target="_blank" rel="noreferrer" title={store.url} className="flex max-w-[260px] min-w-0 items-start gap-1 break-all text-start font-medium text-accent hover:underline">{hostFromUrl(store.url)}<ExternalLink size={12} className="mt-0.5 shrink-0" /></a></Row>}
                   </ul>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button size="sm" variant="secondary" icon={LayoutDashboard} loading={openingId === String(admin.id)} onClick={() => openStoreAdmin(store.id)}>Open admin panel</Button>
@@ -171,23 +171,23 @@ export default function StoreAdminDetailPage() {
           <Card>
             <CardHeader title="Approval timeline" description="Store request and review history" icon={History} />
             <CardBody>
-              {admin.approval ? <ol className="relative space-y-5 border-s border-[var(--border-color)] ps-5">
+              {admin.approval ? <ol className="relative space-y-5 border-s border-line ps-5">
                 <TimelineItem title="Store request submitted" date={admin.approval.requestedAt} detail="Seller sent the store application for review." />
                 {admin.approval.reviewedAt ? <TimelineItem title={admin.approval.status === "approved" ? "Approved by Super Admin" : "Rejected by Super Admin"} date={admin.approval.reviewedAt} detail={admin.approval.reviewedBy?.name ? `Reviewed by ${admin.approval.reviewedBy.name}` : "Review decision recorded"} tone={admin.approval.status === "approved" ? "success" : "danger"} /> : <TimelineItem title="Awaiting approval" detail="A Super Admin has not recorded a decision yet." tone="warning" />}
-              </ol> : <p className="text-sm text-[var(--text-muted)]">No approval request is linked to this admin.</p>}
+              </ol> : <p className="text-sm text-fg-muted">No approval request is linked to this admin.</p>}
             </CardBody>
           </Card>
           <Card>
             <CardHeader title="Security" icon={KeyRound} />
             <CardBody className="flex items-center justify-between gap-4 py-4">
-              <p className="text-sm font-medium text-[var(--text-primary)]">Password access</p>
+              <p className="text-sm font-medium text-fg">Password access</p>
               <Button size="sm" variant="primary" icon={KeyRound} onClick={() => setDialog("password")}>Change password</Button>
             </CardBody>
           </Card>
           <Card className="md:col-span-2">
             <CardHeader title="Recent activity" description="Actions performed by this store admin" icon={History} />
             <CardBody>
-              {admin.activities?.length ? <ol className="relative space-y-4 border-s border-[var(--border-color)] ps-5">{admin.activities.slice(0, 20).map((entry, index) => <li key={`${entry.timestamp}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--accent)] ring-4 ring-[var(--bg-card)]" /><p className="text-[13px] font-medium text-[var(--text-primary)]">{entry.action || "Activity recorded"}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{entry.category || "System"} · {formatDateTime(entry.timestamp)}</p>{entry.details?.changes?.length ? <ul className="mt-2 space-y-1.5">{entry.details.changes.map((change, changeIndex) => <li key={`${change.field}-${changeIndex}`} className="text-[12px] leading-5 text-[var(--text-secondary)]"><span className="font-semibold text-[var(--text-primary)]">{String(change.field || "Field").replace(/_/g, " ")}:</span> {String(change.oldValue ?? change.before ?? "empty")} <span className="px-1 text-[var(--text-muted)]">→</span> {String(change.newValue ?? change.after ?? "empty")}</li>)}</ul> : null}</li>)}</ol> : <p className="text-sm text-[var(--text-muted)]">No activity recorded yet.</p>}
+              {admin.activities?.length ? <ol className="relative space-y-4 border-s border-line ps-5">{admin.activities.slice(0, 20).map((entry, index) => <li key={`${entry.timestamp}-${index}`} className="relative"><span className="absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full bg-accent ring-4 ring-card" /><p className="text-[13px] font-medium text-fg">{entry.action || "Activity recorded"}</p><p className="mt-0.5 text-[12px] text-fg-muted">{entry.category || "System"} · {formatDateTime(entry.timestamp)}</p>{entry.details?.changes?.length ? <ul className="mt-2 space-y-1.5">{entry.details.changes.map((change, changeIndex) => <li key={`${change.field}-${changeIndex}`} className="text-[12px] leading-5 text-fg-secondary"><span className="font-semibold text-fg">{String(change.field || "Field").replace(/_/g, " ")}:</span> {String(change.oldValue ?? change.before ?? "empty")} <span className="px-1 text-fg-muted">→</span> {String(change.newValue ?? change.after ?? "empty")}</li>)}</ul> : null}</li>)}</ol> : <p className="text-sm text-fg-muted">No activity recorded yet.</p>}
             </CardBody>
           </Card>
         </div>
@@ -234,7 +234,7 @@ function DetailSkeleton() {
 }
 
 function TimelineItem({ title, date, detail, tone = "accent" }) {
-  const color = tone === "success" ? "bg-[var(--success)]" : tone === "danger" ? "bg-[var(--danger)]" : tone === "warning" ? "bg-[var(--warning)]" : "bg-[var(--accent)]";
-  return <li className="relative"><span className={`absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full ${color} ring-4 ring-[var(--bg-card)]`} /><p className="text-[13px] font-semibold text-[var(--text-primary)]">{title}</p>{date && <p className="mt-1 text-[12px] font-medium text-[var(--text-secondary)]">{formatDateTime(date)}</p>}<p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{detail}</p></li>;
+  const color = tone === "success" ? "bg-success-solid" : tone === "danger" ? "bg-danger-solid" : tone === "warning" ? "bg-warning-solid" : "bg-accent";
+  return <li className="relative"><span className={`absolute -start-[25px] top-1.5 h-2.5 w-2.5 rounded-full ${color} ring-4 ring-card`} /><p className="text-[13px] font-semibold text-fg">{title}</p>{date && <p className="mt-1 text-[12px] font-medium text-fg-secondary">{formatDateTime(date)}</p>}<p className="mt-0.5 text-[12px] text-fg-muted">{detail}</p></li>;
 }
 function hostFromUrl(value) { return String(value || "").replace(/^https?:\/\//i, "").replace(/\/$/, ""); }

@@ -53,10 +53,10 @@ export default function Modal({
   if (!open) return null;
 
   const tone = {
-    accent: "bg-[var(--accent-soft)] text-[var(--accent)]",
-    danger: "bg-[var(--danger-soft)] text-[var(--danger-text)]",
-    warning: "bg-[var(--warning-soft)] text-[var(--warning-text)]",
-    success: "bg-[var(--success-soft)] text-[var(--success-text)]",
+    accent: "bg-accent-soft text-accent",
+    danger: "bg-danger-soft text-danger",
+    warning: "bg-warning-soft text-warning",
+    success: "bg-success-soft text-success",
   }[iconTone];
 
   return (
@@ -78,13 +78,13 @@ export default function Modal({
             </span>
           ) : null}
           <div className="min-w-0 flex-1 pt-0.5">
-            <h2 id={titleId} className="text-[16px] font-semibold leading-6 text-[var(--text-primary)]">{title}</h2>
-            {description ? <p className="mt-1 text-[13px] leading-5 text-[var(--text-muted)]">{description}</p> : null}
+            <h2 id={titleId} className="text-[16px] font-semibold leading-6 text-fg">{title}</h2>
+            {description ? <p className="mt-1 text-[13px] leading-5 text-fg-muted">{description}</p> : null}
           </div>
           <IconButton icon={X} label="Close" size="sm" onClick={onClose} disabled={busy} data-close className="-me-1.5 -mt-1" />
         </div>
         {children ? <div className={cx("min-h-0 flex-1 overflow-y-auto px-5 pb-5 sm:px-6", bodyClassName)}>{children}</div> : null}
-        {footer ? <div className="flex flex-col-reverse gap-2 border-t border-[var(--border-color)] bg-[var(--bg-card-alt)] px-5 py-3.5 sm:flex-row sm:items-center sm:justify-end sm:px-6">{footer}</div> : null}
+        {footer ? <div className="flex flex-col-reverse gap-2 border-t border-line bg-card-alt px-5 py-3.5 sm:flex-row sm:items-center sm:justify-end sm:px-6">{footer}</div> : null}
       </Tag>
     </div>
   );

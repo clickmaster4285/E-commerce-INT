@@ -43,8 +43,8 @@ export default function PosReturnHistoryPanel() {
   return (
     <div className="space-y-4 pb-1">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-600 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]"><History size={18}/></span><div><h2 className="text-base font-bold leading-5 text-slate-900 dark:text-slate-100">{t("admin.pos.ui.recentReturnHistory")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.returnCount", { count: total })}</p></div></div>
-        <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]">{t("admin.pos.ui.refunded")}<strong className="font-semibold text-slate-800 dark:text-slate-200">{money(totalRefunded, locale)}</strong></span>
+        <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-blue-600 shadow-sm"><History size={18}/></span><div><h2 className="text-base font-bold leading-5 text-fg">{t("admin.pos.ui.recentReturnHistory")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.returnCount", { count: total })}</p></div></div>
+        <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs text-slate-500 shadow-sm">{t("admin.pos.ui.refunded")}<strong className="font-semibold text-fg">{money(totalRefunded, locale)}</strong></span>
       </header>
 
       <div className="mb-2 grid gap-3 sm:grid-cols-[minmax(220px,1fr)_180px_auto]">
@@ -55,7 +55,7 @@ export default function PosReturnHistoryPanel() {
 
       <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[900px] text-start">
-          <thead className="border-b border-slate-200 bg-white text-[10px] uppercase tracking-wide text-slate-500 dark:bg-[var(--bg-card)]"><tr>{["return", "originalSale", "date", "customer", "reason", "items", "refund", ""].map((label) => <th key={label} className="px-4 py-3.5 text-start font-bold">{label ? t(`admin.pos.ui.table.${label}`) : ""}</th>)}</tr></thead>
+          <thead className="border-b border-slate-200 bg-card text-[10px] uppercase tracking-wide text-slate-500"><tr>{["return", "originalSale", "date", "customer", "reason", "items", "refund", ""].map((label) => <th key={label} className="px-4 py-3.5 text-start font-bold">{label ? t(`admin.pos.ui.table.${label}`) : ""}</th>)}</tr></thead>
           <tbody>
             {returnsQuery.isLoading ? <tr><td colSpan={8} className="px-4 py-14 text-center text-sm text-slate-500">{t("admin.pos.ui.loadingReturnHistory")}</td></tr>
               : returnsQuery.isError ? <tr><td colSpan={8} className="px-4 py-14 text-center text-sm text-rose-600">{t("admin.pos.ui.couldNotLoadReturnHistoryPleaseRetry")}</td></tr>
@@ -65,7 +65,7 @@ export default function PosReturnHistoryPanel() {
                   const displayId = record._id ? `RET-${String(record._id).slice(-6).toUpperCase()}` : t("admin.pos.ui.return");
                   const expanded = expandedReturnId === record._id;
                   return <Fragment key={record._id}>
-                    <tr className={`border-b border-slate-200 bg-white text-xs transition-colors dark:bg-[var(--bg-card)] ${expanded ? "!bg-blue-50/40 dark:!bg-blue-950/30" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}>
+                    <tr className={`border-b border-line bg-card text-xs transition-colors ${expanded ? "!bg-info-soft" : "hover:bg-card-alt"}`}>
                       <td className="px-4 py-4"><div className="flex items-center gap-2.5"><button type="button" aria-label={t(`admin.pos.ui.${expanded ? "hide" : "show"}ReturnDetails`, { id: displayId })} aria-expanded={expanded} onClick={() => setExpandedReturnId(expanded ? null : record._id)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${expanded ? "border-blue-200 bg-blue-100 text-blue-700" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-700"}`}><ChevronRight size={14} className={`transition-transform ${expanded ? "rotate-90" : ""}`}/></button><div><strong className="font-mono text-[11px] font-bold text-slate-800">{displayId}</strong><span className="mt-1 block text-[10px] text-slate-400">{t("admin.pos.ui.returnTransaction")}</span></div></div></td>
                       <td className="px-4 py-4"><Link href={`/admin/pos/history/${record._saleId}`} className="font-mono text-[11px] font-bold text-blue-700 hover:text-blue-800">{record._saleNumber}</Link></td>
                       <td className="whitespace-nowrap px-4 py-4"><span className="block font-medium text-slate-700">{date ? date.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span className="mt-1 block text-[10px] text-slate-500">{date ? date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" }) : ""}</span></td>

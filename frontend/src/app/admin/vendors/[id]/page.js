@@ -152,13 +152,13 @@ export default function VendorDetailPage({ params }) {
   return (
     <div className="space-y-4">
       <div className="flex min-w-0 items-start gap-3">
-        <Link href="/admin/vendors" aria-label={t("page.title")} title={t("page.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-[var(--bg-row-hover)]" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></Link>
+        <Link href="/admin/vendors" aria-label={t("page.title")} title={t("page.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-row-hover" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></Link>
         <div className="min-w-0 flex-1">
           <AdminPageHeader
             title={tDetail("pageTitle")}
             actions={<>
           <button onClick={() => router.push(`/admin/purchase-orders/new?vendor=${detail._id}`)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-semibold transition hover:opacity-90" style={accentBtn}><ShoppingCart size={14} /> {tDetail("createPO")}</button>
-          <button onClick={() => { setForm(toVendorForm(detail)); setShowModal(true); }} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-[13px] font-semibold transition hover:bg-[var(--bg-row-hover)]" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)" }}><Pencil size={14} /> {tDetail("edit")}</button>
+          <button onClick={() => { setForm(toVendorForm(detail)); setShowModal(true); }} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-[13px] font-semibold transition hover:bg-row-hover" style={{ borderColor: "var(--border-color)", color: "var(--text-primary)" }}><Pencil size={14} /> {tDetail("edit")}</button>
             </>}
           />
         </div>

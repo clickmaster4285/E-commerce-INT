@@ -205,7 +205,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                    className="block w-full px-3 py-2 text-start text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
+                    className="block w-full px-3 py-2 text-start text-sm hover:bg-subtle transition-colors"
                     style={{ color: active ? "var(--accent)" : "var(--text-primary)", backgroundColor: active ? "var(--accent-soft)" : "transparent" }}>
                     {opt.label}
                   </button>
@@ -215,7 +215,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               // âœ… Rich row — icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-start transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-start transition-colors hover:bg-subtle"
                   style={{
                     backgroundColor: active ? "var(--accent-soft)" : "transparent",
                     borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
@@ -300,7 +300,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
-    className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     style={style}
   />
 );
@@ -311,7 +311,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-accent/30 resize-none"
     style={style}
   />
 );
@@ -489,7 +489,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className="w-full px-3 py-2.5 text-start text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--bg-tertiary)]"
+    className="w-full px-3 py-2.5 text-start text-[13px] flex items-center gap-2.5 transition hover:bg-subtle"
     style={{ color: danger ? "var(--danger-text)" : success ? "var(--success-text)" : "var(--text-primary)" }}
   >
     {icon} {label}
@@ -669,7 +669,7 @@ export default function DiscountsPage() {
   const startIndex = totalDiscounts ? (displayedPage - 1) * itemsPerPage : 0;
   const endIndex = Math.min(startIndex + paginatedDiscounts.length, totalDiscounts);
   const formatPageNumber = (value) => new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
-  const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse";
+  const translationSkeleton = "inline-block h-3 rounded bg-subtle animate-pulse";
 
   // âœ… Stats server se aate hain (poora dataset — search respect, status se independent).
   //    Purana response (stats missing) ho to current page se fallback.
@@ -871,7 +871,7 @@ export default function DiscountsPage() {
           aria-label={`Actions for ${discount?.name || "discount"}`}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
+          className="min-w-[44px] min-h-[44px] p-2 rounded-md transition hover:bg-subtle flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
           title={t("admin.featuredProducts.ui.actions")}
         >
@@ -999,7 +999,7 @@ export default function DiscountsPage() {
                     {discountTypes.map((dt) => {
                       const Icon = dt.icon;
                       return (
-                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-[var(--bg-tertiary)]">
+                        <button key={dt.key} type="button" onClick={() => openDiscountForm(dt.key)} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-subtle">
                           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
                           <span className="min-w-0 flex-1"><span className="block break-words text-[12px] font-semibold leading-snug" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="mt-0.5 block whitespace-normal break-words text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
                         </button>
@@ -1027,7 +1027,7 @@ export default function DiscountsPage() {
                 placeholder={t("admin.discounts.page.search")} 
                 value={search} 
                 onChange={(e) => setSearch(e.target.value)} 
-                className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent)]" 
+                className="w-full h-10 pl-9 pr-3 rounded-lg text-[16px] md:text-[13px] outline-none transition focus:ring-1 focus:ring-accent" 
                 style={inputStyle} 
               />
             </div>
@@ -1101,7 +1101,7 @@ export default function DiscountsPage() {
                     const isSelected = selectedIds.includes(id);
                     const status = getDiscountStatus(discount);
                     return (
-                      <tr key={id} onClick={() => handleView(id)} style={{ borderBottom: index < paginatedDiscounts.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "transparent" }} className="hover:bg-[var(--bg-row-hover)] transition cursor-pointer">
+                      <tr key={id} onClick={() => handleView(id)} style={{ borderBottom: index < paginatedDiscounts.length - 1 ? "1px solid var(--border-color)" : "none", backgroundColor: isSelected ? "var(--bg-tertiary)" : "transparent" }} className="hover:bg-row-hover transition cursor-pointer">
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={isSelected} onChange={() => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">

@@ -237,11 +237,19 @@ exports.getActiveBanners = async (req, res) => {
     // ✅ Optional ?limit= (user cap 50) — na bhejo to purana full-array response
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0;
-    const query = Banner.find({
+    // ⚠️ Pehle object me do `$or` keys thi — doosri (endDate) pehli (startDate) ko
+    // overwrite kar deti thi, future startDate wale banners pehle hi dikh jate the.
+    const filter = {
       status: "active",
-      $or: [{ startDate: null }, { startDate: { $lte: now } }],
-      $or: [{ endDate: null }, { endDate: { $gte: now } }],
-    }).sort({ position: 1 });
+      $and: [
+        { $or: [{ startDate: null }, { startDate: { $lte: now } }] },
+        { $or: [{ endDate: null }, { endDate: { $gte: now } }] },
+      ],
+    };
+    // ✅ Optional ?type=homepage_hero (default: sab types — purana behavior)
+    const BANNER_TYPES = ["homepage_hero", "promotional", "product", "collection", "popup"];
+    if (BANNER_TYPES.includes(req.query.type)) filter.bannerType = req.query.type;
+    const query = Banner.find(filter).sort({ position: 1 });
     if (limit) query.limit(limit);
     const banners = await query.lean();
     res.json({ success: true, data: banners });

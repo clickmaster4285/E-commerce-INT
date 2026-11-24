@@ -60,7 +60,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
     /* eslint-disable-next-line @next/next/no-img-element */
     <img src={logoUrl} alt="Store logo" className={`${sizeClass} object-contain rounded-xl`} />
   ) : (
-    <div className={`${sizeClass} rounded-xl bg-[var(--user-accent)] flex items-center justify-center text-[var(--user-accent-text)] font-black`}>
+    <div className={`${sizeClass} rounded-xl bg-user-accent flex items-center justify-center text-user-accent-fg font-black`}>
       {store?.store_name?.[0] || "C"}
     </div>
   );

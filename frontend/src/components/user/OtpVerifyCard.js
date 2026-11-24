@@ -83,15 +83,15 @@ export default function OtpVerifyCard({
     <div>
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-3">
-          <Icon size={16} className="text-[var(--user-accent)]" />
-          <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+          <Icon size={16} className="text-user-accent" />
+          <span className="text-user-accent text-[0.625rem] font-bold uppercase tracking-widest">
             {t("auth.otp.verification")}
           </span>
         </div>
-        <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">{title}</h2>
-        <p className="text-[var(--user-text-muted)] text-sm">
+        <h2 className="text-2xl font-black text-user-fg mb-1">{title}</h2>
+        <p className="text-user-fg-muted text-sm">
           {subtitle || t("auth.otp.sentSubtitle")}{" "}
-          <span className="font-semibold text-[var(--user-text)]">{email}</span>
+          <span className="font-semibold text-user-fg">{email}</span>
         </p>
       </div>
 
@@ -105,20 +105,20 @@ export default function OtpVerifyCard({
       </div>
 
       <div className="flex items-center justify-center gap-1.5 mb-4 text-[0.75rem] font-semibold">
-        <Clock size={13} className="text-[var(--user-accent)]" />
+        <Clock size={13} className="text-user-accent" />
         {expiresLeft > 0 ? (
-          <span className="text-[var(--user-text-muted)]">
-            {t("auth.otp.expiresIn")} <span className="text-[var(--user-text)]">{mmss(expiresLeft)}</span>
+          <span className="text-user-fg-muted">
+            {t("auth.otp.expiresIn")} <span className="text-user-fg">{mmss(expiresLeft)}</span>
           </span>
         ) : (
-          <span className="text-[var(--user-danger)]">{t("auth.otp.expired")}</span>
+          <span className="text-user-danger">{t("auth.otp.expired")}</span>
         )}
       </div>
 
       {error && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
-          <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-          <p className="text-[var(--user-danger)] text-sm">{error}</p>
+        <div className="mb-4 px-4 py-3 rounded-xl bg-user-danger/10 border border-user-danger/30 flex items-start gap-2">
+          <AlertCircle size={16} className="text-user-danger shrink-0 mt-0.5" />
+          <p className="text-user-danger text-sm">{error}</p>
         </div>
       )}
 
@@ -126,7 +126,7 @@ export default function OtpVerifyCard({
         type="button"
         onClick={handleVerify}
         disabled={verifying || otp.length < 6}
-        className="w-full h-12 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full h-12 rounded-xl bg-user-accent text-user-accent-fg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {verifying ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
         {verifying ? t("auth.otp.verifying") : submitLabel}
@@ -138,7 +138,7 @@ export default function OtpVerifyCard({
             type="button"
             onClick={onBack}
             disabled={verifying}
-            className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition disabled:opacity-50"
+            className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-user-fg-muted hover:text-user-accent transition disabled:opacity-50"
           >
             <ArrowLeft size={13} /> {backLabel}
           </button>
@@ -150,7 +150,7 @@ export default function OtpVerifyCard({
           type="button"
           onClick={handleResend}
           disabled={cooldown > 0 || resending || verifying}
-          className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-[var(--user-accent)] hover:underline transition disabled:opacity-50 disabled:no-underline"
+          className="flex items-center gap-1.5 text-[0.75rem] font-semibold text-user-accent hover:underline transition disabled:opacity-50 disabled:no-underline"
         >
           {resending ? (
             <Loader2 size={13} className="animate-spin" />

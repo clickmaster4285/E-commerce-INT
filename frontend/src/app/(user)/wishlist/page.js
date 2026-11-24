@@ -37,17 +37,17 @@ export default function WishlistPage({ compact = false }) {
       {!compact && (
       <div className="flex items-center justify-between mb-5 sm:mb-8">
         <div>
-          <h1 className="flex items-center gap-2 text-xl lg:text-2xl font-semibold text-[var(--user-text)]">
-            <Heart size={20} className="text-[var(--user-danger)] fill-[var(--user-danger)]" />
+          <h1 className="flex items-center gap-2 text-xl lg:text-2xl font-semibold text-user-fg">
+            <Heart size={20} className="text-user-danger fill-user-danger" />
             My Wishlist
           </h1>
-          <p className="text-xs text-[var(--user-text-muted)] mt-1">
+          <p className="text-xs text-user-fg-muted mt-1">
             {count} saved product{count !== 1 ? "s" : ""}
           </p>
         </div>
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs font-bold text-[var(--user-accent)] hover:underline transition"
+          className="flex items-center gap-1.5 text-[0.6875rem] sm:text-xs font-bold text-user-accent hover:underline transition"
         >
           <ShoppingBag size={13} /> Continue Shopping
         </Link>
@@ -57,23 +57,23 @@ export default function WishlistPage({ compact = false }) {
       {/* Loading */}
       {isLoading ? (
         <div className="flex h-[50vh] items-center justify-center">
-          <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+          <Loader2 className="animate-spin text-user-accent" size={28} />
         </div>
       ) : count === 0 ? (
         /* Empty State */
-        <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-12 text-center">
-          <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
-            <Heart size={32} className="text-[var(--user-text-subtle)]" />
+        <div className="rounded-2xl border border-user-line bg-user-card p-12 text-center">
+          <div className="w-20 h-20 mx-auto rounded-full bg-user-hover flex items-center justify-center mb-4">
+            <Heart size={32} className="text-user-fg-subtle" />
           </div>
-          <h2 className="text-lg font-bold text-[var(--user-text)] mb-2">
+          <h2 className="text-lg font-bold text-user-fg mb-2">
             Your wishlist is empty
           </h2>
-          <p className="text-sm text-[var(--user-text-muted)]  mb-6">
+          <p className="text-sm text-user-fg-muted  mb-6">
             Tap the heart icon on any product to save it here.
           </p>
           <Link
             href="/"
-            className="inline-block my-3 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition"
+            className="inline-block my-3 bg-user-accent text-user-accent-fg px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition"
           >
             Start Shopping
           </Link>
@@ -91,7 +91,7 @@ export default function WishlistPage({ compact = false }) {
               <button
                 type="button"
                 onClick={() => setVisible((v) => v + PAGE_SIZE)}
-                className="h-11 px-6 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-bold text-[var(--user-text-secondary)] hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)] transition active:scale-95"
+                className="h-11 px-6 rounded-xl border border-user-line bg-user-card text-sm font-bold text-user-fg-secondary hover:border-user-accent/50 hover:text-user-accent transition active:scale-95"
               >
                 Show more ({allItems.length - visible} remaining)
               </button>

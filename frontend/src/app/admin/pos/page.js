@@ -126,14 +126,14 @@ function PosDropdown({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`flex w-full min-w-0 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-start text-xs font-medium text-[var(--text-primary)] shadow-sm outline-none transition hover:border-blue-300 hover:bg-[var(--bg-card-alt)] focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${buttonClassName}`}
+        className={`flex w-full min-w-0 items-center gap-2 rounded-xl border border-line bg-card px-3 text-start text-xs font-medium text-fg shadow-sm outline-none transition hover:border-blue-300 hover:bg-card-alt focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${buttonClassName}`}
       >
         {SelectedIcon && <SelectedIcon size={15} className="shrink-0 text-slate-500" />}
         <span className="min-w-0 flex-1 truncate">{prefix}{selectedOption?.label || t("admin.pos.ui.selectAnOption")}</span>
         <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className={`absolute ${placement === "top" ? "bottom-full mb-2" : "top-full mt-2"} start-0 z-[70] min-w-full overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-1 shadow-xl shadow-slate-900/10 ring-1 ring-black/5 ${menuClassName}`}>
+        <div className={`absolute ${placement === "top" ? "bottom-full mb-2" : "top-full mt-2"} start-0 z-[70] min-w-full overflow-hidden rounded-xl border border-line bg-card p-1 shadow-xl shadow-slate-900/10 ring-1 ring-black/5 ${menuClassName}`}>
           <div role="listbox" aria-label={ariaLabel} className="max-h-64 overflow-y-auto">
             {options.map((option) => {
               const isSelected = option.value === value;
@@ -144,7 +144,7 @@ function PosDropdown({
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => { onChange(option.value); setOpen(false); }}
-                  className={`flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start text-xs transition ${isSelected ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-card-alt)] hover:text-[var(--text-primary)]"}`}
+                  className={`flex min-h-9 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-start text-xs transition ${isSelected ? "bg-accent-soft font-semibold text-accent" : "text-fg-secondary hover:bg-card-alt hover:text-fg"}`}
                 >
                   <span className="truncate">{option.label}</span>
                   {isSelected && <Check size={14} className="shrink-0 text-blue-600" />}
@@ -760,8 +760,8 @@ export default function PosPage() {
   const matchingCustomers = Array.isArray(customerResults.data) ? customerResults.data : [];
 
   return (
-    <div dir={dir} className="admin-pos-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-[var(--bg-secondary)] px-0 py-0 text-[var(--text-primary)]">
-      <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] bg-[var(--bg-card)] px-3 sm:px-4">
+    <div dir={dir} className="admin-pos-workspace flex h-full min-h-0 w-full flex-col overflow-hidden bg-page-alt px-0 py-0 text-fg">
+      <header className="flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-line bg-card px-3 sm:px-4">
         <nav className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto whitespace-nowrap py-2" aria-label={t("admin.pos.ui.posSections")}>
           {[["pos", ShoppingCart, t("admin.pos.ui.pos")], ["history", History, t("admin.pos.ui.saleHistoryTab")], ["returns", RotateCcw, t("admin.pos.ui.returnTab")], ["hold", Bookmark, `${t("admin.pos.ui.holdTab")}${heldCarts.length ? ` (${heldCarts.length})` : ""}`]].map(([key, Icon, label]) => (
             <button key={key} type="button" onClick={() => {
@@ -770,14 +770,14 @@ export default function PosPage() {
                 return;
               }
               setActiveView(key);
-            }} className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${activeView === key ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"}`}>
-              <Icon size={15} />{key === "hold" ? <>{t("admin.pos.ui.holdTab")}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeView === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>{heldCarts.length}</span></> : label}
+            }} className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${activeView === key ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-transparent text-fg-secondary hover:border-line hover:bg-card-alt hover:text-fg"}`}>
+              <Icon size={15} />{key === "hold" ? <>{t("admin.pos.ui.holdTab")}<span className={`rounded-full px-1.5 py-0.5 text-[10px] ${activeView === key ? "bg-white/20 text-white" : "bg-subtle text-fg-secondary"}`}>{heldCarts.length}</span></> : label}
             </button>
           ))}
         </nav>
-        <div className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 text-[11px] text-[var(--text-muted)] sm:flex">
-          <span className="font-medium text-[var(--text-secondary)]">{t("admin.pos.ui.today")}</span>
-          <span className="font-semibold text-[var(--text-primary)]">{salesOverviewQuery.isLoading ? "…" : formatMoney(salesOverviewQuery.data?.todayRevenue)}</span>
+        <div className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-page-alt px-3 text-[11px] text-fg-muted sm:flex">
+          <span className="font-medium text-fg-secondary">{t("admin.pos.ui.today")}</span>
+          <span className="font-semibold text-fg">{salesOverviewQuery.isLoading ? "…" : formatMoney(salesOverviewQuery.data?.todayRevenue)}</span>
           <span aria-hidden="true">·</span>
           <span>{salesOverviewQuery.isLoading ? "…" : (salesOverviewQuery.data?.todayCount || 0).toLocaleString(locale)} {salesOverviewQuery.data?.todayCount === 1 ? t("admin.pos.ui.sale") : t("admin.pos.ui.sales")}</span>
         </div>
@@ -787,7 +787,7 @@ export default function PosPage() {
           {activeView === "pos" ? <>
           <div className="relative z-20 mb-3 flex min-w-0 flex-wrap items-center gap-1.5">
             <div className="relative min-w-28 flex-1">
-              <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+              <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-fg-muted" />
               <input
                 ref={searchInputRef}
                 value={search}
@@ -807,7 +807,7 @@ export default function PosPage() {
                   setSearch("");
                   setCurrentPage(1);
                 }}
-                className="h-10 w-full rounded-lg border-0 bg-[#F3F4F6] ps-9 pe-3 text-xs text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-blue-500/20 dark:bg-slate-900 sm:text-sm"
+                className="h-10 w-full rounded-lg border-0 bg-input ps-9 pe-3 text-xs text-fg outline-none transition placeholder:text-fg-muted focus:ring-2 focus:ring-info/20 sm:text-sm"
               />
             </div>
             <PosDropdown
@@ -822,13 +822,13 @@ export default function PosPage() {
               ariaLabel={t("admin.pos.ui.sortProducts")}
               prefix={`${t("admin.pos.ui.sortPrefix")} `}
               className="w-36 shrink-0 sm:w-40"
-              buttonClassName="h-9 justify-between rounded-lg border-0 bg-transparent px-2 text-[11px] font-medium shadow-none hover:bg-[var(--bg-tertiary)]"
+              buttonClassName="h-9 justify-between rounded-lg border-0 bg-transparent px-2 text-[11px] font-medium shadow-none hover:bg-subtle"
               menuClassName="w-48"
             />
             <div ref={filtersPanelRef} className="relative flex shrink-0 items-center gap-1">
-              <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedCategory || selectedBrand || selectedStock ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
-              {filtersOpen && <div className="absolute end-0 top-full z-30 mt-2 w-56 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3 shadow-xl">
-                <div className="mb-2 text-xs font-bold text-[var(--text-primary)]">{t("admin.pos.ui.productFilters")}</div>
+              <button type="button" onClick={() => setFiltersOpen((open) => !open)} aria-label={t("admin.pos.ui.productFilters")} aria-expanded={filtersOpen} className={`flex h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${selectedCategory || selectedBrand || selectedStock ? "bg-accent-soft text-accent" : "text-fg-secondary hover:bg-subtle hover:text-fg"}`}><SlidersHorizontal size={14}/><span>{t("admin.pos.ui.filter")}</span></button>
+              {filtersOpen && <div className="absolute end-0 top-full z-30 mt-2 w-56 rounded-xl border border-line bg-card p-3 shadow-xl">
+                <div className="mb-2 text-xs font-bold text-fg">{t("admin.pos.ui.productFilters")}</div>
                 <PosDropdown fieldLabel={t("admin.pos.ui.category")} value={selectedCategory} options={[{ value: "", label: t("admin.pos.ui.allCategories") }, ...categoryOptions.map((category) => ({ value: category, label: category }))]} onChange={selectCategory} ariaLabel={t("admin.pos.ui.filterByCategory")} className="mb-2" buttonClassName="h-9 rounded-lg px-2" menuClassName="w-full" />
                 <PosDropdown fieldLabel={t("admin.pos.ui.brand")} value={selectedBrand} options={[{ value: "", label: t("admin.pos.ui.allBrands") }, ...brandOptions.map((brand) => ({ value: brand, label: brand }))]} onChange={(value) => { setSelectedBrand(value); setCurrentPage(1); }} ariaLabel={t("admin.pos.ui.filterByBrand")} className="mb-2" buttonClassName="h-9 rounded-lg px-2" menuClassName="w-full" />
                 <PosDropdown fieldLabel={t("admin.pos.ui.stock")} value={selectedStock} options={[{ value: "", label: t("admin.pos.ui.anyStock") }, { value: "in_stock", label: t("admin.pos.ui.inStock") }, { value: "low_stock", label: t("admin.pos.ui.lowStock") }, { value: "out_of_stock", label: t("admin.pos.ui.outOfStock") }]} onChange={(value) => { setSelectedStock(value); setCurrentPage(1); }} ariaLabel={t("admin.pos.ui.filterByStock")} buttonClassName="h-9 rounded-lg px-2" menuClassName="w-full" />
@@ -838,17 +838,17 @@ export default function PosPage() {
           </div>
 
           {productsError ? (
-            <div className="rounded-lg border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-5 text-center text-sm text-[var(--danger-text)]">
+            <div className="rounded-lg border border-danger-solid/30 bg-danger-soft p-5 text-center text-sm text-danger">
               {t("admin.pos.ui.couldNotLoadProductsPleaseTryAgain")}
             </div>
           ) : productsLoading && products.length === 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
               {Array.from({ length: 8 }, (_, index) => (
-                <div key={index} className="animate-pulse rounded-xl border border-slate-200/80 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]"><div className="aspect-square rounded-lg bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-3/4 rounded bg-[var(--bg-tertiary)]"/><div className="mt-2 h-3 w-1/2 rounded bg-[var(--bg-tertiary)]"/></div>
+                <div key={index} className="animate-pulse rounded-xl border border-line bg-card p-2 shadow-sm"><div className="aspect-square rounded-lg bg-subtle"/><div className="mt-2 h-3 w-3/4 rounded bg-subtle"/><div className="mt-2 h-3 w-1/2 rounded bg-subtle"/></div>
               ))}
             </div>
           ) : variantCards.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-card-alt)] p-8 text-center text-sm text-[var(--text-muted)]">
+            <div className="rounded-lg border border-dashed border-line bg-card-alt p-8 text-center text-sm text-fg-muted">
               {t("admin.pos.ui.noProductVariantsFoundForTheseSearchAndFilterSettings")}
             </div>
           ) : (
@@ -865,7 +865,7 @@ export default function PosPage() {
                 ), 0);
 
                 return (
-                  <article key={variant._id} role={inStock ? "button" : undefined} tabIndex={inStock ? 0 : undefined} aria-disabled={!inStock} aria-label={t("admin.pos.ui.addProductToCart", { product: productNameOf(product), variant: variantName })} onClick={() => { if (inStock) addToCart(product, variant); }} onKeyDown={(event) => { if (inStock && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); addToCart(product, variant); } }} className={`${viewMode === "list" ? "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 p-2 sm:p-2.5" : "flex flex-col overflow-hidden"} group min-w-0 rounded-xl border border-slate-200/80 bg-white shadow-sm transition dark:border-slate-700 dark:bg-[var(--bg-card)] ${inStock ? "cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" : "cursor-not-allowed opacity-60"}`}>
+                  <article key={variant._id} role={inStock ? "button" : undefined} tabIndex={inStock ? 0 : undefined} aria-disabled={!inStock} aria-label={t("admin.pos.ui.addProductToCart", { product: productNameOf(product), variant: variantName })} onClick={() => { if (inStock) addToCart(product, variant); }} onKeyDown={(event) => { if (inStock && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); addToCart(product, variant); } }} className={`${viewMode === "list" ? "grid grid-cols-[76px_minmax(0,1fr)] items-center gap-3 p-2 sm:p-2.5" : "flex flex-col overflow-hidden"} group min-w-0 rounded-xl border border-line bg-card shadow-sm transition ${inStock ? "cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" : "cursor-not-allowed opacity-60"}`}>
                   <div className={`relative ${viewMode === "list" ? "aspect-square rounded-lg" : "aspect-square rounded-t-xl rounded-b-none"} w-full shrink-0 overflow-hidden bg-slate-100`}>
                       <FallbackImage nextImage src={image} alt={`${productNameOf(product)} ${variantName}`} fill unoptimized sizes="(max-width: 640px) 44vw, (max-width: 1280px) 22vw, 16vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.025]" />
                       <span className={`absolute start-2 top-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-semibold ${!inStock ? "bg-rose-50/95 text-rose-700" : stockQuantity < 10 ? "bg-amber-50/95 text-amber-700" : "bg-emerald-50/95 text-emerald-700"}`}>
@@ -874,14 +874,14 @@ export default function PosPage() {
                       {inStock && <span aria-hidden="true" title={t("admin.pos.ui.addToCart")} className="absolute bottom-2 end-2 flex h-7 w-7 scale-95 items-center justify-center rounded-full bg-blue-600 text-white opacity-0 transition group-hover:scale-100 group-hover:opacity-100 group-focus-visible:scale-100 group-focus-visible:opacity-100"><Plus size={15} strokeWidth={2.5}/></span>}
                     </div>
                     <div className={`min-w-0 ${viewMode === "list" ? "" : "p-2 pt-1.5 sm:p-2.5 sm:pt-1.5"}`}>
-                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-[var(--text-primary)]" title={variantName}>{hasPosTranslation(variant.title === "Default" ? "" : variant.title, variant.translations?.title?.[locale], posVariantsTranslationsReady) ? (variant.translations?.title?.[locale] || variantName) : <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-[var(--bg-tertiary)] align-middle" aria-label={t("common.loading")} />}</h3>
-                    <p className="truncate text-[10px] text-[var(--text-muted)]" title={productName}>{hasPosTranslation(product.name, product.translations?.name?.[locale], posTranslationsReady) ? (productNameOf(product)) : <span className="inline-block h-2.5 w-20 animate-pulse rounded bg-[var(--bg-tertiary)] align-middle" aria-label={t("common.loading")} />}</p>
-                    <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[11px] text-[var(--text-muted)]"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
+                    <h3 className="line-clamp-2 min-h-9 text-[13px] font-semibold leading-[18px] text-fg" title={variantName}>{hasPosTranslation(variant.title === "Default" ? "" : variant.title, variant.translations?.title?.[locale], posVariantsTranslationsReady) ? (variant.translations?.title?.[locale] || variantName) : <span className="inline-block h-3.5 w-24 animate-pulse rounded bg-subtle align-middle" aria-label={t("common.loading")} />}</h3>
+                    <p className="truncate text-[10px] text-fg-muted" title={productName}>{hasPosTranslation(product.name, product.translations?.name?.[locale], posTranslationsReady) ? (productNameOf(product)) : <span className="inline-block h-2.5 w-20 animate-pulse rounded bg-subtle align-middle" aria-label={t("common.loading")} />}</p>
+                    <p className="mt-1 flex h-4 items-center gap-1.5 truncate text-[11px] text-fg-muted"><Tag size={12} fill="currentColor" /> {t("admin.pos.ui.sku")} {variant.sku || "—"}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-4">
-                      <span className={inStock ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-rose-700 dark:text-rose-400"}>{t("admin.pos.ui.availableStock", { count: stockQuantity })}</span>
-                      <span className="text-amber-700 dark:text-amber-400">{t("admin.pos.ui.onHold")} {heldQuantity}</span>
+                      <span className={inStock ? "font-medium text-success" : "font-medium text-danger"}>{t("admin.pos.ui.availableStock", { count: stockQuantity })}</span>
+                      <span className="text-warning">{t("admin.pos.ui.onHold")} {heldQuantity}</span>
                     </div>
-                    <p className="mt-1 truncate text-sm font-semibold text-[var(--text-primary)]">{formatMoney(variant.selling_price)}</p>
+                    <p className="mt-1 truncate text-sm font-semibold text-fg">{formatMoney(variant.selling_price)}</p>
                     </div>
                   </article>
                 );
@@ -890,15 +890,15 @@ export default function PosPage() {
           )}
 
           {Number(productsPayload.pagination?.total) > 0 && (
-            <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] pt-3" aria-label={t("admin.pos.ui.productPages")}>
-              <span className="text-xs text-[var(--text-muted)]">{t("admin.pos.ui.showing")} {(currentPage - 1) * productPageSize + 1}-{Math.min(currentPage * productPageSize, Number(productsPayload.pagination?.total) || 0)} {t("admin.pos.ui.of")} {Number(productsPayload.pagination?.total) || 0}</span>
-              <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={productPageSize} onChange={(event) => { setProductPageSize(Number(event.target.value)); setCurrentPage(1); }} className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option><option value={50}>50</option></select></label>
+            <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3" aria-label={t("admin.pos.ui.productPages")}>
+              <span className="text-xs text-fg-muted">{t("admin.pos.ui.showing")} {(currentPage - 1) * productPageSize + 1}-{Math.min(currentPage * productPageSize, Number(productsPayload.pagination?.total) || 0)} {t("admin.pos.ui.of")} {Number(productsPayload.pagination?.total) || 0}</span>
+              <label className="flex items-center gap-2 text-xs text-fg-muted"><span>{t("admin.brands.ui.rowsPerPage")}</span><select value={productPageSize} onChange={(event) => { setProductPageSize(Number(event.target.value)); setCurrentPage(1); }} className="h-8 rounded-lg border border-line bg-card px-2 text-fg"><option value={10}>10</option><option value={20}>20</option><option value={30}>30</option><option value={50}>50</option></select></label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => setCurrentPage((page) => page - 1)}
-                  className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+                  className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-fg-secondary hover:bg-subtle disabled:opacity-40"
                 >
                   {t("admin.pos.ui.previous")}
                 </button>
@@ -906,14 +906,14 @@ export default function PosPage() {
                   type="button"
                   disabled={currentPage >= totalPages}
                   onClick={() => setCurrentPage((page) => page + 1)}
-                  className="rounded-md border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40"
+                  className="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-fg-secondary hover:bg-subtle disabled:opacity-40"
                 >
                   {t("admin.pos.ui.next")}
                 </button>
                 <div className="flex items-center gap-1">{Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
                   const first = Math.min(Math.max(1, currentPage - 2), Math.max(1, totalPages - 4));
                   const page = first + index;
-                  return <button key={page} type="button" aria-current={page === currentPage ? "page" : undefined} onClick={() => setCurrentPage(page)} className={`h-8 min-w-8 rounded-md px-2 text-xs font-semibold ${page === currentPage ? "bg-blue-600 text-white" : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}>{page}</button>;
+                  return <button key={page} type="button" aria-current={page === currentPage ? "page" : undefined} onClick={() => setCurrentPage(page)} className={`h-8 min-w-8 rounded-md px-2 text-xs font-semibold ${page === currentPage ? "bg-blue-600 text-white" : "border border-line text-fg-secondary hover:bg-subtle"}`}>{page}</button>;
                 })}</div>
               </div>
             </nav>
@@ -921,8 +921,8 @@ export default function PosPage() {
           </> : activeView === "history" ? <div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-600 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]"><ClipboardList size={18}/></span>
-                <div><h2 className="text-base font-bold leading-5 text-slate-900 dark:text-slate-100">{t("admin.pos.ui.salesHistory")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.reviewCompletedPOSTransactionsAndPaymentDetails")}</p></div>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-blue-600 shadow-sm"><ClipboardList size={18}/></span>
+                <div><h2 className="text-base font-bold leading-5 text-fg">{t("admin.pos.ui.salesHistory")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.reviewCompletedPOSTransactionsAndPaymentDetails")}</p></div>
               </div>
             </div>
 
@@ -935,7 +935,7 @@ export default function PosPage() {
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-start">
-                <thead className="border-b border-slate-200 bg-white text-[11px] uppercase tracking-[0.08em] text-slate-500 dark:bg-[var(--bg-card)]">
+                <thead className="border-b border-slate-200 bg-card text-[11px] uppercase tracking-[0.08em] text-slate-500">
                   <tr>{["sale", "customer", "date", "payment", "items", "total", ""].map((label) => <th key={label} className={`px-4 py-3.5 text-start font-semibold ${label === "sale" ? "ps-12" : ""}`}>{label ? t(`admin.pos.ui.historyTable.${label}`) : ""}</th>)}</tr>
                 </thead>
                 <tbody>
@@ -951,7 +951,7 @@ export default function PosPage() {
                         const latestEdit = editHistory[editHistory.length - 1] || null;
                         const latestEditDate = latestEdit?.edited_at ? new Date(latestEdit.edited_at) : null;
                         const isExpanded = expandedSaleId === sale._id;
-                        return <Fragment key={sale._id}><tr className={`border-b border-slate-200 bg-white text-xs transition-colors dark:bg-[var(--bg-card)] ${isExpanded ? "!bg-blue-50/40 dark:!bg-blue-950/30" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}>
+                        return <Fragment key={sale._id}><tr className={`border-b border-line bg-card text-xs transition-colors ${isExpanded ? "!bg-info-soft" : "hover:bg-card-alt"}`}>
                           <td className="px-4 py-4"><div className="flex items-center gap-2"><button type="button" aria-label={t(`admin.pos.ui.${isExpanded ? "hide" : "show"}SaleDetails`, { sale: sale.sale_number || t("common.notProvided") })} aria-expanded={isExpanded} onClick={() => setExpandedSaleId(isExpanded ? null : sale._id)} className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${isExpanded ? "border-blue-200 bg-blue-100 text-blue-700" : "border-slate-200 bg-white text-slate-500 hover:border-blue-200 hover:text-blue-700"}`}><ChevronRight size={14} className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}/></button><div className="min-w-0"><Link href={`/admin/pos/history/${sale._id}`} className="font-mono text-xs font-semibold text-blue-700 hover:text-blue-800">{sale.sale_number || t("common.notProvided")}</Link>{latestEdit ? <><span className="mt-1 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">{t("admin.pos.ui.saleEdited")}</span><span className="mt-1 block max-w-48 truncate text-[10px] text-slate-500" title={t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}>{t("admin.pos.ui.saleEditedBy", { name: latestEdit.edited_by_name || t("admin.pos.ui.unknownStaff"), time: latestEditDate && !Number.isNaN(latestEditDate.getTime()) ? latestEditDate.toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "" })}</span></> : <span className="mt-1 block text-[10px] text-slate-500">{t("admin.pos.ui.posTransaction")}</span>}</div></div></td>
                           <td className="px-4 py-4"><span className="block max-w-[180px] truncate text-[13px] font-medium text-slate-800">{sale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer")}</span>{sale.customer_snapshot?.phone && <span className="mt-1 block text-[11px] text-slate-500">{sale.customer_snapshot.phone}</span>}</td>
                           <td className="whitespace-nowrap px-4 py-4"><span className="block font-medium text-slate-700">{saleDate ? saleDate.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" }) : "—"}</span><span className="mt-1 block text-[11px] text-slate-500">{saleDate ? saleDate.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" }) : ""}</span></td>
@@ -982,40 +982,40 @@ export default function PosPage() {
           </div>}
         </section>
 
-        <form ref={saleFormRef} dir={dir} onSubmit={submitSale} className={`${cartDrawerOpen ? "fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden sm:start-auto sm:w-[420px] lg:static lg:h-full lg:w-full" : "hidden lg:flex lg:h-full lg:w-full"} min-h-0 min-w-0 self-stretch overflow-hidden border-s border-[var(--border-color)] bg-white p-3 text-[var(--text-primary)] dark:bg-[var(--bg-card)] lg:flex-col lg:p-3`}>
+        <form ref={saleFormRef} dir={dir} onSubmit={submitSale} className={`${cartDrawerOpen ? "fixed inset-0 z-[60] flex min-h-0 flex-col overflow-hidden sm:start-auto sm:w-[420px] lg:static lg:h-full lg:w-full" : "hidden lg:flex lg:h-full lg:w-full"} min-h-0 min-w-0 self-stretch overflow-hidden border-s border-line bg-card p-3 text-fg lg:flex-col lg:p-3`}>
           <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-            <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
-              <ShoppingCart size={17} className="shrink-0 text-[var(--text-secondary)]" />
+            <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-medium text-fg">
+              <ShoppingCart size={17} className="shrink-0 text-fg-secondary" />
               <span>{t("admin.pos.ui.currentOrder")}</span>
-              {itemCount > 0 && <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">{itemCount}</span>}
+              {itemCount > 0 && <span className="rounded-full bg-subtle px-2 py-0.5 text-[10px] font-medium text-fg-secondary">{itemCount}</span>}
             </h2>
             <div className="flex items-center gap-2">
-              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setAdditionalTaxRate("0"); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[var(--danger-text)] transition hover:bg-[var(--danger-soft)]"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
-              <button type="button" onClick={() => setCartDrawerOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] lg:hidden" aria-label={t("admin.pos.ui.closeCart")}><X size={18} /></button>
+              {cart.length > 0 && !editingSaleId && <button type="button" onClick={() => { setCart([]); setDiscountAmount(""); setAdditionalTaxRate("0"); setRateEditorVariantId(null); }} className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-danger transition hover:bg-danger-soft"><Trash2 size={13}/>{t("admin.pos.ui.clearAll")}</button>}
+              <button type="button" onClick={() => setCartDrawerOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle lg:hidden" aria-label={t("admin.pos.ui.closeCart")}><X size={18} /></button>
             </div>
           </div>
 
-          {editingSaleId && <div className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-[var(--accent-soft)] px-3 py-2 text-xs font-bold text-[var(--accent)]"><Pencil size={13}/><span className="truncate">{t("admin.pos.ui.editing")} {editingSaleNumber}</span></div>}
+          {editingSaleId && <div className="mb-2 flex items-center gap-2 rounded-xl border border-blue-200 bg-accent-soft px-3 py-2 text-xs font-bold text-accent"><Pencil size={13}/><span className="truncate">{t("admin.pos.ui.editing")} {editingSaleNumber}</span></div>}
 
           <div className="relative mb-2 flex shrink-0 items-center gap-2" ref={customerBoxRef}>
-            <button type="button" role="combobox" aria-controls="pos-customer-options" aria-expanded={customerOpen} aria-haspopup="listbox" onClick={() => { setCustomerOpen((open) => !open); setCustomerSearch(""); }} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg bg-[var(--bg-tertiary)] px-2.5 text-start text-xs text-[var(--text-primary)] transition hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-              <Search size={14} className="shrink-0 text-[var(--text-muted)]" />
+            <button type="button" role="combobox" aria-controls="pos-customer-options" aria-expanded={customerOpen} aria-haspopup="listbox" onClick={() => { setCustomerOpen((open) => !open); setCustomerSearch(""); }} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg bg-subtle px-2.5 text-start text-xs text-fg transition hover:bg-input focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              <Search size={14} className="shrink-0 text-fg-muted" />
               <span className="min-w-0 flex-1 truncate font-medium">{selectedCustomer?.name || t("admin.pos.ui.walkInCustomer")}</span>
-              <ChevronDown size={14} className={`shrink-0 text-[var(--text-muted)] transition-transform ${customerOpen ? "rotate-180" : ""}`} />
+              <ChevronDown size={14} className={`shrink-0 text-fg-muted transition-transform ${customerOpen ? "rotate-180" : ""}`} />
             </button>
-            <button type="button" onClick={() => { setShowCustomerForm(true); setCustomerOpen(false); }} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-blue-600 transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-blue-950/40"><Plus size={13}/>{t("admin.pos.ui.addShort")}</button>
-            {customerOpen && <div className="absolute start-0 end-0 top-full z-40 mt-2 overflow-hidden rounded-lg bg-[var(--bg-card)] shadow-lg ring-1 ring-black/10">
-              <label className="relative block border-b border-[var(--border-color)] p-2"><Search size={14} className="absolute start-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"/><input autoFocus value={customerSearch} onChange={(event) => { setCustomerSearch(event.target.value); setCustomerOpen(true); }} placeholder={t("admin.pos.ui.searchCustomerByNameOrPhone")} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} className="h-9 w-full rounded-md bg-[var(--bg-tertiary)] ps-8 pe-2 text-xs text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-blue-500/20"/></label>
+            <button type="button" onClick={() => { setShowCustomerForm(true); setCustomerOpen(false); }} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-blue-600 transition hover:bg-info-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"><Plus size={13}/>{t("admin.pos.ui.addShort")}</button>
+            {customerOpen && <div className="absolute start-0 end-0 top-full z-40 mt-2 overflow-hidden rounded-lg bg-card shadow-lg ring-1 ring-black/10">
+              <label className="relative block border-b border-line p-2"><Search size={14} className="absolute start-4 top-1/2 -translate-y-1/2 text-fg-muted"/><input autoFocus value={customerSearch} onChange={(event) => { setCustomerSearch(event.target.value); setCustomerOpen(true); }} placeholder={t("admin.pos.ui.searchCustomerByNameOrPhone")} aria-label={t("admin.pos.ui.searchCustomerByNameOrPhone2")} className="h-9 w-full rounded-md bg-subtle ps-8 pe-2 text-xs text-fg outline-none focus:ring-2 focus:ring-blue-500/20"/></label>
               <div id="pos-customer-options" role="listbox" aria-label={t("admin.pos.ui.customers")} className="max-h-56 overflow-y-auto px-2 py-1">
-                <button type="button" role="option" aria-selected={!selectedCustomer} onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); setCustomerOpen(false); }} className={`my-0.5 w-full rounded-xl border px-3 py-2.5 text-start text-xs transition-all duration-150 ${!selectedCustomer ? "border-[var(--accent)]/20 bg-[var(--accent-soft)]" : "border-transparent hover:border-[var(--border-color)] hover:bg-[var(--bg-card-alt)]"}`}>
-                  <span className="block font-bold">{t("admin.pos.ui.walkInCustomer")}</span><span className="mt-0.5 block text-[10px] text-[var(--text-muted)]">{t("admin.pos.ui.continueWithoutAssigningACustomer")}</span>
+                <button type="button" role="option" aria-selected={!selectedCustomer} onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); setCustomerOpen(false); }} className={`my-0.5 w-full rounded-xl border px-3 py-2.5 text-start text-xs transition-all duration-150 ${!selectedCustomer ? "border-accent/20 bg-accent-soft" : "border-transparent hover:border-line hover:bg-card-alt"}`}>
+                  <span className="block font-bold">{t("admin.pos.ui.walkInCustomer")}</span><span className="mt-0.5 block text-[10px] text-fg-muted">{t("admin.pos.ui.continueWithoutAssigningACustomer")}</span>
                 </button>
-                {customerResults.isFetching && !matchingCustomers.length && <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.loadingCustomers")}</p>}
-                {matchingCustomers.map((customer) => <button key={customer._id} type="button" role="option" aria-selected={selectedCustomer?._id === customer._id} onClick={() => { setSelectedCustomer(customer); setCustomerSearch(""); setCustomerOpen(false); }} className={`my-0.5 w-full rounded-xl border px-3 py-2.5 text-start transition-all duration-150 ${selectedCustomer?._id === customer._id ? "border-[var(--accent)]/20 bg-[var(--accent-soft)]" : "border-transparent hover:border-[var(--border-color)] hover:bg-[var(--bg-card-alt)]"}`}>
-                  <span className="block truncate text-[13px] font-bold text-[var(--text-primary)]">{customer.name}</span><span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{[customer.phone, customer.email].filter(Boolean).join(" · ") || t("admin.pos.ui.noContactDetails")}</span>
+                {customerResults.isFetching && !matchingCustomers.length && <p className="px-3 py-4 text-center text-xs text-fg-muted">{t("admin.pos.ui.loadingCustomers")}</p>}
+                {matchingCustomers.map((customer) => <button key={customer._id} type="button" role="option" aria-selected={selectedCustomer?._id === customer._id} onClick={() => { setSelectedCustomer(customer); setCustomerSearch(""); setCustomerOpen(false); }} className={`my-0.5 w-full rounded-xl border px-3 py-2.5 text-start transition-all duration-150 ${selectedCustomer?._id === customer._id ? "border-accent/20 bg-accent-soft" : "border-transparent hover:border-line hover:bg-card-alt"}`}>
+                  <span className="block truncate text-[13px] font-bold text-fg">{customer.name}</span><span className="mt-0.5 block truncate text-[11px] text-fg-muted">{[customer.phone, customer.email].filter(Boolean).join(" · ") || t("admin.pos.ui.noContactDetails")}</span>
                 </button>)}
-                {!customerResults.isFetching && !customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-4 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.noSavedCustomersYet")}</p>}
-                {!customerResults.isFetching && customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-5 text-center text-xs text-[var(--text-muted)]">{t("admin.pos.ui.noCustomersFound")}</p>}
+                {!customerResults.isFetching && !customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-4 text-center text-xs text-fg-muted">{t("admin.pos.ui.noSavedCustomersYet")}</p>}
+                {!customerResults.isFetching && customerSearch.trim() && !matchingCustomers.length && <p className="px-3 py-5 text-center text-xs text-fg-muted">{t("admin.pos.ui.noCustomersFound")}</p>}
               </div>
             </div>}
           </div>
@@ -1024,66 +1024,66 @@ export default function PosPage() {
 
           {cart.length === 0 ? (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-8 text-center">
-              <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]"><ShoppingCart size={22} /></span>
-              <p className="text-sm font-medium text-[var(--text-primary)]">{t("admin.pos.ui.noItemsYetTapAProductToAdd")}</p>
+              <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-subtle text-fg-muted"><ShoppingCart size={22} /></span>
+              <p className="text-sm font-medium text-fg">{t("admin.pos.ui.noItemsYetTapAProductToAdd")}</p>
             </div>
           ) : (
           <>
           <div className="mb-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
             {cart.map((item) => (
-              <article key={item.variant_id} className="border-b border-[var(--border-color)] px-2.5 py-2 last:border-0 hover:bg-[var(--bg-row-hover)]">
+              <article key={item.variant_id} className="border-b border-line px-2.5 py-2 last:border-0 hover:bg-row-hover">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-card-alt)]">
+                  <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-card-alt">
                     <FallbackImage nextImage src={item.image} alt={productNameOf(item) || item.product_name} fill unoptimized className="object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{item.variant_title && item.variant_title !== "Default" ? item.variant_title : productNameOf(item) || item.product_name}</p>
+                    <p className="truncate text-[13px] font-semibold text-fg">{item.variant_title && item.variant_title !== "Default" ? item.variant_title : productNameOf(item) || item.product_name}</p>
                     <div className="flex min-w-0 items-center justify-between gap-1">
-                    <p className="min-w-0 truncate text-[10px] text-[var(--text-secondary)]">{productNameOf(item) || item.product_name}{item.sku ? ` · ${item.sku}` : ""}</p>
+                    <p className="min-w-0 truncate text-[10px] text-fg-secondary">{productNameOf(item) || item.product_name}{item.sku ? ` · ${item.sku}` : ""}</p>
                     <div className="flex shrink-0 items-center gap-1">
-                      <div className="flex h-6 items-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)]">
-                        <button type="button" onClick={() => changeQuantity(item.variant_id, -1)} className="flex h-full w-6 items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)]" aria-label={t("admin.pos.ui.decreaseQuantity")}><Minus size={12} /></button>
+                      <div className="flex h-6 items-center rounded-lg border border-line bg-card">
+                        <button type="button" onClick={() => changeQuantity(item.variant_id, -1)} className="flex h-full w-6 items-center justify-center text-fg-secondary hover:text-accent" aria-label={t("admin.pos.ui.decreaseQuantity")}><Minus size={12} /></button>
                         <input type="text" inputMode="numeric" pattern="[0-9]*" value={quantityDrafts[item.variant_id] ?? String(item.quantity)} onChange={(event) => {
                           const value = event.target.value;
                           if (/^\d*$/.test(value)) setQuantityDrafts((current) => ({ ...current, [item.variant_id]: value }));
                         }} onBlur={() => commitQuantity(item.variant_id)} onKeyDown={(event) => {
                           if (event.key === "Enter") event.currentTarget.blur();
-                        }} className="h-5 w-9 rounded px-0.5 text-center text-xs tabular-nums text-[var(--text-primary)] outline-none focus:bg-[var(--accent-soft)]" aria-label={t("admin.pos.ui.quantityForProduct", { product: productNameOf(item) })} title={t("admin.pos.ui.availableStock", { count: item.stock })} />
-                        <button type="button" onClick={() => changeQuantity(item.variant_id, 1)} disabled={item.quantity >= item.stock} className="flex h-full w-6 items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] disabled:opacity-30" aria-label={t("admin.pos.ui.increaseQuantity")}><Plus size={12} /></button>
+                        }} className="h-5 w-9 rounded px-0.5 text-center text-xs tabular-nums text-fg outline-none focus:bg-accent-soft" aria-label={t("admin.pos.ui.quantityForProduct", { product: productNameOf(item) })} title={t("admin.pos.ui.availableStock", { count: item.stock })} />
+                        <button type="button" onClick={() => changeQuantity(item.variant_id, 1)} disabled={item.quantity >= item.stock} className="flex h-full w-6 items-center justify-center text-fg-secondary hover:text-accent disabled:opacity-30" aria-label={t("admin.pos.ui.increaseQuantity")}><Plus size={12} /></button>
                       </div>
                     </div>
                     </div>
                   </div>
                   <div className="flex h-full shrink-0 flex-col items-end justify-between self-stretch">
-                    <span className="text-[13px] font-semibold text-[var(--text-primary)]">{formatMoney(itemNetTotal(item))}</span>
+                    <span className="text-[13px] font-semibold text-fg">{formatMoney(itemNetTotal(item))}</span>
                     <div className="flex items-center">
-                    <button type="button" onClick={() => setRateEditorVariantId((current) => current === item.variant_id ? null : item.variant_id)} className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${rateEditorVariantId === item.variant_id || item.discount_rate > 0 || item.flat_discount > 0 || item.tax_rate > 0 ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`} aria-label={t("admin.pos.ui.openItemPriceSettings")} aria-expanded={rateEditorVariantId === item.variant_id} title={t("admin.pos.ui.itemPriceSettings")}><Settings2 size={15} /></button>
-                    <button type="button" onClick={() => setCart((current) => current.filter((entry) => entry.variant_id !== item.variant_id))} className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--danger-soft)] hover:text-[var(--danger-text)]" aria-label={t("admin.pos.ui.removeProductFromCart", { product: productNameOf(item) })}><Trash2 size={14} /></button>
+                    <button type="button" onClick={() => setRateEditorVariantId((current) => current === item.variant_id ? null : item.variant_id)} className={`flex h-7 w-7 items-center justify-center rounded-lg transition ${rateEditorVariantId === item.variant_id || item.discount_rate > 0 || item.flat_discount > 0 || item.tax_rate > 0 ? "bg-accent-soft text-accent" : "text-fg-muted hover:bg-subtle hover:text-fg"}`} aria-label={t("admin.pos.ui.openItemPriceSettings")} aria-expanded={rateEditorVariantId === item.variant_id} title={t("admin.pos.ui.itemPriceSettings")}><Settings2 size={15} /></button>
+                    <button type="button" onClick={() => setCart((current) => current.filter((entry) => entry.variant_id !== item.variant_id))} className="rounded-md p-1.5 text-fg-muted transition hover:bg-danger-soft hover:text-danger" aria-label={t("admin.pos.ui.removeProductFromCart", { product: productNameOf(item) })}><Trash2 size={14} /></button>
                     </div>
                   </div>
                 </div>
                 {rateEditorVariantId === item.variant_id && (
-                  <div className="mt-2 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-card-alt)] p-2.5">
-                    <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-primary)]"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]"><Settings2 size={12}/></span>{t("admin.pos.ui.adjustments")}<span className="ms-auto text-[9px] font-medium text-[var(--text-muted)]">{t("admin.pos.ui.discountBeforeTax")}</span></div>
+                  <div className="mt-2 w-full rounded-xl border border-line bg-card-alt p-2.5">
+                    <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-fg"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent"><Settings2 size={12}/></span>{t("admin.pos.ui.adjustments")}<span className="ms-auto text-[9px] font-medium text-fg-muted">{t("admin.pos.ui.discountBeforeTax")}</span></div>
                     <div className="grid grid-cols-[112px_minmax(0,1fr)_minmax(0,1fr)] gap-x-2">
-                      <span className="col-span-2 mb-1 flex h-5 items-center text-[10px] font-semibold text-[var(--text-secondary)]">{t("admin.pos.ui.discount")}</span>
-                      <span className="mb-1 flex h-5 items-center text-[10px] font-semibold text-[var(--text-secondary)]">{t("admin.pos.ui.tax")}</span>
-                      <div role="group" aria-label={t("admin.pos.ui.discountTypeForProduct", { product: productNameOf(item) })} className="flex h-8 items-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-0.5">
-                        {[['percentage', t("admin.pos.ui.percent")], ['flat', t("admin.pos.ui.flat")]].map(([type, label]) => <button key={type} type="button" aria-label={label} title={t("admin.pos.ui.discountTypeTitle", { type: label })} aria-pressed={getDiscountType(item) === type} onClick={() => setCart((current) => current.map((entry) => entry.variant_id === item.variant_id ? { ...entry, discount_type: type, discount_rate: type === "flat" ? 0 : entry.discount_rate, flat_discount: type === "percentage" ? 0 : entry.flat_discount } : entry))} className={`flex h-full min-w-0 ${type === "percentage" ? "flex-[1.35]" : "flex-1"} items-center justify-center gap-1 rounded-md px-1 text-[10px] font-semibold transition ${getDiscountType(item) === type ? "bg-[var(--accent)] text-white shadow-sm" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"}`}>{type === "percentage" ? <><Percent size={14} strokeWidth={2.5} /><span>{t("admin.pos.ui.percent")}</span></> : label}</button>)}
+                      <span className="col-span-2 mb-1 flex h-5 items-center text-[10px] font-semibold text-fg-secondary">{t("admin.pos.ui.discount")}</span>
+                      <span className="mb-1 flex h-5 items-center text-[10px] font-semibold text-fg-secondary">{t("admin.pos.ui.tax")}</span>
+                      <div role="group" aria-label={t("admin.pos.ui.discountTypeForProduct", { product: productNameOf(item) })} className="flex h-8 items-center rounded-lg border border-line bg-card p-0.5">
+                        {[['percentage', t("admin.pos.ui.percent")], ['flat', t("admin.pos.ui.flat")]].map(([type, label]) => <button key={type} type="button" aria-label={label} title={t("admin.pos.ui.discountTypeTitle", { type: label })} aria-pressed={getDiscountType(item) === type} onClick={() => setCart((current) => current.map((entry) => entry.variant_id === item.variant_id ? { ...entry, discount_type: type, discount_rate: type === "flat" ? 0 : entry.discount_rate, flat_discount: type === "percentage" ? 0 : entry.flat_discount } : entry))} className={`flex h-full min-w-0 ${type === "percentage" ? "flex-[1.35]" : "flex-1"} items-center justify-center gap-1 rounded-md px-1 text-[10px] font-semibold transition ${getDiscountType(item) === type ? "bg-accent text-white shadow-sm" : "text-fg-muted hover:bg-subtle hover:text-fg"}`}>{type === "percentage" ? <><Percent size={14} strokeWidth={2.5} /><span>{t("admin.pos.ui.percent")}</span></> : label}</button>)}
                       </div>
-                      <div className="flex h-8 min-w-0 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-50">
-                        {getDiscountType(item) === "flat" && <span className="shrink-0 text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.pos.ui.rs")}</span>}
+                      <div className="flex h-8 min-w-0 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-50">
+                        {getDiscountType(item) === "flat" && <span className="shrink-0 text-[10px] font-semibold text-fg-muted">{t("admin.pos.ui.rs")}</span>}
                         <input type="number" min="0" max={getDiscountType(item) === "flat" ? item.unit_price : 100} step="1" value={getDiscountType(item) === "flat" ? item.flat_discount || 0 : item.discount_rate || 0} onChange={(event) => {
                           const value = event.target.value === "" ? 0 : Math.max(0, Number(event.target.value) || 0);
                           setCart((current) => current.map((entry) => entry.variant_id === item.variant_id ? getDiscountType(item) === "flat" ? { ...entry, discount_type: "flat", discount_rate: 0, flat_discount: Math.min(entry.unit_price, value) } : { ...entry, discount_type: "percentage", discount_rate: Math.min(100, value), flat_discount: 0 } : entry));
-                        }} className="w-full min-w-0 bg-transparent text-sm font-semibold tabular-nums text-[var(--text-primary)] outline-none" aria-label={t("admin.pos.ui.productDiscountSetting", { setting: getDiscountType(item) === "flat" ? t("admin.pos.ui.flatDiscountPerUnit") : t("admin.pos.ui.discountPercentage"), product: productNameOf(item) })} />
-                        <span className="shrink-0 text-[10px] font-medium text-[var(--text-muted)]">{getDiscountType(item) === "flat" ? t("admin.pos.ui.perUnit") : "%"}</span>
+                        }} className="w-full min-w-0 bg-transparent text-sm font-semibold tabular-nums text-fg outline-none" aria-label={t("admin.pos.ui.productDiscountSetting", { setting: getDiscountType(item) === "flat" ? t("admin.pos.ui.flatDiscountPerUnit") : t("admin.pos.ui.discountPercentage"), product: productNameOf(item) })} />
+                        <span className="shrink-0 text-[10px] font-medium text-fg-muted">{getDiscountType(item) === "flat" ? t("admin.pos.ui.perUnit") : "%"}</span>
                       </div>
-                      <label className="flex h-8 min-w-0 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] px-2.5 transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-50">
+                      <label className="flex h-8 min-w-0 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 transition focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-50">
                         <input type="number" min="0" max="100" step="1" value={item.tax_rate} onChange={(event) => {
                           const value = event.target.value === "" ? 0 : Math.min(100, Math.max(0, Number(event.target.value) || 0));
                           setCart((current) => current.map((entry) => entry.variant_id === item.variant_id ? { ...entry, tax_rate: value } : entry));
-                        }} className="w-full min-w-0 bg-transparent text-sm font-semibold tabular-nums text-[var(--text-primary)] outline-none" aria-label={t("admin.pos.ui.taxPercentageForProduct", { product: productNameOf(item) })} /><span className="text-[10px] font-semibold text-[var(--text-muted)]">%</span>
+                        }} className="w-full min-w-0 bg-transparent text-sm font-semibold tabular-nums text-fg outline-none" aria-label={t("admin.pos.ui.taxPercentageForProduct", { product: productNameOf(item) })} /><span className="text-[10px] font-semibold text-fg-muted">%</span>
                       </label>
                     </div>
                     {item.discount_type === "combined" && <p className="mt-1.5 text-[9px] leading-3 text-amber-700">{t("admin.pos.ui.chooseADiscountTypeToEditThisSavedSale")}</p>}
@@ -1093,14 +1093,14 @@ export default function PosPage() {
             ))}
           </div>
 
-          <section className="shrink-0 border-t border-[var(--border-color)] pt-2">
+          <section className="shrink-0 border-t border-line pt-2">
             <div className="space-y-0.5 text-xs">
             <div className="flex items-center justify-between px-1 py-1">
-              <span className="text-[var(--text-secondary)]">{t("admin.pos.ui.subtotal")}</span>
-              <span className="font-medium text-[var(--text-primary)]">{formatMoney(subtotal)}</span>
+              <span className="text-fg-secondary">{t("admin.pos.ui.subtotal")}</span>
+              <span className="font-medium text-fg">{formatMoney(subtotal)}</span>
             </div>
             <label className="flex items-center justify-between gap-2 px-1 py-1 text-xs">
-                <span className="shrink-0 text-[var(--text-secondary)]">{t("admin.pos.ui.discount")}</span>
+                <span className="shrink-0 text-fg-secondary">{t("admin.pos.ui.discount")}</span>
               <span className="flex items-center gap-2">
                 <input
                   type="number"
@@ -1109,23 +1109,23 @@ export default function PosPage() {
                   value={discountAmount}
                   onChange={(event) => setDiscountAmount(event.target.value)}
                   placeholder="0"
-                    className="h-7 w-20 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2 text-end text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"
+                    className="h-7 w-20 rounded-lg border border-line bg-input px-2 text-end text-xs font-semibold text-fg outline-none focus:border-accent"
                   aria-label={t("admin.pos.ui.additionalDiscountAmount")}
                 />
                 <span className="min-w-16 text-end font-medium">− {formatMoney(discount)}</span>
               </span>
             </label>
             <label className="flex items-center justify-between gap-2 px-1 py-1 text-xs">
-              <span className="shrink-0 text-[var(--text-secondary)]">{t("admin.pos.ui.tax2")}</span>
+              <span className="shrink-0 text-fg-secondary">{t("admin.pos.ui.tax2")}</span>
               <span className="flex items-center gap-2">
                 <span className="relative block w-20">
-                  <input type="number" min="0" max="100" step="0.01" value={additionalTaxRate} onChange={(event) => setAdditionalTaxRate(event.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-2 pe-6 text-end text-xs font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--accent)]" aria-label={t("admin.pos.ui.tax2")} />
-                  <span className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-[10px] text-[var(--text-muted)]">%</span>
+                  <input type="number" min="0" max="100" step="0.01" value={additionalTaxRate} onChange={(event) => setAdditionalTaxRate(event.target.value)} placeholder="0" className="h-7 w-full rounded-lg border border-line bg-input px-2 pe-6 text-end text-xs font-semibold text-fg outline-none focus:border-accent" aria-label={t("admin.pos.ui.tax2")} />
+                  <span className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-[10px] text-fg-muted">%</span>
                 </span>
-                <span className="min-w-16 text-end font-medium text-[var(--text-primary)]">{formatMoney(tax)}</span>
+                <span className="min-w-16 text-end font-medium text-fg">{formatMoney(tax)}</span>
               </span>
             </label>
-            <div className="flex items-center justify-between border-t border-[var(--border-color)] px-1 pt-2 text-lg font-bold text-[var(--text-primary)]">
+            <div className="flex items-center justify-between border-t border-line px-1 pt-2 text-lg font-bold text-fg">
               <span>{t("admin.pos.ui.total")}</span>
               <span className="tabular-nums">{formatMoney(total)}</span>
             </div>
@@ -1133,26 +1133,26 @@ export default function PosPage() {
           </section>
 
           <fieldset className="mt-1 shrink-0">
-            <legend className="mb-1 text-[10px] font-semibold text-[var(--text-muted)]">{t("admin.pos.ui.paymentMethod")}</legend>
-            <div className="grid grid-cols-3 gap-1 rounded-lg bg-[var(--bg-tertiary)] p-1">
-              {paymentMethods.map(({ value, Icon }) => <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => { setPaymentMethod(value); if (!["card", "bank_transfer"].includes(value)) setPaymentReference(""); }} className={`flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${paymentMethod === value ? "bg-[var(--bg-card)] text-blue-600 shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}><Icon size={13}/><span className="truncate">{paymentLabel(value, t)}</span></button>)}
+            <legend className="mb-1 text-[10px] font-semibold text-fg-muted">{t("admin.pos.ui.paymentMethod")}</legend>
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-subtle p-1">
+              {paymentMethods.map(({ value, Icon }) => <button key={value} type="button" aria-pressed={paymentMethod === value} onClick={() => { setPaymentMethod(value); if (!["card", "bank_transfer"].includes(value)) setPaymentReference(""); }} className={`flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${paymentMethod === value ? "bg-card text-blue-600 shadow-sm" : "text-fg-muted hover:text-fg"}`}><Icon size={13}/><span className="truncate">{paymentLabel(value, t)}</span></button>)}
             </div>
           </fieldset>
 
           {["card", "bank_transfer"].includes(paymentMethod) && <label className="mt-2 block shrink-0">
-            <span className="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-muted)]">{t("admin.pos.ui.transactionID")} <span className="text-red-500">*</span></span>
-            <input type="text" required value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder={t("admin.pos.ui.enterTransactionID")} autoComplete="off" className="h-9 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] px-3 text-xs font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-2 focus:ring-blue-100" />
+            <span className="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-fg-muted">{t("admin.pos.ui.transactionID")} <span className="text-red-500">*</span></span>
+            <input type="text" required value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder={t("admin.pos.ui.enterTransactionID")} autoComplete="off" className="h-9 w-full rounded-xl border border-line bg-input px-3 text-xs font-medium text-fg outline-none transition placeholder:text-fg-muted focus:border-accent focus:ring-2 focus:ring-blue-100" />
           </label>}
 
           <div className="mt-1 shrink-0">
-            <button type="button" aria-expanded={notesExpanded || Boolean(notes)} onClick={() => setNotesExpanded((open) => !open)} className="flex h-7 items-center gap-1 text-[11px] font-medium text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"><Plus size={13} className={`transition-transform ${notesExpanded || notes ? "rotate-45" : ""}`}/>{t("admin.pos.ui.addNote")}</button>
-            {(notesExpanded || Boolean(notes)) && <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} placeholder={t("admin.pos.ui.addAnyNotesForThisSale")} className="mt-1 w-full resize-none rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />}
+            <button type="button" aria-expanded={notesExpanded || Boolean(notes)} onClick={() => setNotesExpanded((open) => !open)} className="flex h-7 items-center gap-1 text-[11px] font-medium text-fg-muted transition hover:text-fg"><Plus size={13} className={`transition-transform ${notesExpanded || notes ? "rotate-45" : ""}`}/>{t("admin.pos.ui.addNote")}</button>
+            {(notesExpanded || Boolean(notes)) && <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} placeholder={t("admin.pos.ui.addAnyNotesForThisSale")} className="mt-1 w-full resize-none rounded-lg border border-line bg-input px-3 py-2 text-xs text-fg outline-none placeholder:text-fg-muted focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />}
           </div>
 
           <div className={`mt-2 grid shrink-0 gap-2 ${editingSaleId ? "grid-cols-[auto_minmax(0,1fr)]" : "grid-cols-[auto_auto_minmax(0,1fr)]"}`}>
-          {editingSaleId ? <button type="button" onClick={cancelSaleEdit} className="flex h-12 items-center justify-center rounded-lg px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)]">{t("admin.pos.ui.cancelEdit")}</button> : <>
-          <button type="button" onClick={holdCart} disabled={!cart.length} className="flex h-12 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-45"><Bookmark size={14}/>{t("admin.pos.ui.hold")}</button>
-          <button type="button" onClick={printReceipt} disabled={!cart.length} aria-label={t("admin.pos.ui.print")} title={t("admin.pos.ui.print")} className="flex h-12 w-10 items-center justify-center rounded-lg text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] disabled:cursor-not-allowed disabled:opacity-45"><Printer size={15}/></button>
+          {editingSaleId ? <button type="button" onClick={cancelSaleEdit} className="flex h-12 items-center justify-center rounded-lg px-3 text-xs font-semibold text-fg-secondary transition hover:bg-subtle">{t("admin.pos.ui.cancelEdit")}</button> : <>
+          <button type="button" onClick={holdCart} disabled={!cart.length} className="flex h-12 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-fg-secondary transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-45"><Bookmark size={14}/>{t("admin.pos.ui.hold")}</button>
+          <button type="button" onClick={printReceipt} disabled={!cart.length} aria-label={t("admin.pos.ui.print")} title={t("admin.pos.ui.print")} className="flex h-12 w-10 items-center justify-center rounded-lg text-fg-secondary transition hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-45"><Printer size={15}/></button>
           </>}
           <button
             type="submit"

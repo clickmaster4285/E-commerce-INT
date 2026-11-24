@@ -310,14 +310,14 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
   };
 
   const inputCls =
-    `w-full ${inline ? "h-11 px-3.5 text-sm" : "h-12 px-4 text-sm"} rounded-lg outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/20 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] hover:border-[var(--user-accent)]/40`;
+    `w-full ${inline ? "h-11 px-3.5 text-sm" : "h-12 px-4 text-sm"} rounded-lg outline-none transition-all duration-200 focus:ring-2 focus:ring-user-accent/20 focus:border-user-accent bg-user-input border border-user-line text-user-fg placeholder:text-user-fg-subtle hover:border-user-accent/40`;
   const labelCls =
-    `block text-xs font-semibold leading-snug text-start text-[var(--user-text-secondary)] ${inline ? "mb-1" : "mb-2"}`;
+    `block text-xs font-semibold leading-snug text-start text-user-fg-secondary ${inline ? "mb-1" : "mb-2"}`;
   const textareaCls =
-    `w-full ${inline ? "px-3.5 py-2.5 text-sm" : "px-4 py-3 text-sm"} rounded-lg outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/20 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40`;
+    `w-full ${inline ? "px-3.5 py-2.5 text-sm" : "px-4 py-3 text-sm"} rounded-lg outline-none transition-all duration-200 focus:ring-2 focus:ring-user-accent/20 focus:border-user-accent bg-user-input border border-user-line text-user-fg resize-none hover:border-user-accent/40`;
   const accentBtn = "primary-btn";
   const ghostBtn =
-    "border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
+    "border border-user-line text-user-fg-secondary hover:text-user-fg hover:border-user-accent/40 transition";
   const fieldInputCls = (field) =>
     `${inputCls} ${errors[field] ? "!border-red-500 focus:!border-red-500 focus:ring-red-500/20" : ""}`;
   const renderFieldError = (field) => errors[field] ? (
@@ -337,19 +337,19 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
       >
         <div
           className={inline
-            ? "w-full rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm"
-            : "w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[var(--user-bg-elevated)] border-t-2 sm:border-2 border-[var(--user-border)] shadow-2xl"}
+            ? "w-full rounded-xl bg-user-card border border-user-line shadow-sm"
+            : "w-full sm:max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-user-elevated border-t-2 sm:border-2 border-user-line shadow-2xl"}
           style={inline ? undefined : { animation: "modalUp .3s ease-out" }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className={inline
-            ? "flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--user-border)]"
-            : "sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-[var(--user-border)] bg-[var(--user-bg-elevated)]/95 backdrop-blur-sm"}>
+            ? "flex items-center justify-between gap-3 px-4 py-3 border-b border-user-line"
+            : "sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b-2 border-user-line bg-user-elevated/95 backdrop-blur-sm"}>
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/20 bg-[var(--user-accent)]/5 text-[var(--user-accent)]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-accent/20 bg-user-accent/5 text-user-accent">
                 <MapPin size={17} />
               </span>
-              <h3 className="text-sm font-bold text-[var(--user-text)]">
+              <h3 className="text-sm font-bold text-user-fg">
                 {initialAddress ? t("checkout.address.editTitle") : t("checkout.address.addTitle")}
               </h3>
             </div>
@@ -357,7 +357,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
               type="button"
               onClick={onCancel}
               aria-label={t("common.cancel")}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] p-0 text-[var(--user-text-muted)] hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-line p-0 text-user-fg-muted hover:text-user-fg hover:bg-user-hover transition"
             >
               <X size={16} />
             </button>
@@ -367,7 +367,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
               type="button"
               onClick={fillLocationFromCurrent}
               disabled={locLoading}
-              className={`address-form-location w-full h-10 text-sm rounded-lg border border-[var(--user-accent)]/20 bg-[var(--user-accent)]/5 font-semibold text-[var(--user-accent)] hover:border-[var(--user-accent)]/40 hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center gap-2 disabled:opacity-60`}
+              className={`address-form-location w-full h-10 text-sm rounded-lg border border-user-accent/20 bg-user-accent/5 font-semibold text-user-accent hover:border-user-accent/40 hover:bg-user-accent/10 transition flex items-center justify-center gap-2 disabled:opacity-60`}
             >
               {locLoading ? (
                 <>
@@ -406,7 +406,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                   placeholder={t("checkout.phone.placeholder")}
                   className={fieldInputCls("phone")}
                 />
-                <p className="mt-1 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: form.phone.length, max: PHONE_MAX })}</p>
+                <p className="mt-1 text-xs text-user-fg-muted">{t("checkout.phone.digitCount", { current: form.phone.length, max: PHONE_MAX })}</p>
                 {renderFieldError("phone")}
               </div>
             </div>
@@ -441,7 +441,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                 </select>
                 <ChevronDown
                   size={16}
-                  className="absolute end-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
+                  className="absolute end-4 top-1/2 -translate-y-1/2 text-user-fg-muted pointer-events-none"
                 />
               </div>
               {renderFieldError("country")}
@@ -469,7 +469,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute end-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
+                    className="absolute end-4 top-1/2 -translate-y-1/2 text-user-fg-muted pointer-events-none"
                   />
                 </div>
                 {renderFieldError("state")}
@@ -493,7 +493,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                   </select>
                   <ChevronDown
                     size={16}
-                    className="absolute end-4 top-1/2 -translate-y-1/2 text-[var(--user-text-muted)] pointer-events-none"
+                    className="absolute end-4 top-1/2 -translate-y-1/2 text-user-fg-muted pointer-events-none"
                   />
                 </div>
                 {renderFieldError("city")}
@@ -536,21 +536,21 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                 className={textareaCls}
               />
             </div>
-            <label className={`flex min-h-10 items-center gap-2.5 ${inline ? "px-1" : "p-2.5"} rounded-lg ${inline ? "" : "border border-[var(--user-border)]"} cursor-pointer transition`}>
+            <label className={`flex min-h-10 items-center gap-2.5 ${inline ? "px-1" : "p-2.5"} rounded-lg ${inline ? "" : "border border-user-line"} cursor-pointer transition`}>
               <input
                 type="checkbox"
                 checked={form.is_default}
                 onChange={(e) =>
                   setForm({ ...form, is_default: e.target.checked })
                 }
-                className="h-4 w-4 rounded accent-[var(--user-accent)]"
+                className="h-4 w-4 rounded accent-user-accent"
                 style={{ accentColor: "var(--user-accent)" }}
               />
-              <span className={`${inline ? "text-xs" : "text-sm"} font-semibold text-[var(--user-text)]`}>
+              <span className={`${inline ? "text-xs" : "text-sm"} font-semibold text-user-fg`}>
                 {t("checkout.address.makeDefault")}
               </span>
             </label>
-            <div className={`${inline ? "pt-3" : "pt-4"} flex items-center justify-end gap-2 border-t border-[var(--user-border)]`}>
+            <div className={`${inline ? "pt-3" : "pt-4"} flex items-center justify-end gap-2 border-t border-user-line`}>
               <button
                 onClick={onCancel}
                 className={`${inline ? "h-10" : "h-12"} w-24 justify-center rounded-lg text-sm font-semibold ${ghostBtn}`}

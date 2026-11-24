@@ -88,7 +88,7 @@ function VendorRowMenu({ v, onView, onEdit, onToggle, onDelete, onCreatePurchase
   ];
   return (
     <>
-      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150 hover:bg-[var(--bg-row-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--text-secondary)" }} aria-label={t("more")} aria-haspopup="true" aria-expanded={open}>
+      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); open ? setOpen(false) : openMenu(); }} className="inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150 hover:bg-row-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent" style={{ color: "var(--text-secondary)" }} aria-label={t("more")} aria-haspopup="true" aria-expanded={open}>
         <MoreVertical size={18} />
       </button>
       {open && createPortal(
@@ -271,13 +271,13 @@ export default function VendorsPage() {
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative min-w-0 flex-1 sm:flex-none">
-              <select value={status} onChange={(e) => changeStatus(e.target.value)} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
+              <select value={status} onChange={(e) => changeStatus(e.target.value)} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-accent/30" style={inputStyle}>
                 <option value="all">{t("statusAll")}</option><option value="active">{tShared("status.active")}</option><option value="inactive">{tShared("status.inactive")}</option>
               </select>
               <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><ChevronDown size={14} /></span>
             </div>
             <div className="relative min-w-0 flex-1 sm:flex-none">
-              <select value={city} onChange={(e) => changeCity(e.target.value)} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent)]/30" style={inputStyle}>
+              <select value={city} onChange={(e) => changeCity(e.target.value)} className="appearance-none h-9 w-full sm:w-[140px] ps-3 pe-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-accent/30" style={inputStyle}>
                 <option value="all">{t("cityAll")}</option>{serverCities.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}><ChevronDown size={14} /></span>
@@ -315,9 +315,9 @@ export default function VendorsPage() {
                     <tr key={v._id} onClick={() => router.push(`/admin/vendors/${v._id}`)} className="transition cursor-pointer" style={{ borderBottom: "1px solid var(--border-color)" }} onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-row-hover)")} onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}>
                       <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.includes(v._id)} onChange={() => toggleOne(v._id)} className="w-4 h-4 rounded cursor-pointer" style={{ accentColor: "var(--accent)" }} /></td>
                       <td className="px-4 py-2.5 font-mono text-[12px]" style={{ color: "var(--text-secondary)" }}>{v.vendor_code}</td>
-                      <td className="px-4 py-2.5 font-medium">{showVendorTranslationSkeletons && v.name?.trim() && !v.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.name, v.translations?.name, locale)}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{showVendorTranslationSkeletons && v.company_name?.trim() && !v.translations?.company_name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.company_name, v.translations?.company_name, locale) || "—"}</td>
-                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{showVendorTranslationSkeletons && v.city?.trim() && !v.translations?.city?.[locale]?.trim() ? <span className="inline-block h-3 w-20 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.city, v.translations?.city, locale) || "—"}</td>
+                      <td className="px-4 py-2.5 font-medium">{showVendorTranslationSkeletons && v.name?.trim() && !v.translations?.name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.name, v.translations?.name, locale)}</td>
+                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{showVendorTranslationSkeletons && v.company_name?.trim() && !v.translations?.company_name?.[locale]?.trim() ? <span className="inline-block h-3 w-24 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.company_name, v.translations?.company_name, locale) || "—"}</td>
+                      <td className="px-4 py-2.5" style={{ color: "var(--text-secondary)" }}>{showVendorTranslationSkeletons && v.city?.trim() && !v.translations?.city?.[locale]?.trim() ? <span className="inline-block h-3 w-20 rounded bg-subtle animate-pulse align-middle" aria-busy="true" /> : localizedStrictField(v.city, v.translations?.city, locale) || "—"}</td>
                       <td className="px-4 py-2.5 whitespace-nowrap"><span className="inline-flex items-center gap-1"><Star size={12} style={{ color: "#f59e0b" }} />{(Number(v.rating) || 0).toFixed(1)}</span></td>
                       <td className="px-4 py-2.5 font-semibold">{money(v.balance_payable, locale)}</td>
                       <td className="px-4 py-2.5"><Pill tone={v.is_active ? "active" : "inactive"}>{v.is_active ? tShared("status.active") : tShared("status.inactive")}</Pill></td>

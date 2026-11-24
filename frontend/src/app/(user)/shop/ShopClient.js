@@ -35,7 +35,7 @@ const SidebarDrawer = dynamic(() => import("@/components/user/HomeSidebar"), {
   loading: () => (
     <div className="space-y-2 p-4">
       {[...Array(6).keys()].map((i) => (
-        <div key={i} className="h-7 animate-pulse rounded-lg bg-[var(--user-bg-hover)]" />
+        <div key={i} className="h-7 animate-pulse rounded-lg bg-user-hover" />
       ))}
     </div>
   ),
@@ -54,10 +54,10 @@ export default function ShopClient() {
       fallback={
         <main
           style={SHOP_THEME}
-          className="min-h-screen w-full min-w-0 pb-2 text-[var(--user-text)]"
+          className="min-h-screen w-full min-w-0 pb-2 text-user-fg"
         >
           <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
-            <div className="h-7 w-48 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
+            <div className="h-7 w-48 animate-pulse rounded-full bg-user-card" />
           </div>
         </main>
       }
@@ -416,7 +416,7 @@ function ShopContent() {
   return (
     <main
       style={SHOP_THEME}
-      className="min-h-screen w-full min-w-0 pb-2 text-[var(--user-text)]"
+      className="min-h-screen w-full min-w-0 pb-2 text-user-fg"
     >
       <ShopParamsSync
         filters={filters}
@@ -433,15 +433,15 @@ function ShopContent() {
 
       <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
         {/* BREADCRUMB */}
-        <nav className="mb-3 flex items-center gap-1.5 text-[0.6875rem] text-[var(--user-text-muted)] lg:mb-4 lg:text-xs">
-          <Link href="/" className="transition hover:text-[var(--user-accent)]">
+        <nav className="mb-3 flex items-center gap-1.5 text-[0.6875rem] text-user-fg-muted lg:mb-4 lg:text-xs">
+          <Link href="/" className="transition hover:text-user-accent">
             Home
           </Link>
-          <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
-          <span className="font-semibold text-[var(--user-text-secondary)]">Shop</span>
+          <ChevronRight size={12} className="text-user-fg-subtle" />
+          <span className="font-semibold text-user-fg-secondary">Shop</span>
           {hasQuery ? (
             <>
-              <ChevronRight size={12} className="text-[var(--user-text-subtle)]" />
+              <ChevronRight size={12} className="text-user-fg-subtle" />
               <span className="line-clamp-1 max-w-[11.25rem] sm:max-w-[13.75rem]">
                 {q}
               </span>
@@ -461,12 +461,12 @@ function ShopContent() {
           icon={Store}
         >
           <span className="inline-flex items-center gap-2">
-            <SlidersHorizontal size={13} className="text-[var(--user-text-muted)]" />
+            <SlidersHorizontal size={13} className="text-user-fg-muted" />
             <select
               value={sortBy}
               onChange={(e) => changeSort(e.target.value)}
               aria-label="Sort products"
-              className="h-9 cursor-pointer rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 text-[0.6875rem] font-bold text-[var(--user-text-secondary)] outline-none transition hover:border-[var(--user-accent)]/50 focus:border-[var(--user-accent)] lg:text-xs"
+              className="h-9 cursor-pointer rounded-full border border-user-line bg-user-card px-3 text-[0.6875rem] font-bold text-user-fg-secondary outline-none transition hover:border-user-accent/50 focus:border-user-accent lg:text-xs"
             >
               <option value="featured">Featured</option>
               <option value="newest">Newest Arrivals</option>
@@ -491,17 +491,17 @@ function ShopContent() {
               <button
                 type="button"
                 onClick={() => setFiltersOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3.5 py-2 text-[0.75rem] font-bold text-[var(--user-text)]"
+                className="inline-flex items-center gap-2 rounded-xl border border-user-line bg-user-card px-3.5 py-2 text-[0.75rem] font-bold text-user-fg"
               >
-                <SlidersHorizontal size={14} className="text-[var(--user-accent)]" />
+                <SlidersHorizontal size={14} className="text-user-accent" />
                 Filters
                 {activeFilterCount > 0 || showingViews ? (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--user-accent)] px-1 text-[0.625rem] font-black text-[var(--user-accent-text)]">
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-user-accent px-1 text-[0.625rem] font-black text-user-accent-fg">
                     {showingViews && activeFilterCount === 0 ? 1 : activeFilterCount}
                   </span>
                 ) : null}
               </button>
-              <span className="text-[0.6875rem] font-semibold text-[var(--user-text-subtle)]">
+              <span className="text-[0.6875rem] font-semibold text-user-fg-subtle">
                 {showingViews
                   ? showAllCategoriesView
                     ? `${categories.length} categories`
@@ -562,16 +562,16 @@ function ShopContent() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setFiltersOpen(false)}
           />
-          <div className="absolute right-0 top-0 h-full w-[88%] max-w-[21.25rem] overflow-y-auto border-l border-[var(--user-border)] bg-[var(--user-bg-elevated)]">
-            <div className="flex items-center justify-between border-b border-[var(--user-border)] px-4 py-3">
-              <span className="text-sm font-black uppercase tracking-wider text-[var(--user-text)]">
+          <div className="absolute right-0 top-0 h-full w-[88%] max-w-[21.25rem] overflow-y-auto border-l border-user-line bg-user-elevated">
+            <div className="flex items-center justify-between border-b border-user-line px-4 py-3">
+              <span className="text-sm font-black uppercase tracking-wider text-user-fg">
                 Filters
               </span>
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
                 aria-label="Close filters"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)]"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-user-fg-muted hover:bg-user-hover"
               >
                 <X size={17} />
               </button>

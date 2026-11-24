@@ -765,7 +765,7 @@ export default function DealsPage() {
               <button type="button" onClick={() => setViewMode("grid")} className="h-9 w-9 rounded-lg flex items-center justify-center transition" style={viewMode === "grid" ? { backgroundColor: "var(--accent)", color: "var(--accent-text)" } : cardStyle} title={t("admin.discounts.page.gridView")}><GridIcon /></button>
             </div>
             <div className="relative shrink-0" ref={typeMenuRef}>
-              <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-[var(--accent-hover)] transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
+              <button type="button" onClick={() => setIsTypeMenuOpen((open) => !open)} aria-expanded={isTypeMenuOpen} className="h-9 px-4 rounded-lg text-[13px] font-semibold flex items-center justify-center gap-2 hover:bg-accent-hover transition" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
                 <PlusIcon /> {t("admin.deals.page.new")} <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isTypeMenuOpen ? "rotate-180" : ""}`} />
               </button>
               {isTypeMenuOpen && (
@@ -773,7 +773,7 @@ export default function DealsPage() {
                   {dealTypes.map((dt) => {
                     const Icon = dt.icon;
                     return (
-                      <button key={dt.key} type="button" onClick={() => openDealForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-[var(--bg-tertiary)]">
+                      <button key={dt.key} type="button" onClick={() => openDealForm(dt.key)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-start transition hover:bg-subtle">
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}><Icon className="h-4 w-4" /></span>
                         <span className="min-w-0"><span className="block text-[12px] font-semibold" style={{ color: "var(--text-primary)" }}>{dt.title}</span><span className="block truncate text-[10px]" style={{ color: "var(--text-muted)" }}>{dt.desc}</span></span>
                       </button>
@@ -870,7 +870,7 @@ export default function DealsPage() {
                             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--success-soft)", color: "var(--success-text)" }}><DealIcon className="w-4 h-4" /></div>
                             <div className="min-w-0">
                               {showDealTranslationSkeletons && !deal?.translations?.name?.[locale]?.trim()
-                                ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} />
+                                ? <span className="inline-block h-3 w-28 rounded bg-subtle animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} />
                                 : <p className="font-semibold truncate max-w-[220px]">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>}
                               <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                             </div>
@@ -897,7 +897,7 @@ export default function DealsPage() {
                 </div>
                 <div className="min-w-0">
                   {showDealTranslationSkeletons && !deal?.translations?.name?.[locale]?.trim()
-                    ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse" aria-label={t("admin.categories.page.updating")} />
+                    ? <span className="inline-block h-3 w-28 rounded bg-subtle animate-pulse" aria-label={t("admin.categories.page.updating")} />
                     : <p className="font-semibold text-[13px] truncate">{nameOf(deal) || t("admin.deals.page.noneYet")}</p>}
                   <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--text-muted)" }}>{deal?.code || "—"}</p>
                 </div>
@@ -1108,7 +1108,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
-    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+    className="h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed"
     style={style}
   />
 );
@@ -1119,7 +1119,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-accent/30 resize-none"
     style={style}
   />
 );

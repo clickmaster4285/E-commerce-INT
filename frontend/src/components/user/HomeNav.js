@@ -15,6 +15,8 @@ import { productApi } from "@/apis/user/productApi";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import CategoryIcon from "./CategoryIcon";
+import { useStoreTheme } from "@/storefront/ThemeProvider";
+import { resolveThemeLink, isExternalHref } from "@/storefront/themeLinks";
 import {
   idOf,
   isTopLevelCategory,
@@ -47,8 +49,8 @@ const ALL_CATEGORY_LIMIT = 24;
 const itemClass = (active) =>
   `shrink-0 inline-flex items-center h-10 lg:h-11 px-3 py-2 text-sm font-normal whitespace-nowrap border-b-2 transition-colors duration-200 ${
     active
-      ? "text-[var(--user-text)] border-[var(--user-accent)]"
-      : "text-[var(--user-text-muted)] border-transparent hover:text-[var(--user-text)] hover:bg-[var(--user-bg-hover)]"
+      ? "text-user-fg border-user-accent"
+      : "text-user-fg-muted border-transparent hover:text-user-fg hover:bg-user-hover"
   }`;
 
 /* ---------- Dropdown shell (fixed position = parent ke overflow me clip nahi hota) ---------- */
@@ -77,14 +79,14 @@ function DropdownPanel({ style, panelRef, title, meta, footer, children, onMouse
         if (panelRef) panelRef.current = el;
       }}
       style={style}
-      className="fixed z-[60] overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-elevated)] shadow-[var(--user-shadow-lg)]"
+      className="fixed z-[60] overflow-hidden rounded-2xl border border-user-line bg-user-elevated shadow-[var(--user-shadow-lg)]"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       {title ? (
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)] px-3.5 py-2.5">
-          <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-[var(--user-text)]">{title}</p>
-          {meta ? <span className="text-[0.625rem] font-semibold text-[var(--user-text-subtle)]">{meta}</span> : null}
+        <div className="flex items-center justify-between gap-3 border-b border-user-line bg-user-card px-3.5 py-2.5">
+          <p className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-user-fg">{title}</p>
+          {meta ? <span className="text-[0.625rem] font-semibold text-user-fg-subtle">{meta}</span> : null}
         </div>
       ) : null}
       <div className="max-h-[64vh] overflow-y-auto p-2">{children}</div>
@@ -99,16 +101,16 @@ function CategoryRow({ category, count = 0, onPick, fieldOf }) {
     <Link
       href={`/filtering-product?category=${category._id}`}
       onClick={onPick}
-      className="flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-[var(--user-bg-hover)]"
+      className="flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-user-hover"
     >
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-[var(--user-accent)]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-user-line bg-user-hover text-user-accent">
         <CategoryIcon name={categoryName} size={15} />
       </span>
-      <span className="min-w-0 flex-1 truncate text-[0.78125rem] font-medium capitalize text-[var(--user-text-secondary)]">
+      <span className="min-w-0 flex-1 truncate text-[0.78125rem] font-medium capitalize text-user-fg-secondary">
         {categoryName}
       </span>
       {count > 0 ? (
-        <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-text-subtle)]">
+        <span className="shrink-0 rounded-full bg-user-hover px-1.5 py-0.5 text-[0.625rem] font-bold text-user-fg-subtle">
           {count}
         </span>
       ) : null}
@@ -122,6 +124,15 @@ export default function HomeNav() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { theme } = useStoreTheme();
+  // Store editor main menu (top level) — invalid / deleted target wale links skip
+  const themeMenu = useMemo(
+    () =>
+      (theme?.menus?.main || [])
+        .map((item) => ({ id: item.id, label: item.label, href: resolveThemeLink(item.link) }))
+        .filter((item) => item.label && item.href),
+    [theme],
+  );
   const activeTab = searchParams?.get("tab");
   const [panel, setPanel] = useState(null);
   const [panelStyle, setPanelStyle] = useState(null);
@@ -286,15 +297,28 @@ export default function HomeNav() {
   return (
     <nav
       aria-label={t("admin.sidebar.navigation")}
-      className="user-home-nav sticky top-14 z-40 border-b border-[var(--user-border)] bg-[var(--user-bg-elevated)] lg:top-16"
+      className="user-home-nav sticky top-14 z-40 border-b border-user-line bg-user-elevated lg:top-16"
     >
       <div className="w-full min-w-0 max-w-full px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
         <div
           ref={navScrollRef}
           className="flex h-10 w-full min-w-0 items-center justify-start gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-0.5 lg:h-11 lg:gap-1"
         >
-          {/* PLAIN LINKS — Home | Best Offers | New Arrivals */}
-          {NAV_LINKS.map((link) => (
+          {/* STORE EDITOR MAIN MENU — seller ne banaya ho to purane plain links ki jagah */}
+          {themeMenu.map((item) =>
+            isExternalHref(item.href) ? (
+              <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" className={itemClass(false)}>
+                {item.label}
+              </a>
+            ) : (
+              <Link key={item.id} href={item.href} className={itemClass(pathname === item.href)}>
+                {item.label}
+              </Link>
+            ),
+          )}
+
+          {/* PLAIN LINKS — Home | Best Offers | New Arrivals (default, menu khali ho to) */}
+          {!themeMenu.length && NAV_LINKS.map((link) => (
             <Link
               key={link.labelKey}
               href={link.href}
@@ -353,7 +377,7 @@ export default function HomeNav() {
         >
           {hiddenParents.length > 0 ? (
             <>
-              <p className="px-2.5 pb-1.5 pt-1 text-[0.625rem] font-black uppercase tracking-[0.16em] text-[var(--user-text-subtle)]">
+              <p className="px-2.5 pb-1.5 pt-1 text-[0.625rem] font-black uppercase tracking-[0.16em] text-user-fg-subtle">
                 {t("storefront.navigation.moreCategories")}
               </p>
               {hiddenParents.slice(0, MORE_DROPDOWN_LIMIT).map((category) => (
@@ -369,7 +393,7 @@ export default function HomeNav() {
                 <Link
                   href="/filtering-product?allCategories=1"
                   onClick={closePanel}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-[var(--user-bg-hover)] text-[var(--user-accent)] font-medium"
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-user-hover text-user-accent font-medium"
                 >
                   <span className="text-[0.78125rem]">{t("admin.products.filter.allCategories")}</span>
                   <ChevronDown size={14} />

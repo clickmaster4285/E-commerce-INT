@@ -62,7 +62,7 @@ function StarRow({ value = 0, hover = 0, size = 16, interactive = false, onPick,
             className={
               i <= Math.round(shown)
                 ? "text-amber-500 fill-amber-500"
-                : "text-[var(--user-text-subtle)]"
+                : "text-user-fg-subtle"
             }
           />
         </button>
@@ -81,7 +81,7 @@ function SavedMedia({ images = [], videos = [], onPreview }) {
   if (!entries.length) return null;
   const visible = entries.slice(0, 6);
   const hiddenCount = Math.max(0, entries.length - visible.length);
-  const thumb = "relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]";
+  const thumb = "relative h-[76px] w-[76px] shrink-0 overflow-hidden rounded-lg border border-user-line bg-user-hover";
   return (
     <div className="flex gap-2 overflow-x-auto pb-1" aria-label={t("admin.reviews.ui.media")}>
       {visible.map((item, i) => (
@@ -120,15 +120,15 @@ export function StoreResponse({ response }) {
     ? new Date(response.responded_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale, { month: "short", day: "numeric", year: "numeric" })
     : "";
   return (
-    <div className="rounded-xl border-l-[3px] border-[var(--user-accent)] bg-[var(--user-accent)]/10 px-3.5 py-3.5 sm:px-4">
+    <div className="rounded-xl border-l-[3px] border-user-accent bg-user-accent/10 px-3.5 py-3.5 sm:px-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="flex items-center gap-2 text-sm font-semibold text-[var(--user-accent)]"><MessageSquareText size={15} aria-hidden="true" /> {t("admin.reviews.detail.storeResponse")}</p>
-        {date && <p className="text-xs text-[var(--user-text-muted)]">{date}</p>}
+        <p className="flex items-center gap-2 text-sm font-semibold text-user-accent"><MessageSquareText size={15} aria-hidden="true" /> {t("admin.reviews.detail.storeResponse")}</p>
+        {date && <p className="text-xs text-user-fg-muted">{date}</p>}
       </div>
-      <div className={`mt-2 max-w-2xl overflow-hidden text-sm leading-relaxed text-[var(--user-text-secondary)] ${expanded ? "" : "line-clamp-3"}`}>
+      <div className={`mt-2 max-w-2xl overflow-hidden text-sm leading-relaxed text-user-fg-secondary ${expanded ? "" : "line-clamp-3"}`}>
         {paragraphs.map((paragraph, index) => <p key={index} className={index ? "mt-2" : ""}>{paragraph}</p>)}
       </div>
-      {message.length > 180 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1.5 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{expanded ? t("admin.productDetail.page.showLess") : t("admin.productDetail.page.showMore")}</button>}
+      {message.length > 180 && <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-1.5 min-h-9 text-xs font-semibold text-user-accent hover:underline">{expanded ? t("admin.productDetail.page.showLess") : t("admin.productDetail.page.showMore")}</button>}
     </div>
   );
 }
@@ -170,7 +170,7 @@ function RatingModal({
   }, [onClose]);
 
   const inputCls =
-    "w-full rounded-xl bg-[var(--user-bg)] border border-[var(--user-border)] px-3.5 py-2.5 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/15 transition resize-none";
+    "w-full rounded-xl bg-user-page border border-user-line px-3.5 py-2.5 text-sm text-user-fg placeholder:text-user-fg-subtle outline-none focus:border-user-accent focus:ring-2 focus:ring-user-accent/15 transition resize-none";
 
   return createPortal(
     <div
@@ -178,21 +178,21 @@ function RatingModal({
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose && onClose(); }}
     >
       <div
-        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+        className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-2xl border border-user-line bg-user-card shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 border-b border-user-line bg-user-card/95 backdrop-blur">
           <div className="min-w-0">
-            <p className="text-[0.6875rem] font-bold tracking-wide text-[var(--user-text-muted)]">
+            <p className="text-[0.6875rem] font-bold tracking-wide text-user-fg-muted">
               {rated ? `${t("common.edit")} ${t("admin.reviews.ui.review")}` : t("admin.reviews.ui.review")}
             </p>
             {productName ? (
-              <h3 className="mt-1 text-sm font-black text-[var(--user-text)] leading-snug line-clamp-2">{productName}</h3>
+              <h3 className="mt-1 text-sm font-black text-user-fg leading-snug line-clamp-2">{productName}</h3>
             ) : null}
           </div>
           <button type="button" onClick={onClose} aria-label={t("common.close")}
-            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] transition">
+            className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-user-fg-muted hover:bg-user-hover transition">
             <X size={16} />
           </button>
         </div>
@@ -203,42 +203,42 @@ function RatingModal({
             <div className="flex justify-center">
               <StarRow value={rating} hover={hover} size={32} interactive onPick={onPick} onHover={onHover} />
             </div>
-            <p className={`mt-2 text-sm font-semibold ${(hover || rating) ? "text-amber-500" : "text-[var(--user-text-subtle)]"}`}>
+            <p className={`mt-2 text-sm font-semibold ${(hover || rating) ? "text-amber-500" : "text-user-fg-subtle"}`}>
               {hover || rating ? t("admin.reviews.ui.starsCount", { value: hover || rating }) : t("admin.reviews.page.rating")}
             </p>
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">{t("admin.reviews.ui.review")} <span className="text-[var(--user-accent)]">*</span></span>
+            <span className="text-xs font-semibold text-user-fg-secondary">{t("admin.reviews.ui.review")} <span className="text-user-accent">*</span></span>
             <input type="text" required aria-required="true" value={title} onChange={(e) => onTitle(e.target.value)} maxLength={120}
               className={inputCls} />
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-semibold text-[var(--user-text-secondary)]">{t("admin.reviews.page.comment")}</span>
+            <span className="text-xs font-semibold text-user-fg-secondary">{t("admin.reviews.page.comment")}</span>
             <textarea value={comment} onChange={(e) => onComment(e.target.value)} rows={4} maxLength={800}
               className={inputCls} />
           </label>
 
 
           {/* Media */}
-          <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3.5 space-y-3">
+          <div className="rounded-2xl border border-user-line bg-user-hover/50 p-3.5 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-secondary)] flex items-center gap-1.5">
+              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-user-fg-secondary flex items-center gap-1.5">
                 <ImagePlus size={13} /> {t("common.add")} {t("admin.reviews.ui.media")}
               </p>
-              <span className="text-[0.5625rem] font-semibold text-[var(--user-text-subtle)]">{t("common.optional")}</span>
+              <span className="text-[0.5625rem] font-semibold text-user-fg-subtle">{t("common.optional")}</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
               {/* ✅ <label htmlFor> — real native file-picker trigger (button + JS .click()
                   tab se "silently kuch nahi hota" ka issue avoid karta hai) */}
               <label htmlFor={imgId}
-                className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${images.length + savedImages.length >= MAX_IMAGES ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
+                className={`h-10 px-3.5 rounded-xl border border-dashed border-user-line bg-user-card text-[0.75rem] font-bold text-user-fg-secondary flex items-center gap-1.5 transition ${images.length + savedImages.length >= MAX_IMAGES ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-user-accent/50 hover:text-user-accent"}`}>
                 <ImagePlus size={15} /> {t("common.add")} {t("admin.reviews.ui.media")} ({images.length + savedImages.length}/{MAX_IMAGES})
               </label>
               <label htmlFor={vidId}
-                className={`h-10 px-3.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] text-[0.75rem] font-bold text-[var(--user-text-secondary)] flex items-center gap-1.5 transition ${video || existingVideo ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]"}`}>
+                className={`h-10 px-3.5 rounded-xl border border-dashed border-user-line bg-user-card text-[0.75rem] font-bold text-user-fg-secondary flex items-center gap-1.5 transition ${video || existingVideo ? "opacity-40 pointer-events-none" : "cursor-pointer hover:border-user-accent/50 hover:text-user-accent"}`}>
                 <Video size={15} /> {video || existingVideo ? t("admin.reviews.ui.media") : t("common.add")}
               </label>
             </div>
@@ -250,33 +250,33 @@ function RatingModal({
 
             {(savedImages.length > 0 || existingVideo || previews.length > 0 || videoPreview) && (
               <div className="space-y-2">
-                {savedImages.length || existingVideo ? <p className="text-[0.625rem] font-semibold text-[var(--user-text-muted)]">{t("admin.reviews.ui.media")} · {t("admin.productDetail.page.remove")}</p> : null}
+                {savedImages.length || existingVideo ? <p className="text-[0.625rem] font-semibold text-user-fg-muted">{t("admin.reviews.ui.media")} · {t("admin.productDetail.page.remove")}</p> : null}
                 <div className="flex gap-2 overflow-x-auto pb-1">
                 {savedImages.map((item, i) => {
                   const url = mediaUrl(item.img_url);
                   return url ? (
-                    <span key={`saved-i-${item.img_url}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]">
+                    <span key={`saved-i-${item.img_url}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-user-line bg-user-hover">
                       <FallbackImage src={url} alt="" className="h-full w-full object-cover" />
                       <button type="button" onClick={() => onRemoveExistingImage(item.img_url)} aria-label={t("admin.productDetail.page.remove")} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
                     </span>
                   ) : null;
                 })}
                 {existingVideo ? (
-                  <span className="relative flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--user-border)] bg-black">
+                  <span className="relative flex h-16 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-user-line bg-black">
                     <video src={mediaUrl(existingVideo.video_url)} muted preload="metadata" className="absolute inset-0 h-full w-full object-cover opacity-70" />
                     <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-black/60"><Play size={13} className="fill-white text-white" /></span>
                     <button type="button" onClick={onRemoveExistingVideo} aria-label={t("admin.productDetail.page.remove")} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-white shadow hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"><X size={13} /></button>
                   </span>
                 ) : null}
                 {previews.map((src, i) => (
-                  <span key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-[var(--user-border)] shrink-0 bg-[var(--user-bg-hover)]">
+                  <span key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-user-line shrink-0 bg-user-hover">
                     <FallbackImage src={src} alt="" className="w-full h-full object-cover" />
                     <button type="button" onClick={() => onRemoveImage(i)} aria-label={t("admin.productDetail.page.remove")}
                       className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition"><X size={12} /></button>
                   </span>
                 ))}
                 {videoPreview && (
-                  <span className="relative w-28 h-16 rounded-xl overflow-hidden border border-[var(--user-border)] shrink-0 bg-black flex items-center justify-center">
+                  <span className="relative w-28 h-16 rounded-xl overflow-hidden border border-user-line shrink-0 bg-black flex items-center justify-center">
                     <video src={videoPreview} preload="metadata" muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-70" />
                     <span className="relative w-7 h-7 rounded-full bg-black/60 flex items-center justify-center"><Play size={13} className="text-white fill-white" /></span>
                     <button type="button" onClick={onRemoveVideo} aria-label={t("admin.productDetail.page.remove")}
@@ -287,7 +287,7 @@ function RatingModal({
               </div>
             )}
 
-            <p className="text-[0.625rem] text-[var(--user-text-subtle)] leading-relaxed">
+            <p className="text-[0.625rem] text-user-fg-subtle leading-relaxed">
               Photos: JPG / PNG / WEBP, up to 10MB each &middot; Video: MP4 / WEBM / MOV, up to 50MB.
             </p>
 
@@ -295,21 +295,21 @@ function RatingModal({
 
 
           {error ? (
-            <div className="px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
-              <AlertCircle size={15} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
-              <p className="text-[var(--user-danger)] text-[0.8125rem] font-medium">{error}</p>
+            <div className="px-4 py-3 rounded-xl bg-user-danger/10 border border-user-danger/30 flex items-start gap-2">
+              <AlertCircle size={15} className="text-user-danger shrink-0 mt-0.5" />
+              <p className="text-user-danger text-[0.8125rem] font-medium">{error}</p>
             </div>
           ) : null}
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 flex gap-3 px-5 py-4 border-t border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur">
+        <div className="sticky bottom-0 flex gap-3 px-5 py-4 border-t border-user-line bg-user-card/95 backdrop-blur">
           <button type="button" onClick={onClose} disabled={saving}
-            className="flex-1 h-11 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-bold text-[var(--user-text)] hover:opacity-80 transition disabled:opacity-50">
+            className="flex-1 h-11 rounded-xl border border-user-line bg-user-hover text-sm font-bold text-user-fg hover:opacity-80 transition disabled:opacity-50">
             {t("common.cancel")}
           </button>
           <button type="button" onClick={onSubmit} disabled={saving || !rating}
-            className="flex-[1.4] h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed">
+            className="flex-[1.4] h-11 rounded-xl bg-user-accent text-user-accent-fg text-sm font-black flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
             {saving ? t("common.saving") : t("common.save")}
           </button>
@@ -513,32 +513,32 @@ export default function ProductRating({ productId, productName = "", review = nu
       : review.storeResponse;
     return (
       <>
-        <section className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 sm:p-6 shadow-sm">
+        <section className="rounded-2xl border border-user-line bg-user-card p-5 sm:p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-400/10">
                 <Star size={17} className="fill-amber-500 text-amber-500" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--user-text-muted)]">{t("admin.reviews.page.rating")}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-user-fg-muted">{t("admin.reviews.page.rating")}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <StarRow value={review.rating} size={15} />
-                  <span className="text-sm font-semibold text-[var(--user-text)]">{t("admin.reviews.ui.starsCount", { value: review.rating })}</span>
+                  <span className="text-sm font-semibold text-user-fg">{t("admin.reviews.ui.starsCount", { value: review.rating })}</span>
                 </div>
               </div>
             </div>
             <button type="button" onClick={openModal}
-              className="h-9 rounded-lg border border-[var(--user-border)] px-3.5 text-xs font-semibold text-[var(--user-text-secondary)] transition hover:border-[var(--user-accent)]/50 hover:text-[var(--user-accent)]">
+              className="h-9 rounded-lg border border-user-line px-3.5 text-xs font-semibold text-user-fg-secondary transition hover:border-user-accent/50 hover:text-user-accent">
               {t("common.edit")}
             </button>
           </div>
           {hasReviewBody ? (
-            <div className="mt-4 space-y-4 border-t border-[var(--user-border)] pt-4">
+            <div className="mt-4 space-y-4 border-t border-user-line pt-4">
               {(review.title || review.comment) && <div>
-                {displayTitle ? <p className="text-base font-semibold text-[var(--user-text)]">{displayTitle}</p> : null}
+                {displayTitle ? <p className="text-base font-semibold text-user-fg">{displayTitle}</p> : null}
                 {review.comment ? <div>
-                  <p className={`mt-1.5 whitespace-pre-line break-words text-sm leading-[1.6] text-[var(--user-text-secondary)] ${commentExpanded ? "" : "line-clamp-4"}`}>{displayComment}</p>
-                  {displayComment.length > 220 && <button type="button" onClick={() => setCommentExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-[var(--user-accent)] hover:underline">{commentExpanded ? t("admin.productDetail.page.showLess") : t("admin.productDetail.page.showMore")}</button>}
+                  <p className={`mt-1.5 whitespace-pre-line break-words text-sm leading-[1.6] text-user-fg-secondary ${commentExpanded ? "" : "line-clamp-4"}`}>{displayComment}</p>
+                  {displayComment.length > 220 && <button type="button" onClick={() => setCommentExpanded((value) => !value)} className="mt-1 min-h-9 text-xs font-semibold text-user-accent hover:underline">{commentExpanded ? t("admin.productDetail.page.showLess") : t("admin.productDetail.page.showMore")}</button>}
                 </div> : null}
               </div>}
               {savedCount > 0 && <SavedMedia images={review.images} videos={review.videos} onPreview={setPreview} />}
@@ -565,7 +565,7 @@ export default function ProductRating({ productId, productName = "", review = nu
               </p>
             </div>
             <button type="button" onClick={openModal}
-              className="shrink-0 text-[0.5625rem] font-bold text-[var(--user-accent)] hover:underline">
+              className="shrink-0 text-[0.5625rem] font-bold text-user-accent hover:underline">
               {t("common.edit")}
             </button>
           </div>
@@ -575,7 +575,7 @@ export default function ProductRating({ productId, productName = "", review = nu
         </div>
       ) : (
         <button type="button" onClick={openModal}
-          className="mt-2 w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-lg bg-[var(--user-accent)] text-[var(--user-accent-text)] text-[0.5625rem] sm:text-[0.625rem] font-black hover:opacity-90 active:scale-[0.98] transition">
+          className="mt-2 w-full inline-flex items-center justify-center gap-1.5 h-7 rounded-lg bg-user-accent text-user-accent-fg text-[0.5625rem] sm:text-[0.625rem] font-black hover:opacity-90 active:scale-[0.98] transition">
           <Star size={11} className="fill-current" /> {t("admin.reviews.ui.review")}
         </button>
       )}

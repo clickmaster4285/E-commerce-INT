@@ -22,14 +22,14 @@ export const COMBO_THEME_SIGNUP = {
   strong: "text-slate-700",
 };
 export const COMBO_THEME_ADMIN = {
-  toggle: "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
-  list: "rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[0_16px_40px_-12px_rgba(15,23,42,0.3)]",
-  option: "text-[var(--text-secondary)]",
-  optionActive: "bg-[var(--accent-soft,rgba(99,102,241,0.1))] text-[var(--text-primary)]",
-  check: "text-[var(--accent)]",
-  note: "text-[var(--text-muted)]",
-  empty: "text-[var(--text-muted)]",
-  strong: "text-[var(--text-primary)]",
+  toggle: "text-fg-muted hover:bg-subtle hover:text-fg",
+  list: "rounded-lg border border-line bg-card shadow-[0_16px_40px_-12px_rgba(15,23,42,0.3)]",
+  option: "text-fg-secondary",
+  optionActive: "bg-accent-soft text-fg",
+  check: "text-accent",
+  note: "text-fg-muted",
+  empty: "text-fg-muted",
+  strong: "text-fg",
 };
 
 export default function SearchCombobox({ id, value, onChange, options, loading, inputClassName, describedBy, invalid, itemLabel = "city", allowCustom = true, pinned = [], placeholder: placeholderProp, theme = COMBO_THEME_SIGNUP }) {

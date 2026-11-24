@@ -135,7 +135,7 @@ export default function AdminLanguageSwitcher() {
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate">{item.nativeLabel}</span>
                   {item.nativeLabel !== item.label && (
-                    <span className="text-[11px] text-[var(--text-muted)]">{item.label}</span>
+                    <span className="text-[11px] text-fg-muted">{item.label}</span>
                   )}
                 </span>
                 {active && <Check size={14} strokeWidth={2.5} className="shrink-0" />}

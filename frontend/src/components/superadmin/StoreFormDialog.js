@@ -207,17 +207,17 @@ export default function StoreFormDialog({ store, onClose, onSaved }) {
         </FormSection>
 
         <FormSection title="Store branding">
-          <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] p-3.5">
+          <div className="flex flex-wrap items-center gap-4 rounded-lg border border-line bg-subtle p-3.5">
             {logoSrc ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoSrc} alt="Store logo preview" className="h-16 w-16 shrink-0 rounded-lg border border-[var(--border-color)] bg-white object-contain" />
+              <img src={logoSrc} alt="Store logo preview" className="h-16 w-16 shrink-0 rounded-lg border border-line bg-white object-contain" />
             ) : (
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-muted)]"><ImagePlus size={20} aria-hidden="true" /></span>
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-line bg-card text-fg-muted"><ImagePlus size={20} aria-hidden="true" /></span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-[var(--text-primary)]">{logoSrc ? "Store logo" : "No logo yet"}</p>
-              <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">JPG, PNG or WEBP · optional, can be added any time</p>
-              {errors.logo_url && <p className="mt-1 text-[12px] font-medium text-[var(--danger-text)]">{errors.logo_url}</p>}
+              <p className="text-[13px] font-semibold text-fg">{logoSrc ? "Store logo" : "No logo yet"}</p>
+              <p className="mt-0.5 text-[12px] text-fg-muted">JPG, PNG or WEBP · optional, can be added any time</p>
+              {errors.logo_url && <p className="mt-1 text-[12px] font-medium text-danger">{errors.logo_url}</p>}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <label className={`sa-btn sa-btn--secondary sa-btn--sm cursor-pointer ${logoBusy ? "pointer-events-none opacity-60" : ""}`}>

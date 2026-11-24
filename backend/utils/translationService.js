@@ -60,6 +60,7 @@ const TRANSLATABLE_FIELDS = {
   Quote: ["customer_name"],
   Invoice: ["customer_name"],
   Employee: ["name"],
+  StorePage: ["title"],
 };
 
 // Ye sab translatable *content* fields hain. Jo is list me hain par
@@ -86,6 +87,8 @@ const CONTENT_FIELDS = {
   Quote: ["customer_name"],
   Invoice: ["customer_name"],
   Employee: ["name"],
+  // content (HTML) abhi skipped — LibreTranslate markup tod sakta hai
+  StorePage: ["title", "content"],
 };
 
 // Translation writes update Mongo directly (outside the normal CRUD routes),
@@ -98,6 +101,7 @@ const PUBLIC_CACHE_NAMESPACES = {
   Deal: ["deals"],
   Banner: ["banners"],
   Variant: ["products"],
+  StorePage: ["pages"],
 };
 
 /** Chhota, stable hash — staleness detect karne ke liye. */

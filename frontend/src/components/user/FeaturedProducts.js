@@ -73,7 +73,7 @@ function TabGrid({ tab }) {
         {[...Array(8).keys()].map((index) => (
           <div
             key={index}
-            className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+            className="h-[17.25rem] animate-pulse overflow-hidden rounded-lg border border-user-line bg-user-card"
           />
         ))}
       </div>
@@ -82,13 +82,13 @@ function TabGrid({ tab }) {
 
   if (isError && !displayedProducts.length) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
-        <PackageSearch size={30} className="text-[var(--user-text-subtle)]" />
-        <p className="text-sm font-bold text-[var(--user-text)]">{t("admin.shared.state.error")}</p>
+      <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-user-line bg-user-card px-4 py-12 text-center">
+        <PackageSearch size={30} className="text-user-fg-subtle" />
+        <p className="text-sm font-bold text-user-fg">{t("admin.shared.state.error")}</p>
         <button
           type="button"
           onClick={() => refetch()}
-          className="mt-1 rounded-lg bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+          className="mt-1 rounded-lg bg-user-accent px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-user-accent-fg transition-opacity hover:opacity-90"
         >
           {t("admin.shared.state.errorBody")}
         </button>
@@ -98,16 +98,16 @@ function TabGrid({ tab }) {
 
   if (!products.length && !displayedProducts.length) {
     return (
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-6 py-14 text-center sm:py-16">
+      <div className="relative overflow-hidden rounded-2xl border border-user-line bg-user-card px-6 py-14 text-center sm:py-16">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(ellipse_at_top,var(--user-accent-soft),transparent_70%)]" />
         <div className="relative mx-auto flex max-w-sm flex-col items-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--user-accent-soft)] bg-[var(--user-accent-soft)] text-[var(--user-accent)]">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-user-accent-soft bg-user-accent-soft text-user-accent">
             <PackageSearch size={26} strokeWidth={1.7} />
           </span>
-          <p className="mt-5 text-base font-extrabold tracking-tight text-[var(--user-text)]">
+          <p className="mt-5 text-base font-extrabold tracking-tight text-user-fg">
             {t("admin.products.table.empty")}
           </p>
-          <p className="mt-2 text-[0.8125rem] leading-relaxed text-[var(--user-text-muted)]">
+          <p className="mt-2 text-[0.8125rem] leading-relaxed text-user-fg-muted">
             {t("storefront.featured.comingSoon")}
           </p>
         </div>
@@ -130,7 +130,7 @@ function TabGrid({ tab }) {
             onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
             disabled={isFetching}
             aria-busy={isFetching}
-            className="group inline-flex min-w-52 items-center justify-center gap-2 rounded-xl border border-[var(--user-accent)] bg-[var(--user-bg-card)] px-6 py-3 text-xs font-bold tracking-wide text-[var(--user-accent)] shadow-sm transition duration-200 hover:bg-[var(--user-accent)] hover:text-[var(--user-accent-text)] hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] disabled:cursor-wait disabled:opacity-70"
+            className="group inline-flex min-w-52 items-center justify-center gap-2 rounded-xl border border-user-accent bg-user-card px-6 py-3 text-xs font-bold tracking-wide text-user-accent shadow-sm transition duration-200 hover:bg-user-accent hover:text-user-accent-fg hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-user-accent disabled:cursor-wait disabled:opacity-70"
           >
             {isFetching ? <LoaderCircle size={15} className="animate-spin" /> : <ChevronDown size={15} className="transition-transform group-hover:translate-y-0.5" />}
             {t(isFetching ? "storefront.featured.loadingMore" : "storefront.featured.loadMoreProducts")}
@@ -211,8 +211,8 @@ export default function FeaturedProducts({ titleOverride = null }) {
   const tabClass = (active) =>
     `relative shrink-0 px-1 pb-1.5 text-[0.6875rem] font-bold uppercase tracking-wider transition-colors ${
       active
-        ? "text-[var(--user-text)]"
-        : "text-[var(--user-text-subtle)] hover:text-[var(--user-text-muted)]"
+        ? "text-user-fg"
+        : "text-user-fg-subtle hover:text-user-fg-muted"
     }`;
 
   const title =
@@ -248,7 +248,7 @@ export default function FeaturedProducts({ titleOverride = null }) {
               <Icon size={13} strokeWidth={2.2} />
               {t(labelKey)}
               <span
-                className={`absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-[var(--user-accent)] transition-opacity ${
+                className={`absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-user-accent transition-opacity ${
                   safeTab === id ? "opacity-100" : "opacity-0"
                 }`}
               />

@@ -407,7 +407,7 @@ export default function BrandDetailPage() {
   const brandNameForDisplay = nameOf(brand);
   const brandDescriptionForDisplay = locale === "en" || brandTranslationsReady || !brand?.description || brand?.translations?.description?.[locale]?.trim()
     ? descriptionOf(brand)
-    : <span className="inline-block h-3 w-48 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-label={t("admin.brands.ui.loading")} />;
+    : <span className="inline-block h-3 w-48 animate-pulse rounded bg-subtle" aria-label={t("admin.brands.ui.loading")} />;
 
   const { data: brandProducts = [], isLoading: productsLoading } = useQuery({
     queryKey: ["brand-products", brandId, locale],
@@ -565,7 +565,7 @@ export default function BrandDetailPage() {
         <button
           type="button"
           onClick={() => router.push(backPath)}
-          className="transition-colors hover:text-[var(--text-primary)]"
+          className="transition-colors hover:text-fg"
         >
           {t("admin.brands.page.title")}
         </button>
@@ -581,7 +581,7 @@ export default function BrandDetailPage() {
           <button
             type="button"
             onClick={() => router.push(backPath)}
-            className="mt-0.5 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold transition hover:bg-[var(--bg-tertiary)]"
+            className="mt-0.5 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold transition hover:bg-subtle"
             style={{ border: "1px solid var(--border-color)", color: "var(--text-secondary)" }}
             aria-label={t("admin.brands.detail.backToBrands")}
           >
@@ -625,7 +625,7 @@ export default function BrandDetailPage() {
             )}
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h2 className="text-[17px] leading-tight font-bold">{brandNameIsReady ? brandNameForDisplay : <span className="inline-block h-4 w-32 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-hidden="true" />}</h2>
+                <h2 className="text-[17px] leading-tight font-bold">{brandNameIsReady ? brandNameForDisplay : <span className="inline-block h-4 w-32 animate-pulse rounded bg-subtle" aria-hidden="true" />}</h2>
                 <StatusPill active={brand.is_active} t={t} />
               </div>
               <span className="mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px]" style={{ backgroundColor: "var(--bg-tertiary)", borderColor: "var(--border-color)" }}>
@@ -734,7 +734,7 @@ export default function BrandDetailPage() {
               <div className="px-4 pb-3">
                 <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                   <InfoRow label={t("admin.brands.detail.brandCode")} value={brand.brand_code} mono dir="ltr" />
-                  <InfoRow label={t("admin.brands.detail.brandName")} value={brandNameIsReady ? brandNameForDisplay : <span className="inline-block h-3 w-28 animate-pulse rounded bg-[var(--bg-tertiary)]" aria-hidden="true" />} dir={isRtl ? "rtl" : "ltr"} />
+                  <InfoRow label={t("admin.brands.detail.brandName")} value={brandNameIsReady ? brandNameForDisplay : <span className="inline-block h-3 w-28 animate-pulse rounded bg-subtle" aria-hidden="true" />} dir={isRtl ? "rtl" : "ltr"} />
                   <InfoRow label={t("admin.brands.detail.country")} value={localizedCountryName(brand.country) || "—"} dir={isRtl ? "rtl" : "ltr"} />
                   <InfoRow
                     label={t("admin.brands.detail.status")}
@@ -1285,7 +1285,7 @@ export default function BrandDetailPage() {
                   <p className="text-[13px] font-medium">{t("admin.brands.detail.brandCreated")}</p>
                   <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
                     {t("admin.brands.detail.createdByLabel")}{" "}
-                    <span className="font-semibold text-[var(--text-primary)]">
+                    <span className="font-semibold text-fg">
                       {brand.createdby?.name || "—"}
                     </span>
                     {brand.createdby?.email && (
@@ -1320,7 +1320,7 @@ export default function BrandDetailPage() {
                     <p className="text-[13px] font-medium">{t("admin.brands.detail.brandUpdated")}</p>
                     <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
                       {t("admin.brands.detail.updatedByLabel")}{" "}
-                      <span className="font-semibold text-[var(--text-primary)]">
+                      <span className="font-semibold text-fg">
                         {brand.updatedby?.name || "—"}
                       </span>
                       {brand.updatedby?.email && (

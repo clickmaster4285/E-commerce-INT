@@ -1773,6 +1773,8 @@ const publicPlan = (p, storeCount = 0) => ({
     analytics: p.features?.analytics || "basic",
     pos: Boolean(p.features?.pos),
     customDomain: Boolean(p.features?.customDomain),
+    // Missing (purane plans) = ON
+    storeEditor: p.features?.storeEditor !== false,
   },
   storeCount,
   createdBy: publicCreatedBy(p.createdBy),
@@ -1864,6 +1866,10 @@ const parsePlanBody = async (body, { forUpdate = false, existing = null } = {}) 
   const customDomain = hasFeature("customDomain")
     ? Boolean(featuresIn.customDomain)
     : Boolean(existing?.features?.customDomain);
+  // features object poora replace hota hai — storeEditor yahan na ho to save par mit jata
+  const storeEditor = hasFeature("storeEditor")
+    ? Boolean(featuresIn.storeEditor)
+    : existing?.features?.storeEditor !== false;
 
   if (Object.keys(errors).length) return { errors };
 
@@ -1880,7 +1886,7 @@ const parsePlanBody = async (body, { forUpdate = false, existing = null } = {}) 
       billingInterval,
       currency,
       limits,
-      features: { orderManagement, analytics, pos, customDomain },
+      features: { orderManagement, analytics, pos, customDomain, storeEditor },
     },
   };
 };

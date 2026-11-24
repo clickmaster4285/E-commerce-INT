@@ -104,12 +104,12 @@ export default function PosReturnPanel({ sales, selectedSale, returnSaleId, setR
   return (
     <div className="space-y-4 pb-1">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-600 shadow-sm dark:border-slate-700 dark:bg-[var(--bg-card)]"><RotateCcw size={18}/></span><div><h2 className="text-base font-bold leading-5 text-slate-900 dark:text-slate-100">{t("admin.pos.ui.processAReturn")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.findTheReceiptChooseItemsAndConfirmTheRefund")}</p></div></div>
+        <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-card text-blue-600 shadow-sm"><RotateCcw size={18}/></span><div><h2 className="text-base font-bold leading-5 text-fg">{t("admin.pos.ui.processAReturn")}</h2><p className="mt-1 text-xs leading-4 text-slate-500">{t("admin.pos.ui.findTheReceiptChooseItemsAndConfirmTheRefund")}</p></div></div>
       </header>
 
       <div className="space-y-4">
         <SalePicker sales={sales} value={returnSaleId} onChange={(id) => { setReturnSaleId(id); setReturnQuantities({}); setReasonError(false); }} onSearchSales={onSearchSales} selectedSale={selectedSale}/>
-        {!selectedSale ? <PosReturnHistoryPanel sales={historySales || []} isLoading={historyLoading} isError={historyError} /> : <div className="space-y-4 bg-white dark:bg-[var(--bg-card)]">
+        {!selectedSale ? <PosReturnHistoryPanel sales={historySales || []} isLoading={historyLoading} isError={historyError} /> : <div className="space-y-4 bg-card">
           <div className="grid gap-x-8 gap-y-4 border-b border-slate-200 px-4 pb-4 pt-3 sm:grid-cols-2 xl:grid-cols-4">{[
             ["receipt", selectedSale.sale_number, ClipboardList],
             ["customer", selectedSale.customer_snapshot?.name || t("admin.pos.ui.walkInCustomer"), null],

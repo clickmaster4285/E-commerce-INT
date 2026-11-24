@@ -110,7 +110,7 @@ export default function OtpInput({
           }}
           onFocus={(e) => e.target.select()}
           aria-label={`Code digit ${i + 1}`}
-          className="w-10 h-12 sm:w-12 sm:h-14 rounded-xl bg-[var(--user-bg-input)] border border-[var(--user-border)] text-center text-xl font-black text-[var(--user-text)] outline-none focus:border-[var(--user-accent)] focus:ring-2 focus:ring-[var(--user-accent)]/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-10 h-12 sm:w-12 sm:h-14 rounded-xl bg-user-input border border-user-line text-center text-xl font-black text-user-fg outline-none focus:border-user-accent focus:ring-2 focus:ring-user-accent/20 transition disabled:opacity-50 disabled:cursor-not-allowed"
         />
       ))}
     </div>

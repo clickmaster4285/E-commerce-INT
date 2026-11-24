@@ -25,11 +25,11 @@ export default function BundlesSection({ limit = 8 }) {
             <Layers size={16} className="text-white" />
           </span>
           <div>
-            <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-[var(--user-text)] flex items-center gap-1.5">
+            <h2 className="text-sm sm:text-base font-black uppercase tracking-wider text-user-fg flex items-center gap-1.5">
               Bundle Deals
               <Sparkles size={14} className="text-purple-500" />
             </h2>
-            <p className="text-[0.625rem] sm:text-[0.6875rem] text-[var(--user-text-subtle)] font-semibold">
+            <p className="text-[0.625rem] sm:text-[0.6875rem] text-user-fg-subtle font-semibold">
               Combo packs — more products for less
             </p>
           </div>
@@ -37,7 +37,7 @@ export default function BundlesSection({ limit = 8 }) {
 
         <Link
           href="/bundles"
-          className="text-[0.6875rem] sm:text-xs font-bold text-[var(--user-accent)] hover:underline flex items-center gap-1 shrink-0"
+          className="text-[0.6875rem] sm:text-xs font-bold text-user-accent hover:underline flex items-center gap-1 shrink-0"
         >
           View All <ArrowRight size={13} />
         </Link>
@@ -48,11 +48,11 @@ export default function BundlesSection({ limit = 8 }) {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 animate-pulse"
+              className="rounded-2xl border border-user-line bg-user-card p-3 animate-pulse"
             >
-              <div className="aspect-square rounded-xl bg-[var(--user-bg-hover)] mb-3" />
-              <div className="h-3 w-3/4 rounded bg-[var(--user-bg-hover)] mb-2" />
-              <div className="h-4 w-1/2 rounded bg-[var(--user-bg-hover)]" />
+              <div className="aspect-square rounded-xl bg-user-hover mb-3" />
+              <div className="h-3 w-3/4 rounded bg-user-hover mb-2" />
+              <div className="h-4 w-1/2 rounded bg-user-hover" />
             </div>
           ))}
         </div>

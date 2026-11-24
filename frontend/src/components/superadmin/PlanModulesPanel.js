@@ -54,7 +54,7 @@ export default function PlanModulesPanel({
         description={`${enabledCount} of ${PLAN_MODULES.length} modules enabled`}
         icon={LayoutGrid}
       />
-      <div className="flex gap-0 overflow-x-auto border-b border-[var(--border-color)]">
+      <div className="flex gap-0 overflow-x-auto border-b border-line">
         {MODULE_SECTIONS.map((section) => {
           const active = section === activeSection;
           const { on, total } = sectionStats(section);
@@ -63,10 +63,10 @@ export default function PlanModulesPanel({
               key={section}
               type="button"
               onClick={() => setActiveSection(section)}
-              className={`shrink-0 border-b-2 px-4 py-3 text-[12.5px] font-semibold transition-colors ${active ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"}`}
+              className={`shrink-0 border-b-2 px-4 py-3 text-[12.5px] font-semibold transition-colors ${active ? "border-accent text-accent" : "border-transparent text-fg-muted hover:text-fg"}`}
             >
               {section}
-              <span className={`ms-2 rounded-full px-1.5 py-0.5 text-[10.5px] tabular-nums ${active ? "bg-[var(--accent-soft,rgba(99,102,241,0.12))] text-[var(--accent)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"}`}>
+              <span className={`ms-2 rounded-full px-1.5 py-0.5 text-[10.5px] tabular-nums ${active ? "bg-accent-soft text-accent" : "bg-subtle text-fg-muted"}`}>
                 {on}/{total}
               </span>
             </button>
@@ -76,7 +76,7 @@ export default function PlanModulesPanel({
       <CardBody className="space-y-4">
         {mode === "edit" && (
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[13px] text-[var(--text-secondary)]">Toggle modules on for this plan. Set a max count, or leave unlimited.</p>
+            <p className="text-[13px] text-fg-secondary">Toggle modules on for this plan. Set a max count, or leave unlimited.</p>
             <div className="flex gap-2">
               <Button type="button" size="sm" variant="secondary" onClick={() => onSetSectionEnabled?.(activeSection, true)}>Enable all</Button>
               <Button type="button" size="sm" variant="secondary" onClick={() => onSetSectionEnabled?.(activeSection, false)}>Disable all</Button>
@@ -93,20 +93,20 @@ export default function PlanModulesPanel({
               return (
                 <div
                   key={m.key}
-                  className={`rounded-xl border px-4 py-3.5 transition-colors ${row.enabled ? "border-[var(--border-color)] bg-[var(--bg-card)]" : "border-transparent bg-[var(--bg-tertiary)]/70 opacity-80"}`}
+                  className={`rounded-xl border px-4 py-3.5 transition-colors ${row.enabled ? "border-line bg-card" : "border-transparent bg-subtle/70 opacity-80"}`}
                 >
                   <div className="flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={() => onPatch?.(m.key, { enabled: !row.enabled })}
-                      className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold transition-colors ${row.enabled ? "bg-[var(--success-soft,rgba(16,185,129,0.12))] text-[var(--success-text)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"}`}
+                      className={`inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold transition-colors ${row.enabled ? "bg-success-soft text-success" : "bg-subtle text-fg-muted"}`}
                       aria-pressed={row.enabled}
                     >
                       {row.enabled ? <ToggleRight size={18} aria-hidden="true" /> : <ToggleLeft size={18} aria-hidden="true" />}
                       {Icon ? <Icon size={15} aria-hidden="true" /> : null}
                       {m.label}
                     </button>
-                    <span className="text-[12px] text-[var(--text-muted)]">{row.enabled ? "Included" : "Not included"}</span>
+                    <span className="text-[12px] text-fg-muted">{row.enabled ? "Included" : "Not included"}</span>
                     {m.countable && row.enabled && (
                       <div className="ms-auto flex flex-wrap items-center gap-2">
                         <input
@@ -120,19 +120,19 @@ export default function PlanModulesPanel({
                           aria-invalid={err ? "true" : undefined}
                           className="sa-input h-9 w-[120px] disabled:opacity-60"
                         />
-                        <label className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--text-secondary)]">
+                        <label className="inline-flex items-center gap-1.5 text-[12.5px] text-fg-secondary">
                           <input
                             type="checkbox"
                             checked={row.unlimited}
                             onChange={(e) => onPatch?.(m.key, { unlimited: e.target.checked, limit: e.target.checked ? "" : row.limit })}
-                            className="size-4 rounded border-[var(--border-color)]"
+                            className="size-4 rounded border-line"
                           />
                           <InfinityIcon size={13} aria-hidden="true" /> Unlimited
                         </label>
                       </div>
                     )}
                   </div>
-                  {err && <p className="mt-2 text-[12px] font-medium text-[var(--danger-text)]">{err}</p>}
+                  {err && <p className="mt-2 text-[12px] font-medium text-danger">{err}</p>}
                 </div>
               );
             }
@@ -143,17 +143,17 @@ export default function PlanModulesPanel({
             return (
               <div
                 key={m.key}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 ${enabled ? "border-[var(--border-color)] bg-[var(--bg-card)]" : "border-transparent bg-[var(--bg-tertiary)]/60"}`}
+                className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 ${enabled ? "border-line bg-card" : "border-transparent bg-subtle/60"}`}
               >
-                <span className={`inline-flex items-center gap-2 text-[13px] font-medium ${enabled ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+                <span className={`inline-flex items-center gap-2 text-[13px] font-medium ${enabled ? "text-fg" : "text-fg-muted"}`}>
                   {enabled
-                    ? <Check size={14} className="text-[var(--success-text)]" aria-hidden="true" />
-                    : <X size={14} className="text-[var(--text-muted)]" aria-hidden="true" />}
-                  {Icon ? <Icon size={14} className="text-[var(--text-muted)]" aria-hidden="true" /> : null}
+                    ? <Check size={14} className="text-success" aria-hidden="true" />
+                    : <X size={14} className="text-fg-muted" aria-hidden="true" />}
+                  {Icon ? <Icon size={14} className="text-fg-muted" aria-hidden="true" /> : null}
                   {m.label}
                 </span>
                 {enabled && m.countable ? (
-                  <span className="inline-flex items-center gap-1 text-[12.5px] tabular-nums text-[var(--text-secondary)]">
+                  <span className="inline-flex items-center gap-1 text-[12.5px] tabular-nums text-fg-secondary">
                     {limit == null ? <><InfinityIcon size={13} aria-hidden="true" /> Unlimited</> : limitLabel(limit)}
                   </span>
                 ) : enabled ? (

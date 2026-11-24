@@ -122,6 +122,8 @@ const fixPermissions = (oldPerms = {}) => ({
   categories: oldPerms?.categories ?? true,
   profile: oldPerms?.profile ?? true,
   store: oldPerms?.store ?? true,
+  // Store editor — purane records me missing → store permission se fallback
+  storeEditor: oldPerms?.storeEditor ?? oldPerms?.store ?? true,
   discounts: oldPerms?.discounts ?? true,
   deals: oldPerms?.deals ?? true,
   bundles: oldPerms?.bundles ?? true,
@@ -681,7 +683,7 @@ exports.updateEmployee = async (req, res) => {
       const mergedPermissions = fixPermissions({ ...currentPermissions, ...updates.permissions });
       const permissionKeys = [
         "dashboard", "employees", "products", "featuredProducts", "reviews", "brands", "categories", "profile",
-        "store", "discounts", "deals", "bundles", "banners", "manageStock",
+        "store", "storeEditor", "discounts", "deals", "bundles", "banners", "manageStock",
         "shipping", "order", "attribute", "vendors", "purchaseOrders", "leads", "quotes", "invoices", "finance",
       ];
       for (const key of permissionKeys) {

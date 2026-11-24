@@ -13,10 +13,12 @@
 
 import { headers } from "next/headers";
 import HomeClient from "./HomeClient";
+import { SERVER_API_BASE } from "@/lib/serverStore";
 
 async function getInitialBanners() {
   try {
-    const base = process.env.NEXT_PUBLIC_SERVERURL;
+    // Internal URL (proxy.js jaisa) — public HTTPS cert Node me fail hota tha
+    const base = SERVER_API_BASE;
     if (!base) return null;
     const storeHost = (await headers()).get("x-store-host") || "";
     const res = await fetch(`${base}/banners/active?limit=12`, {

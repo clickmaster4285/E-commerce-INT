@@ -67,14 +67,14 @@ export default function SuperAdminShell({ children }) {
 
   if (state.status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
+      <div className="flex min-h-screen items-center justify-center bg-page">
         <span className="spinner" aria-label="Checking session" />
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
+    <div className="flex h-screen overflow-hidden bg-page">
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
 
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} pendingCount={pendingCount} role={state.admin?.role || "superadmin"} />

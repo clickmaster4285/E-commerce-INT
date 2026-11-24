@@ -173,7 +173,7 @@ export default function PlanDetailPage() {
       )}
 
       {/* Hero overview */}
-      <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-[var(--shadow-sm,0_1px_2px_rgb(0_0_0/0.04))]">
+      <section className="overflow-hidden rounded-2xl border border-line bg-card shadow-[var(--shadow-sm,0_1px_2px_rgb(0_0_0/0.04))]">
         <div className="relative isolate px-5 py-6 sm:px-7 sm:py-8">
           <div
             aria-hidden="true"
@@ -181,13 +181,13 @@ export default function PlanDetailPage() {
           />
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex min-w-0 items-start gap-4">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_oklab,var(--accent)_14%,var(--bg-card))] text-[var(--accent)] ring-1 ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[color-mix(in_oklab,var(--accent)_14%,var(--bg-card))] text-accent ring-1 ring-[color-mix(in_oklab,var(--accent)_22%,transparent)]">
                 <BadgeDollarSign size={28} strokeWidth={1.75} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <p className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Subscription plan</p>
-                <h2 className="mt-1 truncate text-[22px] font-semibold tracking-tight text-[var(--text-primary)] sm:text-[26px]">{plan.name}</h2>
-                <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-[var(--text-secondary)]">
+                <p className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Subscription plan</p>
+                <h2 className="mt-1 truncate text-[22px] font-semibold tracking-tight text-fg sm:text-[26px]">{plan.name}</h2>
+                <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-fg-secondary">
                   {plan.description || "No description yet — add one when you edit this plan."}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -220,11 +220,11 @@ export default function PlanDetailPage() {
         <div className="space-y-4">
           <Card>
             <CardHeader title="Overview" description="Identity and ownership" icon={LayoutGrid} />
-            <ul className="divide-y divide-[var(--border-color)]">
-              <MetaRow icon={Hash} label="Slug"><span className="font-mono text-[12.5px] text-[var(--text-primary)]">{plan.slug}</span></MetaRow>
-              <MetaRow icon={BadgeDollarSign} label="Billing"><span className="font-medium text-[var(--text-primary)]">{intervalLabel(plan.billingInterval)}</span></MetaRow>
+            <ul className="divide-y divide-line">
+              <MetaRow icon={Hash} label="Slug"><span className="font-mono text-[12.5px] text-fg">{plan.slug}</span></MetaRow>
+              <MetaRow icon={BadgeDollarSign} label="Billing"><span className="font-medium text-fg">{intervalLabel(plan.billingInterval)}</span></MetaRow>
               <MetaRow icon={CalendarPlus} label="Created">
-                <span className="font-medium text-[var(--text-primary)]" title={plan.created_at ? formatDateTime(plan.created_at) : undefined}>
+                <span className="font-medium text-fg" title={plan.created_at ? formatDateTime(plan.created_at) : undefined}>
                   {plan.created_at ? formatDateTime(plan.created_at) : "—"}
                 </span>
               </MetaRow>
@@ -233,16 +233,16 @@ export default function PlanDetailPage() {
                   <span className="inline-flex min-w-0 items-center gap-2">
                     <Avatar name={creatorName} size="sm" />
                     <span className="min-w-0 text-end">
-                      <span className="block truncate font-medium text-[var(--text-primary)]">{creatorName}</span>
-                      {plan.createdBy?.email && <span className="block truncate text-[11.5px] text-[var(--text-muted)]">{plan.createdBy.email}</span>}
+                      <span className="block truncate font-medium text-fg">{creatorName}</span>
+                      {plan.createdBy?.email && <span className="block truncate text-[11.5px] text-fg-muted">{plan.createdBy.email}</span>}
                     </span>
                   </span>
                 ) : (
-                  <span className="text-[var(--text-muted)]">Unknown</span>
+                  <span className="text-fg-muted">Unknown</span>
                 )}
               </MetaRow>
               <MetaRow icon={Clock} label="Updated">
-                <span className="font-medium text-[var(--text-primary)]" title={plan.updated_at ? formatDateTime(plan.updated_at) : undefined}>
+                <span className="font-medium text-fg" title={plan.updated_at ? formatDateTime(plan.updated_at) : undefined}>
                   {plan.updated_at ? formatDateTime(plan.updated_at) : "—"}
                 </span>
               </MetaRow>
@@ -258,14 +258,14 @@ export default function PlanDetailPage() {
                 return (
                   <div
                     key={key}
-                    className="flex items-center gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-tertiary)]/50 px-3.5 py-3 transition-colors hover:bg-[var(--bg-tertiary)]"
+                    className="flex items-center gap-3 rounded-xl border border-line bg-subtle/50 px-3.5 py-3 transition-colors hover:bg-subtle"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-card)] text-[var(--text-muted)] ring-1 ring-[var(--border-color)]">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-fg-muted ring-1 ring-line">
                       <Icon size={16} aria-hidden="true" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-medium text-[var(--text-muted)]">{label}</p>
-                      <p className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">
+                      <p className="text-[12px] font-medium text-fg-muted">{label}</p>
+                      <p className="text-[15px] font-semibold tabular-nums text-fg">
                         {unlimited ? "Unlimited" : limitLabel(value)}
                       </p>
                     </div>
@@ -299,17 +299,17 @@ export default function PlanDetailPage() {
                 />
               </CardBody>
             ) : (
-              <ul className="divide-y divide-[var(--border-color)]">
+              <ul className="divide-y divide-line">
                 {stores.map((s) => (
                   <li key={s.id}>
                     <Link
                       href="/super-admin/stores"
-                      className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--bg-row-hover)]"
+                      className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-row-hover"
                     >
                       <Avatar name={s.store_name} shape="square" size="sm" src={s.logo_url ? assetUrl(s.logo_url) : undefined} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13.5px] font-semibold text-[var(--text-primary)]">{s.store_name}</span>
-                        <span className="block truncate text-[12px] text-[var(--text-muted)]">{s.subdomain || "No subdomain"}</span>
+                        <span className="block truncate text-[13.5px] font-semibold text-fg">{s.store_name}</span>
+                        <span className="block truncate text-[12px] text-fg-muted">{s.subdomain || "No subdomain"}</span>
                       </span>
                       <StatusBadge value={s.status} />
                     </Link>
@@ -358,9 +358,9 @@ export default function PlanDetailPage() {
 
 function MiniStat({ label, value }) {
   return (
-    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)]/80 px-3.5 py-3 backdrop-blur-sm">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{label}</dt>
-      <dd className="mt-1 text-[18px] font-semibold tabular-nums tracking-tight text-[var(--text-primary)]">{value}</dd>
+    <div className="rounded-xl border border-line bg-card/80 px-3.5 py-3 backdrop-blur-sm">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">{label}</dt>
+      <dd className="mt-1 text-[18px] font-semibold tabular-nums tracking-tight text-fg">{value}</dd>
     </div>
   );
 }
@@ -368,7 +368,7 @@ function MiniStat({ label, value }) {
 function MetaRow({ icon: Icon, label, children }) {
   return (
     <li className="flex items-center justify-between gap-3 px-5 py-3 text-[13px]">
-      <span className="inline-flex shrink-0 items-center gap-2.5 text-[var(--text-muted)]">
+      <span className="inline-flex shrink-0 items-center gap-2.5 text-fg-muted">
         <Icon size={15} aria-hidden="true" />
         {label}
       </span>
@@ -379,9 +379,9 @@ function MetaRow({ icon: Icon, label, children }) {
 
 function FeatureToggle({ label, on }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] px-3.5 py-2.5">
-      <span className="text-[13px] text-[var(--text-secondary)]">{label}</span>
-      <span className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? "text-[var(--success-text)]" : "text-[var(--text-muted)]"}`}>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3.5 py-2.5">
+      <span className="text-[13px] text-fg-secondary">{label}</span>
+      <span className={`inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${on ? "text-success" : "text-fg-muted"}`}>
         {on ? <Check size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
         {on ? "Included" : "Not included"}
       </span>

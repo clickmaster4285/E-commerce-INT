@@ -26,7 +26,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-4">
             <a href="/" className="flex min-h-[44px] items-center gap-2" aria-label="Click Master Store — home">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)]">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-user-accent text-user-accent-fg">
                 <MousePointerClick size={20} aria-hidden="true" />
               </span>
               <span className="font-heading leading-none">

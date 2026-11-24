@@ -85,12 +85,12 @@ const buildQtyBreakdown = (item, t) => {
 const STATUS_FLOW = ["pending", "confirmed", "processing", "shipped", "delivered"];
 
 const STATUS_CONFIG = {
-  pending:    { icon: Clock,        color: "text-[var(--user-warning)]", bg: "bg-[var(--user-warning)]/10", border: "border-transparent", textColor: "text-[var(--user-warning)]", dotColor: "bg-[var(--user-warning)]" },
-  confirmed:  { icon: CheckCircle2, color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
-  processing: { icon: Package,      color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
-  shipped:    { icon: Truck,        color: "text-[var(--user-text-secondary)]", bg: "bg-[var(--user-bg-hover)]", border: "border-transparent", textColor: "text-[var(--user-text-secondary)]", dotColor: "bg-[var(--user-text-subtle)]" },
-  delivered:  { icon: CheckCircle2, color: "text-[var(--user-success)]", bg: "bg-[var(--user-success)]/10", border: "border-transparent", textColor: "text-[var(--user-success)]", dotColor: "bg-[var(--user-success)]" },
-  cancelled:  { icon: XCircle,      color: "text-[var(--user-danger)]", bg: "bg-[var(--user-danger)]/10", border: "border-transparent", textColor: "text-[var(--user-danger)]", dotColor: "bg-[var(--user-danger)]" },
+  pending:    { icon: Clock,        color: "text-user-warning", bg: "bg-user-warning/10", border: "border-transparent", textColor: "text-user-warning", dotColor: "bg-user-warning" },
+  confirmed:  { icon: CheckCircle2, color: "text-user-fg-secondary", bg: "bg-user-hover", border: "border-transparent", textColor: "text-user-fg-secondary", dotColor: "bg-user-fg-subtle" },
+  processing: { icon: Package,      color: "text-user-fg-secondary", bg: "bg-user-hover", border: "border-transparent", textColor: "text-user-fg-secondary", dotColor: "bg-user-fg-subtle" },
+  shipped:    { icon: Truck,        color: "text-user-fg-secondary", bg: "bg-user-hover", border: "border-transparent", textColor: "text-user-fg-secondary", dotColor: "bg-user-fg-subtle" },
+  delivered:  { icon: CheckCircle2, color: "text-user-success", bg: "bg-user-success/10", border: "border-transparent", textColor: "text-user-success", dotColor: "bg-user-success" },
+  cancelled:  { icon: XCircle,      color: "text-user-danger", bg: "bg-user-danger/10", border: "border-transparent", textColor: "text-user-danger", dotColor: "bg-user-danger" },
 };
 
 const PAYMENT_LABEL = {
@@ -121,7 +121,7 @@ const FilterDropdown = ({ icon: Icon, options, value, onChange, buttonClass, wid
       </button>
 
       {open && (
-        <div className={`absolute left-0 top-full mt-2 ${width} max-h-72 overflow-y-auto z-50 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl p-1.5`}>
+        <div className={`absolute left-0 top-full mt-2 ${width} max-h-72 overflow-y-auto z-50 rounded-xl border border-user-line bg-user-card shadow-2xl p-1.5`}>
           {options.map((o) => {
             const OIcon = o.icon;
             const active = o.value === value;
@@ -129,12 +129,12 @@ const FilterDropdown = ({ icon: Icon, options, value, onChange, buttonClass, wid
               <button
                 key={o.value}
                 onClick={() => { onChange(o.value); setOpen(false); }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-xs font-medium transition ${active ? "bg-[var(--user-accent)] text-[var(--user-accent-text)]" : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"}`}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-xs font-medium transition ${active ? "bg-user-accent text-user-accent-fg" : "text-user-fg-secondary hover:bg-user-hover hover:text-user-fg"}`}
               >
                 {OIcon && <OIcon size={14} className={active ? "" : (o.color || "")} />}
                 <span className="flex-1 truncate">{o.label}</span>
                 {o.count !== undefined && (
-                  <span className={`text-[0.625rem] font-medium px-1.5 py-0.5 rounded-full ${active ? "bg-[var(--user-accent-text)]/20" : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"}`}>{o.count}</span>
+                  <span className={`text-[0.625rem] font-medium px-1.5 py-0.5 rounded-full ${active ? "bg-user-accent-fg/20" : "bg-user-hover text-user-fg-muted"}`}>{o.count}</span>
                 )}
                 {active && <Check size={14} />}
               </button>
@@ -153,9 +153,9 @@ const OrderProgress = ({ status }) => {
   if (status === "cancelled") {
     return (
       <div className="flex items-center gap-3 py-3">
-        <div className="flex-1 h-px bg-[var(--user-danger)]/30" />
-        <XCircle size={14} className="text-[var(--user-danger)]" />
-        <span className="text-xs font-semibold text-[var(--user-danger)]">{t("user.orders.status.cancelled")}</span>
+        <div className="flex-1 h-px bg-user-danger/30" />
+        <XCircle size={14} className="text-user-danger" />
+        <span className="text-xs font-semibold text-user-danger">{t("user.orders.status.cancelled")}</span>
       </div>
     );
   }
@@ -170,15 +170,15 @@ const OrderProgress = ({ status }) => {
             <div key={step} className="flex flex-col items-center flex-1 relative">
               <div className={`relative z-10 w-3.5 h-3.5 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                 isPast ? `${cfg.dotColor} border-transparent text-white`
-                : isCurrent ? `${cfg.dotColor} border-transparent text-white ring-4 ring-[var(--user-bg-hover)] scale-110`
-                : "bg-[var(--user-bg-card)] border-[var(--user-border)]"
+                : isCurrent ? `${cfg.dotColor} border-transparent text-white ring-4 ring-user-hover scale-110`
+                : "bg-user-card border-user-line"
               }`}>
                 {(isPast || isCurrent) && <CheckCircle2 size={10} strokeWidth={3} />}
               </div>
               {index < STATUS_FLOW.length - 1 && (
-                <div className={`absolute top-[0.4375rem] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-[var(--user-text-secondary)]" : "bg-[var(--user-border)]"}`} />
+                <div className={`absolute top-[0.4375rem] left-1/2 w-full h-px transition-colors duration-500 ${isPast ? "bg-user-fg-secondary" : "bg-user-line"}`} />
               )}
-              <span className={`mt-2 text-[0.5625rem] font-medium whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-[var(--user-text)]" : "text-[var(--user-text-subtle)]"}`}>
+              <span className={`mt-2 text-[0.5625rem] font-medium whitespace-nowrap ${isCurrent ? cfg.textColor : isPast ? "text-user-fg" : "text-user-fg-subtle"}`}>
                 {t(`user.orders.status.${step}`)}
               </span>
             </div>
@@ -222,7 +222,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
   return (
     <div className="relative group">
       {showLeftArrow && (
-        <button onClick={() => scroll("left")} className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition-all">
+        <button onClick={() => scroll("left")} className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-user-card border border-user-line shadow-sm flex items-center justify-center text-user-fg hover:bg-user-hover transition-all">
           <ChevronLeft size={16} />
         </button>
       )}
@@ -243,22 +243,22 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
           const itemReview = rateable && pid ? (reviewsMap && reviewsMap.get(pid)) || null : null;
           return (
                        <div key={index} className="flex-shrink-0 w-44 sm:w-72">
-              <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-[var(--user-bg-hover)] border border-[var(--user-border)] hover:border-[var(--user-border-hover)] transition-all">
+              <div className="flex flex-col h-full p-2 sm:p-3 rounded-xl bg-user-hover border border-user-line hover:border-user-line-hover transition-all">
                 <div className="flex gap-2 sm:gap-3 mb-1.5 sm:mb-2">
                   <div className="shrink-0">
-                    <FallbackImage src={getImgUrl(item.image)} alt={text(item.name, item.translations?.name)} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-[var(--user-border)] bg-white" />
+                    <FallbackImage src={getImgUrl(item.image)} alt={text(item.name, item.translations?.name)} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-user-line bg-white" />
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-end items-end text-right">
-                    {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-subtle)] line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
-                    <p className="text-sm sm:text-base font-semibold text-[var(--user-text)] truncate">Rs. {totalPrice.toLocaleString()}</p>
+                    {hasDiscount && <p className="text-[0.5rem] sm:text-[0.5625rem] text-user-fg-subtle line-through mb-0.5">Rs. {originalPrice.toLocaleString()}</p>}
+                    <p className="text-sm sm:text-base font-semibold text-user-fg truncate">Rs. {totalPrice.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex-1 min-w-0 mb-1.5 sm:mb-2">
-                  <p className="text-sm font-medium text-[var(--user-text)] line-clamp-2 leading-snug mb-0.5">{text(item.name, item.translations?.name)}</p>
-                  {item.variantTitle && <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">{item.variantTitle}</p>}
+                  <p className="text-sm font-medium text-user-fg line-clamp-2 leading-snug mb-0.5">{text(item.name, item.translations?.name)}</p>
+                  {item.variantTitle && <p className="text-[0.5rem] sm:text-[0.5625rem] text-user-fg-muted truncate">{item.variantTitle}</p>}
                 </div>
                 {/* QTY + free/deal bonus — attached together, inside the card */}
-                <div className="pt-1.5 sm:pt-2 border-t border-[var(--user-border)]">
+                <div className="pt-1.5 sm:pt-2 border-t border-user-line">
                   <div className="flex items-center justify-between gap-1">
                     {q.hasDetail ? (
                       <button
@@ -268,53 +268,53 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
                         aria-controls={panelId}
                         aria-label={qtyLabel}
                         title={qtyLabel}
-                        className="inline-flex items-center gap-1 shrink-0 rounded-md border border-[var(--user-border)] bg-[var(--user-bg-card)] px-1.5 py-0.5 hover:border-[var(--user-border-hover)] active:scale-95 transition"
+                        className="inline-flex items-center gap-1 shrink-0 rounded-md border border-user-line bg-user-card px-1.5 py-0.5 hover:border-user-line-hover active:scale-95 transition"
                       >
-                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text)]">{t("user.orders.qty.label")}: {q.paidQty}</span>
+                        <span className="text-[0.5rem] sm:text-[0.5625rem] font-medium text-user-fg">{t("user.orders.qty.label")}: {q.paidQty}</span>
                         {q.freeQty > 0 && (
-                          <span className="inline-flex items-center gap-0.5 rounded-[0.1875rem] border border-[var(--user-success)]/30 bg-[var(--user-success)]/15 px-1 py-px text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-success)]">
+                          <span className="inline-flex items-center gap-0.5 rounded-[0.1875rem] border border-user-success/30 bg-user-success/15 px-1 py-px text-[0.5rem] sm:text-[0.5625rem] font-medium text-user-success">
                             +{q.freeQty} {t("user.orders.qty.free").toUpperCase()}
                           </span>
                         )}
-                        <ChevronDown size={10} className={`text-[var(--user-text-subtle)] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        <ChevronDown size={10} className={`text-user-fg-subtle transition-transform ${isOpen ? "rotate-180" : ""}`} />
                       </button>
                     ) : (
-                      <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-[var(--user-text)] bg-[var(--user-bg-card)] px-1.5 py-0.5 rounded border border-[var(--user-border)] shrink-0">{t("user.orders.qty.label")}: {q.paidQty}</span>
+                      <span className="text-[0.5rem] sm:text-[0.5625rem] font-semibold text-user-fg bg-user-card px-1.5 py-0.5 rounded border border-user-line shrink-0">{t("user.orders.qty.label")}: {q.paidQty}</span>
                     )}
-                    <p className="text-[0.5rem] sm:text-[0.5625rem] text-[var(--user-text-muted)] truncate">Rs. {unitPrice.toLocaleString()} {t("user.orders.qty.each")}</p>
+                    <p className="text-[0.5rem] sm:text-[0.5625rem] text-user-fg-muted truncate">Rs. {unitPrice.toLocaleString()} {t("user.orders.qty.each")}</p>
                   </div>
 
                   {/* Inline breakdown — paid / free / total / deal reason / savings */}
                   {q.hasDetail && isOpen && (
-                    <div id={panelId} className="mt-1.5 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-1.5 space-y-1">
+                    <div id={panelId} className="mt-1.5 rounded-lg border border-user-line bg-user-card px-2 py-1.5 space-y-1">
                       <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
-                        <span className="font-semibold text-[var(--user-text-muted)]">{t("user.orders.qty.paidUnits")}</span>
-                        <span className="font-medium text-[var(--user-text)]">{q.paidQty} × Rs. {unitPrice.toLocaleString()}</span>
+                        <span className="font-semibold text-user-fg-muted">{t("user.orders.qty.paidUnits")}</span>
+                        <span className="font-medium text-user-fg">{q.paidQty} × Rs. {unitPrice.toLocaleString()}</span>
                       </div>
                       {q.freeQty > 0 && (
                         <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem]">
-                          <span className="font-semibold text-[var(--user-success)]">{t("user.orders.qty.freeUnits")}</span>
-                          <span className="font-medium text-[var(--user-success)]">+{q.freeQty}</span>
+                          <span className="font-semibold text-user-success">{t("user.orders.qty.freeUnits")}</span>
+                          <span className="font-medium text-user-success">+{q.freeQty}</span>
                         </div>
                       )}
-                      <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem] pt-1 border-t border-dashed border-[var(--user-border)]">
-                        <span className="font-medium text-[var(--user-text)]">{t("user.orders.qty.totalReceived")}</span>
-                        <span className="font-semibold text-[var(--user-text)]">{q.totalQty} {t(q.totalQty > 1 ? "user.orders.qty.units" : "user.orders.qty.unit")}</span>
+                      <div className="flex items-center justify-between gap-2 text-[0.5rem] sm:text-[0.5625rem] pt-1 border-t border-dashed border-user-line">
+                        <span className="font-medium text-user-fg">{t("user.orders.qty.totalReceived")}</span>
+                        <span className="font-semibold text-user-fg">{q.totalQty} {t(q.totalQty > 1 ? "user.orders.qty.units" : "user.orders.qty.unit")}</span>
                       </div>
                       {q.dealTitle && (
-                        <p className="flex items-start gap-1 pt-1 border-t border-dashed border-[var(--user-border)] text-[0.5rem] sm:text-[0.5625rem] font-medium text-[var(--user-text-secondary)]">
+                        <p className="flex items-start gap-1 pt-1 border-t border-dashed border-user-line text-[0.5rem] sm:text-[0.5625rem] font-medium text-user-fg-secondary">
                           <Zap size={9} className="mt-0.5 shrink-0" /> <span className="min-w-0">{q.dealTitle}</span>
                         </p>
                       )}
                       {q.reasons.map((reason, ri) => (
-                        <p key={ri} className="text-[0.5rem] sm:text-[0.5625rem] leading-snug text-[var(--user-text-muted)]">{reason}</p>
+                        <p key={ri} className="text-[0.5rem] sm:text-[0.5625rem] leading-snug text-user-fg-muted">{reason}</p>
                       ))}
                     </div>
                   )}
                 </div>
 
                 {rateable && (
-                  <div className="pt-1.5 mt-1.5 border-t border-dashed border-[var(--user-border)]">
+                  <div className="pt-1.5 mt-1.5 border-t border-dashed border-user-line">
                     <ProductRating productId={pid} productName={text(item.name, item.translations?.name)} review={itemReview} variant="compact" />
                   </div>
                 )}
@@ -324,7 +324,7 @@ const ProductScrollList = ({ items, idPrefix, rateable = false, reviewsMap }) =>
         })}
       </div>
       {showRightArrow && (
-        <button onClick={() => scroll("right")} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition-all">
+        <button onClick={() => scroll("right")} className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-user-card border border-user-line shadow-sm flex items-center justify-center text-user-fg hover:bg-user-hover transition-all">
           <ChevronRight size={16} />
         </button>
       )}
@@ -337,17 +337,17 @@ const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => {
   const { t } = useTranslation();
   return (
   <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-    <div className="w-full max-w-sm bg-[var(--user-bg-card)] rounded-2xl border border-[var(--user-border)] shadow-2xl p-5" onClick={e => e.stopPropagation()}>
+    <div className="w-full max-w-sm bg-user-card rounded-2xl border border-user-line shadow-2xl p-5" onClick={e => e.stopPropagation()}>
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-[var(--user-danger)]/10 flex items-center justify-center shrink-0"><AlertTriangle size={18} className="text-[var(--user-danger)]" /></div>
+        <div className="w-10 h-10 rounded-full bg-user-danger/10 flex items-center justify-center shrink-0"><AlertTriangle size={18} className="text-user-danger" /></div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-[var(--user-text)] leading-snug">{t("user.orders.delete.question", { number: orderNumber })}</h3>
-          <p className="text-xs text-[var(--user-text-muted)] mt-1">{t("user.orders.delete.irreversible")}</p>
+          <h3 className="text-sm font-semibold text-user-fg leading-snug">{t("user.orders.delete.question", { number: orderNumber })}</h3>
+          <p className="text-xs text-user-fg-muted mt-1">{t("user.orders.delete.irreversible")}</p>
         </div>
       </div>
       <div className="flex gap-3 mt-5">
-        <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)] text-sm font-semibold text-[var(--user-text)] hover:opacity-80 transition">{t("user.orders.cancel")}</button>
-        <button onClick={onConfirm} disabled={deleting} className="flex-1 h-10 rounded-xl bg-[var(--user-danger)] text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
+        <button onClick={onClose} className="flex-1 h-10 rounded-xl border border-user-line bg-user-hover text-sm font-semibold text-user-fg hover:opacity-80 transition">{t("user.orders.cancel")}</button>
+        <button onClick={onConfirm} disabled={deleting} className="flex-1 h-10 rounded-xl bg-user-danger text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2">
           {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} {t("common.delete")}
         </button>
       </div>
@@ -358,7 +358,7 @@ const DeleteConfirmModal = ({ orderNumber, deleting, onClose, onConfirm }) => {
 
 const DraftProgress = ({ step }) => {
   const { t } = useTranslation();
-  return <p className="text-xs text-[var(--user-text-muted)]">
+  return <p className="text-xs text-user-fg-muted">
     {t("user.orders.draft.step", { step, current: t(step >= 3 ? "user.orders.draft.payment" : step === 2 ? "user.orders.draft.delivery" : "user.orders.draft.cart") })}
   </p>;
 };
@@ -369,26 +369,26 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
   if (totalPages <= 1) return null;
   return (
     <div className="mt-8 lg:mt-10 flex flex-col items-center gap-3">
-      <p className="text-[0.6875rem] lg:text-xs text-[var(--user-text-muted)]">
+      <p className="text-[0.6875rem] lg:text-xs text-user-fg-muted">
         {t("user.orders.pagination.showing")}{" "}
-        <span className="font-semibold text-[var(--user-text)]">
+        <span className="font-semibold text-user-fg">
           {rangeStart}–{rangeEnd}
         </span>{" "}
-        {t("user.orders.pagination.of")} <span className="font-semibold text-[var(--user-text)]">{pagination.total}</span> {t("user.orders.pagination.orders")}
+        {t("user.orders.pagination.of")} <span className="font-semibold text-user-fg">{pagination.total}</span> {t("user.orders.pagination.orders")}
       </p>
       <div className="flex items-center gap-1.5 flex-wrap justify-center">
         <button
           onClick={() => goToPage(page - 1)}
           disabled={page === 1}
           aria-label={t("user.orders.pagination.previous")}
-          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-border-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-user-card border border-user-line text-user-fg-secondary flex items-center justify-center transition hover:border-user-line-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={15} />
         </button>
 
         {getPageItems().map((item, i) =>
           item === "..." ? (
-            <span key={`gap-${i}`} className="px-1 text-[var(--user-text-muted)] text-xs">
+            <span key={`gap-${i}`} className="px-1 text-user-fg-muted text-xs">
               ...
             </span>
           ) : (
@@ -398,8 +398,8 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
               aria-current={page === item ? "page" : undefined}
               className={`h-9 min-w-[2.25rem] px-2 lg:h-10 lg:min-w-[2.5rem] rounded-lg lg:rounded-xl text-[0.6875rem] lg:text-xs font-medium transition ${
                 page === item
-                  ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] border border-[var(--user-accent)]"
-                  : "bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] hover:border-[var(--user-border-hover)]"
+                  ? "bg-user-accent text-user-accent-fg border border-user-accent"
+                  : "bg-user-card border border-user-line text-user-fg-secondary hover:border-user-line-hover"
               }`}
             >
               {item}
@@ -411,7 +411,7 @@ const PaginationControls = ({ page, totalPages, pagination, rangeStart, rangeEnd
           onClick={() => goToPage(page + 1)}
           disabled={page === totalPages}
           aria-label={t("user.orders.pagination.next")}
-          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] text-[var(--user-text-secondary)] flex items-center justify-center transition hover:border-[var(--user-border-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-9 w-9 lg:h-10 lg:w-10 rounded-lg lg:rounded-xl bg-user-card border border-user-line text-user-fg-secondary flex items-center justify-center transition hover:border-user-line-hover disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronRight size={15} />
         </button>
@@ -635,8 +635,8 @@ function OrdersContent({ compact = false }) {
   if (isLoading) {
     return (
     <>
-      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 aria-label={t("user.orders.loading")} className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
-      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]"><Loader2 aria-label={t("user.orders.loading")} className="animate-spin text-[var(--user-text-muted)]" size={28} /></div>
+      <div className="hidden lg:flex h-[60vh] items-center justify-center"><Loader2 aria-label={t("user.orders.loading")} className="animate-spin text-user-fg-muted" size={28} /></div>
+      <div className="lg:hidden min-h-[60vh] flex items-center justify-center bg-user-page"><Loader2 aria-label={t("user.orders.loading")} className="animate-spin text-user-fg-muted" size={28} /></div>
     </>
     );
   }
@@ -677,7 +677,7 @@ function OrdersContent({ compact = false }) {
     { value: "365", label: t("user.orders.range.thisYear") },
   ];
 
-  const dropdownBtn = "w-full flex items-center gap-2 px-3 h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] transition";
+  const dropdownBtn = "w-full flex items-center gap-2 px-3 h-10 rounded-lg border border-user-line bg-user-card text-xs font-medium text-user-fg transition";
 
   const DraftCard = ({ draft }) => {
     const items = draft.items || [];
@@ -729,39 +729,39 @@ function OrdersContent({ compact = false }) {
       : "—";
 
     return (
-      <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:p-5 transition-colors hover:border-[var(--user-border-hover)]">
+      <div className="rounded-xl border border-user-line bg-user-card p-4 sm:p-5 transition-colors hover:border-user-line-hover">
         <div className="mb-3 flex justify-end gap-2">
-          {unavailable && <span className="rounded-full bg-[var(--user-bg-hover)] px-2.5 py-1 text-xs text-[var(--user-text-muted)]">{t("user.orders.draft.itemUnavailable")}</span>}
-          <span className="text-xs text-[var(--user-text-muted)]">{draftDate}</span>
+          {unavailable && <span className="rounded-full bg-user-hover px-2.5 py-1 text-xs text-user-fg-muted">{t("user.orders.draft.itemUnavailable")}</span>}
+          <span className="text-xs text-user-fg-muted">{draftDate}</span>
         </div>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {getImgUrl(firstItem?.image) ? (
-              <FallbackImage nextImage src={getImgUrl(firstItem.image)} alt={text(firstItem.name, firstItem.translations?.name) || t("user.orders.draft.product")} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-[var(--user-border)] object-cover" />
+              <FallbackImage nextImage src={getImgUrl(firstItem.image)} alt={text(firstItem.name, firstItem.translations?.name) || t("user.orders.draft.product")} width={56} height={56} loader={smartImageLoader} sizes="56px" className="h-14 w-14 shrink-0 rounded-lg border border-user-line object-cover" />
             ) : (
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]"><Package size={20} className="text-[var(--user-text-subtle)]" /></div>
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-user-line bg-user-hover"><Package size={20} className="text-user-fg-subtle" /></div>
             )}
             <div className="min-w-0">
-              <p className="line-clamp-2 text-sm font-medium text-[var(--user-text)]">{text(firstItem?.name, firstItem?.translations?.name) || t("user.orders.draft.savedCheckout")}</p>
-              <p className="mt-0.5 text-xs text-[var(--user-text-muted)]">
+              <p className="line-clamp-2 text-sm font-medium text-user-fg">{text(firstItem?.name, firstItem?.translations?.name) || t("user.orders.draft.savedCheckout")}</p>
+              <p className="mt-0.5 text-xs text-user-fg-muted">
                 {t("user.orders.qty.label")} {Number(firstItem?.qty) || 1}{count > 1 ? ` · +${count - 1} ${t(count - 1 === 1 ? "user.orders.draft.moreItem" : "user.orders.draft.moreItems")}` : ""}
               </p>
               <DraftProgress step={draft.step || 1} />
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] pt-3 sm:border-0 sm:pt-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-user-line pt-3 sm:border-0 sm:pt-0">
             <div className="min-w-0">
-              <p className="text-[0.6875rem] text-[var(--user-text-muted)]">{t("user.orders.total")}</p>
+              <p className="text-[0.6875rem] text-user-fg-muted">{t("user.orders.total")}</p>
               {total > 0 ? (
-                <p className="text-base font-semibold text-[var(--user-text)]">Rs. {total.toLocaleString()}</p>
+                <p className="text-base font-semibold text-user-fg">Rs. {total.toLocaleString()}</p>
               ) : (
-                <p className="text-sm text-[var(--user-text-muted)]">{t("user.orders.draft.calculatedAtCheckout")}</p>
+                <p className="text-sm text-user-fg-muted">{t("user.orders.draft.calculatedAtCheckout")}</p>
               )}
-              {displayedSavings > 0 && <p className="mt-0.5 text-xs text-[var(--user-success)]">{t("user.orders.youSave")} Rs. {displayedSavings.toLocaleString()}</p>}
+              {displayedSavings > 0 && <p className="mt-0.5 text-xs text-user-success">{t("user.orders.youSave")} Rs. {displayedSavings.toLocaleString()}</p>}
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => resumeDraft(draft._id)} disabled={unavailable} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--user-accent)] px-4 text-sm font-medium text-[var(--user-accent-text)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><Play size={13} /> {t("user.orders.draft.resume")}</button>
-              <button type="button" onClick={() => deleteDraft(draft._id, items)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-[var(--user-text-muted)] transition hover:bg-[var(--user-danger)]/10 hover:text-[var(--user-danger)]"><Trash2 size={14} /> {t("user.orders.delete.action")}</button>
+              <button type="button" onClick={() => resumeDraft(draft._id)} disabled={unavailable} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-user-accent px-4 text-sm font-medium text-user-accent-fg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"><Play size={13} /> {t("user.orders.draft.resume")}</button>
+              <button type="button" onClick={() => deleteDraft(draft._id, items)} className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-user-fg-muted transition hover:bg-user-danger/10 hover:text-user-danger"><Trash2 size={14} /> {t("user.orders.delete.action")}</button>
             </div>
           </div>
         </div>
@@ -778,10 +778,10 @@ function OrdersContent({ compact = false }) {
       {!compact && (
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--user-text)]">{t("user.orders.title")}</h1>
-          <p className="mt-1 text-sm text-[var(--user-text-muted)]">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {t((isDraftFilter ? allOrders.length : totalOrders) === 1 ? "user.orders.pagination.order" : "user.orders.pagination.orders")}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-user-fg">{t("user.orders.title")}</h1>
+          <p className="mt-1 text-sm text-user-fg-muted">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {t((isDraftFilter ? allOrders.length : totalOrders) === 1 ? "user.orders.pagination.order" : "user.orders.pagination.orders")}</p>
         </div>
-        <Link href="/" className="inline-flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-3 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+        <Link href="/" className="inline-flex items-center gap-2 rounded-lg border border-user-line px-3 py-2 text-sm font-medium text-user-fg transition hover:bg-user-hover">
           <ShoppingBag size={16} /> {t("user.orders.continueShopping")}
         </Link>
       </div>
@@ -790,19 +790,19 @@ function OrdersContent({ compact = false }) {
       {/* TOOLBAR (Search + Dropdowns) */}
       {(totalOrders > 0 || hasDrafts) && (
         <>
-        <div className="mb-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3">
+        <div className="mb-2 rounded-xl border border-user-line bg-user-card p-3">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(140px,auto))]">
             {/* SEARCH */}
             <div className="relative col-span-2 lg:col-span-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] pointer-events-none" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-user-fg-subtle pointer-events-none" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("user.orders.searchByOrderOrProduct")}
-                className="w-full h-10 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] pl-10 pr-9 text-sm text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] outline-none focus:border-[var(--user-border-hover)] transition"
+                className="w-full h-10 rounded-lg border border-user-line bg-user-card pl-10 pr-9 text-sm text-user-fg placeholder:text-user-fg-subtle outline-none focus:border-user-line-hover transition"
               />
               {search && (
-                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] hover:text-[var(--user-text)] transition"><X size={14} /></button>
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-user-fg-subtle hover:text-user-fg transition"><X size={14} /></button>
               )}
             </div>
 
@@ -817,9 +817,9 @@ function OrdersContent({ compact = false }) {
           </div>
 
         </div>
-        <div className="mb-6 flex items-center justify-between gap-3 px-1 text-xs text-[var(--user-text-muted)]">
+        <div className="mb-6 flex items-center justify-between gap-3 px-1 text-xs text-user-fg-muted">
           <p>{t("user.orders.results", { shown: isDraftFilter ? drafts.length : (pagination.total || orders.length), total: isDraftFilter ? drafts.length : (totalOrders || 0) })}</p>
-          {hasActiveFilters && <button onClick={clearFilters} className="inline-flex items-center gap-1 font-medium hover:text-[var(--user-text)]"><X size={12} /> {t("user.orders.clearFilters")}</button>}
+          {hasActiveFilters && <button onClick={clearFilters} className="inline-flex items-center gap-1 font-medium hover:text-user-fg"><X size={12} /> {t("user.orders.clearFilters")}</button>}
         </div>
         </>
       )}
@@ -828,12 +828,12 @@ function OrdersContent({ compact = false }) {
       {hasDrafts && (filter === "all" || filter === "draft") && (
         <div className="mb-6 space-y-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.savedDrafts")}</h2>
-            <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs text-[var(--user-text-muted)]">{drafts.length}</span>
+            <h2 className="text-sm font-semibold text-user-fg">{t("user.orders.savedDrafts")}</h2>
+            <span className="rounded-full bg-user-hover px-2 py-0.5 text-xs text-user-fg-muted">{drafts.length}</span>
           </div>
           {(showAllDrafts ? drafts : drafts.slice(0, 2)).map((draft) => <DraftCard key={draft._id} draft={draft} />)}
           {drafts.length > 2 && (
-            <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-[var(--user-text-muted)] hover:text-[var(--user-text)]">
+            <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-user-fg-muted hover:text-user-fg">
               {showAllDrafts ? t("user.orders.showFewerDrafts") : t("user.orders.showAllDrafts", { count: drafts.length })}
             </button>
           )}
@@ -842,14 +842,14 @@ function OrdersContent({ compact = false }) {
 
       {/* EMPTY */}
       {(filter !== "draft" || !hasDrafts) && orders.length === 0 && !(filter === "all" && hasDrafts) && (
-        <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4"><ShoppingBag size={28} className="text-[var(--user-text-subtle)]" /></div>
-          <h2 className="text-base font-semibold text-[var(--user-text)] mb-2">{filter === "draft" ? t("user.orders.empty.noDrafts") : (totalOrders || 0) === 0 ? t("user.orders.empty.noOrders") : t("user.orders.empty.noFilterMatches")}</h2>
-          <p className="text-sm text-[var(--user-text-muted)] mb-5">{filter === "draft" ? t("user.orders.empty.draftsHint") : (totalOrders || 0) === 0 ? t("user.orders.empty.shoppingHint") : t("user.orders.empty.filtersHint")}</p>
+        <div className="rounded-2xl border border-user-line bg-user-card p-10 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-user-hover flex items-center justify-center mb-4"><ShoppingBag size={28} className="text-user-fg-subtle" /></div>
+          <h2 className="text-base font-semibold text-user-fg mb-2">{filter === "draft" ? t("user.orders.empty.noDrafts") : (totalOrders || 0) === 0 ? t("user.orders.empty.noOrders") : t("user.orders.empty.noFilterMatches")}</h2>
+          <p className="text-sm text-user-fg-muted mb-5">{filter === "draft" ? t("user.orders.empty.draftsHint") : (totalOrders || 0) === 0 ? t("user.orders.empty.shoppingHint") : t("user.orders.empty.filtersHint")}</p>
           {hasActiveFilters ? (
-            <button onClick={clearFilters} className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">{t("user.orders.clearFilters")}</button>
+            <button onClick={clearFilters} className="inline-block rounded-lg border border-user-line px-4 py-2 text-sm font-medium text-user-fg hover:bg-user-hover transition">{t("user.orders.clearFilters")}</button>
           ) : (
-            <Link href="/" className="inline-block rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition">{t("user.orders.startShopping")}</Link>
+            <Link href="/" className="inline-block rounded-lg border border-user-line px-4 py-2 text-sm font-medium text-user-fg hover:bg-user-hover transition">{t("user.orders.startShopping")}</Link>
           )}
         </div>
       )}
@@ -857,7 +857,7 @@ function OrdersContent({ compact = false }) {
       {/* ORDERS LIST */}
       {filter !== "draft" && orders.length > 0 && (
         <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-          <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.title")}</h2>
+          <h2 className="text-sm font-semibold text-user-fg">{t("user.orders.title")}</h2>
           {orders.map((order) => {
             const status = STATUS_CONFIG[order.status] ? order.status : "pending";
             const cfg = STATUS_CONFIG[status];
@@ -874,19 +874,19 @@ function OrdersContent({ compact = false }) {
             }, 0);
 
             return (
-              <div key={order._id} className="group rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 transition-colors hover:border-[var(--user-border-hover)] sm:p-5">
-                <div className="grid grid-cols-2 gap-3 border-b border-[var(--user-border)] pb-3 sm:grid-cols-4">
+              <div key={order._id} className="group rounded-xl border border-user-line bg-user-card p-4 transition-colors hover:border-user-line-hover sm:p-5">
+                <div className="grid grid-cols-2 gap-3 border-b border-user-line pb-3 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">{t("user.orders.orderNumber")}</p>
-                    <p className="text-sm font-medium text-[var(--user-text)] font-mono">{order.order_number}</p>
+                    <p className="text-xs text-user-fg-muted mb-0.5">{t("user.orders.orderNumber")}</p>
+                    <p className="text-sm font-medium text-user-fg font-mono">{order.order_number}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">{t("user.orders.placedOn")}</p>
-                    <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><Calendar size={12} className="text-[var(--user-text-subtle)]" /> {date}</p>
+                    <p className="text-xs text-user-fg-muted mb-0.5">{t("user.orders.placedOn")}</p>
+                    <p className="text-sm font-medium text-user-fg flex items-center gap-1.5"><Calendar size={12} className="text-user-fg-subtle" /> {date}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-[var(--user-text-muted)] mb-0.5">{t("user.orders.payment")}</p>
-                    <p className="text-sm font-medium text-[var(--user-text)] flex items-center gap-1.5"><pay.icon size={12} className="text-[var(--user-text-subtle)]" /> {t(`user.orders.paymentMethod.${pay.key}`)}</p>
+                    <p className="text-xs text-user-fg-muted mb-0.5">{t("user.orders.payment")}</p>
+                    <p className="text-sm font-medium text-user-fg flex items-center gap-1.5"><pay.icon size={12} className="text-user-fg-subtle" /> {t(`user.orders.paymentMethod.${pay.key}`)}</p>
                   </div>
                   <div className="flex sm:justify-end">
                     <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 ${cfg.bg}`}>
@@ -898,45 +898,45 @@ function OrdersContent({ compact = false }) {
 
                 <div className="py-4">
                   {order.status === "cancelled" && (
-                    <div className="mb-3 flex items-start gap-2.5 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/20 p-3">
-                      <XCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
+                    <div className="mb-3 flex items-start gap-2.5 rounded-xl bg-user-danger/10 border border-user-danger/20 p-3">
+                      <XCircle size={16} className="text-user-danger shrink-0 mt-0.5" />
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-[var(--user-danger)]">{t("user.orders.status.cancelled")}</p>
-                        <p className="text-xs text-[var(--user-text)] mt-1 leading-relaxed">
-                          <span className="font-medium text-[var(--user-danger)]">{t("user.orders.reason")}:</span> {order.cancel_reason || t("user.orders.noReasonProvided")}
+                        <p className="text-xs font-semibold text-user-danger">{t("user.orders.status.cancelled")}</p>
+                        <p className="text-xs text-user-fg mt-1 leading-relaxed">
+                          <span className="font-medium text-user-danger">{t("user.orders.reason")}:</span> {order.cancel_reason || t("user.orders.noReasonProvided")}
                         </p>
                       </div>
                     </div>
                   )}
                   <ProductScrollList items={order.items} idPrefix={order._id} rateable={order.status === "delivered"} reviewsMap={reviewsMap} />
                   {!["delivered", "cancelled"].includes(order.status) && (
-                    <div className="mt-2 border-t border-[var(--user-border)] border-dashed">
+                    <div className="mt-2 border-t border-user-line border-dashed">
                       <OrderProgress status={order.status} />
                     </div>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--user-border)] pt-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-user-line pt-3">
                   <div>
-                    <p className="text-[0.625rem] text-[var(--user-text-muted)] font-medium mb-0.5">{t("user.orders.orderTotal")}</p>
+                    <p className="text-[0.625rem] text-user-fg-muted font-medium mb-0.5">{t("user.orders.orderTotal")}</p>
                     <div className="flex items-baseline gap-2">
-                      <p className="text-base font-semibold text-[var(--user-text)]">Rs. {order.total.toLocaleString()}</p>
+                      <p className="text-base font-semibold text-user-fg">Rs. {order.total.toLocaleString()}</p>
                       {orderTotalSavings > 0 && (
-                        <span className="text-[0.625rem] font-medium text-[var(--user-success)] flex items-center gap-1 bg-[var(--user-success)]/10 px-2 py-0.5 rounded-full border border-[var(--user-success)]/20"><Tag size={10} /> {t("user.orders.saved")} Rs. {orderTotalSavings.toLocaleString()}</span>
+                        <span className="text-[0.625rem] font-medium text-user-success flex items-center gap-1 bg-user-success/10 px-2 py-0.5 rounded-full border border-user-success/20"><Tag size={10} /> {t("user.orders.saved")} Rs. {orderTotalSavings.toLocaleString()}</span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {order.status === "shipped" && (
-                      <button className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] hover:border-[var(--user-border-hover)] transition"><Navigation size={13} /> {t("user.orders.track")}</button>
+                      <button className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-user-line bg-user-card text-xs font-medium text-user-fg hover:border-user-line-hover transition"><Navigation size={13} /> {t("user.orders.track")}</button>
                     )}
                     {order.status === "pending" && (
-                      <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--user-danger)]/40 text-[var(--user-danger)] text-xs font-medium hover:bg-[var(--user-danger)]/10 transition"><Trash2 size={13} /> {t("user.orders.cancelOrder")}</button>
+                      <button onClick={() => setDeleteTarget(order)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-user-danger/40 text-user-danger text-xs font-medium hover:bg-user-danger/10 transition"><Trash2 size={13} /> {t("user.orders.cancelOrder")}</button>
                     )}
-                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="hidden sm:flex items-center gap-1.5 rounded-lg border border-[var(--user-border)] px-3.5 py-2 text-xs font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("support-chat:open", { detail: { orderId: order._id } }))} className="hidden sm:flex items-center gap-1.5 rounded-lg border border-user-line px-3.5 py-2 text-xs font-medium text-user-fg transition hover:bg-user-hover">
                       <MessageCircle size={14} /> Chat about this order
                     </button>
-                    <Link href={`/orders/${order._id}`} className="flex items-center gap-2 rounded-lg border border-[var(--user-border)] px-4 py-2 text-sm font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+                    <Link href={`/orders/${order._id}`} className="flex items-center gap-2 rounded-lg border border-user-line px-4 py-2 text-sm font-medium text-user-fg transition hover:bg-user-hover">
                       {t("user.orders.viewDetails")} <ArrowRight size={15} />
                     </Link>
                   </div>
@@ -967,22 +967,22 @@ function OrdersContent({ compact = false }) {
     </div>
 
     {/* ============= MOBILE (Daraz-style) — lg:hidden ============= */}
-    <div className="user-orders-page lg:hidden bg-[var(--user-bg)]">
+    <div className="user-orders-page lg:hidden bg-user-page">
       {/* Sticky top app bar — account tab (compact) me account ka apna top bar hota hai */}
       {!compact && (
       <div
-        className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+        className="sticky top-0 z-30 bg-user-elevated/90 backdrop-blur-md border-b border-user-line"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="flex items-center gap-2 px-3 h-12">
-          <button type="button" onClick={() => router.push("/")} aria-label={t("user.orders.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+          <button type="button" onClick={() => router.push("/")} aria-label={t("user.orders.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-user-fg hover:bg-user-hover active:scale-90 transition">
             <ArrowLeft size={20} />
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-2xl font-semibold tracking-tight text-[var(--user-text)] leading-none truncate">{t("user.orders.title")}</p>
-            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {t(totalOrders === 1 ? "user.orders.pagination.order" : "user.orders.pagination.orders")}</p>
+            <p className="text-2xl font-semibold tracking-tight text-user-fg leading-none truncate">{t("user.orders.title")}</p>
+            <p className="text-[0.6875rem] text-user-fg-muted mt-0.5">{isDraftFilter ? allOrders.length : (totalOrders || 0)} {t(totalOrders === 1 ? "user.orders.pagination.order" : "user.orders.pagination.orders")}</p>
           </div>
-          <Link href="/" className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-[var(--user-border)] px-2 text-xs font-medium text-[var(--user-text)] transition hover:bg-[var(--user-bg-hover)]">
+          <Link href="/" className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg border border-user-line px-2 text-xs font-medium text-user-fg transition hover:bg-user-hover">
             <ShoppingBag size={14} />
             <span className="hidden sm:inline">{t("user.orders.continueShopping")}</span>
             <span className="sm:hidden">{t("user.orders.shop")}</span>
@@ -994,15 +994,15 @@ function OrdersContent({ compact = false }) {
       <div className={compact ? "space-y-6" : "px-3 pt-3 pb-24 space-y-6"}>
         {(totalOrders > 0 || hasDrafts) && (
           <>
-            <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3">
+            <div className="rounded-xl border border-user-line bg-user-card p-3">
               <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
                 <div className="relative min-w-[190px] flex-1">
-                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)]" />
+                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-user-fg-subtle" />
                   <input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder={t("user.orders.searchOrders")}
-                    className="h-10 w-full rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] pl-9 pr-3 text-sm text-[var(--user-text)] outline-none placeholder:text-[var(--user-text-subtle)] focus:border-[var(--user-border-hover)]"
+                    className="h-10 w-full rounded-lg border border-user-line bg-user-card pl-9 pr-3 text-sm text-user-fg outline-none placeholder:text-user-fg-subtle focus:border-user-line-hover"
                   />
                 </div>
                 <div className="w-36 shrink-0">
@@ -1016,9 +1016,9 @@ function OrdersContent({ compact = false }) {
                 </div>
               </div>
             </div>
-            <div className="-mt-5 flex items-center justify-between px-1 text-xs text-[var(--user-text-muted)]">
+            <div className="-mt-5 flex items-center justify-between px-1 text-xs text-user-fg-muted">
               <p>{t("user.orders.results", { shown: isDraftFilter ? drafts.length : (pagination.total || orders.length), total: isDraftFilter ? drafts.length : (totalOrders || 0) })}</p>
-              {hasActiveFilters && <button onClick={clearFilters} className="font-medium hover:text-[var(--user-text)]">{t("user.orders.clearFilters")}</button>}
+              {hasActiveFilters && <button onClick={clearFilters} className="font-medium hover:text-user-fg">{t("user.orders.clearFilters")}</button>}
             </div>
           </>
         )}
@@ -1027,12 +1027,12 @@ function OrdersContent({ compact = false }) {
         {hasDrafts && (filter === "all" || filter === "draft") && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.savedDrafts")}</h2>
-              <span className="rounded-full bg-[var(--user-bg-hover)] px-2 py-0.5 text-xs text-[var(--user-text-muted)]">{drafts.length}</span>
+              <h2 className="text-sm font-semibold text-user-fg">{t("user.orders.savedDrafts")}</h2>
+              <span className="rounded-full bg-user-hover px-2 py-0.5 text-xs text-user-fg-muted">{drafts.length}</span>
             </div>
             {(showAllDrafts ? drafts : drafts.slice(0, 2)).map((draft) => <DraftCard key={draft._id} draft={draft} />)}
             {drafts.length > 2 && (
-              <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-[var(--user-text-muted)] hover:text-[var(--user-text)]">
+              <button type="button" onClick={() => setShowAllDrafts((current) => !current)} className="text-sm font-medium text-user-fg-muted hover:text-user-fg">
                 {showAllDrafts ? t("user.orders.showFewerDrafts") : t("user.orders.showAllDrafts", { count: drafts.length })}
               </button>
             )}
@@ -1041,22 +1041,22 @@ function OrdersContent({ compact = false }) {
 
         {/* Empty */}
         {(filter !== "draft" || !hasDrafts) && orders.length === 0 && !(filter === "all" && hasDrafts) && (
-          <div className="rounded-2xl bg-[var(--user-bg-card)] border border-[var(--user-border)] shadow-sm p-8 text-center">
-            <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
-                <Package size={36} className="text-[var(--user-text-muted)]" />
+          <div className="rounded-2xl bg-user-card border border-user-line shadow-sm p-8 text-center">
+            <div className="w-20 h-20 mx-auto rounded-full bg-user-hover flex items-center justify-center mb-4">
+                <Package size={36} className="text-user-fg-muted" />
             </div>
-            <h2 className="text-base font-semibold text-[var(--user-text)] mb-1.5">
+            <h2 className="text-base font-semibold text-user-fg mb-1.5">
               {filter === "draft" ? t("user.orders.empty.noDrafts") : (totalOrders || 0) === 0 ? t("user.orders.empty.noOrders") : t("user.orders.empty.noFilterMatches")}
             </h2>
-            <p className="text-xs text-[var(--user-text-muted)] mb-5">
+            <p className="text-xs text-user-fg-muted mb-5">
               {filter === "draft" ? t("user.orders.empty.draftsHint") : (totalOrders || 0) === 0 ? t("user.orders.empty.shoppingHint") : t("user.orders.empty.filtersHint")}
             </p>
             {hasActiveFilters ? (
-              <button onClick={clearFilters} className="w-full h-10 rounded-lg border border-[var(--user-border)] text-sm font-medium text-[var(--user-text)] flex items-center justify-center gap-2 hover:bg-[var(--user-bg-hover)] transition">
+              <button onClick={clearFilters} className="w-full h-10 rounded-lg border border-user-line text-sm font-medium text-user-fg flex items-center justify-center gap-2 hover:bg-user-hover transition">
                 {t("user.orders.clearFilters")}
               </button>
             ) : (
-              <Link href="/" className="w-full h-10 rounded-lg border border-[var(--user-border)] text-sm font-medium text-[var(--user-text)] flex items-center justify-center gap-2 hover:bg-[var(--user-bg-hover)] transition">
+              <Link href="/" className="w-full h-10 rounded-lg border border-user-line text-sm font-medium text-user-fg flex items-center justify-center gap-2 hover:bg-user-hover transition">
                 <ShoppingBag size={16} /> {t("user.orders.startShopping")}
               </Link>
             )}
@@ -1066,7 +1066,7 @@ function OrdersContent({ compact = false }) {
         {/* Orders list */}
         {filter !== "draft" && orders.length > 0 && (
           <div className={`space-y-3 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : "opacity-100"}`}>
-            <h2 className="text-sm font-semibold text-[var(--user-text)]">{t("user.orders.title")}</h2>
+            <h2 className="text-sm font-semibold text-user-fg">{t("user.orders.title")}</h2>
             {orders.map((order) => {
               const status = STATUS_CONFIG[order.status] ? order.status : "pending";
               const cfg = STATUS_CONFIG[status];
@@ -1077,20 +1077,20 @@ function OrdersContent({ compact = false }) {
                 <Link
                   key={order._id}
                   href={`/orders/${order._id}`}
-                  className="block rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 transition-colors hover:border-[var(--user-border-hover)]"
+                  className="block rounded-xl border border-user-line bg-user-card p-4 transition-colors hover:border-user-line-hover"
                 >
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     <div>
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("user.orders.orderNumber")}</p>
-                      <p className="text-sm font-medium text-[var(--user-text)]">{order.order_number}</p>
+                      <p className="text-xs text-user-fg-muted">{t("user.orders.orderNumber")}</p>
+                      <p className="text-sm font-medium text-user-fg">{order.order_number}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("user.orders.placedOn")}</p>
-                      <p className="text-sm font-medium text-[var(--user-text)]">{date}</p>
+                      <p className="text-xs text-user-fg-muted">{t("user.orders.placedOn")}</p>
+                      <p className="text-sm font-medium text-user-fg">{date}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("user.orders.payment")}</p>
-                      <p className="text-sm font-medium text-[var(--user-text)]">{t(`user.orders.paymentMethod.${pay.key}`)}</p>
+                      <p className="text-xs text-user-fg-muted">{t("user.orders.payment")}</p>
+                      <p className="text-sm font-medium text-user-fg">{t(`user.orders.paymentMethod.${pay.key}`)}</p>
                     </div>
                     <div className="flex justify-end">
                       <span className={`inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.bg} ${cfg.textColor}`}>
@@ -1100,24 +1100,24 @@ function OrdersContent({ compact = false }) {
                   </div>
                   {/* Cancelled reason strip */}
                   {order.status === "cancelled" && order.cancel_reason && (
-                    <div className="mt-3 rounded-lg bg-[var(--user-danger)]/10 p-2">
-                      <p className="text-xs text-[var(--user-danger)] line-clamp-2">
+                    <div className="mt-3 rounded-lg bg-user-danger/10 p-2">
+                      <p className="text-xs text-user-danger line-clamp-2">
                         {t("user.orders.reason")}: {order.cancel_reason}
                       </p>
                     </div>
                   )}
 
                   {order.items?.length > 0 && (
-                    <div className="mt-3 border-t border-[var(--user-border)] pt-3">
+                    <div className="mt-3 border-t border-user-line pt-3">
                       <ProductScrollList items={order.items} idPrefix={order._id} rateable={order.status === "delivered"} reviewsMap={reviewsMap} />
                     </div>
                   )}
 
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--user-border)] pt-3">
-                    <p className="text-base font-semibold text-[var(--user-text)] leading-none">
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-user-line pt-3">
+                    <p className="text-base font-semibold text-user-fg leading-none">
                       Rs. {order.total.toLocaleString()}
                     </p>
-                    <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--user-border)] px-3 text-sm font-medium text-[var(--user-text)]">
+                    <div className="inline-flex h-9 items-center gap-1 rounded-lg border border-user-line px-3 text-sm font-medium text-user-fg">
                       {t("user.orders.viewDetails")} <ChevronRight size={14} />
                     </div>
                   </div>

@@ -245,7 +245,7 @@ const FormField = ({ label, required, helpText, children }) => (
 const Input = ({ ...props }) => (
   <input
     {...props}
-    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-gray-400"
+    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-accent focus:ring-2 focus:ring-accent-soft placeholder:text-gray-400"
     style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
   />
 );
@@ -253,7 +253,7 @@ const Input = ({ ...props }) => (
 const Select = ({ children, ...props }) => (
   <select
     {...props}
-    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+    className="w-full h-10 px-3 rounded-md text-sm border outline-none transition-all duration-200 focus:border-accent focus:ring-2 focus:ring-accent-soft"
     style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
   >
     {children}
@@ -263,7 +263,7 @@ const Select = ({ children, ...props }) => (
 const Textarea = ({ ...props }) => (
   <textarea
     {...props}
-    className="w-full px-3 py-2.5 rounded-md text-sm border outline-none transition-all duration-200 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] placeholder:text-gray-400 resize-none"
+    className="w-full px-3 py-2.5 rounded-md text-sm border outline-none transition-all duration-200 focus:border-accent focus:ring-2 focus:ring-accent-soft placeholder:text-gray-400 resize-none"
     style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-primary)" }}
   />
 );
@@ -414,7 +414,7 @@ const ImageUploadBox = ({ label, file, setFile, preview, required, dimensions })
             <button
               type="button"
               onClick={handleRemove}
-              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-md border-2 border-[var(--bg-card)]"
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-md border-2 border-card"
               title={t("admin.shared.media.remove")}
             >
               <CloseIcon className="w-3 h-3" />
@@ -476,7 +476,7 @@ const MenuItem = ({ icon, label, onClick, danger, success }) => (
     role="menuitem"
     type="button"
     onClick={(e) => { e.stopPropagation(); onClick(); }}
-    className="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-[var(--bg-tertiary)]"
+    className="w-full px-3 py-2.5 text-left text-[13px] flex items-center gap-2.5 transition hover:bg-subtle"
     style={{ color: danger ? "var(--danger-text)" : success ? "var(--success-text)" : "var(--text-primary)" }}
   >
     {icon} {label}
@@ -1105,7 +1105,7 @@ export default function BannersPage() {
 
   const SelectFilter = ({ value, onChange, children }) => (
     <div className="relative">
-      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-[var(--accent-soft)]" style={inputStyle}>
+      <select value={value} onChange={onChange} className="appearance-none h-9 w-full sm:w-[160px] pl-3 pr-8 rounded-lg text-[13px] outline-none cursor-pointer transition focus:ring-1 focus:ring-accent-soft" style={inputStyle}>
         {children}
       </select>
       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--text-muted)" }}>
@@ -1138,7 +1138,7 @@ export default function BannersPage() {
           aria-label={`Actions for ${banner?.title || "banner"}`}
           aria-haspopup="menu"
           aria-expanded={open}
-          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-[var(--bg-tertiary)] flex items-center justify-center"
+          className="min-w-[34px] min-h-[34px] p-2 rounded-md transition hover:bg-subtle flex items-center justify-center"
           style={{ color: "var(--text-secondary)" }}
           title={t("admin.featuredProducts.ui.actions")}
         >
@@ -1261,7 +1261,7 @@ export default function BannersPage() {
               placeholder={t("admin.banners.page.searchPlaceholder")} 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-[var(--accent-soft)]"
+              className="w-full h-9 pl-9 pr-3 rounded-lg text-[13px] outline-none transition focus:ring-1 focus:ring-accent-soft"
               style={inputStyle} 
             />
           </div>
@@ -1362,7 +1362,7 @@ export default function BannersPage() {
                         <td className="px-4 py-2.5">
                           <FallbackImage src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-24 h-12 object-cover rounded border" style={{ borderColor: "var(--border-color)" }} />
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-[13px]">{showBannerTranslationSkeletons && !banner?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} /> : contentOf(banner.title, banner.translations?.title)}</td>
+                        <td className="px-4 py-2.5 font-medium text-[13px]">{showBannerTranslationSkeletons && !banner?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-3 w-28 rounded bg-subtle animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} /> : contentOf(banner.title, banner.translations?.title)}</td>
                         <td className="px-4 py-2.5 capitalize text-[13px]" style={{ color: "var(--text-secondary)" }}>{banner.bannerType.replace("_", " ")}</td>
                         <td className="px-4 py-2.5"><StatusBadge status={banner.status} /></td>
                         <td className="px-4 py-2.5 text-[13px] hidden lg:table-cell" style={{ color: "var(--text-muted)" }}>
@@ -1386,7 +1386,7 @@ export default function BannersPage() {
                 <FallbackImage src={getImagePreview(banner.desktopImage)} alt={banner.altText} className="w-full h-32 object-cover rounded-md" style={{ border: "1px solid var(--border-color)" }} />
                 <div className="flex items-start justify-between">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[13px] truncate">{showBannerTranslationSkeletons && !banner?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-3 w-28 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} /> : contentOf(banner.title, banner.translations?.title)}</p>
+                    <p className="font-semibold text-[13px] truncate">{showBannerTranslationSkeletons && !banner?.translations?.title?.[locale]?.trim() ? <span className="inline-block h-3 w-28 rounded bg-subtle animate-pulse align-middle" aria-label={t("admin.categories.page.updating")} /> : contentOf(banner.title, banner.translations?.title)}</p>
                     <p className="text-[11px] capitalize mt-0.5" style={{ color: "var(--text-muted)" }}>{banner.bannerType.replace("_", " ")}</p>
                   </div>
                   <StatusBadge status={banner.status} />
@@ -1651,7 +1651,7 @@ export default function BannersPage() {
                   <button
                     type="submit"
                     disabled={bannerMutation.isPending || !!positionDuplicate}
-                    className="flex-1 h-11 rounded-lg text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 bg-[var(--accent)] text-[var(--accent-text)] hover:bg-[var(--accent-hover)]"
+                    className="flex-1 h-11 rounded-lg text-sm font-semibold transition disabled:opacity-50 hover:opacity-90 bg-accent text-accent-fg hover:bg-accent-hover"
                   >
                     {bannerMutation.isPending ? (
                       <span className="flex items-center justify-center gap-2">

@@ -45,10 +45,10 @@ const paymentDateTime = (payment, locale) => {
   return { date: date(value, locale), time: payment.payment_time || new Date(value).toLocaleTimeString(locale || [], { hour: "2-digit", minute: "2-digit" }) };
 };
 const statusStyles = {
-  Unpaid: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
-  "Partially Paid": "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
-  Paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
-  Overdue: "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
+  Unpaid: "bg-warning-soft text-warning",
+  "Partially Paid": "bg-info-soft text-info",
+  Paid: "bg-success-soft text-success",
+  Overdue: "bg-danger-soft text-danger"
 };
 
 function Badge({ value, status = value }) {
@@ -69,9 +69,9 @@ function Panel({ title, icon: Icon, trailing, className = "", children }) {
 
 function PreviewModal({ onClose, children }) {
   return <div id="invoice-preview-modal" className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-3 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section role="dialog" aria-modal="true" aria-label="Invoice preview" className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
-      <header className="document-preview-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Eye size={17} /></span><div><h2 className="text-sm font-extrabold text-[var(--text-primary)]">Invoice preview</h2><p className="text-[10px] text-[var(--text-muted)]">Review the customer-facing invoice</p></div></div><button type="button" onClick={onClose} aria-label="Close preview" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"><X size={17} /></button></header>
-      <div className="min-h-0 overflow-auto bg-[var(--bg-secondary)] p-3 sm:p-5">{children}</div>
+    <section role="dialog" aria-modal="true" aria-label="Invoice preview" className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-2xl">
+      <header className="document-preview-modal-header flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3"><div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Eye size={17} /></span><div><h2 className="text-sm font-extrabold text-fg">Invoice preview</h2><p className="text-[10px] text-fg-muted">Review the customer-facing invoice</p></div></div><button type="button" onClick={onClose} aria-label="Close preview" className="flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-secondary hover:bg-subtle"><X size={17} /></button></header>
+      <div className="min-h-0 overflow-auto bg-page-alt p-3 sm:p-5">{children}</div>
     </section>
   </div>;
 }
@@ -226,7 +226,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
   };
 
   if (isLoading) return <div className="space-y-3"><div className="skeleton h-8 w-1/3" /><div className="skeleton h-28 w-full" /><div className="skeleton h-52 w-full" /></div>;
-  if (isError || !invoice) return <div className="rounded-xl border bg-[var(--bg-card)] p-8 text-center" style={edge}>
+  if (isError || !invoice) return <div className="rounded-xl border bg-card p-8 text-center" style={edge}>
     <p className="text-sm" style={primary}>{t("admin.quoteInvoice.ui.could_not_load_this_invoice_b761111d")}</p>
     <button type="button" onClick={() => refetch()} className="mt-2 text-sm font-semibold" style={accent}>{t("admin.quoteInvoice.ui.try_again_042c862e")}</button>
     <div><Link href="/admin/invoices" className="mt-3 inline-block text-sm underline" style={muted}>{t("admin.quoteInvoice.ui.back_to_invoices_8371e902")}</Link></div>
@@ -375,7 +375,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45"
+      className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-info-soft disabled:opacity-45"
       style={{ borderColor: primaryAction ? "color-mix(in srgb, var(--accent) 30%, var(--border-color))" : "var(--border-color)", color: primaryAction ? "var(--accent)" : "var(--text-secondary)", background: primaryAction ? "var(--accent-soft)" : "var(--bg-card)" }}>
       {Icon && <Icon size={16} />}{label}</button>;
     return disabled && title ? <span key={label} title={title} className="inline-flex">{button}</span> : <span key={label} title={title}>{button}</span>;
@@ -388,7 +388,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           <ChevronRight size={13} /> <span style={primary}>{invoice.invoice_number}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-[var(--bg-tertiary)]" style={{ borderColor: "var(--border-color)", color: "#2878f0" }}><FileText size={18} /></div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border bg-subtle" style={{ borderColor: "var(--border-color)", color: "#2878f0" }}><FileText size={18} /></div>
           <h1 className="font-mono text-xl font-bold" style={primary}>{t("admin.quoteInvoice.ui.invoice_51d86044")}{invoice.invoice_number}</h1>
           <Badge value={displayStatusLabel} status={rawStatus} />
         </div>
@@ -400,10 +400,10 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         </div>
       </div>
       <div className="flex flex-wrap gap-2 print:hidden">
-        <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 text-[13px] font-semibold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300"><Eye size={15} />{t("admin.invoiceDetail.action.preview")}</button>
+        <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-info/30 bg-info-soft px-3 text-[13px] font-semibold text-info transition hover:bg-blue-100"><Eye size={15} />{t("admin.invoiceDetail.action.preview")}</button>
         {!invoice.sent_at && smallAction(t("common.edit"), () => router.push(`/admin/invoices/new?invoice=${encodeURIComponent(id)}`), Pencil)}
-        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><Printer size={16} />{isGeneratingPdf ? t("admin.invoiceDetail.action.preparing") : t("admin.pos.ui.print")}</button>
-        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><FileText size={16} />{t("admin.invoiceDetail.action.downloadPdf")}</button>
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void printInvoice(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-info-soft disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><Printer size={16} />{isGeneratingPdf ? t("admin.invoiceDetail.action.preparing") : t("admin.pos.ui.print")}</button>
+        <button type="button" disabled={isGeneratingPdf || isStoreLoading} onClick={() => { void downloadPdf(); }} className="inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-semibold transition hover:bg-info-soft disabled:opacity-45" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)", background: "var(--bg-card)" }}><FileText size={16} />{t("admin.invoiceDetail.action.downloadPdf")}</button>
         {canReturn && smallAction(t("admin.invoiceDetail.action.returnRefund"), () => setReturnOpen(true), RotateCcw, true)}
         {!invoice.sent_at && smallAction(
           sendMutation.isPending ? t("admin.invoiceDetail.action.saving") : t("admin.invoiceDetail.action.sendCustomer"),
@@ -420,7 +420,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
         <div className="grid gap-4 md:grid-cols-2">
           <Panel title={t("admin.quoteInvoice.ui.customer_information_c996cd10")} icon={UserRound}>
             <div className="space-y-4 px-5 py-4 text-[13px]">
-              <div className="flex min-w-0 items-center gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-base font-bold text-blue-600">{String(invoice.customer_name || "C").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><div className="truncate text-base font-semibold text-[var(--text-primary)]">{invoice.customer_name || "—"}</div><div className="mt-0.5 text-xs text-[var(--text-muted)]">{t("admin.documentDetail.field.customer")}</div></div></div>
+              <div className="flex min-w-0 items-center gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-50 text-base font-bold text-blue-600">{String(invoice.customer_name || "C").slice(0, 1).toUpperCase()}</span><div className="min-w-0"><div className="truncate text-base font-semibold text-fg">{invoice.customer_name || "—"}</div><div className="mt-0.5 text-xs text-fg-muted">{t("admin.documentDetail.field.customer")}</div></div></div>
               <div className="grid gap-x-5 gap-y-4 border-t pt-4 sm:grid-cols-2" style={{ borderColor: "var(--border-color)" }}>
                 <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.invoiceDetail.field.email")}</p><p className="mt-1 break-words text-[13px] leading-5" style={primary}>{invoice.customer_email || invoice.customer_id?.email || t("admin.documentDetail.field.notProvided")}</p></div>
                 <div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide" style={muted}>{t("admin.invoiceDetail.field.phone")}</p><p className="mt-1 break-words text-[13px] leading-5" style={primary}>{invoice.customer_phone || invoice.customer_id?.phone || t("admin.documentDetail.field.notProvided")}</p></div>
@@ -476,15 +476,15 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
             <div className="flex items-center justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.amount_paid_d39013c6")}</span><span className="font-semibold" style={{ color: "#079878" }}>{money(paidAmount, locale)}</span></div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--bg-tertiary)" }}><div className="h-full rounded-full" style={{ width: `${paymentProgress}%`, background: "#0bb98f" }} /></div>
             <div className="mt-2 flex justify-between text-xs"><span style={muted}>{t("admin.quoteInvoice.ui.remaining_balance_939fea83")}</span><span className="font-semibold" style={remaining > 0 ? { color: "#b5760a" } : { color: "#079878" }}>{money(remaining, locale)}</span></div>
-            {canReturn && <button type="button" onClick={() => setReturnOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-left text-rose-800 transition hover:border-rose-300 hover:bg-rose-100/80 print:hidden dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-card)] text-rose-600 shadow-sm"><RotateCcw size={16} /></span>
+            {canReturn && <button type="button" onClick={() => setReturnOpen(true)} className="mt-4 flex w-full items-center gap-3 rounded-lg border border-danger/30 bg-danger-soft p-3 text-left text-danger transition hover:border-rose-300 hover:bg-danger-soft print:hidden">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card text-rose-600 shadow-sm"><RotateCcw size={16} /></span>
               <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-rose-800">Return &amp; Refund</span><span className="mt-0.5 block text-[10px] text-rose-700/80">Process returned items and adjust the bill</span></span>
               <ChevronRight size={15} className="shrink-0 text-rose-500" />
             </button>}
           </div>
         </Panel>
 
-          <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">{invoiceActivity.length}</span>} className="print:hidden">
+          <Panel title={t("admin.invoiceDetail.activity.title")} icon={Clock3} trailing={<span className="rounded-full bg-info-soft px-2 py-1 text-[9px] font-bold text-info">{invoiceActivity.length}</span>} className="print:hidden">
           <div className="max-h-[480px] overflow-y-auto px-4 py-4">
             <ol className="space-y-1">
               {[...invoiceActivity].reverse().map((event, index, events) => {
@@ -509,12 +509,12 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
                   ? new Date(event.at).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
                   : t("common.notProvided");
                 return <li key={event._id || `${event.type}-${index}`} className="relative flex gap-3 pb-3 last:pb-0">
-                  {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-slate-200 dark:bg-slate-700" />}
-                  <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2 ring-[var(--bg-card)] ${created ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : returned ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"}`}><Icon size={13} /></span>
-                  <div className="min-w-0 flex-1 border-b border-[var(--border-color)] pb-3 last:border-0 last:pb-0">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><p dir="auto" className="min-w-0 text-[13px] font-semibold leading-5 text-[var(--text-primary)]">{title}</p><time dir="auto" className="text-[11px] leading-4 text-[var(--text-muted)]"><bdi>{eventDate}</bdi></time></div>
-                    <p dir="auto" className="mt-0.5 text-[12px] text-[var(--text-muted)]">{t("admin.invoiceDetail.activity.by", { name: bidiIsolate(event.actor_name || t("admin.pos.ui.unknownStaff")) })}</p>
-                    {visibleChanges.length > 0 && <ul className="mt-2 space-y-1.5">{visibleChanges.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-2 text-[12px] leading-5 text-[var(--text-secondary)]"><span className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span dir="auto" className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
+                  {index < events.length - 1 && <span aria-hidden="true" className="absolute start-[11px] top-6 h-[calc(100%-16px)] w-px bg-subtle" />}
+                  <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2 ring-card ${created ? "bg-success-soft text-success" : returned ? "bg-warning-soft text-warning" : "bg-info-soft text-info"}`}><Icon size={13} /></span>
+                  <div className="min-w-0 flex-1 border-b border-line pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5"><p dir="auto" className="min-w-0 text-[13px] font-semibold leading-5 text-fg">{title}</p><time dir="auto" className="text-[11px] leading-4 text-fg-muted"><bdi>{eventDate}</bdi></time></div>
+                    <p dir="auto" className="mt-0.5 text-[12px] text-fg-muted">{t("admin.invoiceDetail.activity.by", { name: bidiIsolate(event.actor_name || t("admin.pos.ui.unknownStaff")) })}</p>
+                    {visibleChanges.length > 0 && <ul className="mt-2 space-y-1.5">{visibleChanges.map((change, changeIndex) => <li key={`${event._id || index}-${changeIndex}`} className="flex items-start gap-2 text-[12px] leading-5 text-fg-secondary"><span className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${change.action === "removed" ? "bg-rose-400" : change.action === "added" || change.action === "returned" ? "bg-emerald-500" : "bg-blue-400"}`} /><span dir="auto" className="min-w-0 break-words">{invoiceActivityLabel(change)}</span></li>)}</ul>}
                   </div>
                 </li>;
               })}
@@ -526,7 +526,7 @@ export default function InvoiceDetailsPage({ params }) {const { t, locale } = us
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] text-left text-xs">
             <thead style={{ background: "var(--bg-card-alt)", color: "var(--text-secondary)" }}><tr>{["#", t("admin.invoiceDetail.field.dateTime"), t("admin.invoiceDetail.field.amount"), t("admin.invoiceDetail.field.method"), t("admin.invoiceDetail.field.note")].map((heading) => <th key={heading} className="whitespace-nowrap px-2 py-2 font-semibold">{heading}</th>)}</tr></thead>
-              <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/30" style={{ borderColor: "var(--border-color)" }}>
+              <tbody>{payments.map((payment, index) => <tr key={payment._id || index} className="border-t transition-colors hover:bg-info-soft" style={{ borderColor: "var(--border-color)" }}>
                 <td className="px-2 py-2.5" style={muted}>{index + 1}</td>
                 <td className="whitespace-nowrap px-2 py-2.5" style={primary}><span className="block">{paymentDateTime(payment).date}</span><span className="mt-0.5 block text-[10px]" style={muted}>{paymentDateTime(payment).time}</span></td>
                 <td className="whitespace-nowrap px-2 py-2.5 font-semibold" style={{ color: Number(payment.amount) < 0 ? "#dc2626" : "var(--text-primary)" }}>{money(payment.amount)}</td>

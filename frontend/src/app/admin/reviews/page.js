@@ -61,7 +61,7 @@ const Stars = ({ value = 0, size = 13 }) => {
       <Star
         key={i}
         size={size}
-        className={i <= Math.round(Number(value) || 0) ? "fill-amber-400 text-amber-400" : "text-[var(--border-color)]"}
+        className={i <= Math.round(Number(value) || 0) ? "fill-amber-400 text-amber-400" : "text-line"}
       />
     ))}
   </span>
@@ -446,7 +446,7 @@ export default function AdminReviewsPage() {
                                 if (next.has(r._id)) next.delete(r._id);
                                 else next.add(r._id);
                                 return next;
-                              })} className="mt-0.5 rounded-sm text-[11px] font-semibold transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" style={{ color: "var(--accent)" }} aria-expanded={isCommentExpanded}>
+                              })} className="mt-0.5 rounded-sm text-[11px] font-semibold transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" style={{ color: "var(--accent)" }} aria-expanded={isCommentExpanded}>
                                 {isCommentExpanded ? t("admin.reviews.ui.readLess") : t("admin.reviews.ui.readMore")}
                               </button>
                             ) : null}                            {(r.images?.length || r.videos?.length) ? (

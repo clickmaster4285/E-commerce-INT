@@ -51,7 +51,7 @@ export default function TermsConditionsPage() {
   });
 
   return (
-    <main dir={dir} className="w-full space-y-4 pb-6 text-[var(--text-primary)]">
+    <main dir={dir} className="w-full space-y-4 pb-6 text-fg">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{localeCopy.title}</h1>

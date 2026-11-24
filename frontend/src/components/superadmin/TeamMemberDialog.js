@@ -100,7 +100,7 @@ export default function TeamMemberDialog({ member, onClose, onSaved }) {
         {!editing && (
           <FormSection title="Login">
             <PasswordPair password={form.password} confirm={form.confirm} onPassword={(v) => set("password")({ target: { value: v } })} onConfirm={(v) => set("confirm")({ target: { value: v } })} errors={errors} />
-            <p className="text-[12px] text-[var(--text-muted)]">Share the password with them directly — no email is sent. They can ask you to reset it later.</p>
+            <p className="text-[12px] text-fg-muted">Share the password with them directly — no email is sent. They can ask you to reset it later.</p>
           </FormSection>
         )}
       </div>

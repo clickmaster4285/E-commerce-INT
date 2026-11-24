@@ -164,31 +164,31 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
   const modal = (
     <div dir={dir} lang={locale} className={`fixed inset-0 ${zIndexClassName} flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm`}>
       <div
-        className="w-[400px] max-w-[92vw] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl overflow-hidden"
+        className="w-[400px] max-w-[92vw] bg-page-alt rounded-xl border border-line shadow-2xl overflow-hidden"
       >
-        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-start justify-between gap-3">
+        <div className="px-5 py-4 border-b border-line flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="w-9 h-9 flex items-center justify-center bg-[var(--accent-soft)] text-[var(--accent)] rounded-lg border border-[var(--accent)]/20 shrink-0">
+            <div className="w-9 h-9 flex items-center justify-center bg-accent-soft text-accent rounded-lg border border-accent/20 shrink-0">
               <SlidersIcon className="w-4 h-4" />
             </div>
             <div className="min-w-0 pt-0.5">
-              <h3 className="text-[14px] font-semibold text-[var(--text-primary)]">{title}</h3>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{subtitle}</p>
+              <h3 className="text-[14px] font-semibold text-fg">{title}</h3>
+              <p className="text-[11px] text-fg-muted mt-0.5">{subtitle}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0"
           >
             <span aria-hidden="true">&times;</span>
           </button>
         </div>
         <div className="px-5 py-5 space-y-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: "min(640px, 85vh)" }}>
           <div className="space-y-3">
-            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("admin.categories.detail.basicInformation")}</p>
+            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">{t("admin.categories.detail.basicInformation")}</p>
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              <label className="block text-[10px] font-bold text-fg-muted uppercase tracking-wider">
                 {t("form.name")} <span className="text-red-500">*</span>
               </label>
               <input
@@ -196,13 +196,13 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 autoFocus
-                className="w-full h-[40px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                className="w-full h-[40px] px-3 text-sm outline-none bg-input border border-line rounded-lg text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors"
                 placeholder={t("form.namePlaceholder")}
               />
             </div>
           </div>
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+            <label className="block text-[10px] font-bold text-fg-muted uppercase tracking-wider">
               {t("form.type")}
             </label>
             <div className="grid grid-cols-2 gap-4">
@@ -221,8 +221,8 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
                     }
                     className={`h-auto py-3 px-3 text-[12px] font-semibold flex flex-col items-center justify-center gap-1.5 rounded-lg border transition-all duration-200 text-left ${
                       isActive
-                        ? "bg-[var(--accent-soft)]/40 text-[var(--accent)] border-[var(--accent)]/40 shadow-sm"
-                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                        ? "bg-accent-soft/40 text-accent border-accent/40 shadow-sm"
+                        : "bg-input text-fg-muted border-line hover:border-fg-muted hover:text-fg-secondary"
                     }`}
                   >
                     <span>{type.label}</span>
@@ -233,18 +233,18 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
           </div>
           {form.data_type === "multi_select" && (
             <div className="space-y-2">
-              <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.options")}</p>
+              <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">{t("form.options")}</p>
               <div className="flex flex-wrap gap-1.5">
                 {(form.values || []).map((opt, idx) => (
                   <span
                     key={`opt-${idx}`}
-                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-[var(--accent-soft)] text-[var(--accent)] rounded-md border border-[var(--accent)]/15"
+                    className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium bg-accent-soft text-accent rounded-md border border-accent/15"
                   >
                     {opt}
                     <button
                       type="button"
                       onClick={() => removeOption(idx)}
-                      className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--accent)]/20 transition-colors ml-0.5"
+                      className="w-4 h-4 flex items-center justify-center rounded hover:bg-accent/20 transition-colors ml-0.5"
                       aria-label={t("action.delete")}
                     >
                       <CloseIcon className="w-2.5 h-2.5" />
@@ -265,24 +265,24 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
                       addOption();
                     }
                   }}
-                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-soft)] transition-colors"
+                  className="flex-1 min-w-0 h-[36px] px-3 text-sm outline-none bg-input border border-line rounded-lg text-fg placeholder:text-fg-muted focus:border-accent focus:ring-1 focus:ring-accent-soft transition-colors"
                 />
                 <button
                   type="button"
                   onClick={addOption}
-                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-1 transition-colors shrink-0"
+                  className="h-[36px] px-3 text-[11px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg flex items-center gap-1 transition-colors shrink-0"
                 >
                   <PlusIcon className="w-3 h-3" /> <span>{t("form.addOption")}</span>
                 </button>
               </div>
-              <p className="text-[10px] text-[var(--text-muted)]">
+              <p className="text-[10px] text-fg-muted">
                 {t("form.optionsHint")}
               </p>
             </div>
           )}
           {form.data_type === "boolean" && (
             <div className="space-y-2.5">
-              <label className="block text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("form.defaultValue")}</label>
+              <label className="block text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("form.defaultValue")}</label>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { id: true, label: t("form.yes") },
@@ -297,14 +297,14 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
                       className={`h-11 text-[12px] font-semibold flex items-center justify-center gap-2 rounded-lg border transition-all ${isActive
                         ? opt.id === true
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm ring-1 ring-emerald-500/10"
-                          : "bg-[var(--bg-tertiary)] text-[var(--text-primary)] border-[var(--text-muted)]/30 shadow-sm"
-                        : "bg-[var(--bg-input)] text-[var(--text-muted)] border-[var(--border-color)] hover:border-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                          : "bg-subtle text-fg border-fg-muted/30 shadow-sm"
+                        : "bg-input text-fg-muted border-line hover:border-fg-muted hover:text-fg-secondary"
                       }`}
                     >
                       <span
                         className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${isActive
-                          ? opt.id === true ? "bg-emerald-500 border-emerald-500" : "bg-[var(--text-muted)] border-[var(--text-muted)]"
-                          : "border-[var(--border-color)] bg-transparent"
+                          ? opt.id === true ? "bg-emerald-500 border-emerald-500" : "bg-fg-muted border-fg-muted"
+                          : "border-line bg-transparent"
                         }`}
                       />
                       {opt.label}
@@ -312,17 +312,17 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
                   );
                 })}
               </div>
-              <p className="text-[10px] text-[var(--text-muted)]">
+              <p className="text-[10px] text-fg-muted">
                 {t("form.defaultValueHint")}
               </p>
             </div>
           )}
         </div>
-        <div className="px-5 py-4 border-t border-[var(--border-color)] flex items-center justify-end gap-3 bg-[var(--bg-primary)]/30">
+        <div className="px-5 py-4 border-t border-line flex items-center justify-end gap-3 bg-page/30">
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-card-alt)] transition-colors"
+            className="h-9 px-4 text-[12px] font-medium text-fg-secondary bg-subtle border border-line rounded-lg hover:bg-card-alt transition-colors"
           >
             {t("form.cancel")}
           </button>
@@ -330,7 +330,7 @@ export default function AttributeFormModal({ open, onClose, mode = "create", ini
             type="button"
             onClick={handleSave}
             disabled={isSaving || !form.name || !form.name.trim()}
-            className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm disabled:opacity-50"
+            className="h-9 px-5 text-[12px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors shadow-sm disabled:opacity-50"
           >
             {saveText}
           </button>

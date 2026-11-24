@@ -164,7 +164,7 @@ export default function PODetailPage({ params }) {
 
   return <div className="space-y-4">
       <div className="flex min-w-0 items-start gap-3">
-        <Link href="/admin/purchase-orders" aria-label={t("admin.purchaseOrders.page.title")} title={t("admin.purchaseOrders.page.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-[var(--bg-row-hover)]" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></Link>
+        <Link href="/admin/purchase-orders" aria-label={t("admin.purchaseOrders.page.title")} title={t("admin.purchaseOrders.page.title")} className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:bg-row-hover" style={{ borderColor: "var(--border-color)", color: "var(--text-secondary)" }}><ArrowLeft size={16} /></Link>
         <div className="min-w-0 flex-1">
           <AdminPageHeader
             title={t("admin.purchaseOrders.detail.poDetails")}

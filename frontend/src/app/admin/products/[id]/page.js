@@ -372,7 +372,7 @@ function SearchableSelectField({ value, onChange, options, placeholder, searchPl
                 type="button"
                 key={String(option.value)}
                 onClick={() => handleSelect(String(option.value))}
-                className="block w-full px-3 py-2 text-left text-[12px] transition hover:bg-[var(--bg-row-hover)]"
+                className="block w-full px-3 py-2 text-left text-[12px] transition hover:bg-row-hover"
                 style={{ color: String(value) === String(option.value) ? "var(--accent)" : "var(--text-primary)", fontWeight: String(value) === String(option.value) ? 600 : 400 }}
               >
                 {option.label}
@@ -550,7 +550,7 @@ function MoreMenu({ actions }) {
         aria-label={t("admin.shared.action.moreActions")}
         aria-haspopup="true"
         aria-expanded={open}
-        className="w-8 h-8 inline-flex items-center justify-center rounded-md transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] focus:outline-none cursor-pointer"
+        className="w-8 h-8 inline-flex items-center justify-center rounded-md transition hover:bg-subtle hover:text-fg focus:outline-none cursor-pointer"
         style={{ color: "var(--text-muted)", backgroundColor: "transparent" }}
       >
         <span className="flex flex-col items-center gap-[3px]">
@@ -580,7 +580,7 @@ function MoreMenu({ actions }) {
               type="button"
               onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick?.(); }}
               disabled={action.disabled}
-              className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors hover:bg-[var(--bg-tertiary)] disabled:opacity-40 opacity-100 pointer-events-auto cursor-pointer"
+              className="w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors hover:bg-subtle disabled:opacity-40 opacity-100 pointer-events-auto cursor-pointer"
               style={{ color: action.destructive ? "var(--danger)" : "var(--text-primary)" }}
             >
               {action.icon && <span className="w-4 h-4 flex items-center justify-center shrink-0">{action.icon}</span>}
@@ -1707,7 +1707,7 @@ export default function ProductDetailPage() {
   if (isLoading) return (
     <div dir={dir} lang={locale} className="w-full flex items-center justify-center py-24">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-full border-4 border-[var(--accent)] border-t-transparent animate-spin" />
+        <div className="w-12 h-12 rounded-full border-4 border-accent border-t-transparent animate-spin" />
         <p className="text-[13px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.loading")}</p>
       </div>
     </div>
@@ -2084,8 +2084,8 @@ export default function ProductDetailPage() {
   <div className="space-y-4">
     <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.variants")}</h2>
-        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{t("admin.productDetail.page.variantSummary", { count: totalVariants, stock: totalStock })}</p>
+        <h2 className="text-[15px] font-bold text-fg">{t("admin.productDetail.page.variants")}</h2>
+        <p className="text-[12px] text-fg-muted mt-0.5">{t("admin.productDetail.page.variantSummary", { count: totalVariants, stock: totalStock })}</p>
       </div>
       <button onClick={handleAddVariantFromTab} className="h-9 px-4 rounded-lg text-[12px] font-semibold flex items-center gap-2 transition hover:opacity-90" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
         <Plus className="w-4 h-4" /> {t("admin.productDetail.page.addVariant")}
@@ -2097,8 +2097,8 @@ export default function ProductDetailPage() {
         <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--bg-tertiary)" }}>
           <Layers3 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
         </div>
-        <p className="text-[13px] font-medium text-[var(--text-secondary)]">{t("admin.productDetail.page.noVariants")}</p>
-        <p className="text-[12px] text-[var(--text-muted)]">{t("admin.productDetail.page.noVariantsBody")}</p>
+        <p className="text-[13px] font-medium text-fg-secondary">{t("admin.productDetail.page.noVariants")}</p>
+        <p className="text-[12px] text-fg-muted">{t("admin.productDetail.page.noVariantsBody")}</p>
         <button onClick={handleAddVariantFromTab} className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2" style={{ backgroundColor: "var(--accent)", color: "var(--accent-text)" }}>
           <Plus className="w-4 h-4" /> {t("admin.productDetail.page.createFirstVariant")}
         </button>
@@ -2108,13 +2108,13 @@ export default function ProductDetailPage() {
         <table className="w-full text-[12px]">
           <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
             <tr>
-              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.image")}</th>
-              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.sku")}</th>
-              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.variantColor")}</th>
-              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.price")}</th>
-              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.stock")}</th>
-              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.status")}</th>
-              <th className="text-end px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.actions")}</th>
+              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.image")}</th>
+              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.sku")}</th>
+              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.variantColor")}</th>
+              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.price")}</th>
+              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.stock")}</th>
+              <th className="text-start px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.status")}</th>
+              <th className="text-end px-4 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -2123,28 +2123,28 @@ export default function ProductDetailPage() {
               const isLowStock = Number(variant.quantity) <= 5;
               const isActive = variant.status === "active" || !variant.status;
               return (
-                <tr key={variant._id || absoluteIndex} onClick={() => setVariantDetailsTarget(variant)} className="cursor-pointer transition-colors hover:bg-[var(--bg-row-hover)]" style={{ borderBottom: index < visibleVariants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
+                <tr key={variant._id || absoluteIndex} onClick={() => setVariantDetailsTarget(variant)} className="cursor-pointer transition-colors hover:bg-row-hover" style={{ borderBottom: index < visibleVariants.length - 1 ? "1px solid var(--border-color)" : "none" }}>
                   <td className="px-4 py-2.5">
                     {variant.images?.length > 0 ? (
-                      <button onClick={(e) => { e.stopPropagation(); openGallery(0); }} className="block w-10 h-10 rounded-md overflow-hidden border border-[var(--border-color)] hover:ring-2 hover:ring-[var(--accent)] transition-all">
+                      <button onClick={(e) => { e.stopPropagation(); openGallery(0); }} className="block w-10 h-10 rounded-md overflow-hidden border border-line hover:ring-2 hover:ring-accent transition-all">
                         <FallbackImage src={getImageUrl(variant.images[0].img_url)} alt="" className="w-full h-full object-cover" />
                       </button>
                     ) : (
-                      <div className="w-10 h-10 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-md bg-subtle border border-line flex items-center justify-center">
                         <ImageIcon className="w-4 h-4" style={{ color: "var(--text-muted)" }} />
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-[11px] text-[var(--text-secondary)] truncate max-w-[140px]">{variant.sku}</td>
+                  <td className="px-4 py-2.5 font-mono text-[11px] text-fg-secondary truncate max-w-[140px]">{variant.sku}</td>
                   <td className="px-4 py-2.5">
-                    <p className="font-semibold text-[13px] text-[var(--text-primary)] truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
+                    <p className="font-semibold text-[13px] text-fg truncate max-w-[180px]">{variant.title || `Variant ${index + 1}`}</p>
                     {variant.tags?.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {variant.tags.slice(0, 2).map((tag, idx) => (
-                          <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
+                          <span key={`${tag}-${idx}`} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium bg-subtle border border-line text-fg-muted">{tag}</span>
                         ))}
                         {variant.tags.length > 2 && (
-                          <span className="text-[9px] text-[var(--text-muted)]">+{variant.tags.length - 2}</span>
+                          <span className="text-[9px] text-fg-muted">+{variant.tags.length - 2}</span>
                         )}
                       </div>
                     )}
@@ -2207,16 +2207,16 @@ export default function ProductDetailPage() {
           </tbody>
         </table>
         {variants.length > 0 && (
-          <div className="flex flex-col gap-3 border-t border-[var(--border-color)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-[var(--text-muted)]">
+          <div className="flex flex-col gap-3 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[12px] text-fg-muted">
               <span>{t("admin.shared.pagination.showingRange", { from: variantRangeStart.toLocaleString(locale), to: variantRangeEnd.toLocaleString(locale), total: variants.length.toLocaleString(locale) })}</span>
               <span>{t("admin.shared.pagination.pageOf", { page: activeVariantPage.toLocaleString(locale), total: totalVariantPages.toLocaleString(locale) })}</span>
             </div>
             {totalVariantPages > 1 && (
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setVariantPage(Math.max(1, activeVariantPage - 1))} disabled={activeVariantPage === 1} aria-label={t("admin.shared.pagination.prev")} className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 text-xs text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />{t("admin.products.pagination.prevShort")}</button>
-                <span className="min-w-12 text-center text-xs font-medium text-[var(--text-secondary)]">{activeVariantPage.toLocaleString(locale)} / {totalVariantPages.toLocaleString(locale)}</span>
-                <button type="button" onClick={() => setVariantPage(Math.min(totalVariantPages, activeVariantPage + 1))} disabled={activeVariantPage >= totalVariantPages} aria-label={t("admin.shared.pagination.next")} className="inline-flex h-8 items-center gap-1 rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] px-2.5 text-xs text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.products.pagination.nextShort")}<ChevronRight className="h-3.5 w-3.5" /></button>
+                <button type="button" onClick={() => setVariantPage(Math.max(1, activeVariantPage - 1))} disabled={activeVariantPage === 1} aria-label={t("admin.shared.pagination.prev")} className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-subtle px-2.5 text-xs text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-3.5 w-3.5" />{t("admin.products.pagination.prevShort")}</button>
+                <span className="min-w-12 text-center text-xs font-medium text-fg-secondary">{activeVariantPage.toLocaleString(locale)} / {totalVariantPages.toLocaleString(locale)}</span>
+                <button type="button" onClick={() => setVariantPage(Math.min(totalVariantPages, activeVariantPage + 1))} disabled={activeVariantPage >= totalVariantPages} aria-label={t("admin.shared.pagination.next")} className="inline-flex h-8 items-center gap-1 rounded-md border border-line bg-subtle px-2.5 text-xs text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40">{t("admin.products.pagination.nextShort")}<ChevronRight className="h-3.5 w-3.5" /></button>
               </div>
             )}
           </div>
@@ -2279,7 +2279,7 @@ export default function ProductDetailPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           <nav className="flex items-center flex-wrap gap-1.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-            <button onClick={() => router.push("/admin/products")} className="hover:text-[var(--text-primary)] transition-colors font-medium">{t("admin.productDetail.page.products")}</button>
+            <button onClick={() => router.push("/admin/products")} className="hover:text-fg transition-colors font-medium">{t("admin.productDetail.page.products")}</button>
             <ChevronRight className="w-3 h-3 shrink-0" />
             {product.category_id?.name && (
               <>
@@ -2314,14 +2314,14 @@ export default function ProductDetailPage() {
         <div className="xl:col-span-8 rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
           <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-0">
           {/* Image Area - NOW CLICKABLE */}
-          <div className="relative bg-[var(--bg-tertiary)] p-5 md:p-6 flex items-center justify-center min-h-[280px] md:min-h-[340px] group">
+          <div className="relative bg-subtle p-5 md:p-6 flex items-center justify-center min-h-[280px] md:min-h-[340px] group">
             {firstVariant?.images?.length > 0 ? (
               <div className="flex w-full max-w-md items-start gap-3">
                 {/* Main Clickable Image */}
                 <button 
                   type="button"
                   onClick={() => openGallery(0)}
-                  className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl bg-[var(--bg-secondary)] shadow-lg transition-shadow duration-300 group-hover:shadow-2xl"
+                  className="relative block aspect-[4/3] w-full overflow-hidden rounded-xl bg-page-alt shadow-lg transition-shadow duration-300 group-hover:shadow-2xl"
                 >
                   <FallbackImage
                     src={getImageUrl(firstVariant.images[0].img_url)}
@@ -2346,8 +2346,8 @@ export default function ProductDetailPage() {
                         onClick={() => openGallery(i)}
                         className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 transition-all duration-200 ${
                           i === 0 
-                            ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/20 scale-105" 
-                            : "border-[var(--border-color)] hover:border-[var(--text-muted)] opacity-70 hover:opacity-100"
+                            ? "border-accent ring-2 ring-accent/20 scale-105" 
+                            : "border-line hover:border-fg-muted opacity-70 hover:opacity-100"
                         }`}
                       >
                         <FallbackImage
@@ -2361,7 +2361,7 @@ export default function ProductDetailPage() {
                 )}
               </div>
             ) : (
-              <div className="w-full h-48 rounded-xl flex flex-col items-center justify-center bg-[var(--bg-secondary)] border border-dashed border-[var(--border-color)]">
+              <div className="w-full h-48 rounded-xl flex flex-col items-center justify-center bg-page-alt border border-dashed border-line">
                 <ImageIcon className="w-12 h-12 mb-2" style={{ color: "var(--text-muted)" }} />
                 <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.noImages")}</p>
               </div>
@@ -2395,28 +2395,28 @@ export default function ProductDetailPage() {
             
             {/* Quick Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+              <div className="rounded-lg p-3 bg-subtle border border-line">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Layers3 className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
                   <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.variants")}</p>
                 </div>
                 <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{totalVariants}</p>
               </div>
-              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+              <div className="rounded-lg p-3 bg-subtle border border-line">
                 <div className="flex items-center gap-1.5 mb-1">
                   <Package className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
                   <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.stock")}</p>
                 </div>
                 <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{totalStock}</p>
               </div>
-              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+              <div className="rounded-lg p-3 bg-subtle border border-line">
                 <div className="flex items-center gap-1.5 mb-1">
                   <FileText className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
                   <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.attributes")}</p>
                 </div>
                 <p className="text-[14px] font-extrabold tabular-nums" style={{ color: "var(--text-primary)" }}>{attributeCount}</p>
               </div>
-              <div className="rounded-lg p-3 bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+              <div className="rounded-lg p-3 bg-subtle border border-line">
                 <div className="flex items-center gap-1.5 mb-1">
                   <TagIcon className="w-3.5 h-3.5" style={{ color: "var(--accent)" }} />
                   <p className="text-[10px] uppercase tracking-wide font-bold" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.tags")}</p>
@@ -2541,67 +2541,67 @@ export default function ProductDetailPage() {
                   <div className="lg:col-span-2 flex flex-col gap-4 self-start">
                     {/* Product Details */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.productDetails")}</h3>
-                        <span className="text-[10px] font-medium text-[var(--text-muted)]">{t("admin.productDetail.page.basicInformation")}</span>
+                      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.productDetails")}</h3>
+                        <span className="text-[10px] font-medium text-fg-muted">{t("admin.productDetail.page.basicInformation")}</span>
                       </div>
                       <div className="p-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.sku")}</p>
-                            <p className="text-[14px] font-mono font-medium text-[var(--text-secondary)]">{firstVariant?.sku || variants?.[0]?.sku || "—"}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.sku")}</p>
+                            <p className="text-[14px] font-mono font-medium text-fg-secondary">{firstVariant?.sku || variants?.[0]?.sku || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.productName")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("admin.productDetail.page.loading")} />}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.productName")}</p>
+                            <p className="text-[14px] font-medium text-fg">{isProductNameReady ? productNameOf(product) : <span className="skeleton inline-block h-3 w-28 rounded" aria-label={t("admin.productDetail.page.loading")} />}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.brand")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{nameOf(product.brand_id) || "—"}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.brand")}</p>
+                            <p className="text-[14px] font-medium text-fg">{nameOf(product.brand_id) || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.category")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{nameOf(product.category_id) || "—"}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.category")}</p>
+                            <p className="text-[14px] font-medium text-fg">{nameOf(product.category_id) || "—"}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.taxRate")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.tax || 0}%</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.taxRate")}</p>
+                            <p className="text-[14px] font-medium text-fg">{product.tax || 0}%</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.status")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.status === "active" ? t("common.active") : t("common.inactive")}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.status")}</p>
+                            <p className="text-[14px] font-medium text-fg">{product.status === "active" ? t("common.active") : t("common.inactive")}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.priceRange")}</p>
-                            <p className="text-[14px] font-semibold text-[var(--accent)]">{priceRange}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.priceRange")}</p>
+                            <p className="text-[14px] font-semibold text-accent">{priceRange}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.totalStock")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{t("admin.productDetail.page.totalUnits", { count: totalStock })}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.totalStock")}</p>
+                            <p className="text-[14px] font-medium text-fg">{t("admin.productDetail.page.totalUnits", { count: totalStock })}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.createdAt")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{fd(product.created_at, locale)}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.createdAt")}</p>
+                            <p className="text-[14px] font-medium text-fg">{fd(product.created_at, locale)}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.updatedAt")}</p>
-                            <p className="text-[14px] font-medium text-[var(--text-primary)]">{product.updated_at ? fd(product.updated_at, locale) : t("admin.productDetail.page.never")}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.updatedAt")}</p>
+                            <p className="text-[14px] font-medium text-fg">{product.updated_at ? fd(product.updated_at, locale) : t("admin.productDetail.page.never")}</p>
                           </div>
                         </div>
                       </div>
                     </div>
                     {/* Description + Tags */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.description")}</h3>
+                      <div className="px-4 py-3 border-b border-line flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.description")}</h3>
                       </div>
                       <div className="p-4 space-y-4">
-                        <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
+                        <p className="text-[12px] leading-relaxed whitespace-pre-wrap text-fg-secondary">
                           {productDescriptionOf(product) || t("admin.productDetail.page.noDescriptionFull")}
                         </p>
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.productDetail.page.tags")}</p>
+                            <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("admin.productDetail.page.tags")}</p>
                             {overviewTagNames.length > 0 && (
                               <button type="button" onClick={() => setActiveTab("tags")} className="text-[11px] font-medium hover:underline" style={{ color: "var(--accent)" }}>
                                 {t("admin.productDetail.page.manage")}
@@ -2611,11 +2611,11 @@ export default function ProductDetailPage() {
                           {overviewTagNames.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {(overviewTagNames || []).map((tag) => (
-                                <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)]">{tag}</span>
+                                <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-medium bg-subtle border border-line text-fg-muted">{tag}</span>
                               ))}
                             </div>
                           ) : (
-                            <p className="text-[12px] text-[var(--text-muted)]">{t("admin.productDetail.page.noTagsAssigned")}</p>
+                            <p className="text-[12px] text-fg-muted">{t("admin.productDetail.page.noTagsAssigned")}</p>
                           )}
                         </div>
                       </div>
@@ -2627,9 +2627,9 @@ export default function ProductDetailPage() {
                   <div className="flex flex-col gap-3">
                     {/* Product Images */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30 flex items-center justify-between">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.productImages")}</h3>
-                        <span className="text-[10px] font-medium text-[var(--text-muted)]">{firstVariant?.images?.length === 1 ? `1 ${t("admin.productDetail.page.image")}` : t("admin.productDetail.page.imagesCount", { count: firstVariant?.images?.length || 0 })}</span>
+                      <div className="px-4 py-3 border-b border-line bg-subtle/30 flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.productImages")}</h3>
+                        <span className="text-[10px] font-medium text-fg-muted">{firstVariant?.images?.length === 1 ? `1 ${t("admin.productDetail.page.image")}` : t("admin.productDetail.page.imagesCount", { count: firstVariant?.images?.length || 0 })}</span>
                       </div>
                       <div className="p-3">
                         {firstVariant?.images?.length > 0 ? (
@@ -2637,7 +2637,7 @@ export default function ProductDetailPage() {
                             <button
                               type="button"
                               onClick={() => openGallery(0)}
-                              className="group/img relative block w-full overflow-hidden rounded-lg border border-[var(--border-color)]"
+                              className="group/img relative block w-full overflow-hidden rounded-lg border border-line"
                             >
                               <FallbackImage src={getImageUrl(firstVariant.images[0].img_url)} alt={product.name} className="w-full h-36 object-cover" />
                               <span className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
@@ -2653,7 +2653,7 @@ export default function ProductDetailPage() {
                                     key={i}
                                     type="button"
                                     onClick={() => openGallery(i + 1)}
-                                    className="h-14 w-full overflow-hidden rounded-md border border-[var(--border-color)] transition-all hover:ring-2 hover:ring-[var(--accent)]"
+                                    className="h-14 w-full overflow-hidden rounded-md border border-line transition-all hover:ring-2 hover:ring-accent"
                                   >
                                     <FallbackImage src={getImageUrl(img.img_url)} alt="" className="h-full w-full object-cover" />
                                   </button>
@@ -2682,8 +2682,8 @@ export default function ProductDetailPage() {
 
                     {/* Quick Info */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.quickInfo")}</h3>
+                      <div className="px-4 py-3 border-b border-line bg-subtle/30">
+                        <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.quickInfo")}</h3>
                       </div>
                       <div className="px-3 pb-3 pt-1">
                         <DataRow label={t("admin.productDetail.page.totalStock")} value={t("admin.productDetail.page.totalUnits", { count: totalStock.toLocaleString(locale) })} highlight />
@@ -2696,8 +2696,8 @@ export default function ProductDetailPage() {
 
                     {/* Perishable Information */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.perishableInfo")}</h3>
+                      <div className="px-4 py-3 border-b border-line bg-subtle/30">
+                        <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.perishableInfo")}</h3>
                       </div>
                       <div className="p-4">
                         <div className="flex items-start gap-3">
@@ -2719,8 +2719,8 @@ export default function ProductDetailPage() {
                             {product.isPerishable ? (
                               <div className="space-y-2">
                                 <div>
-                                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">{t("admin.productDetail.page.expiryAfterDelivery")}</p>
-                                  <p className="text-[14px] font-semibold text-[var(--text-primary)]">
+                                  <p className="text-[10px] font-bold text-fg-muted uppercase tracking-wider mb-1">{t("admin.productDetail.page.expiryAfterDelivery")}</p>
+                                  <p className="text-[14px] font-semibold text-fg">
                                     {Number(product.expiryDuration || 0).toLocaleString(locale)} {t(`admin.productDetail.page.unit${String(product.expiryUnit || "days")[0].toUpperCase()}${String(product.expiryUnit || "days").slice(1)}`)}
                                   </p>
                                 </div>
@@ -2735,7 +2735,7 @@ export default function ProductDetailPage() {
                                 </div>
                               </div>
                             ) : (
-                              <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">
+                              <p className="text-[12px] text-fg-muted leading-relaxed">
                                 {t("admin.productDetail.page.noExpiryAfterDelivery")}
                               </p>
                             )}
@@ -2746,8 +2746,8 @@ export default function ProductDetailPage() {
 
                     {/* Created By */}
                     <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                      <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.createdBy")}</h3>
+                      <div className="px-4 py-3 border-b border-line bg-subtle/30">
+                        <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.createdBy")}</h3>
                       </div>
                       <div className="p-3">
                         {createdByInfo.known ? (
@@ -2755,16 +2755,16 @@ export default function ProductDetailPage() {
                             <div className="flex items-center gap-3">
                               <Avatar name={createdByInfo.name} size="md" color="emerald" />
                               <div>
-                                <p className="text-[13px] font-semibold text-[var(--text-primary)]">{createdByInfo.name}</p>
-                                <p className="text-[11px] text-[var(--text-muted)]">{createdByInfo.email || "—"}</p>
+                                <p className="text-[13px] font-semibold text-fg">{createdByInfo.name}</p>
+                                <p className="text-[11px] text-fg-muted">{createdByInfo.email || "—"}</p>
                               </div>
                             </div>
-                            <p className="text-[11px] text-[var(--text-muted)] mt-1">{t("admin.productDetail.page.createdAt")}: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at, locale)}</span></p>
+                            <p className="text-[11px] text-fg-muted mt-1">{t("admin.productDetail.page.createdAt")}: <span className="font-medium text-fg-secondary">{fd(product.created_at, locale)}</span></p>
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
-                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">{t("admin.productDetail.page.notRecorded")}</p>
-                            <p className="text-[11px] text-[var(--text-muted)]">{t("admin.productDetail.page.createdAt")}: <span className="font-medium text-[var(--text-secondary)]">{fd(product.created_at, locale)}</span></p>
+                            <p className="text-[13px] font-semibold text-fg">{t("admin.productDetail.page.notRecorded")}</p>
+                            <p className="text-[11px] text-fg-muted">{t("admin.productDetail.page.createdAt")}: <span className="font-medium text-fg-secondary">{fd(product.created_at, locale)}</span></p>
                           </div>
                         )}
                       </div>
@@ -2775,8 +2775,8 @@ export default function ProductDetailPage() {
                         persisted audit user so it survives a page reload. */}
                     {hasRealUpdate(product.created_at, product.updated_at) && (
                       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
-                        <div className="px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-tertiary)]/30">
-                          <h3 className="text-sm font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.updatedBy")}</h3>
+                        <div className="px-4 py-3 border-b border-line bg-subtle/30">
+                          <h3 className="text-sm font-bold text-fg">{t("admin.productDetail.page.updatedBy")}</h3>
                         </div>
                         <div className="p-3">
                           {updatedByInfo.known ? (
@@ -2784,16 +2784,16 @@ export default function ProductDetailPage() {
                               <div className="flex items-center gap-3">
                                 <Avatar name={updatedByInfo.name} size="md" color="blue" />
                                 <div>
-                                  <p className="text-[13px] font-semibold text-[var(--text-primary)]">{updatedByInfo.name}</p>
-                                  <p className="text-[11px] text-[var(--text-muted)]">{updatedByInfo.email || "—"}</p>
+                                  <p className="text-[13px] font-semibold text-fg">{updatedByInfo.name}</p>
+                                  <p className="text-[11px] text-fg-muted">{updatedByInfo.email || "—"}</p>
                                 </div>
                               </div>
-                              <p className="text-[11px] text-[var(--text-muted)] mt-1">{t("admin.productDetail.page.updatedAt")}: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at, locale)}</span></p>
+                              <p className="text-[11px] text-fg-muted mt-1">{t("admin.productDetail.page.updatedAt")}: <span className="font-medium text-fg-secondary">{fd(product.updated_at, locale)}</span></p>
                             </div>
                           ) : (
                             <div className="flex flex-col gap-1">
-                              <p className="text-[13px] font-semibold text-[var(--text-primary)]">{t("admin.productDetail.page.notRecorded")}</p>
-                              <p className="text-[11px] text-[var(--text-muted)]">{t("admin.productDetail.page.updatedAt")}: <span className="font-medium text-[var(--text-secondary)]">{fd(product.updated_at, locale)}</span></p>
+                              <p className="text-[13px] font-semibold text-fg">{t("admin.productDetail.page.notRecorded")}</p>
+                              <p className="text-[11px] text-fg-muted">{t("admin.productDetail.page.updatedAt")}: <span className="font-medium text-fg-secondary">{fd(product.updated_at, locale)}</span></p>
                             </div>
                           )}
                         </div>
@@ -2813,8 +2813,8 @@ export default function ProductDetailPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-[15px] font-bold text-[var(--text-primary)]">{t("admin.productDetail.page.tags")}</h2>
-                    <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{allAssignedTags.length} {t("admin.productDetail.page.tags")}</p>
+                    <h2 className="text-[15px] font-bold text-fg">{t("admin.productDetail.page.tags")}</h2>
+                    <p className="text-[12px] text-fg-muted mt-0.5">{allAssignedTags.length} {t("admin.productDetail.page.tags")}</p>
                   </div>
                   <button
                     onClick={() => setShowCreateTagModal(true)}
@@ -2828,8 +2828,8 @@ export default function ProductDetailPage() {
                 {allAssignedTags.length === 0 ? (
                   <div className="rounded-xl py-14 flex flex-col items-center justify-center gap-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
                     <TagIcon className="w-8 h-8" style={{ color: "var(--text-muted)" }} />
-                    <p className="text-[13px] font-medium text-[var(--text-secondary)]">{t("admin.productDetail.page.noAssignedTags")}</p>
-                    <p className="text-[12px] text-[var(--text-muted)]">{t("admin.productDetail.page.tagsBody")}</p>
+                    <p className="text-[13px] font-medium text-fg-secondary">{t("admin.productDetail.page.noAssignedTags")}</p>
+                    <p className="text-[12px] text-fg-muted">{t("admin.productDetail.page.tagsBody")}</p>
                     <button
                       onClick={() => setShowCreateTagModal(true)}
                       className="mt-2 h-10 px-5 rounded-lg text-[12px] font-semibold flex items-center gap-2"
@@ -2843,10 +2843,10 @@ export default function ProductDetailPage() {
                     <table className="w-full text-[12px]">
                       <thead style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
                          <tr>
-                           <th className="text-start px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.tagName")}</th>
-                           <th className="text-start px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.source")}</th>
-                           <th className="text-start px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.createdBy")}</th>
-                           <th className="text-end px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-[var(--text-muted)]">{t("admin.productDetail.page.actions")}</th>
+                           <th className="text-start px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.tagName")}</th>
+                           <th className="text-start px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.source")}</th>
+                           <th className="text-start px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.createdBy")}</th>
+                           <th className="text-end px-5 py-3 font-semibold uppercase tracking-wider text-[10px] text-fg-muted">{t("admin.productDetail.page.actions")}</th>
                          </tr>
                       </thead>
                       <tbody>
@@ -2855,10 +2855,10 @@ export default function ProductDetailPage() {
                              <td className="px-5 py-3.5">
                                <span className="font-semibold text-[13px] capitalize" style={{ color: "var(--text-primary)" }}>{tag.name}</span>
                              </td>
-                             <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)] capitalize">
+                             <td className="px-5 py-3.5 text-[12px] text-fg-secondary capitalize">
                                {tagSourceInfo[String(tag.name || tag || "").trim().toLowerCase()]?.source || "—"}
                              </td>
-                              <td className="px-5 py-3.5 text-[12px] text-[var(--text-secondary)]">
+                              <td className="px-5 py-3.5 text-[12px] text-fg-secondary">
                                 {(() => {
                                   const lookupKey = String(tag.name || tag || "").trim().toLowerCase();
                                   const lookupIdKey = tag._id ? String(tag._id).trim().toLowerCase() : null;
@@ -3097,7 +3097,7 @@ export default function ProductDetailPage() {
                                               onClick={() => router.push(ev.href)}
                                               aria-label={`${t("admin.productDetail.page.viewRelatedRecord")} ${ev.recordNumber || ""}`.trim()}
                                               title={t("admin.productDetail.page.viewRelatedRecord")}
-                                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm transition hover:border-accent hover:text-accent"
                                               style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)", color: "var(--text-secondary)" }}
                                             >
                                               <Eye className="h-4 w-4" />
@@ -3177,7 +3177,7 @@ export default function ProductDetailPage() {
                 <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.productDetail.page.editProduct")}</h3>
                 <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.editProductSubtitle")}</p>
               </div>
-              <button onClick={closeProductModal} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition" style={{ color: "var(--text-muted)" }}>
+              <button onClick={closeProductModal} className="p-2 rounded-lg hover:bg-subtle transition" style={{ color: "var(--text-muted)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3479,7 +3479,7 @@ export default function ProductDetailPage() {
 
                               <div>
                                 <p className="text-[10px] font-bold uppercase tracking-wide mb-2" style={{ color: "var(--text-muted)" }}>{t("admin.productDetail.page.productImages")}</p>
-                                <label className="block cursor-pointer rounded-xl border-2 border-dashed p-4 text-center transition hover:border-[var(--accent)]" style={{ borderColor: "var(--border-color)" }}>
+                                <label className="block cursor-pointer rounded-xl border-2 border-dashed p-4 text-center transition hover:border-accent" style={{ borderColor: "var(--border-color)" }}>
                                   <input hidden multiple type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => handleImageUpload(index, e)} />
                                   <Upload className="mx-auto mb-2 w-6 h-6" style={{ color: "var(--text-muted)" }} />
                                   <p className="text-[12px] font-semibold">{t("admin.productDetail.page.clickToSelectImages")}</p>
@@ -3541,7 +3541,7 @@ export default function ProductDetailPage() {
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.productDetail.page.createNewTag")}</h3>
-              <button onClick={() => { setShowCreateTagModal(false); setNewTagModalValue(""); }} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition" style={{ color: "var(--text-muted)" }}>
+              <button onClick={() => { setShowCreateTagModal(false); setNewTagModalValue(""); }} className="p-2 rounded-lg hover:bg-subtle transition" style={{ color: "var(--text-muted)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3572,7 +3572,7 @@ export default function ProductDetailPage() {
           <div className="w-full max-w-md rounded-2xl p-6" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.productDetail.page.editTag")}</h3>
-              <button onClick={cancelEditTag} className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition" style={{ color: "var(--text-muted)" }}>
+              <button onClick={cancelEditTag} className="p-2 rounded-lg hover:bg-subtle transition" style={{ color: "var(--text-muted)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3607,7 +3607,7 @@ export default function ProductDetailPage() {
                 <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>{editingVariantForTags.title || editingVariantForTags.sku}</p>
               </div>
               <button onClick={() => { setShowVariantTagsModal(false); setEditingVariantForTags(null); setVariantTagInput(""); }}
-                className="p-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition" style={{ color: "var(--text-muted)" }}>
+                className="p-2 rounded-lg hover:bg-subtle transition" style={{ color: "var(--text-muted)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3741,7 +3741,7 @@ export default function ProductDetailPage() {
               <h3 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{t("admin.productDetail.page.createNewAttribute")}</h3>
               <button type="button" onClick={() => { setShowAttributeModal(false); setAttributeTargetVariant(null); resetAttributeForm(); }} disabled={createAttributeMutation.isPending}
                 aria-label={t("admin.shared.action.close")}
-                className="rounded-lg p-2 transition hover:bg-[var(--bg-tertiary)] disabled:opacity-50" style={{ color: "var(--text-muted)" }}>
+                className="rounded-lg p-2 transition hover:bg-subtle disabled:opacity-50" style={{ color: "var(--text-muted)" }}>
                 <X className="w-5 h-5" />
               </button>
             </div>

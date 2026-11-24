@@ -70,11 +70,11 @@ export default function ActivityFeed({ queryKey, fetcher, title, description, wh
       {title && <CardHeader title={title} description={description} icon={Activity} />}
       <CardToolbar>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search activity…" label="Search activity" />
-        {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
+        {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-fg-muted" aria-label="Refreshing" />}
       </CardToolbar>
 
       {isLoading ? (
-        <ul className="divide-y divide-[var(--border-color)]">
+        <ul className="divide-y divide-line">
           {Array.from({ length: 5 }).map((_, i) => (
             <li key={i} className="flex items-start gap-3 px-5 py-3.5"><Skeleton className="h-9 w-9 rounded-lg" /><span className="flex-1 space-y-2"><Skeleton className="h-3.5 w-56" /><Skeleton className="h-3 w-80 max-w-full" /></span><Skeleton className="h-3 w-16" /></li>
           ))}
@@ -91,29 +91,29 @@ export default function ActivityFeed({ queryKey, fetcher, title, description, wh
         <div>
           {groups.map(([day, rows]) => (
             <section key={day}>
-              <h3 className="border-y border-[var(--border-color)] bg-[var(--bg-table)] px-5 py-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] first:border-t-0">{day}</h3>
-              <ol className="divide-y divide-[var(--border-color)]">
+              <h3 className="border-y border-line bg-table px-5 py-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted first:border-t-0">{day}</h3>
+              <ol className="divide-y divide-line">
                 {rows.map((a) => {
                   const meta = ENTITY[a.entityType] || ENTITY.system;
                   const Icon = isSignOut(a) ? LogOut : meta.icon;
                   const href = meta.href && a.entityId ? meta.href(a.entityId) : null;
                   return (
                     <li key={a.id} className="flex items-start gap-3.5 px-5 py-3.5">
-                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)]"><Icon size={16} aria-hidden="true" /></span>
+                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-subtle text-fg-muted"><Icon size={16} aria-hidden="true" /></span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <p className="text-[13.5px] font-semibold leading-5 text-[var(--text-primary)]">{a.title}</p>
+                          <p className="text-[13.5px] font-semibold leading-5 text-fg">{a.title}</p>
                           <Badge tone={titleTone(a.title)} dot={false}>{a.entityLabel}</Badge>
                         </div>
-                        {a.subject && <p className="mt-0.5 text-[13px] text-[var(--text-secondary)]">{a.subject}</p>}
-                        {a.description && <p className="mt-1 text-[12.5px] leading-5 text-[var(--text-muted)]">{a.description}</p>}
+                        {a.subject && <p className="mt-0.5 text-[13px] text-fg-secondary">{a.subject}</p>}
+                        {a.description && <p className="mt-1 text-[12.5px] leading-5 text-fg-muted">{a.description}</p>}
                         {href && (
-                          <Link href={href} className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent)] hover:underline">Open {a.entityLabel.toLowerCase()} <ArrowUpRight size={12} aria-hidden="true" /></Link>
+                          <Link href={href} className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-accent hover:underline">Open {a.entityLabel.toLowerCase()} <ArrowUpRight size={12} aria-hidden="true" /></Link>
                         )}
                       </div>
                       <div className="shrink-0 text-end" title={formatDateTime(a.at)}>
-                        <p className="text-[13px] font-medium tabular-nums text-[var(--text-primary)]">{formatTime(a.at)}</p>
-                        <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{timeAgo(a.at)}</p>
+                        <p className="text-[13px] font-medium tabular-nums text-fg">{formatTime(a.at)}</p>
+                        <p className="mt-0.5 text-[12px] text-fg-muted">{timeAgo(a.at)}</p>
                       </div>
                     </li>
                   );

@@ -97,7 +97,7 @@ const normalizeTab = (t) =>
 function Card({ className = "", children }) {
   return (
     <div
-      className={`rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm ${className}`}
+      className={`rounded-2xl border border-user-line bg-user-card shadow-sm ${className}`}
     >
       {children}
     </div>
@@ -106,27 +106,27 @@ function Card({ className = "", children }) {
 
 function CardHeader({ icon: Icon, title, subtitle, action, tone = "accent" }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-[var(--user-border)]">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 border-b border-user-line">
       <div className="flex items-center gap-3 min-w-0">
         {Icon && (
           <span
             className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
               tone === "success"
-                ? "bg-[var(--user-success)]/10 text-[var(--user-success)]"
+                ? "bg-user-success/10 text-user-success"
                 : tone === "danger"
-                  ? "bg-[var(--user-danger)]/10 text-[var(--user-danger)]"
-                  : "bg-[var(--user-accent)]/10 text-[var(--user-accent)]"
+                  ? "bg-user-danger/10 text-user-danger"
+                  : "bg-user-accent/10 text-user-accent"
             }`}
           >
             <Icon size={16} />
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="text-[0.9375rem] font-black text-[var(--user-text)] truncate">
+          <h2 className="text-[0.9375rem] font-black text-user-fg truncate">
             {title}
           </h2>
           {subtitle && (
-            <p className="text-[0.6875rem] text-[var(--user-text-muted)] mt-0.5 truncate">
+            <p className="text-[0.6875rem] text-user-fg-muted mt-0.5 truncate">
               {subtitle}
             </p>
           )}
@@ -139,8 +139,8 @@ function CardHeader({ icon: Icon, title, subtitle, action, tone = "accent" }) {
 
 function MetaRow({ icon: Icon, children }) {
   return (
-    <span className="flex items-center gap-1.5 min-w-0 text-[0.75rem] text-[var(--user-text-muted)]">
-      {Icon && <Icon size={13} className="text-[var(--user-accent)] shrink-0" />}
+    <span className="flex items-center gap-1.5 min-w-0 text-[0.75rem] text-user-fg-muted">
+      {Icon && <Icon size={13} className="text-user-accent shrink-0" />}
       <span className="truncate">{children}</span>
     </span>
   );
@@ -154,8 +154,8 @@ function StatusPill({ status, size = "md" }) {
         size === "sm" ? "text-[0.5625rem] px-1.5 py-0.5" : "text-[0.625rem] px-2 py-0.5"
       } ${
         active
-          ? "text-[var(--user-success)] bg-[var(--user-success)]/10 border-[var(--user-success)]/30"
-          : "text-[var(--user-danger)] bg-[var(--user-danger)]/10 border-[var(--user-danger)]/30"
+          ? "text-user-success bg-user-success/10 border-user-success/30"
+          : "text-user-danger bg-user-danger/10 border-user-danger/30"
       }`}
     >
       <CheckCircle2 size={size === "sm" ? 9 : 11} /> {status}
@@ -166,11 +166,11 @@ function StatusPill({ status, size = "md" }) {
 function EmptyBlock({ icon: Icon, title, text, action }) {
   return (
     <div className="text-center py-10 sm:py-12 px-4">
-      <div className="w-14 h-14 mx-auto rounded-2xl bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
-        <Icon size={24} className="text-[var(--user-text-subtle)]" />
+      <div className="w-14 h-14 mx-auto rounded-2xl bg-user-hover flex items-center justify-center mb-3">
+        <Icon size={24} className="text-user-fg-subtle" />
       </div>
-      <p className="text-sm font-bold text-[var(--user-text)] mb-1">{title}</p>
-      {text && <p className="text-xs text-[var(--user-text-muted)] mb-4">{text}</p>}
+      <p className="text-sm font-bold text-user-fg mb-1">{title}</p>
+      {text && <p className="text-xs text-user-fg-muted mb-4">{text}</p>}
       {action}
     </div>
   );
@@ -181,16 +181,16 @@ function EmptyBlock({ icon: Icon, title, text, action }) {
 function navItemCls(active) {
   return `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold transition-all duration-200 ${
     active
-      ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md"
-      : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"
+      ? "bg-user-accent text-user-accent-fg shadow-md"
+      : "text-user-fg-secondary hover:bg-user-hover hover:text-user-fg"
   }`;
 }
 
 function navBadgeCls(active) {
   return `ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
     active
-      ? "bg-[var(--user-accent-text)]/15 text-[var(--user-accent-text)]"
-      : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"
+      ? "bg-user-accent-fg/15 text-user-accent-fg"
+      : "bg-user-hover text-user-fg-muted"
   }`;
 }
 
@@ -199,22 +199,22 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
     <div className="space-y-4">
     <Card className="overflow-hidden rounded-l-none border-l-0">
       {/* identity block */}
-      <div className="relative p-4 border-b border-[var(--user-border)] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/12 via-transparent to-transparent pointer-events-none" />
+      <div className="relative p-4 border-b border-user-line overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-user-accent/12 via-transparent to-transparent pointer-events-none" />
         <div className="relative flex items-center gap-3">
           <div className="relative shrink-0">
-            <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-11 h-11 rounded-full object-cover border border-[var(--user-border)]" />
+            <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-11 h-11 rounded-full object-cover border border-user-line" />
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[var(--user-bg-card)] ${
-                status === "Active" ? "bg-[var(--user-success)]" : "bg-[var(--user-danger)]"
+              className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-user-card ${
+                status === "Active" ? "bg-user-success" : "bg-user-danger"
               }`}
             />
           </div>
           <div className="min-w-0">
-            <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate capitalize">
+            <p className="text-[0.8125rem] font-black text-user-fg truncate capitalize">
               {user.name || user.username}
             </p>
-            <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{user.email}</p>
+            <p className="text-[0.625rem] text-user-fg-muted truncate">{user.email}</p>
           </div>
         </div>
 
@@ -242,11 +242,11 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
           );
         })}
 
-        <div className="h-px bg-[var(--user-border)] my-2" />
+        <div className="h-px bg-user-line my-2" />
 
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold text-user-danger hover:bg-user-danger/10 transition-colors duration-200"
         >
           <LogOut size={16} className="shrink-0" /> Logout
         </button>
@@ -263,14 +263,14 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
           const Icon = perk.icon;
           return (
             <div key={perk.title} className="flex items-center gap-2.5 rounded-xl px-2.5 py-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-user-accent/10 text-user-accent">
                 <Icon size={14} />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[0.75rem] font-bold text-[var(--user-text)]">
+                <span className="block truncate text-[0.75rem] font-bold text-user-fg">
                   {perk.title}
                 </span>
-                <span className="block truncate text-[0.625rem] text-[var(--user-text-muted)]">
+                <span className="block truncate text-[0.625rem] text-user-fg-muted">
                   {perk.desc}
                 </span>
               </span>
@@ -298,24 +298,24 @@ function MobileMenu({
     <div className="lg:hidden space-y-3">
       {/* identity */}
       <Card className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/12 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-user-accent/12 via-transparent to-transparent pointer-events-none" />
         <div className="absolute -right-6 -bottom-10 opacity-[0.05] pointer-events-none">
-          <ShoppingBag size={150} className="text-[var(--user-accent)]" />
+          <ShoppingBag size={150} className="text-user-accent" />
         </div>
         <div className="relative p-4 sm:p-5">
           <div className="flex items-center gap-4">
-            <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0" />
+            <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-user-line shadow-lg shrink-0" />
             <div className="min-w-0 flex-1">
-              <h1 className="text-base font-black text-[var(--user-text)] capitalize truncate">
+              <h1 className="text-base font-black text-user-fg capitalize truncate">
                 {user.name || user.username}
               </h1>
-              <p className="text-[0.6875rem] text-[var(--user-text-muted)] truncate mt-0.5">
+              <p className="text-[0.6875rem] text-user-fg-muted truncate mt-0.5">
                 {user.email}
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <StatusPill status={status} />
                 {memberSince && (
-                  <span className="text-[0.625rem] text-[var(--user-text-subtle)]">
+                  <span className="text-[0.625rem] text-user-fg-subtle">
                     Since {memberSince}
                   </span>
                 )}
@@ -329,11 +329,11 @@ function MobileMenu({
               <button
                 key={s.label}
                 onClick={s.onClick}
-                className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60 px-3 py-2.5 text-left active:scale-[0.98] transition"
+                className="rounded-xl border border-user-line bg-user-hover/60 px-3 py-2.5 text-left active:scale-[0.98] transition"
               >
-                <s.icon size={14} className="text-[var(--user-accent)]" />
-                <p className="text-base font-black text-[var(--user-text)] mt-1.5">{s.value}</p>
-                <p className="text-[0.5625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                <s.icon size={14} className="text-user-accent" />
+                <p className="text-base font-black text-user-fg mt-1.5">{s.value}</p>
+                <p className="text-[0.5625rem] text-user-fg-muted uppercase tracking-wider">
                   {s.label}
                 </p>
               </button>
@@ -344,8 +344,8 @@ function MobileMenu({
 
       {/* nav list */}
       <Card className="overflow-hidden">
-        <div className="px-4 py-3 border-b border-[var(--user-border)]">
-          <p className="text-[0.625rem] font-black text-[var(--user-text-muted)] uppercase tracking-widest">
+        <div className="px-4 py-3 border-b border-user-line">
+          <p className="text-[0.625rem] font-black text-user-fg-muted uppercase tracking-widest">
             Account Menu
           </p>
         </div>
@@ -357,29 +357,29 @@ function MobileMenu({
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:bg-[var(--user-bg-hover)] transition-colors duration-200"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-user-fg-secondary hover:bg-user-hover hover:text-user-fg active:bg-user-hover transition-colors duration-200"
               >
-                <span className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                <span className="w-9 h-9 rounded-lg bg-user-accent/10 text-user-accent flex items-center justify-center shrink-0">
                   <Icon size={16} />
                 </span>
                 <span className="truncate">{item.label}</span>
                 {count > 0 && (
-                  <span className="ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] shrink-0">
+                  <span className="ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full bg-user-hover text-user-fg-muted shrink-0">
                     {count}
                   </span>
                 )}
-                <ChevronRight size={15} className="text-[var(--user-text-subtle)] shrink-0" />
+                <ChevronRight size={15} className="text-user-fg-subtle shrink-0" />
               </button>
             );
           })}
 
-          <div className="h-px bg-[var(--user-border)] my-2" />
+          <div className="h-px bg-user-line my-2" />
 
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-user-danger hover:bg-user-danger/10 transition-colors duration-200"
           >
-            <span className="w-9 h-9 rounded-lg bg-[var(--user-danger)]/10 flex items-center justify-center shrink-0">
+            <span className="w-9 h-9 rounded-lg bg-user-danger/10 flex items-center justify-center shrink-0">
               <LogOut size={16} />
             </span>
             Logout
@@ -394,16 +394,16 @@ function MobileMenu({
 /* ============ MOBILE TOP BAR (back to menu) ============ */
 function MobileTopBar({ title, onBack }) {
   return (
-    <div className="lg:hidden sticky top-[3.5625rem] z-30 -mx-3 px-3 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-b border-[var(--user-border)] mb-4">
+    <div className="lg:hidden sticky top-[3.5625rem] z-30 -mx-3 px-3 bg-user-elevated/95 backdrop-blur-md border-b border-user-line mb-4">
       <div className="flex items-center gap-3 h-12">
         <button
           onClick={onBack}
           aria-label="Back to account menu"
-          className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-95 transition"
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-user-fg hover:bg-user-hover active:scale-95 transition"
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-base font-black text-[var(--user-text)] flex-1 truncate">{title}</h1>
+        <h1 className="text-base font-black text-user-fg flex-1 truncate">{title}</h1>
       </div>
     </div>
   );
@@ -452,7 +452,7 @@ export default function AccountPage() {
     return Math.min(score, 4);
   }, [pwForm.next]);
   const pwStrengthMeta = [
-    { label: "", bar: "bg-[var(--user-border)]" },
+    { label: "", bar: "bg-user-line" },
     { label: "Weak", bar: "bg-red-500" },
     { label: "Fair", bar: "bg-orange-500" },
     { label: "Good", bar: "bg-amber-400" },
@@ -519,7 +519,7 @@ export default function AccountPage() {
   if (userLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+        <Loader2 className="animate-spin text-user-accent" size={28} />
       </div>
     );
   }
@@ -527,16 +527,16 @@ export default function AccountPage() {
   if (!user) {
     return (
       <div className="max-w-md mx-auto px-4 py-24 text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-5">
-          <User size={28} className="text-[var(--user-accent)] opacity-60" />
+        <div className="w-16 h-16 mx-auto rounded-full bg-user-card border border-user-line flex items-center justify-center mb-5">
+          <User size={28} className="text-user-accent opacity-60" />
         </div>
-        <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">Login Required</h1>
-        <p className="text-sm text-[var(--user-text-muted)] mb-6">
+        <h1 className="text-lg font-bold text-user-fg mb-2">Login Required</h1>
+        <p className="text-sm text-user-fg-muted mb-6">
           Please login to view your account.
         </p>
         <Link
           href="/login?redirect=/account"
-          className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition"
+          className="inline-block bg-user-accent text-user-accent-fg px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition"
         >
           Login to Your Account
         </Link>
@@ -677,17 +677,17 @@ export default function AccountPage() {
 
   /* ---------- shared class strings ---------- */
   const inputCls =
-    "w-full h-11 px-3 rounded-xl text-sm outline-none transition bg-[var(--user-bg-input)] border border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)]";
+    "w-full h-11 px-3 rounded-xl text-sm outline-none transition bg-user-input border border-user-line text-user-fg placeholder:text-user-fg-subtle focus:ring-2 focus:ring-user-accent/30 focus:border-user-accent";
   const fieldCls = (editable) =>
     `${inputCls} ${
-      editable ? "" : "cursor-default opacity-80 focus:ring-0 focus:border-[var(--user-border)]"
+      editable ? "" : "cursor-default opacity-80 focus:ring-0 focus:border-user-line"
     }`;
   const labelCls =
-    "block text-[0.6875rem] font-bold text-[var(--user-text-muted)] mb-1.5 uppercase tracking-wider";
+    "block text-[0.6875rem] font-bold text-user-fg-muted mb-1.5 uppercase tracking-wider";
   const btnPrimary =
-    "h-10 px-3.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50 active:scale-[0.98]";
+    "h-10 px-3.5 rounded-xl bg-user-accent text-user-accent-fg text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50 active:scale-[0.98]";
   const btnSecondary =
-    "h-10 px-3.5 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-[0.98]";
+    "h-10 px-3.5 rounded-xl border border-user-line bg-user-card text-xs font-bold text-user-fg hover:bg-user-hover hover:border-user-accent/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-[0.98]";
 
 
   /* ---------- shared sidebar props ---------- */
@@ -730,15 +730,15 @@ export default function AccountPage() {
                   <div className="space-y-4 min-w-0">
                     {/* identity */}
                     <Card className="relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-br from-[var(--user-accent)]/10 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-user-accent/10 via-transparent to-transparent pointer-events-none" />
                       <div className="absolute -right-6 -bottom-10 opacity-[0.05] pointer-events-none">
-                        <ShoppingBag size={160} className="text-[var(--user-accent)]" />
+                        <ShoppingBag size={160} className="text-user-accent" />
                       </div>
                       <div className="relative p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                        <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0" />
+                        <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-user-line shadow-lg shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg font-black text-[var(--user-text)] capitalize truncate">
+                            <h1 className="text-lg font-black text-user-fg capitalize truncate">
                               {user.name || user.username}
                             </h1>
                             <StatusPill status={accountStatus} />
@@ -757,7 +757,7 @@ export default function AccountPage() {
 
                     {/* profile information */}
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader
                         icon={User}
                         title="Profile Information"
@@ -857,7 +857,7 @@ export default function AccountPage() {
                   <div className="space-y-4 min-w-0">
                     {/* account security */}
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader
                         icon={ShieldCheck}
                         title="Account Security"
@@ -866,22 +866,22 @@ export default function AccountPage() {
                       <div className="p-2 space-y-0.5">
                         <button
                           onClick={() => navigate("settings")}
-                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[var(--user-bg-hover)] transition text-left"
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-user-hover transition text-left"
                         >
-                          <span className="w-9 h-9 rounded-xl bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                          <span className="w-9 h-9 rounded-xl bg-user-hover text-user-accent flex items-center justify-center shrink-0">
                             <KeyRound size={16} />
                           </span>
                           <span className="flex-1 min-w-0">
-                            <span className="block text-[0.8125rem] font-bold text-[var(--user-text)]">
+                            <span className="block text-[0.8125rem] font-bold text-user-fg">
                               Change Password
                             </span>
-                            <span className="block text-[0.6875rem] text-[var(--user-text-muted)] truncate">
+                            <span className="block text-[0.6875rem] text-user-fg-muted truncate">
                               {user.provider === "google"
                                 ? "Signed up with Google"
                                 : "Keep your account safe"}
                             </span>
                           </span>
-                          <ChevronRight size={15} className="text-[var(--user-text-muted)] shrink-0" />
+                          <ChevronRight size={15} className="text-user-fg-muted shrink-0" />
                         </button>
                       </div>
                     </Card>
@@ -889,7 +889,7 @@ export default function AccountPage() {
 
                     {/* quick stats */}
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader icon={Package} title="Quick Stats" />
                       <div className="p-3 grid grid-cols-2 gap-2.5">
                         {stats.map((s) => {
@@ -898,15 +898,15 @@ export default function AccountPage() {
                             <button
                               key={s.label}
                               onClick={s.onClick}
-                              className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3 text-left hover:border-[var(--user-accent)]/50 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
+                              className="rounded-xl border border-user-line bg-user-hover/50 p-3 text-left hover:border-user-accent/50 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
                             >
-                              <span className="w-8 h-8 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center mb-2">
+                              <span className="w-8 h-8 rounded-lg bg-user-accent/10 text-user-accent flex items-center justify-center mb-2">
                                 <Icon size={15} />
                               </span>
-                              <p className="text-base font-black text-[var(--user-text)]">
+                              <p className="text-base font-black text-user-fg">
                                 {s.value}
                               </p>
-                              <p className="text-[0.5625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                              <p className="text-[0.5625rem] text-user-fg-muted uppercase tracking-wider">
                                 {s.label}
                               </p>
                             </button>
@@ -929,7 +929,7 @@ export default function AccountPage() {
               {/* ============ ADDRESS ============ */}
               {tab === "address" && (
                 <Card className="overflow-hidden">
-                  <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                  <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                   <CardHeader
                     icon={MapPin}
                     title={`Addresses (${addresses.length})`}
@@ -971,35 +971,35 @@ export default function AccountPage() {
                             key={a._id}
                             className={`flex flex-col p-4 sm:p-5 rounded-xl border-2 hover:-translate-y-0.5 hover:shadow-lg transition-all active:scale-[0.99] ${
                               a.is_default
-                                ? "border-[var(--user-accent)] bg-[var(--user-accent)]/5"
-                                : "border-[var(--user-border)]"
+                                ? "border-user-accent bg-user-accent/5"
+                                : "border-user-line"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <p className="text-sm font-bold text-[var(--user-text)] capitalize">
+                              <p className="text-sm font-bold text-user-fg capitalize">
                                 {a.full_name}
                               </p>
                               {a.is_default && (
-                                <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">
+                                <span className="text-[0.5rem] font-black text-user-accent bg-user-accent/10 border border-user-accent/30 px-1.5 py-0.5 rounded shrink-0">
                                   DEFAULT
                                 </span>
                               )}
                             </div>
 
                             <div className="flex-1 space-y-1.5">
-                              <p className="text-xs text-[var(--user-text)] leading-relaxed">
+                              <p className="text-xs text-user-fg leading-relaxed">
                                 {a.street_address1}
                                 {a.street_address2 && <>, {a.street_address2}</>}
                               </p>
-                              <p className="text-xs text-[var(--user-text-muted)] leading-relaxed">
+                              <p className="text-xs text-user-fg-muted leading-relaxed">
                                 {a.city}, {a.state} {a.zip_code && `(${a.zip_code})`}
                               </p>
-                              <p className="text-xs text-[var(--user-text-muted)]">{a.country}</p>
+                              <p className="text-xs text-user-fg-muted">{a.country}</p>
                             </div>
 
-                            <div className="flex items-center gap-1.5 pt-3 mt-3 border-t border-[var(--user-border)]">
-                              <span className="text-[0.6875rem] text-[var(--user-text-secondary)] flex items-center gap-1 flex-1">
-                                <Phone size={11} className="text-[var(--user-accent)]" /> {a.phone}
+                            <div className="flex items-center gap-1.5 pt-3 mt-3 border-t border-user-line">
+                              <span className="text-[0.6875rem] text-user-fg-secondary flex items-center gap-1 flex-1">
+                                <Phone size={11} className="text-user-accent" /> {a.phone}
                               </span>
                             </div>
 
@@ -1007,7 +1007,7 @@ export default function AccountPage() {
                               {!a.is_default && (
                                 <button
                                   onClick={() => setDefaultAddress(a)}
-                                  className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center gap-1 active:scale-95"
+                                  className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-user-accent hover:bg-user-accent/10 transition flex items-center justify-center gap-1 active:scale-95"
                                 >
                                   <Star size={11} /> Default
                                 </button>
@@ -1017,13 +1017,13 @@ export default function AccountPage() {
                                   setEditAddress(a);
                                   setShowAddressModal(true);
                                 }}
-                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-1 active:scale-95"
+                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-user-fg-secondary hover:bg-user-hover transition flex items-center justify-center gap-1 active:scale-95"
                               >
                                 <Pencil size={11} /> Edit
                               </button>
                               <button
                                 onClick={() => setDeleteAddressId(a._id)}
-                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-1 active:scale-95"
+                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-user-danger hover:bg-user-danger/10 transition flex items-center justify-center gap-1 active:scale-95"
                               >
                                 <Trash2 size={11} /> Delete
                               </button>
@@ -1044,7 +1044,7 @@ export default function AccountPage() {
                   <div className="space-y-4 min-w-0">
                     {/* change password */}
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader
                         icon={KeyRound}
                         title="Change Password"
@@ -1066,7 +1066,7 @@ export default function AccountPage() {
                             <button
                               onClick={() => setShowPw(!showPw)}
                               aria-label={showPw ? "Hide password" : "Show password"}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--user-text-subtle)] hover:text-[var(--user-text)] transition"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-user-fg-subtle hover:text-user-fg transition"
                             >
                               {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                             </button>
@@ -1115,7 +1115,7 @@ export default function AccountPage() {
                         {pwForm.next ? (
                           <div>
                             <div className="mb-1.5 flex items-center justify-between">
-                              <span className="text-[0.625rem] font-bold uppercase tracking-wider text-[var(--user-text-subtle)]">
+                              <span className="text-[0.625rem] font-bold uppercase tracking-wider text-user-fg-subtle">
                                 Password strength
                               </span>
                               <span
@@ -1137,7 +1137,7 @@ export default function AccountPage() {
                                   className={`h-1.5 flex-1 rounded-full ${
                                     segment <= pwStrength
                                       ? pwStrengthMeta.bar
-                                      : "bg-[var(--user-bg-hover)]"
+                                      : "bg-user-hover"
                                   }`}
                                 />
                               ))}
@@ -1146,9 +1146,9 @@ export default function AccountPage() {
                         ) : null}
 
                         {/* security tip */}
-                        <div className="flex items-start gap-2.5 rounded-xl border border-[var(--user-accent)]/25 bg-[var(--user-accent-soft)] px-3.5 py-3">
-                          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[var(--user-accent)]" />
-                          <p className="text-[0.6875rem] leading-relaxed text-[var(--user-text-muted)]">
+                        <div className="flex items-start gap-2.5 rounded-xl border border-user-accent/25 bg-user-accent-soft px-3.5 py-3">
+                          <ShieldCheck size={15} className="mt-0.5 shrink-0 text-user-accent" />
+                          <p className="text-[0.6875rem] leading-relaxed text-user-fg-muted">
                             Use 10+ characters with uppercase, numbers and symbols — and never
                             reuse a password from another site.
                           </p>
@@ -1161,47 +1161,47 @@ export default function AccountPage() {
                   {/* right rail — account details */}
                   <div className="space-y-4 min-w-0">
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader
                         icon={Globe}
                         title="Account Details"
                         subtitle="Read-only information from your account"
                       />
-                      <div className="divide-y divide-[var(--user-border)]">
+                      <div className="divide-y divide-user-line">
                         <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                          <span className="w-8 h-8 rounded-lg bg-user-hover text-user-accent flex items-center justify-center shrink-0">
                             <Mail size={14} />
                           </span>
                           <div className="min-w-0">
-                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                            <p className="text-[0.625rem] text-user-fg-muted uppercase tracking-wider">
                               Email
                             </p>
-                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                            <p className="text-[0.8125rem] font-semibold text-user-fg truncate">
                               {user.email}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                          <span className="w-8 h-8 rounded-lg bg-user-hover text-user-accent flex items-center justify-center shrink-0">
                             <Globe size={14} />
                           </span>
                           <div className="min-w-0">
-                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                            <p className="text-[0.625rem] text-user-fg-muted uppercase tracking-wider">
                               Sign-in Method
                             </p>
-                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                            <p className="text-[0.8125rem] font-semibold text-user-fg truncate">
                               {user.provider === "google" ? "Google" : "Email & Password"}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                          <span className="w-8 h-8 rounded-lg bg-user-hover text-user-accent flex items-center justify-center shrink-0">
                             <ShieldCheck size={14} />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                            <p className="text-[0.625rem] text-user-fg-muted uppercase tracking-wider">
                               Account Status
                             </p>
                             <div className="mt-1">
@@ -1211,28 +1211,28 @@ export default function AccountPage() {
                         </div>
 
                         <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                          <span className="w-8 h-8 rounded-lg bg-user-hover text-user-accent flex items-center justify-center shrink-0">
                             <Calendar size={14} />
                           </span>
                           <div className="min-w-0">
-                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                            <p className="text-[0.625rem] text-user-fg-muted uppercase tracking-wider">
                               Member Since
                             </p>
-                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                            <p className="text-[0.8125rem] font-semibold text-user-fg truncate">
                               {memberSince || "—"}
                             </p>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-                          <span className="w-8 h-8 rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)] flex items-center justify-center shrink-0">
+                          <span className="w-8 h-8 rounded-lg bg-user-hover text-user-accent flex items-center justify-center shrink-0">
                             <Clock size={14} />
                           </span>
                           <div className="min-w-0">
-                            <p className="text-[0.625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
+                            <p className="text-[0.625rem] text-user-fg-muted uppercase tracking-wider">
                               Last Updated
                             </p>
-                            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate">
+                            <p className="text-[0.8125rem] font-semibold text-user-fg truncate">
                               {fmtDate(user.updated_at) || "—"}
                             </p>
                           </div>
@@ -1245,7 +1245,7 @@ export default function AccountPage() {
                 {/* bottom row — Default Address + Quick Actions ek hi row me */}
                 <div className="grid items-start gap-4 sm:grid-cols-2">
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader
                         icon={MapPin}
                         title="Default Address"
@@ -1253,7 +1253,7 @@ export default function AccountPage() {
                         action={
                           <button
                             onClick={() => navigate("address")}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-user-line px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-user-fg-muted transition-colors hover:border-user-accent hover:text-user-accent"
                           >
                             Manage
                             <ChevronRight size={12} />
@@ -1265,20 +1265,20 @@ export default function AccountPage() {
                         if (!defaultAddress) {
                           return (
                             <div className="px-4 sm:px-5 py-5 text-center">
-                              <span className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-subtle)]">
+                              <span className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-user-hover text-user-fg-subtle">
                                 <MapPin size={18} />
                               </span>
-                              <p className="text-[0.8125rem] font-bold text-[var(--user-text)]">
+                              <p className="text-[0.8125rem] font-bold text-user-fg">
                                 {addresses.length ? "No default address set" : "No saved addresses"}
                               </p>
-                              <p className="mt-1 text-[0.6875rem] text-[var(--user-text-muted)]">
+                              <p className="mt-1 text-[0.6875rem] text-user-fg-muted">
                                 {addresses.length
                                   ? "Pick one as default from your addresses."
                                   : "Add an address to make checkout faster."}
                               </p>
                               <button
                                 onClick={() => navigate("address")}
-                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-user-accent px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-user-accent-fg transition-opacity hover:opacity-90"
                               >
                                 {addresses.length ? "Choose Default" : "Add Address"}
                               </button>
@@ -1287,25 +1287,25 @@ export default function AccountPage() {
                         }
                         return (
                           <div className="px-4 sm:px-5 py-4">
-                            <div className="rounded-xl border-2 border-[var(--user-accent)] bg-[var(--user-accent)]/5 p-3.5">
+                            <div className="rounded-xl border-2 border-user-accent bg-user-accent/5 p-3.5">
                               <div className="mb-1.5 flex items-start justify-between gap-2">
-                                <p className="text-[0.8125rem] font-bold capitalize text-[var(--user-text)]">
+                                <p className="text-[0.8125rem] font-bold capitalize text-user-fg">
                                   {defaultAddress.full_name}
                                 </p>
-                                <span className="shrink-0 rounded border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[0.5rem] font-black text-[var(--user-accent)]">
+                                <span className="shrink-0 rounded border border-user-accent/30 bg-user-accent/10 px-1.5 py-0.5 text-[0.5rem] font-black text-user-accent">
                                   DEFAULT
                                 </span>
                               </div>
-                              <p className="text-[0.6875rem] leading-relaxed text-[var(--user-text)]">
+                              <p className="text-[0.6875rem] leading-relaxed text-user-fg">
                                 {defaultAddress.street_address1}
                                 {defaultAddress.street_address2 && <>, {defaultAddress.street_address2}</>}
                               </p>
-                              <p className="text-[0.6875rem] leading-relaxed text-[var(--user-text-muted)]">
+                              <p className="text-[0.6875rem] leading-relaxed text-user-fg-muted">
                                 {defaultAddress.city}, {defaultAddress.state}
                                 {defaultAddress.zip_code && ` (${defaultAddress.zip_code})`} · {defaultAddress.country}
                               </p>
-                              <p className="mt-1.5 flex items-center gap-1 text-[0.6875rem] font-semibold text-[var(--user-text-secondary)]">
-                                <Phone size={11} className="text-[var(--user-accent)]" />
+                              <p className="mt-1.5 flex items-center gap-1 text-[0.6875rem] font-semibold text-user-fg-secondary">
+                                <Phone size={11} className="text-user-accent" />
                                 {defaultAddress.phone}
                               </p>
                             </div>
@@ -1315,7 +1315,7 @@ export default function AccountPage() {
                     </Card>
 
                     <Card className="overflow-hidden">
-                      <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
+                      <div className="h-1 bg-gradient-to-r from-user-accent via-user-accent-hover to-transparent" />
                       <CardHeader icon={Star} title="Quick Actions" subtitle="Jump to your stuff" />
                       <div className="space-y-0.5 p-2">
                         {[
@@ -1328,20 +1328,20 @@ export default function AccountPage() {
                             <button
                               key={item.id}
                               onClick={() => navigate(item.id)}
-                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[var(--user-bg-hover)]"
+                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-user-hover"
                             >
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)]">
+                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-user-hover text-user-accent">
                                 <Icon size={14} />
                               </span>
-                              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-bold text-[var(--user-text)]">
+                              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-bold text-user-fg">
                                 {item.label}
                               </span>
                               {item.count > 0 ? (
-                                <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-text-subtle)]">
+                                <span className="shrink-0 rounded-full bg-user-hover px-1.5 py-0.5 text-[0.625rem] font-bold text-user-fg-subtle">
                                   {item.count}
                                 </span>
                               ) : null}
-                              <ChevronRight size={14} className="shrink-0 text-[var(--user-text-subtle)]" />
+                              <ChevronRight size={14} className="shrink-0 text-user-fg-subtle" />
                             </button>
                           );
                         })}
@@ -1374,25 +1374,25 @@ export default function AccountPage() {
           onClick={() => setDeleteAddressId(null)}
         >
           <div
-            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border-t-2 sm:border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl p-5"
+            className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border-t-2 sm:border border-user-line bg-user-card shadow-2xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-black text-[var(--user-text)] mb-2">
+            <h3 className="text-sm font-black text-user-fg mb-2">
               Delete this address?
             </h3>
-            <p className="text-xs text-[var(--user-text-muted)] mb-5">
+            <p className="text-xs text-user-fg-muted mb-5">
               This action cannot be undone.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteAddressId(null)}
-                className="flex-1 h-10 sm:h-9 rounded-xl border border-[var(--user-border)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"
+                className="flex-1 h-10 sm:h-9 rounded-xl border border-user-line text-xs font-bold text-user-fg hover:bg-user-hover transition"
               >
                 Cancel
               </button>
               <button
                 onClick={removeAddress}
-                className="flex-1 h-10 sm:h-9 rounded-xl bg-[var(--user-danger)] text-white text-xs font-bold hover:opacity-90 transition"
+                className="flex-1 h-10 sm:h-9 rounded-xl bg-user-danger text-white text-xs font-bold hover:opacity-90 transition"
               >
                 Delete
               </button>

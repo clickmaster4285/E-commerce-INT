@@ -14,7 +14,7 @@ export default function BundlesPage() {
   });
 
   return (
-    <main className="min-h-screen bg-[var(--user-bg-base)] text-[var(--user-text)]">
+    <main className="min-h-screen bg-user-base text-user-fg">
       <div className="user-shell-1600 mx-auto px-3 sm:px-4 lg:px-6 py-5 sm:py-7">
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
@@ -25,7 +25,7 @@ export default function BundlesPage() {
             <h1 className="text-lg sm:text-xl font-black uppercase tracking-wider">
               Bundle Deals
             </h1>
-            <p className="text-[0.6875rem] sm:text-xs text-[var(--user-text-subtle)] font-semibold">
+            <p className="text-[0.6875rem] sm:text-xs text-user-fg-subtle font-semibold">
               Combo packs — buy together and save
             </p>
           </div>
@@ -37,30 +37,30 @@ export default function BundlesPage() {
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-3 animate-pulse"
+                className="rounded-2xl border border-user-line bg-user-card p-3 animate-pulse"
               >
-                <div className="aspect-square rounded-xl bg-[var(--user-bg-hover)] mb-3" />
-                <div className="h-3 w-3/4 rounded bg-[var(--user-bg-hover)] mb-2" />
-                <div className="h-4 w-1/2 rounded bg-[var(--user-bg-hover)]" />
+                <div className="aspect-square rounded-xl bg-user-hover mb-3" />
+                <div className="h-3 w-3/4 rounded bg-user-hover mb-2" />
+                <div className="h-4 w-1/2 rounded bg-user-hover" />
               </div>
             ))}
           </div>
         ) : bundles.length === 0 ? (
-          <div className="rounded-2xl border-2 border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] p-10 sm:p-14 flex flex-col items-center text-center">
-            <span className="w-14 h-14 rounded-2xl bg-[var(--user-bg-hover)] flex items-center justify-center mb-4">
-              <PackageOpen size={26} className="text-[var(--user-accent)]" />
+          <div className="rounded-2xl border-2 border-dashed border-user-line bg-user-card p-10 sm:p-14 flex flex-col items-center text-center">
+            <span className="w-14 h-14 rounded-2xl bg-user-hover flex items-center justify-center mb-4">
+              <PackageOpen size={26} className="text-user-accent" />
             </span>
             <h2 className="text-sm sm:text-base font-black uppercase tracking-wider mb-1">
               {isError ? "Could not load bundles" : "No bundle deals yet"}
             </h2>
-            <p className="text-xs sm:text-[0.8125rem] text-[var(--user-text-subtle)] max-w-sm">
+            <p className="text-xs sm:text-[0.8125rem] text-user-fg-subtle max-w-sm">
               {isError
                 ? "Something went wrong. Please try again later."
                 : "New combo deals will appear here as soon as they go live."}
             </p>
             <Link
               href="/"
-              className="mt-5 px-5 h-10 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-black uppercase tracking-wider flex items-center justify-center hover:brightness-110 transition"
+              className="mt-5 px-5 h-10 rounded-xl bg-user-accent text-user-accent-fg text-xs font-black uppercase tracking-wider flex items-center justify-center hover:brightness-110 transition"
             >
               Continue Shopping
             </Link>

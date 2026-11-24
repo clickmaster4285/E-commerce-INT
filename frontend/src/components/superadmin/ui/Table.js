@@ -85,8 +85,8 @@ export default function DataTable({
 export function CellText({ primary, secondary, className }) {
   return (
     <div className={cx("min-w-0", className)}>
-      <p className="truncate font-medium text-[var(--text-primary)]">{primary}</p>
-      {secondary ? <p className="mt-0.5 truncate text-[12px] text-[var(--text-muted)]">{secondary}</p> : null}
+      <p className="truncate font-medium text-fg">{primary}</p>
+      {secondary ? <p className="mt-0.5 truncate text-[12px] text-fg-muted">{secondary}</p> : null}
     </div>
   );
 }

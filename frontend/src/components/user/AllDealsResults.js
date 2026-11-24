@@ -59,7 +59,7 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
           {[...Array(10).keys()].map((index) => (
             <div
               key={index}
-              className="h-56 animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+              className="h-56 animate-pulse rounded-2xl border border-user-line bg-user-card"
             />
           ))}
         </div>
@@ -70,7 +70,7 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
   return (
     <section
       aria-label="All deals"
-      className="rounded-2xl border border-[var(--user-accent)]/30 bg-[var(--user-bg-card)]/60 p-3 sm:p-4"
+      className="rounded-2xl border border-user-accent/30 bg-user-card/60 p-3 sm:p-4"
     >
       <SectionHeading
         title="All Deals"
@@ -80,7 +80,7 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-user-line px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-user-fg-muted transition-colors hover:border-user-accent hover:text-user-accent"
         >
           <RotateCcw size={12} />
           Clear all
@@ -88,10 +88,10 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
       </SectionHeading>
 
       {deals.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
-          <Tag size={30} className="text-[var(--user-text-subtle)]" />
-          <p className="text-sm font-bold text-[var(--user-text)]">No active deals</p>
-          <p className="text-[0.6875rem] text-[var(--user-text-muted)]">Check back soon for exciting offers!</p>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-user-line bg-user-card px-4 py-12 text-center">
+          <Tag size={30} className="text-user-fg-subtle" />
+          <p className="text-sm font-bold text-user-fg">No active deals</p>
+          <p className="text-[0.6875rem] text-user-fg-muted">Check back soon for exciting offers!</p>
         </div>
       ) : (
         <>
@@ -104,7 +104,7 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
                   type="button"
                   onClick={() => onSelectDeal?.(deal)}
                   title={deal.name || "Deal"}
-                  className="group relative rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 text-left hover:border-orange-500/50 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+                  className="group relative rounded-2xl border-2 border-user-line bg-user-card p-4 text-left hover:border-orange-500/50 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
                 >
                   <div className="absolute top-2 right-2 bg-gradient-to-r from-red-500 to-orange-600 text-white px-2 py-1 rounded-lg font-black text-[0.625rem] uppercase shadow-lg">
                     {dealBadge(deal)}
@@ -112,10 +112,10 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 flex items-center justify-center mb-3">
                     <Flame size={24} className="text-orange-500" />
                   </div>
-                  <h3 className="text-sm font-black text-[var(--user-text)] mb-1.5 pr-16">
+                  <h3 className="text-sm font-black text-user-fg mb-1.5 pr-16">
                     {deal.name}
                   </h3>
-                  <p className="text-xs text-[var(--user-text-muted)] mb-3 line-clamp-2">
+                  <p className="text-xs text-user-fg-muted mb-3 line-clamp-2">
                     {deal.description}
                   </p>
                   {!time.expired && (
@@ -138,7 +138,7 @@ export default function AllDealsResults({ deals = [], isLoading = false, onClear
                     </span>
                     <ArrowRight
                       size={16}
-                      className="text-[var(--user-text-muted)] group-hover:text-orange-500 group-hover:translate-x-1 transition-all"
+                      className="text-user-fg-muted group-hover:text-orange-500 group-hover:translate-x-1 transition-all"
                     />
                   </div>
                 </button>

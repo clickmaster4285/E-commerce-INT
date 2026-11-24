@@ -69,7 +69,7 @@ export default function EditRequestDialog({ item, onClose, onSaved }) {
       busy={mutation.isPending}
       footer={
         <>
-          <span className="me-auto text-[12.5px] text-[var(--text-muted)]">{dirty ? `${changeCount} unsaved change${changeCount === 1 ? "" : "s"}` : "No changes yet"}</span>
+          <span className="me-auto text-[12.5px] text-fg-muted">{dirty ? `${changeCount} unsaved change${changeCount === 1 ? "" : "s"}` : "No changes yet"}</span>
           <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={!dirty} loading={mutation.isPending}>Save changes</Button>
         </>

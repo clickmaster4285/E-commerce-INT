@@ -119,7 +119,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               if (!OptionIcon && !opt.description) {
                 return (
                   <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                    className="block w-full px-3 py-2 text-left text-sm hover:bg-[var(--bg-tertiary)] transition-colors"
+                    className="block w-full px-3 py-2 text-left text-sm hover:bg-subtle transition-colors"
                     style={{ color: active ? "var(--accent)" : "var(--text-primary)", backgroundColor: active ? "var(--accent-soft)" : "transparent" }}>
                     {opt.label}
                   </button>
@@ -129,7 +129,7 @@ const CustomModalSelect = ({ value, onChange, options, placeholder, disabled }) 
               // âœ… Rich row — icon badge + title + example description + selected tick
               return (
                 <button key={opt.value} type="button" onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-[var(--bg-tertiary)]"
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-subtle"
                   style={{
                     backgroundColor: active ? "var(--accent-soft)" : "transparent",
                     borderLeft: active ? "2px solid var(--accent)" : "2px solid transparent",
@@ -213,7 +213,7 @@ const TextInput = ({ value, onChange, placeholder, type = "text", style, disable
     onWheel={nonNegative ? (e) => e.currentTarget.blur() : undefined}
     placeholder={placeholder}
     disabled={disabled}
-    className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`h-9 w-full rounded-md px-3 text-sm outline-none transition focus:ring-2 focus:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     style={style}
   />
 );
@@ -224,7 +224,7 @@ const TextArea = ({ value, onChange, placeholder, rows = 3, style }) => (
     value={value || ""}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
-    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30 resize-none"
+    className="w-full px-3 py-2 rounded-md text-sm outline-none transition focus:ring-2 focus:ring-accent/30 resize-none"
     style={style}
   />
 );
@@ -675,7 +675,7 @@ export function DiscountFormModal({ formType, formData, setFormData, formErrors,
                         <span className="text-[10px] normal-case tracking-normal opacity-70 group-hover:opacity-100 transition">{t("admin.promotions.ui.generated.562d9326316b")}</span>
                         <div 
                           className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                            formData.has_min_quantity ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-transparent"
+                            formData.has_min_quantity ? "bg-accent border-accent" : "border-line bg-transparent"
                           }`}
                         >
                           {formData.has_min_quantity && <CheckIcon className="w-3 h-3 text-white" />}
@@ -877,7 +877,7 @@ export function SelectionModal({ type, items, selectedIds, onClose, onApply, inp
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t("admin.discounts.page.search") + (type ? " (" + type + ")" : "")}
-              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] outline-none transition focus:ring-2 focus:ring-[var(--accent)]/30"
+              className="w-full h-9 pl-9 pr-3 rounded-md text-[13px] outline-none transition focus:ring-2 focus:ring-accent/30"
               style={inputStyle}
             />
           </div>

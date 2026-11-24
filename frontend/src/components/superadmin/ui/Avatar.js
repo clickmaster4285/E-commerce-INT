@@ -18,7 +18,7 @@ export default function Avatar({ name, src, size = "md", shape = "circle", class
   const radius = shape === "square" ? "rounded-lg" : "rounded-full";
   return (
     <span
-      className={cx("inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-semibold", SIZES[size] || SIZES.md, radius, src && "border border-[var(--border-color)] bg-[var(--bg-card)]", className)}
+      className={cx("inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-semibold", SIZES[size] || SIZES.md, radius, src && "border border-line bg-card", className)}
       style={src ? undefined : { background: `color-mix(in srgb, ${color} 14%, var(--bg-card))`, color }}
       aria-hidden="true"
     >

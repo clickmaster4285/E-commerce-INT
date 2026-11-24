@@ -43,11 +43,11 @@ function calcTime(endDate) {
 
 function TimeBox({ value, label }) {
   return (
-    <div className="flex-1 bg-[var(--user-bg-card)] border-2 border-orange-500/30 rounded-xl p-3 text-center shadow-lg">
-      <p className="text-2xl font-black text-[var(--user-text)] tabular-nums leading-none">
+    <div className="flex-1 bg-user-card border-2 border-orange-500/30 rounded-xl p-3 text-center shadow-lg">
+      <p className="text-2xl font-black text-user-fg tabular-nums leading-none">
         {String(value).padStart(2, "0")}
       </p>
-      <p className="text-[0.625rem] font-bold text-[var(--user-text-subtle)] uppercase mt-1">{label}</p>
+      <p className="text-[0.625rem] font-bold text-user-fg-subtle uppercase mt-1">{label}</p>
     </div>
   );
 }
@@ -67,7 +67,7 @@ export default function DealDetailPage({ params }) {
       fallback={
         <div className="user-shell mx-auto px-4 py-20 text-center">
           <div className="animate-pulse space-y-8">
-            <div className="h-96 bg-[var(--user-bg-card)] rounded-2xl" />
+            <div className="h-96 bg-user-card rounded-2xl" />
           </div>
         </div>
       }
@@ -113,9 +113,9 @@ function DealDetailContent({ params }) {
     return (
       <div className="user-shell mx-auto px-4 py-20 text-center">
         <div className="animate-pulse space-y-8">
-          <div className="h-96 bg-[var(--user-bg-card)] rounded-2xl" />
+          <div className="h-96 bg-user-card rounded-2xl" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-80 bg-[var(--user-bg-card)] rounded-xl" />)}
+            {[...Array(4)].map((_, i) => <div key={i} className="h-80 bg-user-card rounded-xl" />)}
           </div>
         </div>
       </div>
@@ -128,13 +128,13 @@ function DealDetailContent({ params }) {
         <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
           <Flame size={32} className="text-red-500" />
         </div>
-        <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Failed to Load Deal</h1>
-        <p className="text-sm text-[var(--user-text-muted)] mb-6">Something went wrong. Please try again.</p>
+        <h1 className="text-2xl font-black text-user-fg mb-2">Failed to Load Deal</h1>
+        <p className="text-sm text-user-fg-muted mb-6">Something went wrong. Please try again.</p>
         <div className="flex items-center justify-center gap-3">
-          <button onClick={() => refetch()} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
+          <button onClick={() => refetch()} className="inline-flex items-center gap-2 bg-user-accent text-user-accent-fg px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
             Retry
           </button>
-          <Link href="/" className="inline-flex items-center gap-2 border-2 border-[var(--user-border)] text-[var(--user-text-muted)] px-6 py-3 rounded-xl text-sm font-bold hover:border-[var(--user-accent)]/40 transition">
+          <Link href="/" className="inline-flex items-center gap-2 border-2 border-user-line text-user-fg-muted px-6 py-3 rounded-xl text-sm font-bold hover:border-user-accent/40 transition">
             <ArrowLeft size={16} /> Back to Home
           </Link>
         </div>
@@ -148,8 +148,8 @@ function DealDetailContent({ params }) {
         <div className="w-20 h-20 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
           <Flame size={32} className="text-red-500" />
         </div>
-        <h1 className="text-2xl font-black text-[var(--user-text)] mb-2">Deal Not Found</h1>
-        <Link href="/" className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
+        <h1 className="text-2xl font-black text-user-fg mb-2">Deal Not Found</h1>
+        <Link href="/" className="inline-flex items-center gap-2 bg-user-accent text-user-accent-fg px-6 py-3 rounded-xl text-sm font-bold hover:opacity-90 transition">
           <ArrowLeft size={16} /> Back to Home
         </Link>
       </div>
@@ -186,7 +186,7 @@ function DealDetailContent({ params }) {
 
   return (
     <main className="user-shell mx-auto px-3 lg:px-6 py-5 lg:py-12">
-      <Link href="/" className="inline-flex items-center gap-2 text-xs lg:text-sm font-bold text-[var(--user-text-muted)] hover:text-[var(--user-accent)] mb-5 lg:mb-8 transition">
+      <Link href="/" className="inline-flex items-center gap-2 text-xs lg:text-sm font-bold text-user-fg-muted hover:text-user-accent mb-5 lg:mb-8 transition">
         <ArrowLeft size={14} className="lg:w-4 lg:h-4" /> Back to Home
       </Link>
 
@@ -220,14 +220,14 @@ function DealDetailContent({ params }) {
                 </span>
               )}
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-[var(--user-text)] mb-4 leading-tight">{dealName}</h1>
-            {dealDescription && <p className="text-base text-[var(--user-text-muted)] mb-6">{dealDescription}</p>}
+            <h1 className="text-3xl sm:text-4xl font-black text-user-fg mb-4 leading-tight">{dealName}</h1>
+            {dealDescription && <p className="text-base text-user-fg-muted mb-6">{dealDescription}</p>}
 
             {!time.expired ? (
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Clock size={18} className="text-orange-500" />
-                  <span className="text-sm font-bold text-[var(--user-text)]">Ends in:</span>
+                  <span className="text-sm font-bold text-user-fg">Ends in:</span>
                 </div>
                 <div className="flex gap-3">
                   <TimeBox value={time.d} label="Days" />
@@ -243,8 +243,8 @@ function DealDetailContent({ params }) {
             )}
 
             <div className="flex items-center gap-2 text-sm">
-              <Package size={16} className="text-[var(--user-accent)]" />
-              <span className="font-bold text-[var(--user-text)]">{deal.totalProducts} total products in this deal</span>
+              <Package size={16} className="text-user-accent" />
+              <span className="font-bold text-user-fg">{deal.totalProducts} total products in this deal</span>
             </div>
           </div>
         </div>
@@ -264,12 +264,12 @@ function DealDetailContent({ params }) {
 
       {/* Products Grid with Pagination */}
       <div ref={gridTopRef} className="scroll-mt-24">
-        <h2 className="text-2xl font-black text-[var(--user-text)] mb-6 flex items-center gap-2">
+        <h2 className="text-2xl font-black text-user-fg mb-6 flex items-center gap-2">
           Products in this Deal
-          <span className="text-sm my-4 font-normal text-[var(--user-text-muted)]">
+          <span className="text-sm my-4 font-normal text-user-fg-muted">
             (Page {currentPage} of {totalPages})
           </span>
-          {isFetching && <Loader2 size={16} className="animate-spin text-[var(--user-text-subtle)]" />}
+          {isFetching && <Loader2 size={16} className="animate-spin text-user-fg-subtle" />}
         </h2>
 
         {products.length > 0 ? (
@@ -295,10 +295,10 @@ function DealDetailContent({ params }) {
             />
           </>
         ) : (
-          <div className="text-center py-16 rounded-2xl border-2 border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)]">
-            <Package size={48} className="text-[var(--user-text-subtle)] mx-auto mb-4" />
-            <p className="text-lg font-bold text-[var(--user-text)] mb-2">No products yet</p>
-            <p className="text-sm text-[var(--user-text-muted)]">Products will be added to this deal soon.</p>
+          <div className="text-center py-16 rounded-2xl border-2 border-dashed border-user-line bg-user-card">
+            <Package size={48} className="text-user-fg-subtle mx-auto mb-4" />
+            <p className="text-lg font-bold text-user-fg mb-2">No products yet</p>
+            <p className="text-sm text-user-fg-muted">Products will be added to this deal soon.</p>
           </div>
         )}
       </div>

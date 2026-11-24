@@ -56,18 +56,18 @@ export default function TeamPage() {
     },
     {
       key: "phone", header: "Phone", className: "whitespace-nowrap",
-      cell: (m) => m.phone ? <span className="inline-flex items-center gap-1.5 tabular-nums text-[var(--text-secondary)]"><Phone size={13} className="text-[var(--text-muted)]" aria-hidden="true" />{m.phone}</span> : <span className="text-[var(--text-muted)]">—</span>,
+      cell: (m) => m.phone ? <span className="inline-flex items-center gap-1.5 tabular-nums text-fg-secondary"><Phone size={13} className="text-fg-muted" aria-hidden="true" />{m.phone}</span> : <span className="text-fg-muted">—</span>,
     },
     { key: "status", header: "Status", cell: (m) => <StatusBadge value={m.status} /> },
     {
       key: "lastLogin", header: "Last sign-in", className: "whitespace-nowrap",
       cell: (m) => m.lastLoginAt
-        ? (<><p className="font-medium text-[var(--text-primary)]">{timeAgo(m.lastLoginAt)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{formatDateTime(m.lastLoginAt)}</p></>)
-        : <span className="text-[var(--text-muted)]">Never</span>,
+        ? (<><p className="font-medium text-fg">{timeAgo(m.lastLoginAt)}</p><p className="mt-0.5 text-[12px] text-fg-muted">{formatDateTime(m.lastLoginAt)}</p></>)
+        : <span className="text-fg-muted">Never</span>,
     },
     {
       key: "added", header: "Added", className: "whitespace-nowrap",
-      cell: (m) => (<><p className="font-medium text-[var(--text-primary)]">{formatDate(m.created_at)}</p><p className="mt-0.5 text-[12px] text-[var(--text-muted)]">{m.createdBy?.name ? `by ${m.createdBy.name}` : m.isSeed ? "from server config" : "—"}</p></>),
+      cell: (m) => (<><p className="font-medium text-fg">{formatDate(m.created_at)}</p><p className="mt-0.5 text-[12px] text-fg-muted">{m.createdBy?.name ? `by ${m.createdBy.name}` : m.isSeed ? "from server config" : "—"}</p></>),
     },
     {
       key: "actions", header: <span className="sr-only">Actions</span>, align: "end", width: 56, stopRowClick: true,
@@ -115,7 +115,7 @@ export default function TeamPage() {
       <Card>
         <CardToolbar>
           <SearchInput value={search} onChange={setSearch} placeholder="Search by name, email or phone…" label="Search team" />
-          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
+          {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-fg-muted" aria-label="Refreshing" />}
         </CardToolbar>
         <DataTable
           columns={columns}

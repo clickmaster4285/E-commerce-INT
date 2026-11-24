@@ -17,7 +17,8 @@ import { useLocalized } from "@/i18n/localize";
 
 const LIMIT = 12;
 
-export default function PopularCategories({ tiles = [], isLoading = false }) {
+// heading: store editor ka optional override (khali → default i18n title)
+export default function PopularCategories({ tiles = [], isLoading = false, heading = "" }) {
   const { t } = useTranslation();
   const { fieldOf } = useLocalized();
   // ✅ Tiles server se (image) — full catalog nahi
@@ -26,12 +27,12 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
   if (isLoading && !list.length) {
     return (
       <section>
-        <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-[var(--user-bg-card)]" />
+        <div className="mb-3.5 h-5 w-44 animate-pulse rounded-full bg-user-card" />
         <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9">
           {[...Array(8).keys()].map((index) => (
             <div
               key={index}
-              className="h-[10.5rem] animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+              className="h-[10.5rem] animate-pulse rounded-2xl border border-user-line bg-user-card"
             />
           ))}
         </div>
@@ -44,7 +45,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
   return (
     <section>
       <SectionHeading
-        title={t("admin.categories.page.title")}
+        title={heading || t("admin.categories.page.title")}
         href="/filtering-product?allCategories=1"
         linkLabel={t("admin.dashboard.topProducts.viewAll")}
       />
@@ -54,9 +55,9 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
           <Link
             key={category._id}
             href={`/filtering-product?category=${category._id}`}
-            className="group flex flex-col overflow-hidden rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
+            className="group flex flex-col overflow-hidden rounded-xl border border-user-line bg-user-card transition-all duration-150 hover:-translate-y-0.5 hover:border-user-accent-soft hover:shadow-[var(--user-shadow-sm)]"
           >
-            <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
+            <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-user-hover">
               <FallbackImage nextImage
                 src={category.image}
                 alt={fieldOf(category, "name")}
@@ -68,7 +69,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
             </span>
 
             <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
-              <span className="w-full line-clamp-2 break-words text-xs font-medium capitalize text-[var(--user-text)] sm:text-[0.8125rem]">
+              <span className="w-full line-clamp-2 break-words text-xs font-medium capitalize text-user-fg sm:text-[0.8125rem]">
                 {fieldOf(category, "name")}
               </span>
             </span>
@@ -79,7 +80,7 @@ export default function PopularCategories({ tiles = [], isLoading = false }) {
       <div className="mt-3 flex justify-center lg:hidden">
         <Link
           href="/filtering-product?allCategories=1"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-4 py-2 text-[0.6875rem] font-medium text-[var(--user-text-secondary)] transition-colors hover:text-[var(--user-accent)]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-user-line px-4 py-2 text-[0.6875rem] font-medium text-user-fg-secondary transition-colors hover:text-user-accent"
         >
           {t("admin.dashboard.topProducts.viewAll")}
           <ArrowRight size={13} />

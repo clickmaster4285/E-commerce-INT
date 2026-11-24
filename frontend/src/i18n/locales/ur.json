@@ -1640,6 +1640,8 @@
   "admin.manageStock.toast.updated": "اسٹاک کامیابی سے اپ ڈیٹ ہو گیا",
   "admin.nav.item.attributes": "خصوصیات",
   "admin.nav.item.termsConditions": "شرائط و ضوابط",
+  "admin.nav.item.storeEditor": "اسٹور ایڈیٹر",
+  "admin.nav.item.pages": "صفحات",
   "admin.nav.item.banners": "بینرز",
   "admin.nav.item.brands": "برانڈز",
   "admin.nav.item.categories": "زمرے",

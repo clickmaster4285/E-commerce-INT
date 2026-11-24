@@ -62,15 +62,15 @@ export default function BrandStrip({ brands = [], brandCounts = {}, isLoading = 
               key={brand._id}
               href={`/filtering-product?brand=${brand._id}`}
               title={brandName}
-              className="group flex w-[8.75rem] shrink-0 flex-col items-center gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-2 py-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--user-accent-soft)] hover:shadow-[var(--user-shadow-sm)]"
+              className="group flex w-[8.75rem] shrink-0 flex-col items-center gap-3 rounded-xl border border-user-line bg-user-card px-2 py-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-user-accent-soft hover:shadow-[var(--user-shadow-sm)]"
             >
-              <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-1.5">
+              <span className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-user-line bg-user-hover p-1.5">
                 <FallbackImage nextImage src={logo} alt={brandName} fill loader={smartImageLoader} sizes="48px" className="object-contain" />
               </span>
-              <span className="w-full truncate text-center text-sm font-medium capitalize text-[var(--user-text)]">
+              <span className="w-full truncate text-center text-sm font-medium capitalize text-user-fg">
                 {brandName}
               </span>
-              <span className="text-xs font-normal text-[var(--user-text-muted)]">{t("cart.itemsCount", { count: brand.count })}</span>
+              <span className="text-xs font-normal text-user-fg-muted">{t("cart.itemsCount", { count: brand.count })}</span>
             </Link>
           );
         })}

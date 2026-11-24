@@ -69,7 +69,7 @@ function PrimaryButton({
       type={type}
       disabled={isDisabled}
       aria-busy={loading || undefined}
-      className={`primary-btn inline-flex ${widthClass} items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`.trim()}
+      className={`primary-btn inline-flex ${widthClass} items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-user-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`.trim()}
     >
       {loading ? (
         <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin" />
@@ -106,12 +106,12 @@ const DEFAULT_SHIP_CONFIG = {
 
 const ItemThumb = ({ item, size = "w-14 h-14" }) =>
   getImgUrl(item.image) ? (
-    <div className={`${size} rounded-xl overflow-hidden border-2 border-[var(--user-border)] shrink-0 shadow-sm bg-[var(--user-bg-hover)]`}>
+    <div className={`${size} rounded-xl overflow-hidden border-2 border-user-line shrink-0 shadow-sm bg-user-hover`}>
       <FallbackImage src={getImgUrl(item.image)} alt="" className="w-full h-full object-cover" />
     </div>
   ) : (
-    <div className={`${size} rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] flex items-center justify-center shrink-0`}>
-      <Package size={18} className="text-[var(--user-accent)]" />
+    <div className={`${size} rounded-xl bg-user-hover border-2 border-user-line flex items-center justify-center shrink-0`}>
+      <Package size={18} className="text-user-accent" />
     </div>
   );
 
@@ -137,12 +137,12 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
     }
   };
   const inp = compact
-    ? "w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition"
-    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition";
+    ? "w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-user-input text-user-fg transition"
+    : "w-full h-12 px-4 rounded-xl text-sm outline-none border-2 bg-user-input text-user-fg transition";
   const lbl = compact
-    ? "block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider"
-    : "block text-xs font-bold text-[var(--user-text-secondary)] mb-2 uppercase tracking-wider";
-  const errCls = compact ? "text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium" : "text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium";
+    ? "block text-[0.625rem] font-bold text-user-fg-secondary mb-1 uppercase tracking-wider"
+    : "block text-xs font-bold text-user-fg-secondary mb-2 uppercase tracking-wider";
+  const errCls = compact ? "text-[0.625rem] text-user-danger mt-1 font-medium" : "text-xs text-user-danger mt-1.5 font-medium";
 
   const handleSenderNameChange = (e) => {
     setBankForm({ ...bankForm, senderName: e.target.value });
@@ -159,7 +159,7 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
   };
 
   return (
-    <div className={`rounded-xl border-2 border-[var(--user-border)] bg-[var(--user-bg-hover)] overflow-hidden ${compact ? "" : "mt-4"}`}>
+    <div className={`rounded-xl border-2 border-user-line bg-user-hover overflow-hidden ${compact ? "" : "mt-4"}`}>
       {/* ✅ Bank card visual */}
       <div className="relative p-4 sm:p-5" style={{ background: "linear-gradient(135deg, #06281c 0%, #065f46 60%, #047857 130%)" }}>
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
@@ -193,19 +193,19 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
 
       {/* ✅ Steps + fillable fields */}
       <div className={`${compact ? "p-3" : "p-4 sm:p-5"} space-y-3`}>
-        <ol className={`space-y-1.5 text-[var(--user-text-muted)] ${compact ? "text-[0.6875rem]" : "text-xs"}`}>
-          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">1.</span> {t("checkout.bank.instruction.transfer")}</li>
-          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">2.</span> {t("checkout.bank.instruction.reference")}</li>
-          <li className="flex gap-2"><span className="font-black text-[var(--user-accent)] shrink-0">3.</span> {t("checkout.bank.instruction.confirm")}</li>
+        <ol className={`space-y-1.5 text-user-fg-muted ${compact ? "text-[0.6875rem]" : "text-xs"}`}>
+          <li className="flex gap-2"><span className="font-black text-user-accent shrink-0">1.</span> {t("checkout.bank.instruction.transfer")}</li>
+          <li className="flex gap-2"><span className="font-black text-user-accent shrink-0">2.</span> {t("checkout.bank.instruction.reference")}</li>
+          <li className="flex gap-2"><span className="font-black text-user-accent shrink-0">3.</span> {t("checkout.bank.instruction.confirm")}</li>
         </ol>
-        <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
+        <div className="pt-3 border-t border-user-line space-y-3">
           <div>
             <label className={lbl}>{t("checkout.bank.senderName")}</label>
             <input 
               value={bankForm.senderName} 
               onChange={handleSenderNameChange}
               placeholder={t("checkout.bank.senderPlaceholder")}
-              className={`${inp} ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+              className={`${inp} ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`}
             />
             {bankFormErrors.senderName && <p className={errCls}>{bankFormErrors.senderName}</p>}
           </div>
@@ -215,7 +215,7 @@ const BankTransferPanel = ({ bankForm, setBankForm, bankFormErrors, setBankFormE
               value={bankForm.transactionRef} 
               onChange={handleTransactionRefChange}
               placeholder={t("checkout.bank.referencePlaceholder")}
-              className={`${inp} ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+              className={`${inp} ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`}
             />
             {bankFormErrors.transactionRef && <p className={errCls}>{bankFormErrors.transactionRef}</p>}
           </div>
@@ -960,7 +960,7 @@ function CheckoutContent() {
   if (userLoading || !draftReady || (!user && !needsPhone)) {
     return (
       <div className="flex h-[60vh] items-center justify-center" aria-label={t("checkout.loading")}>
-        <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+        <Loader2 className="animate-spin text-user-accent" size={28} />
         <span className="sr-only">{t("checkout.loading")}</span>
       </div>
     );
@@ -970,12 +970,12 @@ function CheckoutContent() {
   if (step === 1 && cart.length === 0 && !placing) {
     return (
       <div className="mx-auto flex min-h-[calc(100dvh-4rem)] max-w-[37.5rem] flex-col items-center justify-center px-4 py-10 text-center">
-        <div className="w-20 h-20 mx-auto rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-6">
-          <Package size={34} className="text-[var(--user-accent)]" />
+        <div className="w-20 h-20 mx-auto rounded-full bg-user-card border-2 border-user-line flex items-center justify-center mb-6">
+          <Package size={34} className="text-user-accent" />
         </div>
-        <h1 className="text-xl sm:text-2xl font-black text-[var(--user-text)] mb-3">{t("cart.empty")}</h1>
-        <p className="text-xs sm:text-sm text-[var(--user-text-muted)] mb-8 max-w-md mx-auto">{t("checkout.empty.message")}</p>
-        <button onClick={() => router.push("/")} className="inline-flex items-center gap-2 bg-[var(--user-accent)] text-[var(--user-accent-text)] px-7 py-3 rounded-xl text-sm font-black hover:opacity-90 active:scale-[0.98] transition">
+        <h1 className="text-xl sm:text-2xl font-black text-user-fg mb-3">{t("cart.empty")}</h1>
+        <p className="text-xs sm:text-sm text-user-fg-muted mb-8 max-w-md mx-auto">{t("checkout.empty.message")}</p>
+        <button onClick={() => router.push("/")} className="inline-flex items-center gap-2 bg-user-accent text-user-accent-fg px-7 py-3 rounded-xl text-sm font-black hover:opacity-90 active:scale-[0.98] transition">
           <ShoppingBag size={17} /> {t("checkout.startShopping")}
         </button>
       </div>
@@ -983,25 +983,25 @@ function CheckoutContent() {
   }
 
   // ✅ THEME-SAFE classes — no hardcoded white/black on accent
-  const inputCls = "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] placeholder:text-[var(--user-text-subtle)] hover:border-[var(--user-accent)]/40";
-  const phoneInputCls = `w-full h-11 rounded-lg border bg-[var(--user-bg-card)] px-3.5 text-sm text-[var(--user-text)] outline-none transition-colors ${
+  const inputCls = "w-full h-12 px-4 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-user-accent/30 focus:border-user-accent bg-user-input border-2 border-user-line text-user-fg placeholder:text-user-fg-subtle hover:border-user-accent/40";
+  const phoneInputCls = `w-full h-11 rounded-lg border bg-user-card px-3.5 text-sm text-user-fg outline-none transition-colors ${
     phoneError
       ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
-      : "border-[var(--user-border)] focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+      : "border-user-line focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
   }`;
-  const labelCls = "block text-xs font-bold leading-snug text-start text-[var(--user-text-secondary)] mb-2";
-  const cardCls = "rounded-2xl border-2 border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm";
-  const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[var(--user-accent)]/30 focus:border-[var(--user-accent)] bg-[var(--user-bg-input)] border-2 border-[var(--user-border)] text-[var(--user-text)] resize-none hover:border-[var(--user-accent)]/40";
+  const labelCls = "block text-xs font-bold leading-snug text-start text-user-fg-secondary mb-2";
+  const cardCls = "rounded-2xl border-2 border-user-line bg-user-card shadow-sm";
+  const textareaCls = "w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-user-accent/30 focus:border-user-accent bg-user-input border-2 border-user-line text-user-fg resize-none hover:border-user-accent/40";
   // ✅ Secondary buttons — outline style, glow nahi (shared PrimaryButton sirf primary CTAs ke liye)
-  const ghostBtn = "border-2 border-[var(--user-border)] text-[var(--user-text-secondary)] hover:text-[var(--user-text)] hover:border-[var(--user-accent)]/40 transition";
+  const ghostBtn = "border-2 border-user-line text-user-fg-secondary hover:text-user-fg hover:border-user-accent/40 transition";
 
   const SummaryPanel = ({ footer, showItems = true, review = false }) => (
-    <div className={`checkout-summary-panel ${showItems ? "checkout-summary-panel-with-items" : ""} ${review ? "checkout-summary-panel-review" : ""} h-auto w-full min-w-0 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5 lg:sticky lg:top-[4.5rem]`}>
-      <div className={`checkout-summary-header flex shrink-0 items-center gap-3 ${review ? "mb-3 border-b border-[var(--user-border)] pb-3" : "mb-4"}`}>
-        <span className={`checkout-summary-icon flex shrink-0 items-center justify-center border text-[var(--user-accent)] ${review ? "h-9 w-9 rounded-lg" : "h-10 w-10 rounded-xl"}`}>
+    <div className={`checkout-summary-panel ${showItems ? "checkout-summary-panel-with-items" : ""} ${review ? "checkout-summary-panel-review" : ""} h-auto w-full min-w-0 rounded-2xl border border-user-line bg-user-card p-4 shadow-sm sm:p-5 lg:sticky lg:top-[4.5rem]`}>
+      <div className={`checkout-summary-header flex shrink-0 items-center gap-3 ${review ? "mb-3 border-b border-user-line pb-3" : "mb-4"}`}>
+        <span className={`checkout-summary-icon flex shrink-0 items-center justify-center border text-user-accent ${review ? "h-9 w-9 rounded-lg" : "h-10 w-10 rounded-xl"}`}>
           <ShoppingBag size={review ? 16 : 17} />
         </span>
-        <h2 className={`${review ? "text-sm" : "text-base"} font-semibold text-[var(--user-text)]`}>{t("checkout.summary.title")}</h2>
+        <h2 className={`${review ? "text-sm" : "text-base"} font-semibold text-user-fg`}>{t("checkout.summary.title")}</h2>
       </div>
 
       {showItems && <div className="checkout-summary-products mt-4 mb-0 space-y-2 pr-1">
@@ -1009,49 +1009,49 @@ function CheckoutContent() {
           <div key={i.key} className="flex items-start gap-3">
             <ItemThumb item={i} size="w-14 h-14" />
             <div className="flex-1 min-w-0">
-              <p className="text-[0.8125rem] font-bold text-[var(--user-text)] leading-snug line-clamp-2">{text(i.name, i.translations?.name)}</p>
-              {i.variantTitle && <p className="text-xs text-[var(--user-text-muted)] mt-0.5 truncate">{text(i.variantTitle, i.variantTranslations?.title)}</p>}
+              <p className="text-[0.8125rem] font-bold text-user-fg leading-snug line-clamp-2">{text(i.name, i.translations?.name)}</p>
+              {i.variantTitle && <p className="text-xs text-user-fg-muted mt-0.5 truncate">{text(i.variantTitle, i.variantTranslations?.title)}</p>}
               {i.dealActive && i.dealId && (
-                <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-[var(--user-accent)] mt-1">
+                <span className="inline-flex items-center gap-1 text-[0.625rem] font-bold text-user-accent mt-1">
                   <Tag size={10} /> {t("checkout.item.deal")}
                 </span>
               )}
-              <p className="text-xs text-[var(--user-text-muted)] mt-0.5">{t("checkout.item.quantity", { count: i.qty })}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
+              <p className="text-xs text-user-fg-muted mt-0.5">{t("checkout.item.quantity", { count: i.qty })}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
             </div>
             <div className="text-right shrink-0">
               {i.hasDiscount && i.originalPrice * i.qty > i.lineTotal && (
-                <p className="text-[0.625rem] text-[var(--user-text-subtle)] line-through">Rs. {(i.originalPrice * i.qty).toLocaleString()}</p>
+                <p className="text-[0.625rem] text-user-fg-subtle line-through">Rs. {(i.originalPrice * i.qty).toLocaleString()}</p>
               )}
-              <p className="text-[0.8125rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
+              <p className="text-[0.8125rem] font-black text-user-fg">Rs. {i.lineTotal.toLocaleString()}</p>
             </div>
           </div>
         ))}
       </div>}
 
-      <div className={`checkout-summary-totals shrink-0 space-y-2 ${review ? "text-xs" : "text-sm"} ${showItems ? "pt-3 border-t border-[var(--user-border)]" : ""}`}>
+      <div className={`checkout-summary-totals shrink-0 space-y-2 ${review ? "text-xs" : "text-sm"} ${showItems ? "pt-3 border-t border-user-line" : ""}`}>
         <div className="flex justify-between">
-          <span className="text-[var(--user-text)] font-medium">{t("cart.subtotal")} ({t("cart.itemsCount", { count: itemsWithDiscounts.reduce((count, item) => count + item.qty, 0) })})</span>
-          <span className="text-[var(--user-text)] font-bold">Rs. {subtotal.toLocaleString()}</span>
+          <span className="text-user-fg font-medium">{t("cart.subtotal")} ({t("cart.itemsCount", { count: itemsWithDiscounts.reduce((count, item) => count + item.qty, 0) })})</span>
+          <span className="text-user-fg font-bold">Rs. {subtotal.toLocaleString()}</span>
         </div>
         {totalSavings > 0 && (
           <div className="flex justify-between">
-            <span className="text-[var(--user-text)] font-medium">{t("checkout.summary.youSave")}</span>
-            <span className="text-[var(--user-success)] font-bold">– Rs. {totalSavings.toLocaleString()}</span>
+            <span className="text-user-fg font-medium">{t("checkout.summary.youSave")}</span>
+            <span className="text-user-success font-bold">– Rs. {totalSavings.toLocaleString()}</span>
           </div>
         )}
         <div className="flex justify-between">
-          <span className="text-[var(--user-text)] font-medium">{t("cart.shipping")}</span>
-          <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping}`}</span>
+          <span className="text-user-fg font-medium">{t("cart.shipping")}</span>
+          <span className={`font-bold ${shipping === 0 ? "text-user-success" : "text-user-fg"}`}>{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping}`}</span>
         </div>
         {tax > 0 && (
           <div className="flex justify-between">
-            <span className="text-[var(--user-text)] font-medium">{t("cart.tax")}</span>
-            <span className="text-[var(--user-text)] font-bold">Rs. {tax.toLocaleString()}</span>
+            <span className="text-user-fg font-medium">{t("cart.tax")}</span>
+            <span className="text-user-fg font-bold">Rs. {tax.toLocaleString()}</span>
           </div>
         )}
-        <div className="checkout-summary-total-row flex justify-between items-center pt-3 border-t border-[var(--user-border)]">
-          <span className={`${review ? "text-sm" : "text-base"} font-black text-[var(--user-text)]`}>{t("cart.total")}</span>
-          <p className={`${review ? "text-lg" : "text-xl"} checkout-summary-total-value font-black text-[var(--user-accent)]`}>Rs. {grandTotal.toLocaleString()}</p>
+        <div className="checkout-summary-total-row flex justify-between items-center pt-3 border-t border-user-line">
+          <span className={`${review ? "text-sm" : "text-base"} font-black text-user-fg`}>{t("cart.total")}</span>
+          <p className={`${review ? "text-lg" : "text-xl"} checkout-summary-total-value font-black text-user-accent`}>Rs. {grandTotal.toLocaleString()}</p>
         </div>
       </div>
       <div className="checkout-summary-footer mt-4 shrink-0">{footer}</div>
@@ -1093,14 +1093,14 @@ function CheckoutContent() {
       {needsPhone ? (
         <div className="max-w-[31.25rem] mx-auto mt-8 sm:mt-12">
           <div className={`${cardCls} checkout-phone-required p-6 sm:p-8`}>
-            <div className="w-14 h-14 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-5">
-              <Phone size={24} className="text-[var(--user-accent-text)]" />
+            <div className="w-14 h-14 rounded-2xl bg-user-accent flex items-center justify-center mb-5">
+              <Phone size={24} className="text-user-accent-fg" />
             </div>
             <div className="space-y-1.5">
-              <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">{t("checkout.phone.requiredTitle")}</h2>
-              <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.phone.requiredMessage")}</p>
+              <h2 className="text-xl font-semibold tracking-tight text-user-fg">{t("checkout.phone.requiredTitle")}</h2>
+              <p className="text-sm text-user-fg-muted">{t("checkout.phone.requiredMessage")}</p>
             </div>
-            <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.phone.label")}</label>
+            <label htmlFor="checkout-phone-desktop" className="mt-5 block text-sm font-medium text-user-fg-secondary">{t("checkout.phone.label")}</label>
             <input
               id="checkout-phone-desktop"
               dir="auto"
@@ -1122,7 +1122,7 @@ function CheckoutContent() {
             />
             <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
               {phoneError ? <p id="checkout-phone-error-desktop" className="text-xs text-red-600">{phoneError}</p> : <span />}
-              <p id="checkout-phone-helper-desktop" className="shrink-0 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: phone.length, max: PHONE_MAX })}</p>
+              <p id="checkout-phone-helper-desktop" className="shrink-0 text-xs text-user-fg-muted">{t("checkout.phone.digitCount", { current: phone.length, max: PHONE_MAX })}</p>
             </div>
             <PrimaryButton
               onClick={savePhone}
@@ -1144,20 +1144,20 @@ function CheckoutContent() {
               {/* LEFT: Your Cart */}
               <div className="min-w-0">
                 <div className={`${cardCls} overflow-hidden`}>
-                  <div className="flex items-end justify-between gap-3 px-5 sm:px-6 py-5 border-b border-[var(--user-border)]">
-                    <h2 className="text-3xl font-normal text-[var(--user-text)]">{t("cart.title")}</h2>
-                    <span className="text-xs text-[var(--user-text-muted)]">{t("common.price")}</span>
+                  <div className="flex items-end justify-between gap-3 px-5 sm:px-6 py-5 border-b border-user-line">
+                    <h2 className="text-3xl font-normal text-user-fg">{t("cart.title")}</h2>
+                    <span className="text-xs text-user-fg-muted">{t("common.price")}</span>
                   </div>
 
                   {/* ✅ LIST — shows ONLY selected items (selection managed on /cart page) */}
-                  <div className="divide-y divide-[var(--user-border)]">
+                  <div className="divide-y divide-user-line">
                     {itemsWithDiscounts.map((item) => (
                         <div key={item.key} className="checkout-cart-item flex items-center gap-5 sm:gap-6 px-4 sm:px-6 py-5 sm:py-6">
                           <div className="checkout-item-thumb relative shrink-0">
                             <ItemThumb item={item} size="w-36 h-36 sm:w-40 sm:h-40" />
                           </div>
                           <div className="flex-1 min-w-0 self-center flex flex-col items-start py-1">
-                            <p className="text-lg font-normal text-[var(--user-text)] line-clamp-2">{text(item.name, item.translations?.name)}</p>
+                            <p className="text-lg font-normal text-user-fg line-clamp-2">{text(item.name, item.translations?.name)}</p>
                             {item.brand && <p className="checkout-item-brand mt-1 text-[0.6875rem] uppercase tracking-wide">{text(item.brand, item.brandTranslations?.name)}</p>}
                             {item.variantTitle && <p className="checkout-item-variant mt-0.5 text-xs">{text(item.variantTitle, item.variantTranslations?.title)}</p>}
                             <p className="checkout-item-stock mt-1 text-xs">{t("product.inStock")}</p>
@@ -1172,7 +1172,7 @@ function CheckoutContent() {
                               </span>
                             )}
                             <div className="mt-3 flex flex-wrap items-center gap-3">
-                              <div className="flex items-center rounded-full border-2 border-[var(--user-border)] bg-[var(--user-bg-card)]">
+                              <div className="flex items-center rounded-full border-2 border-user-line bg-user-card">
                                 <button
                                   type="button"
                                   aria-label={item.qty === 1 ? t("cart.remove") : t("checkout.item.decreaseQuantity")}
@@ -1182,27 +1182,27 @@ function CheckoutContent() {
                                     if (item.qty === 1) removeCheckoutItem(item.key);
                                     else updateQty(item.key, item.qty - 1);
                                   }}
-                                  className="px-3 py-1.5 text-sm text-[var(--user-text)] hover:text-[var(--user-accent)] transition"
+                                  className="px-3 py-1.5 text-sm text-user-fg hover:text-user-accent transition"
                                 >
                                   {item.qty === 1 ? <Trash2 size={14} /> : <Minus size={14} />}
                                 </button>
-                                <span className="text-sm font-semibold text-[var(--user-text)] w-8 text-center">{item.qty}</span>
-                                <button type="button" aria-label={t("checkout.item.increaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="px-3 py-1.5 text-sm text-[var(--user-text)] hover:text-[var(--user-accent)] transition">
+                                <span className="text-sm font-semibold text-user-fg w-8 text-center">{item.qty}</span>
+                                <button type="button" aria-label={t("checkout.item.increaseQuantity")} onClick={(e) => { e.preventDefault(); e.stopPropagation(); updateQty(item.key, item.qty + 1); }} className="px-3 py-1.5 text-sm text-user-fg hover:text-user-accent transition">
                                   <Plus size={14} />
                                 </button>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => removeCheckoutItem(item.key)}
-                                className="checkout-delete-link inline-flex items-center border-l border-[var(--user-border)] pl-3 text-xs hover:underline"
+                                className="checkout-delete-link inline-flex items-center border-l border-user-line pl-3 text-xs hover:underline"
                               >
                                 {t("common.delete")}
                               </button>
                             </div>
                           </div>
                           <div className="shrink-0 self-start flex flex-col items-end gap-1 min-w-24">
-                            {item.hasDiscount && item.originalPrice * item.qty > item.lineTotal && <p className="text-xs text-[var(--user-text-subtle)] line-through">Rs. {(item.originalPrice * item.qty).toLocaleString()}</p>}
-                            <p className="text-base font-semibold text-[var(--user-text)]">Rs. {item.lineTotal.toLocaleString()}</p>
+                            {item.hasDiscount && item.originalPrice * item.qty > item.lineTotal && <p className="text-xs text-user-fg-subtle line-through">Rs. {(item.originalPrice * item.qty).toLocaleString()}</p>}
+                            <p className="text-base font-semibold text-user-fg">Rs. {item.lineTotal.toLocaleString()}</p>
                           </div>
                         </div>
                       ))}
@@ -1221,8 +1221,8 @@ function CheckoutContent() {
                   >
                     {t("checkout.proceedDelivery")}
                   </PrimaryButton>
-                  <div className="flex items-center justify-center gap-2 text-xs text-[var(--user-text-muted)]">
-                    <ShieldCheck size={14} className="text-[var(--user-success)]" />
+                  <div className="flex items-center justify-center gap-2 text-xs text-user-fg-muted">
+                    <ShieldCheck size={14} className="text-user-success" />
                     <span className="font-semibold">{t("checkout.secureSsl")}</span>
                   </div>
                 </div>
@@ -1231,11 +1231,11 @@ function CheckoutContent() {
           )}
           {/* Mobile sticky Proceed bar (step 1) */}
           {step === 1 && (
-            <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t-2 border-[var(--user-border)] px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+            <div className="fixed bottom-16 left-0 right-0 z-40 md:hidden bg-user-elevated/95 backdrop-blur-md border-t-2 border-user-line px-4 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
               <div className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[0.625rem] text-[var(--user-text-muted)] font-semibold">{t("checkout.cart.selectedCount", { count: selectedCartItems.length })}</p>
-                  <p className="text-base font-black text-[var(--user-accent)]">Rs. {subtotal.toLocaleString()}</p>
+                  <p className="text-[0.625rem] text-user-fg-muted font-semibold">{t("checkout.cart.selectedCount", { count: selectedCartItems.length })}</p>
+                  <p className="text-base font-black text-user-accent">Rs. {subtotal.toLocaleString()}</p>
                 </div>
                 <PrimaryButton
                   onClick={proceedToStep2}
@@ -1253,14 +1253,14 @@ function CheckoutContent() {
           {step === 2 && (
             <div className="checkout-step-two-grid grid w-full min-w-0 grid-cols-1 items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,72fr)_minmax(0,28fr)]">
               <div className="space-y-4 sm:space-y-5">
-                <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5">
-                  <div className="mb-4 flex items-center gap-3 border-b border-[var(--user-border)] pb-4">
+                <div className="rounded-2xl border border-user-line bg-user-card p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3 border-b border-user-line pb-4">
                     <div className="checkout-address-section-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border">
-                      <MapPin size={18} className="text-[var(--user-accent)]" />
+                      <MapPin size={18} className="text-user-accent" />
                     </div>
                     <div>
-                      <h2 className="text-base font-semibold leading-5 text-[var(--user-text)]">{t("checkout.address.title")}</h2>
-                      <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.address.subtitle")}</p>
+                      <h2 className="text-base font-semibold leading-5 text-user-fg">{t("checkout.address.title")}</h2>
+                      <p className="mt-0.5 text-xs leading-4 text-user-fg-muted">{t("checkout.address.subtitle")}</p>
                     </div>
                   </div>
                   {addressFormView === "desktop" ? (
@@ -1282,39 +1282,39 @@ function CheckoutContent() {
                             </span>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-bold text-[var(--user-text)] truncate">{address.full_name}</p>
+                                <p className="text-sm font-bold text-user-fg truncate">{address.full_name}</p>
                               </div>
-                              <p className="text-xs text-[var(--user-text-muted)] leading-relaxed mt-1">
+                              <p className="text-xs text-user-fg-muted leading-relaxed mt-1">
                                 {address.street_address1}{address.street_address2 ? `, ${address.street_address2}` : ""}, {address.city}, {address.state}
                               </p>
-                              <p className="text-xs text-[var(--user-text-secondary)] font-semibold mt-1">{address.phone}</p>
+                              <p className="text-xs text-user-fg-secondary font-semibold mt-1">{address.phone}</p>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); openAddressForm("desktop", address); }} aria-label={t("checkout.address.edit")} className="text-[var(--user-text-muted)] hover:text-[var(--user-accent)] transition shrink-0">
+                            <button onClick={(e) => { e.stopPropagation(); openAddressForm("desktop", address); }} aria-label={t("checkout.address.edit")} className="text-user-fg-muted hover:text-user-accent transition shrink-0">
                               <Pencil size={15} />
                             </button>
                           </div>
-                          <div className="mt-auto flex items-center gap-2 pt-2 border-t border-[var(--user-border)]">
-                            <button onClick={(e) => { e.stopPropagation(); openAddressForm("desktop", address); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-xs font-semibold">
+                          <div className="mt-auto flex items-center gap-2 pt-2 border-t border-user-line">
+                            <button onClick={(e) => { e.stopPropagation(); openAddressForm("desktop", address); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-user-fg-muted hover:text-user-accent hover:bg-user-accent/10 transition text-xs font-semibold">
                               <Pencil size={11} /> {t("checkout.address.edit")}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); deleteAddress(address._id); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition text-xs font-semibold">
+                            <button onClick={(e) => { e.stopPropagation(); deleteAddress(address._id); }} className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-user-fg-muted hover:text-user-danger hover:bg-user-danger/10 transition text-xs font-semibold">
                               <Trash2 size={11} /> {t("common.delete")}
                             </button>
                           </div>
                         </div>;
                       }) : (
-                        <div className="checkout-address-empty-state col-span-full flex min-h-[13.5rem] flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-6 text-center">
+                        <div className="checkout-address-empty-state col-span-full flex min-h-[13.5rem] flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-user-line bg-user-card px-4 py-6 text-center">
                           <span className="checkout-address-empty-illustration relative mb-0 flex h-24 w-28 items-center justify-center">
                             <Map className="checkout-address-empty-map absolute bottom-0 left-1/2 h-14 w-[5.5rem] -translate-x-1/2" preserveAspectRatio="none" strokeWidth={1.1} />
                             <MapPin size={44} strokeWidth={1.25} className="checkout-address-empty-pin absolute left-1/2 top-5 -translate-x-1/2" />
                             <Sparkles size={14} strokeWidth={1.4} className="checkout-address-empty-sparkle absolute left-1 top-8" />
                             <Sparkles size={14} strokeWidth={1.4} className="checkout-address-empty-sparkle absolute right-1 top-7" />
                           </span>
-                          <p className="text-sm font-semibold text-[var(--user-text)]">{t("checkout.address.noneSaved")}</p>
-                          <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.address.addToContinue")}</p>
+                          <p className="text-sm font-semibold text-user-fg">{t("checkout.address.noneSaved")}</p>
+                          <p className="text-xs text-user-fg-muted">{t("checkout.address.addToContinue")}</p>
                         </div>
                       )}
-                      <button onPointerEnter={warmAddressForm} onFocus={warmAddressForm} onPointerDown={warmAddressForm} onClick={() => openAddressForm("desktop")} className="checkout-address-add-button col-span-full flex h-12 min-h-0 w-full items-center justify-center gap-2 rounded-xl border bg-[var(--user-bg-card)] px-4 text-sm font-semibold transition active:scale-[0.99]">
+                      <button onPointerEnter={warmAddressForm} onFocus={warmAddressForm} onPointerDown={warmAddressForm} onClick={() => openAddressForm("desktop")} className="checkout-address-add-button col-span-full flex h-12 min-h-0 w-full items-center justify-center gap-2 rounded-xl border bg-user-card px-4 text-sm font-semibold transition active:scale-[0.99]">
                         <Plus size={16} strokeWidth={2} /> {t("checkout.address.add")}
                       </button>
                     </div>
@@ -1322,19 +1322,19 @@ function CheckoutContent() {
                 </div>
 
                 <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-2">
-                <div className="min-w-0 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5">
-                  <div className="mb-4 flex items-center gap-3 border-b border-[var(--user-border)] pb-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
-                      <Truck size={18} className="text-[var(--user-accent)]" />
+                <div className="min-w-0 rounded-2xl border border-user-line bg-user-card p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3 border-b border-user-line pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-user-accent/15 bg-user-accent/10">
+                      <Truck size={18} className="text-user-accent" />
                     </div>
                     <div>
-                      <h2 className="text-base font-semibold leading-5 text-[var(--user-text)]">{t("checkout.shipping.title")}</h2>
-                      <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.shipping.subtitle")}</p>
+                      <h2 className="text-base font-semibold leading-5 text-user-fg">{t("checkout.shipping.title")}</h2>
+                      <p className="mt-0.5 text-xs leading-4 text-user-fg-muted">{t("checkout.shipping.subtitle")}</p>
                     </div>
                   </div>
                   {cfg.free_shipping_over > 0 && (
-                    <div className="mb-4 p-3 rounded-xl bg-[var(--user-success)]/10 border border-[var(--user-success)]/20">
-                      <p className="text-xs text-[var(--user-success)] font-bold flex items-center gap-2"><Gift size={14} /> {t("checkout.shipping.freeOver", { amount: `Rs. ${cfg.free_shipping_over.toLocaleString()}` })}</p>
+                    <div className="mb-4 p-3 rounded-xl bg-user-success/10 border border-user-success/20">
+                      <p className="text-xs text-user-success font-bold flex items-center gap-2"><Gift size={14} /> {t("checkout.shipping.freeOver", { amount: `Rs. ${cfg.free_shipping_over.toLocaleString()}` })}</p>
                     </div>
                   )}
                   <div className="grid auto-rows-fr grid-cols-1 gap-3">
@@ -1355,42 +1355,42 @@ function CheckoutContent() {
                       // ✅ Show hint on any method NOT covered by the deal (only when a deal exists).
                       const showNotApplicableHint = freeShippingByActiveItems && !isFreeForThisMethod;
                       return (
-                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`checkout-selection-card flex h-full min-h-[5.75rem] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-[var(--user-accent)]/40 sm:gap-4 sm:p-4 ${active ? "is-selected" : ""}`}>
+                        <button key={m.id} aria-pressed={active} onClick={() => { setShippingMethod(m.id); setUserSelectedShipping(true); }} className={`checkout-selection-card flex h-full min-h-[5.75rem] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-user-accent/40 sm:gap-4 sm:p-4 ${active ? "is-selected" : ""}`}>
                           <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
                             {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                           </span>
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
-                            <IconComp size={18} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-user-line bg-user-hover/60">
+                            <IconComp size={18} className={active ? "text-user-accent" : "text-user-fg-muted"} />
                           </span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold leading-5 text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
-                            <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{m.time}</p>
-                            {showRateDescription && <p className="text-[0.625rem] leading-4 text-[var(--user-text-muted)]">{rateDescription}</p>}
+                            <p className="text-sm font-semibold leading-5 text-user-fg">{m.titleKey ? t(m.titleKey) : m.title}</p>
+                            <p className="mt-0.5 text-xs leading-4 text-user-fg-muted">{m.time}</p>
+                            {showRateDescription && <p className="text-[0.625rem] leading-4 text-user-fg-muted">{rateDescription}</p>}
                             <div className="mt-1 min-h-4">
-                              {active && shippingReason && <p className="text-[0.625rem] leading-4 text-[var(--user-success)] font-medium">{shippingReason}</p>}
+                              {active && shippingReason && <p className="text-[0.625rem] leading-4 text-user-success font-medium">{shippingReason}</p>}
                             {/* ✅ Non-covered method hint (only when a deal exists AND it's not covering this method) */}
                             {showNotApplicableHint && (
-                              <p className="text-[0.625rem] leading-4 text-[var(--user-text-muted)] font-medium italic">
+                              <p className="text-[0.625rem] leading-4 text-user-fg-muted font-medium italic">
                                 {t("checkout.shipping.freeNotApplicable")}
                               </p>
                             )}
                             </div>
                           </div>
-                          <span className={`min-w-[5.5rem] shrink-0 text-right text-sm font-semibold ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>{isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}</span>
+                          <span className={`min-w-[5.5rem] shrink-0 text-right text-sm font-semibold ${isFree ? "text-user-success" : "text-user-fg"}`}>{isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div className="min-w-0 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm sm:p-5">
-                  <div className="mb-4 flex items-center gap-3 border-b border-[var(--user-border)] pb-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
-                      <CreditCard size={18} className="text-[var(--user-accent)]" />
+                <div className="min-w-0 rounded-2xl border border-user-line bg-user-card p-4 shadow-sm sm:p-5">
+                  <div className="mb-4 flex items-center gap-3 border-b border-user-line pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-user-accent/15 bg-user-accent/10">
+                      <CreditCard size={18} className="text-user-accent" />
                     </div>
                     <div>
-                      <h2 className="text-base font-semibold leading-5 text-[var(--user-text)]">{t("checkout.payment.title")}</h2>
-                      <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.payment.subtitle")}</p>
+                      <h2 className="text-base font-semibold leading-5 text-user-fg">{t("checkout.payment.title")}</h2>
+                      <p className="mt-0.5 text-xs leading-4 text-user-fg-muted">{t("checkout.payment.subtitle")}</p>
                     </div>
                   </div>
                   <div className="grid auto-rows-fr grid-cols-1 gap-3">
@@ -1399,29 +1399,29 @@ function CheckoutContent() {
                       { id: "bank", icon: Landmark, titleKey: "checkout.payment.bank", subKey: "checkout.payment.bankDescription" },
                       { id: "card", icon: CreditCard, titleKey: "checkout.payment.card", subKey: "checkout.payment.cardDescription" },
                     ].map((m) => (
-                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => selectPaymentMethod(m.id)} className={`checkout-selection-card flex h-full min-h-[4.75rem] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-[var(--user-accent)]/40 sm:gap-4 sm:p-4 ${paymentMethod === m.id ? "is-selected" : ""}`}>
+                      <button key={m.id} aria-pressed={paymentMethod === m.id} onClick={() => selectPaymentMethod(m.id)} className={`checkout-selection-card flex h-full min-h-[4.75rem] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-user-accent/40 sm:gap-4 sm:p-4 ${paymentMethod === m.id ? "is-selected" : ""}`}>
                         <span className={`checkout-option-indicator ${paymentMethod === m.id ? "is-selected" : ""}`}>
                           {paymentMethod === m.id && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t(m.titleKey)}</p>
-                          <p className="mt-0.5 text-xs leading-4 text-[var(--user-text-muted)]">{t(m.subKey)}</p>
+                          <p className="text-sm font-semibold leading-5 text-user-fg">{t(m.titleKey)}</p>
+                          <p className="mt-0.5 text-xs leading-4 text-user-fg-muted">{t(m.subKey)}</p>
                         </div>
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
-                          <m.icon size={18} className={paymentMethod === m.id ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-user-line bg-user-hover/60">
+                          <m.icon size={18} className={paymentMethod === m.id ? "text-user-accent" : "text-user-fg-muted"} />
                         </span>
                       </button>
                     ))}
                   </div>
                                    {paymentMethod === "bank" && (
-                    <div ref={bankDetailsDesktopRef} className="checkout-bank-details mt-4 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4 space-y-3">
-                      <p className="text-xs font-bold text-[var(--user-text)]">{t("checkout.bank.details")}</p>
-                      <div className="space-y-1 text-xs text-[var(--user-text-muted)]">
-                        <p>{t("checkout.bank.account")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.title}</span></p>
-                        <p>{t("checkout.bank.bank")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.bank}</span></p>
-                        <p>{t("checkout.bank.iban")}: <span className="font-mono font-bold text-[var(--user-text)]">{BANK_DETAILS.iban}</span></p>
+                    <div ref={bankDetailsDesktopRef} className="checkout-bank-details mt-4 rounded-xl bg-user-hover border-2 border-user-line p-4 space-y-3">
+                      <p className="text-xs font-bold text-user-fg">{t("checkout.bank.details")}</p>
+                      <div className="space-y-1 text-xs text-user-fg-muted">
+                        <p>{t("checkout.bank.account")}: <span className="font-bold text-user-fg">{BANK_DETAILS.title}</span></p>
+                        <p>{t("checkout.bank.bank")}: <span className="font-bold text-user-fg">{BANK_DETAILS.bank}</span></p>
+                        <p>{t("checkout.bank.iban")}: <span className="font-mono font-bold text-user-fg">{BANK_DETAILS.iban}</span></p>
                       </div>
-                      <div className="pt-3 border-t border-[var(--user-border)] space-y-3">
+                      <div className="pt-3 border-t border-user-line space-y-3">
                         <div>
                           <label className={labelCls}>{t("checkout.bank.senderName")}</label>
                           <input 
@@ -1433,7 +1433,7 @@ function CheckoutContent() {
                             placeholder={t("checkout.bank.senderPlaceholder")}
                             className={`${inputCls} ${bankFormErrors.senderName ? "!border-red-500 focus:!border-red-500" : ""}`}
                           />
-                          {bankFormErrors.senderName && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.senderName}</p>}
+                          {bankFormErrors.senderName && <p className="text-xs text-user-danger mt-1.5 font-medium">{bankFormErrors.senderName}</p>}
                         </div>
                         <div>
                           <label className={labelCls}>{t("checkout.bank.transactionReference")}</label>
@@ -1446,28 +1446,28 @@ function CheckoutContent() {
                             placeholder={t("checkout.bank.referencePlaceholder")}
                             className={`${inputCls} ${bankFormErrors.transactionRef ? "!border-red-500 focus:!border-red-500" : ""}`}
                           />
-                          {bankFormErrors.transactionRef && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{bankFormErrors.transactionRef}</p>}
+                          {bankFormErrors.transactionRef && <p className="text-xs text-user-danger mt-1.5 font-medium">{bankFormErrors.transactionRef}</p>}
                         </div>
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">{t("checkout.bank.verificationHint")}</p>
+                        <p className="text-[0.625rem] text-user-fg-muted">{t("checkout.bank.verificationHint")}</p>
                       </div>
                     </div>
                   )}
                   {paymentMethod === "card" && (
                     <div className="mt-5">
                       <CardPreview number={cardForm.number} name={cardForm.name} expiry={cardForm.expiry} t={t} />
-                      <div className="space-y-3 rounded-xl bg-[var(--user-bg-hover)] border-2 border-[var(--user-border)] p-4">
+                      <div className="space-y-3 rounded-xl bg-user-hover border-2 border-user-line p-4">
                         <div><label className={labelCls}>{t("checkout.card.number")}</label>
                           <input name="card-number" value={cardForm.number} onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 19); setCardForm({ ...cardForm, number: v.replace(/(\d{4})(?=\d)/g, "$1 ") }); if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" }); }} placeholder="1234 5678 9012 3456" className={`${inputCls} ${cardFormErrors.number ? "!border-red-500 focus:!border-red-500" : ""}`} />
-                          {cardFormErrors.number && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.number}</p>}
+                          {cardFormErrors.number && <p className="text-xs text-user-danger mt-1.5 font-medium">{cardFormErrors.number}</p>}
                         </div>
                         <div><label className={labelCls}>{t("checkout.card.holder")}</label>
                           <input name="card-name" value={cardForm.name} onChange={(e) => { setCardForm({ ...cardForm, name: e.target.value }); if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" }); }} placeholder={t("checkout.card.holderPlaceholder")} className={`${inputCls} ${cardFormErrors.name ? "!border-red-500 focus:!border-red-500" : ""}`} />
-                          {cardFormErrors.name && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.name}</p>}
+                          {cardFormErrors.name && <p className="text-xs text-user-danger mt-1.5 font-medium">{cardFormErrors.name}</p>}
                         </div>
                         <div>
                           <label className={labelCls}>{t("checkout.card.expiryDate")}</label>
                           <input name="card-expiry" type="datetime-local" value={cardForm.expiry} onChange={(e) => { setCardForm({ ...cardForm, expiry: e.target.value }); if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" }); }} className={`${inputCls} ${cardFormErrors.expiry ? "!border-red-500 focus:!border-red-500" : ""}`} />
-                          {cardFormErrors.expiry && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5 font-medium">{cardFormErrors.expiry}</p>}
+                          {cardFormErrors.expiry && <p className="text-xs text-user-danger mt-1.5 font-medium">{cardFormErrors.expiry}</p>}
                         </div>
                       </div>
                     </div>
@@ -1499,71 +1499,71 @@ function CheckoutContent() {
               <div className="space-y-4 sm:space-y-5">
                 <div className={`${cardCls} p-6`}>
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-[var(--user-accent)] flex items-center justify-center">
-                      <ShieldCheck size={18} className="text-[var(--user-accent-text)]" />
+                    <div className="w-10 h-10 rounded-xl bg-user-accent flex items-center justify-center">
+                      <ShieldCheck size={18} className="text-user-accent-fg" />
                     </div>
                     <div>
-                      <h2 className="text-base font-black text-[var(--user-text)]">{t("checkout.review.title")}</h2>
-                      <p className="text-xs text-[var(--user-text-muted)]">{t("checkout.review.subtitle")}</p>
+                      <h2 className="text-base font-black text-user-fg">{t("checkout.review.title")}</h2>
+                      <p className="text-xs text-user-fg-muted">{t("checkout.review.subtitle")}</p>
                     </div>
                   </div>
                   <div className="mb-4 grid items-stretch gap-3 sm:grid-cols-2 sm:gap-4 sm:mb-5">
-                    <div className="flex h-full flex-col rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3 sm:p-3.5">
+                    <div className="flex h-full flex-col rounded-xl border border-user-line bg-user-hover/50 p-3 sm:p-3.5">
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--user-text)]">{t("checkout.address.title")}</p>
-                        <button onClick={() => goToStep(2)} className="shrink-0 text-xs font-semibold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-user-fg">{t("checkout.address.title")}</p>
+                        <button onClick={() => goToStep(2)} className="shrink-0 text-xs font-semibold text-user-accent hover:opacity-80">{t("checkout.change")}</button>
                       </div>
                       {selectedAddress && (
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold leading-5 text-[var(--user-text)]">{selectedAddress.full_name}</p>
-                          <p className="text-[13px] leading-5 text-[var(--user-text-muted)]">
+                          <p className="text-sm font-semibold leading-5 text-user-fg">{selectedAddress.full_name}</p>
+                          <p className="text-[13px] leading-5 text-user-fg-muted">
                             {selectedAddress.street_address1}{selectedAddress.street_address2 ? `, ${selectedAddress.street_address2}` : ""}<br />
                             {selectedAddress.city}, {selectedAddress.state}, {selectedAddress.country}
                           </p>
-                          <p className="mt-1 flex items-center gap-1.5 text-[13px] font-medium text-[var(--user-text-secondary)]"><Phone size={12} /> {selectedAddress.phone}</p>
+                          <p className="mt-1 flex items-center gap-1.5 text-[13px] font-medium text-user-fg-secondary"><Phone size={12} /> {selectedAddress.phone}</p>
                         </div>
                       )}
                     </div>
-                    <div className="flex h-full flex-col rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/50 p-3 sm:p-3.5">
+                    <div className="flex h-full flex-col rounded-xl border border-user-line bg-user-hover/50 p-3 sm:p-3.5">
                       <div className="mb-2 flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--user-text)]">{t("checkout.shippingPayment")}</p>
-                        <button onClick={() => goToStep(2)} className="shrink-0 text-xs font-semibold text-[var(--user-accent)] hover:opacity-80">{t("checkout.change")}</button>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-user-fg">{t("checkout.shippingPayment")}</p>
+                        <button onClick={() => goToStep(2)} className="shrink-0 text-xs font-semibold text-user-accent hover:opacity-80">{t("checkout.change")}</button>
                       </div>
-                      <div className="space-y-1.5 text-[13px] text-[var(--user-text-muted)]">
+                      <div className="space-y-1.5 text-[13px] text-user-fg-muted">
                         <div className="flex items-center gap-2">
-                          <Truck size={14} className="shrink-0 text-[var(--user-accent)]" />
-                          <span className="font-medium text-[var(--user-text)]">{shippingMethodName(shippingMethod)}</span>
+                          <Truck size={14} className="shrink-0 text-user-accent" />
+                          <span className="font-medium text-user-fg">{shippingMethodName(shippingMethod)}</span>
                         </div>
                         <p className="pl-[22px] text-xs leading-4">{shippingMethods.find((m) => m.id === shippingMethod)?.time}</p>
-                        {shippingReason && <p className="pl-[22px] text-xs font-medium text-[var(--user-success)]">{shippingReason}</p>}
-                        <div className="mt-1 flex items-center gap-2 border-t border-[var(--user-border)] pt-2">
-                          {paymentMethod === "cod" ? <Banknote size={14} className="shrink-0 text-[var(--user-accent)]" /> : paymentMethod === "bank" ? <Landmark size={14} className="shrink-0 text-[var(--user-accent)]" /> : <CreditCard size={14} className="shrink-0 text-[var(--user-accent)]" />}
-                          <span className="font-medium text-[var(--user-text)]">
+                        {shippingReason && <p className="pl-[22px] text-xs font-medium text-user-success">{shippingReason}</p>}
+                        <div className="mt-1 flex items-center gap-2 border-t border-user-line pt-2">
+                          {paymentMethod === "cod" ? <Banknote size={14} className="shrink-0 text-user-accent" /> : paymentMethod === "bank" ? <Landmark size={14} className="shrink-0 text-user-accent" /> : <CreditCard size={14} className="shrink-0 text-user-accent" />}
+                          <span className="font-medium text-user-fg">
                             {paymentMethod === "cod" ? t("checkout.payment.cod") : paymentMethod === "bank" ? t("checkout.payment.bank") : t("checkout.payment.debitCreditCard")}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-xl border-2 border-[var(--user-border)] p-4 space-y-5">
-                    <p className="text-xs font-black text-[var(--user-text)] uppercase tracking-wider">{t("checkout.review.items", { count: itemsWithDiscounts.length })}</p>
-                    <div className="divide-y divide-[var(--user-border)]">
+                  <div className="rounded-xl border-2 border-user-line p-4 space-y-5">
+                    <p className="text-xs font-black text-user-fg uppercase tracking-wider">{t("checkout.review.items", { count: itemsWithDiscounts.length })}</p>
+                    <div className="divide-y divide-user-line">
                       {itemsWithDiscounts.map((i) => (
                         <div key={i.key} className="flex items-start gap-4 py-1.5 first:pt-0 last:pb-0">
                           <ItemThumb item={i} size="w-14 h-14" />
                           <div className="flex-1 min-w-0 space-y-1.5">
-                            <p className="text-xs sm:text-sm font-bold text-[var(--user-text)] line-clamp-2">{text(i.name, i.translations?.name)}</p>
+                            <p className="text-xs sm:text-sm font-bold text-user-fg line-clamp-2">{text(i.name, i.translations?.name)}</p>
 {i.dealActive && i.dealId && (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                <span className="inline-flex items-center gap-1 text-[0.5625rem] sm:text-[0.625rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/20 px-2 py-1 rounded-full">
+                                <span className="inline-flex items-center gap-1 text-[0.5625rem] sm:text-[0.625rem] font-black text-user-accent bg-user-accent/10 border border-user-accent/20 px-2 py-1 rounded-full">
                                   <Gift size={9} />
                                   {i.dealType === 'buy_x_get_y' ? t("checkout.item.buyGetFree", { buy: i.dealBuyQuantity, get: i.dealGetQuantity }) : text(i.dealName, i.dealTranslations?.name) || t("checkout.item.activeDeal")}
                                 </span>
                               </div>
                             )}
-                            <p className="text-[0.625rem] sm:text-xs text-[var(--user-text-muted)]">{t("checkout.item.quantity", { count: i.qty })} {i.freeItems > 0 && `(${t("checkout.item.freeQuantitySummary", { paid: i.payableItems, free: i.freeItems })})`}</p>
+                            <p className="text-[0.625rem] sm:text-xs text-user-fg-muted">{t("checkout.item.quantity", { count: i.qty })} {i.freeItems > 0 && `(${t("checkout.item.freeQuantitySummary", { paid: i.payableItems, free: i.freeItems })})`}</p>
                           </div>
-                          <p className="text-xs sm:text-sm font-black text-[var(--user-text)]">Rs. {Number(i.lineTotal || 0).toLocaleString()}</p>
+                          <p className="text-xs sm:text-sm font-black text-user-fg">Rs. {Number(i.lineTotal || 0).toLocaleString()}</p>
                         </div>
                       ))}
                     </div>
@@ -1585,9 +1585,9 @@ function CheckoutContent() {
                   <button onClick={() => goToStep(2)} className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-2 ${ghostBtn}`}>
                     <ArrowLeft size={14} /> {t("checkout.back")}
                   </button>
-                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-[var(--user-border)]">
-                    <ShieldCheck size={14} className="text-[var(--user-success)]" />
-                    <span className="text-xs text-[var(--user-text-muted)] font-semibold">{t("checkout.payment.secureMessage")}</span>
+                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-user-line">
+                    <ShieldCheck size={14} className="text-user-success" />
+                    <span className="text-xs text-user-fg-muted font-semibold">{t("checkout.payment.secureMessage")}</span>
                   </div>
                 </div>
               } />
@@ -1604,8 +1604,8 @@ function CheckoutContent() {
       // Early-out: loading / empty / needs-phone states render their compact mobile equivalents.
       if (userLoading || !draftReady || (!user && !needsPhone)) {
         return (
-          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-[var(--user-bg)]" aria-label={t("checkout.loading")}>
-            <Loader2 className="animate-spin text-[var(--user-accent)]" size={28} />
+          <div className="checkout-premium lg:hidden min-h-[60vh] flex items-center justify-center bg-user-page" aria-label={t("checkout.loading")}>
+            <Loader2 className="animate-spin text-user-accent" size={28} />
             <span className="sr-only">{t("checkout.loading")}</span>
           </div>
         );
@@ -1615,25 +1615,25 @@ function CheckoutContent() {
       // Empty cart on step 1 (mobile)
       if (step === 1 && cart.length === 0 && !placing) {
         return (
-          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-user-page min-h-[60vh]">
             <div
-              className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+              className="sticky top-0 z-30 bg-user-elevated/90 backdrop-blur-md border-b border-user-line"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
             >
               <div className="flex items-center gap-2 px-3 h-12">
-                <button type="button" onClick={() => router.push("/")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+                <button type="button" onClick={() => router.push("/")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-user-fg hover:bg-user-hover active:scale-90 transition">
                   <ArrowLeft size={20} />
                 </button>
-                <p className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("cart.checkout")}</p>
+                <p className="text-[0.9375rem] font-black text-user-fg">{t("cart.checkout")}</p>
               </div>
             </div>
             <div className="flex flex-col items-center justify-center pt-16 pb-8 px-4 text-center">
-              <div className="w-20 h-20 rounded-full bg-[var(--user-bg-card)] border-2 border-[var(--user-border)] flex items-center justify-center mb-5">
-                <Package size={36} className="text-[var(--user-accent)]" />
+              <div className="w-20 h-20 rounded-full bg-user-card border-2 border-user-line flex items-center justify-center mb-5">
+                <Package size={36} className="text-user-accent" />
               </div>
-              <h2 className="text-lg font-black text-[var(--user-text)] mb-1.5">{t("cart.empty")}</h2>
-              <p className="text-xs text-[var(--user-text-muted)] mb-10 max-w-[17.5rem]">{t("checkout.empty.mobileMessage")}</p>
-              <button onClick={() => router.push("/")} className="w-full max-w-xs h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
+              <h2 className="text-lg font-black text-user-fg mb-1.5">{t("cart.empty")}</h2>
+              <p className="text-xs text-user-fg-muted mb-10 max-w-[17.5rem]">{t("checkout.empty.mobileMessage")}</p>
+              <button onClick={() => router.push("/")} className="w-full max-w-xs h-11 rounded-xl bg-user-accent text-user-accent-fg text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition">
                 <ShoppingBag size={16} /> {t("checkout.startShopping")}
               </button>
             </div>
@@ -1644,28 +1644,28 @@ function CheckoutContent() {
       // needsPhone state — use the same compact card style
       if (needsPhone) {
         return (
-          <div className="checkout-premium lg:hidden bg-[var(--user-bg)] min-h-[60vh]">
+          <div className="checkout-premium lg:hidden bg-user-page min-h-[60vh]">
             <div
-              className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+              className="sticky top-0 z-30 bg-user-elevated/90 backdrop-blur-md border-b border-user-line"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
             >
               <div className="flex items-center gap-2 px-3 h-12">
-                <button type="button" onClick={() => router.push("/")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+                <button type="button" onClick={() => router.push("/")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-user-fg hover:bg-user-hover active:scale-90 transition">
                   <ArrowLeft size={20} />
                 </button>
-                <p className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("cart.checkout")}</p>
+                <p className="text-[0.9375rem] font-black text-user-fg">{t("cart.checkout")}</p>
               </div>
             </div>
             <div className="px-4 pt-6 pb-8 max-w-[30rem] mx-auto">
-              <div className="checkout-phone-required bg-[var(--user-bg-card)] rounded-2xl border-2 border-[var(--user-border)] p-6">
-                <div className="w-12 h-12 rounded-2xl bg-[var(--user-accent)] flex items-center justify-center mb-4">
-                  <Phone size={22} className="text-[var(--user-accent-text)]" />
+              <div className="checkout-phone-required bg-user-card rounded-2xl border-2 border-user-line p-6">
+                <div className="w-12 h-12 rounded-2xl bg-user-accent flex items-center justify-center mb-4">
+                  <Phone size={22} className="text-user-accent-fg" />
                 </div>
                 <div className="space-y-1.5">
-                  <h2 className="text-xl font-semibold tracking-tight text-[var(--user-text)]">{t("checkout.phone.requiredTitle")}</h2>
-                  <p className="text-sm text-[var(--user-text-muted)]">{t("checkout.phone.requiredMessage")}</p>
+                  <h2 className="text-xl font-semibold tracking-tight text-user-fg">{t("checkout.phone.requiredTitle")}</h2>
+                  <p className="text-sm text-user-fg-muted">{t("checkout.phone.requiredMessage")}</p>
                 </div>
-                <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.phone.label")}</label>
+                <label htmlFor="checkout-phone-mobile" className="mt-5 block text-sm font-medium text-user-fg-secondary">{t("checkout.phone.label")}</label>
                 <input
                   id="checkout-phone-mobile"
                   dir="auto"
@@ -1687,7 +1687,7 @@ function CheckoutContent() {
                 />
                 <div className="mt-1.5 flex min-h-4 items-center justify-between gap-3">
                   {phoneError ? <p id="checkout-phone-error-mobile" className="text-xs text-red-600">{phoneError}</p> : <span />}
-                  <p id="checkout-phone-helper-mobile" className="shrink-0 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: phone.length, max: PHONE_MAX })}</p>
+                  <p id="checkout-phone-helper-mobile" className="shrink-0 text-xs text-user-fg-muted">{t("checkout.phone.digitCount", { current: phone.length, max: PHONE_MAX })}</p>
                 </div>
                 <PrimaryButton
                   onClick={savePhone}
@@ -1722,30 +1722,30 @@ function CheckoutContent() {
       ];
 
       return (
-        <div className="checkout-premium lg:hidden bg-[var(--user-bg)]">
+        <div className="checkout-premium lg:hidden bg-user-page">
           {/* Sticky top app bar */}
           <div
-            className="sticky top-0 z-30 bg-[var(--user-bg-elevated)]/90 backdrop-blur-md border-b border-[var(--user-border)]"
+            className="sticky top-0 z-30 bg-user-elevated/90 backdrop-blur-md border-b border-user-line"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
             <div className="flex items-center gap-2 px-3 h-12">
-              <button type="button" onClick={() => router.push("/cart")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition">
+              <button type="button" onClick={() => router.push("/cart")} aria-label={t("checkout.back")} className="flex h-9 w-9 items-center justify-center rounded-full text-user-fg hover:bg-user-hover active:scale-90 transition">
                 <ArrowLeft size={20} />
               </button>
-              <p className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("cart.checkout")}</p>
+              <p className="text-[0.9375rem] font-black text-user-fg">{t("cart.checkout")}</p>
             </div>
           </div>
 
           <div className="px-3 pt-3 pb-28 space-y-3">
             {/* Card 1: Shipping Address — standalone card with header (tappable) */}
-            <div className="overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-user-line bg-user-card shadow-sm">
               <div className="flex items-center gap-3 px-3 pb-2 pt-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
-                  <MapPin size={17} className="text-[var(--user-accent)]" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-accent/15 bg-user-accent/10">
+                  <MapPin size={17} className="text-user-accent" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t("checkout.address.title")}</h2>
-                  <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.address.subtitle")}</p>
+                  <h2 className="text-sm font-semibold leading-5 text-user-fg">{t("checkout.address.title")}</h2>
+                  <p className="text-xs leading-4 text-user-fg-muted">{t("checkout.address.subtitle")}</p>
                 </div>
               </div>
               {addressFormView === "mobile" ? (
@@ -1766,24 +1766,24 @@ function CheckoutContent() {
                     aria-label={t("checkout.address.changeDelivery")}
                     className="flex w-full touch-manipulation items-center gap-3 text-left transition active:scale-[0.99]"
                   >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--user-accent)]/10">
-                      <MapPin size={18} className="text-[var(--user-accent)]" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-user-accent/10">
+                      <MapPin size={18} className="text-user-accent" />
                     </div>
                     <div className="min-w-0 flex-1">
                       {deliveryAddress ? (
                         <>
-                          <p className="truncate text-[0.8125rem] font-black text-[var(--user-text)]">
-                            {deliveryAddress.full_name} <span className="font-semibold text-[var(--user-text-muted)]">· {deliveryAddress.phone}</span>
+                          <p className="truncate text-[0.8125rem] font-black text-user-fg">
+                            {deliveryAddress.full_name} <span className="font-semibold text-user-fg-muted">· {deliveryAddress.phone}</span>
                           </p>
-                          <p className="mt-0.5 line-clamp-2 text-[0.6875rem] text-[var(--user-text-muted)]">
+                          <p className="mt-0.5 line-clamp-2 text-[0.6875rem] text-user-fg-muted">
                             {deliveryAddress.street_address1}{deliveryAddress.street_address2 ? `, ${deliveryAddress.street_address2}` : ""}, {deliveryAddress.city}, {deliveryAddress.state}
                           </p>
                         </>
                       ) : (
-                        <p className="text-[0.75rem] text-[var(--user-text-muted)]">{t("checkout.address.tapToSelect")}</p>
+                        <p className="text-[0.75rem] text-user-fg-muted">{t("checkout.address.tapToSelect")}</p>
                       )}
                     </div>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--user-text-muted)]">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-user-fg-muted">
                       <ChevronDown size={18} />
                     </span>
                   </button>
@@ -1791,7 +1791,7 @@ function CheckoutContent() {
                     type="button"
                     onPointerDown={warmAddressForm}
                     onClick={() => openAddressForm("mobile")}
-                    className="mt-2 flex h-10 w-full touch-manipulation items-center justify-center gap-2 rounded-lg border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/5 px-3 text-xs font-semibold text-[var(--user-accent)] transition hover:bg-[var(--user-accent)]/10"
+                    className="mt-2 flex h-10 w-full touch-manipulation items-center justify-center gap-2 rounded-lg border border-user-accent/30 bg-user-accent/5 px-3 text-xs font-semibold text-user-accent transition hover:bg-user-accent/10"
                   >
                     <Plus size={15} /> {t("checkout.address.add")}
                   </button>
@@ -1800,8 +1800,8 @@ function CheckoutContent() {
             </div>
 
             {/* Card 2: Items (only) */}
-            <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-3">
-              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+            <div className="rounded-xl bg-user-card border border-user-line p-3 space-y-3">
+              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-user-fg-muted flex items-center gap-1.5">
                 <Package size={13} /> {t("checkout.step.items")}
               </p>
 
@@ -1813,34 +1813,34 @@ function CheckoutContent() {
                       <ItemThumb item={i} size="w-12 h-12" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{text(i.name, i.translations?.name)}</p>
+                      <p className="text-[0.75rem] font-bold text-user-fg line-clamp-1">{text(i.name, i.translations?.name)}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {i.variantTitle && <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{text(i.variantTitle, i.variantTranslations?.title)}</p>}
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
+                        {i.variantTitle && <p className="text-[0.625rem] text-user-fg-muted truncate">{text(i.variantTitle, i.variantTranslations?.title)}</p>}
+                        <p className="text-[0.625rem] text-user-fg-muted">×{i.qty}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
                       </div>
                     </div>
-                    <p className="text-[0.75rem] font-black text-[var(--user-text)] shrink-0">Rs. {i.lineTotal.toLocaleString()}</p>
+                    <p className="text-[0.75rem] font-black text-user-fg shrink-0">Rs. {i.lineTotal.toLocaleString()}</p>
                   </div>
                 ))}
               </div>
 
               {/* Free shipping threshold banner (matches desktop) */}
               {cfg.free_shipping_over > 0 && (
-                <p className="text-[0.625rem] font-bold text-[var(--user-success)] bg-[var(--user-success)]/10 border border-[var(--user-success)]/20 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
+                <p className="text-[0.625rem] font-bold text-user-success bg-user-success/10 border border-user-success/20 rounded-lg px-2 py-1.5 flex items-center gap-1.5">
                   <Gift size={11} /> {t("checkout.shipping.freeOver", { amount: `Rs. ${cfg.free_shipping_over.toLocaleString()}` })}
                 </p>
               )}
             </div>
 
             {/* Card 3: Delivery Method (standalone) */}
-            <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm space-y-3">
-              <div className="flex items-center gap-3 border-b border-[var(--user-border)] pb-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
-                  <Truck size={17} className="text-[var(--user-accent)]" />
+            <div className="rounded-2xl border border-user-line bg-user-card p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-3 border-b border-user-line pb-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-accent/15 bg-user-accent/10">
+                  <Truck size={17} className="text-user-accent" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t("checkout.shipping.title")}</h2>
-                  <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.shipping.subtitle")}</p>
+                  <h2 className="text-sm font-semibold leading-5 text-user-fg">{t("checkout.shipping.title")}</h2>
+                  <p className="text-xs leading-4 text-user-fg-muted">{t("checkout.shipping.subtitle")}</p>
                 </div>
               </div>
               <div className="grid auto-rows-fr grid-cols-1 gap-2">
@@ -1855,7 +1855,7 @@ function CheckoutContent() {
                   return (
                     <label
                       key={m.id}
-                      className={`checkout-selection-card flex h-full min-h-[4.5rem] items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all duration-150 hover:border-[var(--user-accent)]/40 ${active ? "is-selected" : ""}`}
+                      className={`checkout-selection-card flex h-full min-h-[4.5rem] items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all duration-150 hover:border-user-accent/40 ${active ? "is-selected" : ""}`}
                     >
                       <input
                         type="radio"
@@ -1867,15 +1867,15 @@ function CheckoutContent() {
                       <span className={`checkout-option-indicator ${active ? "is-selected" : ""}`}>
                         {active && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
                       </span>
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
-                        <IconComp size={17} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-line bg-user-hover/60">
+                        <IconComp size={17} className={active ? "text-user-accent" : "text-user-fg-muted"} />
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.8125rem] font-semibold leading-5 text-[var(--user-text)]">{m.titleKey ? t(m.titleKey) : m.title}</p>
-                        <p className="text-xs leading-4 text-[var(--user-text-muted)]">{m.time}</p>
-                        <p className="text-[0.625rem] leading-4 text-[var(--user-text-muted)]">{t(m.rateDescriptionKey || "checkout.shipping.deliveryRate")}</p>
+                        <p className="text-[0.8125rem] font-semibold leading-5 text-user-fg">{m.titleKey ? t(m.titleKey) : m.title}</p>
+                        <p className="text-xs leading-4 text-user-fg-muted">{m.time}</p>
+                        <p className="text-[0.625rem] leading-4 text-user-fg-muted">{t(m.rateDescriptionKey || "checkout.shipping.deliveryRate")}</p>
                       </div>
-                      <span className={`min-w-[4.75rem] shrink-0 text-right text-xs font-semibold ${isFree ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+                      <span className={`min-w-[4.75rem] shrink-0 text-right text-xs font-semibold ${isFree ? "text-user-success" : "text-user-fg"}`}>
                         {isFree ? t("checkout.summary.free") : `Rs. ${displayFee.toLocaleString()}`}
                       </span>
                     </label>
@@ -1885,14 +1885,14 @@ function CheckoutContent() {
             </div>
 
             {/* Card 4: Payment (compact icon chips — equal-width grid) */}
-            <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 shadow-sm space-y-3">
-              <div className="flex items-center gap-3 border-b border-[var(--user-border)] pb-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-accent)]/15 bg-[var(--user-accent)]/10">
-                  <CreditCard size={17} className="text-[var(--user-accent)]" />
+            <div className="rounded-2xl border border-user-line bg-user-card p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-3 border-b border-user-line pb-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-accent/15 bg-user-accent/10">
+                  <CreditCard size={17} className="text-user-accent" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold leading-5 text-[var(--user-text)]">{t("checkout.payment.title")}</h2>
-                  <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t("checkout.payment.subtitle")}</p>
+                  <h2 className="text-sm font-semibold leading-5 text-user-fg">{t("checkout.payment.title")}</h2>
+                  <p className="text-xs leading-4 text-user-fg-muted">{t("checkout.payment.subtitle")}</p>
                 </div>
               </div>
               <div className="grid auto-rows-fr grid-cols-1 gap-2">
@@ -1908,19 +1908,19 @@ function CheckoutContent() {
                       type="button"
                       onClick={() => selectPaymentMethod(m.id)}
                       aria-pressed={active}
-                      className={`checkout-selection-card flex h-full min-h-[4.5rem] w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:border-[var(--user-accent)]/40 ${
-                        active ? "is-selected" : "bg-[var(--user-bg-card)] text-[var(--user-text-secondary)]"
+                      className={`checkout-selection-card flex h-full min-h-[4.5rem] w-full items-center gap-3 rounded-xl border p-3 text-left transition-all duration-150 hover:border-user-accent/40 ${
+                        active ? "is-selected" : "bg-user-card text-user-fg-secondary"
                       }`}
                     >
                       <span className={`checkout-option-indicator checkout-option-indicator--compact ${active ? "is-selected" : ""}`}>
                         {active && <Check size={10} strokeWidth={2.5} aria-hidden="true" />}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.8125rem] font-semibold leading-5 text-[var(--user-text)]">{t(m.titleKey)}</p>
-                        <p className="text-xs leading-4 text-[var(--user-text-muted)]">{t(m.subKey)}</p>
+                        <p className="text-[0.8125rem] font-semibold leading-5 text-user-fg">{t(m.titleKey)}</p>
+                        <p className="text-xs leading-4 text-user-fg-muted">{t(m.subKey)}</p>
                       </div>
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60">
-                        <m.icon size={17} className={active ? "text-[var(--user-accent)]" : "text-[var(--user-text-muted)]"} />
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-user-line bg-user-hover/60">
+                        <m.icon size={17} className={active ? "text-user-accent" : "text-user-fg-muted"} />
                       </span>
                     </button>
                   );
@@ -1929,16 +1929,16 @@ function CheckoutContent() {
 
               {/* ✅ Mobile: Bank transfer info + fillable fields */}
               {paymentMethod === "bank" && (
-                <div ref={bankDetailsMobileRef} className="checkout-bank-details rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
-                  <p className="text-[0.6875rem] font-bold text-[var(--user-text)]">{t("checkout.bank.details")}</p>
-                  <div className="space-y-1 text-[0.6875rem] text-[var(--user-text-muted)]">
-                    <p>{t("checkout.bank.account")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.title}</span></p>
-                    <p>{t("checkout.bank.bank")}: <span className="font-bold text-[var(--user-text)]">{BANK_DETAILS.bank}</span></p>
-                    <p>{t("checkout.bank.iban")}: <span className="font-mono font-bold text-[var(--user-text)]">{BANK_DETAILS.iban}</span></p>
+                <div ref={bankDetailsMobileRef} className="checkout-bank-details rounded-lg bg-user-hover/60 border border-user-line p-3 space-y-2.5">
+                  <p className="text-[0.6875rem] font-bold text-user-fg">{t("checkout.bank.details")}</p>
+                  <div className="space-y-1 text-[0.6875rem] text-user-fg-muted">
+                    <p>{t("checkout.bank.account")}: <span className="font-bold text-user-fg">{BANK_DETAILS.title}</span></p>
+                    <p>{t("checkout.bank.bank")}: <span className="font-bold text-user-fg">{BANK_DETAILS.bank}</span></p>
+                    <p>{t("checkout.bank.iban")}: <span className="font-mono font-bold text-user-fg">{BANK_DETAILS.iban}</span></p>
                   </div>
-                  <div className="pt-2 border-t border-[var(--user-border)] space-y-2.5">
+                  <div className="pt-2 border-t border-user-line space-y-2.5">
                     <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.bank.senderName")}</label>
+                      <label className="block text-[0.625rem] font-bold text-user-fg-secondary mb-1 uppercase tracking-wider">{t("checkout.bank.senderName")}</label>
                       <input 
                         value={bankForm.senderName} 
                         onChange={(e) => {
@@ -1946,12 +1946,12 @@ function CheckoutContent() {
                           if (bankFormErrors.senderName) setBankFormErrors({ ...bankFormErrors, senderName: "" });
                         }}
                         placeholder={t("checkout.bank.senderPlaceholder")}
-                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-user-input text-user-fg transition ${bankFormErrors.senderName ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`}
                       />
-                      {bankFormErrors.senderName && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.senderName}</p>}
+                      {bankFormErrors.senderName && <p className="text-[0.625rem] text-user-danger mt-1 font-medium">{bankFormErrors.senderName}</p>}
                     </div>
                     <div>
-                      <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.bank.transactionId")}</label>
+                      <label className="block text-[0.625rem] font-bold text-user-fg-secondary mb-1 uppercase tracking-wider">{t("checkout.bank.transactionId")}</label>
                       <input 
                         value={bankForm.transactionRef} 
                         onChange={(e) => {
@@ -1959,9 +1959,9 @@ function CheckoutContent() {
                           if (bankFormErrors.transactionRef) setBankFormErrors({ ...bankFormErrors, transactionRef: "" });
                         }}
                         placeholder={t("checkout.bank.referencePlaceholder")}
-                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                        className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-user-input text-user-fg transition ${bankFormErrors.transactionRef ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`}
                       />
-                      {bankFormErrors.transactionRef && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{bankFormErrors.transactionRef}</p>}
+                      {bankFormErrors.transactionRef && <p className="text-[0.625rem] text-user-danger mt-1 font-medium">{bankFormErrors.transactionRef}</p>}
                     </div>
                   </div>
                 </div>
@@ -1969,9 +1969,9 @@ function CheckoutContent() {
 
               {/* ✅ Mobile: Card form */}
               {paymentMethod === "card" && (
-                <div className="rounded-lg bg-[var(--user-bg-hover)]/60 border border-[var(--user-border)] p-3 space-y-2.5">
+                <div className="rounded-lg bg-user-hover/60 border border-user-line p-3 space-y-2.5">
                   <div>
-                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.card.number")}</label>
+                    <label className="block text-[0.625rem] font-bold text-user-fg-secondary mb-1 uppercase tracking-wider">{t("checkout.card.number")}</label>
                     <input 
                       name="card-number"
                       value={cardForm.number} 
@@ -1981,12 +1981,12 @@ function CheckoutContent() {
                         if (cardFormErrors.number) setCardFormErrors({ ...cardFormErrors, number: "" });
                       }} 
                       placeholder="1234 5678 9012 3456" 
-                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.number ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-user-input text-user-fg transition ${cardFormErrors.number ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`} 
                     />
-                    {cardFormErrors.number && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.number}</p>}
+                    {cardFormErrors.number && <p className="text-[0.625rem] text-user-danger mt-1 font-medium">{cardFormErrors.number}</p>}
                   </div>
                   <div>
-                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.card.holder")}</label>
+                    <label className="block text-[0.625rem] font-bold text-user-fg-secondary mb-1 uppercase tracking-wider">{t("checkout.card.holder")}</label>
                     <input 
                       name="card-name"
                       value={cardForm.name} 
@@ -1995,12 +1995,12 @@ function CheckoutContent() {
                         if (cardFormErrors.name) setCardFormErrors({ ...cardFormErrors, name: "" });
                       }} 
                       placeholder={t("checkout.card.holderPlaceholder")}
-                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.name ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`} 
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-user-input text-user-fg transition ${cardFormErrors.name ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`} 
                     />
-                    {cardFormErrors.name && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.name}</p>}
+                    {cardFormErrors.name && <p className="text-[0.625rem] text-user-danger mt-1 font-medium">{cardFormErrors.name}</p>}
                   </div>
                   <div>
-                    <label className="block text-[0.625rem] font-bold text-[var(--user-text-secondary)] mb-1 uppercase tracking-wider">{t("checkout.card.expiryDate")}</label>
+                    <label className="block text-[0.625rem] font-bold text-user-fg-secondary mb-1 uppercase tracking-wider">{t("checkout.card.expiryDate")}</label>
                     <input
                       name="card-expiry"
                       type="datetime-local"
@@ -2009,45 +2009,45 @@ function CheckoutContent() {
                         setCardForm({ ...cardForm, expiry: e.target.value });
                         if (cardFormErrors.expiry) setCardFormErrors({ ...cardFormErrors, expiry: "" });
                       }}
-                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-[var(--user-bg-input)] text-[var(--user-text)] transition ${cardFormErrors.expiry ? "border-red-500 focus:border-red-500" : "border-[var(--user-border)] focus:border-[var(--user-accent)]"}`}
+                      className={`w-full h-10 px-3 rounded-lg text-[0.75rem] outline-none border-2 bg-user-input text-user-fg transition ${cardFormErrors.expiry ? "border-red-500 focus:border-red-500" : "border-user-line focus:border-user-accent"}`}
                     />
-                    {cardFormErrors.expiry && <p className="text-[0.625rem] text-red-600 dark:text-red-400 mt-1 font-medium">{cardFormErrors.expiry}</p>}
+                    {cardFormErrors.expiry && <p className="text-[0.625rem] text-user-danger mt-1 font-medium">{cardFormErrors.expiry}</p>}
                   </div>
                 </div>
               )}
             </div>
 
             {/* Card 4: Order summary */}
-            <div className="rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] p-3 space-y-2">
-              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-[var(--user-text-muted)] flex items-center gap-1.5">
+            <div className="rounded-xl bg-user-card border border-user-line p-3 space-y-2">
+              <p className="text-[0.6875rem] font-black uppercase tracking-wider text-user-fg-muted flex items-center gap-1.5">
                 <PackageCheck size={13} /> {t("checkout.summary.title")}
               </p>
               <div className="space-y-1.5 text-[0.75rem]">
-                <div className="flex justify-between text-[var(--user-text-muted)]">
+                <div className="flex justify-between text-user-fg-muted">
                   <span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>
-                  <span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span>
+                  <span className="font-bold text-user-fg">Rs. {subtotal.toLocaleString()}</span>
                 </div>
                 {totalSavings > 0 && (
-                  <div className="flex justify-between text-[var(--user-success)]">
+                  <div className="flex justify-between text-user-success">
                     <span className="font-bold">{t("checkout.summary.youSave")}</span>
                     <span className="font-black">-Rs. {totalSavings.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-[var(--user-text-muted)]">
+                <div className="flex justify-between text-user-fg-muted">
                   <span>{t("checkout.summary.shippingFee")}</span>
-                  <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+                  <span className={`font-bold ${shipping === 0 ? "text-user-success" : "text-user-fg"}`}>
                     {shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}
                   </span>
                 </div>
                 {tax > 0 && (
-                  <div className="flex justify-between text-[var(--user-text-muted)]">
+                  <div className="flex justify-between text-user-fg-muted">
                     <span>{t("cart.tax")}</span>
-                    <span className="font-bold text-[var(--user-text)]">Rs. {tax.toLocaleString()}</span>
+                    <span className="font-bold text-user-fg">Rs. {tax.toLocaleString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-[var(--user-border)]">
-                  <span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span>
-                  <span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span>
+                <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-user-line">
+                  <span className="text-[0.8125rem] font-black text-user-fg">{t("cart.total")}</span>
+                  <span className="text-lg font-black text-user-accent">Rs. {grandTotal.toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -2055,18 +2055,18 @@ function CheckoutContent() {
 
           {/* Sticky bottom bar — direct child of lg:hidden page root, fixed bottom-0 z-50 */}
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--user-bg-elevated)]/95 backdrop-blur-md border-t border-[var(--user-border)]"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-user-elevated/95 backdrop-blur-md border-t border-user-line"
             style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
           >
             <div className="flex items-center gap-3 px-3 py-3">
               <div className="flex-1 min-w-0">
-                <p className="text-[0.625rem] text-[var(--user-text-muted)] font-bold uppercase tracking-wider">
+                <p className="text-[0.625rem] text-user-fg-muted font-bold uppercase tracking-wider">
                   {t("cart.total")}
-                  <span className={`ml-1 ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text-muted)]"}`}>
+                  <span className={`ml-1 ${shipping === 0 ? "text-user-success" : "text-user-fg-muted"}`}>
                     {shipping === 0 ? t("checkout.summary.freeShipping") : t("checkout.summary.includingShipping")}
                   </span>
                 </p>
-                <p className="text-base font-black text-[var(--user-accent)] leading-none mt-0.5">Rs. {grandTotal.toLocaleString()}</p>
+                <p className="text-base font-black text-user-accent leading-none mt-0.5">Rs. {grandTotal.toLocaleString()}</p>
               </div>
               <PrimaryButton
                 onClick={() => setOrderReviewOpen(true)}
@@ -2088,20 +2088,20 @@ function CheckoutContent() {
                 style={{ animation: "fadeIn 0.2s ease-out" }}
             >
               <div
-                className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[var(--user-bg-card)] border-t-2 border-[var(--user-border)] shadow-2xl"
+                className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-user-card border-t-2 border-user-line shadow-2xl"
                 style={{ animation: "modalUp .3s ease-out", paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }}
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Sheet header */}
-                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
-                  <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">
+                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-user-line bg-user-card/95 backdrop-blur-sm">
+                  <h3 className="text-[0.9375rem] font-black text-user-fg">
                     {t("checkout.address.title")}
                   </h3>
                   <button
                     type="button"
                     onClick={() => { setMobileAddressSheet(false); setEditingAddressId(null); }}
                     aria-label={t("common.close")}
-                    className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"
+                    className="h-8 w-8 flex items-center justify-center rounded-full text-user-fg-muted hover:bg-user-hover active:scale-90 transition"
                   >
                     <X size={18} />
                   </button>
@@ -2111,10 +2111,10 @@ function CheckoutContent() {
                 <div className="p-3 space-y-2">
                     {addresses.length === 0 && (
                       <div className="flex flex-col items-center gap-3 px-4 py-6 text-center">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--user-accent)]/10 text-[var(--user-accent)]">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-user-accent/10 text-user-accent">
                           <MapPin size={22} />
                         </div>
-                        <p className="text-sm font-medium text-[var(--user-text-secondary)]">{t("checkout.address.noneSaved")}</p>
+                        <p className="text-sm font-medium text-user-fg-secondary">{t("checkout.address.noneSaved")}</p>
                       </div>
                     )}
                   {addresses.map((a) => {
@@ -2130,26 +2130,26 @@ function CheckoutContent() {
                             className="w-full text-left"
                           >
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate">{a.full_name}</p>
-                              <span className="text-[0.6875rem] text-[var(--user-text-muted)] font-semibold">· {a.phone}</span>
+                              <p className="text-[0.8125rem] font-black text-user-fg truncate">{a.full_name}</p>
+                              <span className="text-[0.6875rem] text-user-fg-muted font-semibold">· {a.phone}</span>
                               {isSel && <Check size={14} className="checkout-selection-check ml-auto shrink-0" />}
                             </div>
-                            <p className="text-[0.6875rem] text-[var(--user-text-muted)] line-clamp-2 leading-snug">
+                            <p className="text-[0.6875rem] text-user-fg-muted line-clamp-2 leading-snug">
                               {a.street_address1}{a.street_address2 ? `, ${a.street_address2}` : ""}, {a.city}, {a.state}
                             </p>
                           </button>
-                          <div className="flex items-center gap-2 pt-2 mt-2 border-t border-[var(--user-border)]">
+                          <div className="flex items-center gap-2 pt-2 mt-2 border-t border-user-line">
                             <button
                               type="button"
                               onClick={() => openAddressForm("mobile", a)}
-                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition text-[0.6875rem] font-semibold"
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-user-fg-muted hover:text-user-accent hover:bg-user-accent/10 transition text-[0.6875rem] font-semibold"
                             >
                               <Pencil size={11} /> {t("checkout.address.edit")}
                             </button>
                             <button
                               type="button"
                               onClick={() => { if (window.confirm(t("checkout.address.deleteConfirmation"))) deleteAddress(a._id); }}
-                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[var(--user-text-muted)] hover:text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition text-[0.6875rem] font-semibold"
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-user-fg-muted hover:text-user-danger hover:bg-user-danger/10 transition text-[0.6875rem] font-semibold"
                             >
                               <Trash2 size={11} /> {t("common.delete")}
                             </button>
@@ -2163,39 +2163,39 @@ function CheckoutContent() {
                       onFocus={warmAddressForm}
                       onPointerDown={warmAddressForm}
                       onClick={() => openAddressForm("mobile")}
-                      className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--user-accent)] bg-[var(--user-accent)] px-4 text-[0.75rem] font-semibold text-[var(--user-accent-text)] transition hover:opacity-90 active:scale-[0.99]"
+                      className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-user-accent bg-user-accent px-4 text-[0.75rem] font-semibold text-user-accent-fg transition hover:opacity-90 active:scale-[0.99]"
                     >
                       <Plus size={14} /> {t("checkout.address.add")}
                     </button>
                 </div>
 
                 {/* Summary */}
-                <div className="px-4 py-3 border-t border-[var(--user-border)] space-y-2 text-[0.75rem]">
+                <div className="px-4 py-3 border-t border-user-line space-y-2 text-[0.75rem]">
                   <div className="flex justify-between">
-                    <span className="text-[var(--user-text-muted)]">{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>
-                    <span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span>
+                    <span className="text-user-fg-muted">{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>
+                    <span className="font-bold text-user-fg">Rs. {subtotal.toLocaleString()}</span>
                   </div>
                   {totalSavings > 0 && (
                     <div className="flex justify-between">
-                      <span className="font-bold text-[var(--user-success)]">{t("checkout.summary.youSave")}</span>
-                      <span className="font-black text-[var(--user-success)]">-Rs. {totalSavings.toLocaleString()}</span>
+                      <span className="font-bold text-user-success">{t("checkout.summary.youSave")}</span>
+                      <span className="font-black text-user-success">-Rs. {totalSavings.toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-[var(--user-text-muted)]">{t("checkout.summary.shippingFee")}</span>
-                    <span className={`font-bold ${shipping === 0 ? "text-[var(--user-success)]" : "text-[var(--user-text)]"}`}>
+                    <span className="text-user-fg-muted">{t("checkout.summary.shippingFee")}</span>
+                    <span className={`font-bold ${shipping === 0 ? "text-user-success" : "text-user-fg"}`}>
                       {shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}
                     </span>
                   </div>
                   {tax > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-[var(--user-text-muted)]">{t("cart.tax")}</span>
-                      <span className="font-bold text-[var(--user-text)]">Rs. {tax.toLocaleString()}</span>
+                      <span className="text-user-fg-muted">{t("cart.tax")}</span>
+                      <span className="font-bold text-user-fg">Rs. {tax.toLocaleString()}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-[var(--user-border)]">
-                    <span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span>
-                    <span className="text-lg font-black text-[var(--user-text)]">Rs. {grandTotal.toLocaleString()}</span>
+                  <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-user-line">
+                    <span className="text-[0.8125rem] font-black text-user-fg">{t("cart.total")}</span>
+                    <span className="text-lg font-black text-user-fg">Rs. {grandTotal.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -2218,34 +2218,34 @@ function CheckoutContent() {
           {/* ✅ Mobile Order Review Sheet (Daraz-style) */}
           {orderReviewOpen && (
             <div className="fixed inset-0 z-[70] flex items-end bg-black/70 backdrop-blur-sm" onClick={() => setOrderReviewOpen(false)} style={{ animation: "fadeIn 0.2s ease-out" }}>
-              <div className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-[var(--user-bg-card)] border-t-2 border-[var(--user-border)] shadow-2xl" style={{ animation: "modalUp .3s ease-out", paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
-                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-[var(--user-border)] bg-[var(--user-bg-card)]/95 backdrop-blur-sm">
-                  <h3 className="text-[0.9375rem] font-black text-[var(--user-text)]">{t("checkout.review.orderReview")}</h3>
-                  <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label={t("common.close")} className="h-8 w-8 flex items-center justify-center rounded-full text-[var(--user-text-muted)] hover:bg-[var(--user-bg-hover)] active:scale-90 transition"><X size={18} /></button>
+              <div className="w-full max-h-[85vh] overflow-y-auto rounded-t-2xl bg-user-card border-t-2 border-user-line shadow-2xl" style={{ animation: "modalUp .3s ease-out", paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+                <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-user-line bg-user-card/95 backdrop-blur-sm">
+                  <h3 className="text-[0.9375rem] font-black text-user-fg">{t("checkout.review.orderReview")}</h3>
+                  <button type="button" onClick={() => setOrderReviewOpen(false)} aria-label={t("common.close")} className="h-8 w-8 flex items-center justify-center rounded-full text-user-fg-muted hover:bg-user-hover active:scale-90 transition"><X size={18} /></button>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="divide-y divide-[var(--user-border)]">
+                  <div className="divide-y divide-user-line">
                   {itemsWithDiscounts.map((i) => (
                     <div key={i.key} className="flex items-center gap-4 py-1.5 first:pt-0 last:pb-0">
                       <ItemThumb item={i} size="w-12 h-12" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[0.75rem] font-bold text-[var(--user-text)] line-clamp-1">{text(i.name, i.translations?.name)}</p>
-                        <p className="text-[0.625rem] text-[var(--user-text-muted)]">×{i.qty}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
+                        <p className="text-[0.75rem] font-bold text-user-fg line-clamp-1">{text(i.name, i.translations?.name)}</p>
+                        <p className="text-[0.625rem] text-user-fg-muted">×{i.qty}{i.freeItems > 0 ? ` (${t("checkout.item.paidCount", { count: i.payableItems })})` : ""}</p>
                       </div>
-                      <p className="text-[0.75rem] font-black text-[var(--user-text)]">Rs. {i.lineTotal.toLocaleString()}</p>
+                      <p className="text-[0.75rem] font-black text-user-fg">Rs. {i.lineTotal.toLocaleString()}</p>
                     </div>
                   ))}
                   </div>
-                  <div className="rounded-lg bg-[var(--user-bg-hover)]/50 border border-[var(--user-border)] p-3 text-[0.6875rem] space-y-1.5">
-                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5"><MapPin size={12} className="text-[var(--user-accent)]" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : t("checkout.address.noneSelected")}</p>
-                    {selectedAddress && <p className="text-[var(--user-text-muted)] line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
-                    <p className="font-bold text-[var(--user-text)] flex items-center gap-1.5 pt-1 border-t border-[var(--user-border)]"><CreditCard size={12} className="text-[var(--user-accent)]" /> {paymentMethod === "cod" ? t("checkout.payment.cod") : paymentMethod === "bank" ? t("checkout.payment.bank") : t("checkout.payment.debitCreditCard")}</p>
+                  <div className="rounded-lg bg-user-hover/50 border border-user-line p-3 text-[0.6875rem] space-y-1.5">
+                    <p className="font-bold text-user-fg flex items-center gap-1.5"><MapPin size={12} className="text-user-accent" /> {selectedAddress ? `${selectedAddress.full_name} · ${selectedAddress.phone}` : t("checkout.address.noneSelected")}</p>
+                    {selectedAddress && <p className="text-user-fg-muted line-clamp-2">{selectedAddress.street_address1}, {selectedAddress.city}, {selectedAddress.state}</p>}
+                    <p className="font-bold text-user-fg flex items-center gap-1.5 pt-1 border-t border-user-line"><CreditCard size={12} className="text-user-accent" /> {paymentMethod === "cod" ? t("checkout.payment.cod") : paymentMethod === "bank" ? t("checkout.payment.bank") : t("checkout.payment.debitCreditCard")}</p>
                   </div>
                   <div className="space-y-2.5 text-[0.75rem] pt-3">
-                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span><span className="font-bold text-[var(--user-text)]">Rs. {subtotal.toLocaleString()}</span></div>
-                    {totalSavings > 0 && <div className="flex justify-between text-[var(--user-success)]"><span className="font-bold">{t("checkout.summary.youSave")}</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
-                    <div className="flex justify-between text-[var(--user-text-muted)]"><span>{t("cart.shipping")}</span><span className="font-bold">{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}</span></div>
-                    <div className="flex justify-between items-baseline pt-3 border-t border-[var(--user-border)]"><span className="text-[0.8125rem] font-black text-[var(--user-text)]">{t("cart.total")}</span><span className="text-lg font-black text-[var(--user-accent)]">Rs. {grandTotal.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-user-fg-muted"><span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span><span className="font-bold text-user-fg">Rs. {subtotal.toLocaleString()}</span></div>
+                    {totalSavings > 0 && <div className="flex justify-between text-user-success"><span className="font-bold">{t("checkout.summary.youSave")}</span><span className="font-black">-Rs. {totalSavings.toLocaleString()}</span></div>}
+                    <div className="flex justify-between text-user-fg-muted"><span>{t("cart.shipping")}</span><span className="font-bold">{shipping === 0 ? t("checkout.summary.free") : `Rs. ${shipping.toLocaleString()}`}</span></div>
+                    <div className="flex justify-between items-baseline pt-3 border-t border-user-line"><span className="text-[0.8125rem] font-black text-user-fg">{t("cart.total")}</span><span className="text-lg font-black text-user-accent">Rs. {grandTotal.toLocaleString()}</span></div>
                   </div>
                 </div>
                 <div className="px-4 pt-3 pb-1">
@@ -2272,7 +2272,7 @@ function CheckoutContent() {
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center"><div className="w-16 h-16 rounded-full border-4 border-[var(--user-border)] border-t-[var(--user-accent)] animate-spin" /></div>}>
+    <Suspense fallback={<div className="flex h-[60vh] items-center justify-center"><div className="w-16 h-16 rounded-full border-4 border-user-line border-t-user-accent animate-spin" /></div>}>
       <CheckoutContent />
     </Suspense>
   );

@@ -86,19 +86,19 @@ const timeAgo = (date, t, locale) => {
 };
 
 const ORDER_STATUS_STYLES = {
-  pending: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
-  confirmed: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400",
-  processing: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",
-  shipped: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-400",
-  delivered: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
-  cancelled: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400",
+  pending: "bg-warning-soft text-warning",
+  confirmed: "bg-info-soft text-info",
+  processing: "bg-info-soft text-info",
+  shipped: "bg-purple-soft text-purple",
+  delivered: "bg-success-soft text-success",
+  cancelled: "bg-danger-soft text-danger",
 };
 
 const ACTIVITY_META = {
-  "Order Management": { icon: "cart", classes: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400" },
-  "Product Management": { icon: "package", classes: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400" },
-  "Coupon Management": { icon: "tag", classes: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400" },
-  "Brand Management": { icon: "brand", classes: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400" },
+  "Order Management": { icon: "cart", classes: "bg-info-soft text-info" },
+  "Product Management": { icon: "package", classes: "bg-success-soft text-success" },
+  "Coupon Management": { icon: "tag", classes: "bg-warning-soft text-warning" },
+  "Brand Management": { icon: "brand", classes: "bg-purple-soft text-purple" },
 };
 
 const rangeOptions = (t) => [
@@ -120,9 +120,9 @@ const rangeTabs = (t) => [
 const CHART_COLORS = ["#3b82f6", "#a855f7", "#22c55e", "#f97316", "#ec4899", "#94a3b8"];
 
 const TREND_TONES = {
-  up: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  down: "bg-red-500/10 text-red-500 dark:text-red-400",
-  flat: "bg-slate-500/10 text-slate-500 dark:text-slate-400",
+  up: "bg-emerald-500/10 text-success",
+  down: "bg-red-500/10 text-danger",
+  flat: "bg-slate-500/10 text-fg-muted",
 };
 
 const trendTone = (value) => (value > 0 ? "up" : value < 0 ? "down" : "flat");
@@ -141,19 +141,19 @@ const LIVE_EVENTS = [
 function CardHead({ icon: Icon, title, subtitle, action, compact }) {
   return (
     <div
-      className={`flex items-start justify-between gap-3 border-b border-[var(--border-card)] ${
+      className={`flex items-start justify-between gap-3 border-b border-line-card ${
         compact ? "mb-4 pb-3" : "mb-5 pb-4"
       }`}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--accent)]/10 bg-[var(--accent-soft)] text-[var(--accent)] shadow-sm">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent/10 bg-accent-soft text-accent shadow-sm">
           <Icon size={17} />
         </span>
 
         <div className="min-w-0">
-          <h3 className="truncate text-[14px] font-bold tracking-tight text-[var(--text-primary)]">{title}</h3>
+          <h3 className="truncate text-[14px] font-bold tracking-tight text-fg">{title}</h3>
           {subtitle && (
-            <p className="mt-1 truncate text-[11.5px] text-[var(--text-muted)]">{subtitle}</p>
+            <p className="mt-1 truncate text-[11.5px] text-fg-muted">{subtitle}</p>
           )}
         </div>
       </div>
@@ -166,10 +166,10 @@ function CardHead({ icon: Icon, title, subtitle, action, compact }) {
 function SectionEmpty({ icon: Icon = Package, children }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-subtle text-fg-muted">
         <Icon size={20} />
       </span>
-      <p className="text-[12.5px] text-[var(--text-muted)]">{children}</p>
+      <p className="text-[12.5px] text-fg-muted">{children}</p>
     </div>
   );
 }
@@ -180,13 +180,13 @@ function DashboardPagination({ pagination, page, setPage, pageSize, setPageSize,
   if (total <= pageSize) return null;
   const firstPage = Math.min(Math.max(1, page - 2), Math.max(1, pages - 4));
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-card)] pt-3 text-[11px] text-[var(--text-muted)]">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-card pt-3 text-[11px] text-fg-muted">
       <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}</span>
-      <label className="flex items-center gap-2"><span>{rowsLabel}</span><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="h-8 rounded-lg border border-[var(--border-card)] bg-[var(--bg-card)] px-2 text-[var(--text-primary)]">{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
+      <label className="flex items-center gap-2"><span>{rowsLabel}</span><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="h-8 rounded-lg border border-line-card bg-card px-2 text-fg">{[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       <div className="flex items-center gap-1">
-        <button type="button" aria-label={previousLabel} disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-card)] disabled:opacity-40"><ChevronLeft size={15} /></button>
-        {Array.from({ length: Math.min(pages, 5) }, (_, index) => firstPage + index).map((number) => <button key={number} type="button" aria-current={number === page ? "page" : undefined} onClick={() => setPage(number)} className={`h-8 min-w-8 rounded-lg px-2 font-semibold ${number === page ? "bg-[var(--accent)] text-white" : "border border-[var(--border-card)] text-[var(--text-secondary)]"}`}>{number}</button>)}
-        <button type="button" aria-label={nextLabel} disabled={page >= pages} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-card)] disabled:opacity-40"><ChevronRight size={15} /></button>
+        <button type="button" aria-label={previousLabel} disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line-card disabled:opacity-40"><ChevronLeft size={15} /></button>
+        {Array.from({ length: Math.min(pages, 5) }, (_, index) => firstPage + index).map((number) => <button key={number} type="button" aria-current={number === page ? "page" : undefined} onClick={() => setPage(number)} className={`h-8 min-w-8 rounded-lg px-2 font-semibold ${number === page ? "bg-accent text-white" : "border border-line-card text-fg-secondary"}`}>{number}</button>)}
+        <button type="button" aria-label={nextLabel} disabled={page >= pages} onClick={() => setPage((current) => Math.min(pages, current + 1))} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line-card disabled:opacity-40"><ChevronRight size={15} /></button>
       </div>
     </div>
   );
@@ -249,7 +249,7 @@ function StatCards({ data }) {
       trend: data?.revenue?.trend ?? 0,
       icon: Wallet,
       color: "#3b82f6",
-      bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-500/10 text-info",
       spark: data?.sparklines?.revenue,
     },
     {
@@ -258,7 +258,7 @@ function StatCards({ data }) {
       trend: data?.orders?.trend ?? 0,
       icon: ShoppingCart,
       color: "#a855f7",
-      bg: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+      bg: "bg-purple-500/10 text-purple",
       spark: data?.series?.map((point) => Number(point.orders) || 0),
     },
     {
@@ -267,7 +267,7 @@ function StatCards({ data }) {
       trend: data?.counts?.productsTrend ?? 0,
       icon: Package,
       color: "#f97316",
-      bg: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+      bg: "bg-orange-500/10 text-warning",
       spark: data?.sparklines?.products,
     },
     {
@@ -276,7 +276,7 @@ function StatCards({ data }) {
       trend: data?.counts?.brandsTrend ?? 0,
       icon: Bookmark,
       color: "#8b5cf6",
-      bg: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+      bg: "bg-violet-500/10 text-purple",
       spark: data?.sparklines?.brands,
     },
     {
@@ -285,7 +285,7 @@ function StatCards({ data }) {
       trend: data?.counts?.categoriesTrend ?? 0,
       icon: FolderOpen,
       color: "#06b6d4",
-      bg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+      bg: "bg-cyan-500/10 text-info",
       spark: data?.sparklines?.categories,
     },
     {
@@ -294,7 +294,7 @@ function StatCards({ data }) {
       trend: data?.counts?.featuredProductsTrend ?? 0,
       icon: Star,
       color: "#f59e0b",
-      bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-500/10 text-warning",
       spark: data?.sparklines?.featuredProducts,
     },
   ];
@@ -329,14 +329,14 @@ function StatCards({ data }) {
                 >
                   <c.icon size={15} />
                 </span>
-                <p className="min-w-0 flex-1 whitespace-nowrap text-[11px] font-semibold leading-tight text-[var(--text-muted)]" title={c.title}>
+                <p className="min-w-0 flex-1 whitespace-nowrap text-[11px] font-semibold leading-tight text-fg-muted" title={c.title}>
                   {c.title}
                 </p>
               </div>
 
               <div className="mt-2 flex min-w-0 items-end justify-between gap-1.5">
                 <p
-                  className={`min-w-0 truncate font-extrabold tracking-tight tabular-nums text-[var(--text-primary)] ${
+                  className={`min-w-0 truncate font-extrabold tracking-tight tabular-nums text-fg ${
                     isText ? "text-[17px]" : "text-[22px]"
                   }`}
                   title={String(c.value)}
@@ -347,14 +347,14 @@ function StatCards({ data }) {
               </div>
             </div>
 
-            <div className="relative mt-2.5 flex items-center gap-2 border-t border-[var(--border-card)] pt-2">
+            <div className="relative mt-2.5 flex items-center gap-2 border-t border-line-card pt-2">
               <span
                 className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${TREND_TONES[trendTone(c.trend)]}`}
               >
                 <TrendIcon size={11} />
                 {Math.abs(c.trend)}%
               </span>
-              <span className="truncate text-[11px] text-[var(--text-muted)]">{t("stat.vsPreviousPeriod")}</span>
+              <span className="truncate text-[11px] text-fg-muted">{t("stat.vsPreviousPeriod")}</span>
             </div>
           </div>
         );
@@ -374,18 +374,18 @@ function ChartTooltip({ active, payload, label }) {
   const average = Number(orders) > 0 ? Math.round(Number(revenue) / Number(orders)) : 0;
 
   return (
-    <div className="animate-fade-in min-w-[168px] rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] px-3.5 py-2.5 shadow-[var(--shadow-lg)]">
-      <p className="mb-2 border-b border-[var(--border-card)] pb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+    <div className="animate-fade-in min-w-[168px] rounded-xl border border-line-card bg-card px-3.5 py-2.5 shadow-[var(--shadow-lg)]">
+      <p className="mb-2 border-b border-line-card pb-1.5 text-[10.5px] font-bold uppercase tracking-wide text-fg-muted">
         {label}
       </p>
 
-      <p className="flex items-center gap-2 text-xs text-[var(--text-primary)]">
+      <p className="flex items-center gap-2 text-xs text-fg">
         <span className="h-2 w-2 rounded-sm bg-blue-500" />
         {t("revenueOverview.revenue")}
         <b className="ms-auto tabular-nums">{fmt(revenue)}</b>
       </p>
 
-      <p className="mt-1 flex items-center gap-2 text-xs text-[var(--text-primary)]">
+      <p className="mt-1 flex items-center gap-2 text-xs text-fg">
         <span className="h-2 w-2 rounded-full bg-purple-500" />
         {t("revenueOverview.orders")}
         <b className="ms-auto tabular-nums">{orders}</b>
@@ -426,7 +426,7 @@ function RevenueOverview({ data, range, onRangeChange }) {
         title={t("revenueOverview.title")}
         subtitle={t("revenueOverview.subtitle")}
         action={
-          <div className="no-scrollbar flex max-w-full shrink-0 items-center gap-1 overflow-x-auto rounded-xl border border-[var(--border-card)] bg-[var(--bg-secondary)] p-1">
+          <div className="no-scrollbar flex max-w-full shrink-0 items-center gap-1 overflow-x-auto rounded-xl border border-line-card bg-page-alt p-1">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -434,8 +434,8 @@ function RevenueOverview({ data, range, onRangeChange }) {
                 onClick={() => onRangeChange(tab.key)}
                 className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
                   range === tab.key
-                    ? "bg-[var(--bg-card)] text-[var(--accent)] shadow-[var(--shadow-sm)] ring-1 ring-[var(--border-card)]"
-                    : "text-[var(--text-muted)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]"
+                    ? "bg-card text-accent shadow-[var(--shadow-sm)] ring-1 ring-line-card"
+                    : "text-fg-muted hover:bg-card hover:text-fg"
                 }`}
               >
                 {tab.label}
@@ -448,16 +448,16 @@ function RevenueOverview({ data, range, onRangeChange }) {
       {/* Period summary — compact inline chips */}
       <div className="mb-3 flex flex-wrap items-center gap-2.5">
         {summary.map((s) => (
-          <span key={s.label} className="flex min-w-0 items-center gap-2 rounded-xl border border-[var(--border-card)] bg-[var(--bg-secondary)] px-3 py-2">
+          <span key={s.label} className="flex min-w-0 items-center gap-2 rounded-xl border border-line-card bg-page-alt px-3 py-2">
             <span
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ backgroundColor: s.color }}
             />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-fg-muted">
               {s.label}
             </span>
             <span
-              className="truncate text-[13px] font-bold tabular-nums tracking-tight text-[var(--text-primary)]"
+              className="truncate text-[13px] font-bold tabular-nums tracking-tight text-fg"
               title={s.value}
             >
               {s.value}
@@ -465,7 +465,7 @@ function RevenueOverview({ data, range, onRangeChange }) {
           </span>
         ))}
 
-        <span className="ms-auto hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 md:inline-flex">
+        <span className="ms-auto hidden items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-success md:inline-flex">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           {t("revenueOverview.reportingPoints", { count: series.length })}
         </span>
@@ -617,10 +617,10 @@ function SalesDistribution({ data }) {
             </ResponsiveContainer>
 
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="max-w-[110px] truncate text-[15px] font-extrabold text-[var(--text-primary)]">
+              <span className="max-w-[110px] truncate text-[15px] font-extrabold text-fg">
                 {isRevenue ? fmtShort(total) : total}
               </span>
-              <span className="text-[10.5px] text-[var(--text-muted)]">
+              <span className="text-[10.5px] text-fg-muted">
                 {isRevenue ? t("salesDistribution.totalSales") : t("salesDistribution.products")}
               </span>
             </div>
@@ -638,17 +638,17 @@ function SalesDistribution({ data }) {
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
                         style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                       />
-                      <span className="truncate text-[var(--text-muted)]" title={d.name}>
+                      <span className="truncate text-fg-muted" title={d.name}>
                         {d.name}
                       </span>
                     </span>
 
-                    <span className="shrink-0 font-bold tabular-nums text-[var(--text-primary)]">
+                    <span className="shrink-0 font-bold tabular-nums text-fg">
                       {percent}%
                     </span>
                   </div>
 
-                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
+                  <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-subtle">
                     <div
                       className="h-full rounded-full transition-all"
                       style={{
@@ -685,7 +685,7 @@ function RecentActivity({ data, page, setPage, pageSize, setPageSize }) {
           {items.map((a, i) => {
             const meta =
               ACTIVITY_META[a.category] ||
-              { icon: "system", classes: "bg-slate-200 text-slate-500 dark:bg-slate-500/15 dark:text-slate-400" };
+              { icon: "system", classes: "bg-subtle text-fg-muted" };
             const Icon = ICONS[meta.icon] || Cog;
             const isLast = i === items.length - 1;
             const activityTitleKeys = {
@@ -710,7 +710,7 @@ function RecentActivity({ data, page, setPage, pageSize, setPageSize }) {
                 {!isLast && (
                   <span
                     aria-hidden="true"
-                    className="absolute start-[15px] top-9 h-full w-px bg-[var(--border-card)]"
+                    className="absolute start-[15px] top-9 h-full w-px bg-line-card"
                   />
                 )}
 
@@ -720,18 +720,18 @@ function RecentActivity({ data, page, setPage, pageSize, setPageSize }) {
                   <Icon size={15} />
                 </span>
 
-                <span className="min-w-0 flex-1 rounded-lg px-2 py-1 transition-colors hover:bg-[var(--bg-tertiary)]">
+                <span className="min-w-0 flex-1 rounded-lg px-2 py-1 transition-colors hover:bg-subtle">
                   <span className="flex items-start justify-between gap-2">
                     <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">
+                      <span className="block truncate text-[13px] font-semibold text-fg">
                         {activityTitleKeys[a.title] ? t(activityTitleKeys[a.title]) : a.title}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11.5px] text-[var(--text-muted)]">
+                      <span className="mt-0.5 block truncate text-[11.5px] text-fg-muted">
                         {activitySubtitle}
                       </span>
                     </span>
 
-                    <span className="shrink-0 text-[10px] text-[var(--text-muted)]">
+                    <span className="shrink-0 text-[10px] text-fg-muted">
                       {timeAgo(a.timestamp, t, locale)}
                     </span>
                   </span>
@@ -761,7 +761,7 @@ function RecentOrders({ data, page, setPage, pageSize, setPageSize }) {
         action={
           <Link
             href="/admin/orders"
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line-card px-2.5 py-1.5 text-[11px] font-semibold text-fg transition-colors hover:border-accent hover:text-accent"
           >
             {t("recentOrders.viewAll")} <ChevronRight size={12} />
           </Link>
@@ -771,14 +771,14 @@ function RecentOrders({ data, page, setPage, pageSize, setPageSize }) {
       {orders.length === 0 ? (
         <SectionEmpty icon={ShoppingCart}>{t("recentOrders.noData")}</SectionEmpty>
       ) : (
-        <ul className="custom-scrollbar -mx-1 flex-1 divide-y divide-[var(--border-card)] overflow-y-auto px-1">
+        <ul className="custom-scrollbar -mx-1 flex-1 divide-y divide-line-card overflow-y-auto px-1">
           {orders.map((o) => (
             <li key={String(o.id)}>
               <Link
                 href="/admin/orders"
-                className="group flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-[var(--bg-tertiary)]"
+                className="group flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-subtle"
               >
-                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-tertiary)]">
+                <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-subtle">
                   <FallbackImage
                     src={imageUrl(o.image)}
                     alt={o.order_number}
@@ -788,16 +788,16 @@ function RecentOrders({ data, page, setPage, pageSize, setPageSize }) {
 
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[13px] font-bold text-[var(--text-primary)]">
+                    <span className="truncate text-[13px] font-bold text-fg">
                       #{o.order_number}
                     </span>
-                    <span className="shrink-0 text-[13px] font-bold tabular-nums text-[var(--text-primary)]">
+                    <span className="shrink-0 text-[13px] font-bold tabular-nums text-fg">
                       {fmt(o.total)}
                     </span>
                   </span>
 
                   <span className="mt-0.5 flex items-center justify-between gap-2">
-                    <span className="truncate text-[11.5px] text-[var(--text-muted)]">{o.customer}</span>
+                    <span className="truncate text-[11.5px] text-fg-muted">{o.customer}</span>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
                         ORDER_STATUS_STYLES[o.status] || ""
@@ -807,14 +807,14 @@ function RecentOrders({ data, page, setPage, pageSize, setPageSize }) {
                     </span>
                   </span>
 
-                  <span className="mt-0.5 block text-end text-[10px] text-[var(--text-muted)]">
+                  <span className="mt-0.5 block text-end text-[10px] text-fg-muted">
                     {timeAgo(o.created_at, t, locale)}
                   </span>
                 </span>
 
                 <ChevronRight
                   size={14}
-                  className="shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5"
+                  className="shrink-0 text-fg-muted transition-transform group-hover:translate-x-0.5"
                 />
               </Link>
             </li>
@@ -828,9 +828,9 @@ function RecentOrders({ data, page, setPage, pageSize, setPageSize }) {
 
 /* ==================== TOP SELLING PRODUCTS ==================== */
 const RANK_STYLES = [
-  "bg-amber-400/15 text-amber-600 dark:text-amber-400",
-  "bg-slate-400/20 text-slate-600 dark:text-slate-300",
-  "bg-orange-500/15 text-orange-600 dark:text-orange-400",
+  "bg-amber-400/15 text-warning",
+  "bg-slate-400/20 text-fg-secondary",
+  "bg-orange-500/15 text-warning",
 ];
 
 function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
@@ -860,7 +860,7 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
         action={
           <Link
             href="/admin/products"
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--border-card)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--text-primary)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line-card px-2.5 py-1.5 text-[11px] font-semibold text-fg transition-colors hover:border-accent hover:text-accent"
           >
             {t("topProducts.viewAll")} <ChevronRight size={12} />
           </Link>
@@ -873,7 +873,7 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
         <div className="-mx-1 overflow-x-auto px-1">
           <table className="w-full min-w-[420px] text-start text-[13px]">
             <thead>
-              <tr className="border-b border-[var(--border-card)] bg-[var(--bg-secondary)] text-[10.5px] uppercase tracking-wide text-[var(--text-muted)]">
+              <tr className="border-b border-line-card bg-page-alt text-[10.5px] uppercase tracking-wide text-fg-muted">
                 <th className="py-2 pe-2 font-semibold">{t("topProducts.table.rank")}</th>
                 <th className="py-2 font-semibold">{t("topProducts.table.product")}</th>
                 <th className="py-2 text-end font-semibold">{t("topProducts.table.sold")}</th>
@@ -882,7 +882,7 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-[var(--border-card)]">
+            <tbody className="divide-y divide-line-card">
               {products.map((p, i) => {
                 const TrendIcon = p.trend > 0 ? ArrowUp : p.trend < 0 ? ArrowDown : Minus;
                 const productName = productNameOf(p);
@@ -893,14 +893,14 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
                     onClick={() => openProductOrders(p)}
                     title={p.id ? t("topProducts.viewOrdersTitle", { name: productName }) : t("topProducts.idMissing")}
                     aria-label={p.id ? t("topProducts.viewOrdersAria", { name: productName }) : undefined}
-                    className={`group transition-colors hover:bg-[var(--bg-tertiary)]/70 ${
+                    className={`group transition-colors hover:bg-subtle/70 ${
                       p.id ? "cursor-pointer" : "cursor-default"
                     }`}
                   >
                     <td className="py-2.5 pr-2">
                       <span
                         className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-bold ${
-                          RANK_STYLES[i] || "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
+                          RANK_STYLES[i] || "bg-subtle text-fg-muted"
                         }`}
                       >
                         {(page - 1) * pageSize + i + 1}
@@ -909,12 +909,12 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
 
                     <td className="py-2.5">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--bg-tertiary)]">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-subtle">
                           <FallbackImage src={imageUrl(p.image)} alt={productName} className="h-full w-full object-cover" />
                         </span>
 
                         <span
-                          className="max-w-[220px] truncate font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors"
+                          className="max-w-[220px] truncate font-medium text-fg group-hover:text-accent transition-colors"
                           title={productName}
                         >
                           {productName}
@@ -922,11 +922,11 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
                       </div>
                     </td>
 
-                    <td className="py-2.5 text-right font-semibold tabular-nums text-[var(--text-primary)]">
+                    <td className="py-2.5 text-right font-semibold tabular-nums text-fg">
                       {p.sold}
                     </td>
 
-                    <td className="py-2.5 text-right font-semibold tabular-nums text-[var(--text-primary)]">
+                    <td className="py-2.5 text-right font-semibold tabular-nums text-fg">
                       {fmt(p.revenue)}
                     </td>
 
@@ -954,10 +954,10 @@ function TopProducts({ data, page, setPage, pageSize, setPageSize }) {
 
 /* ==================== QUICK ACTIONS + PROMO ==================== */
 const quickActions = (t) => [
-  { label: t("quickActions.addProduct"), href: "/admin/products", icon: PackagePlus, classes: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-  { label: t("quickActions.addCategory"), href: "/admin/categories", icon: FolderPlus, classes: "bg-violet-500/10 text-violet-600 dark:text-violet-400" },
-  { label: t("quickActions.createDiscount"), href: "/admin/discounts", icon: BadgePercent, classes: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  { label: t("quickActions.manageStock"), href: "/admin/manage-stock", icon: Boxes, classes: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
+  { label: t("quickActions.addProduct"), href: "/admin/products", icon: PackagePlus, classes: "bg-blue-500/10 text-info" },
+  { label: t("quickActions.addCategory"), href: "/admin/categories", icon: FolderPlus, classes: "bg-violet-500/10 text-purple" },
+  { label: t("quickActions.createDiscount"), href: "/admin/discounts", icon: BadgePercent, classes: "bg-emerald-500/10 text-success" },
+  { label: t("quickActions.manageStock"), href: "/admin/manage-stock", icon: Boxes, classes: "bg-orange-500/10 text-warning" },
 ];
 
 function QuickActions() {
@@ -974,7 +974,7 @@ function QuickActions() {
           <Link
             key={a.label}
             href={a.href}
-            className="group flex min-h-[64px] items-center gap-2.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-secondary)] px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-[var(--accent)] hover:bg-[var(--bg-card)] hover:shadow-[var(--shadow-sm)]"
+            className="group flex min-h-[64px] items-center gap-2.5 rounded-xl border border-line-card bg-page-alt px-3 py-3 transition-all hover:-translate-y-0.5 hover:border-accent hover:bg-card hover:shadow-[var(--shadow-sm)]"
           >
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110 ${a.classes}`}
@@ -982,13 +982,13 @@ function QuickActions() {
               <a.icon size={16} />
             </span>
 
-            <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-[var(--text-primary)]">
+            <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-fg">
               {a.label}
             </span>
 
             <ChevronRight
               size={13}
-              className="shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5"
+              className="shrink-0 text-fg-muted transition-transform group-hover:translate-x-0.5"
             />
           </Link>
         ))}
@@ -1082,7 +1082,7 @@ export default function Dashboard() {
   return (
     <div className="min-w-0">
       {/* Header */}
-      <div className="relative mb-4 overflow-visible rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] px-4 py-3 shadow-[var(--shadow-sm)] sm:px-5 sm:py-3.5">
+      <div className="relative mb-4 overflow-visible rounded-xl border border-line-card bg-card px-4 py-3 shadow-[var(--shadow-sm)] sm:px-5 sm:py-3.5">
         <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-1/2 overflow-hidden rounded-e-2xl bg-gradient-to-l from-blue-500/[0.06] to-transparent" />
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -1091,13 +1091,13 @@ export default function Dashboard() {
             </span>
 
             <div className="min-w-0">
-              <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--accent)]">
+              <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-accent">
                 {t("page.storeOverview")}
               </p>
-              <h1 className="text-[17px] font-extrabold tracking-tight text-[var(--text-primary)] sm:text-[18px]">
+              <h1 className="text-[17px] font-extrabold tracking-tight text-fg sm:text-[18px]">
                 {t("page.title")}
               </h1>
-              <p className="mt-0.5 truncate text-[11.5px] text-[var(--text-muted)]">
+              <p className="mt-0.5 truncate text-[11.5px] text-fg-muted">
                 {t("page.subtitle")}
               </p>
             </div>
@@ -1105,7 +1105,7 @@ export default function Dashboard() {
 
           <div className="flex items-center gap-2">
             {isLive && (
-              <span className="hidden items-center gap-1.5 rounded-full border border-[var(--border-card)] bg-[var(--bg-card)] px-2.5 py-1.5 text-[10.5px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 sm:inline-flex">
+              <span className="hidden items-center gap-1.5 rounded-full border border-line-card bg-card px-2.5 py-1.5 text-[10.5px] font-bold uppercase tracking-wide text-success sm:inline-flex">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                 {t("page.live")}
               </span>
@@ -1115,7 +1115,7 @@ export default function Dashboard() {
               type="button"
               onClick={() => refetch()}
               disabled={isRefetching}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] text-[var(--text-muted)] shadow-sm transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-60"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line-card bg-card text-fg-muted shadow-sm transition hover:border-accent hover:text-accent disabled:opacity-60"
               title={t("page.refresh")}
               aria-label={t("page.refresh")}
             >
@@ -1129,18 +1129,18 @@ export default function Dashboard() {
                   e.stopPropagation();
                   setRangeOpen((v) => !v);
                 }}
-                className="inline-flex min-h-[36px] items-center gap-2 rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] px-3 text-[11px] font-semibold text-[var(--text-primary)] shadow-sm transition hover:border-[var(--accent)]"
+                className="inline-flex min-h-[36px] items-center gap-2 rounded-xl border border-line-card bg-card px-3 text-[11px] font-semibold text-fg shadow-sm transition hover:border-accent"
               >
-                <CalendarDays size={14} className="text-[var(--accent)]" />
+                <CalendarDays size={14} className="text-accent" />
                 {activeLabel}
                 <ChevronDown
                   size={13}
-                  className={`text-[var(--text-muted)] transition-transform ${rangeOpen ? "rotate-180" : ""}`}
+                  className={`text-fg-muted transition-transform ${rangeOpen ? "rotate-180" : ""}`}
                 />
               </button>
 
               {rangeOpen && (
-                <div className="animate-fade-in absolute end-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-[var(--border-card)] bg-[var(--bg-card)] py-1 shadow-[var(--shadow-lg)]">
+                <div className="animate-fade-in absolute end-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-line-card bg-card py-1 shadow-[var(--shadow-lg)]">
                   {options.map((r) => (
                     <button
                       key={r.key}
@@ -1152,19 +1152,19 @@ export default function Dashboard() {
                         setActivitiesPage(1);
                         setRangeOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors hover:bg-[var(--bg-tertiary)]"
+                      className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors hover:bg-subtle"
                     >
                       <span
                         className={`flex-1 ${
                           range === r.key
-                            ? "font-semibold text-[var(--accent)]"
-                            : "text-[var(--text-primary)]"
+                            ? "font-semibold text-accent"
+                            : "text-fg"
                         }`}
                       >
                         {r.label}
                       </span>
 
-                      {range === r.key && <Check size={13} className="text-[var(--accent)]" />}
+                      {range === r.key && <Check size={13} className="text-accent" />}
                     </button>
                   ))}
                 </div>
@@ -1176,8 +1176,8 @@ export default function Dashboard() {
 
       {/* Refetch progress */}
       {isRefetching && !isLoading && (
-        <div className="mb-4 h-0.5 w-full overflow-hidden rounded-full bg-[var(--bg-tertiary)]">
-          <div className="h-full w-1/3 animate-pulse rounded-full bg-[var(--accent)]" />
+        <div className="mb-4 h-0.5 w-full overflow-hidden rounded-full bg-subtle">
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-accent" />
         </div>
       )}
 
@@ -1204,8 +1204,8 @@ export default function Dashboard() {
           </span>
 
           <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">{t("state.loadFailed")}</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
+            <p className="text-sm font-semibold text-fg">{t("state.loadFailed")}</p>
+            <p className="mt-1 text-xs text-fg-muted">
               {t("state.loadFailedBody")}
             </p>
           </div>

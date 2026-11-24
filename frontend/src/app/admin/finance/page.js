@@ -135,19 +135,19 @@ const todayAsInputDate = () => {
 
 function SummaryCard({ title, value, note, icon: Icon, tone = "blue" }) {
   const tones = {
-    blue: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
-    green: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
-    red: "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
-    amber: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
-    violet: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+    blue: "bg-info-soft text-info",
+    green: "bg-success-soft text-success",
+    red: "bg-danger-soft text-danger",
+    amber: "bg-warning-soft text-warning",
+    violet: "bg-purple-soft text-purple",
   };
   return (
-    <article className="min-w-0 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
+    <article className="min-w-0 rounded-2xl border border-line bg-card p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">{title}</p>
-          <p className="mt-2 truncate text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{value}</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">{note}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-fg-muted">{title}</p>
+          <p className="mt-2 truncate text-xl font-semibold text-fg sm:text-2xl">{value}</p>
+          <p className="mt-1 text-xs text-fg-muted">{note}</p>
         </div>
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}><Icon className="h-5 w-5" /></span>
       </div>
@@ -158,10 +158,10 @@ function SummaryCard({ title, value, note, icon: Icon, tone = "blue" }) {
 function DrawerPagination({ total, page, pageSize, setPage, setPageSize, t }) {
   if (total <= pageSize) return null;
   const pages = Math.ceil(total / pageSize);
-  return <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)] pt-3 text-xs text-[var(--text-muted)]">
+  return <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-fg-muted">
     <span>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} / {total}</span>
-    <label className="flex items-center gap-2"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></label>
-    <div className="flex items-center gap-1"><button type="button" aria-label={t("admin.finance.previous")} disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-color)] disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>{Array.from({ length: Math.min(pages, 5) }, (_, index) => Math.min(Math.max(1, page - 2), Math.max(1, pages - 4)) + index).map((number) => <button key={number} type="button" aria-current={number === page ? "page" : undefined} onClick={() => setPage(number)} className={`h-8 min-w-8 rounded-lg px-2 font-semibold ${number === page ? "bg-[var(--accent)] text-white" : "border border-[var(--border-color)] text-[var(--text-secondary)]"}`}>{number}</button>)}<button type="button" aria-label={t("admin.finance.next")} disabled={page >= pages} onClick={() => setPage((current) => current + 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border-color)] disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
+    <label className="flex items-center gap-2"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-8 rounded-lg border border-line bg-page px-2 text-fg"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></label>
+    <div className="flex items-center gap-1"><button type="button" aria-label={t("admin.finance.previous")} disabled={page <= 1} onClick={() => setPage((current) => current - 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line disabled:opacity-40"><ChevronLeft className="h-4 w-4" /></button>{Array.from({ length: Math.min(pages, 5) }, (_, index) => Math.min(Math.max(1, page - 2), Math.max(1, pages - 4)) + index).map((number) => <button key={number} type="button" aria-current={number === page ? "page" : undefined} onClick={() => setPage(number)} className={`h-8 min-w-8 rounded-lg px-2 font-semibold ${number === page ? "bg-accent text-white" : "border border-line text-fg-secondary"}`}>{number}</button>)}<button type="button" aria-label={t("admin.finance.next")} disabled={page >= pages} onClick={() => setPage((current) => current + 1)} className="flex h-8 w-8 items-center justify-center rounded-lg border border-line disabled:opacity-40"><ChevronRight className="h-4 w-4" /></button></div>
   </div>;
 }
 
@@ -189,31 +189,31 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
   const showDescription = description && !/^\d+$/.test(description);
   return (
     <div className="fixed inset-0 z-[70] flex justify-end bg-slate-950/45 backdrop-blur-[1px]" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <aside role="dialog" aria-modal="true" aria-labelledby="finance-drawer-title" className="flex h-full w-full max-w-xl flex-col border-s border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-5 py-5 sm:px-6">
+      <aside role="dialog" aria-modal="true" aria-labelledby="finance-drawer-title" className="flex h-full w-full max-w-xl flex-col border-s border-line bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-5 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isIncome ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}><Icon className="h-5 w-5" /></span>
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${isIncome ? "bg-success-soft text-success" : "bg-danger-soft text-danger"}`}><Icon className="h-5 w-5" /></span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.13em] text-[var(--text-muted)]">{translated(t, categoryKeys, transaction.category)}</p>
-              <h2 id="finance-drawer-title" className="mt-1 truncate text-lg font-semibold text-[var(--text-primary)]">{transaction.reference}</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.13em] text-fg-muted">{translated(t, categoryKeys, transaction.category)}</p>
+              <h2 id="finance-drawer-title" className="mt-1 truncate text-lg font-semibold text-fg">{transaction.reference}</h2>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label={t("admin.finance.closeDetails")} className="rounded-lg p-2 text-[var(--text-muted)] transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} aria-label={t("admin.finance.closeDetails")} className="rounded-lg p-2 text-fg-muted transition hover:bg-subtle hover:text-fg"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
-          <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5">
+          <section className="rounded-2xl border border-line bg-page-alt p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm text-[var(--text-muted)]">{translated(t, titleKeys, transaction.title)}</p>
-                <p className={`mt-1 text-3xl font-semibold ${isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{isIncome ? "+" : "−"}{formatCurrency(Math.abs(transaction.amount), locale)}</p>
+                <p className="text-sm text-fg-muted">{translated(t, titleKeys, transaction.title)}</p>
+                <p className={`mt-1 text-3xl font-semibold ${isIncome ? "text-success" : "text-danger"}`}>{isIncome ? "+" : "−"}{formatCurrency(Math.abs(transaction.amount), locale)}</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isIncome ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}>{statusKeys[String(transaction.status || "").toLowerCase()] ? t(statusKeys[String(transaction.status).toLowerCase()]) : transaction.status}</span>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isIncome ? "bg-success-soft text-success" : "bg-danger-soft text-danger"}`}>{statusKeys[String(transaction.status || "").toLowerCase()] ? t(statusKeys[String(transaction.status).toLowerCase()]) : transaction.status}</span>
             </div>
           </section>
 
           <section>
-            <h3 className="mb-3 text-sm font-semibold text-[var(--text-primary)]">{t("admin.finance.transactionDetails")}</h3>
+            <h3 className="mb-3 text-sm font-semibold text-fg">{t("admin.finance.transactionDetails")}</h3>
             <div className="grid grid-cols-2 gap-3 text-start">
               {[
                 [t("admin.finance.customerVendor"), transaction.counterparty],
@@ -227,35 +227,35 @@ function FinanceDrawer({ transaction, onClose, locale, t }) {
                 ...(source.balance != null ? [[t("admin.finance.invoiceBalance"), formatCurrency(source.balance, locale)]] : []),
                 ...(source.dueAmount != null ? [[t("admin.finance.vendorBalance"), formatCurrency(source.dueAmount, locale)]] : []),
                 ...(source.historicalRecord ? [[t("admin.finance.historyNote"), t("admin.finance.historicalRecordText")]] : []),
-              ].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3"><p className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-muted)]">{label}</p><p className="mt-1 break-words text-sm leading-5 text-[var(--text-primary)]">{value || t("admin.finance.notRecorded")}</p></div>)}
+              ].map(([label, value]) => <div key={label} className="min-w-0 rounded-xl border border-line bg-page px-3.5 py-3"><p className="text-[10px] font-medium uppercase tracking-wider text-fg-muted">{label}</p><p className="mt-1 break-words text-sm leading-5 text-fg">{value || t("admin.finance.notRecorded")}</p></div>)}
             </div>
-            {showDescription && <p className="mt-3 text-start text-sm leading-6 text-[var(--text-secondary)]">{description}</p>}
+            {showDescription && <p className="mt-3 text-start text-sm leading-6 text-fg-secondary">{description}</p>}
           </section>
 
           {!!transaction.items?.length && <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><ShoppingBag className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.itemsOnRecord")}</h3>
-            <div className="overflow-hidden rounded-xl border border-[var(--border-color)]">
-              {visibleItems.map((item, index) => { const label = financeItemLabel(item, t); return <div key={`${item._id || item.product_id || item.name || item.product_name || index}-${(itemsPage - 1) * itemsPageSize + index}`} className="flex items-start justify-between gap-4 border-b border-[var(--border-color)] px-3.5 py-3 last:border-0">
-                <div className="min-w-0 flex-1"><p className="break-words text-sm leading-5 text-[var(--text-primary)]">{label.title}</p><p className="mt-1 flex flex-wrap gap-x-1.5 text-xs leading-4 text-[var(--text-muted)]">{label.metadata.length ? label.metadata.map((value, metadataIndex) => <span key={`${value}-${metadataIndex}`}>{metadataIndex > 0 && <span className="me-1.5">·</span>}{value}</span>) : t("admin.finance.noSku")}</p></div>
-                <p className="shrink-0 text-sm text-[var(--text-secondary)]">×{item.quantity || item.qty || item.qty_ordered || 1}</p>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg"><ShoppingBag className="h-4 w-4 text-accent" />{t("admin.finance.itemsOnRecord")}</h3>
+            <div className="overflow-hidden rounded-xl border border-line">
+              {visibleItems.map((item, index) => { const label = financeItemLabel(item, t); return <div key={`${item._id || item.product_id || item.name || item.product_name || index}-${(itemsPage - 1) * itemsPageSize + index}`} className="flex items-start justify-between gap-4 border-b border-line px-3.5 py-3 last:border-0">
+                <div className="min-w-0 flex-1"><p className="break-words text-sm leading-5 text-fg">{label.title}</p><p className="mt-1 flex flex-wrap gap-x-1.5 text-xs leading-4 text-fg-muted">{label.metadata.length ? label.metadata.map((value, metadataIndex) => <span key={`${value}-${metadataIndex}`}>{metadataIndex > 0 && <span className="me-1.5">·</span>}{value}</span>) : t("admin.finance.noSku")}</p></div>
+                <p className="shrink-0 text-sm text-fg-secondary">×{item.quantity || item.qty || item.qty_ordered || 1}</p>
               </div>; })}
             </div>
             <DrawerPagination total={items.length} page={itemsPage} pageSize={itemsPageSize} setPage={setItemsPage} setPageSize={setItemsPageSize} t={t} />
           </section>}
 
           <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]"><History className="h-4 w-4 text-[var(--accent)]" />{t("admin.finance.history")}</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg"><History className="h-4 w-4 text-accent" />{t("admin.finance.history")}</h3>
             {history.length ? <ol className="space-y-0">
               {visibleHistory.map((event, index) => <li key={`${event.type}-${event.at}-${(historyPage - 1) * historyPageSize + index}`} className="relative flex gap-3 pb-4 last:pb-0">
-                {index < visibleHistory.length - 1 && <span className="absolute start-[9px] top-5 h-[calc(100%-8px)] w-px bg-[var(--border-color)]" />}
-                <span className={`relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${event.type === "payment" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : event.type === "return" ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" : "bg-[var(--accent-soft)] text-[var(--accent)]"}`}><CheckCircle2 className="h-3 w-3" /></span>
-                <div className="min-w-0 flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3.5 py-3.5 text-start">
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-sm font-medium leading-5 text-[var(--text-primary)]">{translated(t, historyTitleKeys, event.title)}</p><time className="text-xs leading-5 text-[var(--text-muted)]">{formatDateTime(event.at, locale, t)}</time></div>
-                  <p className="mt-1.5 text-xs leading-5 text-[var(--text-muted)]">{t("admin.finance.by", { actor: event.actor || t("admin.finance.notRecorded") })}</p>
-                  {event.description && <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-[var(--text-secondary)]">{event.description}</p>}
+                {index < visibleHistory.length - 1 && <span className="absolute start-[9px] top-5 h-[calc(100%-8px)] w-px bg-line" />}
+                <span className={`relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${event.type === "payment" ? "bg-success-soft text-success" : event.type === "return" ? "bg-danger-soft text-danger" : "bg-accent-soft text-accent"}`}><CheckCircle2 className="h-3 w-3" /></span>
+                <div className="min-w-0 flex-1 rounded-xl border border-line bg-page px-3.5 py-3.5 text-start">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"><p className="text-sm font-medium leading-5 text-fg">{translated(t, historyTitleKeys, event.title)}</p><time className="text-xs leading-5 text-fg-muted">{formatDateTime(event.at, locale, t)}</time></div>
+                  <p className="mt-1.5 text-xs leading-5 text-fg-muted">{t("admin.finance.by", { actor: event.actor || t("admin.finance.notRecorded") })}</p>
+                  {event.description && <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-fg-secondary">{event.description}</p>}
                 </div>
               </li>)}
-            </ol> : <div className="rounded-xl border border-dashed border-[var(--border-color)] px-4 py-5 text-center text-sm text-[var(--text-muted)]"><Clock3 className="mx-auto mb-2 h-5 w-5" />{t("admin.finance.noDetailedActivity")}</div>}
+            </ol> : <div className="rounded-xl border border-dashed border-line px-4 py-5 text-center text-sm text-fg-muted"><Clock3 className="mx-auto mb-2 h-5 w-5" />{t("admin.finance.noDetailedActivity")}</div>}
             <DrawerPagination total={history.length} page={historyPage} pageSize={historyPageSize} setPage={setHistoryPage} setPageSize={setHistoryPageSize} t={t} />
           </section>
         </div>
@@ -295,11 +295,11 @@ export default function FinancePage() {
   return (
     <div className="min-h-full w-full min-w-0 space-y-5 pb-8">
       <AdminPageHeader className="min-w-0" title={t("admin.finance.title")} subtitle={t("admin.finance.intro")} actions={<div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-          <label className="flex min-w-[180px] items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2.5 text-sm text-[var(--text-muted)]"><CalendarDays className="h-4 w-4 shrink-0" /><select aria-label={t("admin.finance.date")} value={period} onChange={(event) => changePeriod(event.target.value)} className="w-full bg-transparent font-semibold text-[var(--text-primary)] outline-none">{periods.map((option) => <option key={option.value} value={option.value} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">{t(option.key)}</option>)}</select></label>
-          {period === "custom" && <div className="flex flex-wrap justify-end gap-2"><label className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-muted)]"><span>{t("admin.finance.from")}</span><input aria-label={t("admin.finance.from")} type="date" value={startDate} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPage(1); }} className="bg-transparent text-sm text-[var(--text-primary)] outline-none" /></label><label className="flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-muted)]"><span>{t("admin.finance.to")}</span><input aria-label={t("admin.finance.to")} type="date" value={endDate} min={startDate || undefined} onChange={(event) => { setEndDate(event.target.value); setPage(1); }} className="bg-transparent text-sm text-[var(--text-primary)] outline-none" /></label></div>}
+          <label className="flex min-w-[180px] items-center gap-2 rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-fg-muted"><CalendarDays className="h-4 w-4 shrink-0" /><select aria-label={t("admin.finance.date")} value={period} onChange={(event) => changePeriod(event.target.value)} className="w-full bg-transparent font-semibold text-fg outline-none">{periods.map((option) => <option key={option.value} value={option.value} className="bg-card text-fg">{t(option.key)}</option>)}</select></label>
+          {period === "custom" && <div className="flex flex-wrap justify-end gap-2"><label className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-muted"><span>{t("admin.finance.from")}</span><input aria-label={t("admin.finance.from")} type="date" value={startDate} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPage(1); }} className="bg-transparent text-sm text-fg outline-none" /></label><label className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs text-fg-muted"><span>{t("admin.finance.to")}</span><input aria-label={t("admin.finance.to")} type="date" value={endDate} min={startDate || undefined} onChange={(event) => { setEndDate(event.target.value); setPage(1); }} className="bg-transparent text-sm text-fg outline-none" /></label></div>}
         </div>} />
 
-      {isError ? <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300"><p className="font-semibold">{t("admin.finance.loadError")}</p><p className="mt-1">{t("admin.finance.accessError")}</p><button type="button" onClick={() => refetch()} className="mt-3 rounded-lg bg-rose-600 px-3 py-2 font-semibold text-white">{t("admin.finance.tryAgain")}</button></section> : <>
+      {isError ? <section className="rounded-2xl border border-danger/30 bg-danger-soft p-5 text-sm text-danger"><p className="font-semibold">{t("admin.finance.loadError")}</p><p className="mt-1">{t("admin.finance.accessError")}</p><button type="button" onClick={() => refetch()} className="mt-3 rounded-lg bg-rose-600 px-3 py-2 font-semibold text-white">{t("admin.finance.tryAgain")}</button></section> : <>
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SummaryCard title={t("admin.finance.moneyIn")} value={isLoading ? "—" : formatCurrency(summary.income, locale)} note={t("admin.finance.recordedMovements", { count: summary.transactionCount ?? 0 })} icon={TrendingUp} tone="green" />
           <SummaryCard title={t("admin.finance.moneyOut")} value={isLoading ? "—" : formatCurrency(summary.expenses, locale)} note={t("admin.finance.vendorPaymentsRefunds")} icon={TrendingDown} tone="red" />
@@ -308,34 +308,34 @@ export default function FinancePage() {
           <SummaryCard title={t("admin.finance.toPay")} value={isLoading ? "—" : formatCurrency(summary.payable, locale)} note={t("admin.finance.purchaseOrderBalances")} icon={ArrowUpRight} tone="violet" />
         </section>
 
-        <section className="overflow-hidden rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-[var(--border-color)] p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><h2 className="text-base font-semibold text-[var(--text-primary)]">{t("admin.finance.cashFlowHistory")}</h2><p className="mt-0.5 text-xs text-[var(--text-muted)]">{t("admin.finance.entryHint")}</p></div>
+        <section className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div><h2 className="text-base font-semibold text-fg">{t("admin.finance.cashFlowHistory")}</h2><p className="mt-0.5 text-xs text-fg-muted">{t("admin.finance.entryHint")}</p></div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <label className="relative min-w-0 sm:w-64"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={t("admin.finance.searchPlaceholder")} className="h-10 w-full rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] ps-9 pe-3 text-sm text-[var(--text-primary)] outline-none transition focus:border-[var(--accent)]" /></label>
-              <select aria-label={t("admin.finance.transaction")} value={kind} onChange={(event) => { setKind(event.target.value); setPage(1); }} className="h-10 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent)]"><option value="all">{t("admin.finance.allActivity")}</option><option value="income">{t("admin.finance.moneyIn")}</option><option value="expense">{t("admin.finance.moneyOut")}</option></select>
+              <label className="relative min-w-0 sm:w-64"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-muted" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={t("admin.finance.searchPlaceholder")} className="h-10 w-full rounded-xl border border-line bg-page ps-9 pe-3 text-sm text-fg outline-none transition focus:border-accent" /></label>
+              <select aria-label={t("admin.finance.transaction")} value={kind} onChange={(event) => { setKind(event.target.value); setPage(1); }} className="h-10 rounded-xl border border-line bg-page px-3 text-sm text-fg outline-none focus:border-accent"><option value="all">{t("admin.finance.allActivity")}</option><option value="income">{t("admin.finance.moneyIn")}</option><option value="expense">{t("admin.finance.moneyOut")}</option></select>
             </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[780px] text-start">
-              <thead className="bg-[var(--bg-secondary)]"><tr className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--text-muted)]"><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.transaction")}</th><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.customerVendor")}</th><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.date")}</th><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.method")}</th><th scope="col" className="px-4 py-3 text-end">{t("admin.finance.amount")}</th><th scope="col" className="px-4 py-3 text-end">{t("admin.finance.history")}</th></tr></thead>
-              <tbody className="divide-y divide-[var(--border-color)]">
-                {isLoading ? <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-[var(--text-muted)]"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />{t("admin.finance.loadingRecords")}</td></tr> : transactions.length ? transactions.map((entry) => {
+              <thead className="bg-page-alt"><tr className="text-[10px] font-semibold uppercase tracking-[0.1em] text-fg-muted"><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.transaction")}</th><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.customerVendor")}</th><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.date")}</th><th scope="col" className="px-4 py-3 text-start">{t("admin.finance.method")}</th><th scope="col" className="px-4 py-3 text-end">{t("admin.finance.amount")}</th><th scope="col" className="px-4 py-3 text-end">{t("admin.finance.history")}</th></tr></thead>
+              <tbody className="divide-y divide-line">
+                {isLoading ? <tr><td colSpan={6} className="px-4 py-16 text-center text-sm text-fg-muted"><LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />{t("admin.finance.loadingRecords")}</td></tr> : transactions.length ? transactions.map((entry) => {
                   const Icon = categoryIcons[entry.category] || Banknote;
-                  return <tr key={entry.id} onClick={() => setSelected(entry)} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(entry); } }} className="cursor-pointer transition hover:bg-[var(--bg-secondary)] focus:bg-[var(--bg-secondary)] focus:outline-none">
-                    <td className="px-4 py-3.5"><div className="flex items-center gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${entry.kind === "income" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"}`}><Icon className="h-4 w-4" /></span><div><p className="text-sm font-medium text-[var(--text-primary)]">{translated(t, titleKeys, entry.title)}</p><p className="mt-0.5 text-xs text-[var(--text-muted)]">{entry.reference} · {translated(t, categoryKeys, entry.category)}</p></div></div></td>
-                    <td className="px-4 py-3.5 text-start text-sm text-[var(--text-primary)]">{entry.counterparty}</td>
-                    <td className="px-4 py-3.5 text-start text-sm text-[var(--text-secondary)]">{formatDateTime(entry.date, locale, t)}</td>
-                    <td className="px-4 py-3.5 text-start"><span className="rounded-full bg-[var(--bg-secondary)] px-2.5 py-1 text-xs font-medium capitalize text-[var(--text-secondary)]">{translatedMethod(t, entry.method)}</span></td>
-                    <td className={`px-4 py-3.5 text-end text-sm font-semibold ${entry.amount >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>{entry.amount >= 0 ? "+" : "−"}{formatCurrency(Math.abs(entry.amount), locale)}</td>
-                    <td className="px-4 py-3.5 text-end"><span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-color)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-secondary)]"><History className="h-3.5 w-3.5" />{entry.history?.length || 0}</span></td>
+                  return <tr key={entry.id} onClick={() => setSelected(entry)} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(entry); } }} className="cursor-pointer transition hover:bg-page-alt focus:bg-page-alt focus:outline-none">
+                    <td className="px-4 py-3.5"><div className="flex items-center gap-3"><span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${entry.kind === "income" ? "bg-success-soft text-success" : "bg-danger-soft text-danger"}`}><Icon className="h-4 w-4" /></span><div><p className="text-sm font-medium text-fg">{translated(t, titleKeys, entry.title)}</p><p className="mt-0.5 text-xs text-fg-muted">{entry.reference} · {translated(t, categoryKeys, entry.category)}</p></div></div></td>
+                    <td className="px-4 py-3.5 text-start text-sm text-fg">{entry.counterparty}</td>
+                    <td className="px-4 py-3.5 text-start text-sm text-fg-secondary">{formatDateTime(entry.date, locale, t)}</td>
+                    <td className="px-4 py-3.5 text-start"><span className="rounded-full bg-page-alt px-2.5 py-1 text-xs font-medium capitalize text-fg-secondary">{translatedMethod(t, entry.method)}</span></td>
+                    <td className={`px-4 py-3.5 text-end text-sm font-semibold ${entry.amount >= 0 ? "text-success" : "text-danger"}`}>{entry.amount >= 0 ? "+" : "−"}{formatCurrency(Math.abs(entry.amount), locale)}</td>
+                    <td className="px-4 py-3.5 text-end"><span className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-fg-secondary"><History className="h-3.5 w-3.5" />{entry.history?.length || 0}</span></td>
                   </tr>;
-                }) : <tr><td colSpan={6} className="px-4 py-16 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--bg-secondary)] text-[var(--text-muted)]"><Banknote className="h-5 w-5" /></div><p className="mt-3 text-sm font-semibold text-[var(--text-primary)]">{t("admin.finance.noActivityFound")}</p><p className="mt-1 text-xs text-[var(--text-muted)]">{t("admin.finance.noActivityHint")}</p></td></tr>}
+                }) : <tr><td colSpan={6} className="px-4 py-16 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-page-alt text-fg-muted"><Banknote className="h-5 w-5" /></div><p className="mt-3 text-sm font-semibold text-fg">{t("admin.finance.noActivityFound")}</p><p className="mt-1 text-xs text-fg-muted">{t("admin.finance.noActivityHint")}</p></td></tr>}
               </tbody>
             </table>
           </div>
-          {!isLoading && pagination.total > pagination.pageSize && <div className="flex flex-col gap-3 border-t border-[var(--border-color)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-[var(--text-muted)]">{t("admin.finance.showingTransactions", { from: (pagination.page - 1) * pagination.pageSize + 1, to: Math.min(pagination.page * pagination.pageSize, pagination.total), total: pagination.total })}</p><div className="flex flex-wrap items-center justify-end gap-2"><label className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-9 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 text-[var(--text-primary)]"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage(1)} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.first")}</button><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.previous")}</button><span className="min-w-[76px] text-center text-xs font-semibold text-[var(--text-primary)]">{t("admin.finance.pageOf", { page: pagination.page, pages: pagination.pages })}</span>{Array.from({ length: Math.min(pagination.pages, 5) }, (_, index) => Math.min(Math.max(1, pagination.page - 2), Math.max(1, pagination.pages - 4)) + index).map((pageNumber) => <button key={pageNumber} type="button" aria-current={pageNumber === pagination.page ? "page" : undefined} disabled={isFetching} onClick={() => setPage(pageNumber)} className={`h-9 min-w-9 rounded-lg border px-2 text-xs font-semibold disabled:opacity-40 ${pageNumber === pagination.page ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border-color)] text-[var(--text-secondary)]"}`}>{pageNumber}</button>)}<button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.next")}</button><button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage(pagination.pages)} className="rounded-lg border border-[var(--border-color)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.last")}</button></div></div>}
-          {isFetching && !isLoading && <div className="h-0.5 w-full overflow-hidden bg-[var(--bg-secondary)]"><div className="h-full w-1/3 animate-pulse bg-[var(--accent)]" /></div>}
+          {!isLoading && pagination.total > pagination.pageSize && <div className="flex flex-col gap-3 border-t border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-fg-muted">{t("admin.finance.showingTransactions", { from: (pagination.page - 1) * pagination.pageSize + 1, to: Math.min(pagination.page * pagination.pageSize, pagination.total), total: pagination.total })}</p><div className="flex flex-wrap items-center justify-end gap-2"><label className="flex items-center gap-2 text-xs text-fg-muted"><span>{t("admin.shared.pagination.rowsPerPage")}</span><select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1); }} className="h-9 rounded-lg border border-line bg-page px-2 text-fg"><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option><option value={100}>100</option></select></label><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage(1)} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.first")}</button><button type="button" disabled={pagination.page <= 1 || isFetching} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.previous")}</button><span className="min-w-[76px] text-center text-xs font-semibold text-fg">{t("admin.finance.pageOf", { page: pagination.page, pages: pagination.pages })}</span>{Array.from({ length: Math.min(pagination.pages, 5) }, (_, index) => Math.min(Math.max(1, pagination.page - 2), Math.max(1, pagination.pages - 4)) + index).map((pageNumber) => <button key={pageNumber} type="button" aria-current={pageNumber === pagination.page ? "page" : undefined} disabled={isFetching} onClick={() => setPage(pageNumber)} className={`h-9 min-w-9 rounded-lg border px-2 text-xs font-semibold disabled:opacity-40 ${pageNumber === pagination.page ? "border-accent bg-accent text-white" : "border-line text-fg-secondary"}`}>{pageNumber}</button>)}<button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage((current) => Math.min(pagination.pages, current + 1))} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.next")}</button><button type="button" disabled={pagination.page >= pagination.pages || isFetching} onClick={() => setPage(pagination.pages)} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-fg-secondary disabled:cursor-not-allowed disabled:opacity-40">{t("admin.finance.last")}</button></div></div>}
+          {isFetching && !isLoading && <div className="h-0.5 w-full overflow-hidden bg-page-alt"><div className="h-full w-1/3 animate-pulse bg-accent" /></div>}
         </section>
       </>}
       <FinanceDrawer transaction={selected} onClose={() => setSelected(null)} locale={locale} t={t} />

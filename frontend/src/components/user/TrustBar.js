@@ -78,15 +78,15 @@ export default function TrustBar() {
   ];
 
   return (
-    <section className="mt-8 grid grid-cols-1 gap-3 rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4 sm:grid-cols-2 lg:mt-10 lg:grid-cols-4 lg:divide-x lg:divide-[var(--user-border)]">
+    <section className="mt-8 grid grid-cols-1 gap-3 rounded-2xl border border-user-line bg-user-card p-4 sm:grid-cols-2 lg:mt-10 lg:grid-cols-4 lg:divide-x lg:divide-user-line">
       {items.map(({ key, icon: Icon, title, subtitle }) => (
         <div key={key} className="flex items-center gap-3 lg:px-5 lg:first:pl-0 lg:last:pr-0">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--user-accent-soft)] text-[var(--user-accent)]">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-user-accent-soft text-user-accent">
             <Icon size={20} />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[0.8125rem] font-bold text-[var(--user-text)]">{title}</p>
-            <p className="truncate text-[0.6875rem] text-[var(--user-text-subtle)]">{subtitle}</p>
+            <p className="truncate text-[0.8125rem] font-bold text-user-fg">{title}</p>
+            <p className="truncate text-[0.6875rem] text-user-fg-subtle">{subtitle}</p>
           </div>
         </div>
       ))}

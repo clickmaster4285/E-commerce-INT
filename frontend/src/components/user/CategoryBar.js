@@ -24,7 +24,7 @@ export default function CategoryBar() {
       <div className="user-shell mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">
-          <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
+          <h2 className="text-user-fg font-bold text-base lg:text-lg">
             {t("admin.nav.item.categories")}
           </h2>
         </div>
@@ -35,7 +35,7 @@ export default function CategoryBar() {
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[5.625rem] animate-pulse"
+                className="w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-user-card border border-user-line rounded-xl min-h-[5.625rem] animate-pulse"
               />
             ))}
           </div>
@@ -43,7 +43,7 @@ export default function CategoryBar() {
 
         {/* ERROR */}
         {isError && (
-          <div className="text-center py-8 text-[var(--user-text-muted)] text-sm">
+          <div className="text-center py-8 text-user-fg-muted text-sm">
             {t("admin.shared.toast.loadFailed")}
           </div>
         )}
@@ -52,8 +52,8 @@ export default function CategoryBar() {
         {!isLoading && !isError && categories.length > 0 && (
           <div className="relative">
             {/* Edge fades (left/right soft gradient) */}
-            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-r from-[var(--user-bg)] to-transparent z-10" />
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-l from-[var(--user-bg)] to-transparent z-10" />
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-r from-user-page to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-l from-user-page to-transparent z-10" />
 
             {/* Marquee container */}
             <div className="marquee overflow-hidden py-2">
@@ -63,9 +63,9 @@ export default function CategoryBar() {
                   <Link
                     key={`${category._id}-${i}`}
                     href={`/?category=${category._id}`}
-                    className="mr-3 w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-3 py-6 flex items-center justify-center min-h-[5.625rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
+                    className="mr-3 w-[8.75rem] sm:w-[11.25rem] shrink-0 bg-user-card border border-user-line rounded-xl px-3 py-6 flex items-center justify-center min-h-[5.625rem] hover:border-user-accent hover:bg-user-hover transition-colors duration-300"
                   >
-                    <p className="text-[var(--user-accent)] font-extrabold text-xs sm:text-sm uppercase tracking-wider text-center leading-relaxed">
+                    <p className="text-user-accent font-extrabold text-xs sm:text-sm uppercase tracking-wider text-center leading-relaxed">
                       {fieldOf(category, "name")}
                     </p>
                   </Link>
@@ -77,7 +77,7 @@ export default function CategoryBar() {
 
         {/* EMPTY */}
         {!isLoading && !isError && categories.length === 0 && (
-          <div className="text-center py-8 text-[var(--user-text-subtle)] text-sm">
+          <div className="text-center py-8 text-user-fg-subtle text-sm">
             <Package size={32} className="mx-auto mb-2 opacity-50" />
             {t("admin.categories.table.empty")}
           </div>

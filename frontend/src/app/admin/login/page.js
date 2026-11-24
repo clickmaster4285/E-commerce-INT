@@ -103,7 +103,7 @@ function PlatformMark({ dark = false, size = 'lg' }) {
         <ShoppingBag size={big ? 22 : 18} strokeWidth={2.25} className="text-white" />
       </span>
       <span className="text-start leading-tight">
-        <span className={`block font-bold tracking-tight ${big ? 'text-[20px]' : 'text-[16px]'} ${dark ? 'text-white' : 'text-[var(--text-primary)]'}`}>ClickMaster</span>
+        <span className={`block font-bold tracking-tight ${big ? 'text-[20px]' : 'text-[16px]'} ${dark ? 'text-white' : 'text-fg'}`}>ClickMaster</span>
         <span className={`block font-bold uppercase tracking-[0.22em] ${big ? 'text-[10px]' : 'text-[9px]'}`} style={{ color: BRAND_ORANGE }}>Marketplace</span>
       </span>
     </span>
@@ -111,10 +111,10 @@ function PlatformMark({ dark = false, size = 'lg' }) {
 }
 
 const inputClass = (hasError) =>
-  `h-12 w-full rounded-xl border bg-[var(--bg-card)] ps-11 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow] ${
+  `h-12 w-full rounded-xl border bg-card ps-11 text-[14px] text-fg placeholder:text-fg-muted shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow] ${
     hasError
-      ? 'border-[var(--danger)] ring-4 ring-[var(--danger-soft)]'
-      : 'border-[var(--border-card)] hover:border-slate-300 focus:border-[#f57224] focus:ring-4 focus:ring-[#f57224]/15'
+      ? 'border-danger-solid ring-4 ring-danger-soft'
+      : 'border-line-card hover:border-slate-300 focus:border-[#f57224] focus:ring-4 focus:ring-[#f57224]/15'
   }`;
 
 export default function AdminLoginPage() {
@@ -266,14 +266,14 @@ export default function AdminLoginPage() {
       <span className="flex min-w-0 items-center gap-3">
         <StoreLogo alt={displayName} logoUrl={logoUrl} letter={firstLetter} sizeClass={size === 'lg' ? 'h-11 w-11' : 'h-9 w-9'} letterClass={size === 'lg' ? 'text-[19px]' : 'text-[16px]'} />
         <span className="min-w-0 text-start leading-tight">
-          <span className={`block truncate font-bold tracking-tight ${size === 'lg' ? 'text-[19px]' : 'text-[15px]'} ${dark ? 'text-white' : 'text-[var(--text-primary)]'}`}>{displayName}</span>
+          <span className={`block truncate font-bold tracking-tight ${size === 'lg' ? 'text-[19px]' : 'text-[15px]'} ${dark ? 'text-white' : 'text-fg'}`}>{displayName}</span>
           <span className="block text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: BRAND_ORANGE }}>{t('admin.login.brand')}</span>
         </span>
       </span>
     );
 
   return (
-    <div dir={dir} lang={locale} className="flex min-h-dvh w-full bg-[var(--bg-card)] lg:h-dvh">
+    <div dir={dir} lang={locale} className="flex min-h-dvh w-full bg-card lg:h-dvh">
       {/* ============ LEFT — BRAND PANEL (signup page jaisa navy) ============ */}
       <aside className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[44%] xl:w-[48%] 2xl:w-1/2">
         <div aria-hidden="true" className="absolute inset-0" style={{ background: 'linear-gradient(155deg, #0d1834 0%, #0a1229 55%, #070d1f 100%)' }} />
@@ -328,20 +328,20 @@ export default function AdminLoginPage() {
       </aside>
 
       {/* ============ RIGHT — FULL WHITE PANEL ============ */}
-      <main className="flex min-w-0 flex-1 flex-col items-center bg-[var(--bg-card)] px-5 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14">
+      <main className="flex min-w-0 flex-1 flex-col items-center bg-card px-5 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14">
         {/* Top bar — mobile par brand; language; platform par "Create seller account" */}
         <header className="flex w-full shrink-0 items-center justify-between gap-3 py-5 lg:justify-end">
           <span className="lg:hidden">{renderBrand(false, "sm")}</span>
           <div className="flex items-center gap-2.5">
-            <div className="rounded-lg border border-[var(--border-card)] px-1.5 py-0.5">
+            <div className="rounded-lg border border-line-card px-1.5 py-0.5">
               <AdminLanguageSwitcher />
             </div>
             {onPlatform && (
-              <p className="flex items-center gap-2.5 text-[13px] text-[var(--text-muted)]">
+              <p className="flex items-center gap-2.5 text-[13px] text-fg-muted">
                 <span className="hidden sm:inline">{t('admin.login.newSeller')}</span>
                 <Link
                   href="/landing/signup"
-                  className="inline-flex h-9 items-center whitespace-nowrap rounded-lg border border-[var(--border-card)] px-3 text-[13px] font-semibold sm:px-4 text-[var(--text-primary)] transition hover:border-slate-300 hover:bg-[var(--bg-secondary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/20"
+                  className="inline-flex h-9 items-center whitespace-nowrap rounded-lg border border-line-card px-3 text-[13px] font-semibold sm:px-4 text-fg transition hover:border-slate-300 hover:bg-page-alt focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f57224]/20"
                 >
                   <span className="sm:hidden">{t('admin.login.signUp')}</span>
                   <span className="hidden sm:inline">{t('admin.login.createSellerAccount')}</span>
@@ -352,17 +352,17 @@ export default function AdminLoginPage() {
         </header>
 
         <div className="my-auto w-full max-w-[420px] shrink-0 py-6 2xl:max-w-[460px]">
-          <h2 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-[var(--text-primary)] 2xl:text-[30px]">{t('admin.login.welcomeBack')}</h2>
-          <p className="pt-1.5 text-[14px] text-[var(--text-muted)]">
+          <h2 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-fg 2xl:text-[30px]">{t('admin.login.welcomeBack')}</h2>
+          <p className="pt-1.5 text-[14px] text-fg-muted">
             {onPlatform ? t('admin.login.sellerSubtitle') : t('admin.login.panelSubtitle')}
           </p>
 
           <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
             {/* Email */}
             <div>
-              <label htmlFor="admin-email" className="mb-1.5 block text-[13px] font-semibold text-[var(--text-secondary)]">{t('admin.login.email')}</label>
+              <label htmlFor="admin-email" className="mb-1.5 block text-[13px] font-semibold text-fg-secondary">{t('admin.login.email')}</label>
               <div className="group relative">
-                <Mail size={16} aria-hidden="true" className={`pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.email ? 'text-[var(--danger)]' : 'text-[var(--text-muted)] group-focus-within:text-[#f57224]'}`} />
+                <Mail size={16} aria-hidden="true" className={`pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.email ? 'text-danger-solid' : 'text-fg-muted group-focus-within:text-[#f57224]'}`} />
                 <input
                   id="admin-email"
                   type="text"
@@ -379,7 +379,7 @@ export default function AdminLoginPage() {
                 />
               </div>
               {fieldErrors.email && (
-                <p id="admin-email-error" role="alert" className="flex items-center gap-1.5 pt-1.5 text-[12.5px] font-medium text-[var(--danger-text)]">
+                <p id="admin-email-error" role="alert" className="flex items-center gap-1.5 pt-1.5 text-[12.5px] font-medium text-danger">
                   <AlertCircle size={13} aria-hidden="true" />{fieldErrors.email}
                 </p>
               )}
@@ -388,13 +388,13 @@ export default function AdminLoginPage() {
             {/* Password */}
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-3">
-                <label htmlFor="admin-password" className="block text-[13px] font-semibold text-[var(--text-secondary)]">{t('admin.login.password')}</label>
+                <label htmlFor="admin-password" className="block text-[13px] font-semibold text-fg-secondary">{t('admin.login.password')}</label>
                 <button type="button" onClick={() => toast.info(t('admin.login.resetHelp'))} className="text-[12.5px] font-semibold transition hover:underline" style={{ color: '#e2641b' }}>
                   {t('admin.login.forgotPassword')}
                 </button>
               </div>
               <div className="group relative">
-                <Lock size={16} aria-hidden="true" className={`pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.password ? 'text-[var(--danger)]' : 'text-[var(--text-muted)] group-focus-within:text-[#f57224]'}`} />
+                <Lock size={16} aria-hidden="true" className={`pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 transition-colors ${fieldErrors.password ? 'text-danger-solid' : 'text-fg-muted group-focus-within:text-[#f57224]'}`} />
                 <input
                   id="admin-password"
                   type={showPassword ? 'text' : 'password'}
@@ -412,13 +412,13 @@ export default function AdminLoginPage() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? t('admin.login.hidePassword') : t('admin.login.showPassword')}
-                  className="absolute end-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--text-muted)] transition hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f57224]/40"
+                  className="absolute end-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-fg-muted transition hover:bg-page-alt hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f57224]/40"
                 >
                   {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
                 </button>
               </div>
               {fieldErrors.password && (
-                <p id="admin-password-error" role="alert" className="flex items-center gap-1.5 pt-1.5 text-[12.5px] font-medium text-[var(--danger-text)]">
+                <p id="admin-password-error" role="alert" className="flex items-center gap-1.5 pt-1.5 text-[12.5px] font-medium text-danger">
                   <AlertCircle size={13} aria-hidden="true" />{fieldErrors.password}
                 </p>
               )}
@@ -430,7 +430,7 @@ export default function AdminLoginPage() {
             </div>
 
             {/* Remember me */}
-            <label className="flex cursor-pointer select-none items-center gap-2.5 text-[13px] font-medium text-[var(--text-secondary)]">
+            <label className="flex cursor-pointer select-none items-center gap-2.5 text-[13px] font-medium text-fg-secondary">
               <input
                 type="checkbox"
                 checked={rememberMe}
@@ -465,10 +465,10 @@ export default function AdminLoginPage() {
           {/* Sign in with Google (staff / seller owner) */}
           {googleClientId && (
             <>
-              <div className="my-5 flex items-center gap-3 text-[11.5px] text-[var(--text-muted)]">
-                <span className="h-px flex-1 bg-[var(--border-card)]" aria-hidden="true" />
+              <div className="my-5 flex items-center gap-3 text-[11.5px] text-fg-muted">
+                <span className="h-px flex-1 bg-line-card" aria-hidden="true" />
                 {t('admin.login.orGoogle')}
-                <span className="h-px flex-1 bg-[var(--border-card)]" aria-hidden="true" />
+                <span className="h-px flex-1 bg-line-card" aria-hidden="true" />
               </div>
               <div className="flex justify-center">
                 <LazyGoogleLogin
@@ -486,13 +486,13 @@ export default function AdminLoginPage() {
         </div>
 
         {/* Bottom anchor — trust + help */}
-        <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-[var(--border-card)] py-4 text-[12px] text-[var(--text-muted)]">
+        <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line-card py-4 text-[12px] text-fg-muted">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck size={13} aria-hidden="true" />
             {t('admin.login.secureFooter')}
           </span>
           {SUPPORT_EMAIL ? (
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium transition hover:text-[var(--text-primary)]">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium transition hover:text-fg">
               {t('admin.login.contactSupport')}
             </a>
           ) : null}

@@ -126,13 +126,13 @@ const NAME_PARENT_LOCK_MESSAGE =
 /* Parent Category lock hone ki wajah professional alert ke roop mein —
    dropdown disabled kyun hai ye user ko turant clear ho jata hai. */
 const ModalParentLockNotice = ({ title, children }) => (
-  <div className="flex items-start gap-2.5 rounded-[10px] border border-[var(--warning)]/30 bg-[var(--warning-soft)] px-3 py-2.5">
-    <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--warning)] text-[var(--text-inverse)]">
+  <div className="flex items-start gap-2.5 rounded-[10px] border border-warning-solid/30 bg-warning-soft px-3 py-2.5">
+    <span className="mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-warning-solid text-fg-inverse">
       <Ico d={D.info} className="w-[11px] h-[11px]" />
     </span>
     <div className="min-w-0 space-y-0.5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--warning-text)]">{title}</p>
-      <p className="text-[11px] leading-relaxed text-[var(--text-secondary)]">{children}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-warning">{title}</p>
+      <p className="text-[11px] leading-relaxed text-fg-secondary">{children}</p>
     </div>
   </div>
 );
@@ -422,17 +422,17 @@ function AttributeOptionsPanel({ attr, onClose }) {
       />
       
       {/* Side Panel */}
-      <div dir={dir} lang={locale} className="fixed top-0 end-0 bottom-0 z-[70] w-full max-w-[360px] bg-[var(--bg-secondary)] border-s border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out">
+      <div dir={dir} lang={locale} className="fixed top-0 end-0 bottom-0 z-[70] w-full max-w-[360px] bg-page-alt border-s border-line shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out">
         
         {/* Header */}
-        <div className="px-5 py-4 border-b border-[var(--border-color)] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-line flex items-center justify-between">
           <div className="min-w-0">
-            <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate pe-4">{localizedAttr.name}</h3>
-            <p className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5">{attr.code}</p>
+            <h3 className="text-[14px] font-bold text-fg truncate pe-4">{localizedAttr.name}</h3>
+            <p className="text-[10px] font-mono text-fg-muted mt-0.5">{attr.code}</p>
           </div>
           <button 
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0"
           >
             <Ico d={D.close} className="w-4 h-4" />
           </button>
@@ -443,22 +443,22 @@ function AttributeOptionsPanel({ attr, onClose }) {
           
           {/* Details */}
           <div className="space-y-3">
-            <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.attributes.detailPanel.summary")}</h4>
-            <div className="space-y-0 rounded-lg border border-[var(--border-color)] overflow-hidden">
-              <div className="flex justify-between items-center px-3 py-2.5 bg-[var(--bg-input)]">
-                <span className="text-[12px] text-[var(--text-muted)]">{t("admin.attributes.detailPanel.dataType")}</span>
+            <h4 className="text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("admin.attributes.detailPanel.summary")}</h4>
+            <div className="space-y-0 rounded-lg border border-line overflow-hidden">
+              <div className="flex justify-between items-center px-3 py-2.5 bg-input">
+                <span className="text-[12px] text-fg-muted">{t("admin.attributes.detailPanel.dataType")}</span>
                 <span className="inline-flex px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider" style={getDataTypeBadgeStyle(attr.data_type)}>
                   {t(getDataTypeLabel(attr.data_type))}
                 </span>
               </div>
               <div className="flex justify-between items-center px-3 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                <span className="text-[12px] text-[var(--text-muted)]">{t("admin.attributes.detailPanel.status")}</span>
+                <span className="text-[12px] text-fg-muted">{t("admin.attributes.detailPanel.status")}</span>
                 <StatusBadge active={isActive} t={t} />
               </div>
               {attr.category_config?.is_variant_option && (
                 <div className="flex justify-between items-center px-3 py-2.5" style={{ borderTop: "1px solid var(--border-color)" }}>
-                  <span className="text-[12px] text-[var(--text-muted)]">{t("detail.variant")}</span>
-                  <span className="text-[11px] font-medium text-[var(--accent)]">{t("common.yes")}</span>
+                  <span className="text-[12px] text-fg-muted">{t("detail.variant")}</span>
+                  <span className="text-[11px] font-medium text-accent">{t("common.yes")}</span>
                 </div>
               )}
             </div>
@@ -467,10 +467,10 @@ function AttributeOptionsPanel({ attr, onClose }) {
           {/* Options List */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+              <h4 className="text-[10px] font-bold text-fg-muted uppercase tracking-wider">
                 {isBoolean ? t("admin.attributes.detailPanel.booleanValues") : t("admin.attributes.detailPanel.availableOptions")}
               </h4>
-              <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
+              <span className="text-[10px] text-fg-muted bg-subtle px-1.5 py-0.5 rounded">
                 {optionLabels.length}
               </span>
             </div>
@@ -480,13 +480,13 @@ function AttributeOptionsPanel({ attr, onClose }) {
                 optionLabels.map((label, idx) => (
                   <div 
                     key={idx} 
-                    className="flex items-center justify-between px-3 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg group hover:border-[var(--accent)]/30 transition-colors"
+                    className="flex items-center justify-between px-3 py-2.5 bg-input border border-line rounded-lg group hover:border-accent/30 transition-colors"
                   >
                     <div className="flex items-center gap-2.5">
-                      <span className="w-5 h-5 flex items-center justify-center rounded bg-[var(--bg-tertiary)] text-[10px] font-bold text-[var(--text-muted)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
+                      <span className="w-5 h-5 flex items-center justify-center rounded bg-subtle text-[10px] font-bold text-fg-muted group-hover:bg-accent-soft group-hover:text-accent transition-colors">
                         {idx + 1}
                       </span>
-                      <span className="text-[12px] font-medium text-[var(--text-primary)]">{label}</span>
+                      <span className="text-[12px] font-medium text-fg">{label}</span>
                     </div>
                     {isBoolean && (
                        <span className={`w-2 h-2 rounded-full ${label.toLowerCase() === 'yes' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
@@ -494,8 +494,8 @@ function AttributeOptionsPanel({ attr, onClose }) {
                   </div>
                 ))
               ) : (
-                <div className="py-8 text-center border border-dashed border-[var(--border-color)] rounded-lg">
-                   <p className="text-[12px] text-[var(--text-muted)]">{t("admin.attributes.detailPanel.noOptions")}</p>
+                <div className="py-8 text-center border border-dashed border-line rounded-lg">
+                   <p className="text-[12px] text-fg-muted">{t("admin.attributes.detailPanel.noOptions")}</p>
                 </div>
               )}
             </div>
@@ -504,7 +504,7 @@ function AttributeOptionsPanel({ attr, onClose }) {
         </div>
 
         {/* Footer Actions */}
-        <div className="p-5 border-t border-[var(--border-color)]">
+        <div className="p-5 border-t border-line">
            <Button primary onClick={onClose} className="w-full justify-center">
              {t("admin.attributes.detailPanel.closePanel")}
            </Button>
@@ -624,7 +624,7 @@ export default function CategoryDetailPage() {
   const categoryMostlyUntranslated = locale !== "en" && categoryTranslationFieldCount > 0 && translatedCategoryFieldCount / categoryTranslationFieldCount <= 0.2;
   const translatedAttributeCount = categoryAttributes.filter((attribute) => attribute.translations?.name?.[locale]?.trim()).length;
   const attributesMostlyUntranslated = locale !== "en" && categoryAttributes.length > 0 && translatedAttributeCount / categoryAttributes.length <= 0.2;
-  const translationSkeleton = "inline-block h-3 rounded bg-[var(--bg-tertiary)] animate-pulse align-middle";
+  const translationSkeleton = "inline-block h-3 rounded bg-subtle animate-pulse align-middle";
   const categoryNameIsTranslated = locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || Boolean(category?.translations?.name?.[locale]?.trim());
   const categoryDescriptionIsTranslated = locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || !category?.description || Boolean(category?.translations?.description?.[locale]?.trim());
   const parentNameIsTranslated = !parentTranslationRecord || locale === "en" || categoryTranslationsReady || !categoryMostlyUntranslated || Boolean(parentTranslationRecord.translations?.name?.[locale]?.trim());
@@ -760,7 +760,7 @@ export default function CategoryDetailPage() {
     return (
       <div className="w-full min-h-[600px] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Spin className="w-6 h-6 text-[var(--accent)]" />
+          <Spin className="w-6 h-6 text-accent" />
           <span className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
             {t("detail.loading")}
           </span>
@@ -776,7 +776,7 @@ export default function CategoryDetailPage() {
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}>
             <Ico d={D.folder} className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
           </div>
-          <h2 className="text-[16px] font-semibold mb-1.5 text-[var(--text-primary)]">{t("detail.notFound")}</h2>
+          <h2 className="text-[16px] font-semibold mb-1.5 text-fg">{t("detail.notFound")}</h2>
           <p className="text-[12px] mb-5" style={{ color: "var(--text-muted)" }}>{t("detail.notFoundBody")}</p>
           <Button primary onClick={() => router.push(backPath)}>
             {t("detail.back")}
@@ -800,7 +800,7 @@ export default function CategoryDetailPage() {
           <button
             type="button"
             onClick={() => router.push(backPath)}
-            className="transition-colors hover:text-[var(--text-primary)]"
+            className="transition-colors hover:text-fg"
           >
             {t("detail.back")}
           </button>
@@ -811,7 +811,7 @@ export default function CategoryDetailPage() {
               <Ico d={D.chevron} className="w-3 h-3" />
             </>
           )}
-          <span className="max-w-[240px] truncate font-medium text-[var(--text-primary)]">
+          <span className="max-w-[240px] truncate font-medium text-fg">
             {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
           </span>
         </nav>
@@ -819,7 +819,7 @@ export default function CategoryDetailPage() {
         {/* Header Row: Title + Actions */}
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <h1 className="text-[20px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">
+            <h1 className="text-[20px] leading-tight font-bold tracking-tight text-fg">
               {t("detail.title")}
             </h1>
             <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
@@ -848,12 +848,12 @@ export default function CategoryDetailPage() {
         >
           {/* LEFT: Identity */}
           <div className="flex flex-1 items-start gap-3.5 min-w-0">
-            <div className="w-12 h-12 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-accent-soft flex items-center justify-center text-accent border border-accent/20 shrink-0">
               <Ico d={D.folder} className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-[16px] leading-tight font-bold text-[var(--text-primary)]">
+                <h2 className="text-[16px] leading-tight font-bold text-fg">
                   {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-36`} aria-label={t("detail.loading")} />}
                 </h2>
                 <span
@@ -937,7 +937,7 @@ export default function CategoryDetailPage() {
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
                 {t("detail.categoryName")}
               </span>
-              <span className="max-w-[160px] truncate text-[12px] font-semibold text-[var(--text-primary)]">
+              <span className="max-w-[160px] truncate text-[12px] font-semibold text-fg">
                 {categoryNameIsTranslated ? nameOf(category) : <span className={`${translationSkeleton} w-32`} aria-label={t("detail.loading")} />}
               </span>
             </div>
@@ -946,7 +946,7 @@ export default function CategoryDetailPage() {
                 {t("detail.categoryCode")}
               </span>
               <span
-                className="rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold text-[var(--accent)]"
+                className="rounded-md px-2 py-0.5 text-[11px] font-mono font-semibold text-accent"
                 style={{ backgroundColor: "var(--bg-tertiary)", border: "1px solid var(--border-color)" }}
               >
                 {category.category_code || "—"}
@@ -956,7 +956,7 @@ export default function CategoryDetailPage() {
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
                 {t("detail.parentCategory")}
               </span>
-              <span className="max-w-[140px] truncate text-[12px] font-semibold text-[var(--accent)]">
+              <span className="max-w-[140px] truncate text-[12px] font-semibold text-accent">
                 {parentCategoryDoc ? nameOf(parentCategoryDoc) : parentCategoryName}
               </span>
             </div>
@@ -964,7 +964,7 @@ export default function CategoryDetailPage() {
               <span className="text-[11px] font-medium" style={{ color: "var(--text-muted)" }}>
                 {t("form.attributes")}
               </span>
-              <span className="text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">
+              <span className="text-[12px] font-semibold tabular-nums text-fg">
                 {formatPageNumber(attributePagination.total)}
               </span>
             </div>
@@ -1016,7 +1016,7 @@ export default function CategoryDetailPage() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h3 className="text-[15px] font-bold text-[var(--text-primary)]">
+              <h3 className="text-[15px] font-bold text-fg">
                 {t("detail.attributeCount", { count: formatPageNumber(attributePagination.total) })}
               </h3>
               <p className="text-[12px] mt-0.5" style={{ color: "var(--text-muted)" }}>
@@ -1058,12 +1058,12 @@ export default function CategoryDetailPage() {
                 <table className="w-full text-start">
                   <thead>
                     <tr style={{ backgroundColor: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-color)" }}>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider w-10">#</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.attributes.table.name")}</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("admin.attributes.detailPanel.dataType")}</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("detail.options")}</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">{t("table.status")}</th>
-                      <th className="px-5 py-3 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider text-end">{t("table.actions")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-fg-muted uppercase tracking-wider w-10">#</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("admin.attributes.table.name")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("admin.attributes.detailPanel.dataType")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("detail.options")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-fg-muted uppercase tracking-wider">{t("table.status")}</th>
+                      <th className="px-5 py-3 text-[10px] font-bold text-fg-muted uppercase tracking-wider text-end">{t("table.actions")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1100,10 +1100,10 @@ export default function CategoryDetailPage() {
                         <tr
                           key={attr._id}
                           onClick={() => setViewPanelAttr(attr)}
-                          className="transition-colors hover:bg-[var(--bg-tertiary)]/20 relative group cursor-pointer"
+                          className="transition-colors hover:bg-subtle/20 relative group cursor-pointer"
                           style={{ borderBottom: idx < categoryAttributes.length - 1 ? "1px solid var(--border-color)" : "none", opacity: isActive ? 1 : 0.5 }}
                         >
-                          <td className="px-5 py-3 text-[12px] text-[var(--text-muted)] font-mono">{formatPageNumber((displayedAttributePage - 1) * attributePagination.limit + idx + 1)}</td>
+                          <td className="px-5 py-3 text-[12px] text-fg-muted font-mono">{formatPageNumber((displayedAttributePage - 1) * attributePagination.limit + idx + 1)}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "var(--purple-soft)", border: "1px solid var(--purple-soft)" }}>
@@ -1111,7 +1111,7 @@ export default function CategoryDetailPage() {
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  {(locale === "en" || attributeTranslationsReady || !attributesMostlyUntranslated || attr.translations?.name?.[locale]?.trim()) ? <p className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{localizedAttr.name}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("detail.loading")} />}
+                                  {(locale === "en" || attributeTranslationsReady || !attributesMostlyUntranslated || attr.translations?.name?.[locale]?.trim()) ? <p className="text-[13px] font-semibold text-fg truncate">{localizedAttr.name}</p> : <span className={`${translationSkeleton} w-28`} aria-label={t("detail.loading")} />}
                                   {isVariant && (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider shrink-0" style={{ backgroundColor: "var(--purple-soft)", color: "var(--purple-text)", border: "1px solid var(--purple-soft)" }}>
                                       {t("detail.variant")}
@@ -1189,7 +1189,7 @@ export default function CategoryDetailPage() {
                                 }}
                                 aria-haspopup="menu"
                                 aria-expanded={isMenuOpen}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-subtle transition-colors"
                               >
                                 <Ico d={D.dots} className="w-4 h-4" />
                               </button>
@@ -1200,7 +1200,7 @@ export default function CategoryDetailPage() {
                                 return createPortal(
                                   <div dir={dir} lang={locale}
                                   role="menu"
-                                  className="fixed z-[9999] w-48 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal animate-in fade-in zoom-in-95"
+                                  className="fixed z-[9999] w-48 bg-card border border-line rounded-lg shadow-xl overflow-visible pointer-events-auto dropdown-menu-portal animate-in fade-in zoom-in-95"
                                   style={{
                                     top: menuPos.top,
                                     left: menuPos.left,
@@ -1216,9 +1216,9 @@ export default function CategoryDetailPage() {
                                           setViewPanelAttr(attr);
                                           setActiveMenuId(null);
                                         }}
-                                        className="w-full px-4 py-2 text-start text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
+                                        className="w-full px-4 py-2 text-start text-[12px] font-medium text-fg hover:bg-subtle flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
                                       >
-                                        <Ico d={D.eye} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                        <Ico d={D.eye} className="w-3.5 h-3.5 text-fg-muted" />
                                         {t("detail.viewOptions")}
                                       </button>
 
@@ -1235,13 +1235,13 @@ export default function CategoryDetailPage() {
                                           }
                                           setActiveMenuId(null);
                                         }}
-                                        className="w-full px-4 py-2 text-start text-[12px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
+                                        className="w-full px-4 py-2 text-start text-[12px] font-medium text-fg hover:bg-subtle flex items-center gap-2 opacity-100 pointer-events-auto cursor-pointer"
                                       >
-                                        <Ico d={D.edit} className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+                                        <Ico d={D.edit} className="w-3.5 h-3.5 text-fg-muted" />
                                         {t("detail.editAttribute")}
                                       </button>
 
-                                      <div className="h-px bg-[var(--border-color)] my-1" />
+                                      <div className="h-px bg-line my-1" />
 
                                       <button
                                         type="button"
@@ -1252,7 +1252,7 @@ export default function CategoryDetailPage() {
                                           setActiveMenuId(null);
                                           toggleStatusMutation.mutate({ attrId, currentActive: isActive });
                                         }}
-                                        className={`w-full px-4 py-2 text-start text-[12px] font-medium flex items-center gap-2 transition-colors duration-150 ${isTogglingThis ? "opacity-80 cursor-wait" : "opacity-100 cursor-pointer hover:bg-[var(--bg-tertiary)]"}`}
+                                        className={`w-full px-4 py-2 text-start text-[12px] font-medium flex items-center gap-2 transition-colors duration-150 ${isTogglingThis ? "opacity-80 cursor-wait" : "opacity-100 cursor-pointer hover:bg-subtle"}`}
                                         style={{ color: isActive ? "var(--danger-text)" : "var(--success-text)", pointerEvents: isTogglingThis ? "none" : "auto" }}
                                       >
                                         {isTogglingThis ? (
@@ -1281,21 +1281,21 @@ export default function CategoryDetailPage() {
                 </table>
               </div>
               {attributePagination.total > attributePageSize && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3">
-                  <div className="flex items-center gap-3 text-[11px] text-[var(--text-muted)]">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-line px-4 py-3">
+                  <div className="flex items-center gap-3 text-[11px] text-fg-muted">
                     <span>{t("page.showingRange", { from: formatPageNumber((displayedAttributePage - 1) * attributePageSize + 1), to: formatPageNumber(Math.min(displayedAttributePage * attributePageSize, attributePagination.total)), total: formatPageNumber(attributePagination.total) })}</span>
                     <label className="flex items-center gap-2">
                       <span>{t("admin.categories.page.rowsPerPage")}</span>
-                      <select value={attributePageSize} onChange={(event) => { setAttributePageSize(Number(event.target.value)); setAttributePage(1); }} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 text-[11px] text-[var(--text-primary)]">
+                      <select value={attributePageSize} onChange={(event) => { setAttributePageSize(Number(event.target.value)); setAttributePage(1); }} className="h-8 rounded-md border border-line bg-card px-2 text-[11px] text-fg">
                         {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{formatPageNumber(size)}</option>)}
                       </select>
                     </label>
                     {categoryAttributesFetching && <span>{t("page.updating")}</span>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setAttributePage(Math.max(1, displayedAttributePage - 1))} disabled={displayedAttributePage <= 1 || categoryAttributesFetching} title={t("page.prev")} aria-label={t("page.prev")} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40">{t("page.prev")}</button>
-                    <span className="text-[11px] text-[var(--text-muted)]">{t("page.pageOf", { page: formatPageNumber(displayedAttributePage), total: formatPageNumber(attributePagination.pages) })}</span>
-                    <button type="button" onClick={() => setAttributePage(Math.min(attributePagination.pages, displayedAttributePage + 1))} disabled={displayedAttributePage >= attributePagination.pages || categoryAttributesFetching} title={t("page.next")} aria-label={t("page.next")} className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-3 text-xs text-[var(--text-primary)] disabled:opacity-40">{t("page.next")}</button>
+                    <button type="button" onClick={() => setAttributePage(Math.max(1, displayedAttributePage - 1))} disabled={displayedAttributePage <= 1 || categoryAttributesFetching} title={t("page.prev")} aria-label={t("page.prev")} className="h-8 rounded-md border border-line bg-card px-3 text-xs text-fg disabled:opacity-40">{t("page.prev")}</button>
+                    <span className="text-[11px] text-fg-muted">{t("page.pageOf", { page: formatPageNumber(displayedAttributePage), total: formatPageNumber(attributePagination.pages) })}</span>
+                    <button type="button" onClick={() => setAttributePage(Math.min(attributePagination.pages, displayedAttributePage + 1))} disabled={displayedAttributePage >= attributePagination.pages || categoryAttributesFetching} title={t("page.next")} aria-label={t("page.next")} className="h-8 rounded-md border border-line bg-card px-3 text-xs text-fg disabled:opacity-40">{t("page.next")}</button>
                   </div>
                 </div>
               )}
@@ -1375,18 +1375,18 @@ export default function CategoryDetailPage() {
       {/* HISTORY TAB */}
       {tab === "history" && (
         <div className="rounded-xl overflow-hidden" style={cardStyle}>
-          <div className="px-5 py-3.5 border-b border-[var(--border-color)]">
-            <h3 className="text-[13px] font-semibold text-[var(--text-primary)]">{t("detail.activityHistory")}</h3>
+          <div className="px-5 py-3.5 border-b border-line">
+            <h3 className="text-[13px] font-semibold text-fg">{t("detail.activityHistory")}</h3>
           </div>
           <div className="p-6">
-            <div className="space-y-5 relative before:absolute before:start-[7px] before:top-3 before:bottom-3 before:w-px before:bg-[var(--border-color)]">
+            <div className="space-y-5 relative before:absolute before:start-[7px] before:top-3 before:bottom-3 before:w-px before:bg-line">
               <div className="relative ps-8">
-                <div className="absolute start-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-emerald-500 shadow-sm" />
+                <div className="absolute start-0 top-1 w-4 h-4 rounded-full border-2 border-card bg-emerald-500 shadow-sm" />
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                   <div>
-                    <p className="text-[13px] font-medium text-[var(--text-primary)]">{t("detail.categoryCreated")}</p>
+                    <p className="text-[13px] font-medium text-fg">{t("detail.categoryCreated")}</p>
                     <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                      {t("detail.createdBy")} <span className="font-semibold text-[var(--text-primary)]">{category.createdby?.name || "—"}</span>
+                      {t("detail.createdBy")} <span className="font-semibold text-fg">{category.createdby?.name || "—"}</span>
                     </p>
                   </div>
                   <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.created_at, locale)}</span>
@@ -1394,12 +1394,12 @@ export default function CategoryDetailPage() {
               </div>
               {category.updatedby && (
                 <div className="relative ps-8">
-                  <div className="absolute start-0 top-1 w-4 h-4 rounded-full border-2 border-[var(--bg-card)] bg-blue-500 shadow-sm" />
+                  <div className="absolute start-0 top-1 w-4 h-4 rounded-full border-2 border-card bg-blue-500 shadow-sm" />
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
                     <div>
-                      <p className="text-[13px] font-medium text-[var(--text-primary)]">{t("detail.categoryUpdated")}</p>
+                      <p className="text-[13px] font-medium text-fg">{t("detail.categoryUpdated")}</p>
                       <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                        {t("detail.updatedBy")} <span className="font-semibold text-[var(--text-primary)]">{category.updatedby?.name || "—"}</span>
+                        {t("detail.updatedBy")} <span className="font-semibold text-fg">{category.updatedby?.name || "—"}</span>
                       </p>
                     </div>
                     <span className="text-[11px] font-mono" style={{ color: "var(--text-muted)" }}>{formatDateTime(category.updated_at, locale)}</span>
@@ -1420,7 +1420,7 @@ export default function CategoryDetailPage() {
                 <Ico d={D.trash} className="w-5 h-5" style={{ color: "var(--danger)" }} />
               </div>
               <div>
-                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] mb-1">{t("delete.titleOne", { name: categoryNameForDisplay })}</h3>
+                <h3 className="text-[14px] font-semibold text-fg mb-1">{t("delete.titleOne", { name: categoryNameForDisplay })}</h3>
                 <p className="text-[12px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
                   {t("detail.deleteBody")}
                 </p>
@@ -1691,30 +1691,30 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
   return (
     <>
       <div dir={dir} lang={locale} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="w-full max-w-[580px] max-h-[85vh] bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden">
-          <div className="px-6 py-3 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+        <div className="w-full max-w-[580px] max-h-[85vh] bg-page-alt rounded-xl border border-line shadow-2xl flex flex-col overflow-hidden">
+          <div className="px-6 py-3 border-b border-line flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] border border-[var(--accent)]/20 shrink-0"><Ico d={D.folder} className="w-4 h-4" /></div>
-              <div><h2 className="text-[14px] font-bold text-[var(--text-primary)]">{t("form.editTitle")}</h2><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("form.subtitle")}</p></div>
+              <div className="w-9 h-9 rounded-lg bg-accent-soft flex items-center justify-center text-accent border border-accent/20 shrink-0"><Ico d={D.folder} className="w-4 h-4" /></div>
+              <div><h2 className="text-[14px] font-bold text-fg">{t("form.editTitle")}</h2><p className="text-[11px] text-fg-muted mt-0.5">{t("form.subtitle")}</p></div>
             </div>
-            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-4 h-4" /></button>
+            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="w-8 h-8 flex items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0"><Ico d={D.close} className="w-4 h-4" /></button>
           </div>
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto min-h-0">
             <div className="p-5 space-y-4">
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.basicInfo")}</p>
+                <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">{t("form.basicInfo")}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.code")}</label><input type="text" value={formData.category_code} readOnly className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] opacity-60" /></div>
-                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.name")} <span className="text-red-500">*</span></label><input type="text" value={formData.name} onChange={(e) => { const name = e.target.value; const locked = getExistingParentNameMatchId({ categories: allCategories, name, excludeId: editingId }); setFormData((prev) => ({ ...prev, name, parent_category_id: locked ? "" : prev.parent_category_id })); }} required autoFocus className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
+                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-fg-secondary">{t("form.code")}</label><input type="text" value={formData.category_code} readOnly className="w-full h-[38px] px-3 text-[12px] font-mono outline-none rounded-lg bg-input border border-line text-fg-secondary opacity-60" /></div>
+                  <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-fg-secondary">{t("form.name")} <span className="text-red-500">*</span></label><input type="text" value={formData.name} onChange={(e) => { const name = e.target.value; const locked = getExistingParentNameMatchId({ categories: allCategories, name, excludeId: editingId }); setFormData((prev) => ({ ...prev, name, parent_category_id: locked ? "" : prev.parent_category_id })); }} required autoFocus className="w-full h-[38px] px-3 text-[12px] outline-none rounded-lg bg-input border border-line text-fg focus:border-accent" /></div>
                 </div>
-                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.description")}</label><textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] focus:border-[var(--accent)]" /></div>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-fg-secondary">{t("form.description")}</label><textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} className="w-full px-3 py-2 text-[12px] outline-none resize-none rounded-lg bg-input border border-line text-fg focus:border-accent" /></div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.hierarchy")}</p>
-                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.parentCategory")}</label>
+                <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">{t("form.hierarchy")}</p>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-fg-secondary">{t("form.parentCategory")}</label>
                   <div className="relative">
-                    <button ref={parentDropdownRef} type="button" disabled={parentDropdownDisabled} onClick={() => { if (parentDropdownDisabled) return; if (!showParentDropdown && parentDropdownRef.current) { const rect = parentDropdownRef.current.getBoundingClientRect(); setParentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width }); } setParentRestrictionHint(""); setShowParentDropdown(!showParentDropdown); }} title={parentDropdownTitle} className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-70" : "bg-[var(--bg-input)] cursor-pointer"}`}>
-                      <span className="flex items-center gap-2 min-w-0"><span className="truncate text-start">{parentLockedByName ? t("parent.none") : selectedParentName}</span>{parentLockedByName && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("lock.badgeLockedToNone")}</span>)}{!parentLockedByName && editingHasChildren && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-[var(--warning-soft)] text-[var(--warning-text)] border border-[var(--warning)]/30 shrink-0 whitespace-nowrap">{t("parent.badgeAlreadyParent")}</span>)}</span><ModalChevronDownIcon className={`w-3.5 h-3.5 text-[var(--text-muted)] shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
+                    <button ref={parentDropdownRef} type="button" disabled={parentDropdownDisabled} onClick={() => { if (parentDropdownDisabled) return; if (!showParentDropdown && parentDropdownRef.current) { const rect = parentDropdownRef.current.getBoundingClientRect(); setParentDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width }); } setParentRestrictionHint(""); setShowParentDropdown(!showParentDropdown); }} title={parentDropdownTitle} className={`w-full h-[38px] px-3 text-[12px] outline-none rounded-lg border border-line text-fg hover:border-accent focus:border-accent transition-colors flex items-center justify-between gap-2 ${parentDropdownDisabled ? "bg-subtle text-fg-secondary cursor-not-allowed opacity-70" : "bg-input cursor-pointer"}`}>
+                      <span className="flex items-center gap-2 min-w-0"><span className="truncate text-start">{parentLockedByName ? t("parent.none") : selectedParentName}</span>{parentLockedByName && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-warning-soft text-warning border border-warning-solid/30 shrink-0 whitespace-nowrap">{t("lock.badgeLockedToNone")}</span>)}{!parentLockedByName && editingHasChildren && (<span className="text-[9.5px] font-semibold px-1.5 py-[1px] rounded-[4px] bg-warning-soft text-warning border border-warning-solid/30 shrink-0 whitespace-nowrap">{t("parent.badgeAlreadyParent")}</span>)}</span><ModalChevronDownIcon className={`w-3.5 h-3.5 text-fg-muted shrink-0 transition-transform ${showParentDropdown ? "rotate-180" : ""}`} />
                     </button>
                   </div>
                   {parentLockedByName && !editingHasChildren && (
@@ -1730,38 +1730,38 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.productAttributes")}</p>
-                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-[var(--text-secondary)]">{t("form.attributes")}</label>
-                  <button type="button" onClick={openAttrSelectModal} className="w-full min-h-[38px] px-3 py-2 text-[12px] text-start outline-none rounded-lg bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] transition-colors flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-2 min-w-0"><ModalLayersIcon className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />{formData.attributes.length === 0 ? <span className="text-[var(--text-muted)]">{t("form.selectAttributes")}</span> : <span className="text-[var(--text-secondary)]">{t("form.attributesSelected", { count: formData.attributes.length })}</span>}</span>
-                    <span className="text-[var(--text-muted)] text-[10px] font-medium px-2 py-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-color)] shrink-0">{t("form.browse")}</span>
+                <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">{t("form.productAttributes")}</p>
+                <div className="space-y-1.5"><label className="block text-[11px] font-semibold text-fg-secondary">{t("form.attributes")}</label>
+                  <button type="button" onClick={openAttrSelectModal} className="w-full min-h-[38px] px-3 py-2 text-[12px] text-start outline-none rounded-lg bg-input border border-line text-fg hover:border-accent focus:border-accent transition-colors flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 min-w-0"><ModalLayersIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />{formData.attributes.length === 0 ? <span className="text-fg-muted">{t("form.selectAttributes")}</span> : <span className="text-fg-secondary">{t("form.attributesSelected", { count: formData.attributes.length })}</span>}</span>
+                    <span className="text-fg-muted text-[10px] font-medium px-2 py-0.5 rounded bg-subtle border border-line shrink-0">{t("form.browse")}</span>
                   </button>
-                  {formData.attributes.length > 0 && (<div className="flex flex-wrap gap-[6px] pt-1.5">{formData.attributes.map((attr, i) => { const doc = allAttributes.find((item) => String(item._id) === String(getAttributeId(attr))); return (<span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 ps-[10px] pe-[8px] py-[3px] text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-[5px] border border-[var(--border-color)] h-[28px]">{doc ? attributeOf(doc).name : attr.seed_name || t("form.attributeFallback", { n: i + 1 })}<button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))} className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-[var(--bg-card)] transition-colors ms-0.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Ico d={D.close} className="w-[10px] h-[10px]" /></button></span>); })}</div>)}
+                  {formData.attributes.length > 0 && (<div className="flex flex-wrap gap-[6px] pt-1.5">{formData.attributes.map((attr, i) => { const doc = allAttributes.find((item) => String(item._id) === String(getAttributeId(attr))); return (<span key={attr.ui_key || i} className="inline-flex items-center gap-1.5 ps-[10px] pe-[8px] py-[3px] text-[11px] font-medium bg-subtle text-fg-secondary rounded-[5px] border border-line h-[28px]">{doc ? attributeOf(doc).name : attr.seed_name || t("form.attributeFallback", { n: i + 1 })}<button type="button" onClick={() => removeAttributeFromForm(getAttributeId(attr))} className="w-[22px] h-[22px] flex items-center justify-center rounded-[4px] hover:bg-card transition-colors ms-0.5 text-fg-muted hover:text-fg-secondary"><Ico d={D.close} className="w-[10px] h-[10px]" /></button></span>); })}</div>)}
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t("form.status")}</p>
-                <div className="flex rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] overflow-hidden p-0.5 h-[38px] max-w-xs">
+                <p className="text-[10px] font-bold text-fg-muted uppercase tracking-widest">{t("form.status")}</p>
+                <div className="flex rounded-lg border border-line bg-input overflow-hidden p-0.5 h-[38px] max-w-xs">
                   {[{ id: "active", label: t("status.active") }, { id: "inactive", label: t("status.inactive") }].map((opt) => {
                     const isActive = formData.status === opt.id;
-                    return (<button key={opt.id} type="button" onClick={() => { setStatusTouched(true); setFormData({ ...formData, status: opt.id }); }} className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}><span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-[var(--text-muted)]") : "bg-transparent"}`} />{opt.label}</button>);
+                    return (<button key={opt.id} type="button" onClick={() => { setStatusTouched(true); setFormData({ ...formData, status: opt.id }); }} className={`flex-1 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all ${isActive ? "bg-subtle text-fg shadow-sm" : "text-fg-muted hover:text-fg-secondary"}`}><span className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? (opt.id === "active" ? "bg-emerald-500" : "bg-fg-muted") : "bg-transparent"}`} />{opt.label}</button>);
                   })}
                 </div>
               </div>
             </div>
           </form>
-          <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0">
-            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="h-9 px-4 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">{t("form.cancel")}</button>
-            <button type="submit" onClick={handleSubmit} disabled={updateMutation.isPending} className="h-9 px-5 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50">{updateMutation.isPending ? <ModalSpinner className="w-3.5 h-3.5" /> : <Ico d={D.check} className="w-3.5 h-3.5" />}{t("form.update")}</button>
+          <div className="px-5 py-2.5 border-t border-line flex items-center justify-end gap-2 shrink-0">
+            <button type="button" onClick={onClose} disabled={updateMutation.isPending} className="h-9 px-4 text-[12px] font-medium text-fg-secondary bg-transparent border border-line rounded-lg hover:bg-subtle transition-colors">{t("form.cancel")}</button>
+            <button type="submit" onClick={handleSubmit} disabled={updateMutation.isPending} className="h-9 px-5 text-[12px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg flex items-center gap-2 transition-all shadow-sm disabled:opacity-50">{updateMutation.isPending ? <ModalSpinner className="w-3.5 h-3.5" /> : <Ico d={D.check} className="w-3.5 h-3.5" />}{t("form.update")}</button>
           </div>
         </div>
       </div>
 
       {showParentDropdown && !parentDropdownDisabled && createPortal(<>
         <div dir={dir} lang={locale} className="fixed inset-0 z-[9998]" onClick={() => setShowParentDropdown(false)} />
-        <div dir={dir} lang={locale} className="fixed z-[9999] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "280px" }}>
+        <div dir={dir} lang={locale} className="fixed z-[9999] bg-page-alt border border-line rounded-lg shadow-2xl overflow-hidden flex flex-col" style={{ top: parentDropdownPos.top, left: parentDropdownPos.left, width: parentDropdownPos.width, maxHeight: "280px" }}>
           <div className="overflow-y-auto" style={{ maxHeight: "240px", flexShrink: 1 }}>
-            <button type="button" onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }} className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors ${!formData.parent_category_id ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "text-[var(--text-primary)]"}`}><span>{t("parent.none")}</span>{!formData.parent_category_id && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)]" />}</button>
+            <button type="button" onClick={() => { setFormData({ ...formData, parent_category_id: "" }); setShowParentDropdown(false); }} className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between hover:bg-subtle transition-colors ${!formData.parent_category_id ? "bg-accent-soft/30 text-accent" : "text-fg"}`}><span>{t("parent.none")}</span>{!formData.parent_category_id && <Ico d={D.check} className="w-3.5 h-3.5 text-accent" />}</button>
             {rootCategories.map((cat) => {
               const state = cat.parentState || { disabled: false, badge: "", hint: "", message: "" };
               const isSelected = String(formData.parent_category_id) === String(cat._id);
@@ -1780,37 +1780,37 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 onFocus={() => { if (state.hint) setParentRestrictionHint(state.hint); }}
                 title={state.hint ? localizeParentMessage(state.hint) : undefined}
                 aria-disabled={state.disabled ? "true" : undefined}
-                className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between gap-2 transition-colors ${state.disabled ? "cursor-not-allowed text-[var(--text-muted)] opacity-60" : isSelected ? "bg-[var(--accent-soft)]/30 text-[var(--accent)]" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"}`}>
-                <span className="flex items-center gap-2 min-w-0"><span className={`truncate ${state.disabled ? "line-through decoration-[var(--border-color)]" : ""}`}>{nameOf(cat)}</span>{state.badge && (<span className="text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-[var(--border-color)] shrink-0 whitespace-nowrap">{localizeParentMessage(state.badge)}</span>)}</span>
-                {isSelected && <Ico d={D.check} className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />}
+                className={`w-full px-3 py-2 text-[12px] text-start flex items-center justify-between gap-2 transition-colors ${state.disabled ? "cursor-not-allowed text-fg-muted opacity-60" : isSelected ? "bg-accent-soft/30 text-accent" : "hover:bg-subtle text-fg"}`}>
+                <span className="flex items-center gap-2 min-w-0"><span className={`truncate ${state.disabled ? "line-through decoration-line" : ""}`}>{nameOf(cat)}</span>{state.badge && (<span className="text-[9.5px] font-medium px-1.5 py-[1px] rounded-[4px] bg-subtle text-fg-muted border border-line shrink-0 whitespace-nowrap">{localizeParentMessage(state.badge)}</span>)}</span>
+                {isSelected && <Ico d={D.check} className="w-3.5 h-3.5 text-accent shrink-0" />}
               </button>);
             })}
           </div>
           {parentRestrictionHint && (
-            <div className="px-3 py-2 text-[10.5px] leading-snug text-[var(--text-muted)] bg-[var(--bg-tertiary)] border-t border-[var(--border-color)] shrink-0">{localizeParentMessage(parentRestrictionHint)}</div>
+            <div className="px-3 py-2 text-[10.5px] leading-snug text-fg-muted bg-subtle border-t border-line shrink-0">{localizeParentMessage(parentRestrictionHint)}</div>
           )}
         </div>
       </>, document.body)}
 
       {showAttrSelectModal && createPortal(
         <div dir={dir} lang={locale} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
-            <div className="px-5 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0"><div><h3 className="text-[13px] font-bold text-[var(--text-primary)]">{t("attrs.title")}</h3><p className="text-[11px] text-[var(--text-muted)] mt-0.5">{t("attrs.subtitle")}</p></div><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
+          <div className="w-full max-w-md bg-page-alt rounded-xl border border-line shadow-2xl flex flex-col overflow-hidden" style={{ maxHeight: "min(640px, 80vh)" }}>
+            <div className="px-5 py-3.5 border-b border-line flex items-center justify-between shrink-0"><div><h3 className="text-[13px] font-bold text-fg">{t("attrs.title")}</h3><p className="text-[11px] text-fg-muted mt-0.5">{t("attrs.subtitle")}</p></div><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="w-7 h-7 flex items-center justify-center rounded-md text-fg-muted hover:text-fg hover:bg-subtle transition-colors shrink-0"><Ico d={D.close} className="w-3.5 h-3.5" /></button></div>
             {tempSelectedAttrIds.length > 0 && (
-              <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0">
+              <div className="px-5 py-2.5 border-b border-line shrink-0">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-semibold text-[var(--text-secondary)]">{t("attrs.selectedTitle")}</span>
-                  <span className="text-[10px] font-medium text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
+                  <span className="text-[11px] font-semibold text-fg-secondary">{t("attrs.selectedTitle")}</span>
+                  <span className="text-[10px] font-medium text-fg-muted bg-subtle px-1.5 py-0.5 rounded tabular-nums">{tempSelectedAttrIds.length}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-[72px] overflow-y-auto">
                   {tempSelectedAttrIds.map((attrId) => {
                     const attr = allAttributes.find((a) => String(a._id) === String(attrId));
                     if (!attr) return null;
                     return (
-                      <span key={attrId} className="inline-flex items-center gap-1 h-7 ps-2.5 pe-1.5 text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md border border-[var(--border-color)]">
+                      <span key={attrId} className="inline-flex items-center gap-1 h-7 ps-2.5 pe-1.5 text-[11px] font-medium bg-subtle text-fg-secondary rounded-md border border-line">
                         {attributeOf(attr).name}
                         <button type="button" onClick={() => toggleTempAttribute(attrId)}
-                          className="w-4 h-4 flex items-center justify-center rounded hover:bg-[var(--bg-card)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                          className="w-4 h-4 flex items-center justify-center rounded hover:bg-card transition-colors text-fg-muted hover:text-fg">
                           <ModalCloseIcon className="w-2.5 h-2.5" />
                         </button>
                       </span>
@@ -1819,12 +1819,12 @@ function CategoryEditModal({ categoryId, onClose, onSuccess }) {
                 </div>
               </div>
             )}
-            <div className="px-5 py-2.5 border-b border-[var(--border-color)] shrink-0"><div className="relative"><span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"><ModalSearchIcon className="w-3.5 h-3.5" /></span><input type="text" placeholder={t("attrs.searchPlaceholder")} value={attrSearch} onChange={(e) => setAttrSearch(e.target.value)} className="w-full h-9 ps-8 pe-3 rounded-lg text-[12px] outline-none bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent)]" autoFocus /></div></div>
+            <div className="px-5 py-2.5 border-b border-line shrink-0"><div className="relative"><span className="absolute start-2.5 top-1/2 -translate-y-1/2 text-fg-muted"><ModalSearchIcon className="w-3.5 h-3.5" /></span><input type="text" placeholder={t("attrs.searchPlaceholder")} value={attrSearch} onChange={(e) => setAttrSearch(e.target.value)} className="w-full h-9 ps-8 pe-3 rounded-lg text-[12px] outline-none bg-input border border-line text-fg placeholder:text-fg-muted focus:border-accent" autoFocus /></div></div>
             <div className="flex-1 overflow-y-auto min-h-0">
-              {allAttributes.length > 0 ? (filteredAllAttributes.length > 0 ? filteredAllAttributes.map((attr) => { const isChecked = tempSelectedAttrIds.includes(attr._id); return (<button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)} className={`w-full px-5 py-2.5 flex items-center gap-3 text-start transition-colors border-b border-[var(--border-color)] last:border-b-0 ${isChecked ? "bg-[var(--accent-soft)]/30" : "hover:bg-[var(--bg-tertiary)]"}`}><div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-[var(--accent)] border-[var(--accent)]" : "border-[var(--border-color)] bg-[var(--bg-input)]"}`}>{isChecked && <Ico d={D.check} className="w-3 h-3 text-white" />}</div><div className="flex-1 min-w-0"><p className="text-[12px] font-medium text-[var(--text-primary)] truncate">{attributeOf(attr).name}</p><p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{attr.code} &middot; {t(getDataTypeLabel(attr.data_type))}</p></div>{attr.values && attr.values.length > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0 tabular-nums">{t("attrs.valuesCount", { count: attr.values.length })}</span>}</button>); }) : <div className="px-5 py-6 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noMatch")}</p></div>) : <div className="px-5 py-8 text-center"><p className="text-[12px] text-[var(--text-muted)] mb-1">{t("attrs.noneYet")}</p><p className="text-[11px] text-[var(--text-muted)]">{t("attrs.noneYetBody")}</p></div>}
+              {allAttributes.length > 0 ? (filteredAllAttributes.length > 0 ? filteredAllAttributes.map((attr) => { const isChecked = tempSelectedAttrIds.includes(attr._id); return (<button key={attr._id} type="button" onClick={() => toggleTempAttribute(attr._id)} className={`w-full px-5 py-2.5 flex items-center gap-3 text-start transition-colors border-b border-line last:border-b-0 ${isChecked ? "bg-accent-soft/30" : "hover:bg-subtle"}`}><div className={`w-[18px] h-[18px] flex items-center justify-center shrink-0 rounded border-[1.5px] transition-colors ${isChecked ? "bg-accent border-accent" : "border-line bg-input"}`}>{isChecked && <Ico d={D.check} className="w-3 h-3 text-white" />}</div><div className="flex-1 min-w-0"><p className="text-[12px] font-medium text-fg truncate">{attributeOf(attr).name}</p><p className="text-[10px] text-fg-muted font-mono truncate">{attr.code} &middot; {t(getDataTypeLabel(attr.data_type))}</p></div>{attr.values && attr.values.length > 0 && <span className="text-[10px] text-fg-muted shrink-0 tabular-nums">{t("attrs.valuesCount", { count: attr.values.length })}</span>}</button>); }) : <div className="px-5 py-6 text-center"><p className="text-[12px] text-fg-muted mb-1">{t("attrs.noMatch")}</p></div>) : <div className="px-5 py-8 text-center"><p className="text-[12px] text-fg-muted mb-1">{t("attrs.noneYet")}</p><p className="text-[11px] text-fg-muted">{t("attrs.noneYetBody")}</p></div>}
             </div>
-            {!showCreateAttrModal && (<div className="shrink-0 border-t border-[var(--border-color)] bg-[var(--bg-secondary)]">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setCreateAttributeInitialName(attrSearch.trim()); setShowCreateAttrModal(true); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setCreateAttributeInitialName(""); setShowCreateAttrModal(true); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-[var(--bg-tertiary)] rounded-lg px-3 py-2 text-[var(--accent)]"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNewGeneric")}</span></button></div>) : null}</div>)}
-            <div className="px-5 py-2.5 border-t border-[var(--border-color)] flex items-center justify-end gap-2 shrink-0"><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="h-8 px-3 text-[12px] font-medium text-[var(--text-secondary)] bg-transparent border border-[var(--border-color)] rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors">{t("attrs.cancel")}</button><button type="button" onClick={applyAttributeSelection} className="h-8 px-4 text-[12px] font-semibold text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-lg transition-colors shadow-sm">{t("attrs.apply")}{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}</button></div>
+            {!showCreateAttrModal && (<div className="shrink-0 border-t border-line bg-page-alt">{attrSearch.trim() && filteredAllAttributes.length === 0 ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setCreateAttributeInitialName(attrSearch.trim()); setShowCreateAttrModal(true); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-subtle rounded-lg px-3 py-2 text-accent"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNew", { term: attrSearch.trim() })}</span></button></div>) : !attrSearch.trim() ? (<div className="px-5 py-2.5"><button type="button" onClick={() => { setCreateAttributeInitialName(""); setShowCreateAttrModal(true); }} className="w-full flex items-center gap-2 text-start transition-colors hover:bg-subtle rounded-lg px-3 py-2 text-accent"><ModalPlusIcon className="w-3.5 h-3.5 shrink-0" /><span className="text-[12px] font-medium">{t("attrs.createNewGeneric")}</span></button></div>) : null}</div>)}
+            <div className="px-5 py-2.5 border-t border-line flex items-center justify-end gap-2 shrink-0"><button type="button" onClick={() => { setShowAttrSelectModal(false); setShowCreateAttrModal(false); setAttrSearch(""); }} className="h-8 px-3 text-[12px] font-medium text-fg-secondary bg-transparent border border-line rounded-lg hover:bg-subtle transition-colors">{t("attrs.cancel")}</button><button type="button" onClick={applyAttributeSelection} className="h-8 px-4 text-[12px] font-semibold text-white bg-accent hover:bg-accent-hover rounded-lg transition-colors shadow-sm">{t("attrs.apply")}{tempSelectedAttrIds.length > 0 ? ` (${tempSelectedAttrIds.length})` : ""}</button></div>
           </div>
         </div>, document.body
       )}

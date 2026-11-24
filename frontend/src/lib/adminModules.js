@@ -26,6 +26,8 @@ import {
   FileText,
   Receipt,
   DollarSign,
+  Paintbrush,
+  Files,
 } from "lucide-react";
 
 /** Section order — sidebarTitle uppercase labels i18n keys ke liye */
@@ -71,6 +73,8 @@ export const ADMIN_MODULES = [
   { key: "finance", name: "Finance", section: "finance", path: "/admin/finance", permissionKey: "finance", icon: DollarSign, countable: false, nav: true },
   { key: "storeInfo", name: "Store Info", section: "store", path: "/admin/store-info", permissionKey: "store", icon: Store, countable: false, nav: true },
   { key: "terms", name: "Terms & Conditions", section: "store", path: "/admin/terms-conditions", permissionKey: "store", icon: FileText, countable: false, nav: true },
+  { key: "storeEditor", name: "Store Editor", section: "store", path: "/admin/store-editor", permissionKey: "storeEditor", fallbackKey: "store", icon: Paintbrush, countable: false, nav: true },
+  { key: "pages", name: "Pages", section: "store", path: "/admin/pages", permissionKey: "storeEditor", fallbackKey: "store", icon: Files, countable: false, nav: true },
   { key: "employees", name: "Employees", section: "team", path: "/admin/employees", permissionKey: "employees", icon: Users, countable: true, nav: true },
   { key: "profile", name: "Profile", section: "team", path: "/admin/profile", permissionKey: "profile", icon: User, countable: false, nav: true },
 ];

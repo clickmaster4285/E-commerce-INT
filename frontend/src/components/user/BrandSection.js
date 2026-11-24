@@ -36,7 +36,7 @@ export default function BrandSection() {
       <div className="user-shell mx-auto">
         {/* HEADER */}
         <div className="flex items-center justify-between mb-4 lg:mb-5">
-          <h2 className="text-[var(--user-text)] font-bold text-base lg:text-lg">
+          <h2 className="text-user-fg font-bold text-base lg:text-lg">
             {t("header.topBrands")}
           </h2>
         </div>
@@ -47,7 +47,7 @@ export default function BrandSection() {
             {[...Array(6)].map((_, i) => (
               <div
                 key={i}
-                className="w-[8.75rem] sm:w-[10rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl min-h-[8.125rem] animate-pulse"
+                className="w-[8.75rem] sm:w-[10rem] shrink-0 bg-user-card border border-user-line rounded-xl min-h-[8.125rem] animate-pulse"
               />
             ))}
           </div>
@@ -55,7 +55,7 @@ export default function BrandSection() {
 
         {/* ERROR */}
         {isError && (
-          <div className="text-center py-8 text-[var(--user-text-muted)] text-sm">
+          <div className="text-center py-8 text-user-fg-muted text-sm">
             {t("admin.brands.ui.loadFailed")}
           </div>
         )}
@@ -64,8 +64,8 @@ export default function BrandSection() {
         {!isLoading && !isError && brands.length > 0 && (
           <div className="relative">
             {/* Edge fades */}
-            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-r from-[var(--user-bg)] to-transparent z-10" />
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-l from-[var(--user-bg)] to-transparent z-10" />
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-r from-user-page to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 lg:w-20 bg-gradient-to-l from-user-page to-transparent z-10" />
 
             {/* Marquee container */}
             <div className="marquee overflow-hidden py-2">
@@ -79,15 +79,15 @@ export default function BrandSection() {
                     <Link
                       key={`${brand._id}-${i}`}
                       href={`/?brand=${brand._id}`}
-                      className="mr-3 w-[8.75rem] sm:w-[10rem] shrink-0 bg-[var(--user-bg-card)] border border-[var(--user-border)] rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[8.125rem] hover:border-[var(--user-accent)] hover:bg-[var(--user-bg-hover)] transition-colors duration-300"
+                      className="mr-3 w-[8.75rem] sm:w-[10rem] shrink-0 bg-user-card border border-user-line rounded-xl px-4 py-5 flex flex-col items-center justify-center gap-3 min-h-[8.125rem] hover:border-user-accent hover:bg-user-hover transition-colors duration-300"
                     >
                       {/* ✅ Logo (white circle) */}
-                      <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-[var(--user-border)] bg-[var(--user-bg-hover)] p-2">
+                      <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-user-line bg-user-hover p-2">
                         <FallbackImage src={logoUrl} alt={brandName} className="max-h-full max-w-full object-contain" />
                       </span>
 
                       {/* ✅ Brand name */}
-                      <p className="text-xs text-[var(--user-text-muted)] text-center capitalize line-clamp-1 w-full">
+                      <p className="text-xs text-user-fg-muted text-center capitalize line-clamp-1 w-full">
                         {brandName}
                       </p>
                     </Link>
@@ -100,7 +100,7 @@ export default function BrandSection() {
 
         {/* EMPTY */}
         {!isLoading && !isError && brands.length === 0 && (
-          <div className="text-center py-8 text-[var(--user-text-subtle)] text-sm">
+          <div className="text-center py-8 text-user-fg-subtle text-sm">
             <Package size={32} className="mx-auto mb-2 opacity-50" />
             {t("admin.brands.page.noBrands")}
           </div>

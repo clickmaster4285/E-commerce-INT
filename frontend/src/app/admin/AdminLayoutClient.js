@@ -36,6 +36,9 @@ const ROUTE_PERMISSIONS = {
   '/admin/reviews': 'reviews',
   '/admin/store-info': 'store',
   '/admin/terms-conditions': 'store',
+  // ✅ Store editor + custom pages (legacy records me missing → store se fallback)
+  '/admin/store-editor': 'storeEditor',
+  '/admin/pages': 'storeEditor',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',
@@ -283,6 +286,7 @@ export default function AdminLayout({ children }) {
     const ROUTE_FALLBACK = {
       featuredProducts: 'products',
       reviews: 'products',
+      storeEditor: 'store',
     };
     const effectivePerm = (key) => {
       const v = perms[key];
@@ -739,6 +743,11 @@ export default function AdminLayout({ children }) {
     return <div className="contents" dir={dir} lang={locale}>{children}</div>;
   }
 
+  // ✅ Store editor full-screen (apna top bar) — auth/permission upar check ho chuka
+  if (pathname === '/admin/store-editor' || pathname.startsWith('/admin/store-editor/')) {
+    return <div className="admin-panel contents" dir={dir} lang={locale}>{children}</div>;
+  }
+
   // ==========================================
   // MAIN LAYOUT
   // ==========================================
@@ -822,7 +831,7 @@ export default function AdminLayout({ children }) {
               aria-modal="true"
               aria-labelledby="seller-pending-title"
               aria-describedby="seller-pending-desc"
-              className="w-full max-w-md rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-6 text-[var(--text-primary)] shadow-[0_24px_60px_-12px_rgba(15,23,42,0.45)] sm:p-7"
+              className="w-full max-w-md rounded-2xl border border-line-card bg-card p-6 text-fg shadow-[0_24px_60px_-12px_rgba(15,23,42,0.45)] sm:p-7"
             >
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-400/15 text-amber-600" aria-hidden="true">
                 <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -830,10 +839,10 @@ export default function AdminLayout({ children }) {
               <h2 id="seller-pending-title" className="mt-4 text-[19px] font-bold leading-tight">
                 Your account is pending approval
               </h2>
-              <p id="seller-pending-desc" className="mt-2 text-[13.5px] leading-6 text-[var(--text-muted)]">
+              <p id="seller-pending-desc" className="mt-2 text-[13.5px] leading-6 text-fg-muted">
                 Welcome to your store admin panel. Your seller account has been created and is waiting for approval from our team.
               </p>
-              <ul className="mt-4 space-y-2.5 rounded-xl border border-[var(--border-card)] bg-[var(--bg-secondary)] p-4 text-[13px] leading-5">
+              <ul className="mt-4 space-y-2.5 rounded-xl border border-line-card bg-page-alt p-4 text-[13px] leading-5">
                 <li className="flex gap-2.5">
                   <span className="mt-0.5 text-emerald-600" aria-hidden="true">✓</span>
                   <span>You can explore every page of your admin panel.</span>
@@ -865,7 +874,7 @@ export default function AdminLayout({ children }) {
         {/* Keep the scrollport LTR so switching to an RTL locale does not move
             its horizontal origin and crop the left side of admin pages. Apply
             locale direction to the content wrapper instead. */}
-        <main ref={adminMainRef} dir="ltr" className={`min-h-0 min-w-0 flex-1 ${pathname === '/admin/chats' ? 'overflow-hidden p-0' : 'overflow-y-auto overflow-x-auto overscroll-contain px-3 py-4 sm:px-5 sm:py-6'} bg-[var(--bg-secondary)]`}>
+        <main ref={adminMainRef} dir="ltr" className={`min-h-0 min-w-0 flex-1 ${pathname === '/admin/chats' ? 'overflow-hidden p-0' : 'overflow-y-auto overflow-x-auto overscroll-contain px-3 py-4 sm:px-5 sm:py-6'} bg-page-alt`}>
           <div dir={dir} lang={locale} className={pathname === '/admin/chats' ? "h-full min-w-0 w-full" : "mx-auto min-w-0 w-full max-w-[1600px]"}>{children}</div>
         </main>
 

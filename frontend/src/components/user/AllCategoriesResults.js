@@ -46,7 +46,7 @@ export default function AllCategoriesResults({
           {[...Array(12).keys()].map((index) => (
             <div
               key={index}
-              className="h-[10.5rem] animate-pulse rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)]"
+              className="h-[10.5rem] animate-pulse rounded-2xl border border-user-line bg-user-card"
             />
           ))}
         </div>
@@ -57,7 +57,7 @@ export default function AllCategoriesResults({
   return (
     <section
       aria-label="All categories"
-      className="rounded-2xl border border-[var(--user-accent)]/30 bg-[var(--user-bg-card)]/60 p-3 sm:p-4"
+      className="rounded-2xl border border-user-accent/30 bg-user-card/60 p-3 sm:p-4"
     >
       <SectionHeading
         title="All Categories"
@@ -67,7 +67,7 @@ export default function AllCategoriesResults({
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-user-line px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-user-fg-muted transition-colors hover:border-user-accent hover:text-user-accent"
         >
           <RotateCcw size={12} />
           Clear all
@@ -75,10 +75,10 @@ export default function AllCategoriesResults({
       </SectionHeading>
 
       {list.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-12 text-center">
-          <ImageOff size={30} className="text-[var(--user-text-subtle)]" />
-          <p className="text-sm font-bold text-[var(--user-text)]">No categories yet</p>
-          <p className="text-[0.6875rem] text-[var(--user-text-muted)]">Check back soon!</p>
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-user-line bg-user-card px-4 py-12 text-center">
+          <ImageOff size={30} className="text-user-fg-subtle" />
+          <p className="text-sm font-bold text-user-fg">No categories yet</p>
+          <p className="text-[0.6875rem] text-user-fg-muted">Check back soon!</p>
         </div>
       ) : (
         <>
@@ -89,9 +89,9 @@ export default function AllCategoriesResults({
                 type="button"
                 onClick={() => onSelectCategory?.(category)}
                 title={`${category.name} — ${category.count} products`}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--user-accent)] hover:shadow-[var(--user-shadow-md)]"
+                className="group flex flex-col overflow-hidden rounded-2xl border border-user-line bg-user-card text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-user-accent hover:shadow-[var(--user-shadow-md)]"
               >
-                <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[var(--user-bg-hover)]">
+                <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-user-hover">
                   <FallbackImage
                     nextImage
                     src={category.image}
@@ -104,14 +104,14 @@ export default function AllCategoriesResults({
                   />
                 </span>
                 <span className="flex flex-1 flex-col gap-1 px-3 py-2.5">
-                  <span className="w-full line-clamp-2 break-words text-[0.78125rem] font-bold capitalize text-[var(--user-text)]">
+                  <span className="w-full line-clamp-2 break-words text-[0.78125rem] font-bold capitalize text-user-fg">
                     {category.name}
                   </span>
                   <span className="flex items-center justify-between gap-1 text-[0.65625rem] font-semibold">
-                    <span className="truncate text-[var(--user-accent)]">
+                    <span className="truncate text-user-accent">
                       {category.fromPrice > 0 ? `From ${formatPrice(category.fromPrice)}` : "Explore"}
                     </span>
-                    <span className="shrink-0 text-[var(--user-text-subtle)]">{category.count}</span>
+                    <span className="shrink-0 text-user-fg-subtle">{category.count}</span>
                   </span>
                 </span>
               </button>
