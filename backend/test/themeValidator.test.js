@@ -194,3 +194,45 @@ test("safeHref", () => {
   assert.equal(safeHref("mailto:a@b.co"), "mailto:a@b.co");
   assert.equal(safeHref("data:text/html,x"), null);
 });
+
+// ───────────────────────── Section style + presets + hero ─────────────────────────
+test("section style is validated (colors, options) and defaulted", () => {
+  const theme = buildDefaultTheme();
+  theme.sections.deals.style = { background: "#FFEEDD", padding: "large", visibility: "mobile", junk: 1 };
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.deepEqual(r.data.sections.deals.style, { background: "#ffeedd", padding: "large", visibility: "mobile" });
+  assert.deepEqual(r.data.sections.brand_strip.style, { background: null, padding: "none", visibility: "all" });
+
+  const bad = buildDefaultTheme();
+  bad.sections.deals.style = { background: "url(x)" };
+  assert.equal(validate(bad).ok, false);
+  bad.sections.deals.style = { padding: "huge" };
+  assert.equal(validate(bad).ok, false);
+});
+
+test("every preset passes validation", () => {
+  const { PRESETS } = require("../config/themeSchema");
+  assert.ok(PRESETS.length >= 4);
+  for (const preset of PRESETS) {
+    const theme = buildDefaultTheme();
+    theme.settings = { ...theme.settings, ...preset.settings };
+    const r = validate(theme);
+    assert.equal(r.ok, true, `${preset.id}: ${JSON.stringify(r.errors)}`);
+  }
+});
+
+test("hero custom slides validate like blocks (own-store images, safe links)", () => {
+  const theme = buildDefaultTheme();
+  theme.sections.hero_banners.settings = { source: "custom", height: "large", autoplay: false, interval: 99 };
+  theme.sections.hero_banners.blocks = [
+    { id: "s1", settings: { image: `/uploads/stores/${STORE}/theme/a.webp`, heading: "Sale", buttonLabel: "Shop", buttonLink: { type: "url", url: "/deals" } } },
+  ];
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.data.sections.hero_banners.settings.interval, 10);
+  assert.equal(r.data.sections.hero_banners.blocks[0].settings.heading, "Sale");
+
+  theme.sections.hero_banners.blocks[0].settings.image = `/uploads/stores/${OTHER}/theme/a.webp`;
+  assert.equal(validate(theme).ok, false);
+});

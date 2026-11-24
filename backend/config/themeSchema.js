@@ -77,10 +77,29 @@ const heading = (fallback = "") => ({ key: "heading", type: "text", label: "Head
 
 const SECTION_TYPES = {
   // ── Existing storefront components (har ek store-wide data se chalta hai → ek hi baar) ──
+  // source "banners" = Admin → Banners wale slides (purana behavior, default)
+  // source "custom"  = yahin editor me banaye slides (blocks)
   hero_banners: {
     label: "Hero banners",
     limit: 1,
-    settings: [],
+    settings: [
+      { key: "source", type: "select", label: "Slides from", options: ["banners", "custom"], default: "banners" },
+      { key: "height", type: "select", label: "Height", options: ["default", "small", "large"], default: "default" },
+      { key: "autoplay", type: "checkbox", label: "Auto-rotate slides", default: true },
+      { key: "interval", type: "range", label: "Seconds per slide", min: 3, max: 10, step: 1, default: 5, showIf: { key: "autoplay", equals: true } },
+    ],
+    blocks: {
+      label: "Slide",
+      showIf: { key: "source", equals: "custom" },
+      settings: [
+        { key: "image", type: "image", label: "Image", default: "" },
+        { key: "eyebrow", type: "text", label: "Small label", default: "", translatable: true },
+        { key: "heading", type: "text", label: "Heading", default: "", translatable: true },
+        { key: "description", type: "textarea", label: "Text", default: "", translatable: true },
+        { key: "buttonLabel", type: "text", label: "Button label", default: "", translatable: true },
+        { key: "buttonLink", type: "link", label: "Button link", default: { type: "none" } },
+      ],
+    },
   },
   category_tiles: {
     label: "Category tiles",
@@ -141,8 +160,8 @@ const SECTION_TYPES = {
     settings: [
       heading(),
       { key: "source", type: "select", label: "Products from", options: ["new", "offers", "category", "brand"], default: "new" },
-      { key: "categoryId", type: "category", label: "Category", default: "" },
-      { key: "brandId", type: "brand", label: "Brand", default: "" },
+      { key: "categoryId", type: "category", label: "Category", default: "", showIf: { key: "source", equals: "category" } },
+      { key: "brandId", type: "brand", label: "Brand", default: "", showIf: { key: "source", equals: "brand" } },
       { key: "limit", type: "range", label: "Number of products", min: 4, max: 24, step: 1, default: 8 },
     ],
   },
@@ -174,6 +193,79 @@ const SECTION_TYPES = {
     settings: [{ key: "height", type: "range", label: "Height (px)", min: 8, max: 160, step: 8, default: 32 }],
   },
 };
+
+// ── Har section ke common style settings (section.style) ──
+const SECTION_STYLE = [
+  { key: "background", type: "color", label: "Background color", default: null },
+  { key: "padding", type: "select", label: "Vertical spacing", options: ["none", "small", "medium", "large"], default: "none" },
+  { key: "visibility", type: "select", label: "Show on", options: ["all", "desktop", "mobile"], default: "all" },
+];
+
+// ── Theme presets (editor me one-click "Theme styles") ──
+// Sirf colors / typography / layout badalte hain — sections ka content nahi.
+// Har value validator se guzarti hai (hex, FONTS whitelist, radius options).
+const PRESETS = [
+  {
+    id: "classic",
+    name: "Classic",
+    description: "The default storefront look",
+    settings: {
+      colors: { accent: null, accentHover: null, accentText: null, background: null, card: null, text: null, border: null },
+      typography: { headingFont: null, bodyFont: null },
+      layout: { radius: "default" },
+    },
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    description: "Clean black & white, lots of space",
+    settings: {
+      colors: { accent: "#111827", accentHover: "#000000", accentText: "#ffffff", background: "#ffffff", card: "#ffffff", text: "#111827", border: "#e5e7eb" },
+      typography: { headingFont: "Inter", bodyFont: "Inter" },
+      layout: { radius: "small" },
+    },
+  },
+  {
+    id: "bold",
+    name: "Bold",
+    description: "Strong red accent for sales & deals",
+    settings: {
+      colors: { accent: "#e11d48", accentHover: "#be123c", accentText: "#ffffff", background: "#fff5f6", card: "#ffffff", text: "#1f1720", border: "#fbd5dc" },
+      typography: { headingFont: "Montserrat", bodyFont: "Poppins" },
+      layout: { radius: "large" },
+    },
+  },
+  {
+    id: "electronics",
+    name: "Electronics",
+    description: "Cool blue tech store",
+    settings: {
+      colors: { accent: "#2563eb", accentHover: "#1d4ed8", accentText: "#ffffff", background: "#f1f5f9", card: "#ffffff", text: "#0f172a", border: "#e2e8f0" },
+      typography: { headingFont: "Poppins", bodyFont: "Inter" },
+      layout: { radius: "default" },
+    },
+  },
+  {
+    id: "fashion",
+    name: "Fashion",
+    description: "Elegant serif headings, warm neutrals",
+    settings: {
+      colors: { accent: "#1c1917", accentHover: "#44403c", accentText: "#ffffff", background: "#faf7f2", card: "#ffffff", text: "#1c1917", border: "#e7e5e4" },
+      typography: { headingFont: "Playfair Display", bodyFont: "Lato" },
+      layout: { radius: "none" },
+    },
+  },
+  {
+    id: "fresh",
+    name: "Fresh",
+    description: "Green & friendly — grocery, health",
+    settings: {
+      colors: { accent: "#059669", accentHover: "#047857", accentText: "#ffffff", background: "#f0fdf4", card: "#ffffff", text: "#052e16", border: "#d1fae5" },
+      typography: { headingFont: "Nunito", bodyFont: "Nunito" },
+      layout: { radius: "large" },
+    },
+  },
+];
 
 const GLOBAL_SETTINGS = {
   colors: Object.keys(COLOR_VARS).map((key) => ({ key, type: "color", label: key, default: null })),
@@ -208,7 +300,13 @@ const defaultsOf = (fields) =>
 function buildDefaultTheme() {
   const sections = {};
   for (const type of DEFAULT_ORDER) {
-    sections[type] = { type, disabled: false, settings: defaultsOf(SECTION_TYPES[type].settings), blocks: [] };
+    sections[type] = {
+      type,
+      disabled: false,
+      settings: defaultsOf(SECTION_TYPES[type].settings),
+      style: defaultsOf(SECTION_STYLE),
+      blocks: [],
+    };
   }
   return {
     settings: Object.fromEntries(Object.entries(GLOBAL_SETTINGS).map(([group, fields]) => [group, defaultsOf(fields)])),
@@ -226,6 +324,8 @@ function publicSchema() {
     colorVars: COLOR_VARS,
     linkTypes: LINK_TYPES,
     globalSettings: GLOBAL_SETTINGS,
+    sectionStyle: SECTION_STYLE,
+    presets: PRESETS,
     sectionTypes: SECTION_TYPES,
   };
 }
@@ -238,6 +338,8 @@ module.exports = {
   FIELD_TYPES,
   SECTION_TYPES,
   GLOBAL_SETTINGS,
+  SECTION_STYLE,
+  PRESETS,
   DEFAULT_ORDER,
   buildDefaultTheme,
   defaultsOf,

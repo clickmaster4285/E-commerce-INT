@@ -1,6 +1,5 @@
 import "./landing.css";
 
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import Navbar from "@/components/landing/Navbar";
 import Hero from "@/components/landing/Hero";
 import TrustStrip from "@/components/landing/TrustStrip";
@@ -14,17 +13,17 @@ import Footer from "@/components/landing/Footer";
 import FloatingButtons from "@/components/landing/FloatingButtons";
 import { FAQS, SITE } from "@/components/landing/content";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-body",
-  display: "swap",
-});
+// ⚠️ Fonts next/font/google se NAHI — woh `next build` ke waqt Google se download
+// karta hai, aur internet/firewall na ho to poora build fail ho jata tha.
+// Ab browser runtime par Google Fonts stylesheet load karta hai (display=swap);
+// na mile to system font fallback. Variables wahi: --font-body / --font-heading.
+const LANDING_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-heading",
-  display: "swap",
-});
+const fontVars = {
+  "--font-body": '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+  "--font-heading": '"Plus Jakarta Sans", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif',
+};
 
 export const metadata = {
   metadataBase: new URL(SITE.url),
@@ -83,9 +82,11 @@ const faqJsonLd = {
 
 export default function LandingPage() {
   return (
-    <main
-      className={`${inter.variable} ${plusJakarta.variable} user-theme landing-page min-h-screen`}
-    >
+    <main style={fontVars} className="user-theme landing-page min-h-screen">
+      {/* React 19 isay <head> me hoist karta hai */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link rel="stylesheet" href={LANDING_FONTS_HREF} precedence="default" />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify([organizationJsonLd, faqJsonLd]) }}

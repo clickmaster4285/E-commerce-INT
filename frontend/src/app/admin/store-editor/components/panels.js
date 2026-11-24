@@ -26,6 +26,14 @@ import {
 import { useThemeEditorStore, defaultsOf, randomId } from "../useThemeEditorStore";
 import { SettingField, LinkInput, inputCls, humanize } from "./fields";
 
+// Schema `showIf: { key, equals }` — dependent field sirf tab dikhe (value missing → field default)
+function isVisible(field, values, fields) {
+  if (!field?.showIf) return true;
+  const dep = fields.find((f) => f.key === field.showIf.key);
+  const current = values?.[field.showIf.key] ?? dep?.default;
+  return current === field.showIf.equals;
+}
+
 const iconBtn =
   "inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-muted transition hover:bg-subtle hover:text-fg disabled:opacity-30";
 
@@ -145,6 +153,12 @@ export function SectionList({ schema }) {
 }
 
 // ───────────────────────── Section settings ─────────────────────────
+const swap = (list, i, j) => {
+  const copy = [...list];
+  [copy[i], copy[j]] = [copy[j], copy[i]];
+  return copy;
+};
+
 function BlocksEditor({ id, section, def, maxBlocks }) {
   const setBlocks = useThemeEditorStore((s) => s.setBlocks);
   const blocks = section.blocks || [];
@@ -159,13 +173,23 @@ function BlocksEditor({ id, section, def, maxBlocks }) {
             <span className="text-xs font-semibold text-fg-secondary">
               {def.label} {i + 1}
             </span>
-            <button type="button" className={iconBtn} onClick={() => setBlocks(id, blocks.filter((_, j) => j !== i))} aria-label="Remove">
-              <Trash2 size={13} />
-            </button>
+            <div className="flex items-center">
+              <button type="button" className={iconBtn} disabled={i === 0} onClick={() => setBlocks(id, swap(blocks, i, i - 1))} aria-label="Move up">
+                <ArrowUp size={13} />
+              </button>
+              <button type="button" className={iconBtn} disabled={i === blocks.length - 1} onClick={() => setBlocks(id, swap(blocks, i, i + 1))} aria-label="Move down">
+                <ArrowDown size={13} />
+              </button>
+              <button type="button" className={iconBtn} onClick={() => setBlocks(id, blocks.filter((_, j) => j !== i))} aria-label="Remove">
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
-          {def.settings.map((field) => (
-            <SettingField key={field.key} field={field} value={block.settings?.[field.key]} onChange={(v) => update(i, field.key, v)} />
-          ))}
+          {def.settings
+            .filter((field) => isVisible(field, block.settings, def.settings))
+            .map((field) => (
+              <SettingField key={field.key} field={field} value={block.settings?.[field.key]} onChange={(v) => update(i, field.key, v)} />
+            ))}
         </div>
       ))}
       <button
@@ -181,7 +205,7 @@ function BlocksEditor({ id, section, def, maxBlocks }) {
 }
 
 export function SectionSettings({ schema, id, onBack }) {
-  const { draft, setSectionSetting, duplicateSection, removeSection, toggleSection } = useThemeEditorStore();
+  const { draft, setSectionSetting, setSectionStyle, duplicateSection, removeSection, toggleSection } = useThemeEditorStore();
   const section = draft?.sections?.[id];
   if (!section) return null;
   const def = schema.sectionTypes[section.type];
@@ -225,20 +249,48 @@ export function SectionSettings({ schema, id, onBack }) {
 
       {!def ? (
         <p className="text-sm text-warning">This section type is no longer supported and will be removed when you save.</p>
-      ) : def.settings.length === 0 && !def.blocks ? (
-        <p className="text-sm text-fg-muted">This section uses your store data automatically — no settings needed. Reorder or hide it from the list.</p>
       ) : (
         <div className="space-y-4">
-          {def.settings.map((field) => (
-            <SettingField
-              key={field.key}
-              field={field}
-              value={section.settings?.[field.key]}
-              onChange={(v) => setSectionSetting(id, field.key, v)}
-              linkTypes={schema.linkTypes}
-            />
-          ))}
-          {def.blocks ? <BlocksEditor id={id} section={section} def={def.blocks} maxBlocks={schema.limits.maxBlocks} /> : null}
+          {def.settings.length === 0 && !def.blocks ? (
+            <p className="text-sm text-fg-muted">This section uses your store data automatically. Reorder or hide it from the list, or style it below.</p>
+          ) : null}
+          {def.settings
+            .filter((field) => isVisible(field, section.settings, def.settings))
+            .map((field) => (
+              <SettingField
+                key={field.key}
+                field={field}
+                value={section.settings?.[field.key]}
+                onChange={(v) => setSectionSetting(id, field.key, v)}
+                linkTypes={schema.linkTypes}
+              />
+            ))}
+          {def.blocks && isVisible(def.blocks, section.settings, def.settings) ? (
+            <BlocksEditor id={id} section={section} def={def.blocks} maxBlocks={schema.limits.maxBlocks} />
+          ) : null}
+          {section.type === "hero_banners" && def.blocks && !isVisible(def.blocks, section.settings, def.settings) ? (
+            <p className="rounded-lg bg-info-soft px-3 py-2 text-xs text-info">
+              Slides come from{" "}
+              <a href="/admin/banners" target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                Admin / Banners
+              </a>
+              . Switch &quot;Slides from&quot; to Custom to build slides here.
+            </p>
+          ) : null}
+
+          {schema.sectionStyle?.length ? (
+            <div className="space-y-4 border-t border-line pt-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-fg-muted">Section style</p>
+              {schema.sectionStyle.map((field) => (
+                <SettingField
+                  key={field.key}
+                  field={field}
+                  value={section.style?.[field.key]}
+                  onChange={(v) => setSectionStyle(id, field.key, v)}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
     </div>
@@ -263,11 +315,53 @@ const COLOR_LABELS = {
   border: "Borders (light mode)",
 };
 
+function PresetCard({ preset, active, onApply }) {
+  const c = preset.settings?.colors || {};
+  const swatches = [c.background || "#eff0f5", c.card || "#ffffff", c.accent || "#f97316", c.text || "#0a0a0a"];
+  const font = preset.settings?.typography?.headingFont;
+  return (
+    <button
+      type="button"
+      onClick={onApply}
+      className={`flex flex-col gap-2 rounded-lg border p-2.5 text-start transition hover:border-accent ${active ? "border-accent bg-accent-soft" : "border-line bg-card-alt"}`}
+    >
+      <span className="flex overflow-hidden rounded-md border border-line">
+        {swatches.map((color, i) => (
+          <span key={i} className="h-6 flex-1" style={{ backgroundColor: color }} />
+        ))}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-xs font-bold text-fg" style={font ? { fontFamily: `"${font}", system-ui` } : undefined}>
+          {preset.name}
+        </span>
+        <span className="block truncate text-[10px] text-fg-muted">{preset.description}</span>
+      </span>
+    </button>
+  );
+}
+
+const sameValues = (a = {}, b = {}) => Object.keys(b).every((k) => (a[k] ?? null) === (b[k] ?? null));
+
 export function ThemeSettings({ schema }) {
-  const { draft, setGlobalSetting } = useThemeEditorStore();
+  const { draft, setGlobalSetting, applyPreset } = useThemeEditorStore();
   if (!draft) return null;
+  const presets = schema.presets || [];
+  const activePreset = presets.find((p) =>
+    Object.entries(p.settings || {}).every(([group, values]) => sameValues(draft.settings?.[group], values)),
+  );
   return (
     <div className="space-y-6">
+      {presets.length ? (
+        <section className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-fg-muted">Theme styles</h3>
+          <p className="text-[11px] text-fg-muted">One click sets colors, fonts and corners. Your sections and content stay the same, and you can undo anytime.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {presets.map((preset) => (
+              <PresetCard key={preset.id} preset={preset} active={activePreset?.id === preset.id} onApply={() => applyPreset(preset)} />
+            ))}
+          </div>
+        </section>
+      ) : null}
       {Object.entries(schema.globalSettings).map(([group, fields]) => (
         <section key={group} className="space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-fg-muted">{GROUP_LABELS[group] || humanize(group)}</h3>

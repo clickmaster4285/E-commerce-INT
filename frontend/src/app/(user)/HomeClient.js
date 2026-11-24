@@ -42,6 +42,7 @@ import { useStoreTheme, selectSectionInEditor } from "@/storefront/ThemeProvider
 import { hasCustomAccent } from "@/storefront/themeCss";
 import { DEFAULT_SECTION_ORDER } from "@/storefront/themeDefaults";
 import { GENERIC_SECTIONS } from "@/storefront/sections/registry";
+import { SectionStyle, heroSlidesFromBlocks } from "@/storefront/sections/SectionStyle";
 
 /* Below-fold sections — code-split (initial JS chhota → LCP/INP fast).
    ssr:true taake SEO same rahe, lekin alag chunk me load hon. */
@@ -333,15 +334,32 @@ function HomeContent({ initialBanners = null }) {
     .map((id) => [id, theme?.sections?.[id] || (theme ? null : { type: id, settings: {} })])
     .filter(([, section]) => section && !section.disabled);
 
-  const renderBuiltin = (type, settings = {}) => {
+  const renderBuiltin = (type, settings = {}, blocks = []) => {
     const heading = settings.heading || "";
     switch (type) {
-      case "hero_banners":
+      case "hero_banners": {
+        // source "custom" → editor ke slides; warna Admin → Banners (purana)
+        const custom = settings.source === "custom" ? heroSlidesFromBlocks(blocks) : null;
+        if (custom && !custom.length) {
+          // Editor preview me placeholder (click karke select ho sake); live par kuch nahi
+          return isPreview ? (
+            <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed border-user-line text-sm text-user-fg-muted">
+              Add slides in the store editor
+            </div>
+          ) : null;
+        }
         return (
           <div className="overflow-hidden rounded-2xl border border-user-line">
-            <BannerSlider initialBanners={initialBanners} />
+            <BannerSlider
+              initialBanners={initialBanners}
+              customSlides={custom}
+              autoplay={settings.autoplay !== false}
+              intervalMs={(Number(settings.interval) || 5) * 1000}
+              height={settings.height || "default"}
+            />
           </div>
         );
+      }
       case "category_tiles":
         return (
           <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full">
@@ -384,7 +402,7 @@ function HomeContent({ initialBanners = null }) {
   };
 
   const renderSection = (id, section, index) => {
-    const builtin = renderBuiltin(section.type, section.settings);
+    const builtin = renderBuiltin(section.type, section.settings, section.blocks);
     let node = builtin;
     if (builtin === undefined) {
       const generic = GENERIC_SECTIONS[section.type];
@@ -394,9 +412,10 @@ function HomeContent({ initialBanners = null }) {
       // Pehla section lazy nahi (LCP); baaki viewport par mount
       node = eager || index === 0 ? inner : <ViewportSection minHeight={minHeight}>{inner}</ViewportSection>;
     }
+    if (!node) return null;
     return (
       <EditableSection key={id} id={id} isPreview={isPreview} selected={selectedSectionId === id}>
-        {node}
+        <SectionStyle style={section.style}>{node}</SectionStyle>
       </EditableSection>
     );
   };

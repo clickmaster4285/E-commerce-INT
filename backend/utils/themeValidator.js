@@ -23,6 +23,7 @@ const {
   LINK_TYPES,
   SECTION_TYPES,
   GLOBAL_SETTINGS,
+  SECTION_STYLE,
 } = require("../config/themeSchema");
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
@@ -272,6 +273,8 @@ function validateThemeData(data, { storeId } = {}) {
       type: sec.type,
       disabled: Boolean(sec.disabled),
       settings: validateFields(def.settings, sec.settings, `sections.${id}.settings`, ctx),
+      // Common style (background / spacing / visibility) — har section type par
+      style: validateFields(SECTION_STYLE, sec.style, `sections.${id}.style`, ctx),
       blocks,
     };
     order.push(id);

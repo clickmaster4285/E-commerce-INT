@@ -35,6 +35,13 @@ const MOUNT_AHEAD = 2;
    Hover par animation pause hoti hai, is liye bar aur slide hamesha sync rehte hain. */
 const AUTOPLAY_MS = 5000;
 
+/* Store editor hero height (default = purana size bilkul same) */
+const HEIGHTS = {
+  default: "h-[13.125rem] sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto",
+  small: "h-[10rem] sm:h-[13rem] lg:h-[16rem] xl:h-[18rem] 2xl:h-[20rem]",
+  large: "h-[16rem] sm:h-[24rem] lg:h-[30rem] xl:h-[34rem] 2xl:h-[38rem] 3xl:aspect-[5/2] 3xl:h-auto",
+};
+
 /* Har slide ka apna flat color palette (glow/blur nahi) — index se cycle hota hai */
 const PALETTES = [
   { from: "#4c1d95", via: "#a21caf", to: "#ec4899", extrude: "#2e1065" }, // violet → pink
@@ -135,9 +142,21 @@ function getBannerContent(banner, locale) {
   };
 }
 
-export default function BannerSlider({ initialBanners = null }) {
+/* Store editor props (sab optional — na do to purana behavior):
+     customSlides → editor me banaye slides (banners API call nahi hoti;
+                    text pehle se localized: StoreThemeProvider)
+     autoplay / intervalMs / height → hero section settings */
+export default function BannerSlider({
+  initialBanners = null,
+  customSlides = null,
+  autoplay = true,
+  intervalMs = AUTOPLAY_MS,
+  height = "default",
+}) {
   const { locale, dir, t } = useTranslation();
-  const { data: banners = [], isLoading } = useQuery({
+  const usingCustom = Array.isArray(customSlides);
+  const heightCls = HEIGHTS[height] || HEIGHTS.default;
+  const { data: fetchedBanners = [], isLoading: bannersLoading } = useQuery({
     // Locale is part of the cache identity so switching languages never
     // keeps rendering the previous locale's banner snapshot.
     queryKey: ["activeBanners", locale],
@@ -148,7 +167,10 @@ export default function BannerSlider({ initialBanners = null }) {
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     refetchInterval: 5 * 60 * 1000,
+    enabled: !usingCustom,
   });
+  const banners = usingCustom ? customSlides : fetchedBanners;
+  const isLoading = usingCustom ? false : bannersLoading;
 
   // Position ke hisaab se sorted, sirf utne slides jitne hero me sane lagte hain
   const slides = useMemo(() => {
@@ -193,7 +215,7 @@ export default function BannerSlider({ initialBanners = null }) {
   if (isLoading) {
     return (
       <section className="w-full">
-        <div className="h-[13.125rem] w-full sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto bg-user-card animate-pulse" />
+        <div className={`${heightCls} w-full bg-user-card animate-pulse`} />
       </section>
     );
   }
@@ -221,15 +243,17 @@ export default function BannerSlider({ initialBanners = null }) {
       {/* 1080p tak fixed height (jaisa tha), 2000px+ par 3:1 aspect —
           is liye bari screen par hero apne aap proportion me barhta hai */}
       <div
-        className="group relative w-full h-[13.125rem] sm:h-[18.75rem] lg:h-[22.5rem] xl:h-[26rem] 2xl:h-[30rem] 3xl:aspect-[3/1] 3xl:h-auto overflow-hidden bg-user-card"
+        className={`group relative w-full ${heightCls} overflow-hidden bg-user-card`}
         style={{ minHeight: "13.125rem", touchAction: "pan-y" }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
         {/* SLIDES */}
         {slides.map((banner, i) => {
-          const { banner: localizedBanner, locale: contentLocale, dir: contentDir } =
-            getBannerContent(banner, locale);
+          // Custom slides ka text StoreThemeProvider pehle hi localize kar chuka hai
+          const { banner: localizedBanner, locale: contentLocale, dir: contentDir } = banner.preLocalized
+            ? { banner, locale, dir: dirForLocale(locale) }
+            : getBannerContent(banner, locale);
           const imgUrl = getImageUrl(banner.desktopImage || banner.tabletImage || banner.mobileImage);
           const isActive = i === active;
           const hasCopy = Boolean(
@@ -286,7 +310,7 @@ export default function BannerSlider({ initialBanners = null }) {
         {slides.length > 1 && (
           <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-md border border-white/15 bg-black/30 px-2.5 py-1.5 sm:bottom-4">
             {slides.map((_, i) =>
-              i === active ? (
+              i === active && autoplay ? (
                 <button
                   key={i}
                   onClick={() => goTo(i)}
@@ -297,12 +321,20 @@ export default function BannerSlider({ initialBanners = null }) {
                     key={active}
                     className="absolute inset-0 origin-left bg-white"
                     style={{
-                      animation: `bnProgress ${AUTOPLAY_MS}ms linear forwards`,
+                      animation: `bnProgress ${intervalMs}ms linear forwards`,
                       animationPlayState: paused ? "paused" : "running",
                     }}
                     onAnimationEnd={goNext}
                   />
                 </button>
+              ) : i === active ? (
+                /* Autoplay off — active pill static (koi auto-advance nahi) */
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  aria-label={t("banner.current", { index: i + 1 })}
+                  className="h-1.5 w-10 rounded-full bg-white"
+                />
               ) : (
                 <button
                   key={i}
@@ -460,7 +492,7 @@ function ButtonLink({ button, palette, primary = false, isActive, delay = 0, loc
       }`}
       style={{ color: primary ? palette.from : "#ffffff", ...anim(isActive, "bnSlideLeft", delay, 0.6) }}
     >
-      {primary ? (locale === "en" ? "Shop Now" : t("banner.shopNow")) : button.text}
+      {primary ? (button.ownText ? button.text : locale === "en" ? "Shop Now" : t("banner.shopNow")) : button.text}
       {primary && (dirForLocale(locale) === "rtl" ? <ArrowLeft
           size={15}
           className="bn-anim"

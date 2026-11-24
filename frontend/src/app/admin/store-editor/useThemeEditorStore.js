@@ -121,6 +121,19 @@ export const useThemeEditorStore = create((set, get) => ({
       if (d.sections[id]) d.sections[id].blocks = blocks;
     }),
 
+  setSectionStyle: (id, key, value) =>
+    get().update((d) => {
+      if (d.sections[id]) d.sections[id].style = { ...(d.sections[id].style || {}), [key]: value };
+    }),
+
+  // Theme preset → sirf colors / typography / layout replace (sections ka content same)
+  applyPreset: (preset) =>
+    get().update((d) => {
+      for (const [group, values] of Object.entries(preset?.settings || {})) {
+        d.settings[group] = { ...(d.settings[group] || {}), ...clone(values) };
+      }
+    }),
+
   setGlobalSetting: (group, key, value) =>
     get().update((d) => {
       d.settings[group] = { ...(d.settings[group] || {}), [key]: value };
