@@ -147,6 +147,31 @@ function fieldValue(field, raw, ctx) {
     }
     case "checkbox":
       return { value: missing ? Boolean(fallback) : Boolean(raw) };
+    case "url": {
+      // Sirf absolute http(s) (video embeds) — relative / javascript: nahi
+      const v = missing ? "" : str(raw, LIMITS.url);
+      if (!v) return { value: "" };
+      try {
+        const u = new URL(v);
+        return u.protocol === "http:" || u.protocol === "https:" ? { value: u.href } : { error: "must be an http(s) link" };
+      } catch {
+        return { error: "invalid link" };
+      }
+    }
+    case "datetime": {
+      const v = missing ? "" : str(raw, 40);
+      if (!v) return { value: "" };
+      const t = Date.parse(v);
+      if (!Number.isFinite(t)) return { error: "invalid date" };
+      const year = new Date(t).getUTCFullYear();
+      if (year < 2000 || year > 2100) return { error: "date out of range" };
+      return { value: new Date(t).toISOString() };
+    }
+    case "phone": {
+      const v = missing ? "" : String(raw ?? "").replace(/[\s+()-]/g, "").slice(0, 20);
+      if (!v) return { value: "" };
+      return /^\d{8,15}$/.test(v) ? { value: v } : { error: "digits only, with country code" };
+    }
     case "image":
       return missing ? { value: fallback || "" } : imageUrl(raw, ctx.storeId);
     case "link":

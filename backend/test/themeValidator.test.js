@@ -306,3 +306,39 @@ test("header & footer settings default to today's layout and validate", () => {
   assert.ok(keys.includes("g.footer.aboutText"));
   assert.ok(keys.includes("g.footer.copyright"));
 });
+
+// ───────────────────────── Release 5: sections + conversion ─────────────────────────
+test("new field types: url (http only), datetime (ISO), phone (digits)", () => {
+  const mk = (type, settings) => withSection("x1", { type, settings });
+  assert.equal(validate(mk("video", { url: "https://youtu.be/abc123" })).ok, true);
+  assert.equal(validate(mk("video", { url: "javascript:alert(1)" })).ok, false);
+  assert.equal(validate(mk("video", { url: "/relative" })).ok, false);
+
+  const c = validate(mk("countdown", { endsAt: "2026-12-31T18:00" }));
+  assert.equal(c.ok, true);
+  assert.match(c.data.sections.x1.settings.endsAt, /^2026-12-31T/);
+  assert.equal(validate(mk("countdown", { endsAt: "soon" })).ok, false);
+
+  const theme = buildDefaultTheme();
+  theme.settings.conversion = { whatsappFloat: true, whatsappNumber: "+92 300-1234567" };
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.data.settings.conversion.whatsappNumber, "923001234567");
+  theme.settings.conversion.whatsappNumber = "abc";
+  assert.equal(validate(theme).ok, false);
+});
+
+test("conversion + low-stock default OFF (no change for existing stores)", () => {
+  const r = validate(buildDefaultTheme());
+  assert.equal(r.data.settings.conversion.whatsappFloat, false);
+  assert.equal(r.data.templates.product.settings.lowStockBadge, false);
+});
+
+test("contact form parse: validation + honeypot", () => {
+  process.env.LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || "x";
+  const { parseContact } = require("../controllers/contactController")._internal;
+  assert.deepEqual(parseContact({ name: "Ali", email: "A@B.co", message: "Hello there" }).errors, {});
+  assert.equal(parseContact({ name: "Ali", email: "A@B.co", message: "Hello there" }).data.email, "a@b.co");
+  assert.ok(parseContact({ name: "", email: "x", message: "hi" }).errors.email);
+  assert.ok(parseContact({ name: "Bot", email: "a@b.co", message: "spam spam", website: "http://x" }).errors.spam);
+});

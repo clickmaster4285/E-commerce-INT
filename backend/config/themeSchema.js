@@ -71,6 +71,9 @@ const FIELD_TYPES = [
   "category",
   "brand",
   "product",
+  "url", // http(s) only (video / external)
+  "datetime", // ISO date-time (countdown)
+  "phone", // digits with country code (WhatsApp)
 ];
 
 const heading = (fallback = "") => ({ key: "heading", type: "text", label: "Heading", default: fallback, translatable: true });
@@ -192,6 +195,87 @@ const SECTION_TYPES = {
     limit: 10,
     settings: [{ key: "height", type: "range", label: "Height (px)", min: 8, max: 160, step: 8, default: 32 }],
   },
+
+  // ── Release 5: more sections ──
+  faq: {
+    label: "FAQ",
+    limit: 3,
+    settings: [heading("Frequently asked questions")],
+    blocks: {
+      label: "Question",
+      settings: [
+        { key: "question", type: "text", label: "Question", default: "", translatable: true },
+        { key: "answer", type: "textarea", label: "Answer", default: "", translatable: true },
+      ],
+    },
+  },
+  video: {
+    label: "Video",
+    limit: 5,
+    settings: [
+      heading(),
+      { key: "url", type: "url", label: "YouTube or Vimeo link", default: "" },
+      { key: "aspect", type: "select", label: "Shape", options: ["wide", "square", "vertical"], default: "wide" },
+    ],
+  },
+  countdown: {
+    label: "Countdown timer",
+    limit: 3,
+    settings: [
+      heading("Sale ends in"),
+      { key: "subheading", type: "textarea", label: "Text", default: "", translatable: true },
+      { key: "endsAt", type: "datetime", label: "Ends at", default: "" },
+      { key: "buttonLabel", type: "text", label: "Button label", default: "", translatable: true },
+      { key: "buttonLink", type: "link", label: "Button link", default: { type: "none" } },
+      { key: "hideWhenEnded", type: "checkbox", label: "Hide when the timer ends", default: true },
+    ],
+  },
+  logo_list: {
+    label: "Logo list",
+    limit: 3,
+    settings: [heading(), { key: "grayscale", type: "checkbox", label: "Grayscale logos", default: false }],
+    blocks: {
+      label: "Logo",
+      settings: [
+        { key: "image", type: "image", label: "Logo", default: "" },
+        { key: "link", type: "link", label: "Link", default: { type: "none" } },
+      ],
+    },
+  },
+  image_gallery: {
+    label: "Image gallery",
+    limit: 5,
+    settings: [
+      heading(),
+      { key: "columns", type: "select", label: "Columns (desktop)", options: ["2", "3", "4"], default: "3" },
+    ],
+    blocks: {
+      label: "Image",
+      settings: [
+        { key: "image", type: "image", label: "Image", default: "" },
+        { key: "caption", type: "text", label: "Caption", default: "", translatable: true },
+        { key: "link", type: "link", label: "Link", default: { type: "none" } },
+      ],
+    },
+  },
+  contact_form: {
+    label: "Contact form",
+    limit: 1,
+    settings: [
+      heading("Contact us"),
+      { key: "subheading", type: "textarea", label: "Text", default: "", translatable: true },
+      { key: "showPhone", type: "checkbox", label: "Ask for phone number", default: true },
+    ],
+  },
+  map: {
+    label: "Map",
+    limit: 2,
+    settings: [
+      heading("Visit our store"),
+      { key: "address", type: "text", label: "Address (as on Google Maps)", default: "" },
+      { key: "height", type: "select", label: "Height", options: ["small", "medium", "large"], default: "medium" },
+    ],
+  },
 };
 
 // ── Har section ke common style settings (section.style) ──
@@ -289,6 +373,12 @@ const GLOBAL_SETTINGS = {
     { key: "showStoreName", type: "checkbox", label: "Show store name next to logo", default: true },
     { key: "showSearch", type: "checkbox", label: "Show search bar", default: true },
   ],
+  // ── Conversion (sab default OFF) ──
+  conversion: [
+    { key: "whatsappFloat", type: "checkbox", label: "Floating WhatsApp button on every page", default: false },
+    { key: "whatsappNumber", type: "phone", label: "WhatsApp number (with country code, e.g. 923001234567)", default: "", showIf: { key: "whatsappFloat", equals: true } },
+    { key: "whatsappMessage", type: "text", label: "Pre-filled message", default: "Hi, I have a question about your store.", translatable: true, showIf: { key: "whatsappFloat", equals: true } },
+  ],
   // ── Footer (default = aaj ka footer; text khali = built-in text) ──
   footer: [
     { key: "aboutText", type: "textarea", label: "About text (empty = store tagline)", default: "", translatable: true },
@@ -378,6 +468,8 @@ const PRODUCT_BLOCK_TYPES = {
 const PRODUCT_TEMPLATE_SETTINGS = [
   { key: "stickyBar", type: "checkbox", label: "Sticky add-to-cart bar on scroll", default: true },
   { key: "sidebar", type: "checkbox", label: "Show store & quick info sidebar", default: true },
+  { key: "lowStockBadge", type: "checkbox", label: 'Show "Only X left" when stock is low', default: false },
+  { key: "lowStockThreshold", type: "range", label: "Low stock at or below", min: 1, max: 20, step: 1, default: 5, showIf: { key: "lowStockBadge", equals: true } },
 ];
 
 const PRODUCT_ZONES = {

@@ -847,6 +847,8 @@ function ProductDetailContent({ params }) {
   // Store editor product page template (default = purana layout)
   const { template, isPreview, selectedSectionId } = useProductTemplate();
   const showSidebar = template.settings?.sidebar !== false;
+  // "Only X left" badge (template setting, default off)
+  const lowStockLimit = template.settings?.lowStockBadge ? Number(template.settings?.lowStockThreshold) || 5 : 0;
 
   if (isLoading) return <LoadingState />;
   if (isError || !product) return <ErrorState isError={isError} />;
@@ -1322,6 +1324,10 @@ function ProductDetailContent({ params }) {
                   </div>
                   {stock < 1 ? (
                     <span className="text-xs font-semibold text-user-accent">{t("admin.productDetail.page.outOfStock")}</span>
+                  ) : stock <= lowStockLimit ? (
+                    <span className="rounded-full bg-user-danger/10 px-2 py-0.5 text-xs font-semibold text-user-danger">
+                      {t("storefront.product.onlyLeft", { count: stock })}
+                    </span>
                   ) : null}
                 </div>
 

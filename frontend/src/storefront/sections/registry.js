@@ -20,7 +20,19 @@ const pulse = (h) =>
 const generic = (name, h) =>
   dynamic(() => import("./GenericSections").then((m) => m[name]), { ssr: true, loading: pulse(h) });
 
+const more = (name, h) =>
+  dynamic(() => import("./MoreSections").then((m) => m[name]), { ssr: true, loading: pulse(h) });
+
 export const GENERIC_SECTIONS = {
+  // ── Release 5 ──
+  faq: { Component: more("FaqSection", "h-[14rem]"), minHeight: 220 },
+  video: { Component: more("VideoSection", "h-[20rem]"), minHeight: 320 },
+  countdown: { Component: more("CountdownSection", "h-[12rem]"), minHeight: 200 },
+  logo_list: { Component: more("LogoListSection", "h-[7rem]"), minHeight: 120 },
+  image_gallery: { Component: more("GallerySection", "h-[20rem]"), minHeight: 320 },
+  contact_form: { Component: more("ContactFormSection", "h-[24rem]"), minHeight: 380 },
+  map: { Component: more("MapSection", "h-[20rem]"), minHeight: 320 },
+
   rich_text: { Component: generic("RichTextSection", "h-[10rem]"), minHeight: 160 },
   image_with_text: { Component: generic("ImageWithTextSection", "h-[20rem]"), minHeight: 320 },
   product_carousel: { Component: generic("ProductCarouselSection", "h-[20rem]"), minHeight: 320 },

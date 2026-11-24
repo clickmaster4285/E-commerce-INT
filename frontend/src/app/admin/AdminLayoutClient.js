@@ -41,6 +41,8 @@ const ROUTE_PERMISSIONS = {
   '/admin/pages': 'storeEditor',
   // ✅ Newsletter subscribers = customer data
   '/admin/subscribers': 'customers',
+  // ✅ Contact form messages = customer data
+  '/admin/messages': 'customers',
   '/admin/shipping': 'shipping',
   '/admin/profile': 'profile',
   '/admin/employees': 'employees',

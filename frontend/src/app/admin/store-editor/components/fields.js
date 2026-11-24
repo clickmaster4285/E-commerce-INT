@@ -290,6 +290,45 @@ export function SettingField({ field, value, onChange, linkTypes }) {
           <LinkInput value={value} onChange={onChange} linkTypes={linkTypes} />
         </FieldShell>
       );
+    case "url":
+      return (
+        <FieldShell label={label}>
+          <input className={inputCls} type="url" placeholder="https://…" maxLength={500} value={value ?? ""} onChange={(e) => onChange(e.target.value.trim())} />
+        </FieldShell>
+      );
+    case "phone":
+      return (
+        <FieldShell label={label}>
+          <input
+            className={inputCls}
+            inputMode="numeric"
+            placeholder="923001234567"
+            maxLength={20}
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ""))}
+          />
+        </FieldShell>
+      );
+    case "datetime": {
+      // Stored ISO (UTC) ↔ <input type="datetime-local"> (local time)
+      const toLocal = (iso) => {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+      return (
+        <FieldShell label={label}>
+          <input
+            className={inputCls}
+            type="datetime-local"
+            value={toLocal(value)}
+            onChange={(e) => onChange(e.target.value ? new Date(e.target.value).toISOString() : "")}
+          />
+        </FieldShell>
+      );
+    }
     case "category":
     case "brand":
     case "product":

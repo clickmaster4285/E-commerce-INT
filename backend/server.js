@@ -272,6 +272,8 @@ app.use(`${API_PREFIX}/theme`, require("./routes/themeRoutes"));
 app.use(`${API_PREFIX}/pages`, require("./routes/pageRoutes"));
 // ── Newsletter subscribers (store editor newsletter section) ──
 app.use(`${API_PREFIX}/newsletter`, require("./routes/subscriberRoutes"));
+// ── Contact form messages (store editor contact section) ──
+app.use(`${API_PREFIX}/contact`, require("./routes/contactRoutes"));
 // ── Super Admin module (separate namespace + auth) ──
 app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
 // ── Public seller application (pending-review queue) ──

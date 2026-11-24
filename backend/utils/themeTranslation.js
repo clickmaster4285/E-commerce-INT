@@ -55,7 +55,16 @@ function collectThemeTexts(theme) {
   // Baaki global groups (header / footer ...) → g.<group>.<field>
   for (const [group, fields] of Object.entries(GLOBAL_SETTINGS)) {
     if (group === "announcement") continue;
-    for (const key of translatableKeys(fields)) push(`g.${group}.${key}`, theme.settings?.[group]?.[key]);
+    const values = theme.settings?.[group] || {};
+    for (const field of fields) {
+      if (!field.translatable || !TEXT_TYPES.has(field.type)) continue;
+      // showIf off (e.g. WhatsApp button band) → text dikhta hi nahi → translate mat karo
+      if (field.showIf) {
+        const dep = fields.find((f) => f.key === field.showIf.key);
+        if ((values[field.showIf.key] ?? dep?.default) !== field.showIf.equals) continue;
+      }
+      push(`g.${group}.${field.key}`, values[field.key]);
+    }
   }
 
   // Product page template blocks → p.<zone>.<blockId>.<field>
