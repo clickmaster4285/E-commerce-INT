@@ -388,3 +388,42 @@ test("collection template: defaults = today's page, validated, banner text trans
   theme.templates.collection.settings.sidebar = "top";
   assert.equal(validate(theme).ok, false);
 });
+
+// ───────────────────────── Global style (buttons / cards / badges / dark colors) ─────────────────────────
+test("global style groups default to today's look (old drafts without them stay valid)", () => {
+  const theme = buildDefaultTheme();
+  for (const g of ["darkColors", "buttons", "cards", "badges", "animations"]) delete theme.settings[g];
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  const s = r.data.settings;
+  assert.equal(s.buttons.shape, "default");
+  assert.equal(s.buttons.style, "solid");
+  assert.equal(s.cards.style, "default");
+  assert.equal(s.cards.hoverZoom, true);
+  assert.equal(s.cards.quickActions, true);
+  assert.equal(s.badges.showDeal, true);
+  assert.equal(s.animations.reveal, "none");
+  assert.equal(s.darkColors.accent, null);
+  assert.equal(s.typography.headingWeight, "default");
+});
+
+test("global style options and dark colors are validated", () => {
+  const theme = buildDefaultTheme();
+  theme.settings.buttons = { shape: "blob" };
+  theme.settings.darkColors = { background: "red; } body { display:none" };
+  theme.settings.animations = { reveal: "spin" };
+  const r = validate(theme);
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.some((e) => e.startsWith("settings.buttons.shape")));
+  assert.ok(r.errors.some((e) => e.startsWith("settings.darkColors.background")));
+  assert.ok(r.errors.some((e) => e.startsWith("settings.animations.reveal")));
+
+  const ok = buildDefaultTheme();
+  ok.settings.buttons = { shape: "pill", style: "outline", textCase: "uppercase", hover: "lift" };
+  ok.settings.cards = { style: "shadow", imageRatio: "portrait", imageFit: "contain", showWishlist: false };
+  ok.settings.darkColors = { accent: "#22c55e", background: "#000000" };
+  const r2 = validate(ok);
+  assert.equal(r2.ok, true, JSON.stringify(r2.errors));
+  assert.equal(r2.data.settings.cards.showWishlist, false);
+  assert.equal(r2.data.settings.cards.showBrand, true);
+});

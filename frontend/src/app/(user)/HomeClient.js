@@ -40,7 +40,7 @@ import { useHomeCatalog } from "../../hooks/user/useHomeCatalog";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
 import EditableSection from "@/storefront/EditableSection";
-import { hasCustomAccent } from "@/storefront/themeCss";
+import { hasCustomAccent, revealEnabled } from "@/storefront/themeCss";
 import { DEFAULT_SECTION_ORDER } from "@/storefront/themeDefaults";
 import { GENERIC_SECTIONS } from "@/storefront/sections/registry";
 import { SectionStyle, heroSlidesFromBlocks } from "@/storefront/sections/SectionStyle";
@@ -383,6 +383,7 @@ function HomeContent({ initialBanners = null }) {
     }
   };
 
+  const reveal = revealEnabled(theme);
   const renderSection = (id, section, index) => {
     const builtin = renderBuiltin(section.type, section.settings, section.blocks);
     let node = builtin;
@@ -404,7 +405,14 @@ function HomeContent({ initialBanners = null }) {
         isFirst={index === 0}
         isLast={index === sectionEntries.length - 1}
       >
-        <SectionStyle style={section.style}>{node}</SectionStyle>
+        {/* Scroll animation (theme "animations") — pehla section kabhi nahi (LCP) */}
+        {reveal && index > 0 ? (
+          <div data-theme-section="">
+            <SectionStyle style={section.style}>{node}</SectionStyle>
+          </div>
+        ) : (
+          <SectionStyle style={section.style}>{node}</SectionStyle>
+        )}
       </EditableSection>
     );
   };

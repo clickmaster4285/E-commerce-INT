@@ -67,6 +67,10 @@ export function differsFromDefault(field, value) {
   return value !== def;
 }
 
+// Select options jinka humanize() acha nahi padhta
+const OPTION_LABELS = { xlarge: "Extra large", uppercase: "UPPERCASE", start: "Start (left)", center: "Center", end: "End (right)" };
+const optionLabel = (o) => (o === null ? "Default" : OPTION_LABELS[o] || humanize(o));
+
 const humanize = (key) => String(key).replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 // ── Resource lists (cached, editor me baar baar use) ──
@@ -288,7 +292,7 @@ export function SettingField({ field, value, onChange, linkTypes }) {
           <select className={inputCls} value={value ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}>
             {field.options.map((o) => (
               <option key={String(o)} value={o ?? ""}>
-                {o === null ? "Default" : humanize(o)}
+                {optionLabel(o)}
               </option>
             ))}
           </select>

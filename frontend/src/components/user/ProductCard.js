@@ -286,7 +286,7 @@ function ProductCardInner({
       className={`product-card group relative flex min-w-0 flex-col overflow-hidden bg-user-card transition-colors duration-200 ${dealCarousel ? "h-auto rounded-xl border border-user-line shadow-sm" : "h-full rounded-none border-0 shadow-none"}`}
     >
       <div
-        className={`relative w-full shrink-0 overflow-hidden bg-user-card ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-48 @min-[220px]:h-56 @min-[260px]:h-64"}`}
+        className={`product-card-media relative w-full shrink-0 overflow-hidden bg-user-card ${dealCarousel ? "aspect-[4/3] rounded-t-xl" : "h-48 @min-[220px]:h-56 @min-[260px]:h-64"}`}
       >
         <FallbackImage
           nextImage
@@ -300,10 +300,10 @@ function ProductCardInner({
           className="object-cover object-center p-0 transition-transform duration-200 ease-out group-hover:scale-[1.02]"
         />
 
-        <div className={`absolute top-2 left-2 z-20 flex flex-col items-start gap-1.5 ${dealCarousel ? "right-14 max-w-[calc(100%_-_56px)]" : showDealPricing ? "right-11" : ""}`}>
+        <div className={`product-card-badges absolute top-2 left-2 z-20 flex flex-col items-start gap-1.5 ${dealCarousel ? "right-14 max-w-[calc(100%_-_56px)]" : showDealPricing ? "right-11" : ""}`}>
           {displayBadgeText && !hideDiscountBadge && (
             <span
-              className={`flex max-w-full min-w-0 items-center gap-1 truncate ${dealCarousel ? "whitespace-nowrap rounded-full border border-white/10 bg-gray-900/75 px-2 py-[3px] text-[0.6875rem] font-medium leading-4 text-white shadow-sm backdrop-blur-sm" : showDealPricing ? "whitespace-nowrap rounded-full bg-orange-600 px-2.5 py-1 text-[0.6875rem] font-semibold leading-none text-white" : "rounded-full bg-user-accent-soft px-2 py-1 text-[0.6rem] text-user-accent font-normal"}`}
+              className={`product-card-deal-badge flex max-w-full min-w-0 items-center gap-1 truncate ${dealCarousel ? "whitespace-nowrap rounded-full border border-white/10 bg-gray-900/75 px-2 py-[3px] text-[0.6875rem] font-medium leading-4 text-white shadow-sm backdrop-blur-sm" : showDealPricing ? "whitespace-nowrap rounded-full bg-orange-600 px-2.5 py-1 text-[0.6875rem] font-semibold leading-none text-white" : "rounded-full bg-user-accent-soft px-2 py-1 text-[0.6rem] text-user-accent font-normal"}`}
             >
               {badgeConfig?.icon ? (
                 <badgeConfig.icon size={dealCarousel ? 12 : 9} className="shrink-0" />
@@ -332,13 +332,13 @@ function ProductCardInner({
 
           {out ? (
             <span
-              className={`rounded-full bg-user-danger px-2 py-1 text-[0.6rem] text-white font-normal`}
+              className={`product-card-stock rounded-full bg-user-danger px-2 py-1 text-[0.6rem] text-white font-normal`}
             >
               {t("product.outOfStock")}
             </span>
           ) : totalStock < 5 ? (
             <span
-              className={`rounded-full bg-user-warning px-2 py-1 text-[0.6rem] text-black font-normal`}
+              className={`product-card-stock rounded-full bg-user-warning px-2 py-1 text-[0.6rem] text-black font-normal`}
             >
               {t("admin.shared.status.lowStock")}
             </span>
@@ -352,7 +352,7 @@ function ProductCardInner({
             toggleWishlist(productId);
           }}
           aria-label={t("header.wishlist")}
-          className={`absolute right-2 top-2 z-20 flex items-center justify-center rounded-full border border-user-line bg-user-card text-user-icon shadow-sm transition-colors hover:bg-user-hover ${dealCarousel ? "h-8 w-8" : "h-7 w-7"}`}
+          className={`product-card-wishlist absolute right-2 top-2 z-20 flex items-center justify-center rounded-full border border-user-line bg-user-card text-user-icon shadow-sm transition-colors hover:bg-user-hover ${dealCarousel ? "h-8 w-8" : "h-7 w-7"}`}
         >
           <Heart
             size={14}
@@ -413,10 +413,10 @@ function ProductCardInner({
         )}
       </div>
 
-      <div className={`flex min-w-0 ${dealCarousel ? "flex-col px-2.5 py-2" : "flex-1 flex-col p-1"}`}>
+      <div className={`product-card-body flex min-w-0 ${dealCarousel ? "flex-col px-2.5 py-2" : "flex-1 flex-col p-1"}`}>
         <p
           title={dealCarousel ? brandName || undefined : undefined}
-          className={`truncate text-user-fg-subtle ${dealCarousel ? "mb-1 text-[0.6875rem] font-medium uppercase leading-4 tracking-[0.1em]" : "h-3 text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em]"}`}
+          className={`product-card-brand truncate text-user-fg-subtle ${dealCarousel ? "mb-1 text-[0.6875rem] font-medium uppercase leading-4 tracking-[0.1em]" : "h-3 text-[0.6rem] font-normal uppercase leading-3 tracking-[0.1em]"}`}
         >
           {brandName || ""}
         </p>
@@ -428,7 +428,7 @@ function ProductCardInner({
         </h3>
 
         {ratingCount > 0 ? (
-          <div className="mb-0.5 flex h-3 items-center gap-1 text-[0.625rem] text-user-fg-muted">
+          <div className="product-card-rating mb-0.5 flex h-3 items-center gap-1 text-[0.625rem] text-user-fg-muted">
             <span className="flex items-center gap-px" aria-label={`${rating.toFixed(1)} out of 5 stars`}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
@@ -465,7 +465,7 @@ function ProductCardInner({
               </div>
             ) : null}
             {oldPrice > price && price > 0 ? (
-              <div className="mt-1 flex h-3 min-w-0 items-center">
+              <div className="product-card-deal-mention mt-1 flex h-3 min-w-0 items-center">
                 <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-user-accent-soft px-1.5 py-0.5 text-[0.575rem] font-normal text-user-accent">
                   <Sparkles size={9} className="shrink-0" />
                   <span className="truncate">{t("admin.deals.page.deal")}</span>
@@ -493,7 +493,7 @@ function ProductCardInner({
               ) : null}
             </div>
             {mentionDeal && !showDealPricing ? (
-              <div className="flex h-3 min-w-0 items-center">
+              <div className="product-card-deal-mention flex h-3 min-w-0 items-center">
                 <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-user-accent-soft px-1.5 py-0.5 text-[0.575rem] font-normal text-user-accent">
                   <Sparkles size={9} className="shrink-0" />
                   <span className="truncate">{t("admin.deals.page.deal")}</span>

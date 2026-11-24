@@ -297,6 +297,8 @@ const PRESETS = [
       colors: { accent: null, accentHover: null, accentText: null, background: null, card: null, text: null, border: null },
       typography: { headingFont: null, bodyFont: null },
       layout: { radius: "default" },
+      buttons: { shape: "default", style: "solid", textCase: "default" },
+      cards: { style: "default" },
     },
   },
   {
@@ -307,6 +309,8 @@ const PRESETS = [
       colors: { accent: "#111827", accentHover: "#000000", accentText: "#ffffff", background: "#ffffff", card: "#ffffff", text: "#111827", border: "#e5e7eb" },
       typography: { headingFont: "Inter", bodyFont: "Inter" },
       layout: { radius: "small" },
+      buttons: { shape: "square", style: "outline", textCase: "default" },
+      cards: { style: "bordered" },
     },
   },
   {
@@ -317,6 +321,8 @@ const PRESETS = [
       colors: { accent: "#e11d48", accentHover: "#be123c", accentText: "#ffffff", background: "#fff5f6", card: "#ffffff", text: "#1f1720", border: "#fbd5dc" },
       typography: { headingFont: "Montserrat", bodyFont: "Poppins" },
       layout: { radius: "large" },
+      buttons: { shape: "pill", style: "solid", textCase: "uppercase" },
+      cards: { style: "shadow" },
     },
   },
   {
@@ -327,6 +333,8 @@ const PRESETS = [
       colors: { accent: "#2563eb", accentHover: "#1d4ed8", accentText: "#ffffff", background: "#f1f5f9", card: "#ffffff", text: "#0f172a", border: "#e2e8f0" },
       typography: { headingFont: "Poppins", bodyFont: "Inter" },
       layout: { radius: "default" },
+      buttons: { shape: "rounded", style: "solid", textCase: "default" },
+      cards: { style: "bordered" },
     },
   },
   {
@@ -337,6 +345,8 @@ const PRESETS = [
       colors: { accent: "#1c1917", accentHover: "#44403c", accentText: "#ffffff", background: "#faf7f2", card: "#ffffff", text: "#1c1917", border: "#e7e5e4" },
       typography: { headingFont: "Playfair Display", bodyFont: "Lato" },
       layout: { radius: "none" },
+      buttons: { shape: "square", style: "solid", textCase: "uppercase" },
+      cards: { style: "default" },
     },
   },
   {
@@ -347,18 +357,65 @@ const PRESETS = [
       colors: { accent: "#059669", accentHover: "#047857", accentText: "#ffffff", background: "#f0fdf4", card: "#ffffff", text: "#052e16", border: "#d1fae5" },
       typography: { headingFont: "Nunito", bodyFont: "Nunito" },
       layout: { radius: "large" },
+      buttons: { shape: "pill", style: "solid", textCase: "default" },
+      cards: { style: "shadow" },
     },
   },
 ];
 
+// Dark mode ke apne colors (khali = built-in dark surfaces; accent khali = light wala accent)
+const DARK_COLOR_LABELS = {
+  accent: "Accent (dark mode)",
+  background: "Page background (dark mode)",
+  card: "Cards (dark mode)",
+  text: "Text (dark mode)",
+  border: "Borders (dark mode)",
+};
+
 const GLOBAL_SETTINGS = {
   colors: Object.keys(COLOR_VARS).map((key) => ({ key, type: "color", label: key, default: null })),
+  darkColors: Object.entries(DARK_COLOR_LABELS).map(([key, label]) => ({ key, type: "color", label, default: null })),
   typography: [
     { key: "headingFont", type: "select", label: "Heading font", options: [null, ...FONTS], default: null },
     { key: "bodyFont", type: "select", label: "Body font", options: [null, ...FONTS], default: null },
+    { key: "headingWeight", type: "select", label: "Heading weight", options: ["default", "500", "600", "700", "800", "900"], default: "default" },
+    { key: "headingSize", type: "select", label: "Heading size", options: ["default", "small", "large", "xlarge"], default: "default" },
+    { key: "headingCase", type: "select", label: "Heading letters", options: ["default", "uppercase"], default: "default" },
+    { key: "headingSpacing", type: "select", label: "Heading letter spacing", options: ["default", "tight", "wide"], default: "default" },
+    { key: "textSize", type: "select", label: "Overall text size", options: ["default", "small", "large"], default: "default" },
+  ],
+  // ── Buttons (primary = accent buttons: Add to cart, Buy, Subscribe ...) ──
+  buttons: [
+    { key: "shape", type: "select", label: "Shape", options: ["default", "square", "rounded", "pill"], default: "default" },
+    { key: "style", type: "select", label: "Style", options: ["solid", "outline"], default: "solid" },
+    { key: "textCase", type: "select", label: "Letters", options: ["default", "uppercase"], default: "default" },
+    { key: "hover", type: "select", label: "Hover effect", options: ["default", "lift", "glow"], default: "default" },
+  ],
+  // ── Product cards (har listing: home, category, search, deals) ──
+  cards: [
+    { key: "style", type: "select", label: "Card style", options: ["default", "bordered", "shadow"], default: "default" },
+    { key: "imageRatio", type: "select", label: "Image shape", options: ["default", "square", "portrait", "landscape"], default: "default" },
+    { key: "imageFit", type: "select", label: "Image fit", options: ["cover", "contain"], default: "cover" },
+    { key: "hoverZoom", type: "checkbox", label: "Zoom image on hover", default: true },
+    { key: "textAlign", type: "select", label: "Text alignment", options: ["start", "center"], default: "start" },
+    { key: "showBrand", type: "checkbox", label: "Show brand name", default: true },
+    { key: "showRating", type: "checkbox", label: "Show star rating", default: true },
+    { key: "showWishlist", type: "checkbox", label: "Show wishlist heart", default: true },
+    { key: "quickActions", type: "checkbox", label: "Show Add to cart / Buy now buttons", default: true },
+  ],
+  // ── Badges on product cards ──
+  badges: [
+    { key: "showDeal", type: "checkbox", label: "Show deal / discount badges", default: true },
+    { key: "showStock", type: "checkbox", label: "Show out of stock / low stock badges", default: true },
+    { key: "shape", type: "select", label: "Badge shape", options: ["pill", "square"], default: "pill" },
+    { key: "saleColor", type: "color", label: "Deal badge color", default: null },
   ],
   layout: [
     { key: "radius", type: "select", label: "Corner radius", options: ["default", "none", "small", "large"], default: "default" },
+  ],
+  // ── Scroll animations (default off; reduced-motion users ko kabhi nahi) ──
+  animations: [
+    { key: "reveal", type: "select", label: "Sections appear on scroll", options: ["none", "fade", "slide", "zoom"], default: "none" },
   ],
   branding: [{ key: "favicon", type: "image", label: "Favicon", default: "" }],
   announcement: [

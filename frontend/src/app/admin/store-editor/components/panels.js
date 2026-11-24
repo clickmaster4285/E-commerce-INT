@@ -431,6 +431,11 @@ export function SectionSettings({ schema, id, onBack }) {
 // ───────────────────────── Theme settings ─────────────────────────
 const GROUP_LABELS = {
   colors: "Colors",
+  darkColors: "Dark mode colors",
+  buttons: "Buttons",
+  cards: "Product cards",
+  badges: "Product badges",
+  animations: "Animations",
   typography: "Typography",
   layout: "Layout",
   branding: "Branding",
@@ -442,7 +447,12 @@ const GROUP_LABELS = {
 };
 const GROUP_HINTS = {
   colors: "Accent, background, text and borders",
-  typography: "Heading and body fonts",
+  darkColors: "Used when a shopper switches to dark mode",
+  buttons: "Shape, outline, uppercase, hover effect",
+  cards: "Card style, image shape, what each card shows",
+  badges: "Deal and stock badges on product cards",
+  animations: "Sections fade or slide in while scrolling",
+  typography: "Fonts, heading weight and size, text size",
   layout: "Corner radius",
   branding: "Favicon",
   announcement: "Message bar above the header",
@@ -559,7 +569,9 @@ export function ThemeSettings({ schema, focusGroup = null, onFocusHandled }) {
       {visibleGroups.map(({ group, fields, title, matches }) => (
         <div key={group} ref={(el) => (groupRefs.current[group] = el)} className="scroll-mt-2">
           <Collapsible title={title} subtitle={GROUP_HINTS[group]} open={Boolean(q) || Boolean(open[group])} onToggle={() => toggle(group)}>
-            {group === "colors" ? <p className="text-[11px] text-fg-muted">Empty = built-in color. Dark mode keeps its own surfaces automatically.</p> : null}
+            {group === "colors" ? <p className="text-[11px] text-fg-muted">Empty = built-in color. Background, card, text and border apply to light mode; set dark mode in “Dark mode colors”.</p> : null}
+            {group === "darkColors" ? <p className="text-[11px] text-fg-muted">Empty = built-in dark colors. Accent empty = same accent as light mode.</p> : null}
+            {group === "animations" ? <p className="text-[11px] text-fg-muted">Works in Chrome, Edge and Safari. Shoppers who turn off motion in their device settings never see it.</p> : null}
             {matches
               .filter((field) => isVisible(field, draft.settings?.[group], fields))
               .map((field) => (
