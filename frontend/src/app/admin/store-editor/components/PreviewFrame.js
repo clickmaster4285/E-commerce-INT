@@ -15,7 +15,18 @@ const MSG = { update: "theme:update", ready: "theme:ready", select: "section:sel
 
 export const DEVICE_WIDTHS = { desktop: "100%", tablet: "820px", mobile: "390px" };
 
-export default function PreviewFrame({ device = "desktop", reloadKey = 0 }) {
+// Editor selection ↔ storefront data-section-id
+//   { kind: "section", id }               ↔ "<id>"
+//   { kind: "productBlock", zone, id }    ↔ "product:<zone>:<id>"
+const selectionKey = (selected) =>
+  selected?.kind === "section" ? selected.id : selected?.kind === "productBlock" ? `product:${selected.zone}:${selected.id}` : null;
+
+const selectionFromKey = (key) => {
+  const m = /^product:(info|below):([a-z0-9_-]+)$/.exec(key);
+  return m ? { kind: "productBlock", zone: m[1], id: m[2] } : { kind: "section", id: key };
+};
+
+export default function PreviewFrame({ device = "desktop", reloadKey = 0, src = "/?preview=1" }) {
   const iframeRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const draft = useThemeEditorStore((s) => s.draft);
@@ -27,7 +38,7 @@ export default function PreviewFrame({ device = "desktop", reloadKey = 0 }) {
     const win = iframeRef.current?.contentWindow;
     if (!win || !readyRef.current || !draft) return;
     win.postMessage(
-      { type: MSG.update, theme: draft, selectedSectionId: selected?.kind === "section" ? selected.id : null },
+      { type: MSG.update, theme: draft, selectedSectionId: selectionKey(selected) },
       window.location.origin,
     );
   }, [draft, selected]);
@@ -47,7 +58,7 @@ export default function PreviewFrame({ device = "desktop", reloadKey = 0 }) {
         setLoading(false);
         post();
       } else if (msg?.type === MSG.select && typeof msg.id === "string") {
-        select({ kind: "section", id: msg.id });
+        select(selectionFromKey(msg.id));
       }
     };
     window.addEventListener("message", onMessage);
@@ -62,10 +73,10 @@ export default function PreviewFrame({ device = "desktop", reloadKey = 0 }) {
         </div>
       ) : null}
       <iframe
-        key={reloadKey}
+        key={`${reloadKey}:${src}`}
         ref={iframeRef}
         title="Store preview"
-        src="/?preview=1"
+        src={src}
         // "ready" har naye document se aata hai — load event par reset NAHI
         // (load kabhi ready ke BAAD fire hota hai → preview atak jata)
         className="h-full w-full rounded-xl border border-line bg-card shadow-lg"

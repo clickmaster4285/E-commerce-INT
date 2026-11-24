@@ -25,5 +25,19 @@ export function buildDefaultTheme() {
     sections,
     order: [...DEFAULT_SECTION_ORDER],
     menus: { main: [], footer: [] },
+    templates: { product: buildDefaultProductTemplate() },
+  };
+}
+
+// Product page template default = aaj ka product page (backend buildDefaultProductTemplate)
+export const DEFAULT_PRODUCT_BELOW = ["description", "specifications", "reviews", "images", "related"];
+
+export function buildDefaultProductTemplate() {
+  const blocks = {};
+  for (const type of DEFAULT_PRODUCT_BELOW) blocks[type] = { type, disabled: false, settings: {} };
+  return {
+    settings: { stickyBar: true, sidebar: true },
+    info: { order: [], blocks: {} },
+    below: { order: [...DEFAULT_PRODUCT_BELOW], blocks },
   };
 }

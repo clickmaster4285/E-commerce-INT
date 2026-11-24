@@ -8,6 +8,7 @@
    ========================================================== */
 
 import { create } from "zustand";
+import { buildDefaultProductTemplate } from "@/storefront/themeDefaults";
 
 const HISTORY_LIMIT = 50;
 
@@ -120,6 +121,38 @@ export const useThemeEditorStore = create((set, get) => ({
     get().update((d) => {
       if (d.sections[id]) d.sections[id].blocks = blocks;
     }),
+
+  // ── Product page template (draft.templates.product) ──
+  // Purane drafts me template nahi hota → pehli edit par default (aaj ka layout)
+  updateProductTemplate: (updater) =>
+    get().update((d) => {
+      d.templates = d.templates || {};
+      if (!d.templates.product) d.templates.product = buildDefaultProductTemplate();
+      const tpl = d.templates.product;
+      tpl.settings = tpl.settings || {};
+      tpl.info = tpl.info || { order: [], blocks: {} };
+      tpl.below = tpl.below || { order: [], blocks: {} };
+      updater(tpl);
+    }),
+
+  addProductBlock: (zone, type, def) => {
+    const id = def.limit === 1 ? type : randomId(type);
+    get().updateProductTemplate((tpl) => {
+      if (tpl[zone].blocks[id]) return;
+      tpl[zone].blocks[id] = { type, disabled: false, settings: defaultsOf(def.settings) };
+      tpl[zone].order.push(id);
+    });
+    set({ selected: { kind: "productBlock", zone, id } });
+  },
+
+  removeProductBlock: (zone, id) => {
+    get().updateProductTemplate((tpl) => {
+      delete tpl[zone].blocks[id];
+      tpl[zone].order = tpl[zone].order.filter((x) => x !== id);
+    });
+    const sel = get().selected;
+    if (sel?.kind === "productBlock" && sel.id === id) set({ selected: null });
+  },
 
   setSectionStyle: (id, key, value) =>
     get().update((d) => {

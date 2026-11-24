@@ -236,3 +236,53 @@ test("hero custom slides validate like blocks (own-store images, safe links)", (
   theme.sections.hero_banners.blocks[0].settings.image = `/uploads/stores/${OTHER}/theme/a.webp`;
   assert.equal(validate(theme).ok, false);
 });
+
+// ───────────────────────── Product page template ─────────────────────────
+const productTheme = () => {
+  const theme = buildDefaultTheme();
+  const tpl = theme.templates.product;
+  tpl.info.order = ["tb", "wa"];
+  tpl.info.blocks = {
+    tb: { type: "trust_badges", settings: { items: "Free delivery\nCOD" } },
+    wa: { type: "whatsapp_button", settings: { phone: "+92 300 1234567", label: "Order" } },
+  };
+  return theme;
+};
+
+test("product template: default round-trips, missing template gets default", () => {
+  const r = validate(buildDefaultTheme());
+  assert.deepEqual(r.data.templates.product.below.order, ["description", "specifications", "reviews", "images", "related"]);
+  const legacy = buildDefaultTheme();
+  delete legacy.templates;
+  const r2 = validate(legacy);
+  assert.equal(r2.ok, true);
+  assert.equal(r2.data.templates.product.settings.stickyBar, true);
+});
+
+test("product template: zone rules, limits, whatsapp phone normalized", () => {
+  const r = validate(productTheme());
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.data.templates.product.info.blocks.wa.settings.phone, "923001234567");
+
+  const wrongZone = productTheme();
+  wrongZone.templates.product.info.order.push("rv");
+  wrongZone.templates.product.info.blocks.rv = { type: "reviews" };
+  assert.equal(validate(wrongZone).ok, false);
+
+  const badPhone = productTheme();
+  badPhone.templates.product.info.blocks.wa.settings.phone = "call me";
+  assert.equal(validate(badPhone).ok, false);
+
+  const dup = buildDefaultTheme();
+  dup.templates.product.below.order.push("related2");
+  dup.templates.product.below.blocks.related2 = { type: "related" };
+  assert.equal(validate(dup).ok, false);
+});
+
+test("product template text is collected for translation", () => {
+  const { collectThemeTexts } = require("../utils/themeTranslation");
+  const keys = collectThemeTexts(validate(productTheme()).data).map((e) => e.key);
+  assert.ok(keys.includes("p.info.tb.items"));
+  assert.ok(keys.includes("p.info.wa.label"));
+  assert.ok(!keys.some((k) => k.endsWith(".phone")));
+});

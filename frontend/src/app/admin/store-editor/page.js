@@ -37,6 +37,8 @@ import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useThemeEditorStore } from "./useThemeEditorStore";
 import { SectionList, SectionSettings, ThemeSettings, MenuEditor, VersionsPanel } from "./components/panels";
 import PreviewFrame from "./components/PreviewFrame";
+import { ProductTemplatePanel, ProductBlockSettings } from "./components/productPanel";
+import { adminProductApi } from "@/apis/admin/productApi";
 
 const AUTOSAVE_MS = 1500;
 
@@ -80,6 +82,8 @@ export default function StoreEditorPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("sections");
   const [device, setDevice] = useState("desktop");
+  // Kaun sa page edit ho raha hai: homepage sections ya product page template
+  const [editPage, setEditPage] = useState("home");
   const [showVersions, setShowVersions] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
 
@@ -91,6 +95,15 @@ export default function StoreEditorPage() {
   const versionsQuery = useQuery({ queryKey: ["themeVersions"], queryFn: themeApi.listVersions, enabled: showVersions });
 
   const meta = themeQuery.data;
+
+  const sampleProductQuery = useQuery({
+    queryKey: ["storeEditor", "sampleProduct"],
+    queryFn: () => adminProductApi.getPaginated({ page: 1, limit: 1 }),
+    enabled: editPage === "product",
+    staleTime: 5 * 60 * 1000,
+  });
+  const sampleProductId = sampleProductQuery.data?.products?.[0]?._id || null;
+  const previewSrc = editPage === "product" && sampleProductId ? `/product/${sampleProductId}?preview=1` : "/?preview=1";
 
   // ── Server data → editor state (pehli baar / reload / restore) ──
   const loadedAt = useRef(null);
@@ -254,6 +267,25 @@ export default function StoreEditorPage() {
           <SaveIndicator state={saveState} dirty={dirty} error={saveError} />
         </div>
 
+        <div className="ms-2 flex items-center gap-1 rounded-lg bg-subtle p-1">
+          {[
+            { id: "home", label: "Homepage" },
+            { id: "product", label: "Product page" },
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => {
+                setEditPage(opt.id);
+                store.select(null);
+              }}
+              className={`h-7 rounded-md px-2.5 text-xs font-semibold transition ${editPage === opt.id ? "bg-card text-fg shadow-sm" : "text-fg-muted hover:text-fg"}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         <div className="mx-auto hidden items-center gap-1 rounded-lg bg-subtle p-1 md:flex">
           {DEVICES.map(({ id, icon: Icon, label }) => (
             <button
@@ -316,7 +348,18 @@ export default function StoreEditorPage() {
       <div className="flex min-h-0 flex-1">
         {/* ── Sidebar ── */}
         <aside className="flex w-full shrink-0 flex-col border-e border-line bg-card md:w-[340px]">
-          {selected?.kind === "section" ? (
+          {selected?.kind === "productBlock" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <ProductBlockSettings schema={schema} zone={selected.zone} id={selected.id} onBack={() => store.select(null)} />
+            </div>
+          ) : editPage === "product" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {!sampleProductQuery.isLoading && !sampleProductId ? (
+                <p className="mb-4 rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning">Add a product to see the product page preview.</p>
+              ) : null}
+              <ProductTemplatePanel schema={schema} />
+            </div>
+          ) : selected?.kind === "section" ? (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <SectionSettings schema={schema} id={selected.id} onBack={() => store.select(null)} />
             </div>
@@ -353,7 +396,7 @@ export default function StoreEditorPage() {
 
         {/* ── Preview ── */}
         <main className="hidden min-w-0 flex-1 overflow-hidden p-4 md:block">
-          <PreviewFrame device={device} reloadKey={previewKey} />
+          <PreviewFrame device={device} reloadKey={previewKey} src={previewSrc} />
         </main>
       </div>
 

@@ -24,6 +24,10 @@ const {
   SECTION_TYPES,
   GLOBAL_SETTINGS,
   SECTION_STYLE,
+  PRODUCT_BLOCK_TYPES,
+  PRODUCT_TEMPLATE_SETTINGS,
+  PRODUCT_ZONES,
+  buildDefaultProductTemplate,
 } = require("../config/themeSchema");
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
@@ -199,6 +203,64 @@ function validateMenu(items, path, ctx, depth = 1) {
   return out;
 }
 
+// ───────────────────────── Product page template ─────────────────────────
+const WHATSAPP_PHONE = /^\d{8,15}$/;
+
+function validateZone(zone, input, path, ctx) {
+  const src = isPlainObject(input) ? input : {};
+  const blocksIn = isPlainObject(src.blocks) ? src.blocks : {};
+  const orderIn = Array.isArray(src.order) ? src.order : [];
+  const max = PRODUCT_ZONES[zone].max;
+  if (orderIn.length > max) ctx.errors.push(`${path}.order: max ${max} blocks`);
+
+  const blocks = {};
+  const order = [];
+  const perType = {};
+  for (const id of orderIn.slice(0, max)) {
+    if (typeof id !== "string" || !SECTION_ID.test(id)) {
+      ctx.errors.push(`${path}.order: invalid block id`);
+      continue;
+    }
+    if (blocks[id]) {
+      ctx.errors.push(`${path}.order: duplicate block id "${id}"`);
+      continue;
+    }
+    const block = blocksIn[id];
+    const def = isPlainObject(block) ? PRODUCT_BLOCK_TYPES[block.type] : null;
+    if (!def || !def.zones.includes(zone)) {
+      ctx.errors.push(`${path}.blocks.${id}: block type not allowed here`);
+      continue;
+    }
+    perType[block.type] = (perType[block.type] || 0) + 1;
+    if (perType[block.type] > def.limit) {
+      ctx.errors.push(`${path}.blocks.${id}: "${block.type}" allowed at most ${def.limit} time(s)`);
+      continue;
+    }
+    const settings = validateFields(def.settings, block.settings, `${path}.blocks.${id}.settings`, ctx);
+    if (block.type === "whatsapp_button" && settings.phone) {
+      settings.phone = String(settings.phone).replace(/[\s+()-]/g, "");
+      if (!WHATSAPP_PHONE.test(settings.phone)) ctx.errors.push(`${path}.blocks.${id}.settings.phone: digits only, with country code`);
+    }
+    blocks[id] = { type: block.type, disabled: Boolean(block.disabled), settings };
+    order.push(id);
+  }
+  return { order, blocks };
+}
+
+function validateProductTemplate(input, ctx) {
+  // Purane themes (template se pehle ke) → default (aaj ka product page)
+  if (input === undefined || input === null) return buildDefaultProductTemplate();
+  if (!isPlainObject(input)) {
+    ctx.errors.push("templates.product: must be an object");
+    return buildDefaultProductTemplate();
+  }
+  return {
+    settings: validateFields(PRODUCT_TEMPLATE_SETTINGS, input.settings, "templates.product.settings", ctx),
+    info: validateZone("info", input.info, "templates.product.info", ctx),
+    below: validateZone("below", input.below, "templates.product.below", ctx),
+  };
+}
+
 // ───────────────────────── Theme ─────────────────────────
 function validateThemeData(data, { storeId } = {}) {
   const ctx = { storeId, errors: [], menuCount: 0 };
@@ -287,8 +349,12 @@ function validateThemeData(data, { storeId } = {}) {
     footer: validateMenu(menusIn.footer, "menus.footer", ctx),
   };
 
+  // Page templates
+  const templatesIn = isPlainObject(data.templates) ? data.templates : {};
+  const templates = { product: validateProductTemplate(templatesIn.product, ctx) };
+
   if (ctx.errors.length) return { ok: false, errors: ctx.errors.slice(0, 50) };
-  return { ok: true, data: { settings, sections, order, menus } };
+  return { ok: true, data: { settings, sections, order, menus, templates } };
 }
 
 module.exports = {

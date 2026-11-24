@@ -23,10 +23,19 @@ import { useDiscounts } from "@/components/user/DiscountContext";
 import { useWishlist } from "@/components/user/WishlistContext";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import {
+  EditableProductBlock,
+  ProductInfoBlocks,
+  TextBlock,
+  TrustBadges,
+  useProductTemplate,
+  zoneEntries,
+} from "@/storefront/product/ProductBlocks";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 const DEFAULT_QTY = 1;
-const MAX_RELATED = 10;
+// Store editor template "Related products" max 12 (default 10 dikhte hain)
+const MAX_RELATED = 12;
 
 const getImageUrl = (img) => {
   if (!img) return null;
@@ -835,8 +844,216 @@ function ProductDetailContent({ params }) {
   const ratingAvg = Number(summary.avg) || 0;
   const ratingCount = Number(summary.count) || 0;
 
+  // Store editor product page template (default = purana layout)
+  const { template, isPreview, selectedSectionId } = useProductTemplate();
+  const showSidebar = template.settings?.sidebar !== false;
+
   if (isLoading) return <LoadingState />;
   if (isError || !product) return <ErrorState isError={isError} />;
+
+  /* ===== Store editor "Below the product" zone — template order =====
+     Built-in sections ka JSX bilkul purana; sirf order / hide template se. */
+  const renderBelow = (block) => {
+    switch (block.type) {
+      case "description":
+        return (
+          <>
+        {/* ===== Product details — real description ===== */}
+        {(shortDescription || fullDescription || productDescriptionOf(currentVariant)) && (
+          <section className="mt-3 bg-user-card">
+            <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
+              {t("admin.productDetail.page.productDetails")}: {shortDescription || productName}
+            </h2>
+            <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-user-fg">
+              {shortDescription && <p className="font-medium">{shortDescription}</p>}
+              {fullDescription && <p className="whitespace-pre-line break-words text-user-fg-secondary">{fullDescription}</p>}
+              {productDescriptionOf(currentVariant) && (
+                <p className="whitespace-pre-line break-words text-user-fg-secondary">
+                  <span className="font-semibold text-user-fg">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
+                  {productDescriptionOf(currentVariant)}
+                </p>
+              )}
+            </div>
+          </section>
+        )}
+          </>
+        );
+      case "specifications":
+        return (
+          <>
+        {/* ===== Specifications — sirf real fields ===== */}
+        <section className="mt-3 bg-user-card">
+          <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
+            {t("admin.productDetail.page.attributes")}: {productName}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 px-3 sm:px-4 py-2">
+            {brandName && (
+              <div className="border-b border-user-line py-3">
+                <p className="text-xs text-user-fg-muted">{t("admin.productDetail.page.brand")}</p>
+                <p className="mt-0.5 text-sm text-user-fg">{brandName}</p>
+              </div>
+            )}
+            {currentVariant?.sku && (
+              <div className="border-b border-user-line py-3">
+                <p className="text-xs text-user-fg-muted">SKU</p>
+                <p className="mt-0.5 text-sm text-user-fg break-all">{currentVariant.sku}</p>
+              </div>
+            )}
+            {specEntries.map(([k, v]) => (
+              <div key={k} className="border-b border-user-line py-3">
+                <p className="text-xs capitalize text-user-fg-muted">{k}</p>
+                <p className="mt-0.5 text-sm text-user-fg break-words">{v}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+          </>
+        );
+      case "reviews":
+        return (
+          <>
+        {/* ===== Ratings & Reviews — real summary + real reviews ===== */}
+        <section className="mt-3 bg-user-card">
+          <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
+            {t("admin.reviews.page.rating")} &amp; {t("admin.nav.item.reviews")}: {productName}
+          </h2>
+          <div className="grid grid-cols-1 gap-6 px-3 sm:px-4 py-5 md:grid-cols-[12rem_1fr]">
+            <div>
+              <p className="text-4xl font-medium text-user-fg">
+                {ratingAvg}<span className="text-lg text-user-fg-muted">/5</span>
+              </p>
+              <div className="mt-2"><Stars value={ratingAvg} size={16} /></div>
+              <p className="mt-2 text-xs text-user-fg-muted">{ratingCount} {t("admin.reviews.page.rating")}</p>
+            </div>
+            <div className="max-w-md space-y-1.5">
+              {[5, 4, 3, 2, 1].map((star) => {
+                const c = Number(summary.distribution?.[star]) || 0;
+                const pct = ratingCount > 0 ? Math.round((c / ratingCount) * 100) : 0;
+                return (
+                  <div key={star} className="flex items-center gap-2 text-xs">
+                    <span className="w-14 shrink-0"><Stars value={star} size={11} /></span>
+                    <span className="h-2.5 flex-1 bg-user-hover">
+                      <span className="block h-full bg-[#faca51]" style={{ width: `${pct}%` }} />
+                    </span>
+                    <span className="w-6 shrink-0 text-right text-user-fg-muted tabular-nums">{c}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-user-line px-3 sm:px-4 py-5">
+            {myReview && (
+              <div className="mb-4">
+                <ProductRating productId={productId} productName={productName} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
+              </div>
+            )}
+            {reviewsToDisplay.length > 0 ? (
+              <ul className="divide-y divide-user-line">
+                {reviewsToDisplay.map((r) => {
+                  const reviewerName = r.user_id?.name || t("common.customer");
+                  const localizedResponse = r.storeResponse?.message
+                    ? { ...r.storeResponse, message: reviewTextOf(r, "storeResponse.message") }
+                    : r.storeResponse;
+                  const reviewDate = r.created_at
+                    ? new Date(r.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale, { month: "short", day: "numeric", year: "numeric" })
+                    : "";
+                  return (
+                    <li key={r._id} className="py-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-3">
+                        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-user-hover text-sm font-semibold text-user-fg-secondary ring-1 ring-user-line">
+                          {reviewerName.trim().charAt(0).toUpperCase() || "C"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                              <p className="text-sm font-semibold text-user-fg">{reviewerName}</p>
+                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-user-success"><Check size={12} strokeWidth={2.5} /> {t("admin.reviews.ui.customer")}</span>}
+                            </div>
+                            {reviewDate && <time className="text-xs text-user-fg-muted">{reviewDate}</time>}
+                          </div>
+                          <div className="mt-2"><Stars value={r.rating} size={15} /></div>
+                          <p className="mt-1.5 text-base font-semibold text-user-fg">{reviewTextOf(r, "title") || `${r.rating}/5`}</p>
+                          {r.comment && <div className="mt-1"><ReviewComment comment={reviewTextOf(r, "comment")} /></div>}
+                          {(r.images?.length > 0 || r.videos?.length > 0) && <div className="mt-3"><ReviewMediaGallery images={r.images} videos={r.videos} /></div>}
+                          {localizedResponse?.message && <div className="mt-3"><StoreResponse response={localizedResponse} /></div>}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : !myReview ? (
+              <div className="py-6 text-center">
+                <p className="text-sm text-user-fg-muted">{t("admin.reviews.ui.noReviews")}</p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+          </>
+        );
+      case "images":
+        return (
+          <>
+        {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
+        {allImages.length > 0 && (
+          <section className="mt-3 bg-user-card">
+            <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
+              {t("admin.productDetail.page.productImages")}: {productName}
+            </h2>
+            <div className="px-3 sm:px-4 py-4">
+              <DetailImages productName={productName} images={allImages} onZoom={openLightbox} />
+            </div>
+          </section>
+        )}
+          </>
+        );
+      case "related":
+        return (
+          <>
+        {/* ===== You may also like — real related ===== */}
+        {related.length > 0 && (
+          <section className="mt-6">
+            <h2 className="mb-3 text-base font-bold text-user-fg">{block.settings?.heading || t("admin.brands.detail.relatedProducts")}</h2>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              {related.slice(0, Math.min(MAX_RELATED, Number(block.settings?.limit) || 10)).map((p) => {
+                const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
+                const price = p?.variants?.[0]?.selling_price ?? p?.selling_price ?? p?.price;
+                const relatedName = productNameOf(p) || p?.name || "";
+                return (
+                  <Link key={p._id} href={`/product/${p._id}`} className="group bg-user-card hover:shadow-lg transition-shadow">
+                    <div className="relative aspect-square overflow-hidden bg-white">
+                      <FallbackImage src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
+                    </div>
+                    <div className="p-2.5">
+                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-user-fg">{relatedName}</p>
+                      {price != null && <p className="mt-1.5 text-sm font-medium text-user-accent">Rs. {toNum(price).toLocaleString()}</p>}
+                      <div className="mt-1"><Stars value={0} size={10} /></div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+          </>
+        );
+      case "text_block":
+        return (
+          <section className="mt-3">
+            <TextBlock settings={block.settings} boxed />
+          </section>
+        );
+      case "trust_badges":
+        return (
+          <section className="mt-3 bg-user-card p-3 sm:p-4">
+            <TrustBadges settings={block.settings} />
+          </section>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <main dir={dir} lang={locale} className="min-h-screen bg-user-hover pb-16 md:pb-8">
@@ -849,7 +1066,7 @@ function ProductDetailContent({ params }) {
 
         {/* ===== Top card: gallery + info + sold-by (Daraz 3-col) ===== */}
         <div dir={dir} className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-          <section className="bg-user-card p-3 sm:p-4 lg:col-span-9 xl:col-span-10">
+          <section className={`bg-user-card p-3 sm:p-4 ${showSidebar ? "lg:col-span-9 xl:col-span-10" : "lg:col-span-12"}`}>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
               <Gallery
                 productName={productName}
@@ -1127,11 +1344,15 @@ function ProductDetailContent({ params }) {
                   </button>
                 </div>
 
+                {/* Store editor "Next to product info" blocks */}
+                <ProductInfoBlocks productName={productName} />
+
               </div>
             </div>
           </section>
 
           {/* ===== Right sidebar — sirf real data (no fake fees/location) ===== */}
+          {showSidebar && (
           <aside className="space-y-3 lg:col-span-3 xl:col-span-2">
             <div className="bg-user-card">
               <p className="border-b border-user-line px-3 py-2.5 text-xs font-semibold text-user-fg-muted">{t("common.brand")}</p>
@@ -1166,173 +1387,17 @@ function ProductDetailContent({ params }) {
               </div>
             )}
           </aside>
+          )}
         </div>
 
-        {/* ===== Product details — real description ===== */}
-        {(shortDescription || fullDescription || productDescriptionOf(currentVariant)) && (
-          <section className="mt-3 bg-user-card">
-            <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
-              {t("admin.productDetail.page.productDetails")}: {shortDescription || productName}
-            </h2>
-            <div className="space-y-3 px-3 sm:px-4 py-4 text-sm leading-7 text-user-fg">
-              {shortDescription && <p className="font-medium">{shortDescription}</p>}
-              {fullDescription && <p className="whitespace-pre-line break-words text-user-fg-secondary">{fullDescription}</p>}
-              {productDescriptionOf(currentVariant) && (
-                <p className="whitespace-pre-line break-words text-user-fg-secondary">
-                  <span className="font-semibold text-user-fg">{fieldOf(currentVariant, "title") || t("admin.productDetail.page.selectOption")}: </span>
-                  {productDescriptionOf(currentVariant)}
-                </p>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* ===== Specifications — sirf real fields ===== */}
-        <section className="mt-3 bg-user-card">
-          <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
-            {t("admin.productDetail.page.attributes")}: {productName}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 px-3 sm:px-4 py-2">
-            {brandName && (
-              <div className="border-b border-user-line py-3">
-                <p className="text-xs text-user-fg-muted">{t("admin.productDetail.page.brand")}</p>
-                <p className="mt-0.5 text-sm text-user-fg">{brandName}</p>
-              </div>
-            )}
-            {currentVariant?.sku && (
-              <div className="border-b border-user-line py-3">
-                <p className="text-xs text-user-fg-muted">SKU</p>
-                <p className="mt-0.5 text-sm text-user-fg break-all">{currentVariant.sku}</p>
-              </div>
-            )}
-            {specEntries.map(([k, v]) => (
-              <div key={k} className="border-b border-user-line py-3">
-                <p className="text-xs capitalize text-user-fg-muted">{k}</p>
-                <p className="mt-0.5 text-sm text-user-fg break-words">{v}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ===== Ratings & Reviews — real summary + real reviews ===== */}
-        <section className="mt-3 bg-user-card">
-          <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
-            {t("admin.reviews.page.rating")} &amp; {t("admin.nav.item.reviews")}: {productName}
-          </h2>
-          <div className="grid grid-cols-1 gap-6 px-3 sm:px-4 py-5 md:grid-cols-[12rem_1fr]">
-            <div>
-              <p className="text-4xl font-medium text-user-fg">
-                {ratingAvg}<span className="text-lg text-user-fg-muted">/5</span>
-              </p>
-              <div className="mt-2"><Stars value={ratingAvg} size={16} /></div>
-              <p className="mt-2 text-xs text-user-fg-muted">{ratingCount} {t("admin.reviews.page.rating")}</p>
-            </div>
-            <div className="max-w-md space-y-1.5">
-              {[5, 4, 3, 2, 1].map((star) => {
-                const c = Number(summary.distribution?.[star]) || 0;
-                const pct = ratingCount > 0 ? Math.round((c / ratingCount) * 100) : 0;
-                return (
-                  <div key={star} className="flex items-center gap-2 text-xs">
-                    <span className="w-14 shrink-0"><Stars value={star} size={11} /></span>
-                    <span className="h-2.5 flex-1 bg-user-hover">
-                      <span className="block h-full bg-[#faca51]" style={{ width: `${pct}%` }} />
-                    </span>
-                    <span className="w-6 shrink-0 text-right text-user-fg-muted tabular-nums">{c}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="border-t border-user-line px-3 sm:px-4 py-5">
-            {myReview && (
-              <div className="mb-4">
-                <ProductRating productId={productId} productName={productName} review={myReview} variant="detail" autoOpen={searchParams.get("editReview") === "1"} />
-              </div>
-            )}
-            {reviewsToDisplay.length > 0 ? (
-              <ul className="divide-y divide-user-line">
-                {reviewsToDisplay.map((r) => {
-                  const reviewerName = r.user_id?.name || t("common.customer");
-                  const localizedResponse = r.storeResponse?.message
-                    ? { ...r.storeResponse, message: reviewTextOf(r, "storeResponse.message") }
-                    : r.storeResponse;
-                  const reviewDate = r.created_at
-                    ? new Date(r.created_at).toLocaleDateString(locale === "ur" ? "ur-PK" : locale === "zh" ? "zh-CN" : locale === "pt" ? "pt-PT" : locale, { month: "short", day: "numeric", year: "numeric" })
-                    : "";
-                  return (
-                    <li key={r._id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-start gap-3">
-                        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-user-hover text-sm font-semibold text-user-fg-secondary ring-1 ring-user-line">
-                          {reviewerName.trim().charAt(0).toUpperCase() || "C"}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                              <p className="text-sm font-semibold text-user-fg">{reviewerName}</p>
-                              {r.verifiedPurchase && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-user-success"><Check size={12} strokeWidth={2.5} /> {t("admin.reviews.ui.customer")}</span>}
-                            </div>
-                            {reviewDate && <time className="text-xs text-user-fg-muted">{reviewDate}</time>}
-                          </div>
-                          <div className="mt-2"><Stars value={r.rating} size={15} /></div>
-                          <p className="mt-1.5 text-base font-semibold text-user-fg">{reviewTextOf(r, "title") || `${r.rating}/5`}</p>
-                          {r.comment && <div className="mt-1"><ReviewComment comment={reviewTextOf(r, "comment")} /></div>}
-                          {(r.images?.length > 0 || r.videos?.length > 0) && <div className="mt-3"><ReviewMediaGallery images={r.images} videos={r.videos} /></div>}
-                          {localizedResponse?.message && <div className="mt-3"><StoreResponse response={localizedResponse} /></div>}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : !myReview ? (
-              <div className="py-6 text-center">
-                <p className="text-sm text-user-fg-muted">{t("admin.reviews.ui.noReviews")}</p>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        {/* ===== Product images — Ratings & Reviews ke neeche, "View More" se saari images ===== */}
-        {allImages.length > 0 && (
-          <section className="mt-3 bg-user-card">
-            <h2 className="border-b border-user-line px-3 sm:px-4 py-3 text-sm font-bold text-user-fg">
-              {t("admin.productDetail.page.productImages")}: {productName}
-            </h2>
-            <div className="px-3 sm:px-4 py-4">
-              <DetailImages productName={productName} images={allImages} onZoom={openLightbox} />
-            </div>
-          </section>
-        )}
-
-        {/* ===== You may also like — real related ===== */}
-        {related.length > 0 && (
-          <section className="mt-6">
-            <h2 className="mb-3 text-base font-bold text-user-fg">{t("admin.brands.detail.relatedProducts")}</h2>
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-              {related.slice(0, 10).map((p) => {
-                const image = getImageUrl(p?.variants?.[0]?.images?.[0] || p?.images?.[0]);
-                const price = p?.variants?.[0]?.selling_price ?? p?.selling_price ?? p?.price;
-                const relatedName = productNameOf(p) || p?.name || "";
-                return (
-                  <Link key={p._id} href={`/product/${p._id}`} className="group bg-user-card hover:shadow-lg transition-shadow">
-                    <div className="relative aspect-square overflow-hidden bg-white">
-                      <FallbackImage src={image} alt={relatedName} loading="lazy" className="h-full w-full object-contain p-2 group-hover:scale-[1.03] transition-transform" />
-                    </div>
-                    <div className="p-2.5">
-                      <p className="line-clamp-2 min-h-8 text-xs leading-4 text-user-fg">{relatedName}</p>
-                      {price != null && <p className="mt-1.5 text-sm font-medium text-user-accent">Rs. {toNum(price).toLocaleString()}</p>}
-                      <div className="mt-1"><Stars value={0} size={10} /></div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
-        )}
+        {zoneEntries(template.below).map(([blockId, block]) => (
+          <EditableProductBlock key={blockId} zone="below" id={blockId} isPreview={isPreview} selectedSectionId={selectedSectionId}>
+            {renderBelow(block)}
+          </EditableProductBlock>
+        ))}
       </div>
 
-      <StickyBar show={showStickyBar} name={productName} price={activePrice} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} />
+      <StickyBar show={showStickyBar && template.settings?.stickyBar !== false} name={productName} price={activePrice} qty={quantity} stock={stock} onAdd={handleAdd} isAdded={isAdded} />
       <Lightbox images={allImages} index={lightbox} onClose={() => setLightbox(null)} onStep={stepLightbox} />
     </main>
   );

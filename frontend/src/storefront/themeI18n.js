@@ -39,10 +39,30 @@ export function localizeTheme(theme, translations, locale) {
     ? { ...theme.settings.announcement, text: tr("a.text", theme.settings.announcement.text) }
     : theme.settings?.announcement;
 
+  // Product page template blocks → p.<zone>.<blockId>.<field>
+  const product = theme.templates?.product;
+  const localizeZone = (zone) => {
+    const src = product?.[zone];
+    if (!src) return src;
+    const blocks = {};
+    for (const [id, block] of Object.entries(src.blocks || {})) {
+      const settings = { ...(block.settings || {}) };
+      for (const key of Object.keys(settings)) {
+        if (typeof settings[key] === "string") settings[key] = tr(`p.${zone}.${id}.${key}`, settings[key]);
+      }
+      blocks[id] = { ...block, settings };
+    }
+    return { ...src, blocks };
+  };
+  const templates = product
+    ? { ...theme.templates, product: { ...product, info: localizeZone("info"), below: localizeZone("below") } }
+    : theme.templates;
+
   return {
     ...theme,
     settings: { ...theme.settings, announcement },
     sections,
     menus: { main: menu("main", theme.menus?.main), footer: menu("footer", theme.menus?.footer) },
+    templates,
   };
 }

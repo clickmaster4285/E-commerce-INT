@@ -16,7 +16,7 @@
 // storefront English (source) dikhata hai.
 // ==========================================================
 
-const { SECTION_TYPES, GLOBAL_SETTINGS } = require("../config/themeSchema");
+const { SECTION_TYPES, GLOBAL_SETTINGS, PRODUCT_BLOCK_TYPES } = require("../config/themeSchema");
 
 const TEXT_TYPES = new Set(["text", "textarea"]);
 const translatableKeys = (fields = []) => fields.filter((f) => f.translatable && TEXT_TYPES.has(f.type)).map((f) => f.key);
@@ -52,6 +52,17 @@ function collectThemeTexts(theme) {
   walkMenu("footer", theme.menus?.footer);
 
   for (const key of translatableKeys(GLOBAL_SETTINGS.announcement)) push(`a.${key}`, theme.settings?.announcement?.[key]);
+
+  // Product page template blocks → p.<zone>.<blockId>.<field>
+  const product = theme.templates?.product;
+  for (const zone of ["info", "below"]) {
+    for (const id of product?.[zone]?.order || []) {
+      const block = product[zone].blocks?.[id];
+      const def = block && PRODUCT_BLOCK_TYPES[block.type];
+      if (!def || block.disabled) continue;
+      for (const key of translatableKeys(def.settings)) push(`p.${zone}.${id}.${key}`, block.settings?.[key]);
+    }
+  }
   return out;
 }
 

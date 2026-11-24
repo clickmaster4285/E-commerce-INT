@@ -294,6 +294,81 @@ const DEFAULT_ORDER = [
   "brand_showcase",
 ];
 
+// ==========================================================
+// PRODUCT PAGE TEMPLATE (templates.product) — har product page par same
+//   info  zone → product info column me Buy buttons ke NEECHE add-on blocks
+//   below zone → main card ke neeche sections (reorder / hide / add)
+// Core purchase flow (price / deals / variants / quantity / CTA) fixed rehta hai.
+// Default = aaj ka product page bilkul waisa hi.
+// ==========================================================
+const PRODUCT_BLOCK_TYPES = {
+  // ── Built-in (below zone, product data se) ──
+  description: { label: "Description", zones: ["below"], limit: 1, settings: [] },
+  specifications: { label: "Specifications", zones: ["below"], limit: 1, settings: [] },
+  reviews: { label: "Ratings & reviews", zones: ["below"], limit: 1, settings: [] },
+  images: { label: "Product images", zones: ["below"], limit: 1, settings: [] },
+  related: {
+    label: "Related products",
+    zones: ["below"],
+    limit: 1,
+    settings: [
+      heading(),
+      { key: "limit", type: "range", label: "Number of products", min: 4, max: 12, step: 1, default: 10 },
+    ],
+  },
+  // ── Add-on blocks ──
+  trust_badges: {
+    label: "Trust badges",
+    zones: ["info", "below"],
+    limit: 2,
+    settings: [
+      { key: "items", type: "textarea", label: "Badges (one per line)", default: "Free delivery\n7-day easy return\n100% original\nCash on delivery", translatable: true },
+      { key: "layout", type: "select", label: "Layout", options: ["grid", "list"], default: "grid" },
+    ],
+  },
+  delivery_estimate: {
+    label: "Delivery estimate",
+    zones: ["info"],
+    limit: 1,
+    settings: [
+      { key: "label", type: "text", label: "Label", default: "Estimated delivery", translatable: true },
+      { key: "minDays", type: "range", label: "From (days)", min: 0, max: 30, step: 1, default: 2 },
+      { key: "maxDays", type: "range", label: "To (days)", min: 1, max: 60, step: 1, default: 5 },
+    ],
+  },
+  whatsapp_button: {
+    label: "WhatsApp order button",
+    zones: ["info"],
+    limit: 1,
+    settings: [
+      { key: "label", type: "text", label: "Button label", default: "Order on WhatsApp", translatable: true },
+      { key: "phone", type: "text", label: "WhatsApp number (with country code, e.g. 923001234567)", default: "" },
+      { key: "message", type: "textarea", label: "Message (product name & link added automatically)", default: "Hi, I want to order this product:", translatable: true },
+    ],
+  },
+  text_block: {
+    label: "Custom text",
+    zones: ["info", "below"],
+    limit: 4,
+    settings: [
+      heading(),
+      { key: "body", type: "richtext", label: "Content", default: "", translatable: true },
+    ],
+  },
+};
+
+const PRODUCT_TEMPLATE_SETTINGS = [
+  { key: "stickyBar", type: "checkbox", label: "Sticky add-to-cart bar on scroll", default: true },
+  { key: "sidebar", type: "checkbox", label: "Show store & quick info sidebar", default: true },
+];
+
+const PRODUCT_ZONES = {
+  info: { label: "Next to product info", hint: "Shown under the Buy / Add to cart buttons.", max: 6 },
+  below: { label: "Below the product", hint: "Sections under the main product card.", max: 12 },
+};
+
+const DEFAULT_PRODUCT_BELOW = ["description", "specifications", "reviews", "images", "related"];
+
 const defaultsOf = (fields) =>
   Object.fromEntries(fields.map((f) => [f.key, f.default === undefined ? null : structuredClone(f.default)]));
 
@@ -313,6 +388,19 @@ function buildDefaultTheme() {
     sections,
     order: [...DEFAULT_ORDER],
     menus: { main: [], footer: [] },
+    templates: { product: buildDefaultProductTemplate() },
+  };
+}
+
+function buildDefaultProductTemplate() {
+  const blocks = {};
+  for (const type of DEFAULT_PRODUCT_BELOW) {
+    blocks[type] = { type, disabled: false, settings: defaultsOf(PRODUCT_BLOCK_TYPES[type].settings) };
+  }
+  return {
+    settings: defaultsOf(PRODUCT_TEMPLATE_SETTINGS),
+    info: { order: [], blocks: {} },
+    below: { order: [...DEFAULT_PRODUCT_BELOW], blocks },
   };
 }
 
@@ -327,6 +415,7 @@ function publicSchema() {
     sectionStyle: SECTION_STYLE,
     presets: PRESETS,
     sectionTypes: SECTION_TYPES,
+    product: { blockTypes: PRODUCT_BLOCK_TYPES, settings: PRODUCT_TEMPLATE_SETTINGS, zones: PRODUCT_ZONES },
   };
 }
 
@@ -341,7 +430,11 @@ module.exports = {
   SECTION_STYLE,
   PRESETS,
   DEFAULT_ORDER,
+  PRODUCT_BLOCK_TYPES,
+  PRODUCT_TEMPLATE_SETTINGS,
+  PRODUCT_ZONES,
   buildDefaultTheme,
+  buildDefaultProductTemplate,
   defaultsOf,
   publicSchema,
 };
