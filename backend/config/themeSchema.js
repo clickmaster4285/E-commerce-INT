@@ -493,6 +493,22 @@ const PRODUCT_ZONES = {
   below: { label: "Below the product", hint: "Sections under the main product card.", max: 12 },
 };
 
+// ==========================================================
+// CATEGORY / PRODUCT LIST PAGE TEMPLATE (templates.collection)
+// /filtering-product (category links, filters) — default = aaj ka page
+// ==========================================================
+const COLLECTION_TEMPLATE_SETTINGS = [
+  { key: "columns", type: "select", label: "Products per row (desktop)", options: ["default", "3", "4", "5"], default: "default" },
+  { key: "perPage", type: "range", label: "Products per page", min: 12, max: 60, step: 12, default: 24 },
+  { key: "defaultSort", type: "select", label: "Default sort", options: ["featured", "newest", "price-asc", "price-desc"], default: "featured" },
+  { key: "sidebar", type: "select", label: "Filter sidebar (desktop)", options: ["left", "right", "hidden"], default: "left" },
+  { key: "showBreadcrumb", type: "checkbox", label: "Show breadcrumb", default: true },
+  { key: "showBanner", type: "checkbox", label: "Show banner on top", default: false },
+  { key: "bannerImage", type: "image", label: "Banner image", default: "", showIf: { key: "showBanner", equals: true } },
+  { key: "bannerHeading", type: "text", label: "Banner heading", default: "", translatable: true, showIf: { key: "showBanner", equals: true } },
+  { key: "bannerText", type: "textarea", label: "Banner text", default: "", translatable: true, showIf: { key: "showBanner", equals: true } },
+];
+
 const DEFAULT_PRODUCT_BELOW = ["description", "specifications", "reviews", "images", "related"];
 
 const defaultsOf = (fields) =>
@@ -514,8 +530,12 @@ function buildDefaultTheme() {
     sections,
     order: [...DEFAULT_ORDER],
     menus: { main: [], footer: [] },
-    templates: { product: buildDefaultProductTemplate() },
+    templates: { product: buildDefaultProductTemplate(), collection: buildDefaultCollectionTemplate() },
   };
+}
+
+function buildDefaultCollectionTemplate() {
+  return { settings: defaultsOf(COLLECTION_TEMPLATE_SETTINGS) };
 }
 
 function buildDefaultProductTemplate() {
@@ -542,6 +562,7 @@ function publicSchema() {
     presets: PRESETS,
     sectionTypes: SECTION_TYPES,
     product: { blockTypes: PRODUCT_BLOCK_TYPES, settings: PRODUCT_TEMPLATE_SETTINGS, zones: PRODUCT_ZONES },
+    collection: { settings: COLLECTION_TEMPLATE_SETTINGS },
   };
 }
 
@@ -561,6 +582,8 @@ module.exports = {
   PRODUCT_ZONES,
   buildDefaultTheme,
   buildDefaultProductTemplate,
+  COLLECTION_TEMPLATE_SETTINGS,
+  buildDefaultCollectionTemplate,
   defaultsOf,
   publicSchema,
 };

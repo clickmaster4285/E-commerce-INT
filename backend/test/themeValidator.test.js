@@ -365,3 +365,26 @@ test("popup defaults off; settings validated; text translated only when enabled"
   theme.settings.popup.trigger = "always";
   assert.equal(validate(theme).ok, false);
 });
+
+// ───────────────────────── Category page template ─────────────────────────
+test("collection template: defaults = today's page, validated, banner text translated", () => {
+  const { collectThemeTexts } = require("../utils/themeTranslation");
+  const r = validate(buildDefaultTheme());
+  assert.deepEqual(
+    { columns: r.data.templates.collection.settings.columns, perPage: r.data.templates.collection.settings.perPage, sidebar: r.data.templates.collection.settings.sidebar },
+    { columns: "default", perPage: 24, sidebar: "left" },
+  );
+  const legacy = buildDefaultTheme();
+  delete legacy.templates.collection;
+  assert.equal(validate(legacy).data.templates.collection.settings.defaultSort, "featured");
+
+  const theme = buildDefaultTheme();
+  theme.templates.collection.settings = { columns: "4", perPage: 100, sidebar: "right", showBanner: true, bannerHeading: "Summer sale" };
+  const ok = validate(theme);
+  assert.equal(ok.ok, true, JSON.stringify(ok.errors));
+  assert.equal(ok.data.templates.collection.settings.perPage, 60);
+  assert.ok(collectThemeTexts(ok.data).some((e) => e.key === "c.bannerHeading"));
+
+  theme.templates.collection.settings.sidebar = "top";
+  assert.equal(validate(theme).ok, false);
+});

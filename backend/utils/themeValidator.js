@@ -28,6 +28,7 @@ const {
   PRODUCT_TEMPLATE_SETTINGS,
   PRODUCT_ZONES,
   buildDefaultProductTemplate,
+  COLLECTION_TEMPLATE_SETTINGS,
 } = require("../config/themeSchema");
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
@@ -376,7 +377,12 @@ function validateThemeData(data, { storeId } = {}) {
 
   // Page templates
   const templatesIn = isPlainObject(data.templates) ? data.templates : {};
-  const templates = { product: validateProductTemplate(templatesIn.product, ctx) };
+  const collectionIn = isPlainObject(templatesIn.collection) ? templatesIn.collection : {};
+  const templates = {
+    product: validateProductTemplate(templatesIn.product, ctx),
+    // Missing (purane themes) → defaults = aaj ka category page
+    collection: { settings: validateFields(COLLECTION_TEMPLATE_SETTINGS, collectionIn.settings, "templates.collection.settings", ctx) },
+  };
 
   if (ctx.errors.length) return { ok: false, errors: ctx.errors.slice(0, 50) };
   return { ok: true, data: { settings, sections, order, menus, templates } };

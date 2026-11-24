@@ -65,9 +65,23 @@ export function localizeTheme(theme, translations, locale) {
     }
     return { ...src, blocks };
   };
-  const templates = product
-    ? { ...theme.templates, product: { ...product, info: localizeZone("info"), below: localizeZone("below") } }
-    : theme.templates;
+  // Category page banner → c.<field>
+  const collection = theme.templates?.collection;
+  const collectionLocalized = collection?.settings
+    ? {
+        ...collection,
+        settings: {
+          ...collection.settings,
+          bannerHeading: tr("c.bannerHeading", collection.settings.bannerHeading),
+          bannerText: tr("c.bannerText", collection.settings.bannerText),
+        },
+      }
+    : collection;
+  const templates = {
+    ...theme.templates,
+    ...(product ? { product: { ...product, info: localizeZone("info"), below: localizeZone("below") } } : {}),
+    ...(collectionLocalized ? { collection: collectionLocalized } : {}),
+  };
 
   return {
     ...theme,

@@ -41,6 +41,7 @@ import { SectionList, SectionSettings, ThemeSettings, MenuEditor, VersionsPanel 
 import PreviewFrame from "./components/PreviewFrame";
 import { ScheduleDialog, ShareDialog, ScheduleBanner } from "./components/PublishTools";
 import { ProductTemplatePanel, ProductBlockSettings } from "./components/productPanel";
+import { CollectionTemplatePanel } from "./components/collectionPanel";
 import { adminProductApi } from "@/apis/admin/productApi";
 
 const AUTOSAVE_MS = 1500;
@@ -109,7 +110,12 @@ export default function StoreEditorPage() {
     staleTime: 5 * 60 * 1000,
   });
   const sampleProductId = sampleProductQuery.data?.products?.[0]?._id || null;
-  const previewSrc = editPage === "product" && sampleProductId ? `/product/${sampleProductId}?preview=1` : "/?preview=1";
+  const previewSrc =
+    editPage === "product" && sampleProductId
+      ? `/product/${sampleProductId}?preview=1`
+      : editPage === "collection"
+        ? "/filtering-product?preview=1"
+        : "/?preview=1";
 
   // ── Server data → editor state (pehli baar / reload / restore) ──
   const loadedAt = useRef(null);
@@ -294,6 +300,7 @@ export default function StoreEditorPage() {
           {[
             { id: "home", label: "Homepage" },
             { id: "product", label: "Product page" },
+            { id: "collection", label: "Category page" },
           ].map((opt) => (
             <button
               key={opt.id}
@@ -397,6 +404,10 @@ export default function StoreEditorPage() {
           {selected?.kind === "productBlock" ? (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
               <ProductBlockSettings schema={schema} zone={selected.zone} id={selected.id} onBack={() => store.select(null)} />
+            </div>
+          ) : editPage === "collection" ? (
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <CollectionTemplatePanel schema={schema} />
             </div>
           ) : editPage === "product" ? (
             <div className="min-h-0 flex-1 overflow-y-auto p-4">

@@ -38,6 +38,13 @@ const safePageParam = (raw) => {
 const GRID =
   "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-9";
 
+/* Store editor category template "Products per row" (default = upar wala GRID) */
+const GRID_BY_COLUMNS = {
+  3: "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3",
+  4: "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4",
+  5: "grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5",
+};
+
 function Chip({ label, onRemove }) {
   return (
     <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-user-accent/40 bg-user-accent-soft py-1 ps-3 pe-1.5 text-[0.6875rem] font-bold text-user-fg">
@@ -70,7 +77,12 @@ export default function FilterResults({
   /* Shop par bina-filter state ("All Products") me empty copy alag ho —
      "remove a filter" wali line ka matlab nahi banta. Home false bhejta hai. */
   cleanMode = false,
+  /* Store editor category template (optional — na do to purana) */
+  columns = "default",
+  perPage = PER_PAGE,
 }) {
+  const gridCls = GRID_BY_COLUMNS[columns] || GRID;
+  const pageSize = Math.min(60, Math.max(12, Number(perPage) || PER_PAGE));
   const { t } = useTranslation();
   const { fieldOf } = useLocalized();
   const searchParams = useSearchParams();
@@ -103,7 +115,7 @@ export default function FilterResults({
   // ✅ Server grid (admin pattern: placeholderData, queryKey me sab)
   const { products, total, pagination, isLoading, isFetching, isError, refetch } = useShopProducts({
     page,
-    limit: PER_PAGE,
+    limit: pageSize,
     sort: sortBy,
     search,
     brandIds: filters?.brandIds || [],
@@ -115,7 +127,7 @@ export default function FilterResults({
     discountBands: bands,
   });
 
-  const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / PER_PAGE));
+  const totalPages = pagination?.pages || Math.max(1, Math.ceil(total / pageSize));
   const currentPage = pagination?.page || Math.min(page, totalPages);
   // ✅ Badi list ka render defer — filter typing/pagination responsive, logic same
   const deferredProducts = useDeferredValue(products);
@@ -226,7 +238,7 @@ export default function FilterResults({
           subtitle={t("admin.products.table.loading")}
           icon={ListFilter}
         />
-        <div className={GRID}>
+        <div className={gridCls}>
           {[...Array(10).keys()].map((index) => (
             <div
               key={index}
@@ -309,7 +321,7 @@ export default function FilterResults({
         </div>
       ) : (
         <>
-          <div className={GRID}>
+          <div className={gridCls}>
             {deferredProducts.map((product, i) => (
               <ProductCard key={idOf(product._id) || product.name} product={product} priority={i < 2} />
             ))}
@@ -319,7 +331,7 @@ export default function FilterResults({
             page={currentPage}
             totalPages={totalPages}
             total={total}
-            perPage={PER_PAGE}
+            perPage={pageSize}
             onPageChange={goToPage}
           />
         </>

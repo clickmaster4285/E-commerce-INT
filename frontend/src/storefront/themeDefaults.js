@@ -25,8 +25,25 @@ export function buildDefaultTheme() {
     sections,
     order: [...DEFAULT_SECTION_ORDER],
     menus: { main: [], footer: [] },
-    templates: { product: buildDefaultProductTemplate() },
+    templates: { product: buildDefaultProductTemplate(), collection: buildDefaultCollectionTemplate() },
   };
+}
+
+// Category page (/filtering-product) template default = aaj ka page (backend buildDefaultCollectionTemplate)
+export const DEFAULT_COLLECTION_SETTINGS = {
+  columns: "default",
+  perPage: 24,
+  defaultSort: "featured",
+  sidebar: "left",
+  showBreadcrumb: true,
+  showBanner: false,
+  bannerImage: "",
+  bannerHeading: "",
+  bannerText: "",
+};
+
+export function buildDefaultCollectionTemplate() {
+  return { settings: { ...DEFAULT_COLLECTION_SETTINGS } };
 }
 
 // Product page template default = aaj ka product page (backend buildDefaultProductTemplate)

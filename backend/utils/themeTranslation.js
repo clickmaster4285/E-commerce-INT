@@ -16,7 +16,7 @@
 // storefront English (source) dikhata hai.
 // ==========================================================
 
-const { SECTION_TYPES, GLOBAL_SETTINGS, PRODUCT_BLOCK_TYPES } = require("../config/themeSchema");
+const { SECTION_TYPES, GLOBAL_SETTINGS, PRODUCT_BLOCK_TYPES, COLLECTION_TEMPLATE_SETTINGS } = require("../config/themeSchema");
 
 const TEXT_TYPES = new Set(["text", "textarea"]);
 const translatableKeys = (fields = []) => fields.filter((f) => f.translatable && TEXT_TYPES.has(f.type)).map((f) => f.key);
@@ -65,6 +65,12 @@ function collectThemeTexts(theme) {
       }
       push(`g.${group}.${field.key}`, values[field.key]);
     }
+  }
+
+  // Category page template banner → c.<field> (sirf banner on ho to)
+  const collection = theme.templates?.collection?.settings;
+  if (collection?.showBanner) {
+    for (const key of translatableKeys(COLLECTION_TEMPLATE_SETTINGS)) push(`c.${key}`, collection[key]);
   }
 
   // Product page template blocks → p.<zone>.<blockId>.<field>

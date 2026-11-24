@@ -23,6 +23,9 @@ import { productApi } from "@/apis/user/productApi";
 import { ChevronRight, ListFilter, SlidersHorizontal, X } from "lucide-react";
 import HomeNav from "@/components/user/HomeNav";
 import HomeSidebar from "@/components/user/HomeSidebar";
+import { useCollectionTemplate } from "@/storefront/collectionTemplate";
+import { useStoreTheme } from "@/storefront/ThemeProvider";
+import { hasCustomAccent } from "@/storefront/themeCss";
 import FilterResults from "@/components/user/FilterResults";
 import AllDealsResults from "@/components/user/AllDealsResults";
 import AllCategoriesResults from "@/components/user/AllCategoriesResults";
@@ -185,8 +188,21 @@ function FilteringParamsSync({
   return null;
 }
 
+const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
+const assetSrc = (url) => (!url ? "" : /^https?:/i.test(url) ? url : `${API_ORIGIN}${url}`);
+
+// Sidebar side ke hisaab se page padding (purana = left: lg:pl-0)
+const CONTAINER_PAD = {
+  left: "lg:pl-0 lg:pr-8 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12",
+  right: "lg:pl-8 lg:pr-0 xl:pl-10 xl:pr-0 2xl:pl-12 2xl:pr-0",
+  hidden: "lg:pl-8 lg:pr-8 xl:pl-10 xl:pr-10 2xl:pl-12 2xl:pr-12",
+};
+
 function FilteringContent() {
   const { dir } = useTranslation();
+  // Store editor "Category page" template (default = purana layout)
+  const tpl = useCollectionTemplate();
+  const { theme: storeTheme } = useStoreTheme();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -221,7 +237,7 @@ function FilteringContent() {
   const [desktopHoverAvailable, setDesktopHoverAvailable] = useState(false);
   const [showAllDealsView, setShowAllDealsView] = useState(false);
   const [showAllCategoriesView, setShowAllCategoriesView] = useState(false);
-  const [sortBy, setSortBy] = useState("featured");
+  const [sortBy, setSortBy] = useState(tpl.defaultSort);
   const wasActiveRef = useRef(false);
 
   useEffect(() => {
@@ -355,7 +371,8 @@ function FilteringContent() {
   const changeSort = (next) => {
     setSortBy(next);
     const sp = new URLSearchParams(window.location.search);
-    if (!next || next === "featured") sp.delete("sort");
+    // Template ka default sort URL me nahi (clean link); baaki ?sort= me
+    if (!next || next === tpl.defaultSort) sp.delete("sort");
     else sp.set("sort", next);
     sp.delete("page");
     const query = sp.toString();
@@ -443,12 +460,14 @@ function FilteringContent() {
           : "All Products";
 
   const showingViews = showAllCategoriesView || showAllDealsView;
+  // Desktop sidebar: hover-capable screen + template "hidden" nahi
+  const desktopSidebar = desktopHoverAvailable && tpl.sidebar !== "hidden";
 
   void searchParams;
 
   return (
     <main
-      style={FILTERING_THEME}
+      style={hasCustomAccent(storeTheme) ? undefined : FILTERING_THEME}
       className="min-h-screen w-full min-w-0 pb-2 text-user-fg"
     >
       <FilteringParamsSync
@@ -464,8 +483,9 @@ function FilteringContent() {
       />
       <HomeNav />
 
-      <div className="w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pl-0 lg:pr-8 lg:pt-5 xl:pl-0 xl:pr-10 2xl:pl-0 2xl:pr-12">
+      <div className={`w-full max-w-none pl-3 pr-3 pt-4 sm:pl-4 sm:pr-4 lg:pt-5 ${CONTAINER_PAD[tpl.sidebar] || CONTAINER_PAD.left}`}>
         {/* BREADCRUMB */}
+        {tpl.showBreadcrumb !== false && (
         <nav
           aria-label="Breadcrumb"
           className="mb-3 flex items-center gap-1.5 pl-3 text-[0.6875rem] text-user-fg-muted lg:mb-4 lg:text-xs"
@@ -478,6 +498,25 @@ function FilteringContent() {
             Filtered Products
           </span>
         </nav>
+        )}
+
+        {/* STORE EDITOR BANNER (template) */}
+        {tpl.showBanner && (tpl.bannerImage || tpl.bannerHeading) ? (
+          <div className="relative mb-4 overflow-hidden rounded-2xl border border-user-line bg-user-card lg:ms-3">
+            {tpl.bannerImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={assetSrc(tpl.bannerImage)} alt="" className="h-36 w-full object-cover sm:h-48 lg:h-56" />
+            ) : (
+              <div className="h-28 w-full bg-user-accent-soft sm:h-32" />
+            )}
+            {tpl.bannerHeading || tpl.bannerText ? (
+              <div className={`absolute inset-0 flex flex-col justify-center px-5 sm:px-8 ${tpl.bannerImage ? "bg-gradient-to-r from-black/55 to-transparent text-white" : "text-user-fg"}`}>
+                {tpl.bannerHeading ? <h2 className="text-xl font-black sm:text-3xl">{tpl.bannerHeading}</h2> : null}
+                {tpl.bannerText ? <p className="mt-1.5 max-w-xl text-sm opacity-90">{tpl.bannerText}</p> : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <SectionHeading
           title="Filtered Products"
@@ -509,11 +548,11 @@ function FilteringContent() {
           </span>
         </SectionHeading>
 
-        <div dir={dir} className="flex w-full items-start gap-4 lg:gap-6 xl:gap-8">
+        <div dir={dir} className={`flex w-full items-start gap-4 lg:gap-6 xl:gap-8 ${tpl.sidebar === "right" ? "flex-row-reverse" : ""}`}>
           {/* LEFT SIDEBAR — home wala same component */}
           <div
             className={`filters-sidebar-hover sticky top-[7.25rem] hidden min-w-0 shrink-0 self-start overflow-hidden ${
-              desktopHoverAvailable ? "lg:block" : ""
+              desktopSidebar ? "lg:block" : ""
             }`}
             style={{
               width: "clamp(12rem, 14vw, 13rem)",
@@ -522,7 +561,7 @@ function FilteringContent() {
             <HomeSidebar
               {...sidebarProps}
               scrollable
-              className={`w-full ${dir === "rtl" ? "rounded-r-none border-r-0" : "rounded-l-none border-l-0"}`}
+              className={`w-full ${(dir === "rtl") !== (tpl.sidebar === "right") ? "rounded-r-none border-r-0" : "rounded-l-none border-l-0"}`}
             />
           </div>
 
@@ -531,7 +570,7 @@ function FilteringContent() {
             {/* MOBILE FILTER TRIGGER */}
             <div
               className={`mb-4 flex items-center justify-between gap-3 ${
-                desktopHoverAvailable ? "lg:hidden" : ""
+                desktopSidebar ? "lg:hidden" : ""
               }`}
             >
               <button
@@ -593,6 +632,8 @@ function FilteringContent() {
                   onClear={handleClearAll}
                   titleOverride={resultsTitle}
                   cleanMode={!filtersActive}
+                  columns={tpl.columns}
+                  perPage={tpl.perPage}
                 />
               </div>
             ) : null}
@@ -602,7 +643,7 @@ function FilteringContent() {
 
       {/* MOBILE FILTER DRAWER — next/dynamic, sirf kholne par load */}
       {filtersOpen ? (
-        <div className={`fixed inset-0 z-[70] ${desktopHoverAvailable ? "lg:hidden" : ""}`}>
+        <div className={`fixed inset-0 z-[70] ${desktopSidebar ? "lg:hidden" : ""}`}>
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setFiltersOpen(false)}
