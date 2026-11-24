@@ -18,10 +18,12 @@ exports.subscribe = async (req, res) => {
     const email = normalizeEmail(req.body?.email);
     if (!Subscriber.EMAIL_PATTERN.test(email)) return fail(res, 400, "Please enter a valid email address");
     const locale = String(req.body?.locale || "en").slice(0, 10);
+    // Kahan se aaya (allowlist) — newsletter section ya store editor popup
+    const source = ["newsletter_section", "popup"].includes(req.body?.source) ? req.body.source : "newsletter_section";
 
     await Subscriber.updateOne(
       { email },
-      { $set: { status: "subscribed", locale }, $setOnInsert: { email, source: "newsletter_section" } },
+      { $set: { status: "subscribed", locale }, $setOnInsert: { email, source } },
       { upsert: true },
     );
     return res.status(200).json({ success: true, message: "Subscribed" });

@@ -71,7 +71,14 @@ export function localizeTheme(theme, translations, locale) {
 
   return {
     ...theme,
-    settings: { ...theme.settings, announcement, header: localizeGroup("header"), footer: localizeGroup("footer") },
+    settings: {
+      ...theme.settings,
+      announcement,
+      header: localizeGroup("header"),
+      footer: localizeGroup("footer"),
+      popup: localizeGroup("popup"),
+      conversion: localizeGroup("conversion"),
+    },
     sections,
     menus: { main: menu("main", theme.menus?.main), footer: menu("footer", theme.menus?.footer) },
     templates,

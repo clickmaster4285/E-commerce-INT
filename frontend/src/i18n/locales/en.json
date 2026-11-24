@@ -1,4 +1,8 @@
 {
+  "storefront.popup.close": "Close",
+  "storefront.popup.noThanks": "No thanks",
+  "storefront.popup.copy": "Copy",
+  "storefront.popup.copied": "Copied",
   "admin.nav.item.messages": "Messages",
   "storefront.countdown.days": "Days",
   "storefront.countdown.hours": "Hours",

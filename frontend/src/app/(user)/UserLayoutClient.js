@@ -19,6 +19,7 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 import SupportChatWidget from "@/components/chat/SupportChatWidget";
 import AnnouncementBar from "@/storefront/AnnouncementBar";
 import FloatingWhatsApp from "@/storefront/FloatingWhatsApp";
+import StorePopup from "@/storefront/StorePopup";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
@@ -166,6 +167,7 @@ export default function UserLayoutClient({ children }) {
           <VariantQuickBuyDrawer />
           <SupportChatWidget />
           <FloatingWhatsApp />
+          <StorePopup />
           <MobileNav />
         </div>
         </QuickBuyProvider>

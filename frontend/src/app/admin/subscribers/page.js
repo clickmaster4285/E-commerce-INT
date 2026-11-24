@@ -128,6 +128,7 @@ export default function SubscribersPage() {
                   <p className="truncate text-sm font-semibold text-fg">{s.email}</p>
                   <p className="text-xs text-fg-muted">
                     {new Date(s.createdAt).toLocaleDateString()} · {String(s.locale || "en").toUpperCase()}
+                    {s.source === "popup" ? " · via popup" : ""}
                   </p>
                 </div>
                 <span

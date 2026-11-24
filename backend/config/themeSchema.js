@@ -373,6 +373,22 @@ const GLOBAL_SETTINGS = {
     { key: "showStoreName", type: "checkbox", label: "Show store name next to logo", default: true },
     { key: "showSearch", type: "checkbox", label: "Show search bar", default: true },
   ],
+  // ── Popup (default OFF) — newsletter signup ya offer / coupon ──
+  popup: [
+    { key: "enabled", type: "checkbox", label: "Show a popup", default: false },
+    { key: "type", type: "select", label: "Popup type", options: ["newsletter", "offer"], default: "newsletter", showIf: { key: "enabled", equals: true } },
+    { key: "image", type: "image", label: "Image", default: "", showIf: { key: "enabled", equals: true } },
+    { key: "heading", type: "text", label: "Heading", default: "Get 10% off your first order", translatable: true, showIf: { key: "enabled", equals: true } },
+    { key: "text", type: "textarea", label: "Text", default: "Join our newsletter for exclusive deals and new arrivals.", translatable: true, showIf: { key: "enabled", equals: true } },
+    { key: "couponCode", type: "text", label: "Coupon code to show (optional)", default: "", showIf: { key: "enabled", equals: true } },
+    { key: "buttonLabel", type: "text", label: "Button label", default: "", translatable: true, showIf: { key: "type", equals: "offer" } },
+    { key: "buttonLink", type: "link", label: "Button link", default: { type: "none" }, showIf: { key: "type", equals: "offer" } },
+    { key: "trigger", type: "select", label: "When to show", options: ["delay", "scroll", "exit"], default: "delay", showIf: { key: "enabled", equals: true } },
+    { key: "delaySeconds", type: "range", label: "Seconds after page load", min: 0, max: 60, step: 1, default: 5, showIf: { key: "trigger", equals: "delay" } },
+    { key: "scrollPercent", type: "range", label: "After scrolling (% of page)", min: 10, max: 90, step: 5, default: 40, showIf: { key: "trigger", equals: "scroll" } },
+    { key: "frequency", type: "select", label: "How often", options: ["once", "session", "always"], default: "once", showIf: { key: "enabled", equals: true } },
+    { key: "pages", type: "select", label: "Show on", options: ["all", "home"], default: "all", showIf: { key: "enabled", equals: true } },
+  ],
   // ── Conversion (sab default OFF) ──
   conversion: [
     { key: "whatsappFloat", type: "checkbox", label: "Floating WhatsApp button on every page", default: false },

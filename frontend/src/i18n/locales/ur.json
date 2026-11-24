@@ -1,4 +1,8 @@
 {
+  "storefront.popup.close": "بند کریں",
+  "storefront.popup.noThanks": "نہیں، شکریہ",
+  "storefront.popup.copy": "کاپی کریں",
+  "storefront.popup.copied": "کاپی ہو گیا",
   "admin.nav.item.messages": "پیغامات",
   "storefront.countdown.days": "دن",
   "storefront.countdown.hours": "گھنٹے",

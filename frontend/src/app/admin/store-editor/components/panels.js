@@ -307,6 +307,7 @@ const GROUP_LABELS = {
   header: "Header",
   footer: "Footer",
   conversion: "Conversion boosters",
+  popup: "Popup",
 };
 const COLOR_LABELS = {
   accent: "Accent (buttons, links)",

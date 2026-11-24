@@ -342,3 +342,26 @@ test("contact form parse: validation + honeypot", () => {
   assert.ok(parseContact({ name: "", email: "x", message: "hi" }).errors.email);
   assert.ok(parseContact({ name: "Bot", email: "a@b.co", message: "spam spam", website: "http://x" }).errors.spam);
 });
+
+// ───────────────────────── Popup ─────────────────────────
+test("popup defaults off; settings validated; text translated only when enabled", () => {
+  const { collectThemeTexts } = require("../utils/themeTranslation");
+  const r = validate(buildDefaultTheme());
+  assert.equal(r.data.settings.popup.enabled, false);
+  assert.ok(!collectThemeTexts(r.data).some((e) => e.key.startsWith("g.popup.")));
+
+  const theme = buildDefaultTheme();
+  theme.settings.popup = { enabled: true, type: "offer", trigger: "scroll", scrollPercent: 999, heading: "Eid sale", couponCode: "EID20", buttonLabel: "Shop", buttonLink: { type: "url", url: "/deals" } };
+  const ok = validate(theme);
+  assert.equal(ok.ok, true, JSON.stringify(ok.errors));
+  assert.equal(ok.data.settings.popup.scrollPercent, 90);
+  const keys = collectThemeTexts(ok.data).map((e) => e.key);
+  assert.ok(keys.includes("g.popup.heading"));
+  assert.ok(keys.includes("g.popup.buttonLabel"));
+
+  theme.settings.popup.image = "https://evil.example/x.png";
+  assert.equal(validate(theme).ok, false);
+  theme.settings.popup.image = "";
+  theme.settings.popup.trigger = "always";
+  assert.equal(validate(theme).ok, false);
+});
