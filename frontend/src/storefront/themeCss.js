@@ -223,6 +223,67 @@ function cardRules(theme, rules) {
   if (sale) rules.push(`${CARD} .product-card-deal-badge{background:${sale};color:${readableOn(sale)}}`);
 }
 
+/* Header / nav / footer ka apna color: us bar ke andar --user-* tokens
+   background ke hisaab se (readable text). Dropdowns (.storefront-popover)
+   bar ke andar hote hue bhi page ke asli tokens wapas le lete hain:
+   #user-theme par --sf-* = asli values (resolve ho kar inherit hoti hain). */
+const BAR_TOKENS = [
+  "bg-elevated",
+  "bg-card",
+  "bg-hover",
+  "bg-input",
+  "text",
+  "text-secondary",
+  "text-muted",
+  "text-subtle",
+  "border",
+  "border-soft",
+  "border-hover",
+  "icon-color",
+];
+
+function barDecls(bg) {
+  const fg = readableOn(bg);
+  const mix = (pct) => `color-mix(in srgb, ${fg} ${pct}%, transparent)`;
+  const tint = (pct) => `color-mix(in srgb, ${fg} ${pct}%, ${bg})`;
+  return [
+    `--user-bg-elevated:${bg}`,
+    `--user-bg-card:${tint(8)}`,
+    `--user-bg-hover:${mix(12)}`,
+    `--user-bg-input:${tint(10)}`,
+    `--user-text:${fg}`,
+    `--user-text-secondary:${mix(85)}`,
+    `--user-text-muted:${mix(72)}`,
+    `--user-text-subtle:${mix(60)}`,
+    `--user-border:${mix(18)}`,
+    `--user-border-soft:${mix(12)}`,
+    `--user-border-hover:${mix(30)}`,
+    `--user-icon-color:${mix(80)}`,
+    `background-color:${bg}`,
+  ].join(";");
+}
+
+const BARS = [
+  { group: "header", selector: ".storefront-header" },
+  { group: "navigation", selector: ".user-home-nav" },
+  { group: "footer", selector: ".storefront-footer" },
+];
+
+function barRules(theme, rules) {
+  const colored = BARS.map((bar) => ({ ...bar, bg: color(group(theme, bar.group).background) })).filter((bar) => bar.bg);
+  if (!colored.length) return;
+  rules.push(`#user-theme{${BAR_TOKENS.map((t) => `--sf-${t}:var(--user-${t})`).join(";")}}`);
+  const restore = BAR_TOKENS.map((t) => `--user-${t}:var(--sf-${t})`).join(";");
+  for (const bar of colored) {
+    rules.push(`#user-theme ${bar.selector}{${barDecls(bar.bg)}}`);
+    rules.push(`#user-theme ${bar.selector} .storefront-popover{${restore}}`);
+  }
+  // Login pill accent rang ka hai → colored header par accent ke upar gayab na ho
+  if (colored.some((bar) => bar.group === "header")) {
+    rules.push("#user-theme .storefront-header .storefront-login{color:var(--user-text);border-color:var(--user-border);background-color:var(--user-bg-hover)}");
+  }
+}
+
 function animationRules(theme, rules) {
   const from = REVEAL_FROM[group(theme, "animations").reveal];
   if (!from) return;
@@ -240,6 +301,7 @@ export function buildThemeCss(theme) {
   typographyRules(theme, rules);
   buttonRules(theme, rules);
   cardRules(theme, rules);
+  barRules(theme, rules);
   animationRules(theme, rules);
   return rules.join("\n");
 }

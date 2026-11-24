@@ -290,7 +290,17 @@ test("product template text is collected for translation", () => {
 // ───────────────────────── Header / footer settings ─────────────────────────
 test("header & footer settings default to today's layout and validate", () => {
   const r = validate(buildDefaultTheme());
-  assert.deepEqual(r.data.settings.header, { sticky: true, logoSize: "default", showStoreName: true, showSearch: true });
+  assert.deepEqual(r.data.settings.header, {
+    sticky: true,
+    logoSize: "default",
+    showStoreName: true,
+    showSearch: true,
+    logoPosition: "left",
+    background: null,
+    showLanguage: true,
+    showThemeToggle: true,
+    showWishlist: true,
+  });
   assert.equal(r.data.settings.footer.showBadges, true);
   assert.equal(r.data.settings.footer.copyright, "");
 
@@ -426,4 +436,53 @@ test("global style options and dark colors are validated", () => {
   assert.equal(r2.ok, true, JSON.stringify(r2.errors));
   assert.equal(r2.data.settings.cards.showWishlist, false);
   assert.equal(r2.data.settings.cards.showBrand, true);
+});
+
+// ───────────────────────── Header / navigation / footer layouts ─────────────────────────
+test("header, navigation and footer layout options default to today's layout", () => {
+  const theme = buildDefaultTheme();
+  delete theme.settings.navigation;
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  const { header, navigation, footer } = r.data.settings;
+  assert.equal(header.logoPosition, "left");
+  assert.equal(header.background, null);
+  assert.equal(header.showLanguage, true);
+  assert.equal(navigation.show, true);
+  assert.equal(navigation.categoryCount, 3);
+  assert.equal(navigation.dropdownStyle, "list");
+  assert.equal(footer.showNewsletter, false);
+  assert.equal(footer.background, null);
+});
+
+test("menu item images (mega menu) must be this store's uploads", () => {
+  const own = `/uploads/stores/${STORE}/theme/a.webp`;
+  const theme = buildDefaultTheme();
+  theme.menus.main = [
+    { id: "m1", label: "Shop", link: { type: "home" }, children: [{ id: "m2", label: "Shoes", link: { type: "home" }, image: own }] },
+  ];
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.data.menus.main[0].children[0].image, own);
+  assert.equal("image" in r.data.menus.main[0], false);
+
+  theme.menus.main[0].children[0].image = `/uploads/stores/${OTHER}/theme/a.webp`;
+  const bad = validate(theme);
+  assert.equal(bad.ok, false);
+  assert.ok(bad.errors.some((e) => e.includes("children[0].image")));
+});
+
+test("footer menu columns (children) validate; footer newsletter title translated only when on", () => {
+  const { collectThemeTexts } = require("../utils/themeTranslation");
+  const theme = buildDefaultTheme();
+  theme.menus.footer = [{ id: "c1", label: "Company", link: { type: "none" }, children: [{ id: "c2", label: "About", link: { type: "home" } }] }];
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.data.menus.footer[0].children.length, 1);
+  let keys = collectThemeTexts(r.data).map((e) => e.key);
+  assert.ok(keys.includes("m.footer.c2"));
+  assert.ok(!keys.includes("g.footer.newsletterTitle"));
+  r.data.settings.footer.showNewsletter = true;
+  keys = collectThemeTexts(r.data).map((e) => e.key);
+  assert.ok(keys.includes("g.footer.newsletterTitle"));
 });

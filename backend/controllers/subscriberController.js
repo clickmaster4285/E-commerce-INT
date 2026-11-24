@@ -19,7 +19,7 @@ exports.subscribe = async (req, res) => {
     if (!Subscriber.EMAIL_PATTERN.test(email)) return fail(res, 400, "Please enter a valid email address");
     const locale = String(req.body?.locale || "en").slice(0, 10);
     // Kahan se aaya (allowlist) — newsletter section ya store editor popup
-    const source = ["newsletter_section", "popup"].includes(req.body?.source) ? req.body.source : "newsletter_section";
+    const source = ["newsletter_section", "popup", "footer"].includes(req.body?.source) ? req.body.source : "newsletter_section";
 
     await Subscriber.updateOne(
       { email },

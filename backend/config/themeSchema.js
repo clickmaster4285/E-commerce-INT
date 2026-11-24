@@ -429,6 +429,21 @@ const GLOBAL_SETTINGS = {
     { key: "logoSize", type: "select", label: "Logo size", options: ["default", "small", "large"], default: "default" },
     { key: "showStoreName", type: "checkbox", label: "Show store name next to logo", default: true },
     { key: "showSearch", type: "checkbox", label: "Show search bar", default: true },
+    // Phase 3 — layout + color (default = aaj ka header)
+    { key: "logoPosition", type: "select", label: "Logo position", options: ["left", "center"], default: "left" },
+    { key: "background", type: "color", label: "Header color (empty = default)", default: null },
+    { key: "showLanguage", type: "checkbox", label: "Show language switcher", default: true },
+    { key: "showThemeToggle", type: "checkbox", label: "Show dark mode switch", default: true },
+    { key: "showWishlist", type: "checkbox", label: "Show wishlist icon", default: true },
+  ],
+  // ── Navigation bar (header ke neeche wali row) ──
+  navigation: [
+    { key: "show", type: "checkbox", label: "Show navigation bar", default: true },
+    { key: "align", type: "select", label: "Links alignment (desktop)", options: ["center", "start"], default: "center" },
+    { key: "categoryCount", type: "range", label: "Top categories shown", min: 0, max: 6, step: 1, default: 3 },
+    { key: "showMoreCategories", type: "checkbox", label: "Show “More categories” dropdown", default: true },
+    { key: "dropdownStyle", type: "select", label: "Menu dropdown style", options: ["list", "mega"], default: "list" },
+    { key: "background", type: "color", label: "Navigation bar color (empty = default)", default: null },
   ],
   // ── Popup (default OFF) — newsletter signup ya offer / coupon ──
   popup: [
@@ -462,6 +477,9 @@ const GLOBAL_SETTINGS = {
     { key: "showBadges", type: "checkbox", label: "Show payment & security badges", default: true },
     { key: "paymentMethods", type: "textarea", label: "Payment methods, one per line (empty = default badges)", default: "", showIf: { key: "showBadges", equals: true } },
     { key: "copyright", type: "text", label: "Copyright text (empty = default)", default: "", translatable: true },
+    { key: "background", type: "color", label: "Footer color (empty = default dark)", default: null },
+    { key: "showNewsletter", type: "checkbox", label: "Show newsletter signup in footer", default: false },
+    { key: "newsletterTitle", type: "text", label: "Newsletter title", default: "Subscribe for offers and new arrivals", translatable: true, showIf: { key: "showNewsletter", equals: true } },
   ],
 };
 

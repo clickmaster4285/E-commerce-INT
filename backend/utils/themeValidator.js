@@ -224,7 +224,13 @@ function validateMenu(items, path, ctx, depth = 1) {
     const id = SECTION_ID.test(String(item.id || "")) ? item.id : `m${ctx.menuCount}`;
     const children =
       depth < LIMITS.maxMenuDepth ? validateMenu(item.children, `${path}[${i}].children`, ctx, depth + 1) : [];
-    out.push({ id, label, link: link.value || { type: "none" }, children });
+    const entry = { id, label, link: link.value || { type: "none" }, children };
+    if (item.image) {
+      const image = imageUrl(item.image, ctx.storeId);
+      if (image.error) ctx.errors.push(`${path}[${i}].image: ${image.error}`);
+      else if (image.value) entry.image = image.value;
+    }
+    out.push(entry);
   }
   return out;
 }

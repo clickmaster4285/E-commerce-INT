@@ -112,7 +112,7 @@ function SearchBox({ value, onChange, onSubmit, results = [], onPick }) {
   };
 
   return (
-    <div ref={ref} className="relative flex w-full items-center">
+    <div ref={ref} className="storefront-popover relative flex w-full items-center">
       <input
         value={value}
         aria-label={t("header.searchProducts")}
@@ -256,6 +256,11 @@ export default function Header() {
   const showSearch = headerCfg.showSearch !== false;
   const showStoreName = headerCfg.showStoreName !== false;
   const logoSizeClass = LOGO_SIZES[headerCfg.logoSize] || LOGO_SIZES.default;
+  // Logo beech me: desktop search bar ki jagah search icon (row neeche khulti hai)
+  const logoCenter = headerCfg.logoPosition === "center";
+  const showLanguage = headerCfg.showLanguage !== false;
+  const showThemeToggle = headerCfg.showThemeToggle !== false;
+  const showWishlist = headerCfg.showWishlist !== false;
   const { t, dir, locale } = useTranslation();
   const { fieldOf } = useLocalized();
   const [open, setOpen] = useState(false);
@@ -446,14 +451,14 @@ export default function Header() {
       )}
 
       <header
-        className={`${isSticky ? "sticky top-0" : "relative"} z-50 border-b border-user-line transition-shadow duration-300 ${
+        className={`storefront-header ${isSticky ? "sticky top-0" : "relative"} z-50 border-b border-user-line transition-shadow duration-300 ${
           scrolled ? "shadow-[var(--user-shadow-md)]" : ""
         }`}
       >
         <div         className="pointer-events-none absolute inset-0 bg-user-elevated/95 backdrop-blur-md" />
 
         <div className="relative w-full max-w-none px-3.5 sm:px-5 lg:px-7 xl:px-9 2xl:px-12">
-          <div className="flex h-14 items-center gap-2 sm:gap-3 lg:h-16 lg:gap-4">
+          <div className="relative flex h-14 items-center gap-2 sm:gap-3 lg:h-16 lg:gap-4">
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <button
                 onClick={() => setOpen(true)}
@@ -463,7 +468,10 @@ export default function Header() {
                 <Menu size={19} strokeWidth={1.7} />
               </button>
 
-              <Link href="/" className="flex min-w-0 items-center gap-2">
+              <Link
+                href="/"
+                className={`flex min-w-0 items-center gap-2 ${logoCenter ? "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" : ""}`}
+              >
                 <StoreLogo store={store} sizeClass={logoSizeClass} />
                 {showStoreName ? (
                   <span className="hidden max-w-[10rem] truncate text-base font-semibold tracking-tight text-user-fg sm:block lg:max-w-[14rem] lg:text-lg">
@@ -473,7 +481,7 @@ export default function Header() {
               </Link>
             </div>
 
-            <div className={`mx-auto hidden max-w-2xl flex-1 ${showSearch ? "md:block" : ""}`}>
+            <div className={`mx-auto hidden max-w-2xl flex-1 ${showSearch && !logoCenter ? "md:block" : ""}`}>
               <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -487,14 +495,15 @@ export default function Header() {
               <button
                 onClick={() => setMobileSearchOpen((v) => !v)}
                 aria-label={mobileSearchOpen ? t("header.closeSearch") : t("header.openSearch")}
-                className={`${iconBtn} md:hidden ${showSearch ? "" : "!hidden"}`}
+                className={`${iconBtn} ${logoCenter ? "" : "md:hidden"} ${showSearch ? "" : "!hidden"}`}
               >
                 {mobileSearchOpen ? <X size={18} strokeWidth={1.7} /> : <Search size={18} strokeWidth={1.7} />}
               </button>
 
-              <LanguageSwitcher />
+              {showLanguage ? <LanguageSwitcher /> : null}
 
               <button
+                hidden={!showThemeToggle}
                 onClick={toggleTheme}
                 title={theme === "dark" ? t("header.lightMode") : t("header.darkMode")}
                 aria-label={t("header.toggleTheme")}
@@ -504,6 +513,7 @@ export default function Header() {
               </button>
 
               <Link
+                hidden={!showWishlist}
                 href="/wishlist"
                 title={t("header.myWishlist")}
                 aria-label={t("header.myWishlist")}
@@ -565,7 +575,7 @@ export default function Header() {
                         className="fixed inset-0 z-40"
                         onClick={() => setProfileOpen(false)}
                       />
-                      <div dir={dir} lang={locale} className="absolute end-0 top-11 z-50 w-60 rounded-2xl border border-user-line bg-user-card p-2 shadow-[var(--user-shadow-lg)]">
+                      <div dir={dir} lang={locale} className="storefront-popover absolute end-0 top-11 z-50 w-60 rounded-2xl border border-user-line bg-user-card p-2 shadow-[var(--user-shadow-lg)]">
                         <div className="px-3 py-2.5 border-b border-user-line mb-1">
                           <p className="truncate text-sm font-medium text-user-fg">
                             {user.name || user.username}
@@ -611,7 +621,7 @@ export default function Header() {
               ) : (
                 <button
                   onClick={() => setLoginOpen(true)}
-                  className="ml-1 flex h-8 items-center gap-1.5 rounded-xl border border-user-accent/25 bg-user-accent-soft px-2.5 text-xs font-medium text-user-accent transition-colors hover:bg-user-accent/15 active:scale-[0.96] lg:px-3"
+                  className="storefront-login ml-1 flex h-8 items-center gap-1.5 rounded-xl border border-user-accent/25 bg-user-accent-soft px-2.5 text-xs font-medium text-user-accent transition-colors hover:bg-user-accent/15 active:scale-[0.96] lg:px-3"
                 >
                   <User size={13} />
                   {t("header.login")}
@@ -621,7 +631,7 @@ export default function Header() {
           </div>
 
           {showSearch && mobileSearchOpen && (
-            <div className="md:hidden pb-3">
+            <div className={`pb-3 ${logoCenter ? "mx-auto max-w-2xl" : "md:hidden"}`}>
               <SearchBox
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

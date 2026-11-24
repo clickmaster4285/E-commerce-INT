@@ -42,7 +42,11 @@ const NAV_LINKS = [
   { labelKey: "storefront.navigation.newProducts", href: "/?tab=new", tab: "new", isActive: (_path, activeTab) => activeTab === "new" },
 ];
 
-const PARENT_LIMIT = 3;
+const PARENT_LIMIT = 3; // default (store editor Navigation → "Top categories shown")
+const MEGA_MAX_WIDTH = 1100;
+
+const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
+const assetSrc = (url) => (!url ? "" : /^https?:/i.test(url) ? url : `${API_ORIGIN}${url}`);
 const MORE_DROPDOWN_LIMIT = 5;
 const ALL_CATEGORY_LIMIT = 24;
 
@@ -79,7 +83,7 @@ function DropdownPanel({ style, panelRef, title, meta, footer, children, onMouse
         if (panelRef) panelRef.current = el;
       }}
       style={style}
-      className="fixed z-[60] overflow-hidden rounded-2xl border border-user-line bg-user-elevated shadow-[var(--user-shadow-lg)]"
+      className="storefront-popover fixed z-[60] overflow-hidden rounded-2xl border border-user-line bg-user-elevated shadow-[var(--user-shadow-lg)]"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -118,6 +122,60 @@ function CategoryRow({ category, count = 0, onPick, fieldOf }) {
   );
 }
 
+/* Internal → next/link, external → naya tab */
+function MenuLink({ href, onClick, className, children }) {
+  return isExternalHref(href) ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={className}>
+      {children}
+    </a>
+  ) : (
+    <Link href={href} onClick={onClick} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+/* Mega menu: sub-links image tiles (image na ho to sirf naam) */
+function MegaMenuGrid({ links, onPick }) {
+  const withImages = links.some((l) => l.image);
+  if (!withImages) {
+    return (
+      <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
+        {links.map((link) => (
+          <MenuLink
+            key={link.id}
+            href={link.href}
+            onClick={onPick}
+            className="block truncate rounded-xl px-3 py-2.5 text-[0.8125rem] font-medium text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-fg"
+          >
+            {link.label}
+          </MenuLink>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      {links.map((link) => (
+        <MenuLink key={link.id} href={link.href} onClick={onPick} className="group block rounded-xl p-1.5 transition-colors hover:bg-user-hover">
+          <span className="block aspect-[4/3] overflow-hidden rounded-lg border border-user-line bg-user-hover">
+            {link.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={assetSrc(link.image)}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+            ) : null}
+          </span>
+          <span className="mt-1.5 block truncate px-0.5 text-[0.8125rem] font-semibold text-user-fg">{link.label}</span>
+        </MenuLink>
+      ))}
+    </div>
+  );
+}
+
 export default function HomeNav() {
   const { t } = useTranslation();
   const { fieldOf } = useLocalized();
@@ -125,6 +183,13 @@ export default function HomeNav() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { theme } = useStoreTheme();
+  // Store editor Theme → Navigation (default = purana nav)
+  const navCfg = theme?.settings?.navigation || {};
+  const showNav = navCfg.show !== false;
+  const parentLimit = Number.isInteger(navCfg.categoryCount) ? Math.min(6, Math.max(0, navCfg.categoryCount)) : PARENT_LIMIT;
+  const showMoreCategories = navCfg.showMoreCategories !== false;
+  const isMega = navCfg.dropdownStyle === "mega";
+  const alignStart = navCfg.align === "start";
   // Store editor main menu (top level) — invalid / deleted target wale links skip
   const themeMenu = useMemo(
     () =>
@@ -134,7 +199,7 @@ export default function HomeNav() {
           label: item.label,
           href: resolveThemeLink(item.link),
           children: (item.children || [])
-            .map((c) => ({ id: c.id, label: c.label, href: resolveThemeLink(c.link) }))
+            .map((c) => ({ id: c.id, label: c.label, href: resolveThemeLink(c.link), image: c.image || "" }))
             .filter((c) => c.label && c.href),
         }))
         // Parent ka link na ho tab bhi sub-links ho to dropdown dikhao
@@ -187,18 +252,24 @@ export default function HomeNav() {
     return parents.length ? parents : sortedCategories;
   }, [sortedCategories]);
 
-  const visibleParents = parentCategories.slice(0, PARENT_LIMIT);
-  const hiddenParents = parentCategories.slice(PARENT_LIMIT);
-  const hasMoreCategories = hiddenParents.length > 0;
+  const visibleParents = parentCategories.slice(0, parentLimit);
+  const hiddenParents = parentCategories.slice(parentLimit);
+  const hasMoreCategories = showMoreCategories && hiddenParents.length > 0;
 
   const positionPanel = useCallback((key) => {
     const anchor = key === "more" ? moreRef.current : document.querySelector(`[data-panel-id="${key}"]`);
     if (!anchor || typeof window === "undefined") return;
     const rect = anchor.getBoundingClientRect();
+    // Mega menu: nav ke neeche beech me chauda panel
+    if (isMega && key.startsWith("menu-")) {
+      const width = Math.min(MEGA_MAX_WIDTH, window.innerWidth - 24);
+      setPanelStyle({ left: Math.max(12, (window.innerWidth - width) / 2), top: rect.bottom, width });
+      return;
+    }
     const width = Math.min(key === "more" ? 288 : 220, window.innerWidth - 24);
     const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12));
     setPanelStyle({ left, top: rect.bottom, width });
-  }, []);
+  }, [isMega]);
 
   const closePanel = useCallback(() => {
     if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
@@ -326,6 +397,8 @@ export default function HomeNav() {
     };
   }, [panel, positionPanel, closePanel]);
 
+  if (!showNav) return null;
+
   return (
     <nav
       aria-label={t("admin.sidebar.navigation")}
@@ -334,7 +407,7 @@ export default function HomeNav() {
       <div className="w-full min-w-0 max-w-full px-3 sm:px-4 lg:px-8 xl:px-10 2xl:px-12">
         <div
           ref={navScrollRef}
-          className="flex h-10 w-full min-w-0 items-center justify-start gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:justify-center md:gap-0.5 lg:h-11 lg:gap-1"
+          className={`flex h-10 w-full min-w-0 items-center justify-start gap-2 overflow-x-auto overflow-y-hidden whitespace-nowrap scroll-smooth px-4 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${alignStart ? "md:justify-start" : "md:justify-center"} md:gap-0.5 lg:h-11 lg:gap-1`}
         >
           {/* STORE EDITOR MAIN MENU — seller ne banaya ho to purane plain links ki jagah */}
           {themeMenu.map((item) =>
@@ -420,6 +493,30 @@ export default function HomeNav() {
             const item = themeMenu.find((m) => `menu-${m.id}` === panel);
             if (!item) return null;
             const links = item.href ? [{ id: `${item.id}-self`, label: item.label, href: item.href }, ...item.children] : item.children;
+            if (isMega) {
+              return (
+                <DropdownPanel
+                  panelRef={panelRef}
+                  style={panelStyle}
+                  title={item.label}
+                  onMouseEnter={() => {
+                    if (moreCloseTimerRef.current) clearTimeout(moreCloseTimerRef.current);
+                  }}
+                  onMouseLeave={() => scheduleMenuClose(panel)}
+                  footer={
+                    item.href ? (
+                      <div className="border-t border-user-line px-3.5 py-2.5">
+                        <MenuLink href={item.href} onClick={closePanel} className="text-[0.78125rem] font-semibold text-user-accent hover:underline">
+                          {t("storefront.navigation.viewAll")} →
+                        </MenuLink>
+                      </div>
+                    ) : null
+                  }
+                >
+                  <MegaMenuGrid links={item.children} onPick={closePanel} />
+                </DropdownPanel>
+              );
+            }
             return (
               <DropdownPanel
                 panelRef={panelRef}

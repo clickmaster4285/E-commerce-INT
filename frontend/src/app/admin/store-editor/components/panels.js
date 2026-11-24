@@ -152,6 +152,7 @@ function SectionRow({ id, section, label, selected, isFirst, isLast }) {
 const FIXED_ROWS_TOP = [
   { group: "announcement", label: "Announcement bar" },
   { group: "header", label: "Header" },
+  { group: "navigation", label: "Navigation bar" },
 ];
 const FIXED_ROWS_BOTTOM = [{ group: "footer", label: "Footer" }];
 
@@ -432,6 +433,7 @@ export function SectionSettings({ schema, id, onBack }) {
 const GROUP_LABELS = {
   colors: "Colors",
   darkColors: "Dark mode colors",
+  navigation: "Navigation bar",
   buttons: "Buttons",
   cards: "Product cards",
   badges: "Product badges",
@@ -448,6 +450,7 @@ const GROUP_LABELS = {
 const GROUP_HINTS = {
   colors: "Accent, background, text and borders",
   darkColors: "Used when a shopper switches to dark mode",
+  navigation: "Categories shown, alignment, mega menu, color",
   buttons: "Shape, outline, uppercase, hover effect",
   cards: "Card style, image shape, what each card shows",
   badges: "Deal and stock badges on product cards",
@@ -456,8 +459,8 @@ const GROUP_HINTS = {
   layout: "Corner radius",
   branding: "Favicon",
   announcement: "Message bar above the header",
-  header: "Sticky header, search, logo",
-  footer: "Footer text, social links",
+  header: "Logo position, color, search, icons",
+  footer: "Text, columns, newsletter, color",
   conversion: "WhatsApp button, low stock",
   popup: "Newsletter / promo popup",
 };
@@ -595,7 +598,9 @@ export function ThemeSettings({ schema, focusGroup = null, onFocusHandled }) {
 }
 
 // ───────────────────────── Menus ─────────────────────────
-function MenuList({ menuKey, title, hint, maxItems, allowChildren = false }) {
+const MENU_IMAGE_FIELD = { key: "image", type: "image", label: "Image (mega menu tile)", default: "" };
+
+function MenuList({ menuKey, title, hint, maxItems, allowChildren = false, childImages = false, childLabel = "Add sub-link (dropdown)" }) {
   const { draft, setMenu } = useThemeEditorStore();
   const items = draft?.menus?.[menuKey] || [];
   // Validator har menu item (children bhi) gin-ta hai — yahan bhi wahi
@@ -654,6 +659,9 @@ function MenuList({ menuKey, title, hint, maxItems, allowChildren = false }) {
                     </button>
                   </div>
                   <LinkInput value={child.link} onChange={(link) => patchChild(i, j, { link })} />
+                  {childImages ? (
+                    <SettingField field={MENU_IMAGE_FIELD} value={child.image || ""} onChange={(image) => patchChild(i, j, { image })} />
+                  ) : null}
                 </div>
               ))}
               <button
@@ -664,7 +672,7 @@ function MenuList({ menuKey, title, hint, maxItems, allowChildren = false }) {
                 }
                 className="inline-flex h-7 items-center gap-1 text-[11px] font-semibold text-accent disabled:opacity-50"
               >
-                <Plus size={12} /> Add sub-link (dropdown)
+                <Plus size={12} /> {childLabel}
               </button>
             </div>
           ) : null}
@@ -688,14 +696,17 @@ export function MenuEditor({ schema }) {
       <MenuList
         menuKey="main"
         allowChildren
+        childImages
         title="Main menu"
-        hint="Shown in the navigation bar under the header. Empty = default links (Home, Best offers, New)."
+        hint="Shown in the navigation bar under the header. Empty = default links (Home, Best offers, New). Sub-link images show when Theme settings → Navigation → dropdown style is Mega."
         maxItems={schema.limits.maxMenuItems}
       />
       <MenuList
         menuKey="footer"
+        allowChildren
+        childLabel="Add link to this column"
         title="Footer menu"
-        hint="Shown in the footer Help column. Empty = default links."
+        hint="Links without sub-links go in the Help column. Add sub-links under a link to make it its own footer column (the link's label becomes the column title)."
         maxItems={schema.limits.maxMenuItems}
       />
     </div>
