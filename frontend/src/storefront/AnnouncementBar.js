@@ -3,50 +3,44 @@
 /* ==========================================================
    ANNOUNCEMENT BAR — store editor Theme → Announcement bar
    settings.announcement = { enabled, text, link } (translated text
-   StoreThemeProvider se aata hai). Visitor band kare to usi text ke
-   liye band rehta hai (text badle to dobara dikhta hai).
+   StoreThemeProvider se aata hai).
+
+   ✕ sirf is page view ke liye band karta hai (state). Pehle localStorage
+   me hamesha ke liye save hota tha → refresh par bar ek second dikh kar
+   gayab ho jata tha (SSR dikhata, hydration chhupa deta) aur kabhi wapas
+   nahi aata tha. Shopify jaisa: har refresh par bar dikhta hai.
    ========================================================== */
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 import { useStoreTheme } from "./ThemeProvider";
 import { resolveThemeLink, isExternalHref } from "./themeLinks";
 
-const STORAGE_KEY = "announcement-dismissed";
-
-const readDismissed = () => {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) || "";
-  } catch {
-    return "";
-  }
-};
-const noopSubscribe = () => () => {};
-
 export default function AnnouncementBar() {
-  const { theme, isPreview } = useStoreTheme();
+  const { theme } = useStoreTheme();
   const bar = theme?.settings?.announcement;
   const text = typeof bar?.text === "string" ? bar.text.trim() : "";
-  // Server par "" (hydration same); client par localStorage
-  const storedDismissed = useSyncExternalStore(noopSubscribe, readDismissed, () => "");
-  const [dismissedNow, setDismissedNow] = useState("");
+  const [dismissedText, setDismissedText] = useState("");
 
-  if (!bar?.enabled || !text) return null;
-  if (!isPreview && (storedDismissed === text || dismissedNow === text)) return null;
+  if (!bar?.enabled || !text || dismissedText === text) return null;
 
   const href = resolveThemeLink(bar.link);
   const content = <span className="truncate">{text}</span>;
 
   return (
-    <div className="relative flex min-h-9 w-full items-center justify-center bg-user-accent px-10 py-2 text-center text-xs font-semibold text-user-accent-fg sm:text-[0.8125rem]">
+    <div
+      role="region"
+      aria-label="Announcement"
+      className="relative z-[51] flex min-h-9 w-full items-center justify-center bg-user-accent px-10 py-2 text-center text-xs font-semibold text-user-accent-fg sm:text-[0.8125rem]"
+    >
       {href ? (
         isExternalHref(href) ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-user-accent-fg underline-offset-2 hover:underline">
             {content}
           </a>
         ) : (
-          <Link href={href} className="min-w-0 truncate underline-offset-2 hover:underline">
+          <Link href={href} className="min-w-0 truncate text-user-accent-fg underline-offset-2 hover:underline">
             {content}
           </Link>
         )
@@ -56,15 +50,8 @@ export default function AnnouncementBar() {
       <button
         type="button"
         aria-label="Dismiss announcement"
-        onClick={() => {
-          setDismissedNow(text);
-          try {
-            window.localStorage.setItem(STORAGE_KEY, text);
-          } catch {
-            // private mode — sirf is page ke liye band
-          }
-        }}
-        className="absolute end-2 top-1/2 -translate-y-1/2 rounded-md p-1 opacity-80 hover:opacity-100"
+        onClick={() => setDismissedText(text)}
+        className="absolute end-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-user-accent-fg opacity-80 hover:opacity-100"
       >
         <X size={14} />
       </button>
