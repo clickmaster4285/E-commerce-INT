@@ -1,4 +1,8 @@
 {
+  "storefront.sharePreview.active": "غیر شائع شدہ تبدیلیوں کا پیش منظر",
+  "storefront.sharePreview.expires": "لنک کی میعاد {date}",
+  "storefront.sharePreview.exit": "پیش منظر بند کریں",
+  "storefront.sharePreview.expired": "یہ پیش منظر لنک ختم ہو چکا ہے۔ آپ اصل اسٹور دیکھ رہے ہیں۔",
   "storefront.popup.close": "بند کریں",
   "storefront.popup.noThanks": "نہیں، شکریہ",
   "storefront.popup.copy": "کاپی کریں",

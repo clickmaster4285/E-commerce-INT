@@ -1,4 +1,8 @@
 {
+  "storefront.sharePreview.active": "معاينة تغييرات غير منشورة",
+  "storefront.sharePreview.expires": "ينتهي الرابط {date}",
+  "storefront.sharePreview.exit": "إنهاء المعاينة",
+  "storefront.sharePreview.expired": "انتهت صلاحية رابط المعاينة. أنت تشاهد المتجر الحالي.",
   "storefront.popup.close": "إغلاق",
   "storefront.popup.noThanks": "لا، شكرًا",
   "storefront.popup.copy": "نسخ",

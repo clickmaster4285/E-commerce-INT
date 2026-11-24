@@ -19,7 +19,9 @@ import {
   Check,
   CloudOff,
   ExternalLink,
+  CalendarClock,
   History,
+  Link2,
   LayoutList,
   Loader2,
   Lock,
@@ -37,6 +39,7 @@ import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useThemeEditorStore } from "./useThemeEditorStore";
 import { SectionList, SectionSettings, ThemeSettings, MenuEditor, VersionsPanel } from "./components/panels";
 import PreviewFrame from "./components/PreviewFrame";
+import { ScheduleDialog, ShareDialog, ScheduleBanner } from "./components/PublishTools";
 import { ProductTemplatePanel, ProductBlockSettings } from "./components/productPanel";
 import { adminProductApi } from "@/apis/admin/productApi";
 
@@ -85,6 +88,9 @@ export default function StoreEditorPage() {
   // Kaun sa page edit ho raha hai: homepage sections ya product page template
   const [editPage, setEditPage] = useState("home");
   const [showVersions, setShowVersions] = useState(false);
+  const [dialog, setDialog] = useState(null); // "schedule" | "share" | null
+  // Schedule / preview-link responses — sirf ye fields override (draft reload NAHI → undo history safe)
+  const [publishMeta, setPublishMeta] = useState(null);
   const [previewKey, setPreviewKey] = useState(0);
 
   const store = useThemeEditorStore();
@@ -115,6 +121,7 @@ export default function StoreEditorPage() {
 
   const applyServerTheme = useCallback(
     (data) => {
+      setPublishMeta(null); // fresh server data me schedule / links bhi hain
       queryClient.setQueryData(["theme"], data);
     },
     [queryClient],
@@ -203,6 +210,22 @@ export default function StoreEditorPage() {
     onSuccess: (data) => {
       applyServerTheme(data);
       toast.success("Changes discarded");
+    },
+    onError: (error) => toast.error(apiError(error).message),
+  });
+
+  // Publish / discard / restore ke baad server meta fresh — local override hatao
+  const metaSchedule = publishMeta ? publishMeta.scheduled : themeQuery.data?.scheduled;
+  const metaPreviewLinks = (publishMeta ? publishMeta.previewLinks : themeQuery.data?.previewLinks) || [];
+  const metaScheduleError = publishMeta ? publishMeta.lastScheduleError : themeQuery.data?.lastScheduleError;
+  const takeMeta = (data) =>
+    data && setPublishMeta({ scheduled: data.scheduled || null, previewLinks: data.previewLinks || [], lastScheduleError: data.lastScheduleError || null });
+
+  const cancelScheduleMutation = useMutation({
+    mutationFn: themeApi.cancelSchedule,
+    onSuccess: (data) => {
+      takeMeta(data);
+      toast.success("Schedule cancelled");
     },
     onError: (error) => toast.error(apiError(error).message),
   });
@@ -311,6 +334,9 @@ export default function StoreEditorPage() {
           <button type="button" onClick={() => setShowVersions(true)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg" title="Version history">
             <History size={16} />
           </button>
+          <button type="button" onClick={() => setDialog("share")} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg" title="Share preview link">
+            <Link2 size={16} />
+          </button>
           <a href="/" target="_blank" rel="noopener noreferrer" className="hidden h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg sm:inline-flex" title="Open live store">
             <ExternalLink size={16} />
           </a>
@@ -333,8 +359,28 @@ export default function StoreEditorPage() {
             {publishMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
             Publish
           </button>
+          <button
+            type="button"
+            disabled={busy || saveState === "conflict"}
+            onClick={() => setDialog("schedule")}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-secondary hover:bg-subtle disabled:opacity-50"
+            title="Schedule publish"
+          >
+            <CalendarClock size={16} />
+          </button>
         </div>
       </header>
+
+      <ScheduleBanner
+        scheduled={metaSchedule}
+        lastError={metaScheduleError}
+        cancelling={cancelScheduleMutation.isPending}
+        onCancel={() => window.confirm("Cancel the scheduled publish?") && cancelScheduleMutation.mutate()}
+      />
+      {dialog === "schedule" ? <ScheduleDialog onClose={() => setDialog(null)} onSaveDraft={saveNow} onDone={takeMeta} /> : null}
+      {dialog === "share" ? (
+        <ShareDialog onClose={() => setDialog(null)} onSaveDraft={saveNow} activeLinks={metaPreviewLinks.length} onChanged={takeMeta} />
+      ) : null}
 
       {saveState === "conflict" ? (
         <div role="alert" className="flex items-center justify-between gap-3 border-b border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning">

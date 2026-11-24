@@ -203,3 +203,74 @@ test("CSV cells are escaped against formula injection", () => {
   assert.equal(csvCell('a,"b"'), '"a,""b"""');
   assert.equal(csvCell("ok@x.co"), "ok@x.co");
 });
+
+// ───────────────────────── Scheduled publish + preview links ─────────────────────────
+test("schedulePublish rejects past / invalid dates, stores snapshot", async (t) => {
+  const draft = buildDefaultTheme();
+  stub(t, StoreTheme, "findOne", () => chain({ _id: 1, draft, publishedVersion: 0 }));
+  let update = null;
+  stub(t, StoreTheme, "findOneAndUpdate", async (_f, u) => { update = u; return { ...u.$set, draft, published: draft }; });
+
+  const past = mockRes();
+  await ctrl.schedulePublish(adminReq({ at: new Date(Date.now() - 1000).toISOString() }), past);
+  assert.equal(past.statusCode, 400);
+  const bad = mockRes();
+  await ctrl.schedulePublish(adminReq({ at: "nope" }), bad);
+  assert.equal(bad.statusCode, 400);
+
+  const ok = mockRes();
+  const at = new Date(Date.now() + 3600 * 1000).toISOString();
+  await ctrl.schedulePublish(adminReq({ at, note: "Eid" }), ok);
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(update.$set.scheduled.data, draft);
+  assert.equal(new Date(update.$set.scheduled.at).toISOString(), at);
+  assert.equal(ok.body.data.scheduled.note, "Eid");
+});
+
+test("preview link: token returned once, only hash stored; expired/unknown rejected", async (t) => {
+  let saved = null;
+  stub(t, StoreTheme, "findOne", () => chain({ _id: 1, draft: buildDefaultTheme(), previewLinks: saved?.previewLinks || [] }));
+  stub(t, StoreTheme, "findOneAndUpdate", async (_f, u) => { saved = u.$set; return { ...u.$set, draft: buildDefaultTheme() }; });
+
+  const created = mockRes();
+  await ctrl.createPreviewLink(adminReq({ hours: 168 }), created);
+  assert.equal(created.statusCode, 201);
+  const { token } = created.body.data;
+  assert.ok(token.length >= 30);
+  assert.ok(!JSON.stringify(saved).includes(token)); // asli token DB me nahi
+  assert.equal(saved.previewLinks[0].hash, ctrl._internal.hashToken(token));
+
+  const view = mockRes();
+  await ctrl.getPreviewTheme({ store: { _id: STORE }, query: { token } }, view);
+  assert.equal(view.statusCode, 200);
+  assert.ok(view.body.data.theme.order);
+
+  const wrong = mockRes();
+  await ctrl.getPreviewTheme({ store: { _id: STORE }, query: { token: "x".repeat(32) } }, wrong);
+  assert.equal(wrong.statusCode, 410);
+
+  saved.previewLinks[0].expiresAt = new Date(Date.now() - 1000);
+  const expired = mockRes();
+  await ctrl.getPreviewTheme({ store: { _id: STORE }, query: { token } }, expired);
+  assert.equal(expired.statusCode, 410);
+});
+
+test("scheduler claims due themes atomically and publishes once", async (t) => {
+  const { runOnce } = require("../utils/themeScheduler");
+  const due = [{ _id: "t1", storeId: STORE }];
+  const chainList = (v) => { const q = { select: () => q, setOptions: () => q, lean: async () => v }; return q; };
+  stub(t, StoreTheme, "find", () => chainList(due));
+  let claims = 0;
+  stub(t, StoreTheme, "findOneAndUpdate", () => {
+    claims += 1;
+    // Pehla claim snapshot leta hai, doosra (dusra instance) kuch nahi
+    return chainList(claims === 1 ? { scheduled: { at: new Date(), data: buildDefaultTheme(), note: "Eid" } } : { scheduled: null });
+  });
+  const calls = [];
+  const publish = async (args) => { calls.push(args); return { ok: true }; };
+  assert.equal(await runOnce({ publish }), 1);
+  assert.equal(await runOnce({ publish }), 0);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].note, "Scheduled: Eid");
+  assert.equal(calls[0].storeId, String(STORE));
+});

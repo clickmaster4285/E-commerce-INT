@@ -12,6 +12,12 @@ const { validateThemeData } = require("../utils/themeValidator");
 const { invalidate } = require("../utils/publicCache");
 const { storeIdFor } = require("../utils/uploadPaths");
 const { publicTranslations, queueThemeTranslationSync } = require("../utils/themeTranslation");
+const crypto = require("crypto");
+
+// Preview links: random token (sirf hash DB me) — max itne active per store
+const MAX_PREVIEW_LINKS = 5;
+const PREVIEW_HOURS = [24, 168];
+const hashToken = (token) => crypto.createHash("sha256").update(String(token)).digest("hex");
 
 const fail = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
 
@@ -39,6 +45,11 @@ const adminView = (doc) => ({
   draftUpdatedAt: doc.draftUpdatedAt,
   publishedAt: doc.publishedAt,
   hasUnpublishedChanges: JSON.stringify(doc.draft) !== JSON.stringify(doc.published),
+  scheduled: doc.scheduled?.at ? { at: doc.scheduled.at, note: doc.scheduled.note || "", createdAt: doc.scheduled.createdAt } : null,
+  lastScheduleError: doc.lastScheduleError || null,
+  previewLinks: (doc.previewLinks || [])
+    .filter((l) => new Date(l.expiresAt).getTime() > Date.now())
+    .map((l) => ({ id: String(l._id), expiresAt: l.expiresAt, createdAt: l.createdAt })),
 });
 
 const emitTheme = (req, event, payload) => {
@@ -119,48 +130,171 @@ exports.saveDraft = async (req, res) => {
   }
 };
 
+/**
+ * Publish core — Publish button aur scheduled publish (utils/themeScheduler) dono.
+ * Store context (runWithStore / request) ke andar chalna chahiye.
+ * Returns { ok, doc } | { ok: false, status, message, errors?, code? }
+ */
+async function publishThemeData({ data, storeId, actor = null, note = "", io = null }) {
+  const current = await getOrCreateTheme();
+  // Schema badal chuka ho to purana draft / snapshot bhi dobara validate
+  const result = validateThemeData(data || buildDefaultTheme(), { storeId });
+  if (!result.ok) return { ok: false, status: 400, message: "Draft is invalid — fix it before publishing", errors: result.errors };
+
+  const nextVersion = (current.publishedVersion || 0) + 1;
+  const doc = await StoreTheme.findOneAndUpdate(
+    { publishedVersion: current.publishedVersion || 0 },
+    {
+      $set: { published: result.data, publishedAt: new Date(), publishedBy: actor },
+      $inc: { publishedVersion: 1 },
+    },
+    { returnDocument: "after" },
+  );
+  if (!doc) return { ok: false, status: 409, message: "Another publish just happened. Reload and try again.", code: "THEME_PUBLISH_CONFLICT" };
+
+  await StoreThemeVersion.create({
+    version: nextVersion,
+    data: result.data,
+    note: String(note || "").slice(0, 200),
+    publishedBy: actor,
+  });
+
+  // Purane versions prune (sirf aakhri MAX_VERSIONS)
+  const stale = await StoreThemeVersion.find()
+    .sort({ version: -1 })
+    .skip(StoreThemeVersion.MAX_VERSIONS)
+    .select("_id")
+    .lean();
+  if (stale.length) await StoreThemeVersion.deleteMany({ _id: { $in: stale.map((v) => v._id) } });
+
+  invalidate(["theme"]);
+  try {
+    io?.emit("themePublished", { version: doc.publishedVersion, publishedAt: doc.publishedAt });
+  } catch (_) {}
+  // Seller text → ur/ar (background, response block nahi hota)
+  queueThemeTranslationSync(storeId);
+  return { ok: true, doc };
+}
+
+const sendPublishResult = (res, r) =>
+  r.ok
+    ? res.status(200).json({ success: true, data: adminView(r.doc) })
+    : fail(res, r.status, r.message, { ...(r.errors ? { errors: r.errors } : {}), ...(r.code ? { code: r.code } : {}) });
+
 // ── ADMIN: POST /theme/publish  { note? } ──
 exports.publish = async (req, res) => {
   try {
     const current = await getOrCreateTheme();
-    // Schema badal chuka ho to purana draft bhi dobara validate
-    const result = validateThemeData(current.draft || buildDefaultTheme(), { storeId: storeIdFor(req) });
-    if (!result.ok) return fail(res, 400, "Draft is invalid — fix it before publishing", { errors: result.errors });
+    const r = await publishThemeData({
+      data: current.draft,
+      storeId: storeIdFor(req),
+      actor: actorId(req),
+      note: req.body?.note,
+      io: req.io,
+    });
+    return sendPublishResult(res, r);
+  } catch (error) {
+    return fail(res, 500, "Failed to publish theme");
+  }
+};
 
-    const nextVersion = (current.publishedVersion || 0) + 1;
+// ── ADMIN: POST /theme/schedule { at, note? } — draft ka SNAPSHOT us waqt publish hoga ──
+// Snapshot is liye: schedule ke baad editor me kiye changes galti se live na hon.
+exports.schedulePublish = async (req, res) => {
+  try {
+    const at = new Date(req.body?.at);
+    const now = Date.now();
+    if (Number.isNaN(at.getTime())) return fail(res, 400, "Pick a valid date and time");
+    if (at.getTime() < now + 60 * 1000) return fail(res, 400, "Schedule at least 1 minute in the future");
+    if (at.getTime() > now + 365 * 24 * 3600 * 1000) return fail(res, 400, "Schedule within the next 12 months");
+
+    const current = await getOrCreateTheme();
+    const result = validateThemeData(current.draft || buildDefaultTheme(), { storeId: storeIdFor(req) });
+    if (!result.ok) return fail(res, 400, "Draft is invalid — fix it before scheduling", { errors: result.errors });
+
     const doc = await StoreTheme.findOneAndUpdate(
-      { publishedVersion: current.publishedVersion || 0 },
+      { _id: current._id },
       {
-        $set: { published: result.data, publishedAt: new Date(), publishedBy: actorId(req) },
-        $inc: { publishedVersion: 1 },
+        $set: {
+          scheduled: {
+            at,
+            data: result.data,
+            note: String(req.body?.note || "").slice(0, 200),
+            by: actorId(req),
+            createdAt: new Date(),
+          },
+          lastScheduleError: null,
+        },
       },
       { returnDocument: "after" },
     );
-    if (!doc) return fail(res, 409, "Another publish just happened. Reload and try again.", { code: "THEME_PUBLISH_CONFLICT" });
-
-    await StoreThemeVersion.create({
-      version: nextVersion,
-      data: result.data,
-      note: String(req.body?.note || "").slice(0, 200),
-      publishedBy: actorId(req),
-    });
-
-    // Purane versions prune (sirf aakhri MAX_VERSIONS)
-    const stale = await StoreThemeVersion.find()
-      .sort({ version: -1 })
-      .skip(StoreThemeVersion.MAX_VERSIONS)
-      .select("_id")
-      .lean();
-    if (stale.length) await StoreThemeVersion.deleteMany({ _id: { $in: stale.map((v) => v._id) } });
-
-    invalidate(["theme"]);
-    emitTheme(req, "themePublished", { version: doc.publishedVersion, publishedAt: doc.publishedAt });
-    // Seller text → ur/ar (background, response block nahi hota)
-    queueThemeTranslationSync(storeIdFor(req));
-
+    emitTheme(req, "themeScheduled", { at });
     return res.status(200).json({ success: true, data: adminView(doc) });
   } catch (error) {
-    return fail(res, 500, "Failed to publish theme");
+    return fail(res, 500, "Failed to schedule publish");
+  }
+};
+
+// ── ADMIN: DELETE /theme/schedule ──
+exports.cancelSchedule = async (req, res) => {
+  try {
+    const current = await getOrCreateTheme();
+    const doc = await StoreTheme.findOneAndUpdate({ _id: current._id }, { $set: { scheduled: null } }, { returnDocument: "after" });
+    emitTheme(req, "themeScheduled", { at: null });
+    return res.status(200).json({ success: true, data: adminView(doc) });
+  } catch (error) {
+    return fail(res, 500, "Failed to cancel schedule");
+  }
+};
+
+// ── ADMIN: POST /theme/preview-links { hours: 24 | 168 } → { url-token (sirf ek baar), expiresAt } ──
+exports.createPreviewLink = async (req, res) => {
+  try {
+    const hours = PREVIEW_HOURS.includes(Number(req.body?.hours)) ? Number(req.body.hours) : 24;
+    const token = crypto.randomBytes(24).toString("base64url");
+    const expiresAt = new Date(Date.now() + hours * 3600 * 1000);
+    const current = await getOrCreateTheme();
+    // Expired hatao, sirf aakhri MAX rakho
+    const active = (current.previewLinks || []).filter((l) => new Date(l.expiresAt).getTime() > Date.now());
+    const links = [...active, { hash: hashToken(token), expiresAt, createdAt: new Date(), createdBy: actorId(req) }].slice(-MAX_PREVIEW_LINKS);
+    const doc = await StoreTheme.findOneAndUpdate({ _id: current._id }, { $set: { previewLinks: links } }, { returnDocument: "after" });
+    return res.status(201).json({ success: true, data: { token, expiresAt, theme: adminView(doc) } });
+  } catch (error) {
+    return fail(res, 500, "Failed to create preview link");
+  }
+};
+
+// ── ADMIN: DELETE /theme/preview-links — sab links revoke ──
+exports.revokePreviewLinks = async (req, res) => {
+  try {
+    const current = await getOrCreateTheme();
+    const doc = await StoreTheme.findOneAndUpdate({ _id: current._id }, { $set: { previewLinks: [] } }, { returnDocument: "after" });
+    return res.status(200).json({ success: true, data: adminView(doc) });
+  } catch (error) {
+    return fail(res, 500, "Failed to revoke preview links");
+  }
+};
+
+// ── PUBLIC: GET /theme/preview?token= — valid link par CURRENT draft (login nahi) ──
+exports.getPreviewTheme = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    res.set("X-Robots-Tag", "noindex");
+    const token = String(req.query.token || "");
+    if (!req.store?._id || token.length < 20 || token.length > 64) return fail(res, 404, "Preview link not found");
+    const doc = await StoreTheme.findOne().select("draft previewLinks").lean();
+    const hash = hashToken(token);
+    const link = (doc?.previewLinks || []).find((l) => {
+      const a = Buffer.from(String(l.hash || ""), "hex");
+      const b = Buffer.from(hash, "hex");
+      return a.length === b.length && crypto.timingSafeEqual(a, b);
+    });
+    if (!link || new Date(link.expiresAt).getTime() <= Date.now()) {
+      return fail(res, 410, "This preview link has expired or was revoked", { code: "PREVIEW_EXPIRED" });
+    }
+    return res.status(200).json({ success: true, data: { theme: doc.draft || buildDefaultTheme(), expiresAt: link.expiresAt } });
+  } catch (error) {
+    return fail(res, 500, "Failed to load preview");
   }
 };
 
@@ -230,4 +364,5 @@ exports.uploadImage = (req, res) => {
   return res.status(201).json({ success: true, data: req.themeImage });
 };
 
-exports._internal = { getOrCreateTheme, adminView };
+exports._internal = { getOrCreateTheme, adminView, hashToken };
+exports.publishThemeData = publishThemeData;

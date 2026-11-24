@@ -22,6 +22,13 @@ import { buildThemeCss, themeFontsHref } from "./themeCss";
 import { buildDefaultTheme } from "./themeDefaults";
 import { localizeTheme } from "./themeI18n";
 import { useTranslation } from "@/i18n/LanguageProvider";
+import { userHttp } from "@/apis/axiosInstance";
+
+/* SHARED PREVIEW LINK (store editor "Share preview"):
+   ?theme_preview=<token> → token is tab ki sessionStorage me, URL se hata diya,
+   current DRAFT backend /theme/preview se. Navigation par bhi preview rehta hai.
+   Expired / revoked → normal published theme + chhota notice. */
+const SHARE_KEY = "store-theme-preview";
 
 const ThemeContext = createContext({ theme: null, isPreview: false, selectedSectionId: null });
 
@@ -54,6 +61,47 @@ export function StoreThemeProvider({ initialTheme = null, translations = null, c
   // Server par hamesha false (hydration same), client par iframe/URL se
   const isPreview = useSyncExternalStore(noopSubscribe, detectPreview, () => false);
   const [selectedSectionId, setSelectedSectionId] = useState(null);
+  const [sharePreview, setSharePreview] = useState(null); // { status: "active" | "expired", expiresAt }
+
+  useEffect(() => {
+    if (isPreview) return undefined; // editor iframe apna draft postMessage se leta hai
+    let token = null;
+    try {
+      const url = new URL(window.location.href);
+      token = url.searchParams.get("theme_preview");
+      if (token) {
+        window.sessionStorage.setItem(SHARE_KEY, token);
+        url.searchParams.delete("theme_preview");
+        // Next router ki history state same rakho
+        window.history.replaceState(window.history.state, "", url.toString());
+      } else {
+        token = window.sessionStorage.getItem(SHARE_KEY);
+      }
+    } catch {
+      // storage / URL blocked
+    }
+    if (!token) return undefined;
+    let cancelled = false;
+    userHttp
+      .get("/theme/preview", { params: { token } })
+      .then((res) => {
+        const d = res?.data?.data;
+        if (cancelled || !isThemeShape(d?.theme)) return;
+        setTheme(d.theme);
+        setSharePreview({ status: "active", expiresAt: d.expiresAt });
+      })
+      .catch(() => {
+        try {
+          window.sessionStorage.removeItem(SHARE_KEY);
+        } catch {
+          // ignore
+        }
+        if (!cancelled) setSharePreview({ status: "expired" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPreview]);
 
   useEffect(() => {
     if (!isPreview) return undefined;
@@ -69,15 +117,19 @@ export function StoreThemeProvider({ initialTheme = null, translations = null, c
     return () => window.removeEventListener("message", onMessage);
   }, [isPreview]);
 
-  // Preview me draft (abhi translate nahi hua) → seller ka original text
+  // Preview / shared preview me draft (abhi translate nahi hua) → seller ka original text
+  const showingDraft = isPreview || sharePreview?.status === "active";
   const theme = useMemo(
-    () => (isPreview ? rawTheme : localizeTheme(rawTheme, translations, locale)),
-    [rawTheme, translations, locale, isPreview],
+    () => (showingDraft ? rawTheme : localizeTheme(rawTheme, translations, locale)),
+    [rawTheme, translations, locale, showingDraft],
   );
 
   const css = useMemo(() => buildThemeCss(theme), [theme]);
   const fontsHref = useMemo(() => themeFontsHref(theme), [theme]);
-  const value = useMemo(() => ({ theme, isPreview, selectedSectionId }), [theme, isPreview, selectedSectionId]);
+  const value = useMemo(
+    () => ({ theme, isPreview, selectedSectionId, sharePreview }),
+    [theme, isPreview, selectedSectionId, sharePreview],
+  );
 
   return (
     <ThemeContext.Provider value={value}>
@@ -90,6 +142,16 @@ export function StoreThemeProvider({ initialTheme = null, translations = null, c
 
 export function useStoreTheme() {
   return useContext(ThemeContext);
+}
+
+/** Shared preview band karo → published theme (reload) */
+export function exitSharedPreview() {
+  try {
+    window.sessionStorage.removeItem(SHARE_KEY);
+  } catch {
+    // ignore
+  }
+  window.location.reload();
 }
 
 /** Preview me section click → editor sidebar me wahi section select */

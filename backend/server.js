@@ -364,6 +364,8 @@ const startServer = async () => {
     // 🧹 Store editor: unused theme images (nightly, 24h grace) — multi-instance par
     // ek saath chale to bhi safe (unlink idempotent)
     require("./utils/themeImageCleanup").start();
+    // ⏰ Store editor scheduled publish (har minute, multi-instance safe)
+    require("./utils/themeScheduler").start();
 
     // 📧 SMTP check — BACKGROUND me (await NAHI). Pehle startup isi par ~12s
     // rukta tha (SMTP handshake), server listen hi nahi karta tha. Email bhejna

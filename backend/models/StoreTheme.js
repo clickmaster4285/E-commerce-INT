@@ -33,6 +33,27 @@ const storeThemeSchema = new mongoose.Schema(
     // { "<key>": { h: md5, ur: "...", ar: "..." } } — publish ke baad async bharta hai
     translations: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
     translationsUpdatedAt: { type: Date, default: null },
+
+    // Scheduled publish — draft ka SNAPSHOT { at, data, note, by, createdAt } (utils/themeScheduler)
+    scheduled: { type: mongoose.Schema.Types.Mixed, default: null },
+    // Pichla scheduled publish fail hua ho (e.g. schema invalid) → editor me dikhta hai
+    lastScheduleError: { type: mongoose.Schema.Types.Mixed, default: null },
+
+    // Shareable preview links — sirf token ka sha256 hash (asli token kabhi save nahi)
+    previewLinks: {
+      type: [
+        new mongoose.Schema(
+          {
+            hash: { type: String, required: true },
+            expiresAt: { type: Date, required: true },
+            createdAt: { type: Date, default: Date.now },
+            createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
+          },
+          { _id: true },
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true, minimize: false, collection: "store_themes" },
 );
@@ -41,5 +62,7 @@ const storeThemeSchema = new mongoose.Schema(
 storeThemeSchema.plugin(tenantScope);
 // Har store ka sirf ek theme document
 storeThemeSchema.index({ storeId: 1 }, { unique: true });
+// Scheduler har minute sirf due themes dhoondta hai
+storeThemeSchema.index({ "scheduled.at": 1 }, { sparse: true });
 
 module.exports = mongoose.model("StoreTheme", storeThemeSchema);

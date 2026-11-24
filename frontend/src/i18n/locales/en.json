@@ -1,4 +1,8 @@
 {
+  "storefront.sharePreview.active": "Previewing unpublished changes",
+  "storefront.sharePreview.expires": "Link expires {date}",
+  "storefront.sharePreview.exit": "Exit preview",
+  "storefront.sharePreview.expired": "This preview link has expired or was revoked. You're seeing the live store.",
   "storefront.popup.close": "Close",
   "storefront.popup.noThanks": "No thanks",
   "storefront.popup.copy": "Copy",

@@ -20,6 +20,7 @@ import SupportChatWidget from "@/components/chat/SupportChatWidget";
 import AnnouncementBar from "@/storefront/AnnouncementBar";
 import FloatingWhatsApp from "@/storefront/FloatingWhatsApp";
 import StorePopup from "@/storefront/StorePopup";
+import SharePreviewBar from "@/storefront/SharePreviewBar";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
@@ -159,6 +160,7 @@ export default function UserLayoutClient({ children }) {
           lang={locale}
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-user-page text-user-fg"
         >
+          <SharePreviewBar />
           <AnnouncementBar />
           <Header />
           <main className="w-full min-w-0">{children}</main>

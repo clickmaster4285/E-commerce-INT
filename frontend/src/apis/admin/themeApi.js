@@ -15,6 +15,12 @@ export const themeApi = {
   discard: () => adminHttp.post("/theme/discard").then(data),
   listVersions: () => adminHttp.get("/theme/versions").then(data),
   restoreVersion: (version) => adminHttp.post(`/theme/versions/${version}/restore`).then(data),
+  // Scheduled publish — draft ka snapshot "at" (ISO) par live
+  schedule: ({ at, note = "" }) => adminHttp.post("/theme/schedule", { at, note }).then(data),
+  cancelSchedule: () => adminHttp.delete("/theme/schedule").then(data),
+  // Shareable preview link → { token, expiresAt, theme } (token sirf isi response me)
+  createPreviewLink: (hours = 24) => adminHttp.post("/theme/preview-links", { hours }).then(data),
+  revokePreviewLinks: () => adminHttp.delete("/theme/preview-links").then(data),
   uploadImage: (file) => {
     const form = new FormData();
     form.append("image", file);
