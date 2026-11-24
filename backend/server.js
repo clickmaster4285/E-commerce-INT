@@ -363,16 +363,21 @@ const startServer = async () => {
     // ek saath chale to bhi safe (unlink idempotent)
     require("./utils/themeImageCleanup").start();
 
-    // 📧 SMTP check (chalta rehta hai, par print nahi — extra info nahi chahiye)
-    try {
-      const { isSmtpConfigured, verifySmtpConnection, getSmtpConfig } = require("./utils/sendEmail");
-      if (isSmtpConfigured()) {
-        await verifySmtpConnection();
+    // 📧 SMTP check — BACKGROUND me (await NAHI). Pehle startup isi par ~12s
+    // rukta tha (SMTP handshake), server listen hi nahi karta tha. Email bhejna
+    // is check par depend nahi karta — sirf misconfig ka early warning hai.
+    setImmediate(() => {
+      try {
+        const { isSmtpConfigured, verifySmtpConnection } = require("./utils/sendEmail");
+        if (!isSmtpConfigured()) return;
+        verifySmtpConnection().catch((smtpError) => {
+          console.warn(`⚠️  SMTP check failed: ${smtpError.message}`);
+        });
+      } catch (smtpError) {
+        console.warn(`⚠️  SMTP check failed: ${smtpError.message}`);
       }
-    } catch (smtpError) {
-      log.error("❌ SMTP check failed:", smtpError.message);
-    }
-    
+    });
+
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
       startupLog.error(`Port ${PORT} already in use — stop the existing service or configure a different PORT.`);
