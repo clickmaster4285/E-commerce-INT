@@ -66,13 +66,15 @@ export const useThemeEditorStore = create((set, get) => ({
   markSaveError: (saveState, saveError) => set({ saveState, saveError }),
 
   // ── Section helpers ──
-  addSection: (type, schemaType) => {
+  // insertAt (optional) = order index (preview ke "+" / "add below" se); warna end me
+  addSection: (type, schemaType, insertAt) => {
     const { draft } = get();
     if (!draft) return;
     const id = schemaType.limit === 1 && !draft.sections[type] ? type : randomId(type);
     get().update((d) => {
       d.sections[id] = { type, disabled: false, settings: defaultsOf(schemaType.settings), blocks: [] };
-      d.order.push(id);
+      const at = Number.isInteger(insertAt) && insertAt >= 0 && insertAt <= d.order.length ? insertAt : d.order.length;
+      d.order.splice(at, 0, id);
     });
     set({ selected: { kind: "section", id } });
   },
@@ -85,12 +87,16 @@ export const useThemeEditorStore = create((set, get) => ({
     if (get().selected?.id === id) set({ selected: null });
   },
 
-  duplicateSection: (id) =>
+  // limit (schema) di ho to usse zyada copies nahi (preview toolbar se bhi)
+  duplicateSection: (id, limit = Infinity) =>
     get().update((d) => {
       const src = d.sections[id];
       if (!src) return;
+      if (d.order.filter((x) => d.sections[x]?.type === src.type).length >= limit) return;
       const copyId = randomId(src.type);
       d.sections[copyId] = clone(src);
+      // Blocks ki ids bhi nayi (do sections me same block id na ho)
+      d.sections[copyId].blocks = (src.blocks || []).map((b) => ({ ...clone(b), id: randomId("b") }));
       d.order.splice(d.order.indexOf(id) + 1, 0, copyId);
     }),
 

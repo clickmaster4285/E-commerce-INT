@@ -38,7 +38,8 @@ import BannerSlider from "@/components/user/BannerSlider";
 import ViewportSection from "@/components/user/ViewportSection";
 import { useHomeCatalog } from "../../hooks/user/useHomeCatalog";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { useStoreTheme, selectSectionInEditor } from "@/storefront/ThemeProvider";
+import { useStoreTheme } from "@/storefront/ThemeProvider";
+import EditableSection from "@/storefront/EditableSection";
 import { hasCustomAccent } from "@/storefront/themeCss";
 import { DEFAULT_SECTION_ORDER } from "@/storefront/themeDefaults";
 import { GENERIC_SECTIONS } from "@/storefront/sections/registry";
@@ -96,26 +97,7 @@ function useHomeStyle() {
   return hasCustomAccent(theme) ? undefined : HOME_THEME;
 }
 
-/* Store editor preview: section par outline + click → editor me select.
-   Preview ke bahar sirf <Fragment> jaisa wrapper (koi extra DOM nahi). */
-function EditableSection({ id, isPreview, selected, children }) {
-  if (!isPreview) return children;
-  return (
-    <div
-      data-section-id={id}
-      onClickCapture={(event) => {
-        // Preview me links navigate na karein — click sirf select kare
-        if (event.target.closest?.("a")) event.preventDefault();
-        selectSectionInEditor(id);
-      }}
-      className={`relative rounded-2xl outline-offset-4 transition-[outline-color] ${
-        selected ? "outline outline-2 outline-user-accent" : "hover:outline hover:outline-1 hover:outline-user-line"
-      }`}
-    >
-      {children}
-    </div>
-  );
-}
+/* Store editor preview wrapper (outline + hover toolbar) → storefront/EditableSection.js */
 
 const FILTER_KEYS = [
   "category",
@@ -414,7 +396,14 @@ function HomeContent({ initialBanners = null }) {
     }
     if (!node) return null;
     return (
-      <EditableSection key={id} id={id} isPreview={isPreview} selected={selectedSectionId === id}>
+      <EditableSection
+        key={id}
+        id={id}
+        isPreview={isPreview}
+        selected={selectedSectionId === id}
+        isFirst={index === 0}
+        isLast={index === sectionEntries.length - 1}
+      >
         <SectionStyle style={section.style}>{node}</SectionStyle>
       </EditableSection>
     );

@@ -12,8 +12,9 @@
      Sirf tab jab URL me ?preview=1 ho AUR page iframe me ho AUR parent
      ISI origin ka ho (admin panel same store host par chalta hai).
      Parent window draft theme postMessage se bhejta hai:
-        parent → iframe : { type: "theme:update", theme, selectedSectionId }
+        parent → iframe : { type: "theme:update", theme, selectedSectionId, labels }
         iframe → parent : { type: "theme:ready" } | { type: "section:select", id }
+                          | { type: "section:action", action, id }  (hover toolbar)
      Draft kabhi public URL se nahi aata → public visitors ko draft nahi dikhta.
    ========================================================== */
 
@@ -30,13 +31,17 @@ import { userHttp } from "@/apis/axiosInstance";
    Expired / revoked → normal published theme + chhota notice. */
 const SHARE_KEY = "store-theme-preview";
 
-const ThemeContext = createContext({ theme: null, isPreview: false, selectedSectionId: null });
+const ThemeContext = createContext({ theme: null, isPreview: false, selectedSectionId: null, sectionLabels: null });
 
 export const PREVIEW_MESSAGE = {
   update: "theme:update",
   ready: "theme:ready",
   select: "section:select",
+  action: "section:action",
 };
+
+// Preview toolbar ke actions (editor side bhi yahi allowlist check karta hai)
+export const SECTION_ACTIONS = ["moveUp", "moveDown", "hide", "duplicate", "remove", "addBelow"];
 
 function detectPreview() {
   if (typeof window === "undefined") return false;
@@ -61,6 +66,7 @@ export function StoreThemeProvider({ initialTheme = null, translations = null, c
   // Server par hamesha false (hydration same), client par iframe/URL se
   const isPreview = useSyncExternalStore(noopSubscribe, detectPreview, () => false);
   const [selectedSectionId, setSelectedSectionId] = useState(null);
+  const [sectionLabels, setSectionLabels] = useState(null); // { [id]: "Rich text · About" } (editor se)
   const [sharePreview, setSharePreview] = useState(null); // { status: "active" | "expired", expiresAt }
 
   useEffect(() => {
@@ -111,6 +117,7 @@ export function StoreThemeProvider({ initialTheme = null, translations = null, c
       if (!msg || msg.type !== PREVIEW_MESSAGE.update) return;
       if (isThemeShape(msg.theme)) setTheme(msg.theme);
       setSelectedSectionId(typeof msg.selectedSectionId === "string" ? msg.selectedSectionId : null);
+      if (msg.labels && typeof msg.labels === "object") setSectionLabels(msg.labels);
     };
     window.addEventListener("message", onMessage);
     window.parent.postMessage({ type: PREVIEW_MESSAGE.ready }, window.location.origin);
@@ -127,8 +134,8 @@ export function StoreThemeProvider({ initialTheme = null, translations = null, c
   const css = useMemo(() => buildThemeCss(theme), [theme]);
   const fontsHref = useMemo(() => themeFontsHref(theme), [theme]);
   const value = useMemo(
-    () => ({ theme, isPreview, selectedSectionId, sharePreview }),
-    [theme, isPreview, selectedSectionId, sharePreview],
+    () => ({ theme, isPreview, selectedSectionId, sharePreview, sectionLabels }),
+    [theme, isPreview, selectedSectionId, sharePreview, sectionLabels],
   );
 
   return (
@@ -158,6 +165,16 @@ export function exitSharedPreview() {
 export function selectSectionInEditor(id) {
   try {
     window.parent.postMessage({ type: PREVIEW_MESSAGE.select, id }, window.location.origin);
+  } catch {
+    // ignore
+  }
+}
+
+/** Preview hover toolbar → editor (move / hide / duplicate / remove / add below) */
+export function sendSectionAction(action, id) {
+  if (!SECTION_ACTIONS.includes(action)) return;
+  try {
+    window.parent.postMessage({ type: PREVIEW_MESSAGE.action, action, id }, window.location.origin);
   } catch {
     // ignore
   }

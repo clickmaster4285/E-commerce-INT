@@ -28,14 +28,43 @@ export const assetUrl = (url) => (!url ? "" : /^https?:/i.test(url) ? url : `${A
 const inputCls =
   "h-9 w-full rounded-lg border border-line bg-input px-3 text-sm text-fg outline-none transition placeholder:text-fg-muted focus:border-accent focus:ring-2 focus:ring-accent/20";
 
-function FieldShell({ label, hint, children }) {
+// onReset diya ho → label ke saath "reset to default" icon (sirf jab value default se alag ho)
+function FieldShell({ label, hint, aside, onReset, children }) {
   return (
-    <label className="block space-y-1.5">
-      <span className="block text-xs font-semibold text-fg-secondary">{label}</span>
+    <label className="group/field block space-y-1.5">
+      <span className="flex min-h-5 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-xs font-semibold text-fg-secondary">{label}</span>
+        {aside}
+        {onReset ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onReset();
+            }}
+            title="Reset to default"
+            aria-label={`Reset ${label} to default`}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-fg-muted opacity-70 transition hover:bg-subtle hover:text-fg hover:opacity-100"
+          >
+            <RotateCcw size={11} />
+          </button>
+        ) : null}
+      </span>
       {children}
       {hint ? <span className="block text-[11px] text-fg-muted">{hint}</span> : null}
     </label>
   );
+}
+
+const cloneValue = (v) => (v === undefined ? null : v && typeof v === "object" ? JSON.parse(JSON.stringify(v)) : v);
+const isEmptyValue = (v) => v === undefined || v === null || v === "";
+// Value default se alag? (link objects JSON compare; "" aur null barabar)
+export function differsFromDefault(field, value) {
+  if (value === undefined) return false; // kabhi set nahi hua = default
+  const def = field.default === undefined ? null : field.default;
+  if (isEmptyValue(value) && isEmptyValue(def)) return false;
+  if ((value && typeof value === "object") || (def && typeof def === "object")) return JSON.stringify(value) !== JSON.stringify(def);
+  return value !== def;
 }
 
 const humanize = (key) => String(key).replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
@@ -220,40 +249,42 @@ function ColorInput({ value, onChange }) {
 /** Ek schema field render karo */
 export function SettingField({ field, value, onChange, linkTypes }) {
   const label = field.label || humanize(field.key);
+  // Reset icon: value badli ho to default par wapas (color ka apna reset hai)
+  const onReset = differsFromDefault(field, value) ? () => onChange(cloneValue(field.default)) : null;
   switch (field.type) {
     case "text":
       return (
-        <FieldShell label={label} hint={field.translatable ? "Leave empty to use the default text" : null}>
+        <FieldShell label={label} onReset={onReset} hint={field.hint || (field.translatable ? "Leave empty to use the default text" : null)}>
           <input className={inputCls} maxLength={200} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
         </FieldShell>
       );
     case "textarea":
       return (
-        <FieldShell label={label}>
+        <FieldShell label={label} onReset={onReset} hint={field.hint}>
           <textarea className={`${inputCls} h-24 py-2`} maxLength={1000} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
         </FieldShell>
       );
     case "richtext":
       return (
-        <FieldShell label={label}>
+        <FieldShell label={label} onReset={onReset} hint={field.hint}>
           <RichTextEditor value={value || ""} onChange={onChange} minHeight={140} />
         </FieldShell>
       );
     case "image":
       return (
-        <FieldShell label={label}>
+        <FieldShell label={label} hint={field.hint}>
           <ImageInput value={value} onChange={onChange} />
         </FieldShell>
       );
     case "color":
       return (
-        <FieldShell label={label}>
+        <FieldShell label={label} hint={field.hint}>
           <ColorInput key={value || "empty"} value={value} onChange={onChange} />
         </FieldShell>
       );
     case "select":
       return (
-        <FieldShell label={label}>
+        <FieldShell label={label} onReset={onReset} hint={field.hint}>
           <select className={inputCls} value={value ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}>
             {field.options.map((o) => (
               <option key={String(o)} value={o ?? ""}>
@@ -265,7 +296,12 @@ export function SettingField({ field, value, onChange, linkTypes }) {
       );
     case "range":
       return (
-        <FieldShell label={`${label}: ${value ?? field.default}`}>
+        <FieldShell
+          label={label}
+          onReset={onReset}
+          hint={field.hint}
+          aside={<span className="rounded-md bg-subtle px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-fg">{value ?? field.default}</span>}
+        >
           <input
             type="range"
             min={field.min}
@@ -286,7 +322,7 @@ export function SettingField({ field, value, onChange, linkTypes }) {
       );
     case "link":
       return (
-        <FieldShell label={label}>
+        <FieldShell label={label} onReset={onReset} hint={field.hint}>
           <LinkInput value={value} onChange={onChange} linkTypes={linkTypes} />
         </FieldShell>
       );

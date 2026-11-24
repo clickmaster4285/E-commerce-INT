@@ -3,35 +3,47 @@
 /* ==========================================================
    STORE EDITOR (/admin/store-editor) — Shopify-style theme editor
    ----------------------------------------------------------
-   Left: sections / theme / menus (schema-driven forms — backend
-   GET /theme/schema). Right: live storefront iframe (postMessage).
+   Layout: [icon rail] [settings panel] [live preview iframe]
+   • Rail: Sections (page ke hisaab se — homepage / product / category),
+     Theme settings, Menus, Pages link, shortcuts.
+   • Settings forms schema-driven (backend GET /theme/schema).
+   • Preview: postMessage draft + hover toolbar actions (move / hide /
+     duplicate / remove / add below) → yahan handle (single source of truth).
    Draft autosave (1.5s debounce, optimistic revision → 409 conflict),
    Publish = storefront par live, Versions = restore into draft.
    Full-screen: AdminLayoutClient is route par sidebar/navbar skip karta hai.
    ========================================================== */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  CalendarClock,
   Check,
+  ChevronDown,
   CloudOff,
   ExternalLink,
-  CalendarClock,
+  FileText,
   History,
-  Link2,
+  House,
+  Keyboard,
+  LayoutGrid,
   LayoutList,
+  Link2,
   Loader2,
   Lock,
+  Maximize2,
   Menu as MenuIcon,
   Monitor,
+  Package,
   Palette,
   Redo2,
   Smartphone,
   Tablet,
   Undo2,
+  WifiOff,
   X,
 } from "lucide-react";
 import { themeApi, apiError } from "@/apis/admin/themeApi";
@@ -39,6 +51,7 @@ import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useThemeEditorStore } from "./useThemeEditorStore";
 import { SectionList, SectionSettings, ThemeSettings, MenuEditor, VersionsPanel } from "./components/panels";
 import PreviewFrame from "./components/PreviewFrame";
+import AddSectionDialog from "./components/AddSectionDialog";
 import { ScheduleDialog, ShareDialog, ScheduleBanner } from "./components/PublishTools";
 import { ProductTemplatePanel, ProductBlockSettings } from "./components/productPanel";
 import { CollectionTemplatePanel } from "./components/collectionPanel";
@@ -46,10 +59,16 @@ import { adminProductApi } from "@/apis/admin/productApi";
 
 const AUTOSAVE_MS = 1500;
 
-const TABS = [
+const RAIL = [
   { id: "sections", label: "Sections", icon: LayoutList },
-  { id: "theme", label: "Theme", icon: Palette },
+  { id: "theme", label: "Theme settings", icon: Palette },
   { id: "menus", label: "Menus", icon: MenuIcon },
+];
+
+const EDIT_PAGES = [
+  { id: "home", label: "Homepage", icon: House },
+  { id: "product", label: "Product page", icon: Package },
+  { id: "collection", label: "Category page", icon: LayoutGrid },
 ];
 
 const DEVICES = [
@@ -57,6 +76,30 @@ const DEVICES = [
   { id: "tablet", icon: Tablet, label: "Tablet" },
   { id: "mobile", icon: Smartphone, label: "Mobile" },
 ];
+
+const SHORTCUTS = [
+  ["Ctrl", "Z", "Undo"],
+  ["Ctrl", "Shift", "Z", "Redo"],
+  ["Ctrl", "S", "Save draft now"],
+  ["Esc", "Close section / dialog"],
+  ["?", "Show shortcuts"],
+];
+
+const isTyping = (target) => {
+  const tag = target?.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable;
+};
+
+// navigator.onLine (offline me autosave ruk jata hai, online hote hi save)
+const subscribeOnline = (cb) => {
+  window.addEventListener("online", cb);
+  window.addEventListener("offline", cb);
+  return () => {
+    window.removeEventListener("online", cb);
+    window.removeEventListener("offline", cb);
+  };
+};
+const getOnline = () => navigator.onLine;
 
 function FullScreenMessage({ icon: Icon, title, children }) {
   return (
@@ -73,35 +116,97 @@ function FullScreenMessage({ icon: Icon, title, children }) {
   );
 }
 
-function SaveIndicator({ state, dirty, error }) {
+function SaveIndicator({ state, dirty, error, online }) {
+  if (!online) return <span className="inline-flex items-center gap-1.5 text-xs text-warning" title="Changes save when you're back online"><WifiOff size={13} /> Offline</span>;
   if (state === "saving") return <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted"><Loader2 size={13} className="animate-spin" /> Saving…</span>;
   if (state === "error") return <span className="inline-flex items-center gap-1.5 text-xs text-danger" title={error || ""}><CloudOff size={13} /> Not saved</span>;
   if (state === "conflict") return <span className="inline-flex items-center gap-1.5 text-xs text-warning"><CloudOff size={13} /> Conflict</span>;
   if (dirty) return <span className="text-xs text-fg-muted">Unsaved changes</span>;
   if (state === "saved") return <span className="inline-flex items-center gap-1.5 text-xs text-success"><Check size={13} /> Draft saved</span>;
-  return null;
+  return <span className="text-xs text-fg-muted">All changes saved</span>;
+}
+
+const topBtn =
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted transition hover:bg-subtle hover:text-fg disabled:opacity-30";
+
+function PageSwitcher({ value, onChange }) {
+  const current = EDIT_PAGES.find((p) => p.id === value) || EDIT_PAGES[0];
+  const Icon = current.icon;
+  return (
+    <label className="relative inline-flex h-9 items-center rounded-lg border border-line bg-card ps-2.5 pe-1 text-sm font-semibold text-fg transition hover:border-line-strong focus-within:border-accent">
+      <Icon size={15} className="pointer-events-none text-fg-muted" />
+      <span className="sr-only">Page to edit</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-full cursor-pointer appearance-none bg-transparent ps-2 pe-6 text-sm font-semibold text-fg outline-none"
+      >
+        {EDIT_PAGES.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute end-2 text-fg-muted" />
+    </label>
+  );
+}
+
+function ShortcutsDialog({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="w-full max-w-sm rounded-2xl border border-line bg-card p-5 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-fg">Keyboard shortcuts</h2>
+          <button type="button" onClick={onClose} className="rounded-md p-1 text-fg-muted hover:bg-subtle" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <ul className="space-y-2">
+          {SHORTCUTS.map((row) => (
+            <li key={row.join("+")} className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-fg-secondary">{row[row.length - 1]}</span>
+              <span className="flex items-center gap-1">
+                {row.slice(0, -1).map((k) => (
+                  <kbd key={k} className="rounded-md border border-line bg-subtle px-1.5 py-0.5 text-[11px] font-semibold text-fg">
+                    {k}
+                  </kbd>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[11px] text-fg-muted">On Mac use ⌘ instead of Ctrl.</p>
+      </div>
+    </div>
+  );
 }
 
 export default function StoreEditorPage() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("sections");
   const [device, setDevice] = useState("desktop");
-  // Kaun sa page edit ho raha hai: homepage sections ya product page template
+  const [zoom, setZoom] = useState("fit"); // fit = asli device width, scaled | actual = panel width
+  // Kaun sa page edit ho raha hai: homepage sections / product / category template
   const [editPage, setEditPage] = useState("home");
   const [showVersions, setShowVersions] = useState(false);
-  const [dialog, setDialog] = useState(null); // "schedule" | "share" | null
+  const [dialog, setDialog] = useState(null); // "schedule" | "share" | "shortcuts" | null
+  const [addSection, setAddSection] = useState(null); // { insertAt } | null
+  const [focusGroup, setFocusGroup] = useState(null); // ThemeSettings me kholne wala group
   // Schedule / preview-link responses — sirf ye fields override (draft reload NAHI → undo history safe)
   const [publishMeta, setPublishMeta] = useState(null);
   const [previewKey, setPreviewKey] = useState(0);
+  const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
 
   const store = useThemeEditorStore();
-  const { draft, revision, dirty, saveState, saveError, selected, past, future } = store;
+  const { draft, dirty, saveState, saveError, selected, past, future } = store;
 
   const schemaQuery = useQuery({ queryKey: ["themeSchema"], queryFn: themeApi.getSchema, staleTime: Infinity });
   const themeQuery = useQuery({ queryKey: ["theme"], queryFn: themeApi.getTheme, refetchOnWindowFocus: false, retry: false });
   const versionsQuery = useQuery({ queryKey: ["themeVersions"], queryFn: themeApi.listVersions, enabled: showVersions });
 
   const meta = themeQuery.data;
+  const schema = schemaQuery.data;
 
   const sampleProductQuery = useQuery({
     queryKey: ["storeEditor", "sampleProduct"],
@@ -156,10 +261,10 @@ export default function StoreEditorPage() {
   }, []);
 
   useEffect(() => {
-    if (!dirty || saveState === "conflict" || saveState === "saving") return undefined;
+    if (!online || !dirty || saveState === "conflict" || saveState === "saving") return undefined;
     const timer = setTimeout(saveNow, AUTOSAVE_MS);
     return () => clearTimeout(timer);
-  }, [draft, dirty, saveState, saveNow]);
+  }, [draft, dirty, saveState, saveNow, online]);
 
   // Unsaved tab close warning
   useEffect(() => {
@@ -174,19 +279,37 @@ export default function StoreEditorPage() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
-  // Undo / redo shortcuts (inputs ke andar browser ka apna undo)
+  // ── Keyboard shortcuts ──
+  // Undo/redo inputs ke andar browser ka apna; Ctrl+S hamesha (browser "save page" nahi)
+  const anyDialogOpen = Boolean(dialog || addSection || showVersions);
   useEffect(() => {
     const onKey = (event) => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "z") return;
-      const tag = event.target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || event.target?.isContentEditable) return;
-      event.preventDefault();
-      if (event.shiftKey) useThemeEditorStore.getState().redo();
-      else useThemeEditorStore.getState().undo();
+      const mod = event.ctrlKey || event.metaKey;
+      const key = event.key.toLowerCase();
+      if (mod && key === "s") {
+        event.preventDefault();
+        saveNow();
+        return;
+      }
+      if (mod && (key === "z" || key === "y")) {
+        if (isTyping(event.target)) return;
+        event.preventDefault();
+        if (key === "y" || event.shiftKey) useThemeEditorStore.getState().redo();
+        else useThemeEditorStore.getState().undo();
+        return;
+      }
+      if (event.key === "Escape" && !anyDialogOpen && !isTyping(event.target)) {
+        useThemeEditorStore.getState().select(null);
+        return;
+      }
+      if (event.key === "?" && !mod && !anyDialogOpen && !isTyping(event.target)) {
+        event.preventDefault();
+        setDialog("shortcuts");
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [saveNow, anyDialogOpen]);
 
   // Doosre admin ne publish kiya → meta refresh (draft overwrite nahi)
   const { socket } = useAdminSocket();
@@ -196,6 +319,67 @@ export default function StoreEditorPage() {
     socket.on("themePublished", onPublished);
     return () => socket.off("themePublished", onPublished);
   }, [socket, queryClient]);
+
+  // ── Preview hover toolbar → draft ──
+  const handleSectionAction = useCallback(
+    (action, id) => {
+      const s = useThemeEditorStore.getState();
+      const d = s.draft;
+      const section = d?.sections?.[id];
+      if (!section) return;
+      const def = schema?.sectionTypes?.[section.type];
+      switch (action) {
+        case "moveUp":
+        case "moveDown": {
+          // Preview me sirf visible sections dikhte hain → visible padosi ke paar le jao
+          const visible = d.order.filter((x) => d.sections[x] && !d.sections[x].disabled);
+          const neighbour = visible[visible.indexOf(id) + (action === "moveUp" ? -1 : 1)];
+          if (!neighbour) return;
+          const order = d.order.filter((x) => x !== id);
+          const at = order.indexOf(neighbour);
+          order.splice(action === "moveUp" ? at : at + 1, 0, id);
+          s.setOrder(order);
+          s.select({ kind: "section", id });
+          break;
+        }
+        case "hide":
+          s.toggleSection(id);
+          toast("Section hidden", {
+            description: "Show it again from the section list.",
+            action: { label: "Undo", onClick: () => useThemeEditorStore.getState().undo() },
+          });
+          break;
+        case "duplicate": {
+          const used = d.order.filter((x) => d.sections[x]?.type === section.type).length;
+          if (!def || used >= def.limit) {
+            toast.error(`Only ${def?.limit ?? 1} ${def?.label || "section"} allowed`);
+            return;
+          }
+          if (d.order.length >= (schema?.limits?.maxSections ?? Infinity)) {
+            toast.error("Section limit reached");
+            return;
+          }
+          s.duplicateSection(id, def.limit);
+          break;
+        }
+        case "remove":
+          if (window.confirm("Remove this section?")) s.removeSection(id);
+          break;
+        case "addBelow":
+          setAddSection({ insertAt: d.order.indexOf(id) + 1 });
+          break;
+        default:
+      }
+    },
+    [schema],
+  );
+
+  const openGlobalGroup = useCallback((group) => {
+    useThemeEditorStore.getState().select(null);
+    setTab("theme");
+    setFocusGroup(group);
+  }, []);
+  const clearFocusGroup = useCallback(() => setFocusGroup(null), []);
 
   const publishMutation = useMutation({
     mutationFn: async () => {
@@ -272,7 +456,6 @@ export default function StoreEditorPage() {
     );
   }
 
-  const schema = schemaQuery.data;
   if (!schema || !draft) {
     return (
       <div className="flex h-screen items-center justify-center bg-page">
@@ -283,68 +466,95 @@ export default function StoreEditorPage() {
 
   const busy = publishMutation.isPending || discardMutation.isPending || restoreMutation.isPending;
   const hasUnpublished = dirty || saveState === "saving" || meta?.hasUnpublishedChanges || saveState === "saved";
+  const switchPage = (id) => {
+    setEditPage(id);
+    setTab("sections");
+    store.select(null);
+  };
+
+  // ── Sidebar content ──
+  let panel;
+  if (selected?.kind === "productBlock") {
+    panel = <ProductBlockSettings schema={schema} zone={selected.zone} id={selected.id} onBack={() => store.select(null)} />;
+  } else if (selected?.kind === "section" && draft.sections[selected.id]) {
+    panel = <SectionSettings key={selected.id} schema={schema} id={selected.id} onBack={() => store.select(null)} />;
+  } else if (tab === "theme") {
+    panel = <ThemeSettings schema={schema} focusGroup={focusGroup} onFocusHandled={clearFocusGroup} />;
+  } else if (tab === "menus") {
+    panel = <MenuEditor schema={schema} />;
+  } else if (editPage === "collection") {
+    panel = <CollectionTemplatePanel schema={schema} />;
+  } else if (editPage === "product") {
+    panel = (
+      <>
+        {!sampleProductQuery.isLoading && !sampleProductId ? (
+          <p className="mb-4 rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning">Add a product to see the product page preview.</p>
+        ) : null}
+        <ProductTemplatePanel schema={schema} />
+      </>
+    );
+  } else {
+    panel = <SectionList schema={schema} onAddSection={() => setAddSection({ insertAt: null })} onOpenGlobal={openGlobalGroup} />;
+  }
+  const panelTitle = selected ? null : tab === "theme" ? "Theme settings" : tab === "menus" ? "Menus" : EDIT_PAGES.find((p) => p.id === editPage)?.label;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-page text-fg">
       {/* ── Top bar ── */}
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-card px-3 sm:px-4">
-        <Link href="/admin/dashboard" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg" aria-label="Exit editor">
-          <ArrowLeft size={18} />
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-card px-2 sm:gap-3 sm:px-3">
+        <Link href="/admin/dashboard" className={topBtn} aria-label="Exit editor" title="Exit editor">
+          <ArrowLeft size={18} className="rtl:rotate-180" />
         </Link>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold">Store editor</p>
-          <SaveIndicator state={saveState} dirty={dirty} error={saveError} />
+        <div className="hidden min-w-0 sm:block">
+          <p className="truncate text-sm font-bold leading-tight">Store editor</p>
+          <SaveIndicator state={saveState} dirty={dirty} error={saveError} online={online} />
         </div>
 
-        <div className="ms-2 flex items-center gap-1 rounded-lg bg-subtle p-1">
-          {[
-            { id: "home", label: "Homepage" },
-            { id: "product", label: "Product page" },
-            { id: "collection", label: "Category page" },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => {
-                setEditPage(opt.id);
-                store.select(null);
-              }}
-              className={`h-7 rounded-md px-2.5 text-xs font-semibold transition ${editPage === opt.id ? "bg-card text-fg shadow-sm" : "text-fg-muted hover:text-fg"}`}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="ms-1 sm:ms-3">
+          <PageSwitcher value={editPage} onChange={switchPage} />
         </div>
 
-        <div className="mx-auto hidden items-center gap-1 rounded-lg bg-subtle p-1 md:flex">
-          {DEVICES.map(({ id, icon: Icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setDevice(id)}
-              aria-label={label}
-              title={label}
-              className={`inline-flex h-7 w-8 items-center justify-center rounded-md transition ${device === id ? "bg-card text-fg shadow-sm" : "text-fg-muted hover:text-fg"}`}
-            >
-              <Icon size={15} />
-            </button>
-          ))}
+        <div className="mx-auto hidden items-center gap-1 md:flex">
+          <div className="flex items-center gap-1 rounded-lg bg-subtle p-1">
+            {DEVICES.map(({ id, icon: Icon, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setDevice(id)}
+                aria-label={label}
+                aria-pressed={device === id}
+                title={label}
+                className={`inline-flex h-7 w-8 items-center justify-center rounded-md transition ${device === id ? "bg-card text-fg shadow-sm" : "text-fg-muted hover:text-fg"}`}
+              >
+                <Icon size={15} />
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => (z === "fit" ? "actual" : "fit"))}
+            className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition hover:bg-subtle ${zoom === "fit" ? "text-fg" : "text-fg-muted"}`}
+            title={zoom === "fit" ? "Showing the real device width, scaled to fit. Click to use the panel width." : "Showing the panel width. Click to show the real device width."}
+          >
+            <Maximize2 size={14} /> {zoom === "fit" ? "Fit" : "100%"}
+          </button>
         </div>
 
-        <div className="ms-auto flex items-center gap-1.5 md:ms-0">
-          <button type="button" onClick={store.undo} disabled={!past.length} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg disabled:opacity-30" title="Undo (Ctrl+Z)">
+        <div className="ms-auto flex items-center gap-0.5 sm:gap-1 md:ms-0">
+          <button type="button" onClick={store.undo} disabled={!past.length} className={topBtn} title="Undo (Ctrl+Z)" aria-label="Undo">
             <Undo2 size={16} />
           </button>
-          <button type="button" onClick={store.redo} disabled={!future.length} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg disabled:opacity-30" title="Redo (Ctrl+Shift+Z)">
+          <button type="button" onClick={store.redo} disabled={!future.length} className={topBtn} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
             <Redo2 size={16} />
           </button>
-          <button type="button" onClick={() => setShowVersions(true)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg" title="Version history">
+          <span className="mx-1 hidden h-6 w-px bg-line sm:block" />
+          <button type="button" onClick={() => setShowVersions(true)} className={topBtn} title="Version history" aria-label="Version history">
             <History size={16} />
           </button>
-          <button type="button" onClick={() => setDialog("share")} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg" title="Share preview link">
+          <button type="button" onClick={() => setDialog("share")} className={topBtn} title="Share preview link" aria-label="Share preview link">
             <Link2 size={16} />
           </button>
-          <a href="/" target="_blank" rel="noopener noreferrer" className="hidden h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-subtle hover:text-fg sm:inline-flex" title="Open live store">
+          <a href="/" target="_blank" rel="noopener noreferrer" className={`${topBtn} hidden sm:inline-flex`} title="Open live store" aria-label="Open live store">
             <ExternalLink size={16} />
           </a>
           <button
@@ -357,24 +567,27 @@ export default function StoreEditorPage() {
           >
             Discard
           </button>
-          <button
-            type="button"
-            disabled={busy || saveState === "conflict" || !hasUnpublished}
-            onClick={() => publishMutation.mutate()}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-accent-fg shadow-sm hover:bg-accent-hover disabled:opacity-50"
-          >
-            {publishMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
-            Publish
-          </button>
-          <button
-            type="button"
-            disabled={busy || saveState === "conflict"}
-            onClick={() => setDialog("schedule")}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line text-fg-secondary hover:bg-subtle disabled:opacity-50"
-            title="Schedule publish"
-          >
-            <CalendarClock size={16} />
-          </button>
+          <div className="flex items-center overflow-hidden rounded-lg shadow-sm">
+            <button
+              type="button"
+              disabled={busy || saveState === "conflict" || !hasUnpublished}
+              onClick={() => publishMutation.mutate()}
+              className="inline-flex h-9 items-center gap-2 bg-accent px-4 text-sm font-semibold text-accent-fg hover:bg-accent-hover disabled:opacity-50"
+            >
+              {publishMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : null}
+              Publish
+            </button>
+            <button
+              type="button"
+              disabled={busy || saveState === "conflict"}
+              onClick={() => setDialog("schedule")}
+              className="inline-flex h-9 w-9 items-center justify-center border-s border-accent-fg/20 bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-50"
+              title="Schedule publish"
+              aria-label="Schedule publish"
+            >
+              <CalendarClock size={15} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -388,6 +601,19 @@ export default function StoreEditorPage() {
       {dialog === "share" ? (
         <ShareDialog onClose={() => setDialog(null)} onSaveDraft={saveNow} activeLinks={metaPreviewLinks.length} onChanged={takeMeta} />
       ) : null}
+      {dialog === "shortcuts" ? <ShortcutsDialog onClose={() => setDialog(null)} /> : null}
+      {addSection ? (
+        <AddSectionDialog
+          schema={schema}
+          draft={draft}
+          onClose={() => setAddSection(null)}
+          onAdd={(type, def) => {
+            store.addSection(type, def, addSection.insertAt ?? undefined);
+            setAddSection(null);
+            setTab("sections");
+          }}
+        />
+      ) : null}
 
       {saveState === "conflict" ? (
         <div role="alert" className="flex items-center justify-between gap-3 border-b border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning">
@@ -399,61 +625,70 @@ export default function StoreEditorPage() {
       ) : null}
 
       <div className="flex min-h-0 flex-1">
-        {/* ── Sidebar ── */}
-        <aside className="flex w-full shrink-0 flex-col border-e border-line bg-card md:w-[340px]">
-          {selected?.kind === "productBlock" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <ProductBlockSettings schema={schema} zone={selected.zone} id={selected.id} onBack={() => store.select(null)} />
+        {/* ── Icon rail ── */}
+        <nav aria-label="Editor panels" className="flex w-14 shrink-0 flex-col items-center gap-1 border-e border-line bg-card py-2">
+          {RAIL.map(({ id, label, icon: Icon }) => {
+            const active = tab === id && !selected;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => {
+                  store.select(null);
+                  setTab(id);
+                }}
+                aria-label={label}
+                aria-current={active ? "true" : undefined}
+                title={label}
+                className={`relative inline-flex h-10 w-10 items-center justify-center rounded-xl transition ${
+                  tab === id ? "bg-accent-soft text-accent" : "text-fg-muted hover:bg-subtle hover:text-fg"
+                }`}
+              >
+                <Icon size={18} />
+              </button>
+            );
+          })}
+          <span className="my-1 h-px w-8 bg-line" />
+          <Link href="/admin/pages" className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition hover:bg-subtle hover:text-fg" title="Manage pages" aria-label="Manage pages">
+            <FileText size={18} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setDialog("shortcuts")}
+            className="mt-auto inline-flex h-10 w-10 items-center justify-center rounded-xl text-fg-muted transition hover:bg-subtle hover:text-fg"
+            title="Keyboard shortcuts (?)"
+            aria-label="Keyboard shortcuts"
+          >
+            <Keyboard size={18} />
+          </button>
+        </nav>
+
+        {/* ── Settings panel ── */}
+        <aside className="flex min-w-0 flex-1 flex-col border-e border-line bg-card md:w-[340px] md:flex-none">
+          {panelTitle ? (
+            <div className="flex h-11 shrink-0 items-center border-b border-line px-4">
+              <h2 className="truncate text-sm font-bold text-fg">{panelTitle}</h2>
+              <span className="ms-auto sm:hidden">
+                <SaveIndicator state={saveState} dirty={dirty} error={saveError} online={online} />
+              </span>
             </div>
-          ) : editPage === "collection" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <CollectionTemplatePanel schema={schema} />
-            </div>
-          ) : editPage === "product" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {!sampleProductQuery.isLoading && !sampleProductId ? (
-                <p className="mb-4 rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning">Add a product to see the product page preview.</p>
-              ) : null}
-              <ProductTemplatePanel schema={schema} />
-            </div>
-          ) : selected?.kind === "section" ? (
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <SectionSettings schema={schema} id={selected.id} onBack={() => store.select(null)} />
-            </div>
-          ) : (
-            <>
-              <nav className="flex shrink-0 border-b border-line">
-                {TABS.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setTab(id)}
-                    className={`inline-flex flex-1 items-center justify-center gap-1.5 border-b-2 py-3 text-xs font-semibold transition ${
-                      tab === id ? "border-accent text-accent" : "border-transparent text-fg-muted hover:text-fg"
-                    }`}
-                  >
-                    <Icon size={14} /> {label}
-                  </button>
-                ))}
-              </nav>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                {tab === "sections" ? <SectionList schema={schema} /> : null}
-                {tab === "theme" ? <ThemeSettings schema={schema} /> : null}
-                {tab === "menus" ? <MenuEditor schema={schema} /> : null}
-              </div>
-            </>
-          )}
+          ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">{panel}</div>
           <p className="shrink-0 border-t border-line px-4 py-2 text-[11px] text-fg-muted">
-            Changes save as a draft automatically. Customers see them after you publish.{" "}
-            <Link href="/admin/pages" className="font-semibold text-accent hover:underline">
-              Manage pages
-            </Link>
+            Changes save as a draft automatically. Customers see them after you publish.
           </p>
         </aside>
 
         {/* ── Preview ── */}
-        <main className="hidden min-w-0 flex-1 overflow-hidden p-4 md:block">
-          <PreviewFrame device={device} reloadKey={previewKey} src={previewSrc} />
+        <main className="hidden min-w-0 flex-1 overflow-hidden bg-subtle/40 p-4 md:block">
+          <PreviewFrame
+            device={device}
+            zoom={zoom}
+            reloadKey={previewKey}
+            src={previewSrc}
+            schema={schema}
+            onSectionAction={editPage === "home" ? handleSectionAction : undefined}
+          />
         </main>
       </div>
 
