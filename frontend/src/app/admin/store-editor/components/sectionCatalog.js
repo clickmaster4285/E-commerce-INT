@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   LayoutTemplate,
   Layers,
+  MapPinned,
   Mail,
   MapPin,
   MessageSquare,
@@ -58,6 +59,7 @@ export const SECTION_CATALOG = {
   newsletter: { icon: Mail, category: "forms", description: "Email signup box." },
   contact_form: { icon: MessageSquare, category: "forms", description: "Message form — replies land in Messages." },
   map: { icon: MapPin, category: "forms", description: "Google map of your shop address." },
+  osm_map: { icon: MapPinned, category: "forms", description: "OpenStreetMap with your own pins, zoom and area. Pin one or many shops." },
   spacer: { icon: MoveVertical, category: "layout", description: "Empty space between sections." },
 };
 
@@ -72,7 +74,7 @@ export function sectionLabel(schema, section) {
 
 /** Block ka title: pehla bhara text field (heading / question / author / caption) */
 export function blockTitle(def, block, index) {
-  for (const key of ["heading", "question", "author", "caption", "eyebrow", "quote"]) {
+  for (const key of ["heading", "question", "name", "author", "caption", "eyebrow", "quote"]) {
     const v = block?.settings?.[key];
     if (typeof v === "string" && v.trim()) return v.trim().slice(0, 40);
   }

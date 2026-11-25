@@ -74,6 +74,7 @@ const FIELD_TYPES = [
   "url", // http(s) only (video / external)
   "datetime", // ISO date-time (countdown)
   "phone", // digits with country code (WhatsApp)
+  "geo", // { lat, lng } map pin — `withZoom: true` → { lat, lng, zoom } (map view)
 ];
 
 const heading = (fallback = "") => ({ key: "heading", type: "text", label: "Heading", default: fallback, translatable: true });
@@ -280,6 +281,38 @@ const SECTION_TYPES = {
       { key: "address", type: "text", label: "Address (as on Google Maps)", default: "" },
       { key: "height", type: "select", label: "Height", options: ["small", "medium", "large"], default: "medium" },
     ],
+  },
+  // Leaflet + OpenStreetMap — Google "map" section se alag (woh waisa hi rehta hai).
+  // Kai pins (blocks), seller khud zoom / area chunta hai, API key nahi chahiye.
+  osm_map: {
+    label: "Map (OpenStreetMap)",
+    limit: 2,
+    settings: [
+      heading("Find our stores"),
+      { key: "fitPins", type: "checkbox", label: "Zoom to show all pins", default: true },
+      {
+        key: "view",
+        type: "geo",
+        withZoom: true,
+        label: "Map area and zoom",
+        hint: "Move and zoom the map to the area customers see first",
+        default: null,
+        showIf: { key: "fitPins", equals: false },
+      },
+      { key: "height", type: "select", label: "Height", options: ["small", "medium", "large"], default: "medium" },
+      { key: "showList", type: "checkbox", label: "Show the list of locations", default: true },
+      { key: "scrollZoom", type: "checkbox", label: "Zoom with the mouse wheel", default: false },
+    ],
+    blocks: {
+      label: "Location",
+      settings: [
+        { key: "name", type: "text", label: "Name", default: "", translatable: true },
+        { key: "location", type: "geo", label: "Pin on the map", hint: "Search, or click the map to drop the pin", default: null },
+        { key: "address", type: "textarea", label: "Address", default: "" },
+        { key: "phone", type: "text", label: "Phone", default: "" },
+        { key: "hours", type: "text", label: "Opening hours", default: "", translatable: true },
+      ],
+    },
   },
 };
 

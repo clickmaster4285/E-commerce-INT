@@ -4,7 +4,7 @@
    STORE EDITOR — schema-driven setting fields
    Backend config/themeSchema.js ke field types:
    text | textarea | richtext | image | color | select | range |
-   checkbox | link | category | brand | product
+   checkbox | link | category | brand | product | url | datetime | phone | geo
    ========================================================== */
 
 import dynamic from "next/dynamic";
@@ -23,6 +23,12 @@ import { linkIssue } from "../draftIssues";
 const RichTextEditor = dynamic(() => import("@/components/admin/RichTextEditor"), {
   ssr: false,
   loading: () => <div className="h-40 animate-pulse rounded-lg bg-subtle" />,
+});
+
+// Leaflet window chahiye → sirf client par
+const GeoPicker = dynamic(() => import("./GeoPicker"), {
+  ssr: false,
+  loading: () => <div className="h-72 animate-pulse rounded-lg bg-subtle" />,
 });
 
 const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
@@ -442,6 +448,17 @@ export function SettingField({ field, value, onChange, linkTypes }) {
         </FieldShell>
       );
     }
+    case "geo":
+      // <label> nahi (FieldShell) — map ke andar clicks/buttons label ko forward ho jate
+      return (
+        <div className="space-y-1.5">
+          <span className="flex min-h-5 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-fg-secondary">{label}</span>
+          </span>
+          <GeoPicker value={value} onChange={onChange} withZoom={Boolean(field.withZoom)} />
+          {field.hint ? <span className="block text-[11px] text-fg-muted">{field.hint}</span> : null}
+        </div>
+      );
     case "category":
     case "brand":
     case "product":

@@ -32,6 +32,7 @@ export const GENERIC_SECTIONS = {
   image_gallery: { Component: more("GallerySection", "h-[20rem]"), minHeight: 320 },
   contact_form: { Component: more("ContactFormSection", "h-[24rem]"), minHeight: 380 },
   map: { Component: more("MapSection", "h-[20rem]"), minHeight: 320 },
+  osm_map: { Component: dynamic(() => import("./OsmMapSection"), { ssr: true, loading: pulse("h-[20rem]") }), minHeight: 320 },
 
   rich_text: { Component: generic("RichTextSection", "h-[10rem]"), minHeight: 160 },
   image_with_text: { Component: generic("ImageWithTextSection", "h-[20rem]"), minHeight: 320 },

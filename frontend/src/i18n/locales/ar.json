@@ -20,6 +20,7 @@
   "storefront.contact.send": "إرسال الرسالة",
   "storefront.contact.thanks": "شكرًا! تم إرسال رسالتك وسنتواصل معك قريبًا.",
   "storefront.contact.error": "تعذر إرسال رسالتك. حاول مرة أخرى.",
+  "storefront.map.directions": "احصل على الاتجاهات",
   "storefront.whatsapp.chat": "تحدث عبر واتساب",
   "storefront.product.onlyLeft": "متبقٍ {count} فقط",
   "storefront.newsletter.placeholder": "بريدك الإلكتروني",

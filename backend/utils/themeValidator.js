@@ -124,6 +124,24 @@ function linkValue(value) {
   return OBJECT_ID.test(ref) ? { value: { type, ref } } : { error: `invalid ${type} id` };
 }
 
+// Map pin { lat, lng } (6 decimals ≈ 10cm); withZoom → zoom 1–19 bhi (Leaflet / OSM tiles)
+function geoValue(raw, field) {
+  if (raw === null || raw === "") return { value: null };
+  if (!isPlainObject(raw)) return { error: "invalid map position" };
+  const lat = Number(raw.lat);
+  const lng = Number(raw.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return { error: "invalid map position" };
+  }
+  const round = (n) => Math.round(n * 1e6) / 1e6;
+  const value = { lat: round(lat), lng: round(lng) };
+  if (field.withZoom) {
+    const zoom = Number(raw.zoom);
+    value.zoom = Number.isFinite(zoom) ? Math.min(19, Math.max(1, Math.round(zoom))) : 13;
+  }
+  return { value };
+}
+
 function fieldValue(field, raw, ctx) {
   const missing = raw === undefined;
   const fallback = field.default === undefined ? null : structuredClone(field.default);
@@ -173,6 +191,8 @@ function fieldValue(field, raw, ctx) {
       if (!v) return { value: "" };
       return /^\d{8,15}$/.test(v) ? { value: v } : { error: "digits only, with country code" };
     }
+    case "geo":
+      return missing ? { value: fallback } : geoValue(raw, field);
     case "image":
       return missing ? { value: fallback || "" } : imageUrl(raw, ctx.storeId);
     case "link":

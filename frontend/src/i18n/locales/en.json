@@ -20,6 +20,7 @@
   "storefront.contact.send": "Send message",
   "storefront.contact.thanks": "Thanks! Your message has been sent. We'll get back to you soon.",
   "storefront.contact.error": "Could not send your message. Please try again.",
+  "storefront.map.directions": "Get directions",
   "storefront.whatsapp.chat": "Chat on WhatsApp",
   "storefront.product.onlyLeft": "Only {count} left",
   "storefront.newsletter.placeholder": "Your email address",

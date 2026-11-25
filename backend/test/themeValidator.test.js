@@ -237,6 +237,32 @@ test("hero custom slides validate like blocks (own-store images, safe links)", (
   assert.equal(validate(theme).ok, false);
 });
 
+test("osm_map: pins round to 6 decimals, view zoom clamped, bad coords rejected", () => {
+  const theme = withSection("locs", {
+    type: "osm_map",
+    settings: { fitPins: false, view: { lat: 31.5204, lng: 74.3587, zoom: 42 } },
+    blocks: [
+      { id: "b1", settings: { name: "Main shop", location: { lat: "31.52041234567", lng: 74.35871234567, zoom: 5 } } },
+      { id: "b2", settings: { name: "No pin yet" } },
+    ],
+  });
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  const sec = r.data.sections.locs;
+  assert.deepEqual(sec.settings.view, { lat: 31.5204, lng: 74.3587, zoom: 19 });
+  assert.deepEqual(sec.blocks[0].settings.location, { lat: 31.520412, lng: 74.358712 }); // zoom sirf withZoom par
+  assert.equal(sec.blocks[1].settings.location, null);
+
+  theme.sections.locs.blocks[0].settings.location = { lat: 91, lng: 0 };
+  assert.equal(validate(theme).ok, false);
+  theme.sections.locs.blocks[0].settings.location = "31.5,74.3";
+  assert.equal(validate(theme).ok, false);
+});
+
+test("google map section is unchanged by the OSM map", () => {
+  assert.deepEqual(SECTION_TYPES.map.settings.map((f) => f.key), ["heading", "address", "height"]);
+});
+
 // ───────────────────────── Product page template ─────────────────────────
 const productTheme = () => {
   const theme = buildDefaultTheme();
