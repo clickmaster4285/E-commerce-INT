@@ -88,7 +88,7 @@ const group = (theme, name) => {
 };
 
 // Badge text color: background ke hisaab se kala ya safed (contrast)
-function readableOn(hex) {
+export function readableOn(hex) {
   let h = hex.slice(1);
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);

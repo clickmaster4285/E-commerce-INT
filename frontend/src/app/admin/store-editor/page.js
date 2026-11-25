@@ -15,7 +15,7 @@
    ========================================================== */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -23,6 +23,7 @@ import {
   CalendarClock,
   Check,
   ChevronDown,
+  CircleAlert,
   CloudOff,
   ExternalLink,
   FileText,
@@ -49,6 +50,7 @@ import {
 import { themeApi, apiError } from "@/apis/admin/themeApi";
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useThemeEditorStore } from "./useThemeEditorStore";
+import { draftIssues } from "./draftIssues";
 import { SectionList, SectionSettings, ThemeSettings, MenuEditor, VersionsPanel } from "./components/panels";
 import PreviewFrame from "./components/PreviewFrame";
 import AddSectionDialog from "./components/AddSectionDialog";
@@ -116,8 +118,21 @@ function FullScreenMessage({ icon: Icon, title, children }) {
   );
 }
 
-function SaveIndicator({ state, dirty, error, online }) {
+function SaveIndicator({ state, dirty, error, online, issues = [], onShowIssue }) {
   if (!online) return <span className="inline-flex items-center gap-1.5 text-xs text-warning" title="Changes save when you're back online"><WifiOff size={13} /> Offline</span>;
+  // Adhoora item (label / link) → autosave ruka hua; click = us jagah le jao
+  if (dirty && issues.length && state !== "saving" && state !== "conflict") {
+    return (
+      <button
+        type="button"
+        onClick={() => onShowIssue?.(issues[0])}
+        title={issues.map((i) => i.message).join("\n")}
+        className="inline-flex items-center gap-1.5 text-xs text-warning hover:underline"
+      >
+        <CircleAlert size={13} /> {issues.length === 1 ? "1 item to finish" : `${issues.length} items to finish`}
+      </button>
+    );
+  }
   if (state === "saving") return <span className="inline-flex items-center gap-1.5 text-xs text-fg-muted"><Loader2 size={13} className="animate-spin" /> Saving…</span>;
   if (state === "error") return <span className="inline-flex items-center gap-1.5 text-xs text-danger" title={error || ""}><CloudOff size={13} /> Not saved</span>;
   if (state === "conflict") return <span className="inline-flex items-center gap-1.5 text-xs text-warning"><CloudOff size={13} /> Conflict</span>;
@@ -207,6 +222,8 @@ export default function StoreEditorPage() {
 
   const meta = themeQuery.data;
   const schema = schemaQuery.data;
+  // Adhoore menu items / links — jab tak ye hain, autosave nahi (warna backend 400)
+  const issues = useMemo(() => draftIssues(draft, schema), [draft, schema]);
 
   const sampleProductQuery = useQuery({
     queryKey: ["storeEditor", "sampleProduct"],
@@ -239,13 +256,23 @@ export default function StoreEditorPage() {
   );
 
   // ── Autosave (debounced) ──
+  // Timer polling nahi hai: har edit ke 1.5s baad (typing rukne par) EK save.
+  const currentIssues = useCallback(
+    () => draftIssues(useThemeEditorStore.getState().draft, queryClient.getQueryData(["themeSchema"])),
+    [queryClient],
+  );
+  // Jo draft server ne reject kiya — wahi dobara auto-retry nahi (naya edit hone par hi)
+  const failedDraft = useRef(null);
+
   const saveNow = useCallback(async () => {
     const s = useThemeEditorStore.getState();
     if (!s.draft || !s.dirty || s.saveState === "conflict") return true;
+    if (currentIssues().length) return false;
     const snapshot = s.draft;
     s.markSaving();
     try {
       const res = await themeApi.saveDraft({ data: snapshot, baseRevision: s.revision });
+      failedDraft.current = null;
       useThemeEditorStore.getState().markSaved(res.draftRevision, snapshot);
       return true;
     } catch (error) {
@@ -253,18 +280,27 @@ export default function StoreEditorPage() {
       if (e.code === "THEME_REVISION_CONFLICT") {
         useThemeEditorStore.getState().markSaveError("conflict", e.message);
       } else {
+        failedDraft.current = snapshot;
         useThemeEditorStore.getState().markSaveError("error", e.errors?.[0] || e.message);
         toast.error(e.errors?.[0] || e.message);
       }
       return false;
     }
-  }, []);
+  }, [currentIssues]);
+
+  // Manual save (Ctrl+S / publish / schedule): na ho sake to wajah ke saath throw
+  const saveOrExplain = useCallback(async () => {
+    if (await saveNow()) return true;
+    const issue = currentIssues()[0];
+    throw new Error(issue ? `Finish this first: ${issue.message}` : useThemeEditorStore.getState().saveError || "Couldn't save the draft");
+  }, [saveNow, currentIssues]);
 
   useEffect(() => {
     if (!online || !dirty || saveState === "conflict" || saveState === "saving") return undefined;
+    if (issues.length || draft === failedDraft.current) return undefined;
     const timer = setTimeout(saveNow, AUTOSAVE_MS);
     return () => clearTimeout(timer);
-  }, [draft, dirty, saveState, saveNow, online]);
+  }, [draft, dirty, saveState, saveNow, online, issues.length]);
 
   // Unsaved tab close warning
   useEffect(() => {
@@ -288,7 +324,9 @@ export default function StoreEditorPage() {
       const key = event.key.toLowerCase();
       if (mod && key === "s") {
         event.preventDefault();
-        saveNow();
+        saveOrExplain().catch((e) => {
+          if (currentIssues().length) toast.error(e.message); // API error ka toast saveNow pehle hi de chuka
+        });
         return;
       }
       if (mod && (key === "z" || key === "y")) {
@@ -309,7 +347,7 @@ export default function StoreEditorPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [saveNow, anyDialogOpen]);
+  }, [saveOrExplain, currentIssues, anyDialogOpen]);
 
   // Doosre admin ne publish kiya → meta refresh (draft overwrite nahi)
   const { socket } = useAdminSocket();
@@ -383,8 +421,7 @@ export default function StoreEditorPage() {
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const ok = await saveNow();
-      if (!ok) throw new Error(useThemeEditorStore.getState().saveError || "Save the draft first");
+      await saveOrExplain();
       return themeApi.publish();
     },
     onSuccess: (data) => {
@@ -471,6 +508,24 @@ export default function StoreEditorPage() {
     setTab("sections");
     store.select(null);
   };
+  // Issue par click → jahan theek karna hai wahan le jao
+  const showIssue = (issue) => {
+    const target = issue?.target;
+    if (!target) return;
+    if (target.kind === "section") {
+      setEditPage("home");
+      setTab("sections");
+      store.select({ kind: "section", id: target.id });
+    } else if (target.kind === "theme") {
+      openGlobalGroup(target.group);
+    } else {
+      store.select(null);
+      setTab("menus");
+    }
+  };
+  const indicator = (
+    <SaveIndicator state={saveState} dirty={dirty} error={saveError} online={online} issues={issues} onShowIssue={showIssue} />
+  );
 
   // ── Sidebar content ──
   let panel;
@@ -507,7 +562,7 @@ export default function StoreEditorPage() {
         </Link>
         <div className="hidden min-w-0 sm:block">
           <p className="truncate text-sm font-bold leading-tight">Store editor</p>
-          <SaveIndicator state={saveState} dirty={dirty} error={saveError} online={online} />
+          {indicator}
         </div>
 
         <div className="ms-1 sm:ms-3">
@@ -597,9 +652,9 @@ export default function StoreEditorPage() {
         cancelling={cancelScheduleMutation.isPending}
         onCancel={() => window.confirm("Cancel the scheduled publish?") && cancelScheduleMutation.mutate()}
       />
-      {dialog === "schedule" ? <ScheduleDialog onClose={() => setDialog(null)} onSaveDraft={saveNow} onDone={takeMeta} /> : null}
+      {dialog === "schedule" ? <ScheduleDialog onClose={() => setDialog(null)} onSaveDraft={saveOrExplain} onDone={takeMeta} /> : null}
       {dialog === "share" ? (
-        <ShareDialog onClose={() => setDialog(null)} onSaveDraft={saveNow} activeLinks={metaPreviewLinks.length} onChanged={takeMeta} />
+        <ShareDialog onClose={() => setDialog(null)} onSaveDraft={saveOrExplain} activeLinks={metaPreviewLinks.length} onChanged={takeMeta} />
       ) : null}
       {dialog === "shortcuts" ? <ShortcutsDialog onClose={() => setDialog(null)} /> : null}
       {addSection ? (
@@ -668,9 +723,22 @@ export default function StoreEditorPage() {
           {panelTitle ? (
             <div className="flex h-11 shrink-0 items-center border-b border-line px-4">
               <h2 className="truncate text-sm font-bold text-fg">{panelTitle}</h2>
-              <span className="ms-auto sm:hidden">
-                <SaveIndicator state={saveState} dirty={dirty} error={saveError} online={online} />
-              </span>
+              <span className="ms-auto sm:hidden">{indicator}</span>
+            </div>
+          ) : null}
+          {dirty && issues.length ? (
+            <div role="status" className="shrink-0 border-b border-warning/30 bg-warning-soft px-4 py-2 text-xs text-warning">
+              <p className="font-semibold">Autosave is paused until you finish:</p>
+              <ul className="mt-1 space-y-0.5">
+                {issues.slice(0, 3).map((issue, i) => (
+                  <li key={i}>
+                    <button type="button" onClick={() => showIssue(issue)} className="text-start hover:underline">
+                      • {issue.message}
+                    </button>
+                  </li>
+                ))}
+                {issues.length > 3 ? <li>• and {issues.length - 3} more</li> : null}
+              </ul>
             </div>
           ) : null}
           <div className="min-h-0 flex-1 overflow-y-auto p-3">{panel}</div>

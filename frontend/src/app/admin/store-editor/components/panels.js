@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   Copy,
   Eye,
   EyeOff,
@@ -31,7 +32,8 @@ import {
   X,
 } from "lucide-react";
 import { useThemeEditorStore, defaultsOf, randomId } from "../useThemeEditorStore";
-import { SettingField, LinkInput, inputCls, humanize } from "./fields";
+import { SettingField, LinkInput, inputCls, humanize, linkTypeLabel } from "./fields";
+import { menuItemErrors } from "../draftIssues";
 import { catalogOf, sectionLabel, blockTitle } from "./sectionCatalog";
 
 // Schema `showIf: { key, equals }` — dependent field sirf tab dikhe (value missing → field default)
@@ -600,14 +602,159 @@ export function ThemeSettings({ schema, focusGroup = null, onFocusHandled }) {
 // ───────────────────────── Menus ─────────────────────────
 const MENU_IMAGE_FIELD = { key: "image", type: "image", label: "Image (mega menu tile)", default: "" };
 
-function MenuList({ menuKey, title, hint, maxItems, allowChildren = false, childImages = false, childLabel = "Add sub-link (dropdown)" }) {
-  const { draft, setMenu } = useThemeEditorStore();
+const newMenuItem = () => ({ id: randomId("m"), label: "", link: { type: "home" }, children: [] });
+
+// Label input + "required" message (khali label backend reject karta hai)
+function MenuLabelInput({ value, onChange, placeholder, autoFocus, error }) {
+  return (
+    <div className="min-w-0 flex-1">
+      <input
+        className={`${inputCls} ${error ? "border-warning focus:border-warning focus:ring-warning/20" : ""}`}
+        placeholder={placeholder}
+        maxLength={60}
+        value={value}
+        autoFocus={autoFocus}
+        aria-invalid={Boolean(error)}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {error ? <p className="mt-1 text-[11px] font-medium text-warning">{error}</p> : null}
+    </div>
+  );
+}
+
+function MenuItemCard({ item, index, count, open, onToggle, onPatch, onMove, onRemove, allowChildren, childImages, childLabel, canAdd, autoFocusId, onAdded }) {
+  const errors = menuItemErrors(item);
+  const children = item.children || [];
+  const childErrors = children.filter((c) => Object.keys(menuItemErrors(c)).length).length;
+  const problems = Object.keys(errors).length + childErrors;
+  const patchChild = (j, next) => onPatch({ children: children.map((c, k) => (k === j ? { ...c, ...next } : c)) });
+  const moveChild = (j, d) => {
+    const k = j + d;
+    if (k < 0 || k >= children.length) return;
+    const copy = [...children];
+    [copy[j], copy[k]] = [copy[k], copy[j]];
+    onPatch({ children: copy });
+  };
+
+  return (
+    <li className={`overflow-hidden rounded-xl border bg-card transition ${problems ? "border-warning/60" : "border-line"} ${open ? "shadow-sm" : ""}`}>
+      {/* Summary row — click = khol/band */}
+      <div className="flex items-center gap-1 pe-1.5">
+        <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-start">
+          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-subtle text-[11px] font-bold text-fg-secondary">{index + 1}</span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate text-sm font-semibold ${item.label?.trim() ? "text-fg" : "italic text-fg-muted"}`}>
+              {item.label?.trim() || "Untitled link"}
+            </span>
+            <span className="block truncate text-[11px] text-fg-muted">
+              {linkTypeLabel(item.link?.type || "none")}
+              {children.length ? ` · ${children.length} sub-link${children.length > 1 ? "s" : ""}` : ""}
+            </span>
+          </span>
+          {problems ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning-soft px-2 py-0.5 text-[10px] font-bold text-warning">
+              <CircleAlert size={11} /> {problems}
+            </span>
+          ) : null}
+          <ChevronDown size={15} className={`shrink-0 text-fg-muted transition ${open ? "rotate-180" : ""}`} />
+        </button>
+        <button type="button" className={iconBtn} onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move up" title="Move up">
+          <ArrowUp size={13} />
+        </button>
+        <button type="button" className={iconBtn} onClick={() => onMove(1)} disabled={index === count - 1} aria-label="Move down" title="Move down">
+          <ArrowDown size={13} />
+        </button>
+        <button type="button" className={`${iconBtn} hover:text-danger`} onClick={onRemove} aria-label="Remove link" title="Remove link">
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      {open ? (
+        <div className="space-y-3 border-t border-line bg-card-alt px-3 py-3">
+          <label className="block space-y-1.5">
+            <span className="text-xs font-semibold text-fg-secondary">Label</span>
+            <MenuLabelInput
+              value={item.label}
+              placeholder="e.g. Shop all"
+              autoFocus={autoFocusId === item.id}
+              error={errors.label}
+              onChange={(label) => onPatch({ label })}
+            />
+          </label>
+          <div className="space-y-1.5">
+            <span className="block text-xs font-semibold text-fg-secondary">Links to</span>
+            <LinkInput value={item.link} onChange={(link) => onPatch({ link })} />
+          </div>
+
+          {allowChildren ? (
+            <div className="space-y-2">
+              {children.length ? <span className="block text-xs font-semibold text-fg-secondary">Sub-links</span> : null}
+              {children.map((child, j) => {
+                const ce = menuItemErrors(child);
+                return (
+                  <div key={child.id} className={`space-y-2 rounded-lg border bg-card p-2.5 ${Object.keys(ce).length ? "border-warning/60" : "border-line"}`}>
+                    <div className="flex items-start gap-1">
+                      <MenuLabelInput
+                        value={child.label}
+                        placeholder="Sub-link label"
+                        autoFocus={autoFocusId === child.id}
+                        error={ce.label}
+                        onChange={(label) => patchChild(j, { label })}
+                      />
+                      <button type="button" className={`${iconBtn} mt-1`} onClick={() => moveChild(j, -1)} disabled={j === 0} aria-label="Move sub-link up">
+                        <ArrowUp size={12} />
+                      </button>
+                      <button type="button" className={`${iconBtn} mt-1`} onClick={() => moveChild(j, 1)} disabled={j === children.length - 1} aria-label="Move sub-link down">
+                        <ArrowDown size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        className={`${iconBtn} mt-1 hover:text-danger`}
+                        onClick={() => onPatch({ children: children.filter((_, k) => k !== j) })}
+                        aria-label="Remove sub-link"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    <LinkInput value={child.link} onChange={(link) => patchChild(j, { link })} />
+                    {childImages ? (
+                      <SettingField field={MENU_IMAGE_FIELD} value={child.image || ""} onChange={(image) => patchChild(j, { image })} />
+                    ) : null}
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                disabled={!canAdd}
+                onClick={() => {
+                  const child = newMenuItem();
+                  onPatch({ children: [...children, child] });
+                  onAdded(child.id);
+                }}
+                className="inline-flex h-8 w-full items-center justify-center gap-1 rounded-lg border border-dashed border-line text-[11px] font-semibold text-fg-secondary transition hover:border-accent hover:text-accent disabled:opacity-50"
+              >
+                <Plus size={12} /> {childLabel}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function MenuList({ menuKey, title, hint, emptyText, maxItems, allowChildren = false, childImages = false, childLabel = "Add sub-link (dropdown)" }) {
+  const draft = useThemeEditorStore((s) => s.draft);
+  const setMenu = useThemeEditorStore((s) => s.setMenu);
   const items = draft?.menus?.[menuKey] || [];
   // Validator har menu item (children bhi) gin-ta hai — yahan bhi wahi
   const countItems = (list) => (list || []).reduce((n, it) => n + 1 + countItems(it.children), 0);
   const totalItems = Object.values(draft?.menus || {}).reduce((n, list) => n + countItems(list), 0);
-  const patchChild = (i, j, next) =>
-    patch(i, { children: (items[i].children || []).map((c, k) => (k === j ? { ...c, ...next } : c)) });
+  const canAdd = totalItems < maxItems;
+  // Khule cards; adhoore items hamesha khule (error dikhe)
+  const [openIds, setOpenIds] = useState({});
+  const [autoFocusId, setAutoFocusId] = useState(null);
+
   const patch = (i, next) => setMenu(menuKey, items.map((it, j) => (j === i ? { ...it, ...next } : it)));
   const move = (i, d) => {
     const j = i + d;
@@ -616,89 +763,79 @@ function MenuList({ menuKey, title, hint, maxItems, allowChildren = false, child
     [copy[i], copy[j]] = [copy[j], copy[i]];
     setMenu(menuKey, copy);
   };
+  const isOpen = (item) =>
+    openIds[item.id] ??
+    (Object.keys(menuItemErrors(item)).length > 0 || (item.children || []).some((c) => Object.keys(menuItemErrors(c)).length));
+
   return (
     <section className="space-y-3">
       <div>
         <h3 className="text-sm font-bold text-fg">{title}</h3>
-        <p className="text-[11px] text-fg-muted">{hint}</p>
+        <p className="text-[11px] leading-relaxed text-fg-muted">{hint}</p>
       </div>
-      {items.map((item, i) => (
-        <div key={item.id} className="space-y-2 rounded-lg border border-line bg-card-alt p-3">
-          <div className="flex items-center gap-1">
-            <input className={inputCls} placeholder="Label" maxLength={60} value={item.label} onChange={(e) => patch(i, { label: e.target.value })} />
-            <button type="button" className={iconBtn} onClick={() => move(i, -1)} aria-label="Move up">
-              <ArrowUp size={13} />
-            </button>
-            <button type="button" className={iconBtn} onClick={() => move(i, 1)} aria-label="Move down">
-              <ArrowDown size={13} />
-            </button>
-            <button type="button" className={`${iconBtn} hover:text-danger`} onClick={() => setMenu(menuKey, items.filter((_, j) => j !== i))} aria-label="Remove">
-              <Trash2 size={13} />
-            </button>
-          </div>
-          <LinkInput value={item.link} onChange={(link) => patch(i, { link })} />
-          {allowChildren ? (
-            <div className="space-y-2 border-s-2 border-line ps-3">
-              {(item.children || []).map((child, j) => (
-                <div key={child.id} className="space-y-1.5">
-                  <div className="flex items-center gap-1">
-                    <input
-                      className={inputCls}
-                      placeholder="Sub-link label"
-                      maxLength={60}
-                      value={child.label}
-                      onChange={(e) => patchChild(i, j, { label: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      className={`${iconBtn} hover:text-danger`}
-                      onClick={() => patch(i, { children: item.children.filter((_, k) => k !== j) })}
-                      aria-label="Remove sub-link"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                  <LinkInput value={child.link} onChange={(link) => patchChild(i, j, { link })} />
-                  {childImages ? (
-                    <SettingField field={MENU_IMAGE_FIELD} value={child.image || ""} onChange={(image) => patchChild(i, j, { image })} />
-                  ) : null}
-                </div>
-              ))}
-              <button
-                type="button"
-                disabled={totalItems >= maxItems}
-                onClick={() =>
-                  patch(i, { children: [...(item.children || []), { id: randomId("m"), label: "", link: { type: "home" }, children: [] }] })
-                }
-                className="inline-flex h-7 items-center gap-1 text-[11px] font-semibold text-accent disabled:opacity-50"
-              >
-                <Plus size={12} /> {childLabel}
-              </button>
-            </div>
-          ) : null}
-        </div>
-      ))}
-      <button
-        type="button"
-        disabled={totalItems >= maxItems}
-        onClick={() => setMenu(menuKey, [...items, { id: randomId("m"), label: "", link: { type: "home" }, children: [] }])}
-        className="inline-flex h-8 items-center gap-1.5 text-xs font-semibold text-accent disabled:opacity-50"
-      >
-        <Plus size={13} /> Add link
-      </button>
+
+      {items.length ? (
+        <ul className="space-y-2">
+          {items.map((item, i) => (
+            <MenuItemCard
+              key={item.id}
+              item={item}
+              index={i}
+              count={items.length}
+              open={isOpen(item)}
+              onToggle={() => setOpenIds((o) => ({ ...o, [item.id]: !isOpen(item) }))}
+              onPatch={(next) => patch(i, next)}
+              onMove={(d) => move(i, d)}
+              onRemove={() => setMenu(menuKey, items.filter((_, j) => j !== i))}
+              allowChildren={allowChildren}
+              childImages={childImages}
+              childLabel={childLabel}
+              canAdd={canAdd}
+              autoFocusId={autoFocusId}
+              onAdded={setAutoFocusId}
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="rounded-xl border border-dashed border-line px-3 py-4 text-center text-[11px] text-fg-muted">{emptyText}</p>
+      )}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canAdd}
+          onClick={() => {
+            const item = newMenuItem();
+            setMenu(menuKey, [...items, item]);
+            setOpenIds((o) => ({ ...o, [item.id]: true }));
+            setAutoFocusId(item.id);
+          }}
+          className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-line text-xs font-semibold text-accent transition hover:border-accent hover:bg-accent-soft disabled:opacity-50"
+        >
+          <Plus size={13} /> Add link
+        </button>
+      </div>
     </section>
   );
 }
 
 export function MenuEditor({ schema }) {
+  const draft = useThemeEditorStore((s) => s.draft);
+  const countItems = (list) => (list || []).reduce((n, it) => n + 1 + countItems(it.children), 0);
+  const used = Object.values(draft?.menus || {}).reduce((n, list) => n + countItems(list), 0);
+  const max = schema.limits.maxMenuItems;
   return (
     <div className="space-y-6">
+      <p className={`text-[11px] ${used >= max ? "font-semibold text-warning" : "text-fg-muted"}`}>
+        {used} of {max} links used (both menus, sub-links included)
+      </p>
       <MenuList
         menuKey="main"
         allowChildren
         childImages
         title="Main menu"
-        hint="Shown in the navigation bar under the header. Empty = default links (Home, Best offers, New). Sub-link images show when Theme settings → Navigation → dropdown style is Mega."
+        hint="Shown in the navigation bar under the header. Sub-link images show when Theme settings → Navigation → dropdown style is Mega."
+        emptyText="No links yet. The default links (Home, Best offers, New) are shown."
         maxItems={schema.limits.maxMenuItems}
       />
       <MenuList
@@ -707,6 +844,7 @@ export function MenuEditor({ schema }) {
         childLabel="Add link to this column"
         title="Footer menu"
         hint="Links without sub-links go in the Help column. Add sub-links under a link to make it its own footer column (the link's label becomes the column title)."
+        emptyText="No links yet. The Help column shows its default links."
         maxItems={schema.limits.maxMenuItems}
       />
     </div>

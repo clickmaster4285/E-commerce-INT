@@ -15,6 +15,9 @@ import SectionHeading from "@/components/user/SectionHeading";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useStoreTheme } from "../ThemeProvider";
 import { resolveThemeLink, isExternalHref } from "../themeLinks";
+import { readableOn } from "../themeCss";
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/, "");
 const imageSrc = (url) => (!url ? "" : /^https?:/i.test(url) ? url : `${API_ORIGIN}${url}`);
@@ -163,8 +166,17 @@ export function CountdownSection({ settings = {} }) {
   const labels = [t("storefront.countdown.days"), t("storefront.countdown.hours"), t("storefront.countdown.minutes"), t("storefront.countdown.seconds")];
   const href = resolveThemeLink(settings.buttonLink);
 
+  // Colors: khali = accent box + card button. Inline style isliye ke `.user-theme a { color: inherit }`
+  // (unlayered CSS) Tailwind text-* class ko hara deta tha → button text safed par safed.
+  const boxBg = HEX_COLOR.test(settings.backgroundColor || "") ? settings.backgroundColor : null;
+  const boxText = HEX_COLOR.test(settings.textColor || "") ? settings.textColor : boxBg ? readableOn(boxBg) : null;
+  const btnBg = HEX_COLOR.test(settings.buttonColor || "") ? settings.buttonColor : null;
+  const btnText = HEX_COLOR.test(settings.buttonTextColor || "") ? settings.buttonTextColor : btnBg ? readableOn(btnBg) : null;
+  const boxStyle = { backgroundColor: boxBg || "var(--user-accent)", color: boxText || "var(--user-accent-text)" };
+  const buttonStyle = { backgroundColor: btnBg || "var(--user-bg-card)", color: btnText || "var(--user-accent)" };
+
   return (
-    <section className="rounded-2xl bg-user-accent px-5 py-7 text-center text-user-accent-fg sm:px-8 sm:py-10">
+    <section className="rounded-2xl px-5 py-7 text-center sm:px-8 sm:py-10" style={boxStyle}>
       {settings.heading ? <h2 className="text-xl font-black sm:text-2xl">{settings.heading}</h2> : null}
       {settings.subheading ? <p className="mx-auto mt-2 max-w-xl text-sm opacity-90">{settings.subheading}</p> : null}
       {ended ? (
@@ -182,7 +194,8 @@ export function CountdownSection({ settings = {} }) {
       {href && settings.buttonLabel && !ended ? (
         <MaybeLink
           link={settings.buttonLink}
-          className="mt-6 inline-flex h-11 items-center rounded-xl bg-user-card px-6 text-sm font-bold text-user-accent transition hover:opacity-90"
+          className="mt-6 inline-flex h-11 items-center rounded-xl px-6 text-sm font-bold transition hover:opacity-90"
+          style={buttonStyle}
         >
           {settings.buttonLabel}
         </MaybeLink>

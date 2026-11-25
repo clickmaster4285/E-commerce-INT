@@ -16,6 +16,9 @@ import { themeApi, pageApi, apiError } from "@/apis/admin/themeApi";
 import { adminCategoryApi } from "@/apis/admin/categoryApi";
 import { adminBrandApi } from "@/apis/admin/brandApi";
 import { adminProductApi } from "@/apis/admin/productApi";
+import { dealApi } from "@/apis/admin/dealApi";
+import { Combobox } from "@/components/ui/combobox";
+import { linkIssue } from "../draftIssues";
 
 const RichTextEditor = dynamic(() => import("@/components/admin/RichTextEditor"), {
   ssr: false,
@@ -86,44 +89,114 @@ function usePages() {
 
 const listOf = (v) => (Array.isArray(v) ? v : Array.isArray(v?.items) ? v.items : Array.isArray(v?.data) ? v.data : []);
 
+// Products / deals bahut ho sakte hain → server-side search (20 per request)
+const REMOTE_LIMIT = 20;
+const REMOTE = {
+  product: {
+    list: (search) => adminProductApi.getPaginated({ page: 1, limit: REMOTE_LIMIT, search }),
+    items: (data) => listOf(data?.products || data),
+    total: (data) => data?.pagination?.total ?? data?.total ?? null,
+    one: (id) => adminProductApi.getById(id),
+  },
+  deal: {
+    list: (search) => dealApi.getPaginated({ page: 1, limit: REMOTE_LIMIT, ...(search ? { search } : {}) }),
+    items: (data) => listOf(data?.deals),
+    total: (data) => data?.pagination?.total ?? null,
+    one: (id) => dealApi.getById(id),
+  },
+};
+
+const RESOURCE_TEXT = {
+  category: { placeholder: "Choose a category", search: "Search categories…", empty: "No categories yet" },
+  brand: { placeholder: "Choose a brand", search: "Search brands…", empty: "No brands yet" },
+  page: { placeholder: "Choose a page", search: "Search pages…", empty: "No pages yet. Create one in Pages." },
+  product: { placeholder: "Choose a product", search: "Search products…", empty: "No products found" },
+  deal: { placeholder: "Choose a deal", search: "Search deals…", empty: "No deals found" },
+};
+
+function dealHint(d) {
+  const end = d?.endDate || d?.endsAt || d?.end_date;
+  if (d?.isActive === false || d?.status === "inactive") return "Inactive";
+  if (end && Date.parse(end) < Date.now()) return "Ended";
+  return end ? `Ends ${new Date(end).toLocaleDateString()}` : undefined;
+}
+
+function RemoteResourceSelect({ kind, value, onChange }) {
+  const cfg = REMOTE[kind];
+  const text = RESOURCE_TEXT[kind];
+  const [search, setSearch] = useState("");
+  const list = useQuery({
+    queryKey: ["storeEditor", kind, "list", search],
+    queryFn: () => cfg.list(search),
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
+  const items = cfg.items(list.data);
+  const total = cfg.total(list.data);
+  const options = items.map((it) => ({ value: it._id, label: it.name || it.title || it._id, hint: kind === "deal" ? dealHint(it) : undefined }));
+  const found = !value || options.some((o) => o.value === value);
+  // Selected item pehle 20 me na ho (reload ke baad) → uska naam alag se
+  const selectedQuery = useQuery({
+    queryKey: ["storeEditor", kind, "one", value],
+    queryFn: () => cfg.one(value),
+    enabled: Boolean(value) && !found,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const selectedLabel = selectedQuery.data?.name || selectedQuery.data?.title || (selectedQuery.isError ? "Item not found" : selectedQuery.isLoading ? "Loading…" : value);
+  // 10+ items ho (ya search chal rahi ho) tab hi search box
+  const searchable = Boolean(search) || (total ?? items.length) > 10;
+  const footer = total && total > items.length && !search ? `Showing ${items.length} of ${total}. Type to search.` : null;
+
+  return (
+    <Combobox
+      options={options}
+      value={value || ""}
+      onChange={onChange}
+      placeholder={text.placeholder}
+      searchPlaceholder={text.search}
+      emptyText={search ? `No ${kind}s match “${search}”` : text.empty}
+      searchable={searchable}
+      onSearchChange={setSearch}
+      loading={list.isFetching}
+      selectedLabel={selectedLabel}
+      footer={footer}
+      invalid={!value}
+    />
+  );
+}
+
 function ResourceSelect({ kind, value, onChange }) {
+  if (REMOTE[kind]) return <RemoteResourceSelect kind={kind} value={value} onChange={onChange} />;
+  return <LocalResourceSelect kind={kind} value={value} onChange={onChange} />;
+}
+
+function LocalResourceSelect({ kind, value, onChange }) {
   const categories = useCategories();
   const brands = useBrands();
   const pages = usePages();
-  const [search, setSearch] = useState("");
-  const products = useQuery({
-    queryKey: ["storeEditor", "products", search],
-    queryFn: () => adminProductApi.getPaginated({ page: 1, limit: 20, search }),
-    enabled: kind === "product",
-    staleTime: 60 * 1000,
-  });
+  const text = RESOURCE_TEXT[kind] || {};
+  const source = kind === "category" ? categories : kind === "brand" ? brands : pages;
 
   const options = useMemo(() => {
     if (kind === "category") return listOf(categories.data).map((c) => ({ value: c._id, label: c.name }));
     if (kind === "brand") return listOf(brands.data).map((b) => ({ value: b._id, label: b.name }));
-    if (kind === "page") return listOf(pages.data).map((p) => ({ value: p.slug, label: `${p.title}${p.status === "draft" ? " (draft)" : ""}` }));
-    if (kind === "product") {
-      const items = listOf(products.data?.products || products.data);
-      return items.map((p) => ({ value: p._id, label: p.name }));
-    }
+    if (kind === "page") return listOf(pages.data).map((p) => ({ value: p.slug, label: p.title, hint: p.status === "draft" ? "Draft, not visible yet" : `/pages/${p.slug}` }));
     return [];
-  }, [kind, categories.data, brands.data, pages.data, products.data]);
+  }, [kind, categories.data, brands.data, pages.data]);
 
   return (
-    <div className="space-y-1.5">
-      {kind === "product" ? (
-        <input className={inputCls} placeholder="Search products…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      ) : null}
-      <select className={inputCls} value={value || ""} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— Select —</option>
-        {value && !options.some((o) => o.value === value) ? <option value={value}>{value}</option> : null}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
+    <Combobox
+      options={options}
+      value={value || ""}
+      onChange={onChange}
+      placeholder={text.placeholder}
+      searchPlaceholder={text.search}
+      emptyText={source.isLoading ? "Loading…" : text.empty}
+      loading={source.isLoading}
+      selectedLabel={value}
+      invalid={!value}
+    />
   );
 }
 
@@ -135,30 +208,31 @@ const LINK_LABELS = {
   category: "Category",
   product: "Product",
   brand: "Brand",
-  deal: "Deal (id)",
+  deal: "Deal",
 };
+
+export const linkTypeLabel = (type) => LINK_LABELS[type] || type;
 
 export function LinkInput({ value, onChange, linkTypes = Object.keys(LINK_LABELS) }) {
   const link = value && typeof value === "object" ? value : { type: "none" };
   const setType = (type) => onChange(type === "url" ? { type, url: "" } : type === "none" || type === "home" ? { type } : { type, ref: "" });
+  // Adhoora link (product select nahi, address khali) → yahin batao; save tab tak ruka
+  const issue = linkIssue(link);
   return (
     <div className="space-y-1.5">
-      <select className={inputCls} value={link.type} onChange={(e) => setType(e.target.value)}>
-        {linkTypes.map((t) => (
-          <option key={t} value={t}>
-            {LINK_LABELS[t] || t}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        aria-label="Link type"
+        options={linkTypes.map((t) => ({ value: t, label: LINK_LABELS[t] || t }))}
+        value={link.type}
+        onChange={(t) => t !== link.type && setType(t)}
+      />
       {link.type === "url" ? (
         <input className={inputCls} placeholder="https://… or /path" value={link.url || ""} onChange={(e) => onChange({ ...link, url: e.target.value })} />
       ) : null}
-      {["page", "category", "product", "brand"].includes(link.type) ? (
-        <ResourceSelect kind={link.type} value={link.ref} onChange={(ref) => onChange({ ...link, ref })} />
+      {["page", "category", "product", "brand", "deal"].includes(link.type) ? (
+        <ResourceSelect key={link.type} kind={link.type} value={link.ref} onChange={(ref) => onChange({ ...link, ref })} />
       ) : null}
-      {link.type === "deal" ? (
-        <input className={inputCls} placeholder="Deal id" value={link.ref || ""} onChange={(e) => onChange({ ...link, ref: e.target.value.trim() })} />
-      ) : null}
+      {issue ? <p className="text-[11px] font-medium text-warning">{issue}</p> : null}
     </div>
   );
 }
@@ -289,13 +363,12 @@ export function SettingField({ field, value, onChange, linkTypes }) {
     case "select":
       return (
         <FieldShell label={label} onReset={onReset} hint={field.hint}>
-          <select className={inputCls} value={value ?? ""} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}>
-            {field.options.map((o) => (
-              <option key={String(o)} value={o ?? ""}>
-                {optionLabel(o)}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            aria-label={label}
+            options={field.options.map((o) => ({ value: o, label: optionLabel(o) }))}
+            value={value ?? field.default ?? null}
+            onChange={onChange}
+          />
         </FieldShell>
       );
     case "range":

@@ -228,6 +228,11 @@ const SECTION_TYPES = {
       { key: "buttonLabel", type: "text", label: "Button label", default: "", translatable: true },
       { key: "buttonLink", type: "link", label: "Button link", default: { type: "none" } },
       { key: "hideWhenEnded", type: "checkbox", label: "Hide when the timer ends", default: true },
+      // Khali (null) = theme accent wala purana look; text color khali → background ke hisaab se auto contrast
+      { key: "backgroundColor", type: "color", label: "Box color", default: null },
+      { key: "textColor", type: "color", label: "Text color", default: null },
+      { key: "buttonColor", type: "color", label: "Button color", default: null },
+      { key: "buttonTextColor", type: "color", label: "Button text color", default: null },
     ],
   },
   logo_list: {
