@@ -162,8 +162,10 @@ const checkRegistration = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
+
     const { name, username, phone, email: rawEmail, password } = req.body;
     const referralCode = String(req.body?.referralCode || "").trim().toUpperCase().slice(0, 24);
+    return res.send(referralCode);
     const email = normalizeEmail(rawEmail);
     const cleanUsername = String(username || "").trim();
     const rawPhone = typeof phone === "string" ? phone : "";
@@ -512,8 +514,7 @@ const loginUser = async (req, res) => {
       });
 
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
+    await pushGlobalActivity( io,
       {
         action: `${user.name} logged in`,
         category: "Authentication",

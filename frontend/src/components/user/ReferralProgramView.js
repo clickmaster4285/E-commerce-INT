@@ -4,10 +4,27 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Gift, Copy, Users, Sparkles, ArrowRight, LoaderCircle, CheckCircle2, UserRound, Link2, X, Info } from "lucide-react";
+import { Gift, Copy, Users, Sparkles, ArrowRight, LoaderCircle, CheckCircle2, Link2, X, Info, ShieldCheck, TicketPercent } from "lucide-react";
 import { toast } from "sonner";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
+
+function BenefitRow({ icon: Icon, iconClassName, label, value, text }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg)] p-3.5">
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconClassName}`}>
+        <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="text-[12.5px] text-[var(--user-text-muted)]">{label}</span>
+          <span className="text-[15px] font-bold text-[var(--user-text)]">{value}</span>
+        </div>
+        <p className="mt-0.5 text-[11.5px] leading-[17px] text-[var(--user-text-muted)]">{text}</p>
+      </div>
+    </div>
+  );
+}
 
 function copyTextFallback(value) {
   if (typeof document.execCommand !== "function") throw new Error("Clipboard copy is unavailable");
@@ -74,41 +91,108 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
   };
 
   if (onboarding) {
+    const referrerPoints = Number(data?.referrerPoints || 0).toLocaleString();
+    const friendPoints = Number(data?.friendPoints || 0).toLocaleString();
+    const programOn = Boolean(data?.enabled);
     return (
-      <main dir={dir} className="user-theme fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-black/45 px-4 py-6 backdrop-blur-sm sm:px-6" role="dialog" aria-modal="true" aria-labelledby="referral-setup-title" aria-describedby="referral-setup-description">
-        <section className="relative my-auto w-full max-w-xl rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-5 py-7 text-[var(--user-text)] shadow-[0_24px_80px_-24px_rgba(15,23,42,.38)] sm:px-8 sm:py-9">
-          <Link href="/shop" aria-label="Close referral setup and continue shopping" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-[var(--user-text-muted)] transition hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] sm:right-5 sm:top-5">
-            <X size={18} strokeWidth={1.8} />
-          </Link>
-
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-accent-soft)] text-[var(--user-accent)]">
-            <UserRound size={20} strokeWidth={1.8} />
+      <main dir={dir} className="user-theme fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-slate-950/50 px-4 py-6 backdrop-blur-sm sm:px-6" role="dialog" aria-modal="true" aria-labelledby="referral-setup-title" aria-describedby="referral-setup-description">
+        <section className="relative my-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text)] shadow-[0_30px_90px_-30px_rgba(15,23,42,.55)]">
+          {/* Gradient header */}
+          <div className="relative bg-gradient-to-br from-[var(--user-accent)] to-indigo-700 px-5 py-7 text-white sm:px-8 sm:py-8">
+            <Link href="/shop" aria-label="Close referral setup and continue shopping" className="absolute end-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:end-5 sm:top-5">
+              <X size={18} strokeWidth={1.9} />
+            </Link>
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+              <Gift size={22} strokeWidth={1.8} aria-hidden="true" />
+            </span>
+            <p className="mt-4 text-[11px] font-semibold uppercase tracking-[.18em] text-white/75">Referral program</p>
+            <h1 id="referral-setup-title" className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Your referral link is ready</h1>
+            <p id="referral-setup-description" className="mt-2 max-w-lg text-sm leading-6 text-white/85">Share it with friends. When they join and verify their account, you both earn points toward future orders.</p>
           </div>
-          <h1 id="referral-setup-title" className="mt-4 text-center text-xl font-semibold tracking-tight">Your Referral Link</h1>
-          <p id="referral-setup-description" className="mx-auto mt-2 max-w-md text-center text-sm leading-6 text-[var(--user-text-muted)]">Share this link with your friends and earn rewards.</p>
 
           {query.isLoading ? (
-            <div className="mt-7 flex min-h-12 items-center justify-center text-[var(--user-accent)]" aria-label="Loading referral link"><LoaderCircle size={20} className="animate-spin" /></div>
+            <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-2" aria-label="Loading referral link">
+              <div className="space-y-3">
+                <div className="h-4 w-32 animate-pulse rounded bg-[var(--user-bg-hover)]" />
+                <div className="h-12 w-full animate-pulse rounded-xl bg-[var(--user-bg-hover)]" />
+                <div className="h-10 w-full animate-pulse rounded-lg bg-[var(--user-bg-hover)]" />
+              </div>
+              <div className="space-y-3">
+                <div className="h-4 w-28 animate-pulse rounded bg-[var(--user-bg-hover)]" />
+                <div className="h-16 w-full animate-pulse rounded-xl bg-[var(--user-bg-hover)]" />
+                <div className="h-16 w-full animate-pulse rounded-xl bg-[var(--user-bg-hover)]" />
+              </div>
+            </div>
           ) : query.isError ? (
-            <div className="mt-7 flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3 px-5 py-10 text-center">
               <p role="alert" className="text-sm text-[var(--user-text-muted)]">We couldn’t load your referral link.</p>
               <button type="button" onClick={() => query.refetch()} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--user-accent)] px-4 text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">Try again</button>
             </div>
           ) : (
             <>
-              <div className="mt-7 flex min-w-0 flex-col gap-2.5 sm:flex-row">
-                <label className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg)] px-3.5 focus-within:border-[var(--user-accent)] focus-within:ring-2 focus-within:ring-[var(--user-accent-soft)]">
-                  <Link2 size={17} className="shrink-0 text-[var(--user-accent)]" aria-hidden="true" />
-                  <input ref={referralInputRef} readOnly value={data?.shareUrl || ""} aria-label="Your referral link" title={data?.shareUrl || ""} dir="ltr" className="min-w-0 w-full bg-transparent text-sm text-[var(--user-text)] outline-none" />
-                </label>
-                <button type="button" onClick={copy} disabled={!data?.shareUrl} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-5 text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] disabled:cursor-not-allowed disabled:opacity-60">
-                  <Copy size={16} strokeWidth={1.9} />Copy Link
-                </button>
+              <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-2 lg:gap-8">
+                {/* Left: share link */}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Link2 size={16} className="text-[var(--user-accent)]" aria-hidden="true" />
+                    <h2 className="text-[14px] font-semibold">Share your link</h2>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-5 text-[var(--user-text-muted)]">Anyone who creates an account through this link counts as your referral.</p>
+
+                  <div className="mt-3 flex min-w-0 flex-col gap-2.5 sm:flex-row">
+                    <label className="flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg)] px-3.5 focus-within:border-[var(--user-accent)] focus-within:ring-2 focus-within:ring-[var(--user-accent-soft)]">
+                      <Link2 size={17} className="shrink-0 text-[var(--user-accent)]" aria-hidden="true" />
+                      <input ref={referralInputRef} readOnly value={data?.shareUrl || ""} aria-label="Your referral link" title={data?.shareUrl || ""} dir="ltr" className="w-full min-w-0 bg-transparent text-[13px] text-[var(--user-text)] outline-none" />
+                    </label>
+                    <button type="button" onClick={copy} disabled={!data?.shareUrl} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] px-5 text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)] disabled:cursor-not-allowed disabled:opacity-60">
+                      <Copy size={16} strokeWidth={1.9} aria-hidden="true" />Copy link
+                    </button>
+                  </div>
+
+                  {data?.code ? (
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-dashed border-[var(--user-border)] bg-[var(--user-bg)] px-3.5 py-2.5">
+                      <span className="text-[11.5px] text-[var(--user-text-muted)]">Referral code</span>
+                      <code className="rounded-md bg-[var(--user-accent-soft)] px-2 py-1 text-[12.5px] font-semibold tracking-[.08em] text-[var(--user-accent)]" dir="ltr">{data.code}</code>
+                    </div>
+                  ) : null}
+
+                  {!programOn && (
+                    <p className="mt-3 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2.5 text-[11.5px] leading-5 text-amber-700">
+                      <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                      <span>The store hasn’t activated referral rewards yet. Your link is ready; points start once the program is enabled.</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Right: benefits */}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="text-[var(--user-accent)]" aria-hidden="true" />
+                    <h2 className="text-[14px] font-semibold">What you both get</h2>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-5 text-[var(--user-text-muted)]">Points are added after your friend verifies their new account.</p>
+
+                  <div className="mt-3 space-y-2.5">
+                    <BenefitRow icon={CheckCircle2} iconClassName="bg-[var(--user-accent-soft)] text-[var(--user-accent)]" label="You earn" value={`${referrerPoints} points`} text="For every friend who joins and verifies." />
+                    <BenefitRow icon={Gift} iconClassName="bg-emerald-500/10 text-emerald-600" label="Your friend gets" value={`${friendPoints} points`} text="A welcome reward on their new account." />
+                  </div>
+
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-[var(--user-bg)] px-3 py-2.5 text-[11.5px] leading-5 text-[var(--user-text-muted)]">
+                    <TicketPercent size={14} className="mt-0.5 shrink-0 text-[var(--user-accent)]" aria-hidden="true" />
+                    <span>Use your points at checkout to save on future orders.</span>
+                  </div>
+                </div>
               </div>
-              <p className="mt-5 flex items-start gap-2.5 rounded-lg bg-[var(--user-accent-soft)] px-3.5 py-3 text-left text-xs leading-5 text-[var(--user-text-muted)]">
-                <Info size={15} className="mt-0.5 shrink-0 text-[var(--user-accent)]" aria-hidden="true" />
-                <span>Friends who join using your referral link can earn rewards.</span>
-              </p>
+
+              <div className="flex flex-col gap-3 border-t border-[var(--user-border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+                <p className="flex items-start gap-2 text-[11.5px] leading-5 text-[var(--user-text-muted)]">
+                  <ShieldCheck size={14} className="mt-0.5 shrink-0 text-[var(--user-accent)]" aria-hidden="true" />
+                  <span>Self-referrals and repeat sign-ups don’t qualify.</span>
+                </p>
+                <Link href="/shop" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-5 text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                  Start shopping <ArrowRight size={16} className="rtl:rotate-180" aria-hidden="true" />
+                </Link>
+              </div>
             </>
           )}
         </section>
