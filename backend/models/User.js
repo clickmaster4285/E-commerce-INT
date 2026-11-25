@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema(
     // Account status — super admin can block a seller without deleting data
     status: { type: String, default: "active", enum: ["active", "blocked"], index: true },
     role: { type: String, default: "user", enum: ["user"] },
+    referralCode: { type: String, trim: true, uppercase: true, default: null },
+    referredByCode: { type: String, trim: true, uppercase: true, default: "", maxlength: 24 },
 
     // ✅ Account page fields — ye pehle schema mein the hi nahi,
     // isliye avatar save aur preferences silently drop ho rahe the
@@ -68,5 +70,6 @@ userSchema.methods.softDelete = function (userId) {
 userSchema.plugin(tenantScope); // har store ka data alag (storeId)
 userSchema.index({ storeId: 1, username: 1 }, { unique: true }); // unique per store
 userSchema.index({ storeId: 1, email: 1 }, { unique: true }); // unique per store
+userSchema.index({ storeId: 1, referralCode: 1 }, { unique: true, partialFilterExpression: { referralCode: { $type: "string" } } });
 
 module.exports = mongoose.model("User", userSchema);

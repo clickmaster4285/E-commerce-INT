@@ -40,11 +40,12 @@ import OrdersView from "../orders/page";
 import WishlistView from "../wishlist/page";
 import MyReviews from "@/components/user/MyReviews";
 import RewardsView from "@/components/user/RewardsView";
+import ReferralProgramView from "@/components/user/ReferralProgramView";
 import AccountPageHeader from "@/components/user/AccountPageHeader";
 import {
   User, Package, Heart, MapPin, Settings, LogOut, Phone, Mail, Calendar,
   Plus, Pencil, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Loader2, X,
-  CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Star, Save,
+  CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Star, Save, UserRoundPlus,
   ChevronRight, SlidersHorizontal, KeyRound, Globe, Gift,
 } from "lucide-react";
 
@@ -77,6 +78,7 @@ const NAV_ITEMS = [
   { id: "orders", label: "My Orders", icon: Package },
   { id: "reviews", label: "My Reviews", icon: Star },
   { id: "rewards", label: "Rewards", icon: Gift },
+  { id: "referrals", label: "Refer a Friend", icon: UserRoundPlus },
   { id: "wishlist", label: "Wishlist", icon: Heart },
   { id: "address", label: "Address", icon: MapPin },
   { id: "settings", label: "Setting", icon: Settings },
@@ -87,6 +89,7 @@ const TAB_TITLES = {
   orders: "My Orders",
   reviews: "My Reviews",
   rewards: "Rewards",
+  referrals: "Refer a Friend",
   wishlist: "Wishlist",
   address: "Address",
   settings: "Setting",
@@ -947,6 +950,7 @@ export default function AccountPage() {
 
               {/* ============ REWARDS — loyalty points ============ */}
               {tab === "rewards" && <RewardsView />}
+              {tab === "referrals" && <ReferralProgramView showContinue={false} />}
 
               {/* ============ WISHLIST — wishlist page wala hi design (reuse) ============ */}
               {tab === "wishlist" && <WishlistView compact />}

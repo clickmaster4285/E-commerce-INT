@@ -49,6 +49,7 @@ export default function UserLoginPage() {
   const { t } = useTranslation();
   const { nameOf } = useLocalized();
   const [isLogin, setIsLogin] = useState(true);
+  const [referralCode] = useState(() => typeof window === "undefined" ? "" : String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24));
   // Loyalty welcome bonus banner (register mode) — program off ho to kuch nahi dikhta
   const { data: loyaltyProgram } = useQuery({ queryKey: ["loyaltyProgram"], queryFn: loyaltyApi.program, staleTime: 5 * 60 * 1000, retry: false });
 
@@ -60,6 +61,7 @@ export default function UserLoginPage() {
         if (new URLSearchParams(window.location.search).get("approved") === "1") {
           setApprovedInfo(true);
         }
+        if (new URLSearchParams(window.location.search).get("mode") === "register") setIsLogin(false);
       } catch {
         /* ignore */
       }
@@ -178,7 +180,8 @@ export default function UserLoginPage() {
       console.log("Login successful");
 
       // ✅ REGISTER → User NAHI banta, sirf pending + OTP jata hai, phir verify screen
-      const res = await authApi.register({ name, username, phone, email, password });
+      const res = await authApi.register({ name, username, phone, email, password, referralCode });
+      if (!res?.delivered && res?.debugOtp) toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
       setOtpEmail(res?.email || email);
       setStep("verify-email");
       toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
@@ -208,7 +211,8 @@ export default function UserLoginPage() {
 
   const handleResendEmailOtp = async () => {
     const res = await authApi.sendEmailOtp(otpEmail);
-    toast.success(t("auth.login.verificationResent"));
+    if (!res?.delivered && res?.debugOtp) toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
+    else toast.success(t("auth.login.verificationResent"));
   };
 
   // ==========================================
@@ -261,7 +265,7 @@ export default function UserLoginPage() {
   const handleGoogleLogin = async (credential) => {
     setLoading(true);
     try {
-      await authApi.googleCustomerLogin(credential);
+      await authApi.googleCustomerLogin(credential, referralCode);
       window.location.href = "/";
     } catch (err) {
       toast.error(getApiErrorMessage(err, t("auth.login.googleFailed")));

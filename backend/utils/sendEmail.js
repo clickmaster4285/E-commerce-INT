@@ -1,6 +1,9 @@
 const nodemailer = require("nodemailer");
 const log = require("./logger");
 
+// Fail quickly when the SMTP server accepts TCP but never completes its greeting.
+const SMTP_TIMEOUTS = Object.freeze({ connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 12000 });
+
 // ==========================================
 // ✉️ EMAIL UTILITY (Nodemailer + SMTP)
 // ==========================================
@@ -49,10 +52,8 @@ const getTransporter = () => {
     port,
     secure,
     auth: { user, pass },
-    // ✅ Timeouts taake request hang na ho — fail fast aur clear error mile
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
+    // SMTP timeout so an unresponsive provider cannot hold signup / OTP requests.
+    ...SMTP_TIMEOUTS,
     // ✅ Port 587 par STARTTLS force karo (Gmail/zyada providers ke liye zaroori)
     ...(secure === false && port === 587 ? { requireTLS: true } : {}),
     tls: { minVersion: "TLSv1.2" },
@@ -206,4 +207,4 @@ const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresIn
   return sendEmail({ to, subject: `${copy.subject} — ${storeName}`, html, text });
 };
 
-module.exports = { sendEmail, sendOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig };
+module.exports = { sendEmail, sendOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig, SMTP_TIMEOUTS };

@@ -1,4 +1,5 @@
 const loyalty = require("../utils/loyaltyService");
+const referrals = require("../utils/referralService");
 const crypto = require("crypto");
 const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const bcrypt = require("bcryptjs");
@@ -23,6 +24,7 @@ const OTP_MAX_ATTEMPTS = Number(process.env.EMAIL_OTP_MAX_ATTEMPTS);
 const OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS);
 const OTP_LENGTH = Number(process.env.OTP_LENGTH);
 const RESET_TOKEN_EXPIRE_MINUTES = Number(process.env.RESET_TOKEN_EXPIRE_MINUTES);
+const SMTP_RETRY_SECONDS = 10;
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
@@ -82,7 +84,16 @@ const issueOtp = async ({ email, purpose }) => {
   } catch (emailError) {
     // ✅ Email fail ho to bekaar OTP DB mein na chhodo — user dobara try kar sake
     await Otp.deleteOne({ _id: created._id }).catch(() => {});
+    emailError.statusCode = 503;
+    emailError.retryAfter = SMTP_RETRY_SECONDS;
     throw emailError;
+  }
+  if (!delivery.delivered && process.env.NODE_ENV === "production") {
+    await Otp.deleteOne({ _id: created._id }).catch(() => {});
+    const error = new Error("The email server did not accept the verification email. Please retry shortly.");
+    error.statusCode = 503;
+    error.retryAfter = SMTP_RETRY_SECONDS;
+    throw error;
   }
 
   // 🧪 DEV ONLY — SMTP off ho to bhi flow test ho sake (prod mein kabhi OTP expose nahi hoga)
@@ -191,12 +202,7 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
       throw error;
     }
     const code = generateOtpCode();
-    pending.otpHash = await bcrypt.hash(code, 10);
-    pending.expiresAt = new Date(Date.now() + OTP_EXPIRE_MINUTES * 60 * 1000);
-    pending.attempts = 0;
-    pending.lastSentAt = new Date();
-    await pending.save();
-
+    const otpHash = await bcrypt.hash(code, 10);
     let delivery;
     try {
       delivery = await sendOtpEmail({
@@ -206,8 +212,29 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
         expiresInMinutes: OTP_EXPIRE_MINUTES,
       });
     } catch (emailError) {
+      const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
+      pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
+      await pending.save();
+      emailError.statusCode = 503;
+      emailError.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
       throw emailError;
     }
+    if (!delivery.delivered && process.env.NODE_ENV === "production") {
+      const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
+      pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
+      await pending.save();
+      const error = new Error("The email server did not accept the verification email. Please retry shortly.");
+      error.statusCode = 503;
+      error.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
+      throw error;
+    }
+    // Sirf email successfully queued (ya dev fallback code tayyar) hone par
+    // naya OTP active karein; SMTP failure purane valid code ko revoke na kare.
+    pending.otpHash = otpHash;
+    pending.expiresAt = new Date(Date.now() + OTP_EXPIRE_MINUTES * 60 * 1000);
+    pending.attempts = 0;
+    pending.lastSentAt = new Date();
+    await pending.save();
     const debugOtp =
       !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
@@ -378,10 +405,18 @@ const verifyEmailVerificationOtp = async (req, res) => {
           role: "user",
           emailVerified: true,
           status: "active",
+          referralCode: null,
+          referredByCode: pending.referralCode || "",
         });
         await PendingRegistration.deleteOne({ _id: pending._id });
         // ✅ Loyalty welcome bonus (program off ho to kuch nahi hota)
         await loyalty.awardSignupBonus(customer._id);
+        try {
+          await referrals.processSignupReferral(customer, pending.referralCode);
+          await referrals.ensureReferralCode(customer);
+        } catch (referralError) {
+          console.error("[referrals] signup processing failed:", referralError.message);
+        }
         await setAuthCookies(req, res, customer);
 
         const io = req.io || getIO();

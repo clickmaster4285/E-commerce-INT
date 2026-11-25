@@ -8,4 +8,6 @@ export const loyaltyApi = {
   member: (userId, params = {}) => adminHttp.get(`/loyalty/admin/members/${userId}`, { params }).then((res) => res.data?.data),
   adjust: (userId, data) => adminHttp.post(`/loyalty/admin/members/${userId}/adjust`, data).then((res) => res.data),
   transactions: (params = {}) => adminHttp.get("/loyalty/admin/transactions", { params }).then((res) => res.data),
+  referrals: () => adminHttp.get("/loyalty/admin/referrals").then((res) => res.data?.data),
+  saveReferrals: (data) => adminHttp.put("/loyalty/admin/referrals", data).then((res) => res.data),
 };

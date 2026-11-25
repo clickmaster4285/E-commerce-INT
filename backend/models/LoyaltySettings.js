@@ -40,7 +40,7 @@ const loyaltySettingsSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );
 
-loyaltySettingsSchema.plugin(tenantScope); // har store ka data alag (storeId)
+loyaltySettingsSchema.plugin(tenantScope, { index: false }); // unique index neeche define hai
 loyaltySettingsSchema.index({ storeId: 1 }, { unique: true });
 
 module.exports = mongoose.model("LoyaltySettings", loyaltySettingsSchema);

@@ -220,6 +220,13 @@ export default function WelcomeRewardModal() {
     setDismissed(s.bonus._id);
   }, []);
 
+  // Link navigation ko modal state change se race na karne dein. Browser/Next
+  // ko destination par navigate karne dein; welcome reward bas dobara na khule.
+  const markWelcomeSeenForNavigation = useCallback(() => {
+    const currentBonus = stateRef.current.bonus;
+    if (currentBonus?._id) markSeen(currentBonus._id);
+  }, []);
+
   // Pre-order claim → checkout ko continue karne deta hai (order ab place hota hai).
   const handlePreorderClaim = () => {
     if (!preorderClaim) return;
@@ -336,16 +343,16 @@ export default function WelcomeRewardModal() {
                 : t("rewards.claim.successText", { points: n(successPoints) })}
             </p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
-              <Link href="/account?tab=rewards" onClick={close}
+              <a href="/account?tab=rewards" onClick={markWelcomeSeenForNavigation}
                 className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-sm font-medium text-[var(--user-text)] transition-colors hover:bg-[var(--user-bg-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
                 <Gift size={15} strokeWidth={1.75} />
                 {t("rewards.welcome.view")}
-              </Link>
-              <Link href="/shop" onClick={close}
+              </a>
+              <a href={mode === "welcome" ? "/referrals/setup" : "/shop"} onClick={markWelcomeSeenForNavigation}
                 className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-all duration-300 hover:bg-[var(--user-accent-hover)] hover:shadow-md active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
                 {t("rewards.welcome.shop")}
                 <ArrowRight size={15} strokeWidth={1.75} />
-              </Link>
+              </a>
             </div>
           </div>
         ) : (

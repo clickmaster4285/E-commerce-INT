@@ -16,6 +16,7 @@ export const initials = (name = "") =>
 // Transaction type → icon + rang
 export const TXN_META = {
   signup: { icon: Sparkles, tone: "purple" },
+  referral: { icon: Gift, tone: "success" },
   earn: { icon: ShoppingBag, tone: "success" },
   redeem: { icon: TicketPercent, tone: "accent" },
   refund: { icon: RotateCcw, tone: "info" },

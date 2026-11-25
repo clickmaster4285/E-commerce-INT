@@ -213,6 +213,41 @@ async function takeBack(userId, points, extra = {}) {
   return 0;
 }
 
+/** Delivered referral-sale reward ko cancel par balance se wapas lo (minus balance nahi). */
+async function reverseAvailableCredit(sourceKey, note) {
+  const txn = await LoyaltyTransaction.findOneAndUpdate(
+    { source_key: sourceKey, status: "available" },
+    { $set: { status: "reversed", note } },
+    { returnDocument: "before" },
+  ).lean();
+  if (!txn) return 0;
+  const recovered = await takeBack(txn.user_id, txn.points);
+  await inc(txn.user_id, { lifetimeEarned: -recovered });
+  await LoyaltyTransaction.updateOne(
+    { _id: txn._id, status: "reversed" },
+    { $set: { reversed_points: recovered, note: recovered < txn.points ? `${note} · ${recovered} of ${txn.points} points recovered` : note } },
+  );
+  return recovered;
+}
+
+/** Cancelled referral-sale reward ko order restore par wahi amount se wapas lao. */
+async function restoreReversedCredit(sourceKey, note) {
+  const previous = await LoyaltyTransaction.findOne({ source_key: sourceKey, status: "reversed" }).lean();
+  if (!previous) return false;
+  const recovered = Math.min(Math.max(0, Number(previous.reversed_points) || 0), Math.max(0, Number(previous.points) || 0));
+  // If the customer had already spent the reward, cancellation could not
+  // recover it. Keep the ledger reversed instead of issuing it again.
+  if (!recovered) return true;
+  const txn = await LoyaltyTransaction.findOneAndUpdate(
+    { _id: previous._id, status: "reversed" },
+    { $set: { status: "available", points: recovered, reversed_points: 0, note: recovered < previous.points ? `${note} · ${recovered} of ${previous.points} points restored` : note } },
+    { returnDocument: "before" },
+  ).lean();
+  if (!txn) return true;
+  await inc(txn.user_id, { balance: recovered, lifetimeEarned: recovered });
+  return true;
+}
+
 /**
  * Order bante hi uske points "pending" — kharch nahi ho sakte.
  * Delivered par "available" hote hain; cancel / delete par hat jaate hain.
@@ -384,6 +419,7 @@ async function onOrderStatusChange(order, prevStatus, nextStatus) {
       // Pehle kharch kiye points wapas, phir kamaye hue points wapas lo
       const refunded = await refundRedemption(order);
       const reversed = await reverseEarn(order);
+      await require("./referralService").reverseReferralSale(order);
       if (refunded || reversed) {
         await notifyCustomer(order.user_id, { kind: "order_cancelled", refunded, reversed, order_id: order._id, order_number: order.order_number });
       }
@@ -393,13 +429,21 @@ async function onOrderStatusChange(order, prevStatus, nextStatus) {
     if (prevStatus === "cancelled") {
       const restored = await restoreEarn(order, delivered);
       const recharged = await undoRefund(order);
+      if (delivered) {
+        const referralRestored = await require("./referralService").restoreReferralSale(order);
+        if (!referralRestored) await require("./referralService").rewardReferralSale(order);
+      }
       if (restored || recharged) {
         await notifyCustomer(order.user_id, { kind: "order_restored", refunded: recharged, reversed: restored, order_id: order._id, order_number: order.order_number });
       }
       return;
     }
     // Delivered par hi points kharch ke qabil
-    if (delivered) await releaseEarn(order);
+    if (delivered) {
+      await releaseEarn(order);
+      const referralRestored = await require("./referralService").restoreReferralSale(order);
+      if (!referralRestored) await require("./referralService").rewardReferralSale(order);
+    }
     else if (prevStatus === "delivered") await holdEarn(order);
   } catch (err) {
     log.error("[loyalty] status sync failed:", err.message);
@@ -411,6 +455,7 @@ async function onOrderDeleted(order) {
   try {
     await refundRedemption(order, `Order ${order.order_number} removed`);
     await reverseEarn(order);
+    await require("./referralService").reverseReferralSale(order);
   } catch (err) {
     log.error("[loyalty] delete sync failed:", err.message);
   }
@@ -462,6 +507,8 @@ module.exports = {
   getSettings,
   getAccount,
   ensureAccount,
+  reverseAvailableCredit,
+  restoreReversedCredit,
   awardSignupBonus,
   claimWelcomeBonus,
   redeemForCheckout,

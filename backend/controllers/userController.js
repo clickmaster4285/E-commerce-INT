@@ -40,6 +40,19 @@ const checkStoreSubdomain = async (raw, email) => {
 // ✅ OTP config (sirf .env se — koi hardcoded fallback nahi)
 const REGISTER_OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
 const REGISTER_OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS);
+const SMTP_RETRY_SECONDS = 10;
+
+const allowSignupOtpRetry = async (email) => {
+  const cooldown = Number.isFinite(REGISTER_OTP_RESEND_SECONDS) && REGISTER_OTP_RESEND_SECONDS > 0
+    ? REGISTER_OTP_RESEND_SECONDS
+    : 60;
+  const retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
+  await PendingRegistration.updateOne(
+    { email },
+    { $set: { lastSentAt: new Date(Date.now() - Math.max(0, cooldown - retryAfter) * 1000) } },
+  );
+  return retryAfter;
+};
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -150,6 +163,7 @@ const checkRegistration = async (req, res) => {
 const createUser = async (req, res) => {
   try {
     const { name, username, phone, email: rawEmail, password } = req.body;
+    const referralCode = String(req.body?.referralCode || "").trim().toUpperCase().slice(0, 24);
     const email = normalizeEmail(rawEmail);
     const cleanUsername = String(username || "").trim();
     const rawPhone = typeof phone === "string" ? phone : "";
@@ -325,16 +339,14 @@ const createUser = async (req, res) => {
     const otpHash = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + REGISTER_OTP_EXPIRE_MINUTES * 60 * 1000);
 
+    let pendingRegistration;
     if (existingPending && new Date(existingPending.expiresAt).getTime() > Date.now()) {
       existingPending.name = cleanName;
       existingPending.username = finalUsername;
       existingPending.phone = cleanPhone;
       existingPending.passwordHash = passwordHash;
-      existingPending.otpHash = otpHash;
-      existingPending.expiresAt = expiresAt;
-      existingPending.attempts = 0;
-      existingPending.lastSentAt = new Date();
       existingPending.storeId = signupStoreId;
+      existingPending.referralCode = referralCode || existingPending.referralCode || "";
       existingPending.storeName = wantsStore ? storeName : "";
       existingPending.subdomain = wantsStore ? storeSubdomain : "";
       existingPending.storeDescription = storeDescription;
@@ -346,8 +358,9 @@ const createUser = async (req, res) => {
       existingPending.zipCode = zipCode;
       if (storeLogoUrl) existingPending.storeLogoUrl = storeLogoUrl;
       await existingPending.save();
+      pendingRegistration = existingPending;
     } else {
-      await PendingRegistration.create({
+      pendingRegistration = await PendingRegistration.create({
         email,
         name: cleanName,
         username: finalUsername,
@@ -358,6 +371,7 @@ const createUser = async (req, res) => {
         attempts: 0,
         lastSentAt: new Date(),
         storeId: signupStoreId,
+        referralCode,
         storeName: wantsStore ? storeName : "",
         subdomain: wantsStore ? storeSubdomain : "",
         storeDescription,
@@ -371,9 +385,8 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 📧 Verification OTP bhejo. Dev me SMTP offline/slow ho to signup block nahi hota:
-    // 12s se zyada wait nahi (Gmail ka pehla connection 4–6s le leta hai) — phir OTP
-    // console par dikhta hai, pending registration banti rehti hai.
+    // 📧 Verification OTP bhejo. Nodemailer transport ke bounded SMTP timeouts
+    // dev aur production dono me apply hote hain.
     const emailArgs = {
       to: email,
       otp: code,
@@ -381,20 +394,26 @@ const createUser = async (req, res) => {
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
     };
     let delivery;
-    if (process.env.NODE_ENV !== "production") {
-      delivery = await Promise.race([
-        sendOtpEmail(emailArgs).catch((e) => ({ delivered: false, reason: e?.code || "smtp_failed" })),
-        new Promise((resolve) => setTimeout(() => resolve({ delivered: false, reason: "smtp_timeout" }), 12000)),
-      ]);
-    } else {
-      try {
-        delivery = await sendOtpEmail(emailArgs);
-      } catch (emailError) {
-        await PendingRegistration.deleteOne({ email }).catch(() => {});
-        log.error("createUser otp error:", emailError.cause || emailError);
-        return res.status(500).json({ success: false, message: emailError.message });
+    try {
+      delivery = await sendOtpEmail(emailArgs);
+    } catch (emailError) {
+      log.error("createUser otp error:", emailError.cause || emailError);
+      if (process.env.NODE_ENV === "production") {
+        const retryAfter = await allowSignupOtpRetry(email);
+        return res.status(503).json({ success: false, message: emailError.message, retryAfter });
       }
+      delivery = { delivered: false, reason: emailError?.code || "smtp_failed" };
     }
+    if (!delivery.delivered && process.env.NODE_ENV === "production") {
+      const retryAfter = await allowSignupOtpRetry(email);
+      return res.status(503).json({ success: false, message: "The email server did not accept the verification email. Please retry shortly.", retryAfter });
+    }
+
+    pendingRegistration.otpHash = otpHash;
+    pendingRegistration.expiresAt = expiresAt;
+    pendingRegistration.attempts = 0;
+    pendingRegistration.lastSentAt = new Date();
+    await pendingRegistration.save();
 
     // 🧪 DEV ONLY — logger no-op hai, isliye seedha console (prod me OTP kabhi print nahi hota).
     const debugOtp =
@@ -408,9 +427,11 @@ const createUser = async (req, res) => {
       success: true,
       message: delivery.delivered
         ? `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
-        : `We couldn't email your verification code right now. Please try "Resend code" in a moment. (Development: the code is printed in the backend console. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.)`,
+        : debugOtp
+          ? `Email is unavailable in development. Use the development verification code shown in the app. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
+          : `We couldn't email your verification code right now. Please try "Resend code" in a moment.`,
       requireVerification: true,
-      otpSent: true,
+      otpSent: Boolean(delivery.delivered),
       delivered: delivery.delivered,
       email,
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
@@ -1162,9 +1183,17 @@ const googleCustomerLogin = async (req, res) => {
         storeId: defaultStore?._id,
         // ✅ Google se aayi email already verified hoti hai
         emailVerified: email_verified !== false,
+        referredByCode: String(req.body?.referralCode || "").trim().toUpperCase().slice(0, 24),
       });
       // ✅ Naya Google customer → loyalty welcome bonus
       await loyalty.awardSignupBonus(user._id);
+      try {
+        const referrals = require("../utils/referralService");
+        await referrals.processSignupReferral(user, req.body?.referralCode);
+        await referrals.ensureReferralCode(user);
+      } catch (referralError) {
+        console.error("[referrals] Google signup processing failed:", referralError.message);
+      }
     }
 
     const io = req.io || getIO();

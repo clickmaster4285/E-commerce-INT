@@ -10,7 +10,7 @@ const tenantScope = require("../utils/tenantScopePlugin");
 //   refund:<orderId>  adjust:<id>
 // ==========================================================
 
-const TYPES = ["signup", "earn", "redeem", "refund", "adjust"];
+const TYPES = ["signup", "earn", "redeem", "refund", "adjust", "referral"];
 const STATUSES = ["pending", "available", "reversed"];
 
 const loyaltyTransactionSchema = new mongoose.Schema(
@@ -18,6 +18,7 @@ const loyaltyTransactionSchema = new mongoose.Schema(
     user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     type: { type: String, enum: TYPES, required: true },
     points: { type: Number, required: true }, // + credit, − debit
+    reversed_points: { type: Number, default: 0, min: 0 }, // balance portion recovered if a delivered reward is reversed
     status: { type: String, enum: STATUSES, default: "available" },
     source_key: { type: String, required: true },
     order_id: { type: mongoose.Schema.Types.ObjectId, ref: "Order", default: null },

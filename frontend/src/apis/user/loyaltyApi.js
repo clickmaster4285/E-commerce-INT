@@ -7,4 +7,5 @@ export const loyaltyApi = {
   me: (params = {}) => userHttp.get("/loyalty/me", { params }).then((res) => res.data?.data),
   /** Idempotent welcome-bonus claim (bonus already credited; server marks it claimed). */
   claimWelcome: () => userHttp.post("/loyalty/me/welcome/claim").then((res) => res.data?.data),
+  referrals: () => userHttp.get("/loyalty/referrals/me").then((res) => res.data?.data),
 };

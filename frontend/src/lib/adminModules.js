@@ -27,6 +27,7 @@ import {
   Receipt,
   DollarSign,
   Award,
+  UserRoundPlus,
 } from "lucide-react";
 
 /** Section order — sidebarTitle uppercase labels i18n keys ke liye */
@@ -75,6 +76,7 @@ export const ADMIN_MODULES = [
   { key: "employees", name: "Employees", section: "team", path: "/admin/employees", permissionKey: "employees", icon: Users, countable: true, nav: true },
   { key: "profile", name: "Profile", section: "team", path: "/admin/profile", permissionKey: "profile", icon: User, countable: false, nav: true },
   { key: "loyalty", name: "Rewards", section: "team", path: "/admin/loyalty", permissionKey: "loyalty", icon: Award, countable: false, nav: true },
+  { key: "referrals", name: "Referrals", section: "sales", path: "/admin/referrals", permissionKey: "loyalty", icon: UserRoundPlus, countable: false, nav: true },
 ];
 
 export const getSection = (sectionId) => ADMIN_SECTIONS.find((s) => s.id === sectionId);

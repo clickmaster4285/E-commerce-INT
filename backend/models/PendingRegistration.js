@@ -24,6 +24,7 @@ const pendingRegistrationSchema = new mongoose.Schema(
     // Customer signup kis store par hua (store host). null = platform seller signup.
     // Verify isi store par hota hai — store A ka code store B / platform par nahi.
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
+    referralCode: { type: String, trim: true, uppercase: true, default: "", maxlength: 24 },
     storeName: { type: String, default: "", trim: true },
     // Seller ka chuna hua store web address — "ahmed-electronics" → ahmed-electronics.<ROOT_DOMAIN>
     subdomain: { type: String, default: "", trim: true, lowercase: true },
