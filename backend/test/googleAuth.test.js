@@ -1,4 +1,4 @@
-// Google ID token verification (utils/googleAuth.js) + admin Google login rules
+﻿// Google ID token verification (utils/googleAuth.js) + admin Google login rules
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
 
 const test = require("node:test");
@@ -17,7 +17,7 @@ const good = {
   name: "Owner",
   picture: "https://example.com/p.png",
 };
-// tokeninfo stub: credential "ok" → payload, warna Google 400 (bad signature)
+// tokeninfo stub: credential "ok" â†’ payload, warna Google 400 (bad signature)
 const fetchFor = (payload) => async (url) => {
   const token = decodeURIComponent(String(url).split("id_token=")[1] || "");
   if (token !== "signed-by-google") return { ok: false, json: async () => ({ error: "invalid_token" }) };
@@ -26,7 +26,7 @@ const fetchFor = (payload) => async (url) => {
 const verify = (payload, credential = "signed-by-google", extra = {}) =>
   verifyGoogleIdToken(credential, { fetchImpl: fetchFor(payload), clientId: CLIENT_ID, now: () => NOW, ...extra });
 
-test("valid Google token → normalized identity", async () => {
+test("valid Google token â†’ normalized identity", async () => {
   const id = await verify(good);
   assert.deepEqual(id, { sub: "g-1", email: "owner@store.com", name: "Owner", picture: "https://example.com/p.png" });
 });
@@ -44,7 +44,7 @@ test("wrong audience / issuer / expired / unverified email are rejected", async 
   await assert.rejects(verify({ ...good, email: "" }), /email/);
 });
 
-test("missing credential, missing client id, network error → rejected", async () => {
+test("missing credential, missing client id, network error â†’ rejected", async () => {
   await assert.rejects(verify(good, ""), /missing/);
   await assert.rejects(verify(good, "signed-by-google", { clientId: "" }), /not configured/);
   await assert.rejects(
@@ -53,7 +53,7 @@ test("missing credential, missing client id, network error → rejected", async 
   );
 });
 
-// ── googleLogin handler: who may get an admin session ──
+// â”€â”€ googleLogin handler: who may get an admin session â”€â”€
 const path = require("path");
 const mongoose = require("mongoose");
 const tokensPath = path.join(__dirname, "..", "utils", "tokens.js");
@@ -62,7 +62,7 @@ const ownershipPath = path.join(__dirname, "..", "utils", "sellerOwnership.js");
 
 function loadHandler({ email, employeesByStore, platformOwner }) {
   // Fresh copies with stubs
-  for (const p of [tokensPath, googlePath, ownershipPath, require.resolve("../controllers/userController")]) delete require.cache[p];
+  for (const p of [tokensPath, googlePath, ownershipPath, require.resolve("../controllers/adminAuthController")]) delete require.cache[p];
   require.cache[googlePath] = { id: googlePath, filename: googlePath, loaded: true, exports: {
     verifyGoogleIdToken: async (c) => { if (c !== "ok") throw new Error("Invalid Google token"); return { email, sub: "g", name: "", picture: "" }; },
   } };
@@ -81,7 +81,7 @@ function loadHandler({ email, employeesByStore, platformOwner }) {
   });
   const activity = require("../utils/activityHelper");
   activity.pushGlobalActivity = async () => {};
-  const { googleLogin } = require("../controllers/userController");
+  const { googleLogin } = require("../controllers/adminAuthController");
   return { googleLogin, issued };
 }
 const call = (handler, body, store) =>
@@ -100,14 +100,14 @@ test("store host: this store's active staff gets an admin session", async () => 
   assert.equal(issued[0].aud, "admin");
 });
 
-test("store host: Google email with no staff record here (customer / other store) → 403, no session", async () => {
+test("store host: Google email with no staff record here (customer / other store) â†’ 403, no session", async () => {
   const { googleLogin, issued } = loadHandler({ email: "owner@store.com", employeesByStore: { current: [] } });
   const r = await call(googleLogin, { credential: "ok" }, STORE_A);
   assert.equal(r.status, 403);
   assert.equal(issued.length, 0);
 });
 
-test("inactive or deleted staff → 403", async () => {
+test("inactive or deleted staff â†’ 403", async () => {
   for (const extra of [{ status: "inactive" }, { is_deleted: true }]) {
     const { googleLogin, issued } = loadHandler({ email: "owner@store.com", employeesByStore: { current: [staff(extra)] } });
     const r = await call(googleLogin, { credential: "ok" }, STORE_A);
@@ -116,14 +116,14 @@ test("inactive or deleted staff → 403", async () => {
   }
 });
 
-test("invalid Google token → 401", async () => {
+test("invalid Google token â†’ 401", async () => {
   const { googleLogin, issued } = loadHandler({ email: "owner@store.com", employeesByStore: { current: [staff()] } });
   const r = await call(googleLogin, { credential: "forged" }, STORE_A);
   assert.equal(r.status, 401);
   assert.equal(issued.length, 0);
 });
 
-test("platform host: only the seller owner; ambiguous → 409", async () => {
+test("platform host: only the seller owner; ambiguous â†’ 409", async () => {
   let h = loadHandler({ email: "owner@store.com", employeesByStore: {}, platformOwner: { employee: staff() } });
   assert.equal((await call(h.googleLogin, { credential: "ok" }, null)).status, 200);
   h = loadHandler({ email: "owner@store.com", employeesByStore: {}, platformOwner: { employee: null, ambiguous: true } });
@@ -131,3 +131,4 @@ test("platform host: only the seller owner; ambiguous → 409", async () => {
   h = loadHandler({ email: "owner@store.com", employeesByStore: {}, platformOwner: { employee: null } });
   assert.equal((await call(h.googleLogin, { credential: "ok" }, null)).status, 403);
 });
+
