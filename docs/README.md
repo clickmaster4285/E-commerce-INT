@@ -49,7 +49,7 @@ Tech stack:
 | [07-api-reference.md](07-api-reference.md) | Har module ke endpoints |
 | [08-features.md](08-features.md) | Translation, email, loyalty, referral, POS, finance, invoices, quotes, PO, chat |
 | [09-configuration-and-ops.md](09-configuration-and-ops.md) | Env vars, commands, production checklist, scripts, tests |
-| [10-notes-and-issues.md](10-notes-and-issues.md) | Jo bugs/gaps mile, observations aur suggestions |`n| [11-controllers.md](11-controllers.md) | Har controller ka function-by-function reference |`n| [12-routes.md](12-routes.md) | Har endpoint (method + path + handler + middleware) |`n| [13-models.md](13-models.md) | Har Mongoose model ka schema field reference |`n| [14-referral-system.md](14-referral-system.md) | Referral system complete guide (files, flow, APIs) |
+| [10-notes-and-issues.md](10-notes-and-issues.md) | Jo bugs/gaps mile, observations aur suggestions |`n| [11-controllers.md](11-controllers.md) | Har controller ka function-by-function reference |`n| [12-routes.md](12-routes.md) | Har endpoint (method + path + handler + middleware) |`n| [13-models.md](13-models.md) | Har Mongoose model ka schema field reference |`n| [14-referral-system.md](14-referral-system.md) | Referral system complete guide (files, flow, APIs) |`n| [15-otp-system.md](15-otp-system.md) | OTP system complete guide (email verification + password reset) |
 
 ---
 
@@ -87,5 +87,6 @@ Browser â†’ Host header â†’ Next proxy.js (tenant) â†’ page rende
 
 Har request par store automatically resolve hota hai aur uske baad saari DB queries khud
 `storeId` se filter ho jati hain â€” controllers ko manually kuch nahi karna padta.
+
 
 

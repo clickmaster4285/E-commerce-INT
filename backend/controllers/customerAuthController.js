@@ -166,7 +166,6 @@ const createUser = async (req, res) => {
 
     const { name, username, phone, email: rawEmail, password } = req.body;
     const referralCode = String(req.body?.referralCode || "").trim().toUpperCase().slice(0, 24);
-    return res.send(referralCode);
     const email = normalizeEmail(rawEmail);
     const cleanUsername = String(username || "").trim();
     const rawPhone = typeof phone === "string" ? phone : "";

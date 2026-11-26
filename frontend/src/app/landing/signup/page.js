@@ -496,14 +496,20 @@ export default function SignupPage() {
           return;
         }
       const target = res?.email || email.trim().toLowerCase();
-      if (!res?.delivered) {
+      if (!res?.delivered && !res?.debugOtp && !res?.requireVerification) {
           setGeneralError(res?.message || "Verification code could not be sent. Please try again later.");
           setLoading(false);
           return;
         }
         setOtpEmail(target);
         setStep("otp");
-        toast.success(t("auth.login.verificationSent", { email: target }));
+        if (res?.debugOtp) {
+          toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
+        } else if (!res?.delivered) {
+          toast.info(res?.message || "Email is unavailable. Check the backend terminal for the development verification code.");
+        } else {
+          toast.success(t("auth.login.verificationSent", { email: target }));
+        }
       setLoading(false);
     } catch (err) {
       const data = err?.response?.data || {};
