@@ -13,7 +13,12 @@ async function ensureReferralCode(user) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const code = createCode();
     try {
-      const result = await User.updateOne({ _id: user._id, referralCode: null }, { $set: { referralCode: code } });
+      // Older customer records may store an empty string instead of null.
+      // Match both so they can receive a code instead of failing referral setup.
+      const result = await User.updateOne(
+        { _id: user._id, referralCode: { $in: [null, ""] } },
+        { $set: { referralCode: code } },
+      );
       if (result.modifiedCount) return code;
       const fresh = await User.findById(user._id).select("referralCode").lean();
       if (fresh?.referralCode) return fresh.referralCode;

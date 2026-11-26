@@ -530,7 +530,9 @@ const { storeAdminBaseUrl } = require("../utils/storeUrl");
 
 const { claimOnce } = require("../utils/oneTimeToken");
 
-const HANDOFF_TTL_SECONDS = 120;
+// Signup redirect can be delayed by the welcome screen, network, or subdomain
+// startup. Keep the one-time handoff valid long enough to reach the store.
+const HANDOFF_TTL_SECONDS = 10 * 60;
 
 // @route POST /api/users/admin/handoff   (logged-in employee, platform host)
 

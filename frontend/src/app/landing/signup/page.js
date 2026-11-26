@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getStoreAdminUrl } from "@/apis/storeHandoff";
@@ -67,8 +67,8 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
 }
 
 /* Mirrors the backend register rules exactly:
-   name required + ≥2, username optional ≥3 and letters/numbers/underscores only,
-   phone optional 10–16 digits, email valid, password ≥6 */
+   name required + â‰¥2, username optional â‰¥3 and letters/numbers/underscores only,
+   phone optional 10â€“16 digits, email valid, password â‰¥6 */
 const scorePassword = (pw) => {
   if (!pw) return 0;
   let s = 0;
@@ -79,7 +79,7 @@ const scorePassword = (pw) => {
   return Math.min(4, s);
 };
 
-/* ═══════════ SHARED DESIGN SYSTEM (dono steps same tokens use karte hain) ═══════════ */
+/* â•â•â•â•â•â•â•â•â•â•â• SHARED DESIGN SYSTEM (dono steps same tokens use karte hain) â•â•â•â•â•â•â•â•â•â•â• */
 const INPUT_BASE =
   "w-full h-11 rounded-xl border bg-white pl-11 pr-4 text-[14px] text-slate-900 placeholder:text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.04)] outline-none transition-[border-color,box-shadow,background-color] duration-150 disabled:cursor-not-allowed disabled:bg-slate-50";
 const inputState = (hasError) =>
@@ -87,7 +87,7 @@ const inputState = (hasError) =>
     ? "border-red-300 bg-red-50/40 focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
     : "border-slate-200 hover:border-slate-300 focus:border-[#f57224] focus:ring-4 focus:ring-[#f57224]/15";
 
-/* Wizard card (Shopify/Stripe style) — white card on soft gray, actions footer bar me */
+/* Wizard card (Shopify/Stripe style) â€” white card on soft gray, actions footer bar me */
 const CARD_SHELL = "mt-5 [@media(max-height:820px)]:mt-4 rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.14)]";
 const CARD = "p-5 sm:p-6 [@media(max-height:820px)]:sm:p-5";
 const CARD_FOOTER = "-mx-5 -mb-5 mt-2 flex rounded-b-2xl flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/80 px-5 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:items-center sm:justify-between sm:px-6 [@media(max-height:820px)]:py-3 [@media(max-height:820px)]:sm:-mx-5 [@media(max-height:820px)]:sm:-mb-5 [@media(max-height:820px)]:sm:px-5";
@@ -97,7 +97,7 @@ const PRIMARY_BTN =
 const SECONDARY_BTN =
   "inline-flex h-12 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50";
 
-/* Field wrapper — label, icon, hint, error ek jaisi spacing ke saath.
+/* Field wrapper â€” label, icon, hint, error ek jaisi spacing ke saath.
    Component bahar define hai taake re-render par input focus na khoye. */
 function Field({ id, label, optional, hint, error, icon: Icon, iconTop = false, counter, trailing, below, className = "", children }) {
   return (
@@ -143,7 +143,7 @@ const fieldA11y = (id, error, hasHint = false) => ({
 
 function SectionHeading({ icon: Icon, title, description }) {
   return (
-    /* Compact heading — group saaf dikhe lekin vertical jagah kam le */
+    /* Compact heading â€” group saaf dikhe lekin vertical jagah kam le */
     <div className="mb-3 flex items-center gap-2.5">
       <span data-tone="accent" aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f57224]/10 text-[#f57224]">
         <Icon size={15} strokeWidth={2} />
@@ -156,7 +156,7 @@ function SectionHeading({ icon: Icon, title, description }) {
   );
 }
 
-/* Connected stepper — ek compact row (node + label, beech me connector).
+/* Connected stepper â€” ek compact row (node + label, beech me connector).
    done / active / upcoming teeno states alag dikhte hain; dono steps par same. */
 const SIGNUP_STEPS = [
   { label: "Account details", short: "Account", sub: "Login & location", desc: "Your login details and business location", icon: UserRound },
@@ -167,7 +167,7 @@ const SIGNUP_STEPS = [
 function SignupStepper({ currentIndex }) {
   const current = SIGNUP_STEPS[currentIndex] || SIGNUP_STEPS[0];
   const CurrentIcon = current.icon;
-  // Card header: left icon tile + step title/desc · right numbered step chips (① Account — ② Store)
+  // Card header: left icon tile + step title/desc Â· right numbered step chips (â‘  Account â€” â‘¡ Store)
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
       <div className="flex min-w-0 items-center gap-3.5">
@@ -206,7 +206,7 @@ function SignupStepper({ currentIndex }) {
                     {status === "done" ? <Check size={12} strokeWidth={3} /> : i + 1}
                   </span>
                   {step.short}
-                  <span className="sr-only"> — {status === "done" ? "completed" : status === "active" ? "current step" : "upcoming"}</span>
+                  <span className="sr-only"> â€” {status === "done" ? "completed" : status === "active" ? "current step" : "upcoming"}</span>
                 </span>
               </li>
             );
@@ -249,7 +249,7 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(false); // step 1 → server par email/username/phone availability
+  const [checking, setChecking] = useState(false); // step 1 â†’ server par email/username/phone availability
   const [emailPending, setEmailPending] = useState(false); // email ki application already under review
   const [errors, setErrors] = useState({});
   const [generalError, setGeneralError] = useState("");
@@ -262,12 +262,12 @@ export default function SignupPage() {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [zipCode, setZipCode] = useState("");
-  // Store web address — seller khud likhta hai (live availability check)
+  // Store web address â€” seller khud likhta hai (live availability check)
   const [subdomain, setSubdomain] = useState("");
   const [subdomainCheck, setSubdomainCheck] = useState({ state: "idle", value: "", suggestion: "" }); // idle | checking | available | taken
 
 
-  /* Desktop par window scroll nahi hota — step badalne par right panel ko top par le jao */
+  /* Desktop par window scroll nahi hota â€” step badalne par right panel ko top par le jao */
   const formPanelRef = useRef(null);
   useEffect(() => {
     formPanelRef.current?.scrollTo?.({ top: 0 });
@@ -287,7 +287,7 @@ export default function SignupPage() {
 
   const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []), [geo]);
   // Load hone tak selected country hi option rahe (select khali na dikhe).
-  // Flag emoji nahi — Windows Chrome unhe "PK" jaise letters me dikhata hai.
+  // Flag emoji nahi â€” Windows Chrome unhe "PK" jaise letters me dikhata hai.
   const countryOptions = useMemo(
     () => (allCountries.length ? allCountries.map((c) => c.name) : [country]),
     [allCountries, country]
@@ -296,12 +296,12 @@ export default function SignupPage() {
     if (!geo?.City) return [];
     const match = allCountries.find((c) => c.name === country);
     const list = match ? geo.City.getCitiesOfCountry(match.isoCode) || [] : [];
-    // Library me ek naam kai states me repeat hota hai — unique + A–Z
+    // Library me ek naam kai states me repeat hota hai â€” unique + Aâ€“Z
     return [...new Set(list.map((c) => c.name))].sort((a, b) => a.localeCompare(b));
   }, [geo, allCountries, country]);
   const citiesLoading = step === "account" && !geo;
 
-  /* Web address ki live availability (400ms debounce) — server format + reserved + taken check karta hai */
+  /* Web address ki live availability (400ms debounce) â€” server format + reserved + taken check karta hai */
   useEffect(() => {
     const value = subdomain.trim();
     if (step !== "store" || value.length < 3) return undefined;
@@ -313,13 +313,13 @@ export default function SignupPage() {
         setSubdomainCheck({ state: error ? "taken" : "available", value, suggestion: res?.subdomainSuggestion || "" });
         setErrors((p) => ({ ...p, subdomain: error || "" }));
       } catch {
-        setSubdomainCheck({ state: "idle", value, suggestion: "" }); // network fail — submit par dobara check hota hai
+        setSubdomainCheck({ state: "idle", value, suggestion: "" }); // network fail â€” submit par dobara check hota hai
       }
     }, 400);
     return () => window.clearTimeout(id);
   }, [subdomain, step, email]);
 
-  // Web address store naam se khud banta hai — jab tak seller use khud na badle.
+  // Web address store naam se khud banta hai â€” jab tak seller use khud na badle.
   // Seller address poora mita de to auto-fill phir se chalu.
   const [subdomainTouched, setSubdomainTouched] = useState(false);
   const setCleanSubdomain = (clean) => {
@@ -331,7 +331,7 @@ export default function SignupPage() {
     setStoreName(value);
     setErrors((p) => ({ ...p, storeName: "" }));
     if (!subdomainTouched) {
-      // "Ahmed Electronics" → "ahmed-electronics"
+      // "Ahmed Electronics" â†’ "ahmed-electronics"
       const slug = String(value).toLowerCase().trim()
         .replace(/[^a-z0-9]+/g, "-").replace(/^-+/, "")
         .slice(0, STORE_ADDRESS_MAX).replace(/-+$/, "");
@@ -339,7 +339,7 @@ export default function SignupPage() {
     }
   };
   const changeSubdomain = (value) => {
-    // Sirf a-z 0-9 aur hyphen — type karte waqt hi saaf
+    // Sirf a-z 0-9 aur hyphen â€” type karte waqt hi saaf
     const clean = String(value).toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, STORE_ADDRESS_MAX);
     setSubdomainTouched(clean !== "");
     setCleanSubdomain(clean);
@@ -392,7 +392,7 @@ export default function SignupPage() {
     return next;
   };
 
-  /* Store info ab do wizard steps me hai — rules bilkul wahi, sirf split kiye hain */
+  /* Store info ab do wizard steps me hai â€” rules bilkul wahi, sirf split kiye hain */
   const validateStoreDetails = () => {
     const next = {};
     if (!storeName.trim()) next.storeName = "Please enter your store name.";
@@ -418,12 +418,12 @@ export default function SignupPage() {
 
   const validate = () => ({ ...validateAccount(), ...validateStore() });
 
-  /* Step 1 (account + location) ke fields — store step par inka error aaye to banner wapas bhejta hai */
+  /* Step 1 (account + location) ke fields â€” store step par inka error aaye to banner wapas bhejta hai */
   const ACCOUNT_FIELD_KEYS = ["name", "username", "phone", "email", "password", "confirmPassword", "country", "city", "address", "zipCode"];
-  const goToErrorStep = () => {}; // store aakhri step hai — account errors ke liye banner "Go to account step"
+  const goToErrorStep = () => {}; // store aakhri step hai â€” account errors ke liye banner "Go to account step"
 
   /* Server se poochho: email / username / phone pehle se registered to nahi?
-     Network fail ho to block nahi karte — final submit waise bhi dobara check karta hai. */
+     Network fail ho to block nahi karte â€” final submit waise bhi dobara check karta hai. */
   const checkAvailability = async (fields) => {
     try {
       const res = await authApi.checkRegistration(fields);
@@ -487,11 +487,19 @@ export default function SignupPage() {
         zipCode: zipCode.trim(),
       });
         if (res?.pendingApproval) {
-          // Same email + password as the pending application → welcome, then /admin (read-only)
+          // Same email + password as the pending application â†’ welcome, then /admin (read-only)
           setPendingApproval(true);
-          // Multi-tenant: admin sirf store subdomain par → one-time sign-in link
-          setWelcomeTarget((await getStoreAdminUrl()) || "/");
-          setStep("welcome");
+          // Multi-tenant: admin sirf store subdomain par â†’ one-time sign-in link
+          // Handoff can fail if the temporary admin session or store URL is
+          // unavailable. Keep sellers in the admin flow so they can sign in,
+          // instead of silently sending them back to the marketplace home.
+          let adminUrl = res?.handoffUrl || await getStoreAdminUrl();
+          if (!adminUrl && res?.storeSubdomain) {
+            const protocol = window.location.protocol;
+            const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || window.location.hostname;
+            adminUrl = window.location.protocol + "//" + res.storeSubdomain + "." + (process.env.NEXT_PUBLIC_ROOT_DOMAIN || window.location.hostname) + "/admin/login";
+          }
+          setWelcomeTarget(adminUrl || "/admin/login");
           setLoading(false);
           return;
         }
@@ -514,7 +522,7 @@ export default function SignupPage() {
     } catch (err) {
       const data = err?.response?.data || {};
       if (data?.code === "SELLER_PENDING") {
-        // Yeh email pehle se apply kar chuka hai — form par hi bata do (approval par email aayegi)
+        // Yeh email pehle se apply kar chuka hai â€” form par hi bata do (approval par email aayegi)
         const msg = data?.message || "Your application is already under review. We will email you once it is approved.";
         toast.info(msg);
         setGeneralError(msg);
@@ -543,10 +551,15 @@ export default function SignupPage() {
     const res = await authApi.verifyEmailOtp(otpEmail, otp);
 
     if (res?.pendingApproval) {
-      // Seller signed up — send them into the admin panel (read-only until approval)
+      // Seller signed up â€” send them into the admin panel (read-only until approval)
       setPendingApproval(true);
-      // Multi-tenant: admin sirf store subdomain par → one-time sign-in link
-          setWelcomeTarget((await getStoreAdminUrl()) || "/");
+      // Multi-tenant: admin sirf store subdomain par â†’ one-time sign-in link
+          // Same fallback as the direct pending-approval path above.
+          let _adminUrl = res?.handoffUrl || await getStoreAdminUrl();
+          if (!_adminUrl && res?.storeSubdomain) {
+            _adminUrl = window.location.protocol + "//" + res.storeSubdomain + "." + (process.env.NEXT_PUBLIC_ROOT_DOMAIN || window.location.hostname) + "/admin/login";
+          }
+          setWelcomeTarget(_adminUrl || "/admin/login");
     } else {
       setWelcomeTarget("/");
     }
@@ -566,7 +579,7 @@ export default function SignupPage() {
     return () => window.clearTimeout(id);
   }, [step, welcomeTarget]);
 
-  /* ═══════════ WELCOME / REDIRECTING OVERLAY ═══════════ */
+  /* â•â•â•â•â•â•â•â•â•â•â• WELCOME / REDIRECTING OVERLAY â•â•â•â•â•â•â•â•â•â•â• */
   if (step === "welcome") {
     const title = pendingApproval ? t("auth.signup.pendingTitle") : t("auth.signup.successTitle");
     const subtitle = pendingApproval ? t("auth.signup.pendingSubtitle") : t("auth.signup.successSubtitle");
@@ -606,7 +619,7 @@ export default function SignupPage() {
           </span>
         </div>
 
-        {/* Success emblem — layered glow */}
+        {/* Success emblem â€” layered glow */}
         <div className="relative z-10 mt-8 flex items-center justify-center" aria-hidden="true">
           <span className="absolute h-36 w-36 rounded-full bg-emerald-400/[0.07] blur-2xl" />
           <span className="absolute h-28 w-28 rounded-full border border-emerald-400/15" />
@@ -668,7 +681,7 @@ export default function SignupPage() {
           {subtitle}
         </motion.p>
 
-        {/* What happens next — seller flow */}
+        {/* What happens next â€” seller flow */}
         {pendingApproval ? (
           <motion.div
             initial={{ opacity: 0, y: 18 }}
@@ -679,7 +692,7 @@ export default function SignupPage() {
             <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-slate-500">What happens next</p>
             <p className="max-w-[420px] text-[12px] leading-5 text-slate-300">
               Your store is submitted for review. Until the Super Admin approves it, the admin panel is
-              <span className="font-semibold text-white"> view-only</span> — you can browse every page but cannot change anything.
+              <span className="font-semibold text-white"> view-only</span> â€” you can browse every page but cannot change anything.
             </p>
           </motion.div>
         ) : null}
@@ -696,11 +709,11 @@ export default function SignupPage() {
         </div>
         <p className="relative z-10 mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">
           <Loader2 size={12} className="animate-spin text-[#ff9a4d]" aria-hidden="true" />
-          Opening your {pendingApproval ? "admin panel" : "marketplace"}…
+          Opening your {pendingApproval ? "admin panel" : "marketplace"}â€¦
         </p>
         <p className="relative z-10 mt-6 flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-[0.28em] text-slate-700">
           <ShieldCheck size={11} aria-hidden="true" />
-          Secure · ClickMaster Marketplace
+          Secure Â· ClickMaster Marketplace
         </p>
       </main>
     );
@@ -716,7 +729,7 @@ export default function SignupPage() {
   ];
   const strengthColors = ["", "bg-red-400", "bg-amber-400", "bg-lime-400", "bg-emerald-500"];
 
-  /* ═══════════ SIGNUP PAGE ═══════════ */
+  /* â•â•â•â•â•â•â•â•â•â•â• SIGNUP PAGE â•â•â•â•â•â•â•â•â•â•â• */
   const isWizardStep = step === "account" || step === "store";
   const stepIndex = step === "account" ? 0 : 1;
   const accountHasErrors = step === "store" && ACCOUNT_FIELD_KEYS.some((k) => errors[k]);
@@ -729,10 +742,10 @@ export default function SignupPage() {
   const header = HEADERS[step] || HEADERS.account;
 
   return (
-    /* Desktop (lg+): main exactly viewport height — window scroll nahi hota,
+    /* Desktop (lg+): main exactly viewport height â€” window scroll nahi hota,
        sirf right panel apne andar scroll karta hai. Mobile/tablet: natural page scroll. */
     <main className="user-theme signup-reference-page flex min-h-dvh bg-white lg:h-dvh lg:min-h-0">
-      {/* ═══════════ LEFT — NAVY BRAND PANEL (lg+, stationary) ═══════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â• LEFT â€” NAVY BRAND PANEL (lg+, stationary) â•â•â•â•â•â•â•â•â•â•â• */}
       <div className="relative hidden h-full shrink-0 overflow-hidden bg-[#0b1430] text-white lg:flex lg:w-[42%] xl:w-[44%] 2xl:w-[46%]">
         {/* Background layers: navy gradient + orange glow + faded artwork + dot grid */}
         <div
@@ -750,7 +763,7 @@ export default function SignupPage() {
           className="absolute -bottom-40 -left-24 h-[480px] w-[480px] rounded-full"
           style={{ background: "radial-gradient(circle, rgba(59,91,219,0.16) 0%, transparent 65%)" }}
         />
-        {/* Warehouse artwork — sirf neeche-daayen halki texture, text ke peeche nahi */}
+        {/* Warehouse artwork â€” sirf neeche-daayen halki texture, text ke peeche nahi */}
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-cover bg-center opacity-[0.18]"
@@ -771,7 +784,7 @@ export default function SignupPage() {
           }}
         />
 
-        {/* Simple: logo top · message center · footer bottom */}
+        {/* Simple: logo top Â· message center Â· footer bottom */}
         <div className="relative flex min-h-0 w-full flex-col px-10 py-10 xl:px-14 xl:py-12 [@media(max-height:700px)]:py-7">
           <BrandMark />
 
@@ -803,28 +816,28 @@ export default function SignupPage() {
             </ul>
           </div>
 
-          <p className="text-[12px] text-slate-500">© {new Date().getFullYear()} ClickMaster Marketplace</p>
+          <p className="text-[12px] text-slate-500">Â© {new Date().getFullYear()} ClickMaster Marketplace</p>
         </div>
       </div>
 
-      {/* ═══════════ RIGHT — FORM ═══════════ */}
+      {/* â•â•â•â•â•â•â•â•â•â•â• RIGHT â€” FORM â•â•â•â•â•â•â•â•â•â•â• */}
       {/* Desktop par yahi independent scroll container hai. justify-center ki jagah
-          auto margins (mt-auto / mb-auto) — content lamba ho to top clip nahi hota. */}
+          auto margins (mt-auto / mb-auto) â€” content lamba ho to top clip nahi hota. */}
       {/* "Full panel" layout (Shopify/Stripe style): poora right side white page,
           form bina card ke beech me; top (Sign in) aur bottom (footer) anchored. */}
       <div
         ref={formPanelRef}
         className="flex min-w-0 flex-1 flex-col items-center bg-white px-5 lg:bg-slate-50 sm:px-10 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:[scrollbar-gutter:stable_both-edges] xl:px-14"
       >
-        {/* Top bar — sirf mobile par brand ("Sign in" ab card ke neeche) */}
+        {/* Top bar â€” sirf mobile par brand ("Sign in" ab card ke neeche) */}
         <header className="flex w-full shrink-0 items-center py-4 lg:hidden">
           <BrandMark size="sm" />
         </header>
 
-        {/* Form — box nahi, sirf controlled width; my-auto = space ho to vertically center */}
+        {/* Form â€” box nahi, sirf controlled width; my-auto = space ho to vertically center */}
         {/* Wizard steps wide (multi-column, desktop par scroll nahi); OTP card narrow */}
         <div className={`my-auto w-full shrink-0 py-4 ${isWizardStep ? "max-w-[760px]" : "max-w-[460px] 2xl:max-w-[500px]"}`}>
-          {/* Step number stepper me already hai — alag eyebrow pill ki zaroorat nahi */}
+          {/* Step number stepper me already hai â€” alag eyebrow pill ki zaroorat nahi */}
           <div className="text-center">
             <h2 className="[@media(max-height:820px)]:text-[22px] text-[26px] font-bold leading-tight tracking-[-0.02em] text-slate-900 2xl:text-[30px]">{header.title}</h2>
             <p className="pt-1.5 text-[14px] leading-5 text-slate-500">{header.subtitle}</p>
@@ -848,7 +861,7 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* Store step par account field ka backend error — user ko wapas le jao */}
+          {/* Store step par account field ka backend error â€” user ko wapas le jao */}
           {accountHasErrors && (
             <div role="alert" data-tone="error" className="mx-5 mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 sm:mx-6">
               <AlertCircle size={18} className="mt-px shrink-0 text-amber-600" aria-hidden="true" />
@@ -869,7 +882,7 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* ═══ STEP: OTP ═══ */}
+          {/* â•â•â• STEP: OTP â•â•â• */}
           {step === "otp" && (
             <div className="mt-6">
               <OtpVerifyCard
@@ -883,10 +896,10 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* ═══ STEP 1: ACCOUNT ═══ */}
+          {/* â•â•â• STEP 1: ACCOUNT â•â•â• */}
           {step === "account" && (
             <form onSubmit={(e) => { e.preventDefault(); handleNext(); }} className={`${CARD} grid grid-cols-1 items-start gap-x-4 gap-y-3 md:grid-cols-2`} noValidate>
-              {/* Har row me do fields: naam · username / phone · email / password · confirm */}
+              {/* Har row me do fields: naam Â· username / phone Â· email / password Â· confirm */}
               <Field id="su-name" label="Full name" icon={User} error={errors.name}>
                 <input
                   {...fieldA11y("su-name", errors.name)}
@@ -921,7 +934,7 @@ export default function SignupPage() {
                   />
                 </Field>
 
-                <Field id="su-phone" label="Phone number" icon={Phone} error={errors.phone} counter={<span id="su-phone-hint" className="text-[11px] font-medium text-slate-400">{PHONE_MIN}–{PHONE_MAX} digits</span>}>
+                <Field id="su-phone" label="Phone number" icon={Phone} error={errors.phone} counter={<span id="su-phone-hint" className="text-[11px] font-medium text-slate-400">{PHONE_MIN}â€“{PHONE_MAX} digits</span>}>
                   <input
                     {...fieldA11y("su-phone", errors.phone, true)}
                     type="tel"
@@ -939,7 +952,7 @@ export default function SignupPage() {
 
                             <Field id="su-email" label="Email address" icon={Mail} error={errors.email}>
                 {/* suppressHydrationWarning: temp-mail jaisi browser extensions is input par
-                    attributes inject karti hain → dev overlay me false hydration "issue" */}
+                    attributes inject karti hain â†’ dev overlay me false hydration "issue" */}
                 <input
                   {...fieldA11y("su-email", errors.email)}
                   suppressHydrationWarning
@@ -960,7 +973,7 @@ export default function SignupPage() {
                 </button>
               ) : null}
 
-              {/* Password + confirm ek row me (sm+) — 48px inputs, kam vertical height */}
+              {/* Password + confirm ek row me (sm+) â€” 48px inputs, kam vertical height */}
               <div className="contents">
               <Field
                
@@ -1039,7 +1052,7 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-3 border-t border-slate-100 pt-4 md:col-span-2">
-              {/* Group 3 — Location — desktop par ek hi row */}
+              {/* Group 3 â€” Location â€” desktop par ek hi row */}
               <section aria-labelledby="su-sec-location">
                 <SectionHeading icon={MapPin} title={<span id="su-sec-location">Business location</span>} description="Used for shipping and tax settings" />
                 <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3 sm:grid-cols-2">
@@ -1119,17 +1132,17 @@ export default function SignupPage() {
                 </button>
               </p>
               <button type="submit" disabled={checking} className={`${PRIMARY_BTN} w-full sm:w-auto sm:min-w-[260px]`}>
-                {checking ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Checking details…</> : "Continue to store details"}
+                {checking ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Checking detailsâ€¦</> : "Continue to store details"}
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
               </div>
             </form>
           )}
 
-          {/* ═══ STEP 2: STORE DETAILS + WEB ADDRESS (final) ═══ */}
+          {/* â•â•â• STEP 2: STORE DETAILS + WEB ADDRESS (final) â•â•â• */}
           {step === "store" && (
             <form onSubmit={handleSubmit} className={`${CARD} space-y-5`} noValidate aria-busy={loading}>
-              {/* Group 1 — Store identity */}
+              {/* Group 1 â€” Store identity */}
               <section aria-labelledby="su-sec-identity">
                 <SectionHeading icon={Store} title={<span id="su-sec-identity">Store identity</span>} description="Your store name and what kind of business it is" />
                 <div className="grid grid-cols-1 items-start gap-x-4 gap-y-3.5 md:grid-cols-2">
@@ -1167,9 +1180,9 @@ export default function SignupPage() {
                 </div>
               </section>
 
-              {/* Web address + description — desktop par side by side (bina scroll fit) */}
+              {/* Web address + description â€” desktop par side by side (bina scroll fit) */}
               <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 md:grid-cols-2">
-              {/* Group 2 — Store web address (required) */}
+              {/* Group 2 â€” Store web address (required) */}
               <section aria-labelledby="su-sec-web" className="min-w-0">
                 <SectionHeading icon={Globe} title={<span id="su-sec-web">Store web address</span>} description="Where customers will find your store" />
                 <Field
@@ -1181,9 +1194,9 @@ export default function SignupPage() {
                   below={!errors.subdomain && (
                     <p id="su-subdomain-hint" className="flex items-center gap-1.5 pt-1.5 text-[11.5px] leading-4" aria-live="polite">
                       {subdomain.trim().length < 3 ? (
-                        <span className="text-slate-500">Lowercase letters, numbers and hyphens · 3–{STORE_ADDRESS_MAX} characters</span>
+                        <span className="text-slate-500">Lowercase letters, numbers and hyphens Â· 3â€“{STORE_ADDRESS_MAX} characters</span>
                       ) : subdomainCheck.value === subdomain.trim() && subdomainCheck.state === "checking" ? (
-                        <><Loader2 size={12} className="animate-spin text-slate-400" aria-hidden="true" /><span className="text-slate-500">Checking availability…</span></>
+                        <><Loader2 size={12} className="animate-spin text-slate-400" aria-hidden="true" /><span className="text-slate-500">Checking availabilityâ€¦</span></>
                       ) : subdomainCheck.value === subdomain.trim() && subdomainCheck.state === "available" ? (
                         <><CheckCircle2 size={13} className="text-emerald-500" aria-hidden="true" /><span className="font-medium text-emerald-700">{subdomain.trim()}.{ROOT_DOMAIN} is available</span></>
                       ) : (
@@ -1223,7 +1236,7 @@ export default function SignupPage() {
                 )}
               </section>
 
-              {/* Group 3 — Business description */}
+              {/* Group 3 â€” Business description */}
               <section aria-labelledby="su-sec-desc" className="min-w-0">
                 <SectionHeading icon={FileText} title={<span id="su-sec-desc">Business description</span>} description="Tell buyers what you sell and why they should choose you" />
                 <div className="space-y-4">
@@ -1257,7 +1270,7 @@ export default function SignupPage() {
               </section>
               </div>
 
-              {/* Back + Create account — card footer */}
+              {/* Back + Create account â€” card footer */}
               <div className={CARD_FOOTER}>
                 <button
                   type="button"
@@ -1288,12 +1301,12 @@ export default function SignupPage() {
 
         </div>
 
-        {/* Bottom anchor — trust + help (© left panel me hai; mobile par yahan) */}
+        {/* Bottom anchor â€” trust + help (Â© left panel me hai; mobile par yahan) */}
         <footer className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-100 py-4 text-[12px] text-slate-400 [@media(max-height:820px)]:py-2.5">
           <span className="inline-flex items-center gap-1.5">
             <ShieldCheck size={13} aria-hidden="true" />
             Secure, encrypted signup
-            <span className="lg:hidden">· © {new Date().getFullYear()} ClickMaster</span>
+            <span className="lg:hidden">Â· Â© {new Date().getFullYear()} ClickMaster</span>
           </span>
           {SUPPORT_EMAIL ? (
             <a href={`mailto:${SUPPORT_EMAIL}`} className="font-medium text-slate-500 transition hover:text-slate-800">
@@ -1305,3 +1318,4 @@ export default function SignupPage() {
     </main>
   );
 }
+

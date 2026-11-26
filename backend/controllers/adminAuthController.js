@@ -280,10 +280,18 @@ const createStoreHandoff = async (req, res) => {
     if (req.userType !== "employee") {
       return res.status(403).json({ success: false, message: "Only store staff can open a store admin panel." });
     }
-    if (!req.user?.storeId) {
+    let storeId = req.user?.storeId;
+    if (!storeId) {
+      try {
+        const SellerApplication = require("../models/SellerApplication");
+        const app = await SellerApplication.findOne({ email: req.user.email, store_id: { $ne: null } }).sort({ created_at: -1 }).lean();
+        if (app?.store_id) storeId = app.store_id;
+      } catch (e) { /* ignore */ }
+    }
+    if (!storeId) {
       return res.status(404).json({ success: false, message: "No store is linked to this account." });
     }
-    const store = await Store.findById(req.user.storeId).select("subdomain store_name").lean();
+    const store = await Store.findById(storeId).select("subdomain store_name").lean();
     const baseUrl = storeAdminBaseUrl(store);
     if (!baseUrl) return res.status(404).json({ success: false, message: "Store address is not configured." });
 
