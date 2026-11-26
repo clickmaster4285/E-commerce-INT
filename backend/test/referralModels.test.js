@@ -5,6 +5,11 @@ const Referral = require("../models/Referral");
 const LoyaltyTransaction = require("../models/LoyaltyTransaction");
 const { createCode } = require("../utils/referralService");
 
+test("loyalty credit is exported for referral rewards", () => {
+  const { credit } = require("../utils/loyaltyService");
+  assert.equal(typeof credit, "function");
+});
+
 test("referral codes are unique-looking uppercase alphanumeric tokens", () => {
   const first = createCode();
   const second = createCode();

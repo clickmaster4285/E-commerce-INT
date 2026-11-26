@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Country, State, City } from "country-state-city";
-import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 import { addressApi } from "@/apis/user/addressApi";
 import { useCurrentLocation } from "../../hooks/user/useCurrentLocation";
 import { MapPin, ChevronDown, Loader2, Check, X } from "lucide-react";
@@ -90,7 +89,7 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => {
       if (!current[field]) return current;
-      const valid = field === "phone" ? isPhoneValidForCountry(value, form.country) : Boolean(String(value).trim());
+      const valid = Boolean(String(value).trim());
       if (!valid) return current;
       const next = { ...current };
       delete next[field];
@@ -124,17 +123,6 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
   }, [user, initialAddress, fresh]);
 
   const allCountries = ALL_COUNTRIES;
-  const isPhoneValidForCountry = (value, countryName) => {
-    const country = allCountries.find((item) => item.name === countryName);
-    if (!country || !value) return false;
-    const digits = normalizePhone(value);
-    const nationalNumber = parsePhoneNumberFromString(digits, country.isoCode);
-    if (nationalNumber?.isValid()) return true;
-    if (digits.startsWith(country.phonecode)) {
-      return !!parsePhoneNumberFromString(`+${digits}`)?.isValid();
-    }
-    return false;
-  };
   const allStates = useMemo(() => {
     const c = allCountries.find((x) => x.name === form.country);
     return c ? State.getStatesOfCountry(c.isoCode) : [];
@@ -280,9 +268,6 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
         nextErrors[field] = field === "phone" ? t("checkout.phone.required") : t("checkout.address.requiredFields");
       }
     });
-    if (f.phone && !isPhoneValidForCountry(f.phone, f.country)) {
-      nextErrors.phone = t("admin.shared.validation.invalidPhone");
-    }
     setErrors(nextErrors);
     const firstInvalid = required.find(([field]) => nextErrors[field])?.[0];
     if (firstInvalid) {
@@ -406,7 +391,6 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                   placeholder={t("checkout.phone.placeholder")}
                   className={fieldInputCls("phone")}
                 />
-                <p className="mt-1 text-xs text-[var(--user-text-muted)]">{t("checkout.phone.digitCount", { current: form.phone.length, max: PHONE_MAX })}</p>
                 {renderFieldError("phone")}
               </div>
             </div>
@@ -421,14 +405,6 @@ export default function AddressForm({ initialAddress, onSuccess, onCancel, inlin
                     updateField("country", country);
                     setForm((current) => ({ ...current, country, state: "", city: "" }));
                     setPendingCityCandidates(null);
-                    setErrors((current) => {
-                      const next = { ...current };
-                      if (form.phone) {
-                        if (isPhoneValidForCountry(form.phone, country)) delete next.phone;
-                        else next.phone = t("admin.shared.validation.invalidPhone");
-                      }
-                      return next;
-                    });
                   }}
                   className={`${fieldInputCls("country")} appearance-none pr-10 cursor-pointer`}
                 >

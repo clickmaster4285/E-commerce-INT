@@ -593,8 +593,13 @@ const googleCustomerLogin = async (req, res) => {
       await loyalty.awardSignupBonus(user._id);
       try {
         const referrals = require("../utils/referralService");
-        await referrals.processSignupReferral(user, req.body?.referralCode);
         await referrals.ensureReferralCode(user);
+      } catch (referralError) {
+        console.error("[referrals] could not create referral code:", referralError.message);
+      }
+      try {
+        const referrals = require("../utils/referralService");
+        await referrals.processSignupReferral(user, req.body?.referralCode);
       } catch (referralError) {
         console.error("[referrals] Google signup processing failed:", referralError.message);
       }

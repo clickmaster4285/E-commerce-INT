@@ -504,6 +504,7 @@ async function markNoticesSeen(userId, ids) {
 }
 
 module.exports = {
+  credit,
   getSettings,
   getAccount,
   ensureAccount,

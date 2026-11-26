@@ -23,6 +23,7 @@ const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 const { suggestUsernames, uniqueUsername } = require("../utils/username");
 const { validateStoreAddress, slugifySubdomain } = require("../utils/tenantHost");
+const { claimOnce } = require("../utils/oneTimeToken");
 
 /* Store web address check — format, reserved, kisi store ya doosre pending signup ne to nahi liya?
    @returns {{ error: string|null, suggestion: string }} */

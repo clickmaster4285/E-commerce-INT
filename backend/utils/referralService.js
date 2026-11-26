@@ -64,8 +64,12 @@ async function processSignupReferral(user, rawCode) {
 }
 
 async function getReferralSummary(user) {
-  if (user.referredByCode) await processSignupReferral(user, user.referredByCode);
-  await rewardPendingReferrals(user._id);
+  try {
+    if (user.referredByCode) await processSignupReferral(user, user.referredByCode);
+    await rewardPendingReferrals(user._id);
+  } catch (error) {
+    console.error("[referrals] reward processing failed:", error.message);
+  }
   const code = await ensureReferralCode(user);
   const [program, total, recent, rewardTotals] = await Promise.all([
     ReferralProgram.findOne().lean(),

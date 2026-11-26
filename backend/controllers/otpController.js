@@ -412,8 +412,12 @@ const verifyEmailVerificationOtp = async (req, res) => {
         // âœ… Loyalty welcome bonus (program off ho to kuch nahi hota)
         await loyalty.awardSignupBonus(customer._id);
         try {
-          await referrals.processSignupReferral(customer, pending.referralCode);
           await referrals.ensureReferralCode(customer);
+        } catch (referralError) {
+          console.error("[referrals] could not create referral code:", referralError.message);
+        }
+        try {
+          await referrals.processSignupReferral(customer, pending.referralCode);
         } catch (referralError) {
           console.error("[referrals] signup processing failed:", referralError.message);
         }

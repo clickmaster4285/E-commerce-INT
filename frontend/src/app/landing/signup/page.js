@@ -934,7 +934,7 @@ export default function SignupPage() {
                   />
                 </Field>
 
-                <Field id="su-phone" label="Phone number" icon={Phone} error={errors.phone} counter={<span id="su-phone-hint" className="text-[11px] font-medium text-slate-400">{PHONE_MIN}â€“{PHONE_MAX} digits</span>}>
+                <Field id="su-phone" label="Phone number" icon={Phone} error={errors.phone} counter={<span id="su-phone-hint" className="text-[11px] font-medium text-slate-400">{PHONE_MIN}-{PHONE_MAX} digits</span>}>
                   <input
                     {...fieldA11y("su-phone", errors.phone, true)}
                     type="tel"

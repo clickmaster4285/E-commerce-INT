@@ -35,6 +35,7 @@ export const ADMIN_SECTIONS = [
   { id: "overview", title: "Overview", sidebarTitle: "OVERVIEW" },
   { id: "catalog", title: "Catalog", sidebarTitle: "CATALOG" },
   { id: "sales", title: "Sales & Marketing", sidebarTitle: "SALES & MARKETING" },
+  { id: "rewards", title: "Rewards & Referrals", sidebarTitle: "REWARDS & REFERRALS" },
   { id: "operations", title: "Operations", sidebarTitle: "OPERATIONS" },
   { id: "purchasing", title: "Purchasing", sidebarTitle: "PURCHASING" },
   {
@@ -75,8 +76,8 @@ export const ADMIN_MODULES = [
   { key: "terms", name: "Terms & Conditions", section: "store", path: "/admin/terms-conditions", permissionKey: "store", icon: FileText, countable: false, nav: true },
   { key: "employees", name: "Employees", section: "team", path: "/admin/employees", permissionKey: "employees", icon: Users, countable: true, nav: true },
   { key: "profile", name: "Profile", section: "team", path: "/admin/profile", permissionKey: "profile", icon: User, countable: false, nav: true },
-  { key: "loyalty", name: "Rewards", section: "team", path: "/admin/loyalty", permissionKey: "loyalty", icon: Award, countable: false, nav: true },
-  { key: "referrals", name: "Referrals", section: "sales", path: "/admin/referrals", permissionKey: "loyalty", icon: UserRoundPlus, countable: false, nav: true },
+  { key: "loyalty", name: "Rewards", section: "rewards", path: "/admin/loyalty", permissionKey: "loyalty", icon: Award, countable: false, nav: true },
+  { key: "referrals", name: "Referrals", section: "rewards", path: "/admin/referrals", permissionKey: "loyalty", icon: UserRoundPlus, countable: false, nav: true },
 ];
 
 export const getSection = (sectionId) => ADMIN_SECTIONS.find((s) => s.id === sectionId);
