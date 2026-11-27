@@ -623,6 +623,7 @@ const googleCustomerLogin = async (req, res) => {
     res.json({
       success: true,
       message: "Google login successful",
+      isNewUser,
       user: {
         id: user._id,
         name: user.name,

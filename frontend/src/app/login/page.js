@@ -203,10 +203,22 @@ export default function UserLoginPage() {
   // ==========================================
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
+  // Naya customer: referral program on ho to pehle referral setup page,
+  // warna normal storefront home.
+  const goAfterSignup = async (isNewUser = true) => {
+    if (isNewUser) {
+      try {
+        const referral = await loyaltyApi.referrals();
+        if (referral?.enabled) { window.location.href = "/referrals/setup"; return; }
+      } catch { /* status na mile to home par bhej do */ }
+    }
+    window.location.href = "/";
+  };
+
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     toast.success(t("auth.login.emailVerified"));
-    window.location.href = "/";
+    await goAfterSignup();
   };
 
   const handleResendEmailOtp = async () => {
@@ -265,8 +277,8 @@ export default function UserLoginPage() {
   const handleGoogleLogin = async (credential) => {
     setLoading(true);
     try {
-      await authApi.googleCustomerLogin(credential, referralCode);
-      window.location.href = "/";
+      const res = await authApi.googleCustomerLogin(credential, referralCode);
+      await goAfterSignup(res?.isNewUser !== false);
     } catch (err) {
       toast.error(getApiErrorMessage(err, t("auth.login.googleFailed")));
       setLoading(false);

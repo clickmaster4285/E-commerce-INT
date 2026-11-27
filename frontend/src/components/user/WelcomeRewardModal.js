@@ -224,7 +224,7 @@ export default function WelcomeRewardModal() {
   const successPoints = mode === "order"
     ? orderReward.points
     : mode === "referral"
-      ? (referralBonus?.points || 0)
+      ? (claimedPoints || referralBonus?.points || 0)
       : claimedPoints;
 
   useEffect(() => {
@@ -298,18 +298,21 @@ export default function WelcomeRewardModal() {
   // daalte, coins header ki taraf nahi udte. Popup timeline dikhata hai.
 
   const handleClaim = async () => {
-    if (phase !== "idle" || !bonus) return;
+    const txn = mode === "referral" ? referralBonus : bonus;
+    if (phase !== "idle" || !txn) return;
     setPhase("claiming");
     setError(null);
     try {
-      const res = await loyaltyApi.claimWelcome();
-      if (!res) throw new Error("empty claim response");
-      const points = Number(res.points) || bonus.points || 0;
+      // Referral points pehle se credited hain — claim sirf existing welcome
+      // flow jaisa dikhata hai. Signup bonus server par mark hota hai.
+      const res = mode === "referral" ? null : await loyaltyApi.claimWelcome();
+      if (!res && mode !== "referral") throw new Error("empty claim response");
+      const points = Number(res?.points) || txn.points || 0;
       setClaimedPoints(points);
 
       const creditToHeader = () => {
         window.dispatchEvent(new CustomEvent("loyalty:coins-incoming", {
-          detail: { points, balance: Number(res.account?.balance) || 0 },
+          detail: { points, balance: Number(res?.account?.balance) || 0 },
         }));
       };
 
@@ -357,7 +360,7 @@ export default function WelcomeRewardModal() {
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
 
-        {phase === "success" || mode === "referral" ? (
+        {phase === "success" ? (
           <div className="px-6 pb-7 pt-10 text-center">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--user-accent-soft)] text-[var(--user-accent)] motion-safe:animate-[rewardCheck_.5s_cubic-bezier(.2,1.2,.3,1)_both]">
               <Check size={26} strokeWidth={1.8} />
@@ -437,7 +440,7 @@ export default function WelcomeRewardModal() {
                   {t("rewards.claim.button")}
                   <ArrowRight size={15} strokeWidth={1.75} />
                 </button>
-              ) : mode === "welcome" ? (
+              ) : mode === "welcome" || mode === "referral" ? (
                 <button type="button" onClick={handleClaim} disabled={busy}
                   className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-[var(--user-accent-hover)] hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
                   {phase === "claiming" ? (
