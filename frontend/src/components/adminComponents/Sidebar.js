@@ -722,7 +722,6 @@ export default function Sidebar({ onNavigate, userData }) {
             const sectionTitle = section.title;
             const sectionItems = visibleMenuItems.filter((item) => section.items.includes(item.name));
             if (sectionItems.length === 0) return null;
-            const sectionActive = sectionItems.some((item) => pathname === item.path || pathname.startsWith(`${item.path}/`));
             return (
               <div key={section.id || sectionTitle} className="mb-0.5">
                 {(() => {
@@ -737,13 +736,13 @@ export default function Sidebar({ onNavigate, userData }) {
                         if (iconOnly) { toggleCollapse(); setOpenSection(section.id); return; }
                         setOpenSection((current) => current === section.id ? null : section.id);
                       }}
-                      className={`group relative flex h-10 w-full items-center gap-3 rounded-lg border px-3 text-left text-sm font-medium tracking-normal transition-colors duration-150 focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--sidebar-focus)] focus-visible:outline-offset-[-2px] ${iconOnly ? "justify-center px-0" : "justify-between"} ${sectionActive ? "border-transparent bg-[var(--sidebar-active-soft)] text-[var(--sidebar-text-hover)]" : "border-transparent text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-hover)]"}`}
+                      className={`group relative flex h-10 w-full items-center gap-3 rounded-lg border px-3 text-left text-sm font-medium tracking-normal transition-colors duration-150 focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--sidebar-focus)] focus-visible:outline-offset-[-2px] ${iconOnly ? "justify-center px-0" : "justify-between"} border-transparent text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-hover)]`}
                     >
                       <span className={`flex min-w-0 items-center gap-3 ${iconOnly ? "justify-center" : ""}`}>
-                        <SectionIcon size={18} strokeWidth={1.75} className={`shrink-0 transition-colors ${sectionActive ? "text-[var(--sidebar-accent)]" : "text-[var(--sidebar-text)] group-hover:text-[var(--sidebar-text-hover)]"}`} />
+                        <SectionIcon size={18} strokeWidth={1.75} className="shrink-0 text-[var(--sidebar-text)] transition-colors group-hover:text-[var(--sidebar-text-hover)]" />
                         {!iconOnly && <span className="flex-1 min-w-0 truncate text-sm font-medium tracking-normal">{sectionTitle}</span>}
                       </span>
-                      {!iconOnly && <ChevronRight size={16} className={`shrink-0 text-[var(--sidebar-muted)] transition-all duration-200 ease-out group-hover:text-[var(--sidebar-text-hover)] ${sectionActive ? "!text-[var(--sidebar-text-hover)]" : ""} ${openSection === section.id ? "rotate-90" : ""}`} />}
+                      {!iconOnly && <ChevronRight size={16} className={`shrink-0 text-[var(--sidebar-muted)] transition-all duration-200 ease-out group-hover:text-[var(--sidebar-text-hover)] ${openSection === section.id ? "rotate-90" : ""}`} />}
                     </button>
                   );
                 })()}

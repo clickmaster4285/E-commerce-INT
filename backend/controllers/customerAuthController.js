@@ -562,6 +562,7 @@ const googleCustomerLogin = async (req, res) => {
     const email_verified = true; // verifyGoogleIdToken sirf verified email par aage jane deta hai
 
     let user = await User.findOne({ $or: [{ email }, { google_id: googleId }] });
+    const isNewUser = !user;
 
     if (user) {
       const updates = {};
