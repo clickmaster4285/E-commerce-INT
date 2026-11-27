@@ -507,6 +507,7 @@
   "checkout.order.confirmPlace": "کیا آپ کو یقین ہے کہ آپ اس حکم کو پورا کرنا چاہتے ہیں؟",
   "checkout.order.place": "جگہ کا حکم",
   "checkout.order.placeFailed": "آپ کا حکم نہیں کر سکتے ہیں",
+  "checkout.order.priceChanged": "آپ کی کارٹ میں قیمتیں تبدیل ہو گئی ہیں۔ براہ کرم کارٹ دیکھ کر دوبارہ کوشش کریں۔",
   "checkout.order.placing": "حکم دینے کے لئے ...",
   "checkout.payment.bank": "بینک",
   "checkout.payment.bankDescription": "ہمارے بینک اکاؤنٹ پر رقم منتقل کرکے ادائیگی کریں",

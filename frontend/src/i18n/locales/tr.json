@@ -450,6 +450,7 @@
   "checkout.order.confirmPlace": "Bu siparişi vermek istediğinizden emin misiniz?",
   "checkout.order.place": "Ordu Yerleri",
   "checkout.order.placeFailed": "Sipariş veremezsiniz",
+  "checkout.order.priceChanged": "Sepetinizdeki fiyatlar değişti. Lütfen sepetinizi kontrol edip tekrar deneyin.",
   "checkout.order.placing": "Sipariş vermek...",
   "checkout.payment.bank": "Bankalar",
   "checkout.payment.bankDescription": "Hesabımızı banka hesabımıza aktararak ödeme yapıyoruz",

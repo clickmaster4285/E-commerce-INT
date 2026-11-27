@@ -450,6 +450,7 @@
   "checkout.order.confirmPlace": "Você tem certeza de que quer colocar essa ordem?",
   "checkout.order.place": "Localização Ordem",
   "checkout.order.placeFailed": "Não podia colocar a sua ordem",
+  "checkout.order.priceChanged": "Os preços do seu carrinho mudaram. Revise o carrinho e tente novamente.",
   "checkout.order.placing": "Posição de ordem...",
   "checkout.payment.bank": "Bancos",
   "checkout.payment.bankDescription": "Pagamento transferindo o montante para a nossa conta bancária",

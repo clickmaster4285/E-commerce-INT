@@ -480,6 +480,7 @@
   "checkout.order.confirmPlace": "هل أنت متأكد من أنك ترغب في وضع هذا الطلب؟",
   "checkout.order.place": "مكان الأوامر",
   "checkout.order.placeFailed": "لا أستطيع أن أضع أمرك",
+  "checkout.order.priceChanged": "تغيّرت الأسعار في سلة التسوق. يرجى مراجعة السلة والمحاولة مرة أخرى.",
   "checkout.order.placing": "وضع الأوامر...",
   "checkout.payment.bank": "البنك",
   "checkout.payment.bankDescription": "الدفع عن طريق تحويل المبلغ إلى حسابنا المصرفي",

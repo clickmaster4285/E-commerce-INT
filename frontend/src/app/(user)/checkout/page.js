@@ -951,7 +951,17 @@ function CheckoutContent() {
       setCurrentDraftId(null);
       router.push("/orders");
     } catch (e) {
-      toast.error(e.response?.data?.message || t("checkout.order.placeFailed"));
+      // 409 PRICE_CHANGED: server ne price khud nikali aur cart wali se alag thi
+      // (discount/deal badal gayi ya cart purana). Taaza discounts/deals/products
+      // laao taake cart naye price dikhaye, phir customer dobara confirm kare.
+      if (e.response?.status === 409 && e.response?.data?.code === "PRICE_CHANGED") {
+        ["publicDiscounts", "activeDeals", "products", "product"].forEach((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        );
+        toast.error(t("checkout.order.priceChanged"));
+      } else {
+        toast.error(e.response?.data?.message || t("checkout.order.placeFailed"));
+      }
       placingRef.current = false;
       setPlacing(false);
     }

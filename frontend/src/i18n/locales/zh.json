@@ -450,6 +450,7 @@
   "checkout.order.confirmPlace": "您是否肯定要安排这个命令?",
   "checkout.order.place": "命令地点",
   "checkout.order.placeFailed": "不能把你的命令",
+  "checkout.order.priceChanged": "购物车中的价格已更新，请检查购物车后重试。",
   "checkout.order.placing": "命令...",
   "checkout.payment.bank": "银行",
   "checkout.payment.bankDescription": "通过将金额转移到我们的银行账户",

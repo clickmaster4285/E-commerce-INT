@@ -450,6 +450,7 @@
   "checkout.order.confirmPlace": "क्या आप निश्चित हैं कि आप इस आदेश को रखना चाहते हैं?",
   "checkout.order.place": "स्थान आदेश",
   "checkout.order.placeFailed": "आप अपना आदेश नहीं दे सकते",
+  "checkout.order.priceChanged": "आपके कार्ट में कीमतें बदल गई हैं। कृपया कार्ट देखें और फिर से कोशिश करें।",
   "checkout.order.placing": "आदेश देना...",
   "checkout.payment.bank": "बैंक",
   "checkout.payment.bankDescription": "हमारे बैंक खाते में राशि स्थानांतरित करके भुगतान करें",

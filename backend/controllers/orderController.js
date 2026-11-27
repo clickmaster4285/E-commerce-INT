@@ -10,6 +10,7 @@ const Bundle = require("../models/Bundle");
 const discountController = require("./discountController");
 const log = require("../utils/logger");
 const { nextSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
+const { priceCheckout } = require("../services/pricing/checkout"); // server-side cart pricing
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
@@ -191,22 +192,42 @@ const placeOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Address not found" });
     }
 
-    let subtotal = 0;
-    let taxTotal = 0;
-    const orderItems = [];
+    // =====================================================
+    // 💰 SERVER-SIDE PRICING (services/pricing/checkout.js)
+    // Pehle yahan "TRUST FRONTEND SNAPSHOT" tha: displayPrice / freeItems /
+    // savings / bundle price browser se aate the → koi bhi price 1 bhej sakta
+    // tha. Ab loop sirf product / variant / deal / bundle DB se load + validate
+    // karta hai; price, free items aur savings server storefront wale rules se
+    // nikalta hai. Client ka price sirf compare: farq → 409 PRICE_CHANGED.
+    // PRICING_MODE=log (sirf emergency) → purana behaviour + mismatch log.
+    // =====================================================
+    const now = new Date();
+    const activeDiscounts = await Discount.find({
+      is_deleted: false,
+      isActive: true,
+      status: "active",
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    }).select("type value discountValue applyTo selectedProducts selectedCategories selectedBrands isActive name").lean();
+
+    const DEAL_PRICING_FIELDS = "name type applyTo productIds categoryIds brandIds discountValue buyQuantity getQuantity minQuantity isActive startDate endDate freeShippingMethods";
+    const BUNDLE_DEAL_FIELDS = "name type isActive startDate endDate bundleRule bundlePrice bundleProducts";
+    const pricingLines = [];
+    const shippingItems = [];
     const uniqueDealIds = new Set();
     const uniqueBundleIds = new Set();
+    const orderItems = [];
 
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
       const keyParts = String(item.key || "").split("__");
       const rawId = item.id || item.productId || item._id || keyParts[0] || null;
       const rawVariantId = item.variant_id || (keyParts[1] !== "default" ? keyParts[1] : null);
 
-      // ✅ Product/Variant fetch — sirf validation + snapshot ke liye
+      // ✅ Product/Variant fetch — validation + snapshot + PRICE (server)
       let product = null;
-      try { product = await Product.findById(rawId); } catch (e) { product = null; }
+      try { product = await Product.findById(rawId).lean(); } catch (e) { product = null; }
       if (!product || product.is_deleted) {
-        log.error("❌ [placeOrder] Product not found | id:", rawId, "| item:", item.name);
+        log.warn("[placeOrder] Product not found | id:", rawId, "| item:", item.name);
         return res.status(400).json({
           success: false,
           message: `Product not found or removed (${item.name || "unknown"})`,
@@ -215,53 +236,47 @@ const placeOrder = async (req, res) => {
 
       let variant = null;
       if (rawVariantId) {
-        try { variant = await Variant.findById(rawVariantId); } catch (e) { variant = null; }
+        try { variant = await Variant.findOne({ _id: rawVariantId, product_id: product._id }).lean(); } catch (e) { variant = null; }
       }
       if (!variant) {
-        variant = await Variant.findOne({ product_id: product._id });
+        variant = await Variant.findOne({ product_id: product._id }).lean();
       }
       if (!variant) {
         return res.status(400).json({ success: false, message: "Variant not found" });
       }
 
-      // =====================================================
-      // ✅ TRUST FRONTEND SNAPSHOT — no re-calculation
-      // Frontend ne already calculate kiya hai (checkout pe):
-      //   - displayPrice (final discounted price)
-      //   - originalPrice (before discount)
-      //   - savings (per item discount savings)
-      //   - dealSavings (buy X get Y savings)
-      //   - freeItems / payableItems
-      // =====================================================
+      const qty = Math.max(1, Math.floor(Number(item.qty || 1))); // paid qty
+      const isGift = Boolean(item.isBundleGift);
 
-      // Frontend se aaye calculated values
-      const displayPrice = Number(item.displayPrice || item.price || variant.selling_price || 0);
-      const originalPrice = Number(item.originalPrice || item.dealOriginalPrice || variant.selling_price || 0);
-      const perItemSavings = Number(item.savings || 0);
-      const dealSavings = Number(item.dealSavings || 0);
-      const freeItems = Number(item.freeItems || 0);
-      const qty = Math.max(1, Number(item.qty || 1));  // paid qty
-      const payableItems = Number(item.payableItems || qty);
-      const totalItems = payableItems + freeItems;  // total ship hone wale
-
-      // Deal info (frontend se)
-      const dealId = item.dealId || null;
-      const dealType = item.dealType || "";
-      const dealName = item.dealName || "";
-      const dealBadge = item.dealBadge || "";
-      const dealBuyQuantity = Number(item.dealBuyQuantity || 0);
-      const dealGetQuantity = Number(item.dealGetQuantity || 0);
-
-      // ✅ Bundle info (frontend se) — combo deal ki lines
+      // ✅ Bundle (combo) lines — rule / price DB ke bundle doc se, client se nahi
       const bundleId =
         item.bundleId && /^[a-f\d]{24}$/i.test(String(item.bundleId))
           ? String(item.bundleId)
           : null;
-      const bundleName = item.bundleName || "";
-      const bundlePrice = Number(item.bundlePrice || 0);
-      const bundleSavings = Number(item.bundleSavings || 0);
+      let bundleDoc = null;
+      let bundleDealDoc = null;
+      if (bundleId) {
+        [bundleDoc, bundleDealDoc] = await Promise.all([
+          Bundle.findById(bundleId).select("name bundlePrice products isActive").lean(),
+          Deal.findOne({ _id: bundleId, type: "bundle" }).select(BUNDLE_DEAL_FIELDS).lean(),
+        ]);
+        const dealWindowOk = bundleDealDoc
+          && bundleDealDoc.isActive !== false
+          && (!bundleDealDoc.startDate || new Date(bundleDealDoc.startDate) <= now)
+          && (!bundleDealDoc.endDate || new Date(bundleDealDoc.endDate) >= now);
+        if (!dealWindowOk) bundleDealDoc = null;
+        if (bundleDoc && bundleDoc.isActive === false) bundleDoc = null;
+        if (!bundleDoc && !bundleDealDoc) {
+          return res.status(400).json({
+            success: false,
+            message: `"${item.name}" was part of a bundle that is no longer available`,
+          });
+        }
+      }
 
-      // ✅ MIN QUANTITY CHECK — server-side validation
+      // ✅ Deal lines (non-bundle) — threshold check (pehle jaisa message)
+      const dealId = !bundleId && item.dealId ? item.dealId : null;
+      let dealDoc = null;
       if (dealId) {
         if (!mongoose.isValidObjectId(dealId)) {
           return res.status(400).json({
@@ -269,7 +284,7 @@ const placeOrder = async (req, res) => {
             message: `"${item.name}" has an invalid deal. Please remove it and try again.`,
           });
         }
-        const dealDoc = await Deal.findById(dealId).select("minQuantity type buyQuantity isActive").lean();
+        dealDoc = await Deal.findById(dealId).select(DEAL_PRICING_FIELDS).lean();
         if (!dealDoc || !dealDoc.isActive) {
           return res.status(400).json({
             success: false,
@@ -283,72 +298,112 @@ const placeOrder = async (req, res) => {
           const remaining = threshold - qty;
           return res.status(400).json({
             success: false,
-            message: `"${item.name}" requires at least ${threshold} items for this deal. You have selected only ${qty}. Please add ${remaining} more item${remaining === 1 ? '' : 's'}.`,
+            message: `"${item.name}" requires at least ${threshold} items for this deal. You have selected only ${qty}. Please add ${remaining} more item${remaining === 1 ? "" : "s"}.`,
           });
         }
+        uniqueDealIds.add(String(dealId));
       }
-
-      // Discount name (frontend se ya product se fallback)
-      const discountName = item.discountName || "";
-
-      // ✅ Bundle validation — bundle delete ho chuka ho to order block kar do
-      //    Bundle do tarah ke ho sakte hain:
-      //      1) Legacy Bundle collection (Bundle model)
-      //      2) Deals form ka "Bundle Deal" (Deal model, type: "bundle")
-      if (bundleId) {
-        const [bundleDoc, bundleDealDoc] = await Promise.all([
-          Bundle.findById(bundleId).select("_id").lean(),
-          Deal.findById(bundleId).select("_id").lean(),
-        ]);
-
-        if (!bundleDoc && !bundleDealDoc) {
-          return res.status(400).json({
-            success: false,
-            message: `"${item.name}" was part of a bundle that is no longer available`,
-          });
-        }
-      }
-
-      // ✅ Stock check TOTAL (paid + free) par
-      if (Number(variant.quantity) < totalItems) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for "${product.name}" (available: ${variant.quantity})`,
-        });
-      }
-
-      // ✅ Subtotal = PAID qty × FINAL PRICE (frontend calculated)
-      subtotal += displayPrice * payableItems;
-      taxTotal += displayPrice * payableItems * (Number(product.tax || 0) / 100);
-
-      if (dealId) uniqueDealIds.add(dealId);
       if (bundleId) uniqueBundleIds.add(bundleId);
 
+      pricingLines.push({
+        index,
+        qty,
+        product,
+        variant,
+        isGift,
+        dealDoc,
+        bundleId,
+        bundleDoc,
+        bundleDealDoc,
+        clientUnit: item.displayPrice ?? item.price,
+        clientFree: item.freeItems,
+      });
+      shippingItems.push({ productId: product._id, brandId: product.brand_id, categoryId: product.category_id });
+
+      // Snapshot (price fields neeche server pricing se bharte hain)
       orderItems.push({
         product_id: product._id,
         variant_id: variant._id,
         name: product.name,
-        brand: typeof product.brand_id === "object" ? product.brand_id?.name || "" : (product.brand || ""),
+        brand: String(item.brand || ""),
         variantTitle: variant.title || "",
         image: variant.images?.[0]?.img_url || "",
-        price: displayPrice,           // ✅ FRONTEND CALCULATED (final discounted)
-        original_price: originalPrice, // ✅ BEFORE discount
-        discount_name: discountName,
-        savings: perItemSavings,       // ✅ Per-item discount savings
-        qty: payableItems,             // ✅ PAID quantity (snapshot)
-        deal_id: dealId,
-        deal_type: dealType,
-        deal_name: dealName,
-        deal_buy_quantity: dealBuyQuantity,
-        deal_get_quantity: dealGetQuantity,
-        free_items: freeItems,         // ✅ FREE items (frontend calculated)
-        payable_items: payableItems,   // ✅ PAID qty
-        deal_savings: dealSavings,     // ✅ DEAL SAVINGS (frontend calculated)
-        bundle_id: bundleId,           // ✅ Bundle (combo) line
-        bundle_name: bundleName,
-        bundle_price: bundlePrice,
-        bundle_savings: bundleSavings,
+        price: 0,
+        original_price: Number(variant.selling_price) || 0,
+        discount_name: "",
+        savings: 0,
+        qty,
+        deal_id: dealDoc?._id || null,
+        deal_type: dealDoc?.type || "",
+        deal_name: dealDoc?.name || "",
+        deal_buy_quantity: Number(dealDoc?.buyQuantity) || 0,
+        deal_get_quantity: Number(dealDoc?.getQuantity) || 0,
+        free_items: 0,
+        payable_items: qty,
+        deal_savings: 0,
+        bundle_id: bundleId,
+        bundle_name: bundleDealDoc?.name || bundleDoc?.name || "",
+        bundle_price: 0,
+        bundle_savings: 0,
+        _taxRate: Number(product.tax || 0),
       });
+    }
+
+    const { priced, mismatches, errors: pricingErrors } = priceCheckout({ lines: pricingLines, discounts: activeDiscounts, now });
+    if (pricingErrors.length) {
+      const first = pricingErrors[0];
+      const name = items[first.index]?.name || orderItems[first.index]?.name || "an item";
+      const messages = {
+        DEAL_NOT_APPLICABLE: `The deal for "${name}" no longer applies. Please update your cart.`,
+        BUNDLE_NOT_AVAILABLE: `"${name}" was part of a bundle that is no longer available`,
+        BUNDLE_GIFT_INVALID: `The free gift "${name}" does not match the bundle offer. Please update your cart.`,
+      };
+      return res.status(400).json({ success: false, code: first.code, message: messages[first.code] || "Your cart needs an update." });
+    }
+    const pricingMode = String(process.env.PRICING_MODE || "enforce").toLowerCase();
+    if (mismatches.length) {
+      log.warn({ mismatches: mismatches.slice(0, 20), mode: pricingMode }, "[placeOrder] client prices differ from server pricing");
+      if (pricingMode !== "log") {
+        return res.status(409).json({
+          success: false,
+          code: "PRICE_CHANGED",
+          message: "Prices in your cart have changed. Please review your cart and try again.",
+          items: mismatches.map((m) => ({ index: m.index, name: orderItems[m.index]?.name, price: m.serverUnit, freeItems: m.serverFree })),
+        });
+      }
+    }
+
+    let subtotal = 0;
+    let taxTotal = 0;
+    orderItems.forEach((oi, index) => {
+      const p = priced.get(index);
+      const client = items[index] || {};
+      // PRICING_MODE=log: purana (client) hisaab; warna hamesha server
+      const useClient = pricingMode === "log";
+      const unit = useClient ? Number(client.displayPrice || client.price || p.unit || 0) : p.unit;
+      const free = useClient ? Number(client.freeItems || 0) : p.free;
+      oi.price = unit;
+      oi.free_items = free;
+      oi.discount_name = p.discountName || "";
+      oi.savings = p.perItemSavings;
+      oi.deal_savings = p.dealSavings;
+      oi.bundle_savings = p.bundleSavings;
+      oi.bundle_price = oi.bundle_id ? unit : 0;
+      subtotal += unit * oi.qty;
+      taxTotal += unit * oi.qty * (oi._taxRate / 100);
+      delete oi._taxRate;
+    });
+    subtotal = Math.round(subtotal * 100) / 100;
+
+    // ✅ Stock check TOTAL (paid + free) par — free items ab server se pata hain
+    for (const [index, oi] of orderItems.entries()) {
+      const lineVariant = pricingLines[index].variant;
+      if (Number(lineVariant.quantity) < oi.qty + oi.free_items) {
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for "${oi.name}" (available: ${lineVariant.quantity})`,
+        });
+      }
     }
 
     // ✅ Stock decrement = PAID + FREE (total ship hone wale) — ATOMIC + CONDITIONAL.
@@ -422,7 +477,8 @@ const placeOrder = async (req, res) => {
     } else {
       const { calculateShipping } = require("./shippingController");
       const quote = await calculateShipping({
-        items: items.map(i => ({ productId: i.productId || i.id, brandId: i.brandId, categoryId: i.categoryId })),
+        // Shipping rules ke liye category / brand DB product se (client ke bheje ids nahi)
+        items: shippingItems,
         method: shipping_method,
         subtotal,
       });

@@ -28,6 +28,8 @@ test.before(async () => {
 });
 test.after(async () => {
   if (connected) {
+    // Background index builds (autoIndex) khatam hone do — warna drop ke baad collections dobara ban jati hain
+    await Promise.all(mongoose.modelNames().map((n) => mongoose.model(n).init().catch(() => {})));
     await mongoose.connection.dropDatabase().catch(() => {});
     await mongoose.disconnect().catch(() => {});
   }

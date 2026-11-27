@@ -507,6 +507,7 @@
   "checkout.order.confirmPlace": "Are you sure you want to place this order?",
   "checkout.order.place": "Place order",
   "checkout.order.placeFailed": "Could not place your order",
+  "checkout.order.priceChanged": "Prices in your cart have changed. Please review your cart and try again.",
   "checkout.order.placing": "Placing order...",
   "checkout.payment.bank": "Bank",
   "checkout.payment.bankDescription": "Pay by transferring the amount to our bank account",

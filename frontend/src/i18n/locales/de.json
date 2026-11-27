@@ -450,6 +450,7 @@
   "checkout.order.confirmPlace": "Sie sind sicher, dass Sie diese Bestellung setzen möchten?",
   "checkout.order.place": "Orden Ort",
   "checkout.order.placeFailed": "Du kannst deine Bestellung nicht geben",
+  "checkout.order.priceChanged": "Die Preise in Ihrem Warenkorb haben sich geändert. Bitte prüfen Sie Ihren Warenkorb und versuchen Sie es erneut.",
   "checkout.order.placing": "Ordnung stellen...",
   "checkout.payment.bank": "Die Bank",
   "checkout.payment.bankDescription": "Zahlung durch Überweisung des Betrags auf unser Bankkonto",
