@@ -36,7 +36,7 @@ Baseline before the upgrade: the backend passes `npm test` (177/177). Frontend `
   - `"private": true`, `"main": "server.js"` (today it says `index.js`, which does not exist)
   - `"engines": { "node": ">=24" }`
   - scripts: `migrate:indexes`, `migrate:attributes`
-- [ ] New dependencies are added **in the PR that first uses them**, not ahead of time: `helmet`, `pino` + `pino-http` (§7.1), `zod` (§5.3), and dev-only `supertest` + `mongodb-memory-server` (§7.2).
+- [ ] New dependencies are added **in the PR that first uses them** (added so far: `helmet`, `pino`, `pino-http`, dev `supertest`, `pino-pretty`), not ahead of time: `helmet`, `pino` + `pino-http` (§7.1), `zod` (§5.3), and dev-only `supertest` + `mongodb-memory-server` (§7.2).
 
 **Frontend (`frontend/package.json`):**
 - [x] Minor and patch upgrades within the current majors:
@@ -673,13 +673,13 @@ backend/
   jobs/             ← queue workers (translation, email, audit, stats, cleanup)
   utils/            ← small pure helpers
 ```
-- [ ] Split `app.js` from `server.js`. Today `server.js` calls `listen` on import, so the app cannot be tested.
+- [x] Split `app.js` from `server.js`. Today `server.js` calls `listen` on import, so the app cannot be tested. — **done:** `app.js` builds the app (exported, used by `test/app.test.js` through supertest); `server.js` owns HTTP, sockets (`app.set("io")`), DB, seeding, schedulers and listen
 - [ ] Move all route-file logic into controllers or services: `categoryRoutes.js:38-256` (about 220 lines of handlers), `variantRoutes.js:41-59`, and the multer config in `storeRoutes.js:18-53`.
 - [ ] Move `scripts/seedAttributes.js` (required at runtime by `models/Store.js:134`) into `services/`.
 - [ ] `socket.js` (1050 lines) re-implements REST controllers using fake req/res objects, in 4 different variants. Keep sockets for **push notifications and chat only**, and move writes back to REST. Remove the permission migration that runs inside `getProfile`.
 
 ### 5.2 Errors and responses
-- [ ] `utils/asyncHandler.js` plus an `AppError(status, code, message)` class plus **one** error-handling middleware (4 arguments) at the end of `app.js`. It maps:
+- [ ] `utils/asyncHandler.js` plus an `AppError(status, code, message)` class plus **one** error-handling middleware (4 arguments) at the end of `app.js`. It maps: — **partly done:** `middleware/errorHandler.js` (`AppError`, classification, JSON with `requestId`, no raw 500 messages) is mounted last in `app.js`. Still open: `asyncHandler`, and moving controllers off try/catch
   - Mongoose `ValidationError` → 400
   - `CastError` → 400
   - E11000 → 409
@@ -721,9 +721,9 @@ backend/
 
 ### 5.5 Config and server hardening
 - [ ] `config/env.js`: validate every variable with zod at boot and fail fast with a clear message. Today a missing variable becomes `NaN`, for example in the limiter `max`/`WINDOW_MS` and `SOCKET_MAX_BUFFER_MB`. Remove the duplicate `TRANSLATION_MODEL_DOWNLOAD_CHUNK_BYTES` line in `.env`. Add a `.env.example`.
-- [ ] Add `helmet()`, `app.disable("x-powered-by")`, and per-route body limits instead of one large global `REQUEST_SIZE_LIMIT` (which was raised only for base64 KYC; send KYC as multipart).
+- [ ] Add `helmet()`, `app.disable("x-powered-by")`, and per-route body limits instead of one large global `REQUEST_SIZE_LIMIT` (which was raised only for base64 KYC; send KYC as multipart). — **partly done:** helmet (CORP cross-origin for `/uploads`, HSTS production only), `x-powered-by` off, `default-src none; frame-ancestors none` on API responses, and a sandboxed CSP on `/uploads` (KYC excluded). Still open: per-route body limits
 - [ ] Mount the global rate limiter **before** `resolveStore`, so unknown hosts cannot hit the DB unthrottled. Add limits for chat GET polling, staff sends and `/translation/page`.
-- [ ] Graceful shutdown: on SIGTERM, `server.close()`, `io.close()`, drain the queues, `mongoose.disconnect()`. Add `unhandledRejection`/`uncaughtException` handlers that log and exit.
+- [x] Graceful shutdown: on SIGTERM, `server.close()`, `io.close()`, drain the queues, `mongoose.disconnect()`. Add `unhandledRejection`/`uncaughtException` handlers that log and exit. — **done**
 - [ ] Cache CORS origin checks, since they call `resolveStoreByHost` on every preflight (`server.js:126`).
 - [ ] Use one router-import style. `server.js` currently mixes top-level imports with inline requires at lines 271-280.
 
@@ -783,7 +783,7 @@ backend/
 ## 7. P0–P4: Observability and tests (start in week 1)
 
 ### 7.1 Logging and monitoring
-- [ ] Replace the no-op logger with **pino**: JSON logs with `reqId`, `storeId`, `userId`, route and duration, and `pino-http` for access logs. Keep the `log.*` interface so the 164 existing calls start working. Set the level per environment.
+- [x] Replace the no-op logger with **pino**: JSON logs with `reqId`, `storeId`, `userId`, route and duration, and `pino-http` for access logs. Keep the `log.*` interface so the 164 existing calls start working. Set the level per environment. — **done:** `utils/logger.js` (same `log.*` interface; `LOG_LEVEL`, default warn in dev / info in prod / silent in tests; pino-pretty in dev; secrets redacted), plus `pino-http` with `X-Request-Id`
 - [ ] Error tracking (Sentry or similar) from the central error handler.
 - [ ] Log slow queries: Mongoose `debug` in dev, the profiler in staging.
 - [ ] `/health` (liveness) and `/ready` (Mongo, Redis and queue reachable).
@@ -867,7 +867,7 @@ What is already good and should be kept:
     - narrow the matcher to `_next/static|_next/image|favicon.ico` plus real `public/` paths
     - in the proxy, always delete incoming `x-store-subdomain` and `x-internal-proxy-secret`
     - add `import "server-only"` to `lib/serverStore.js`
-- [ ] **P1 Security headers: there are none** (no `headers()` in `next.config.mjs`, none in the proxy).
+- [ ] **P1 Security headers: there are none** (no `headers()` in `next.config.mjs`, none in the proxy). — **partly done:** `next.config.mjs` `headers()` adds nosniff, Referrer-Policy, Permissions-Policy and HSTS (production), with `frame-ancestors none`/DENY on `/admin` + `/super-admin` and `self` on the storefront, plus `poweredByHeader:false`. Still open: the full CSP with nonce
   - Add `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(self)` (the map section uses geolocation), and HSTS in production.
   - Add `frame-ancestors 'none'` on `/admin/:path*` and `/super-admin/:path*` (POS actions and approvals can be clickjacked today), and `'self'` on storefront paths (the store-editor preview iframe is same-origin).
   - CSP with a per-request nonce generated in `proxy.js` (the Next docs guide `content-security-policy.md`). The inline `beforeInteractive` theme scripts (`app/layout.js:37-46`) need the nonce.
