@@ -644,6 +644,8 @@ function buildDefaultTheme() {
     order: [...DEFAULT_ORDER],
     menus: { main: [], footer: [] },
     templates: { product: buildDefaultProductTemplate(), collection: buildDefaultCollectionTemplate() },
+    // Edit mode per-element styles (utils/elementStyles.js)
+    elements: {},
   };
 }
 

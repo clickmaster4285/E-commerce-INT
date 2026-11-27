@@ -52,6 +52,7 @@ import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useThemeEditorStore } from "./useThemeEditorStore";
 import { draftIssues } from "./draftIssues";
 import { SectionList, SectionSettings, ThemeSettings, MenuEditor, VersionsPanel } from "./components/panels";
+import ElementPanel from "./components/ElementPanel";
 import PreviewFrame from "./components/PreviewFrame";
 import AddSectionDialog from "./components/AddSectionDialog";
 import { ScheduleDialog, ShareDialog, ScheduleBanner } from "./components/PublishTools";
@@ -529,7 +530,9 @@ export default function StoreEditorPage() {
 
   // ── Sidebar content ──
   let panel;
-  if (selected?.kind === "productBlock") {
+  if (selected?.kind === "element") {
+    panel = <ElementPanel key={selected.key} schema={schema} selection={selected} onBack={() => store.select(null)} />;
+  } else if (selected?.kind === "productBlock") {
     panel = <ProductBlockSettings schema={schema} zone={selected.zone} id={selected.id} onBack={() => store.select(null)} />;
   } else if (selected?.kind === "section" && draft.sections[selected.id]) {
     panel = <SectionSettings key={selected.id} schema={schema} id={selected.id} onBack={() => store.select(null)} />;

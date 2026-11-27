@@ -22,6 +22,10 @@ import FloatingWhatsApp from "@/storefront/FloatingWhatsApp";
 import StorePopup from "@/storefront/StorePopup";
 import SharePreviewBar from "@/storefront/SharePreviewBar";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
+import dynamic from "next/dynamic";
+
+// Store editor Edit mode overlay — sirf editor iframe me load hota hai
+const VisualEditor = dynamic(() => import("@/storefront/VisualEditor"), { ssr: false });
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
@@ -115,7 +119,7 @@ export default function UserLayoutClient({ children }) {
   const pathname = usePathname();
   const queryClient = useQueryClient();
   // Store editor: header sticky off → neeche wale sticky bars ka offset user.css adjust karta hai
-  const { theme: storeTheme } = useStoreTheme();
+  const { theme: storeTheme, isPreview } = useStoreTheme();
   const headerSticky = storeTheme?.settings?.header?.sticky !== false;
 
   // Session expired / guest 401: switch UI to logged-out state silently.
@@ -161,10 +165,20 @@ export default function UserLayoutClient({ children }) {
           className="user-theme min-h-screen w-full min-w-0 flex flex-col overflow-x-clip bg-user-page text-user-fg"
         >
           <SharePreviewBar />
-          <AnnouncementBar />
-          <Header />
-          <main className="w-full min-w-0">{children}</main>
-          {!hideFooter && <Footer />}
+          {/* data-sf-anchor → store editor Edit mode element styles (storefront/elementStyles.js) */}
+          <div data-sf-anchor="announcement" className="contents">
+            <AnnouncementBar />
+          </div>
+          <div data-sf-anchor="header" className="contents">
+            <Header />
+          </div>
+          <main data-sf-anchor="main" className="w-full min-w-0">{children}</main>
+          {!hideFooter && (
+            <div data-sf-anchor="footer" className="contents">
+              <Footer />
+            </div>
+          )}
+          {isPreview ? <VisualEditor /> : null}
           <CartDrawer />
           <VariantQuickBuyDrawer />
           <SupportChatWidget />

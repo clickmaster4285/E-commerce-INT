@@ -512,3 +512,52 @@ test("footer menu columns (children) validate; footer newsletter title translate
   keys = collectThemeTexts(r.data).map((e) => e.key);
   assert.ok(keys.includes("g.footer.newsletterTitle"));
 });
+
+// ───────────────────────── Element styles (edit mode) ─────────────────────────
+test("element styles: valid keys kept, values clamped, junk dropped", () => {
+  const theme = buildDefaultTheme();
+  theme.elements = {
+    "home~s:rich_1~div.1/h2.1": { color: "#FF0000", fontSize: 500, padding: { t: 10, r: "x", b: -5 }, margin: { l: -999 }, evil: "x" },
+    "*~a:header~": { background: "#112233", hidden: true },
+    "pages/about~a:main~div.2": { textAlign: "center", fontWeight: 700, scale: 10, opacity: 50 },
+    "home~a:main~div.3": { color: "red" }, // sirf invalid value → entry hi drop
+  };
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.deepEqual(r.data.elements, {
+    "home~s:rich_1~div.1/h2.1": { color: "#ff0000", fontSize: 120, padding: { t: 10, b: 0 }, margin: { l: -200 } },
+    "*~a:header~": { background: "#112233", hidden: true },
+    "pages/about~a:main~div.2": { textAlign: "center", fontWeight: 700, scale: 50, opacity: 50 },
+  });
+});
+
+test("element styles: keys that could break out of a CSS selector are rejected", () => {
+  for (const key of [
+    'home~s:x"]{}body{display:none}~',
+    "home~a:sidebar~div.1",
+    "home~s:x~div.0",
+    "home~s:x~div.1>p.1",
+    "HOME~s:x~",
+    "home~s:x~div.1/</style>",
+  ]) {
+    const theme = buildDefaultTheme();
+    theme.elements = { [key]: { color: "#000000" } };
+    assert.equal(validate(theme).ok, false, key);
+  }
+});
+
+test("element styles: missing elements (old themes) becomes empty object", () => {
+  const theme = buildDefaultTheme();
+  delete theme.elements;
+  const r = validate(theme);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data.elements, {});
+});
+
+test("element styles: width / height (resize handles) clamped", () => {
+  const theme = buildDefaultTheme();
+  theme.elements = { "home~s:x~div.1": { width: 320.6, height: 99999 }, "home~s:x~div.2": { width: "abc" } };
+  const r = validate(theme);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.deepEqual(r.data.elements, { "home~s:x~div.1": { width: 321, height: 2400 } });
+});

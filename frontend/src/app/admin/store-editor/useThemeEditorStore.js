@@ -9,6 +9,7 @@
 
 import { create } from "zustand";
 import { buildDefaultProductTemplate } from "@/storefront/themeDefaults";
+import { compactStyle } from "@/storefront/elementStyles";
 
 const HISTORY_LIMIT = 50;
 
@@ -48,6 +49,15 @@ export const useThemeEditorStore = create((set, get) => ({
     if (batch) batch.pushed = true;
     set({ draft: next, past: [...past, draft].slice(-HISTORY_LIMIT), future: [], dirty: true });
   },
+
+  // Edit mode: ek element ka style merge (null value = woh property hatao) / reset
+  setElementStyle: (key, patch) =>
+    get().update((d) => {
+      d.elements = d.elements && typeof d.elements === "object" ? d.elements : {};
+      const next = patch === null ? null : compactStyle({ ...(d.elements[key] || {}), ...patch });
+      if (next) d.elements[key] = next;
+      else delete d.elements[key];
+    }),
 
   // Color picker drag jaisi continuous edits → ek hi undo step
   batch: null,

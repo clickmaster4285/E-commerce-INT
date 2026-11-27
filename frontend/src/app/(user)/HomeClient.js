@@ -396,6 +396,12 @@ function HomeContent({ initialBanners = null }) {
       node = eager || index === 0 ? inner : <ViewportSection minHeight={minHeight}>{inner}</ViewportSection>;
     }
     if (!node) return null;
+    // Edit mode element styles ka anchor (preview aur live dono me same DOM; block div → space-y chalta hai) — storefront/elementStyles.js
+    node = (
+      <div data-sf-section={id} className="empty:hidden">
+        {node}
+      </div>
+    );
     return (
       <EditableSection
         key={id}

@@ -34,18 +34,27 @@ export function useProductTemplate() {
 export const zoneEntries = (zone) =>
   (zone?.order || []).map((id) => [id, zone.blocks?.[id]]).filter(([, b]) => b && !b.disabled);
 
-export function EditableProductBlock({ zone, id, isPreview, selectedSectionId, children }) {
-  if (!isPreview) return children;
+export function EditableProductBlock({ zone, id, isPreview, selectedSectionId, children: content }) {
+  const { editorMode } = useStoreTheme();
   const key = `product:${zone}:${id}`;
-  const selected = selectedSectionId === key;
+  // Edit mode element styles ka anchor (preview aur live dono me) — storefront/elementStyles.js
+  const children = (
+    <div data-sf-section={key} className="empty:hidden">
+      {content}
+    </div>
+  );
+  if (!isPreview) return children;
+  const editing = editorMode !== "view";
+  const selected = editing && selectedSectionId === key;
   return (
     <div
       data-section-id={key}
       onClickCapture={(event) => {
+        if (!editing) return;
         if (event.target.closest?.("a")) event.preventDefault();
         selectSectionInEditor(key);
       }}
-      className={`relative outline-offset-2 ${selected ? "outline outline-2 outline-user-accent" : "hover:outline hover:outline-1 hover:outline-user-line"}`}
+      className={`relative outline-offset-2 ${!editing ? "" : selected ? "outline outline-2 outline-user-accent" : "hover:outline hover:outline-1 hover:outline-user-line"}`}
     >
       {children}
     </div>

@@ -30,6 +30,7 @@ const {
   buildDefaultProductTemplate,
   COLLECTION_TEMPLATE_SETTINGS,
 } = require("../config/themeSchema");
+const { validateElements } = require("./elementStyles");
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const SECTION_ID = /^[a-z0-9_-]{1,40}$/;
@@ -410,8 +411,12 @@ function validateThemeData(data, { storeId } = {}) {
     collection: { settings: validateFields(COLLECTION_TEMPLATE_SETTINGS, collectionIn.settings, "templates.collection.settings", ctx) },
   };
 
+  // Edit mode ke per-element styles (utils/elementStyles.js)
+  const elementsResult = validateElements(data.elements);
+  ctx.errors.push(...elementsResult.errors);
+
   if (ctx.errors.length) return { ok: false, errors: ctx.errors.slice(0, 50) };
-  return { ok: true, data: { settings, sections, order, menus, templates } };
+  return { ok: true, data: { settings, sections, order, menus, templates, elements: elementsResult.value } };
 }
 
 module.exports = {
