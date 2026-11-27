@@ -1,7 +1,7 @@
 # Backend and Database Optimization Plan
 
-Scope: `backend/` (Express 5 + Mongoose 9) and the MongoDB data model, aimed at 100+ stores on one deployment.
-Based on a full read of the backend at commit `1092d8d` (branch `optimizing_v1`), about 38.7k lines: 46 models, 37 controllers, 36 routes, 17 middleware files, 38 utils, scripts and tests.
+Scope: `backend/` (Express 5 + Mongoose 9), the MongoDB data model, and `frontend/` (Next.js 16), aimed at 100+ stores on one deployment.
+Based on a full read of the code at commit `85a1bb6` (branch `optimizing_v1`): the backend (about 38.7k lines: 46 models, 37 controllers, 36 routes, 17 middleware files, 38 utils, scripts and tests) and the frontend (about 108k lines: `app/` 136 files, `components/` 110, `hooks/` 22, `apis/` 47).
 Line numbers are from that commit and will drift as you edit.
 
 ## Priorities
@@ -22,7 +22,14 @@ Rule for the whole plan: **one module per PR**, with tests first. Never change a
 
 ## 0. Current state in numbers
 
-- MongoDB runs as a **standalone** `mongod` (`MONGO_URI=mongodb://localhost:27017/...`). It is not a replica set, so **multi-document transactions are impossible**. Only one place tries one (`purchaseOrderController.js:442`, behind a feature check).
+- The local MongoDB 8.3 **is already a single-node replica set** (`mongod.cfg` → `replication.replSetName: rs0`; `rs.status()` → `127.0.0.1:27017 PRIMARY`), so transactions work on this machine today. The app does not use them:
+  - `MONGO_URI` has no `?replicaSet=rs0`.
+  - `config/db.js` forces `retryWrites=false`.
+  - `posController.js:576` says "this deployment is a standalone MongoDB server" and does manual rollbacks instead.
+  - `purchaseOrderController.js:402-408` runs `admin.hello()` on **every** PO delivery to decide whether a transaction is possible.
+
+  Only that one place uses a transaction. Production must be verified to match (§3.1).
+- **Money is stored as JS floating-point `Number`** in every model, rounded by 4 different `round` helpers (`financeController.js:7`, `invoiceController.js:9`, `quoteController.js:56`, `utils/invoiceReturnMath.js:1`). Stock is a single mutable `Variant.quantity` number (§3.9).
 - `config/db.js` forces `retryWrites=false`. It sets no pool size and no `serverSelectionTimeoutMS`, and `autoIndex` is on in production.
 - `utils/logger.js` is a **no-op**, so 164 `log.*` calls print nothing, including every `log.error` in roughly 415 try/catch blocks. Production errors are invisible.
 - There are 229 hand-written `res.status(500)` responses, with no central error handler and no asyncHandler.
@@ -133,9 +140,35 @@ So:
 
 ## 3. P1/P2: Database
 
-### 3.1 Infrastructure (P1, blocks the transactions work)
-- [ ] Run MongoDB as a **replica set** (a single-node `rs0` is fine for dev; use 3 nodes, or Atlas, in prod). This enables transactions, change streams and retryable writes.
-- [ ] Remove the forced `retryWrites=false` from `config/db.js` (it was only needed for a MongoDB-compatible host that rejects retryable writes).
+### 3.1 Switch to a replica set and use it (P1, blocks the transactions work)
+A replica set enables transactions, retryable writes, change streams and `majority` reads and writes. The money and stock ledger (§3.9) depends on it.
+
+**Development (this machine already has it):**
+- [ ] Keep `C:\Program Files\MongoDB\Server\8.3\bin\mongod.cfg` → `replication: { replSetName: rs0 }` (already set and initiated). For any other developer machine, document these steps in `backend/README.md`:
+  1. Add the same `replication` block.
+  2. Restart the `MongoDB` service.
+  3. Run `mongosh --eval "rs.initiate({_id:'rs0', members:[{_id:0, host:'127.0.0.1:27017'}]})"` once.
+  4. Verify with `rs.status().ok === 1`.
+- [ ] Set `MONGO_URI=mongodb://127.0.0.1:27017/ecommerce?replicaSet=rs0` in `backend/.env` and a new `.env.example`. Use `127.0.0.1`, not `localhost`, because the member is registered as `127.0.0.1`. Docker alternative: `mongo:8 --replSet rs0` with a one-shot init container.
+
+**Production:**
+- [ ] A **3-member replica set** (primary plus 2 secondaries, on separate machines or zones), or MongoDB Atlas (M10+), which is always a replica set. Never one node in production: a single node gives transactions but no failover.
+- [ ] Enable authentication and keyfile/x.509 internal auth, plus TLS, and `bindIp` to private addresses only. The local config today has `#security:` commented out, which is acceptable only on a dev laptop.
+- [ ] Connection string with every member, `replicaSet=rs0`, `retryWrites=true`, `w=majority`, `readPreference=primary` (use `secondaryPreferred` only for analytics/report jobs, never for money or stock reads).
+- [ ] Backups: point-in-time recovery (Atlas continuous backup, or `mongodump --oplog` plus oplog archiving). Test a restore once per quarter.
+
+**Code changes:**
+- [ ] `config/db.js`:
+  - remove the `retryWrites=false` rewrite
+  - fail fast at boot if `db.hello().setName` is missing (`"MongoDB must be a replica set"`)
+  - set the pool and timeout options listed below
+- [ ] `utils/tx.js`: `withTx(fn)` = `mongoose.connection.transaction(fn, { readConcern: "snapshot", writeConcern: { w: "majority" } })`. It retries `TransientTransactionError` and `UnknownTransactionCommitResult` automatically.
+  - The tenant ALS context must be kept inside the callback, so add a test for that.
+  - Pass `{ session }` to every read and write inside it.
+- [ ] Delete the fallbacks: `supportsTx()` (`purchaseOrderController.js:402-408`), the "standalone" manual compensations (`posController.js:576`, `createProduct`'s rollback at `productController.js:1917`, `createSellerStore`'s manual rollback), and every "if transactions unsupported" branch.
+- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge.
+- [ ] Tests: `MongoMemoryReplSet` (from `mongodb-memory-server`) so tests run against a real replica set.
+- [ ] Later uses of the replica set: **change streams** for cross-instance cache invalidation (`store:changed`, `publicCache` namespaces), socket fan-out of admin events, and the read-model refresh (§3.4). They can replace some Redis pub/sub.
 - [ ] Connection options: `maxPoolSize` (for example 50), `minPoolSize`, `serverSelectionTimeoutMS: 5000`, `socketTimeoutMS`, and **`autoIndex: false` in production**. Build indexes through a migration script, not on boot.
 - [ ] Turn on the profiler (`slowms: 100`) in staging, and record `explain("executionStats")` for the top 30 queries before and after §3.3.
 - [ ] Back up before every migration (`mongodump`), and version the migration scripts (§3.8).
@@ -338,7 +371,152 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
 ### 3.8 Migration process
 - [ ] `scripts/migrations/NNN-name.js` with `up()`, a dry-run by default, `--apply`, and a `migrations` collection that records what ran.
 - [ ] Archive the one-off scripts that already ran (`renameAuthCollections.js`, `backfillSubdomains.js`, `migrateAttributesPerStore.js`) into `scripts/migrations/archive/`. Note: `renameAuthCollections` drops `superadmin_activities`, which is still in use.
-- [ ] Order: **backups → field backfills (`is_deleted:false`, Variant.is_deleted, Address.storeId) → counters seed → new indexes (built online) → read-model backfill → audit move → drop old indexes and fields**.
+- [ ] Order: **backups → field backfills (`is_deleted:false`, Variant.is_deleted, Address.storeId) → counters seed → new indexes (built online) → read-model backfill → audit move → money and stock ledger backfill (§3.9) → shared reference collections (§3.10) → drop old indexes and fields**.
+
+### 3.9 Money and stock in their own linked, append-only collections (P1/P2)
+**Why:** today money and stock live as mutable numbers and arrays *inside* business documents:
+- money: `Invoice.payments[]`, `Invoice.returns[]`, `PosSale.payment`, `PosSale.returns[]`, `Order.payment`, `Vendor.total_paid` and `balance_payable`, `Invoice.remaining_balance`
+- stock: `Variant.quantity`
+
+Anyone can overwrite them (mass assignment, a direct `$set`), concurrent writes lose updates, there is no single place to answer "where did this money or unit go?", and finance has to load 5 collections to rebuild it (§4.3).
+
+The professional pattern is **separate collections linked by ids, where each row is a fact that is never edited** (append-only, like a bank statement). Current balances are a small read-model updated **in the same transaction** (§3.1). Business documents (Order, Invoice, PosSale, PO) keep only their snapshot totals and a cached `amount_paid`.
+
+```
+Order / PosSale / Invoice / PurchaseOrder        (business document, snapshot totals)
+   │ ref_type + ref_id                    │ ref_type + ref_id + line_id
+   ▼                                      ▼
+payments ──► ledger_entries ◄── returns   stock_movements ──► stock_levels
+   (facts)      (double-entry journal)        (facts)            (current balance)
+                     │
+                     ▼
+              account_balances (read model: cash, receivable, payable per party)
+```
+
+**Money (P1):**
+- [ ] **Integer minor units everywhere:** store `amount_minor` as an integer number of paisa or cents, plus the store `currency` (ISO 4217). Never use floats.
+  - Migration: a field-by-field `*_minor` backfill, then rename.
+  - `utils/money.js`:
+    - `toMinor`, `fromMinor`
+    - `add`, `mul(qty)`
+    - `pct(amount, rate)` with one rounding rule (half-up, per line)
+    - `allocate(total, parts)` to split a discount across lines without losing a paisa
+
+    It replaces the 4 `round` helpers.
+  - `Decimal128` is the alternative, but integers are faster, indexable and exact in `$sum`.
+- [ ] **`payments`**:
+  - fields: `{ storeId, direction: "in"|"out", method_code (§3.10), amount_minor, currency, status: "pending"|"captured"|"failed"|"refunded", ref_type: "order"|"pos_sale"|"invoice"|"purchase_order", ref_id, party_type: "customer"|"vendor", party_id, reference, received_by, idempotency_key, at }`
+  - indexes: unique `{storeId, idempotency_key}`, `{storeId, ref_type, ref_id}`, `{storeId, party_type, party_id, at:-1}`, `{storeId, at:-1}`
+  - It replaces `Invoice.payments[]`, `Order.payment`, `PosSale.payment` and `PurchasePayment` (migrate that collection into it).
+- [ ] **`returns`**:
+  - fields: `{ storeId, ref_type, ref_id, lines:[{line_id, variant_id, qty, amount_minor}], refund_payment_id, method, reason, actor_id, at }`
+  - It replaces `Invoice.returns[]` and `PosSale.returns[]`.
+  - The "already returned" quantity is a `$group` over `{storeId, ref_type, ref_id}`, checked inside the transaction.
+- [ ] **`ledger_entries`** (double-entry journal):
+  - fields: `{ storeId, journal_no, at, ref_type, ref_id, memo, lines:[{ account, party_type?, party_id?, debit_minor, credit_minor }], posted_by }`
+  - A schema validator requires **Σdebit = Σcredit**.
+  - indexes: `{storeId, at:-1}`, `{storeId, ref_type, ref_id}`, `{storeId, "lines.account", at:-1}`, `{storeId, "lines.party_id", at:-1}`
+  - Per-store chart of accounts (seeded): `cash`, `bank`, `card_clearing`, `wallet`, `accounts_receivable`, `accounts_payable`, `store_credit`, `sales_revenue`, `sales_returns`, `discounts_given`, `shipping_income`, `tax_payable`, `inventory`, `cogs`.
+  - Examples:
+    - a POS cash sale posts `cash Dr / sales_revenue Cr / tax_payable Cr`
+    - PO delivery posts `inventory Dr / accounts_payable Cr`
+    - a vendor payment posts `accounts_payable Dr / cash Cr`
+- [ ] **`account_balances`** (read model):
+  - fields: `{ storeId, account, party_type?, party_id?, balance_minor }`
+  - unique `{storeId, account, party_id}`
+  - Updated with `$inc` in the same transaction as the journal entry.
+  - This gives vendor payable and customer receivable instantly, and replaces `Vendor.total_purchased/total_paid/balance_payable` (wrong today, §3.4) and the hand-maintained `Invoice.remaining_balance`.
+- [ ] **Immutability:**
+  - Mongoose `pre(["updateOne","updateMany","findOneAndUpdate","deleteOne","deleteMany"])` hooks on `payments`, `ledger_entries`, `returns` and `stock_movements` throw unless `{ allowCorrection: true }` (used only by a migration).
+  - Mistakes are fixed with a **reversal entry**, never an edit.
+  - Invoice/Order "edit" posts the difference as new entries.
+- [ ] `services/ledger.js#post({ ref, lines }, session)` and `services/payments.js#record(...)` are the **only** writers. Controllers never touch these collections directly.
+- [ ] Finance overview, the vendor statement, the customer statement, the daily cash report and `store_daily_stats` (§3.4) all read `ledger_entries`/`account_balances` with an indexed `{storeId, at}` range. This replaces the 5-collection scan in `financeController.js:96-274`.
+- [ ] A nightly reconciliation job:
+  - Σ`payments` per document = document `amount_paid`
+  - Σjournal per account = `account_balances`
+  - Alert on drift.
+
+**Stock (P1):**
+- [ ] **`stock_levels`**:
+  - fields: `{ storeId, variant_id, location_id (default "main"), on_hand, reserved, reorder_min, reorder_max }`
+  - unique `{storeId, variant_id, location_id}`, plus `{storeId, on_hand}` for the low-stock list
+  - `available = on_hand - reserved`
+  - `Variant.quantity`, `min_qnt` and `max_qnt` move here. Keep `Variant.quantity` only as a read-only cache during the migration, then drop it.
+  - `location_id` makes multiple branches/warehouses possible later without another migration.
+- [ ] **`stock_movements`** (replaces `StockHistory`):
+  - fields: `{ storeId, variant_id, location_id, qty_delta, on_hand_after, kind: "sale"|"sale_cancel"|"return"|"purchase_receive"|"adjust_add"|"adjust_remove"|"count_set"|"transfer_in"|"transfer_out", ref_type, ref_id, line_id, unit_cost_minor, reason, explanation, actor_id, actor_name, sku, variant_title, at, idempotency_key }`
+  - indexes: unique `{storeId, idempotency_key}` (for example `order:<id>:<line>:sale`), so a retried request can never move stock twice; `{storeId, variant_id, at:-1}`; `{storeId, at:-1}`; `{storeId, ref_type, ref_id}`
+  - Drop the `translations` maps that StockHistory carries today.
+- [ ] **`stock_reservations`**:
+  - fields: `{ storeId, variant_id, location_id, qty, checkout_draft_id, expires_at }`
+  - Checkout reserves (`reserved += n` only when `on_hand - reserved >= n`). The order confirm converts the reservation into a `sale` movement (`on_hand -= n`, `reserved -= n`).
+  - A leader-locked sweeper job (§6.2) releases expired reservations in a transaction. **A TTL index alone is not enough**, because it would delete the row without giving back `reserved`. Keep the TTL only as a safety cleanup afterwards.
+- [ ] `services/stock.js` (§4.1) is the only writer:
+  - `reserve`, `commit`, `release`, `receive(po)`, `adjust`, `countSet`, `transfer`
+  - each one is a conditional `updateOne` on `stock_levels`, plus a movement insert, plus `productSummary.refresh`, inside one `withTx`
+- [ ] **Cost:** `purchase_receive` stores `unit_cost_minor`, so you can keep a weighted-average `avg_cost_minor` on `stock_levels`. Each sale posts `cogs Dr / inventory Cr` to the ledger, which gives real profit per product and per day.
+- [ ] *(P3, optional)* **`stock_lots`** `{storeId, variant_id, lot_no, expiry_date, qty}` for perishable products (`Product.isPerishable`/`expiryDuration` exist today with no lot tracking). This allows first-expiry-first-out picking and expiry alerts.
+- [ ] A nightly reconciliation job: Σ`qty_delta` per variant = `stock_levels.on_hand`, with an alert on drift.
+- [ ] Backfill: create `stock_levels` from the current `Variant.quantity`, and move `StockHistory` rows into `stock_movements` (`kind` from `adjustment_type`), plus one `opening_balance` movement per variant so the reconciliation starts at zero drift.
+
+### 3.10 Shared reference collections: store a value once, reference it everywhere (P2)
+The same values are copied into thousands of documents today. Each item below says what is duplicated, where, and what replaces it.
+
+- [ ] **Attribute templates.** `scripts/seedAttributes.js` copies **67 attributes with their values into every new store** (`models/Store.js:134`, `migrateAttributesPerStore.js`). At 100 stores that is 6,700 attribute documents, each sent to LibreTranslate separately.
+  - New platform collection `attribute_templates` (no `storeId`, translated **once**), plus `store_attributes { storeId, template_id?, name?, values_override?, custom_values[], is_active }`.
+  - A store stores only what it changes or adds. Reads merge template and override (cached per store).
+- [ ] **Translation memory.**
+  - The problem: identical strings ("Red", "Cotton", "Small", common category names, attribute labels) are machine-translated again for every store and every document.
+  - New platform collection `translation_memory { source_hash, source_lang, target_lang, text, engine, created_at }`, with unique `{source_hash, target_lang}`.
+  - `translationService` checks it before calling LibreTranslate and writes to it after. This cuts translation load and queue time across all stores.
+- [ ] **Roles instead of 29 booleans per employee.** Every Employee document carries the full `permissions` object (`models/Employee.js:38-68`).
+  - New `roles { storeId, name, permissions:{...}, is_system }`, seeded per store with Admin, Manager, Cashier and Staff.
+  - `Employee.role_id` plus an optional, small `permission_overrides`.
+  - Auth caches the role (§5.4), and editing a role changes every member at once.
+  - Also merge the `order`/`orders` duplicate key here.
+- [ ] **Document templates.** `pdf_design` (Mixed), `terms` and `bank_details` are copied from the request body into **every** invoice and quote (`invoiceController.js:184-187`, `quoteController.js:99-101`). The store also keeps `quote_terms_conditions`, `invoice_terms_conditions` and their translations in the Store document.
+  - New `document_templates { storeId, kind: "invoice"|"quote"|"receipt"|"po", name, pdf_design, terms, bank_details, version, is_default }`.
+  - Invoice and Quote store `template_id` plus `template_version`, and only a frozen copy of the **terms text** (that is legally part of the document). The `pdf_design` copy per document is removed.
+- [ ] **Payment methods: one list instead of 4 different enums.** Today:
+  - Order uses `cod|bank|card`
+  - PosSale uses `cash|card|mobile_wallet|bank_transfer`
+  - Invoice uses `Cash|Bank|Card|Other`
+  - refunds use `Cash Refund|Balance Adjustment`
+
+  The fix:
+  - `config/paymentMethods.js` with codes `cash|card|bank_transfer|mobile_wallet|cod|store_credit|other`.
+  - Per store, `store_payment_methods { storeId, code, label, enabled, ledger_account }` maps each method to its ledger account (§3.9).
+  - A migration normalizes the existing values.
+- [ ] **Tax classes.** Today a raw `tax` number sits on every product (`Product.js:73`), plus `Store.tax_rate`.
+  - New `tax_classes { storeId, name, rate_bp (basis points), inclusive }`.
+  - `Product.tax_class_id` (default = the store default class).
+  - Orders and invoices snapshot the rate used.
+- [ ] **Geography as ISO codes.** Today `Address.country` defaults to `"Pakistan"`, `Order.address_snapshot.country` to `"Pakistan"`, and `Store.country` to `"PK"`.
+  - Store `country_code` (ISO 3166-1) and `state_code`, and render names from the frontend's `country-state-city` data.
+  - Snapshots keep both the code and the display name.
+- [ ] **Units, statuses and enums** as shared constants (`config/units.js`, `config/statuses.js`), not copy-pasted string arrays. Today `["days","months","years"]` appears in Product, Variant and PurchaseOrder, and order statuses are duplicated in controllers.
+  - Add an **allowed-transitions map** for orders, POs and invoices (`pending→confirmed→processing→shipped→delivered`, `*→cancelled`), so the "status" update endpoints cannot jump states.
+- [ ] **Media library.** The image sub-schema (`img_url`, `img_size`, `mimeType`, `width`, `height`) is defined separately in Variant, brand, Review, SellerApplication and Store, and the same picture uploaded for several variants is stored as several files.
+  - New `media { storeId, kind, url, size, mime, width, height, sha256, ref_count, created_by, at }` with unique `{storeId, sha256}`, so identical uploads are deduplicated.
+  - Documents store `media_ids`, or `{media_id, url}` for render speed.
+  - Files are deleted only when `ref_count` reaches 0, which fixes the "files deleted before the DB write" bugs (§5.6).
+- [ ] **Split the Store document by how often it is read.** Today one document holds routing data, settings, SEO, social links, 5 long legal texts with translations, and the activity log, and it is loaded and cached on every request (`resolveStore`).
+  - `stores` (slim, cached per request): identity, subdomain/domain, status, plan, currency, timezone.
+  - `store_settings` (read by admin/checkout): tax, units, locale, social, SEO, contact.
+  - `store_content` (read on demand, cached): return/privacy/terms policies and their translations.
+  - `Store.activity` moves to `audit_events` (§3.5).
+- [ ] **Shipping methods by reference.** `Order.shipping_method` is a free string. Store `shipping_method_id` plus a snapshot `{code, name, price_minor}`.
+- [ ] **Shared sub-schemas and plugins** in `models/shared/`:
+  - `imageSchema`, `addressSchema`, `moneyFields`
+  - an `auditRefs` plugin (`createdby/updatedby/deletedby`, `ref:"Employee"`)
+  - a `softDelete` plugin (§3.7)
+  - a **`translatable(schema, ["name","description"])` plugin**. The `translations` / `translation_source` / `translation_status` trio is hand-written in about 15 models today.
+- [ ] **How these are linked and read (the relational part):**
+  - Every reference is an indexed `ObjectId` (or a stable `code` for platform constants).
+  - Per-request reads use the **cached** reference data (roles, tax classes, payment methods, templates, attribute templates) from Redis or an in-process LRU, invalidated on write (§6.1).
+  - Lists resolve names with one batched `$in` (`hydrate`, §1).
+  - `$lookup` is used only in admin reports and background jobs, never in the storefront hot path.
 
 ---
 
@@ -346,12 +524,12 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
 
 ### 4.1 Stock: one service, atomic writes (P1)
 Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS sale/edit/return, invoice create/edit/return, PO delivery, manual adjust, product/variant update). Most do read → check → set → save, so **concurrent orders oversell**. The order flow decrements before `Order.create` and never rolls back (`orderController.js:312,356,434`), and order flows write no StockHistory.
-- [ ] `services/stock.js`:
-  - `reserve(items, session)` = `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`, failing on the first miss
-  - `release(items, session)`
-  - `set(variantId, qty, reason, session)`
+- [ ] `services/stock.js`, built on `stock_levels`, `stock_movements` and `stock_reservations` (§3.9):
+  - `reserve(items, session)` = `updateOne({storeId, variant_id, location_id, $expr: {$gte: [{$subtract: ["$on_hand","$reserved"]}, n]}}, {$inc: {reserved: n}})`, failing on the first miss
+  - `commit`, `release`, `receive`, `adjust`, `countSet`
 
-  Every call writes a `StockHistory` row and calls `productSummary.refresh` in the **same transaction**.
+  Every call writes a `stock_movements` row with an idempotency key and calls `productSummary.refresh` in the **same `withTx` transaction** (§3.1).
+  - *Before §3.9 lands*, the quick fix on the current model is `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`.
 - [ ] Replace every direct `quantity` write in controllers, including `updateVariant`/`updateProduct` (`variantController.js:170-177`, `productController.js:1860,2137`), which overwrite quantity with no history.
 - [ ] Order cancel and delete: use a conditional status transition, `findOneAndUpdate({_id, status: {$ne: "cancelled"}}, ...)`, so two concurrent cancels cannot restore stock twice (`orderController.js:1016-1048,1183-1198`).
 - [ ] PO delivery: do the status transition plus stock in one transaction, so it is idempotent (`purchaseOrderController.js:411-482`).
@@ -376,7 +554,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 ### 4.3 Dashboard, finance and stats (P3)
 - [ ] Dashboard: `Order.find({})`, `Product.find({})`, `Discount.find({})` and `Brand.find({})` load **whole collections** to show 10 recent activities (`dashboardController.js:271-276`). Read them from `audit_events` with `{storeId, at:-1}` and `limit 10`.
 - [ ] Dashboard: about 20 aggregations per load (`:97-253`). Read `store_daily_stats` for the range, and cache for 60s in Redis by `{storeId, range}`.
-- [ ] Finance overview loads **5 entire collections** (with items, activity, returns and payments) and then filters, searches and pages in JS. It also runs `purchaseOrders.find` inside the payments loop, which is O(P×PO) (`financeController.js:96-274`). Replace this with a `ledger_entries {storeId, at, type, refType, refId, amount, method}` collection written by order, POS, invoice and PO payments, queried with an indexed `$match` on a date range. The sort parameter is currently ignored.
+- [ ] Finance overview loads **5 entire collections** (with items, activity, returns and payments) and then filters, searches and pages in JS. It also runs `purchaseOrders.find` inside the payments loop, which is O(P×PO) (`financeController.js:96-274`). Replace this with reads from `ledger_entries`/`account_balances`/`payments` (§3.9), using an indexed `$match` on a `{storeId, at}` range. The sort parameter is currently ignored.
 - [ ] Super-admin dashboard and `listUsers`: read cached platform stats instead of running platform-wide `countDocuments` and unanchored regex on every request (`superAdminController.js:177-209,1052-1066`). `activityFeed` runs 6 queries on an unindexed `actor.id` (`:1693`).
 - [ ] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`.
 
@@ -622,19 +800,281 @@ backend/
 
 ---
 
-## 9. Suggested order (sprints)
+## 9. Frontend (Next.js 16): security, data contracts, speed
+
+Read `frontend/node_modules/next/dist/docs/` before any Next-specific change (Next 16 differs from older versions: middleware is `src/proxy.js`, plus the caching APIs and headers config).
+
+### 9.1 Security (P0/P1)
+What is already good and should be kept:
+- Auth is httpOnly cookies only; no tokens are in localStorage, Redux or Zustand.
+- The store-editor `postMessage` listeners check `origin` and `source` (`store-editor/components/PreviewFrame.js:190`, `storefront/ThemeProvider.js:142`).
+- Theme links and CSS values are allowlisted (`storefront/themeLinks.js`, `themeCss.js:83`).
+- No secret is `NEXT_PUBLIC_*`.
+
+- [ ] **P0 Raw SVG store logo is stored XSS that crosses stores.**
+  - The admin accepts `image/svg+xml` (`app/admin/store-info/page.js:712,1112`), and the backend writes the raw buffer (`backend/utils/socket.js:78-83`).
+  - `/uploads` is served by plain `express.static` on **every** API host (`backend/server.js:180`). A seller's SVG therefore runs script on another store's API origin, or on the platform API origin, where host-only `a_at`/`sa_at` cookies are sent.
+  - Fix:
+    - remove SVG from both lists
+    - re-encode the logo through sharp (§2.4)
+    - serve `/uploads` with `Content-Security-Policy: default-src 'none'; sandbox`, `X-Content-Type-Options: nosniff`, and `Content-Disposition: attachment` for anything that is not a raster image
+    - delete or convert the existing `.svg` files under `uploads/`
+  - `app/admin/deals/page.js:1229` also accepts `image/*`.
+- [ ] **P0 Tenant spoofing through the proxy matcher.**
+  - The matcher skips any path ending in `.svg|png|jpg|jpeg|gif|webp` (`src/proxy.js:133`), so for `/product/abc.png` the proxy does not run and the **client's own `x-store-host` header** reaches server components.
+  - `lib/serverStore.js:33-40` and `app/(user)/page.js:23-28` forward that header **together with `INTERNAL_PROXY_SECRET`**, so the backend serves store B's data under host A. That is content spoofing and cache poisoning, and it also skips the `storeExists` and `/admin` cookie checks.
+  - Fix:
+    - in server code, derive the tenant from `headers().get("host")` with `parseTenantHost`, never from `x-store-host`
+    - narrow the matcher to `_next/static|_next/image|favicon.ico` plus real `public/` paths
+    - in the proxy, always delete incoming `x-store-subdomain` and `x-internal-proxy-secret`
+    - add `import "server-only"` to `lib/serverStore.js`
+- [ ] **P1 Security headers: there are none** (no `headers()` in `next.config.mjs`, none in the proxy).
+  - Add `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=(self)` (the map section uses geolocation), and HSTS in production.
+  - Add `frame-ancestors 'none'` on `/admin/:path*` and `/super-admin/:path*` (POS actions and approvals can be clickjacked today), and `'self'` on storefront paths (the store-editor preview iframe is same-origin).
+  - CSP with a per-request nonce generated in `proxy.js` (the Next docs guide `content-security-policy.md`). The inline `beforeInteractive` theme scripts (`app/layout.js:37-46`) need the nonce.
+  - Allow Google GSI, Google fonts, OSM tiles, and the API/socket origin in `connect-src`/`img-src`.
+- [ ] **P1 Sanitize HTML during SSR too.**
+  - `storefront/sections/GenericSections.js:30` and `storefront/product/ProductBlocks.js:139` return **raw HTML when `typeof window === "undefined"`**, so server-rendered output is unsanitized.
+  - `app/(user)/pages/[slug]/page.js:48` never sanitizes.
+  - Today only the backend `sanitizeRichText` protects them. Use `isomorphic-dompurify` (one `sanitizeHtml()` helper) on server and client, with `FORBID_ATTR: ["style"]`.
+  - In `lib/termsContent.js:55-62`, drop `style` and remote `img` (they allow UI redressing and tracking pixels). The `"ul[data-type]"` entry is not a valid tag.
+- [ ] **P1 CSRF between stores.** Every `<store>.<root>` is the *same site*, so `SameSite=Lax` gives no protection between stores (`backend/utils/tokens.js:125-129` can even be switched to `none` by env).
+  - The backend should reject state-changing requests without `Content-Type: application/json` or the custom `X-Auth-Aud` header (which the frontend already sends), use a strict per-origin CORS allowlist, and never allow `SameSite=None`.
+- [ ] **P1 Login CSRF in the admin handoff.** `app/admin-handoff/page.js:20-29` exchanges any `#token=` without confirmation, so an attacker's link logs the victim into the attacker's store.
+  - Bind the token to a nonce cookie set on the platform host when the handoff was requested, or show "Continue as X to store Y?" first.
+- [ ] **P2 Unbounded `storeCache` in the proxy.** `src/proxy.js:34-52` caches by any Host header, and each unknown host triggers a backend `/store/resolve` call. One transient 5xx is cached as "not found" for 60s.
+  - Use an LRU capped at a few thousand entries, cache only `res.ok`, use a short TTL for negatives, and have nginx reject unknown hosts.
+- [ ] **P2 Validate the remaining user-controlled links** with the `resolveThemeLink` rules (React 19 blocks `javascript:`, but don't rely on that alone): banner `button.link` (`components/user/BannerSlider.js:483`) and footer social `url` (`components/user/Footer.js:334`).
+- [ ] **P2 Client-side storage hygiene:**
+  - the guest chat token in localStorage (`components/chat/SupportChatWidget.js:28,325`) needs a short TTL
+  - the POS held carts (`app/admin/pos/page.js:297-304`) and the quote template draft (`components/admin/QuoteTemplateDesigner.js:228,533`) must be cleared on logout (shared POS machines)
+- [ ] **P2 Error messages:** about 73 places toast the raw backend `err.response.data.message`. Map them through one `toUserMessage(err)` that uses the backend `code` (§5.2).
+- [ ] **P3 Route guards:** the proxy only checks that admin cookies exist (`src/proxy.js:97-100`), and `/super-admin` has no proxy check. The client shells do wait for `me()` before rendering, so there is no data flash. Add a `sa_sess` presence redirect in the proxy for consistency. Permission checks stay server-side (§5.4).
+- [ ] **P3 Dependencies:** `html2canvas@1.4.1` and `react-phone-input-2@2.15.1` are unmaintained. Run `npm audit` in CI, and plan replacements (§9.4).
+
+### 9.2 Send only what the page renders: storefront data contracts (P0/P1)
+**Rule:** every endpoint returns a named **DTO** built by an explicit projection, never a whole Mongoose document. The DTOs live in `backend/dto/*.js`, one function per shape (`toProductTile(doc, locale)`), with a contract test that fails if a field outside the whitelist appears.
+
+Translations are **sliced to the active locale on the server**: send `name` already localized, or `{name, nameLocal}`, never `translations.*` maps for every locale and never `translation_source`/`translation_status`. `storeId`, `__v`, audit refs and timestamps are left out unless the page shows them.
+
+**P0: sensitive data reaching public storefront responses** (in addition to §2.1):
+- [ ] `GET /products/:id` returns:
+  - `purchaseOrderHistory[]`, with `cost_price`, `sell_price`, `po_number`, `invoice_no` and `received_by_name` (`productController.js:1518-1555,1625`)
+  - raw variants with `cost_price`
+  - staff `createdby`/`updatedby` `{name,email}` (`:1490-1513`)
+
+  It also runs 3 extra DB queries and **writes Tags** on a public GET (`:1563-1596`). Move the document history to an admin-only endpoint.
+- [ ] `GET /products` (every mode) returns full Variant docs (`cost_price`, `min_qnt/max_qnt/topup`, audit ids). Without `slim=1` it also returns staff name and email.
+  - The non-slim callers are the Header search (`components/user/Header.js:393`), `BundleCard.js:83`, `app/(user)/brand/[id]/page.js:86`, related products (`product/[id]/page.js:119`) and `search/page.js:36`.
+  - Public reads also have **no `status:"active"` filter** (`buildProductFilter`, `productController.js:261-283`), and `getProductById` does not check status.
+- [ ] `GET /users/profile` (customer) runs `.populate("storeId")`, which sends the **whole Store document including `domainVerifyToken`**, `activity[]` and `planId` (`userController.js:668-670`). It also sends `google_id`, `provider` and `status`.
+- [ ] `GET /store/public` sends `activity[]`, `planId`, `logo.public_id`, quote/invoice terms and their translations, and `__v` (`storeController.js:169-181`).
+- [ ] `GET /deals/active/:id` returns the full Deal (`createdBy`, `usageLimit`, `usedCount`, `perUserLimit`), full products and variants (`cost_price`), and has **no active/date check**, so expired deals can be read by id (`dealController.js:673-756`).
+- [ ] `GET /discounts/public` sends every active discount's `code`, `usageLimit`, `perUserLimit` and `minOrderValue` (`discountController.js:837-848`). Send only what the badge shows, and validate codes at checkout.
+- [ ] `GET /reviews/product/:id` sends `storeResponse.responded_by_name` and other customers' `user_id` (`reviewController.js:131-137`).
+- [ ] Socket `productCreated`/`productUpdated` events carry full variants (`cost_price`) and staff emails to every storefront visitor (`productController.js:1893-1905,2336-2350`). Socket events should carry **`{ _id, changed: true }` only** and let the client refetch its own DTO. Today `useUserSocketSync.js:86-89` also *replaces* the detail cache with that partial payload, so after any admin edit the product page loses its description, category and brand.
+
+**DTOs to build (P1):**
+
+| DTO | Fields | Used by | Today |
+|---|---|---|---|
+| `ProductTile` | `_id, name, category_id, brand:{_id,name}, price, compareAt?, totalStock, image, variantCount, rating?, singleVariant?:{_id,sku,price,qty,image}` | shop, filtering, home grids, brand rows, carousels, search, related, wishlist page, bundles | full product + all-locale translations + every full variant: about **120–150 KB for 24 tiles vs about 8–10 KB needed** (~15×) |
+| `ProductDetail` | `_id, name, description, short_description, category:{_id,name}, brand:{_id,name}, isPerishable, expiryDuration, expiryUnit, rating summary, variants:[{_id,sku,title,description,price,qty,attributes,images:[url]}]` | `/product/[id]` | 60–80% unused, plus PO history, audit data and ratings computed twice |
+| `VariantPicker` | `variants:[{_id,title,sku,price,qty,attributes,image}]` from `GET /products/:id/variants` | `VariantQuickBuyDrawer.js:120-235`, loaded **lazily when it opens** | every tile carries every variant |
+| `CategoryNav` / `CategoryTile` | `{_id,name,parent_category_id,sort_order}` / `{_id,name,image,count,fromPrice}` | header/nav, home tiles | spreads the whole category (`productController.js:1349,1413`; `/categories/public`) |
+| `BannerSlide` | `_id, position, desktopImage, tabletImage, mobileImage, eyebrow, heading, description, altText, primaryButton, secondaryButton` | `BannerSlider` | the `locale` param is ignored (`bannerController.js:234-258`), with `displayRules`, `createdby` and all locales |
+| `StorePublic` | `store_name, tagline, logo.url, phone, support_email, support_phone, address, city, country, social_links, currency, store_status, maintenance_message` (policies via a separate `/store/content/:kind`) | layout, header, footer | full Store |
+| `ProfileMe` | `_id, name, username, email, phone, dob, avatar, emailVerified, provider` | account and 9+ components | full user + populated store |
+| `OrderListItem` | `_id, order_number, status, total, created_at, payment.status, itemCount, items[0..2]:{name,image,qty,price}` | orders, account | full docs, unpaginated legacy mode |
+| `ReviewItem` | `_id, rating, title, comment, images[url], videos[url], verifiedPurchase, created_at, user:{name,avatar}, storeResponse:{message,responded_at}` | product reviews | all ratings loaded into Node for the summary (`reviewController.js:140`) |
+| `DealCard` / `BundleCard` | the deal/bundle fields shown **plus resolved product tiles embedded**, paginated | `DealsSection`, `BundlesSection`, `/bundles` | `DealsSection.js:227` sends products twice (`productIds` with variants, plus `resolvedProducts`). The `images.img_url` populate is wasted because Product has no `images` field. **Each `BundleCard` makes its own `/products?ids=` request without slim (N+1, `BundleCard.js:80-86`).** |
+
+- [ ] Build `ProductTile` with one `Variant.aggregate` (`$group` for the first price, the first image and the stock sum), like `getAdminListVariantSummaries` (`productController.js:783-800`), or read the Product read-model fields directly once §3.4 lands.
+- [ ] **One endpoint, one shape.** Replace the `slim=1` flag and the legacy no-limit modes with dedicated endpoints (`/products/tiles`, `/products/:id`, `/products/:id/variants`), each always paginated where it is a list.
+
+**Duplicate and wasted requests (P1):**
+- [ ] **Storefront calls an admin endpoint.** `usePageTranslations` (imported from `hooks/admin/`) runs in `hooks/user/useHomeCatalog.js:73` and `app/(user)/brand/[id]/page.js:73`, and calls `POST /translations/page`, which is `requireAdmin` (`backend/routes/translationRoutes.js:7`).
+  - For `ur`/`ar` customers that is a 401, then **3 retries every 5s, and each retry invalidates `["brands"]`, so the list refetches up to 4× per page load**.
+  - Remove it from the storefront. The server returns localized text (above).
+- [ ] **Wishlist on every page:** `/users/wishlist` runs on every page (`WishlistContext.js:12-19`, no `staleTime`, and guests get a 401 every time), and it returns full products plus variants (`userController.js:1226-1259`). The provider needs only ids.
+  - Add `GET /users/wishlist/ids`, skip the call for guests, and send `ProductTile` only on `/wishlist`.
+- [ ] **The chat widget loads the whole order history even when closed:** `SupportChatWidget` is always mounted (`UserLayoutClient.js:184`) and fetches the **entire unpaginated `/orders/my`** plus conversations for every logged-in customer (`SupportChatWidget.js:166`). Gate both on `open`.
+- [ ] **Account page:** it fetches the full `/orders/my` only to count (`account/page.js:504-573`), while the embedded `OrdersView` fetches the paginated list again. Add `/orders/my/summary` (counts per status).
+  - MyReviews, the chats page and the order detail also fetch all orders or all `/reviews/my`. Fold `myReview` into `/reviews/product/:id` for the logged-in user.
+- [ ] **SSR data fetched twice:**
+  - `/store/public` is fetched in `generateMetadata` (`app/(user)/layout.js:15`) and again on the client (`UserLayoutClient.js:137`).
+  - The home banners are server-rendered, but `BannerSlider` uses `staleTime:0, refetchOnMount:"always"` (`BannerSlider.js:161-170`), so it refetches right after hydration. The SSR fetch also has no `type` filter.
+
+  Pass the SSR result as `initialData`, and set `staleTime` to 60s or more.
+- [ ] `/theme/public` serializes translations for **all locales** into every page's RSC payload (`themeController.js:64-81`). Slice them to the `lang` cookie on the server.
+- [ ] **Waterfalls on product detail:** `getById` → related products, and `/users/profile` → `/reviews/my` (`product/[id]/page.js:108-126,679-692`). Fetch them in parallel or server-render them.
+- [ ] Cart and checkout: the shipping-quote query key includes `Math.round(subtotal)` (`cart/page.js:245-262`, `checkout/page.js:761-767`), so **every quantity click POSTs a new quote**. Debounce it, and key by item ids plus method.
+- [ ] Header search: 400ms debounce, but it fires at 1 character and without slim (`Header.js:384-397`). Use a 2-character minimum, `limit 8` and `ProductTile`.
+- [ ] `["shopFacets","global"]` runs a full-catalog facet compute in Header and HomeNav on every page, only to sort the nav (`Header.js:352`, `HomeNav.js:231`). Ship `productCount` inside `CategoryNav` instead.
+- [ ] Dead code: `Showcase.js` (calls the whole-catalog `productApi.getAll`; not imported) and `dealApi.getActivePaginated` (the backend branch is broken, §2.5).
+
+**Rendering (P1):**
+
+| Data | Where |
+|---|---|
+| Store info, theme, category nav, brands, category tiles, home banners | RSC fetch in the layout or page (tenant from `Host`, §9.1), passed to client components as `initialData`. Cache with the backend ETag/`Cache-Control` per host |
+| Product detail | **Server-rendered** (SEO and LCP: the page is 100% client-fetched today), with `ProductDetail`. The client only refreshes stock |
+| Shop grids and facets | Client (filter-driven), `ProductTile`, `keepPreviousData` |
+| Wishlist ids, profile, orders, chat | Client, only when logged in, and lazily (the widget fetches when opened) |
+
+### 9.3 Send only what the page renders: admin and super-admin data contracts (P0/P1)
+**P0: socket events and admin responses that leak.** Every socket on a store host, including anonymous visitors, joins `store:<id>` (`utils/socket.js:444`), so each of these reaches the public. Fix them together with the admin/public room split (§2.1). An admin event carries `{ _id, changed_fields?, status? }`, and the admin client refetches its own DTO.
+- [ ] `employeeCreated`/`employeeUpdated`/`employeeStatusToggled` include the **password hash** (`employeeController.js:497-508,720-732,911-923`; `Employee.password` has no `select:false`). Add `select:false` to `password` in Employee, User and SuperAdmin.
+- [ ] `storeUpdated` sends the full Store (activity, `domainVerifyToken`) (`storeController.js:134`, `socket.js:664,690`). The public socket `getStoreInfo` returns the raw document (`socket.js:621`). `profileUpdated` with the populated store goes to the room (`socket.js:749`).
+- [ ] Order events send the raw Order with `address_snapshot` (name, phone, city) and `payment` (`orderController.js:14-18,495,1050,1153,1256`). The admin hook reads only `_id` (`hooks/admin/useOrderSocketSync.js:22-33`).
+- [ ] `vendorCreated` sends `bank_details.account_no` (`vendorController.js:95`). `bank_details` is also in both vendor list modes (`:48,108`); keep it on the detail page only.
+- [ ] Product events send variants with `cost_price` and staff emails (`productController.js:1898,2340`).
+- [ ] **Split the product endpoints:** `GET /products/admin/:id` (auth, current payload) and the public `GET /products/:id` (`ProductDetail`, §9.2). The admin edit page reuses the public endpoint today (`app/admin/products/[id]/page.js:1146`).
+- [ ] Lead detail embeds full PosSale, Quote and Invoice documents in `customer_history`, which no screen reads (`leadController.js:268-276`). Delete it.
+- [ ] The super-admin applications list sends `documents[]` (KYC), phone, address and rejection text (`superAdminController.js:276-281`). Whitelist `_id, name, email, store_name, business_category, city, country, logo, status, created_at`.
+- [ ] `GET /employees` has no permission check, so any staff member lists every employee's email and phone (§2.3).
+
+**P1: replace "load the whole collection into a dropdown" with search-as-you-type option endpoints.** Each option endpoint is `?search=&limit=20`, prefix match, indexed, and returns only label fields. React Query uses one key per option type.
+
+| Endpoint (new or existing) | Returns | Replaces |
+|---|---|---|
+| `/brands/admin/options` | `{_id, name}` (localized) | legacy `brandApi.getAll`, an **N+1: one `Product.find` per brand**, non-lean, deleted products included (`brandController.js:468-482`). It is called on products list/edit mount, in `ProductFormModal`, banners, deals, discounts and the store-editor `fields.js:93`. `brands/page.js:316` loads it only to compute the next code, although `/brands/next-code` exists |
+| `/categories/admin/options` (**already exists**, `categoryRoutes.js:135`) | `{_id, name, parent}` | `getCategories` with populated attributes, parents and creators (`categoryController.js:516-527`), in the same 7 places |
+| `/products/options` (or the existing `admin_list=1&admin_inventory=1`) | `{_id, name, price, image}` | legacy `/products`, which loads the whole catalog with every variant. `banners/page.js:858` loads it **on mount**. The store-editor `fields.js:105` calls `getPaginated` without `admin_list` on every keystroke, `fields.js:108` uses the heavy `getById` just for a label, and `store-editor/page.js:229` fetches a full document to get one `_id` |
+| `/variants/picker` | `{_id, sku, title, selling_price, quantity, product:{_id,name}, image}` | `/variants` (no `is_deleted` filter, no `.lean()`, `cost_price`, all translations, populated creators, `variantController.js:116-127`) plus the legacy `stockApi.getAll()` in `quotes/new:276`, `invoices/new:72`, `QuoteTemplateDesigner.js:390` and `purchase-orders/new:161`. `quotes/[id]/page.js:31` loads all variants for names that `getQuote` already populates, so delete that query |
+| `/customers/search` (**exists**, limit 20) | `{_id, name, phone, email, address}` | `customerApi.getAll({limit:500})`. The backend ignores `limit` without `page` and returns **every customer** (`customerController.js:38-43`), after running `syncLeadCustomer` for every converted lead (writes on a GET) |
+| `/vendors/options`, `/employees/options`, `/plans/options` | `{_id, name, code?}` / `{_id, name, role}` / `{_id, name, status}` | full vendors with bank details (PO pages), full employees with email/phone/avatar (lead dropdowns), all plans (`StoreFormDialog.js:34`) |
+
+**P1: move filtering, sorting and paging into MongoDB:**
+- [ ] POS products: `posController.js:38-146` loads all products and variants, then filters, sorts and pages in JS, with an undebounced search (`pos/page.js:795`). Project `{_id, sku, title, selling_price, quantity, min_qnt, image}` with `limit 20`, and serve category/brand facets from a separate cached endpoint.
+- [ ] Finance: `/finance/transactions?from&to&type&page` returns the list DTO `{id, kind, category, reference, title, counterparty, amount, date, method, status}`, with `/finance/transactions/:id` for the detail (reads §3.9 `ledger_entries`/`payments`).
+- [ ] Dashboard: the activity panel (§4.3), and `recentOrders` gets a `select` (`dashboardController.js:253`).
+
+**P1: detail endpoints that ship unbounded history:**
+
+| Endpoint | Fix |
+|---|---|
+| `GET /customers/:id` (`customerController.js:107-131`, also `posController.js:688`) returns **every** PosSale, Quote and Invoice in full (items, `pdf_design`, payments, returns, edit_history). The quote and invoice "new" pages use it only to prefill | customer plus counts, then paginated `/customers/:id/sales`, `/quotes` and `/invoices` rows `{number, date, method, total, status}` |
+| `GET /vendors/:id/details` returns 100 POs with full `activity`, and then the page makes **10 `purchaseOrderApi.getById` calls** for payments that the backend already loaded (`vendors/[id]:109-118`, `vendorController.js:212`) | return a slim `payments[]` and remove the N+1 |
+| SA `getStore` / `getStoreAdmin` return 100 activity entries; 20 are rendered (`superAdminController.js:734,1146,1198`) | field projection plus paginated `audit_events` (§3.5) |
+| SA `listTeam`/`getTeamMember` put `activities.slice(0,100)` on every list row (never rendered), and the detail page and `ActivityFeed` both **poll every 60s** with 6 queries each (`team/[id]:24`, `ActivityFeed.js:52`) | drop activities from list rows; one feed with no polling (use socket push) |
+| `GET /theme` returns both `draft` and `published`; publish, restore and preview echo both, and `saveDraft` echoes the draft (`themeController.js:39-53,127,181-355`) | draft plus meta; `saveDraft` returns `{draftRevision}` only |
+
+**P1: trim list endpoints:**
+- [ ] Leads: no `select` (`leadController.js:203`), so `activities` and `history` are read and deleted in JS, and the translation internals still go out. `getLead` re-syncs on every GET (§3.6).
+- [ ] PO list populates vendor phone, email, address and every translation (`purchaseOrderController.js:218`). The page uses the name, `vendor_code` and the localized name.
+- [ ] POS sales list ships every item with populated translations and images (the UI previews 4), and reads the full `edit_history` to take the last entry (`posController.js:195-221`). The overview card calls `getSales({limit:1})` for a single counter; add `/pos/summary`.
+- [ ] Quotes list returns translations for every locale (`quoteController.js:129,143`); invoices already slice them. The invoice list sends `translation_source/status` (`invoiceController.js:225`).
+- [ ] SA `listStores` has no `.select` (`superAdminController.js:667`).
+- [ ] Already lean (keep as the reference pattern): products `admin_list`, stock paginated, customers, employees, orders paginated, discount and deal lists, SA users, chat.
+
+**P2: socket invalidation storms and refetch triggers:**
+- [ ] `useProductSocketSync.js:125-135` prefix-invalidates `["brands"]` (the N+1), every `["products"]` key and every `["product",*]` detail **on each event**. `variantController.js:93,230,274` emits `productUpdated` per variant save, so saving a product with N variants triggers N full refetch waves in every open admin tab, and `useStockSocketSync.js:40-42` refetches stock on top.
+  - Patch the caches by id (`setQueryData`), and invalidate only `["product", id]` and the visible list page. Have the backend emit **one** event per save.
+- [ ] Chat: one message emits 3 events and `markRead` emits 2 (`chatController.js:405-425`). Each reruns the list and `chat-counts` (4 separate `listAdmin` calls, `chats/page.js:43-64`), which adds up to **about 15 requests per incoming message**. `ChatThread.js:215-226` also refetches the page, although the payload contains the message.
+  - Use `setQueryData` from the payload, one `/chat/admin/counts` aggregate, and debounced search with limits.
+- [ ] Dashboard: about 20 event types trigger a full stats recompute (`dashboard/page.js:131-137,1062-1068`). Debounce the invalidation to about 5s and read the precomputed stats (§3.4).
+- [ ] `staleTime: 0` overrides the 60s global default (`app/providers.js:17`) in `categories/page.js:357` and `attributes/page.js:520,619`. Remove these.
+- [ ] Debounce search (300ms, at least 2 characters) in POS products/customers/history (`pos/page.js:482,795,930`), finance (`finance/page.js:315`) and chat.
+- [ ] Unify duplicate query keys for the same data (`["admin-products"]`/`["deal-products"]`/`["discount-products"]`, and 4 category keys). Use one key factory in `src/lib/queryKeys.js`.
+- [ ] Store logo upload sends base64 over the socket (`socket.js:645`). Move it to multipart HTTP (§5.6).
+
+### 9.4 Speed and maintainability (P1/P2)
+Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gzipped** of JS, and the storefront order detail page is **9,460 KB / 2,538 KB gz**.
+
+**P1, biggest wins:**
+- [ ] **The order detail page ships 2.5 MB gzipped** because `app/(user)/orders/[id]/page.js:15` statically imports `{Country, State, City}` from `country-state-city` (`city.json` alone is 8 MB). The same static import is in `admin/store-info/page.js:48`, `components/admin/VendorFormModal.js:5`, `admin/purchase-orders/new` and `admin/vendors/*`.
+  - Read-only pages render the stored name (§3.10 stores code plus name).
+  - Forms use `import()`, as `landing/signup:282` already does, or a backend `/geo/:country/states` endpoint.
+- [ ] **Every storefront page load fetches everything twice.** `hooks/user/useUserSocketSync.js:58-60` runs `onReconnect` on the **first** `connect` too, and it invalidates 17 key families (categories, products, brands, deals, discounts, banners, facets, store and more). Item-level events invalidate the whole `["products"]` prefix, so one admin edit makes every connected shopper refetch every list. Polling runs on top (`BannerSlider.js:169`, `DealsSection.js:126`, `DiscountContext.js:17,25`, `useHomeCatalog.js:87`).
+  - Invalidate only on a real `socket.io.on("reconnect")`.
+  - Use narrow keys by id (with the `{_id}` socket payloads from §9.2).
+  - Remove polling wherever the socket already covers it.
+- [ ] **Images are not optimized.** There is no `images` block in `next.config.mjs`, so `/_next/image` rejects the remote URLs that `utils/smartImageLoader.js` sends. Private hosts get `?w=&q=` appended, which the backend ignores, so the full-size file is served.
+  - Only 18 of 117 `<FallbackImage>` uses go through next/image (most of them `unoptimized`), plus 15 raw `<img>`.
+  - Add `images: { remotePatterns: [backend/CDN], qualities: [75] }`, and route product cards, banners and the product gallery through next/image with `sizes`.
+  - Replace the deprecated `priority` prop with `preload` / `fetchPriority="high"` on the LCP image (Next 16 `image.md:291`).
+  - Have the backend generate fixed widths (320/640/1080) at upload (§5.6), so the loader can request a real size.
+- [ ] **i18n sends admin strings to every shopper.**
+  - `i18n/translations.js:17` statically imports `en.json` (305 KB raw / 64 KB gz, about **25% of the home JS**), and roughly 223 KB of it is `admin.*`.
+  - The storefront root `LanguageProvider` (`app/layout.js:46`) gets no `initialLocale`, so ur/ar users see **an English flash plus an LTR→RTL layout shift**.
+
+  The fix:
+  - Split into `storefront.<lc>.json` and `admin.<lc>.json`. `en.json` stays the fallback; split it with a script so the CLAUDE.md rule "add every new key to en.json" maps to the right namespace.
+  - Read the `lang` cookie in `(user)/layout.js` and pass only the active namespace.
+  - Set `<html lang dir>` on the server.
+  - The admin layout already reads the cookie, but it inlines the whole dictionary (about 380 KB) into the HTML; serve the admin namespace as a cached static asset instead.
+- [ ] **Admin opens about 4 WebSocket connections per tab.** `AdminLayoutClient.js:84`, `Navbar.js:28`, `Sidebar.js:95` and `hooks/admin/useAdminSocket.js:96` each call `io()`. The getters reuse a socket only when it is `.connected`, so connects and reconnects create more sockets, and the old ones keep their listeners.
+  - Use **one** `getAdminSocket()` module singleton.
+  - Storefront: connect the socket only when it is needed (logged in, chat open, or a page with live stock), not for every anonymous visitor (`UserLayoutClient.js:117`).
+  - Load `SupportChatWidget` with `next/dynamic` on first open (`UserLayoutClient.js:19,184`). It currently imports `getAdminSocket`.
+- [ ] **Render-blocking fonts.** `app/layout.js:31-37` loads 4 Arabic and Urdu families × 4 weights on every page through a blocking stylesheet, and the "media trick" the comment describes is not there. Meanwhile `Inter` (`globals.css:308`) is never loaded.
+  - Use `next/font` (self-hosted, `display: swap`).
+  - Load the RTL families only when the locale is ar or ur.
+- [ ] **Cache server data per tenant.** `lib/serverStore.js` and `(user)/page.js` use `cache:"no-store"`, because the old cache was not keyed by host.
+  - Next 16 `'use cache'` keys on function arguments (`01-directives/use-cache.md:76-99`). Pass `storeHost` as an argument, add `cacheLife` and `cacheTag("store:<id>:theme")`, enable `cacheComponents`, and call `revalidateTag` from admin saves (through a small authenticated route handler the backend calls after writes).
+  - Hydrate React Query from that server data (`initialData`). Today `storeInfo` is fetched again in `UserLayoutClient.js:138`, `Header.js:332`, `Footer.js:152` and `product/[id]/page.js:694`, and `Header.js:338-353` fetches all categories, all brands and the global facets on every page.
+- [ ] **Proxy store lookup** (`proxy.js:16-34`). It is cached, but in an unbounded per-instance Map with no in-flight dedupe, so concurrent cold hits stampede `/store/resolve`. A backend hiccup rewrites a real store to `/store-not-found`.
+  - Use an LRU cap, a pending-promise map (single flight), and **stale-while-error** (serve the last known value). Also apply the §9.1 fixes.
+- [ ] **Server-render the storefront pages.** 107 of 136 `app/` files are `"use client"`. `product/[id]` (1,410 lines, data loaded after hydration, so LCP waits on a waterfall), `brand/[id]`, `brands`, `deals/[id]`, `bundles` and `search` should become Server Components that pass DTOs to small client islands (add to cart, variant picker, gallery). Home server-renders only the banners; `HomeClient.js` fetches the rest on the client.
+
+**P2, bundle and structure:**
+- [ ] Lazy-load the remaining heavy editors and charts with `next/dynamic`:
+  - [ ] `RichTextEditor` in `admin/terms-conditions/page.js:9` (the tiptap chunk is 430 KB)
+  - [ ] `QuoteTemplateDesigner` in invoices/quotes `new` and `[id]`
+  - [ ] recharts in `admin/dashboard:49` and the super-admin dashboard
+  - [ ] `ColorPicker` (`fields.js:30`, `ElementPanel.js:15`)
+  - [ ] `VariantForm`
+
+  jspdf, html2canvas, leaflet, the VisualEditor and the section registry are already lazy, which is good.
+- [ ] Use `libphonenumber-js/min` instead of `/max` (`AddressForm.js:7`): 84 KB vs 157 KB.
+- [ ] **Remove Redux.** It is one slice (`redux/slices/storeInfoSlice.js`) mirroring server data, loaded on every storefront page through `providers.js:6`. Use the React Query `storeInfo` key instead, and drop `@reduxjs/toolkit`, `react-redux` and the root Provider. Keep Zustand for the store editor only.
+- [ ] Remove unused dependencies: `react-select` and `next-themes` (no imports). Replace the 3 `react-icons` uses with lucide or inline SVG, and drop that package too.
+- [ ] One `src/lib/queryKeys.js` factory. There are about 150 distinct key heads today, and the store document alone is cached under 4 keys (`storeInfo`, `store`, `admin-store-info`, `store-public`), so invalidations miss some. `setQueryData(["products"], arr)` writes an orphan key (`useUserSocketSync.js:76`).
+- [ ] Axios: add a default `timeout` (for example 15s) to `axios.create`. Today only the refresh call has one, so a hung backend leaves spinners forever.
+- [ ] Split the giant files, starting with the most-edited ones:
+  - `admin/products/[id]/page.js` (3,816 lines, 38 `useState`, 7 queries): extract `VariantDetailsDrawer`, `ImageGalleryModal`, `AllAttributesModal` and `SearchableSelectField`
+  - `admin/employees/[id]` (2,384)
+  - `(user)/checkout` (2,279; desktop and mobile markup duplicated, `AddressForm` rendered twice)
+  - `admin/categories` (1,974), `admin/products` (1,951), `admin/store-info` (1,731), `admin/banners` (1,731)
+  - `CartContext.js` (911) and `Header.js` (902)
+- [ ] Shared UI: move the local helpers (`Spinner` defined 12×, `StatusBadge` 13×, `StatCard` 5×, `Avatar` 7×) into `components/ui`.
+- [ ] Global CSS: one 307 KB raw / 44 KB gz chunk on every page (`globals.css` plus `user.css` both imported in the root layout). Import `user.css` from the `(user)` layout only, and purge the unused rules.
+- [ ] `public/` is 19 MB:
+  - `public/banners/*.png` (9.8 MB) is not referenced in `src`. Confirm the backend seeds don't use it, then delete it.
+  - `landing/hero-bg.mp4` is 4.7 MB; compress it, and add a poster image.
+  - Convert the 1.7–1.8 MB PNG backgrounds to AVIF/WebP.
+  - Add immutable `Cache-Control` for hashed and static media through `headers()`.
+- [ ] `next.config.mjs`: add `poweredByHeader: false`, the `images` block, `cacheComponents`, and `headers()` (§9.1). Make `@next/next/no-img-element` an ESLint error.
+- [ ] Delete dead files (never imported):
+  - `hooks/useEmployeeSocket.js` (919 lines)
+  - `hooks/useSocket.js` (174)
+  - `components/user/Showcase.js` (360), `BrandSection.js` (111), `TrustBar.js` (95), `CategoryBar.js` (87), `BundlesSection.js` (68)
+  - `components/superadmin/PlanModulesPanel.js` (173), `Topbar.js` (115), `ui/index.js` (15)
+  - `components/admin/CalculationSummaryCard.js` (41)
+  - the stale react-select comment block at `admin/store-info/page.js:202`
+
+**Frontend performance budget (enforce in CI with `next build` output and Lighthouse CI):**
+- [ ] Storefront route JS at most **150 KB gzipped** (home today: 259 KB; order detail: 2,538 KB).
+- [ ] Storefront LCP under 2.5s and CLS under 0.1 on mobile 4G (no locale/RTL shift).
+- [ ] Each storefront page makes at most **4 API requests** on first load, with no request repeated within `staleTime`.
+- [ ] No API response on a storefront page over **50 KB**, and no field outside the page's DTO (contract tests, §9.2).
+
+## 10. Suggested order (sprints)
 
 | # | Sprint | Contents |
 |---|---|---|
-| 1 | **Safety net + P0** | pino logger, `app.js` split, supertest plus memory-server setup, permission matrix test; every §2 item |
-| 2 | **DB foundation** | replica set, `config/db.js` options, counters (§3.2), `is_deleted` backfills, Variant.is_deleted, Address.storeId, the index rebuild (§3.3) with `explain()` before and after |
-| 3 | **Integrity** | `services/stock.js`, `services/pricing.js`, transactional `placeOrder` with idempotency, POS/invoice/PO in transactions, atomic payments and OTP |
-| 4 | **Read models** | Product summary fields, `audit_events` migration, `store_daily_stats`, `ledger_entries`, rewrites of dashboard, finance and facets |
-| 5 | **Architecture** | central error handler, zod validation, `requirePermission`, auth service merge, image upload factory, thin controllers for product, order, user and superAdmin |
-| 6 | **Scale** | Redis cache and store cache, Socket.IO adapter, admin/public rooms, BullMQ (translation, email, audit), scheduler lock, object storage |
-| 7 | **People model + cleanup** | Customer↔User link, Lead↔Customer ref, SellerApplication trim, stop translating names, avatars to files, timestamp/ref conventions, dead code, shared helpers, API naming |
+| 1 | **Safety net + P0** | pino logger, `app.js` split, supertest plus `MongoMemoryReplSet` setup, permission matrix test; every §2 item; frontend P0 (§9.1 SVG + proxy spoofing; the §9.2/§9.3 P0 leaks: product detail, profile populate, socket payloads + admin/public rooms, password `select:false`) |
+| 2 | **DB foundation** | replica set wired in code (`?replicaSet=rs0`, `withTx`, delete the `supportsTx`/manual rollbacks, §3.1), `config/db.js` options, counters (§3.2), `is_deleted` backfills, Variant.is_deleted, Address.storeId, the index rebuild (§3.3) with `explain()` before and after |
+| 3 | **Money and stock ledger** | `utils/money.js` + `*_minor` migration, `payments`, `returns`, `ledger_entries`, `account_balances`, `stock_levels`, `stock_movements`, `stock_reservations` (§3.9); `services/stock.js`, `services/pricing.js`, transactional `placeOrder` with idempotency, POS/invoice/PO in transactions, reconciliation jobs |
+| 4 | **Shared reference data + read models** | `roles`, `payment methods`, `tax_classes`, `document_templates`, `attribute_templates`, `translation_memory`, `media`, Store split (§3.10); Product summary fields, `audit_events` migration, `store_daily_stats`; rewrites of dashboard, finance and facets |
+| 5 | **API contracts** | backend `dto/` + contract tests; storefront DTOs (§9.2) and admin option/picker endpoints (§9.3); locale-sliced translations; socket `{_id}` payloads; split admin vs public product detail; remove legacy no-limit modes |
+| 6 | **Frontend speed** | geo import, socket connect storm + polling, images config, i18n split + server locale, single admin socket, fonts, `'use cache'` per host + hydration, server-rendered product/brand/deal pages, remove Redux, lazy editors/charts, security headers + CSP (§9.1, §9.4) |
+| 7 | **Architecture** | central error handler, zod validation, `requirePermission`, auth service merge, image upload factory, thin controllers for product, order, user and superAdmin |
+| 8 | **Scale** | Redis cache and store cache, Socket.IO adapter, BullMQ (translation, email, audit), scheduler lock, object storage, change streams |
+| 9 | **People model + cleanup** | Customer↔User link, Lead↔Customer ref, SellerApplication trim, stop translating names, avatars to files, timestamp/ref conventions, dead code (backend and frontend), shared helpers, giant-file splits, API naming |
 
-## 10. Definition of done (targets)
+## 11. Definition of done (targets)
 
 - [ ] Every hot query in §3.3 shows `IXSCAN` with no in-memory `SORT` in `explain()`.
 - [ ] No endpoint reads more than `limit` documents from a collection that grows with traffic (no full-collection `find` in any request path).
@@ -643,3 +1083,7 @@ backend/
 - [ ] The permission matrix and cross-store isolation tests pass in CI.
 - [ ] Two backend instances behind a load balancer: chat, admin sync, cache invalidation and schedulers all behave correctly.
 - [ ] No `res.status(500)` in controllers, and every error is logged with `reqId` and `storeId`.
+- [ ] Every money and stock change is a row in `payments`/`ledger_entries`/`stock_movements`; the nightly reconciliation reports zero drift; no float money fields remain.
+- [ ] The app refuses to boot unless MongoDB is a replica set; no manual-rollback code remains.
+- [ ] No storefront or socket response contains `cost_price`, staff emails, password hashes, `activity` logs, `domainVerifyToken`, bank details or another customer's data (contract tests).
+- [ ] Frontend meets the §9.4 performance budget, and securityheaders.com grades the admin and storefront A.
