@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 const Vendor = require("../models/Vendor");
@@ -85,14 +86,12 @@ const PO_SORT_FIELDS = {
   created: "created_at",
 };
 
-const generateNextPONumber = async () => {
-  const pos = await PurchaseOrder.find({ po_number: { $regex: /^PO-\d+$/ } }).select("po_number").lean();
-  let max = 0;
-  for (const p of pos) { const n = parseInt(String(p.po_number).split("-")[1], 10); if (Number.isFinite(n) && n > max) max = n; }
-  return `PO-${String(max + 1).padStart(5, "0")}`;
-};
+// Atomic counter; preview (next-code endpoint) number consume nahi karta
+const poSeed = () => maxNumericSuffix(PurchaseOrder, "po_number", /^PO-d+$/);
+const generateNextPONumber = async () => formatNumber("PO-", await nextSeq("purchase_order", { seed: poSeed }), 5);
+const previewNextPONumber = async () => formatNumber("PO-", await peekSeq("purchase_order", { seed: poSeed }), 5);
 const getNextPONumber = async (req, res) => {
-  try { res.status(200).json({ success: true, data: { nextCode: await generateNextPONumber() } }); }
+  try { res.status(200).json({ success: true, data: { nextCode: await previewNextPONumber() } }); }
   catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 

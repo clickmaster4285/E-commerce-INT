@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const Lead = require("../models/Lead");
 const Employee = require("../models/Employee");
 const Category = require("../models/Category");
@@ -44,11 +45,9 @@ const LEAD_SORT_FIELDS = {
   followUp: "next_follow_up_date",
   created: "created_at",
 };
-const nextLeadNumber = async () => {
-  const existing = await Lead.find({ lead_number: /^LD-\d+$/ }).select("lead_number").lean();
-  const max = existing.reduce((highest, lead) => Math.max(highest, Number(String(lead.lead_number).slice(3)) || 0), 0);
-  return `LD-${String(max + 1).padStart(4, "0")}`;
-};
+// Atomic counter (pehle har lead par saari leads scan + 5 retry loop)
+const nextLeadNumber = async () =>
+  formatNumber("LD-", await nextSeq("lead", { seed: () => maxNumericSuffix(Lead, "lead_number", /^LD-d+$/) }), 4);
 const validId = (id) => mongoose.isValidObjectId(id);
 const actorId = (req) => req.user?._id || req.user?.id || null;
 const actorName = async (req) => req.user?.name || (actorId(req) ? (await Employee.findById(actorId(req)).select("name").lean())?.name : null) || "Staff";

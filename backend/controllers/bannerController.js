@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { uploadUrlFor, localPathForUrl } = require("../utils/uploadPaths");
 const { getIO } = require("../utils/socket");
+const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const { queueTranslationSync } = require("../utils/translationService");
 
 const emitSocketEvent = (event, data) => {
@@ -260,7 +261,7 @@ exports.getActiveBanners = async (req, res) => {
 
 exports.createBanner = async (req, res) => {
   try {
-    const data = { ...req.body };
+    const data = withoutProtected(req.body);
     ["primaryButton", "secondaryButton", "displayRules"].forEach((k) => {
       if (typeof data[k] === "string") data[k] = JSON.parse(data[k]);
     });
@@ -309,7 +310,7 @@ exports.updateBanner = async (req, res) => {
     const banner = await Banner.findById(req.params.id);
     if (!banner) return res.status(404).json({ success: false, message: "Not found" });
 
-    const data = { ...req.body };
+    const data = withoutProtected(req.body);
 
     // FIX: Multipart mein koi field 2 baar append ho to uska array ban jata hai
     // (e.g. status -> ["active","active"]). Mongoose String path par array cast

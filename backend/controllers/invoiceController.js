@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Invoice = require("../models/Invoice");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const Customer = require("../models/Customer");
 const Variant = require("../models/Variant");
 const { calculateReturnLine, capReturnLines, calculateReturnSettlement, getOriginalInvoiceTotal } = require("../utils/invoiceReturnMath");
@@ -102,11 +103,10 @@ const compareInvoice = (current, next) => {
   ].forEach(([field, before, after]) => add("field", field, before, after));
   return changes;
 };
-const nextInvoiceNumber = async () => {
-  const existing = await Invoice.find({ invoice_number: /^INV-(?:\d{4}-)?\d+$/ }).select("invoice_number").lean();
-  const max = existing.reduce((highest, item) => Math.max(highest, Number(item.invoice_number.split("-").at(-1)) || 0), 0);
-  return `INV-${String(max + 1).padStart(4, "0")}`;
-};
+// Atomic counter (pehle poori collection scan + max → concurrent par duplicate)
+const invoiceSeed = () => maxNumericSuffix(Invoice, "invoice_number", /^INV-(?:d{4}-)?d+$/);
+const nextInvoiceNumber = async () => formatNumber("INV-", await nextSeq("invoice", { seed: invoiceSeed }), 4);
+const previewInvoiceNumber = async () => formatNumber("INV-", await peekSeq("invoice", { seed: invoiceSeed }), 4);
 
 const buildInvoice = (body = {}) => {
   const customerName = String(body.customer_name || "").trim();
@@ -262,7 +262,7 @@ exports.listInvoices = async (req, res) => {
 
 exports.getNextInvoiceNumber = async (_req, res) => {
   try {
-    res.json({ success: true, data: { invoice_number: await nextInvoiceNumber() } });
+    res.json({ success: true, data: { invoice_number: await previewInvoiceNumber() } });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 

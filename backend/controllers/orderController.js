@@ -9,6 +9,7 @@ const Deal = require("../models/Deal");
 const Bundle = require("../models/Bundle");
 const discountController = require("./discountController");
 const log = require("../utils/logger");
+const { nextSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
@@ -350,14 +351,32 @@ const placeOrder = async (req, res) => {
       });
     }
 
-    // ✅ Stock decrement = PAID + FREE (total ship hone wale)
+    // ✅ Stock decrement = PAID + FREE (total ship hone wale) — ATOMIC + CONDITIONAL.
+    // Pehle upar wala check aur ye $inc alag the → do concurrent orders dono check
+    // pass kar ke stock negative / oversell kar dete. Ab `quantity >= n` shart
+    // update ke andar hai: stock na ho to update match hi nahi karta. Fail par
+    // is order ne jo stock liya wo wapas, aur 400.
     const stockTouchedOnOrder = [];
+    const restoreOrderStock = async () => {
+      for (const touched of stockTouchedOnOrder) {
+        await Variant.updateOne({ _id: touched.variant_id }, { $inc: { quantity: -touched.change } }).catch(() => {});
+      }
+      stockTouchedOnOrder.length = 0;
+    };
     for (const oi of orderItems) {
-      await Variant.updateOne(
-        { _id: oi.variant_id },
-        { $inc: { quantity: -(oi.qty + (oi.free_items || 0)) } }
+      const need = oi.qty + (oi.free_items || 0);
+      const result = await Variant.updateOne(
+        { _id: oi.variant_id, quantity: { $gte: need } },
+        { $inc: { quantity: -need } }
       );
-      stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -(oi.qty + (oi.free_items || 0)) });
+      if (!result.modifiedCount) {
+        await restoreOrderStock();
+        return res.status(400).json({
+          success: false,
+          message: `Insufficient stock for "${oi.name}". Please refresh your cart.`,
+        });
+      }
+      stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -need });
     }
 
     // ✅ Live update — order place hote hi manage-stock page apne aap refresh
@@ -413,18 +432,13 @@ const placeOrder = async (req, res) => {
     const tax = Math.round(taxTotal);
     const total = subtotal + shipping + tax;
 
-    // ✅ SAFE ORDER NUMBER
+    // ✅ ATOMIC ORDER NUMBER (utils/counter.js)
+    // Pehle `sort({ order_number: -1 })` STRING sort tha → ORD-99999 ke baad
+    // "ORD-100000" chhota maana jata, har naya order duplicate number par fail
+    // hota; aur do concurrent checkouts ko same number milta tha.
     const getNextOrderNumber = async () => {
-      const last = await Order.findOne({ order_number: /^ORD-/ })
-        .sort({ order_number: -1 })
-        .select("order_number")
-        .lean();
-      let next = 1;
-      if (last?.order_number) {
-        const m = last.order_number.match(/(\d+)$/);
-        if (m) next = parseInt(m[1], 10) + 1;
-      }
-      return `ORD-${String(next).padStart(5, "0")}`;
+      const seq = await nextSeq("order", { seed: () => maxNumericSuffix(Order, "order_number", /^ORD-/) });
+      return formatNumber("ORD-", seq, 5);
     };
 
     let order;
@@ -463,6 +477,8 @@ const placeOrder = async (req, res) => {
         break;
       } catch (err) {
         if (err.code === 11000 && attempt < 4) continue;
+        // Order save nahi hua → is checkout ka liya hua stock wapas (pehle permanent leak)
+        await restoreOrderStock();
         throw err;
       }
     }
@@ -1028,9 +1044,18 @@ const updateOrderStatus = async (req, res) => {
     if (notes) order.notes = notes;
     if (status === "cancelled" && cancel_reason) order.cancel_reason = cancel_reason;
 
+    // 🔒 Atomic claim: do concurrent "cancel" requests dono ne previousStatus
+    // "pending" padha to dono stock wapas kar dete (double restore). Ab sirf wo
+    // request restore karti hai jiska conditional update kamyab hua.
+    let restoreClaimed = false;
+    if (shouldRestoreStock) {
+      const claim = await Order.updateOne({ _id: order._id, status: { $ne: "cancelled" } }, { $set: { status: "cancelled" } });
+      restoreClaimed = claim.modifiedCount === 1;
+    }
+
     await order.save();
 
-    if (shouldRestoreStock) {
+    if (restoreClaimed) {
       const restoredVariants = [];
       for (const item of order.items || []) {
         if (!item.variant_id) continue;
@@ -1178,9 +1203,17 @@ const deleteOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Only pending orders can be deleted" });
     }
 
+    // 🔒 Pehle atomic delete (owner + pending shart ke sath), PHIR stock restore.
+    // Pehle restore pehle hota tha → do concurrent delete requests dono stock
+    // wapas kar deti thi. Ab sirf jis request ne asal me delete kiya wahi restore.
+    const deletedOrder = await Order.findOneAndDelete({ _id: order._id, user_id: req.user._id, status: "pending" });
+    if (!deletedOrder) {
+      return res.status(409).json({ success: false, message: "Order was already changed or deleted" });
+    }
+
     // ✅ Stock wapas restore = PAID + FREE (total jo ship hone wala tha)
     const restoredVariants = [];
-    for (const item of order.items) {
+    for (const item of deletedOrder.items) {
       if (item.variant_id) {
         await Variant.updateOne(
           { _id: item.variant_id },
@@ -1194,8 +1227,6 @@ const deleteOrder = async (req, res) => {
     if (restoredVariants.length > 0) {
       emitStockEvent({ variants: restoredVariants, source: "order_deleted" });
     }
-
-    await Order.findByIdAndDelete(id);
 
     emitOrderEvent("order:deleted", { success: true, data: { id: req.params.id } });
     emitOrderEvent("order:updated", { success: true, data: { id: req.params.id, deleted: true } });

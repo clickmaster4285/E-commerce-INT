@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const log = require("../utils/logger");
+const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const Category = require("../models/Category");
 const Attribute = require("../models/Attribute");
 const User = require("../models/User");
@@ -587,7 +588,7 @@ const updateCategory = async (req, res) => {
       return res.status(404).json({ success: false, message: "Category not found" });
     }
 
-    const updateData = { ...req.body };
+    const updateData = withoutProtected(req.body);
 
     delete updateData._id;
     delete updateData.created_at;

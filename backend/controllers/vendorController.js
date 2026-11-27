@@ -1,9 +1,13 @@
 const Vendor = require("../models/Vendor");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const { auditEvent, diffFields } = require("../utils/auditHistory");
+const { withoutProtected } = require("../utils/sanitizeBody");
+// Balances sirf PO / payment flow se badalte hain — client body se kabhi nahi
+const VENDOR_PROTECTED = ["total_purchased", "total_paid", "balance_payable"];
 
 const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -66,19 +70,14 @@ const VENDOR_SORT_FIELDS = {
   created: "created_at",
 };
 
-const generateNextVendorCode = async () => {
-  const vendors = await Vendor.find({ vendor_code: { $regex: /^VND-\d+$/ } }).select("vendor_code").lean();
-  let max = 0;
-  for (const v of vendors) {
-    const n = parseInt(String(v.vendor_code).split("-")[1], 10);
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  return `VND-${String(max + 1).padStart(5, "0")}`;
-};
+// Atomic counter; preview (next-code endpoint) number consume nahi karta
+const vendorSeed = () => maxNumericSuffix(Vendor, "vendor_code", /^VND-d+$/);
+const generateNextVendorCode = async () => formatNumber("VND-", await nextSeq("vendor", { seed: vendorSeed }), 5);
+const previewNextVendorCode = async () => formatNumber("VND-", await peekSeq("vendor", { seed: vendorSeed }), 5);
 
 const getNextVendorCode = async (req, res) => {
   try {
-    res.status(200).json({ success: true, data: { nextCode: await generateNextVendorCode() } });
+    res.status(200).json({ success: true, data: { nextCode: await previewNextVendorCode() } });
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 
@@ -89,7 +88,7 @@ const createVendor = async (req, res) => {
       const dup = await Vendor.findOne({ vendor_code: code, is_deleted: false });
       if (dup) return res.status(400).json({ success: false, message: "Active vendor with this code already exists" });
     }
-    const vendor = await Vendor.create({ ...req.body, vendor_code: code, createdby: req.user?._id || null, activity: [auditEvent(req, "created", [{ field: "Vendor", before: "—", after: String(req.body?.name || "").trim() }])] });
+    const vendor = await Vendor.create({ ...withoutProtected(req.body, VENDOR_PROTECTED), vendor_code: code, createdby: req.user?._id || null, activity: [auditEvent(req, "created", [{ field: "Vendor", before: "—", after: String(req.body?.name || "").trim() }])] });
     const io = req.io || getIO();
     await pushGlobalActivity(io, { action: `${req.user?.name || "Admin"} created vendor "${vendor.name}"`, category: "Vendor Management", performedBy: req.user?._id || null, performedByName: req.user?.name || "Admin", details: { vendorId: vendor._id, vendor_code: code } }, req.user?._id || null).catch(() => {});
     try { io.emit("vendorCreated", vendor.toObject()); } catch {}
@@ -265,7 +264,7 @@ const updateVendor = async (req, res) => {
   try {
     const existing = await Vendor.findOne({ _id: req.params.id, is_deleted: false });
     if (!existing) return res.status(404).json({ success: false, message: "Vendor not found" });
-    const update = { ...req.body, updatedby: req.user?._id || null };
+    const update = { ...withoutProtected(req.body, VENDOR_PROTECTED), updatedby: req.user?._id || null };
     if (!String(req.body?.vendor_code || "").trim()) update.vendor_code = existing.vendor_code;
     const fields = ["vendor_code", "name", "company_name", "contact_person", "email", "phone", "whatsapp", "address", "city", "state", "country", "zip_code", "tax_id", "bank_details", "lead_time_days", "rating", "is_active"];
     const changes = diffFields(existing.toObject(), { ...existing.toObject(), ...update }, fields.map((key) => [key, key.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase())]));

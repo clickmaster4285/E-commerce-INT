@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 const PosSale = require("../models/PosSale");
@@ -24,16 +25,9 @@ const localizeProduct = (product, locale) => {
 
 const normalizeMoney = (value) => Math.max(0, Number(value) || 0);
 
-const generateNextSaleNumber = async () => {
-  const sales = await PosSale.find({ sale_number: { $regex: /^POS-\d+$/ } }).select("sale_number").lean();
-  let max = 0;
-  for (const sale of sales) {
-    const match = String(sale.sale_number || "").match(/^(?:POS-)(\d+)$/);
-    const value = match ? Number(match[1]) : 0;
-    if (Number.isFinite(value) && value > max) max = value;
-  }
-  return `POS-${String(max + 1).padStart(5, "0")}`;
-};
+// Atomic counter (pehle har sale par saari sales scan)
+const generateNextSaleNumber = async () =>
+  formatNumber("POS-", await nextSeq("pos_sale", { seed: () => maxNumericSuffix(PosSale, "sale_number", /^POS-d+$/) }), 5);
 
 const getPosProducts = async (req, res) => {
   try {

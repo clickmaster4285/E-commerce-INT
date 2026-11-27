@@ -118,12 +118,12 @@ So:
 ### 2.2 Money and trust
 - [ ] **Checkout trusts client prices.** `displayPrice`, `savings`, `freeItems`, `payableItems`, `dealSavings` and the shipping `brandId`/`categoryId` all come from the request body (`orderController.js:235-246,320,406`). Recompute price, deal, bundle, tax and shipping on the server from DB data. The client sends only `{variant_id, qty}`.
 - [ ] Remove the raw card number and CVV handling (`orderController.js:44-47`). Nothing is charged, and receiving them puts you in PCI scope. Use a payment provider's token flow when card payments are added.
-- [ ] Mass assignment: `...req.body` is spread into
-  - [ ] Deal (`dealController.js:143-149,452`): can set `usedCount` and `createdBy`
-  - [ ] Vendor (`vendorController.js:349,525`): can set `balance_payable` and `is_deleted`
-  - [ ] Brand (`brandController.js:105,295`)
-  - [ ] Category `$set: req.body` (`categoryController.js:590-696`)
-  - [ ] Banner (`bannerController.js:263,312`)
+- [x] Mass assignment: `...req.body` is spread into — **done (guard):** `utils/sanitizeBody.js#withoutProtected` now strips ids, `storeId`, audit/soft-delete/translation/activity fields, `$` operators and dotted keys in all five controllers below (deal also `usedCount`, vendor also the balances). Per-endpoint zod schemas are still §5.3
+  - [x] Deal (`dealController.js:143-149,452`): can set `usedCount` and `createdBy`
+  - [x] Vendor (`vendorController.js:349,525`): can set `balance_payable` and `is_deleted`
+  - [x] Brand (`brandController.js:105,295`)
+  - [x] Category `$set: req.body` (`categoryController.js:590-696`)
+  - [x] Banner (`bannerController.js:263,312`)
 
   Whitelist fields per endpoint (validation schemas in §5.3).
 - [ ] A store admin can reopen a store the super admin closed (`storeController.js:81`). `store_status` should be writable by the super admin only.
@@ -227,9 +227,9 @@ Today 9 generators scan every document to find the max, and **all of them race**
 - employee code (`employeeController.js:454`)
 
 The order generator also sorts **lexically**: once the store passes ORD-99999, `"ORD-100000"` sorts lower, so every new order fails.
-- [ ] New collection `counters { storeId, key, seq }` with unique `{storeId, key}`.
-- [ ] `utils/counter.js`: `next(key)` = `findOneAndUpdate({storeId, key}, {$inc:{seq:1}}, {upsert:true, new:true})`, formatted as `ORD-000123`.
-- [ ] A migration seeds each counter from the current max per store.
+- [x] New collection `counters { storeId, key, seq }` with unique `{storeId, key}`. — **done:** `models/Counter.js`
+- [ ] `utils/counter.js`: `next(key)` = `findOneAndUpdate({storeId, key}, {$inc:{seq:1}}, {upsert:true, new:true})`, formatted as `ORD-000123`. — **partly done:** `nextSeq`/`peekSeq`/`formatNumber` are used by order, invoice, POS sale, PO, vendor code, quote and lead numbers; the `next-code` previews use `peekSeq`, so they consume nothing. Still open: SKU, category code, brand code, employee code
+- [x] A migration seeds each counter from the current max per store. — **done differently:** lazy seed. On first use per store, `nextSeq` seeds from the numeric max of existing data (`maxNumericSuffix`, not a lexical sort), so no migration script is needed. Tested, including ORD-99999 → ORD-100000
 - [ ] Delete `QuoteNumberReservation`, or give it a TTL (`Quote.js:63`).
 
 ### 3.3 Index rebuild (P2): the biggest single speed-up
@@ -568,9 +568,9 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   - `commit`, `release`, `receive`, `adjust`, `countSet`
 
   Every call writes a `stock_movements` row with an idempotency key and calls `productSummary.refresh` in the **same `withTx` transaction** (§3.1).
-  - *Before §3.9 lands*, the quick fix on the current model is `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`.
+  - *Before §3.9 lands*, the quick fix on the current model is `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`. **Done for `placeOrder`** (a conditional decrement per line, rollback of this order's stock on a miss or on an `Order.create` failure; `test/counterAndStock.test.js`: 20 parallel orders for stock 5 → exactly 5). Still open: POS, invoice, PO and manual adjust
 - [ ] Replace every direct `quantity` write in controllers, including `updateVariant`/`updateProduct` (`variantController.js:170-177`, `productController.js:1860,2137`), which overwrite quantity with no history.
-- [ ] Order cancel and delete: use a conditional status transition, `findOneAndUpdate({_id, status: {$ne: "cancelled"}}, ...)`, so two concurrent cancels cannot restore stock twice (`orderController.js:1016-1048,1183-1198`).
+- [x] Order cancel and delete: use a conditional status transition, `findOneAndUpdate({_id, status: {$ne: "cancelled"}}, ...)`, so two concurrent cancels cannot restore stock twice (`orderController.js:1016-1048,1183-1198`). — **done:** cancel claims the transition with `updateOne({status:{$ne:"cancelled"}})`; delete uses an atomic `findOneAndDelete({user_id, status:"pending"})` before restoring
 - [ ] PO delivery: do the status transition plus stock in one transaction, so it is idempotent (`purchaseOrderController.js:411-482`).
 - [ ] POS returns: do the return-quantity check plus stock inside one transaction (`posController.js:311-349`).
 

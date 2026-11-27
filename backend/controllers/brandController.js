@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs-extra");
 const { getIO } = require("../utils/socket");
 const log = require("../utils/logger");
+const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 
@@ -103,7 +104,7 @@ const createBrand = async (req, res) => {
     }
 
     const brandData = {
-      ...req.body,
+      ...withoutProtected(req.body),
       brand_code,
       createdby: req.user?._id || null,
       updatedby: null,
@@ -293,7 +294,7 @@ const updateBrand = async (req, res) => {
     }
 
     const updateData = {
-      ...req.body,
+      ...withoutProtected(req.body),
       updatedby: req.user?._id || null,
     };
 

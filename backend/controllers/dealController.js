@@ -4,6 +4,9 @@ const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { getIO } = require("../utils/socket");
 const { queueTranslationSync } = require("../utils/translationService");
+const { withoutProtected } = require("../utils/sanitizeBody");
+// Client usedCount / createdBy / storeId wagaira set na kar sake (mass assignment)
+const DEAL_PROTECTED = ["usedCount"];
 
 const emitSocketEvent = (event, data) => {
   try {
@@ -140,7 +143,7 @@ const BUNDLE_FREE_PRODUCT_FIELDS = "name sku images selling_price price variants
 
 const createDeal = async (req, res) => {
   try {
-    const payload = applyBundleRule({ ...req.body });
+    const payload = applyBundleRule(withoutProtected(req.body, DEAL_PROTECTED));
 
     const deal = await Deal.create({
       ...payload,
@@ -449,7 +452,7 @@ const updateDeal = async (req, res) => {
       });
     }
 
-    Object.assign(deal, applyBundleRule({ ...req.body }));
+    Object.assign(deal, applyBundleRule(withoutProtected(req.body, DEAL_PROTECTED)));
 
     deal.updatedBy =
       req.user?._id ||

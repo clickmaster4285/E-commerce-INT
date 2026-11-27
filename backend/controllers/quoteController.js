@@ -1,18 +1,18 @@
 const mongoose = require("mongoose");
+const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const { randomUUID } = require("crypto");
 const Quote = require("../models/Quote");
 const QuoteNumberReservation = Quote.NumberReservation;
 const { auditEvent, diffFields, diffItems, valueText } = require("../utils/auditHistory");
 
-const nextQuoteNumber = async () => {
-  const pattern = /^(?:QT|QUO)-(?:\d{4}-)?\d+$/;
-  const [existing, reserved] = await Promise.all([
-    Quote.find({ quote_number: pattern }).select("quote_number").lean(),
-    QuoteNumberReservation.find({ quote_number: pattern }).select("quote_number").lean(),
-  ]);
-  const max = [...existing, ...reserved].reduce((highest, quote) => Math.max(highest, Number(String(quote.quote_number).split("-").at(-1)) || 0), 0);
-  return `QUO-${String(max + 1).padStart(4, "0")}`;
-};
+// Atomic counter — reservations bhi isi se number lete hain (pehle 2 collections scan)
+const nextQuoteNumber = async () =>
+  formatNumber("QUO-", await nextSeq("quote", {
+    seed: async () => Math.max(
+      await maxNumericSuffix(Quote, "quote_number", /^(?:QT|QUO)-(?:d{4}-)?d+$/),
+      await maxNumericSuffix(QuoteNumberReservation, "quote_number", /^(?:QT|QUO)-(?:d{4}-)?d+$/),
+    ),
+  }), 4);
 
 exports.reserveQuoteNumber = async (req, res) => {
   try {
