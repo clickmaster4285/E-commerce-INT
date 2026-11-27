@@ -128,6 +128,17 @@
   --sidebar-overlay: rgba(0, 0, 0, 0.5);
 }
 
+.admin-panel {
+  --primary: var(--accent);
+  --card: var(--bg-card);
+  --background: var(--bg-primary);
+  --border: var(--border-color);
+  --foreground: var(--text-primary);
+  --muted: var(--bg-tertiary);
+  --muted-foreground: var(--text-muted);
+  --ring: var(--accent);
+}
+
 /* ============================================================
    DARK THEME
    ============================================================ */

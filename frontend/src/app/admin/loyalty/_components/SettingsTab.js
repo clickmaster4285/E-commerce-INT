@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, BookOpen, Coins, Gift, Info, Lightbulb, Loader2, Percent, ShoppingBag, TicketPercent } from "lucide-react";
+import { AlertTriangle, BookOpen, Coins, Gift, Info, Lightbulb, Loader2, Percent, RotateCcw, Save, ShoppingBag, TicketPercent } from "lucide-react";
 import { loyaltyApi } from "@/apis/admin/loyaltyApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { pointsForAmount, quoteRedemption } from "@/lib/loyalty";
@@ -216,9 +216,11 @@ export default function SettingsTab() {
   const discard = () => { setDraft(null); setErrors({}); };
   const actions = (
     <div className="flex items-center gap-2">
-      <button type="button" className={secondaryBtn} onClick={discard} disabled={!dirty || save.isPending}>{t("admin.loyalty.settings.discard")}</button>
+      <button type="button" className={secondaryBtn} onClick={discard} disabled={!dirty || save.isPending}>
+        <RotateCcw size={14} aria-hidden="true" />{t("admin.loyalty.settings.discard")}
+      </button>
       <button type="button" className={primaryBtn} style={primaryStyle} onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
-        {save.isPending && <Loader2 size={14} className="animate-spin" />}{t("admin.loyalty.settings.save")}
+        {save.isPending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}{t("admin.loyalty.settings.save")}
       </button>
     </div>
   );

@@ -50,10 +50,11 @@ function copyTextFallback(value) {
 
 export default function ReferralProgramView({ showContinue = true, onboarding = false }) {
   const router = useRouter();
-  const { dir } = useTranslation();
+  const { t, dir } = useTranslation();
   const referralInputRef = useRef(null);
   const query = useQuery({ queryKey: ["my-referrals"], queryFn: loyaltyApi.referrals, retry: false });
   const data = query.data;
+  const programOn = Boolean(data?.enabled);
 
   useEffect(() => {
     if (query.error?.response?.status === 401) router.replace("/login");
@@ -93,7 +94,6 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
   if (onboarding) {
     const referrerPoints = Number(data?.referrerPoints || 0).toLocaleString();
     const friendPoints = Number(data?.friendPoints || 0).toLocaleString();
-    const programOn = Boolean(data?.enabled);
     return (
       <main dir={dir} className="user-theme fixed inset-0 z-[130] flex items-center justify-center overflow-y-auto bg-slate-950/50 px-4 py-6 backdrop-blur-sm sm:px-6" role="dialog" aria-modal="true" aria-labelledby="referral-setup-title" aria-describedby="referral-setup-description">
         <section className="relative my-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-[var(--user-text)] shadow-[0_30px_90px_-30px_rgba(15,23,42,.55)]">
@@ -106,8 +106,8 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
               <Gift size={22} strokeWidth={1.8} aria-hidden="true" />
             </span>
             <p className="mt-4 text-[11px] font-semibold uppercase tracking-[.18em] text-white/75">Referral program</p>
-            <h1 id="referral-setup-title" className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Your referral link is ready</h1>
-            <p id="referral-setup-description" className="mt-2 max-w-lg text-sm leading-6 text-white/85">Share it with friends. When they join and verify their account, you both earn points toward future orders.</p>
+            <h1 id="referral-setup-title" className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">{programOn ? "Your referral link is ready" : t("referral.offTitle")}</h1>
+            <p id="referral-setup-description" className="mt-2 max-w-lg text-sm leading-6 text-white/85">{programOn ? "Share it with friends. When they join and verify their account, you both earn points toward future orders." : t("referral.offText")}</p>
           </div>
 
           {query.isLoading ? (
@@ -127,6 +127,14 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
             <div className="flex flex-col items-center gap-3 px-5 py-10 text-center">
               <p role="alert" className="text-sm text-[var(--user-text-muted)]">We couldn’t load your referral link.</p>
               <button type="button" onClick={() => query.refetch()} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[var(--user-accent)] px-4 text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">Try again</button>
+            </div>
+          ) : !programOn ? (
+            <div className="flex flex-col items-center gap-3 px-5 py-10 text-center sm:px-7">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"><Info size={20} aria-hidden="true" /></span>
+              <p role="status" className="max-w-lg text-sm leading-6 text-[var(--user-text-muted)]">{t("referral.offNotice")}</p>
+              <Link href="/shop" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--user-accent)] px-5 text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+                Start shopping <ArrowRight size={16} className="rtl:rotate-180" aria-hidden="true" />
+              </Link>
             </div>
           ) : (
             <>
@@ -156,12 +164,6 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
                     </div>
                   ) : null}
 
-                  {!programOn && (
-                    <p className="mt-3 flex items-start gap-2 rounded-lg bg-amber-500/10 px-3 py-2.5 text-[11.5px] leading-5 text-amber-700">
-                      <Info size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-                      <span>The store hasn’t activated referral rewards yet. Your link is ready; points start once the program is enabled.</span>
-                    </p>
-                  )}
                 </div>
 
                 {/* Right: benefits */}
@@ -209,19 +211,27 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
         <div className="bg-gradient-to-br from-[var(--user-accent)] to-indigo-700 px-6 py-8 text-white sm:px-10 sm:py-10">
           <span className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15"><Gift size={24} /></span>
           <p className="text-xs font-semibold uppercase tracking-[.18em] text-white/75">{onboarding ? "YOUR REFERRAL LINK" : "CUSTOMER REFERRAL PROGRAM"}</p>
-          <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{onboarding ? "Your link is ready to share" : data.headline}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">{onboarding ? "Invite friends with your personal link. When a friend joins and verifies their account, you both can earn points toward future purchases." : "Share your personal link with friends. When a friend creates and verifies an account, both of you receive reward points to use on future purchases."}</p>
+          <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{programOn ? data.headline : t("referral.offTitle")}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-white/85">{programOn ? "Share your personal link with friends. When a friend creates and verifies an account, both of you receive reward points to use on future purchases." : t("referral.offText")}</p>
         </div>
-        <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8">
-          <div className="rounded-2xl border border-[var(--user-border)] p-5"><span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--user-accent)]/10 text-[var(--user-accent)]"><Sparkles size={20} /></span><p className="mt-4 text-sm text-[var(--user-text-muted)]">Your reward for each verified friend</p><p className="mt-1 text-3xl font-black text-[var(--user-text)]">{Number(data.referrerPoints).toLocaleString()} <span className="text-base font-semibold">points</span></p></div>
-          <div className="rounded-2xl border border-[var(--user-border)] p-5"><span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600"><Gift size={20} /></span><p className="mt-4 text-sm text-[var(--user-text-muted)]">Your friend’s welcome reward</p><p className="mt-1 text-3xl font-black text-[var(--user-text)]">{Number(data.friendPoints).toLocaleString()} <span className="text-base font-semibold">points</span></p></div>
-        </div>
-        <div className="mx-5 mb-5 rounded-2xl bg-[var(--user-bg)] p-5 sm:mx-8 sm:mb-8 sm:p-6">
-          <p className="text-sm font-bold text-[var(--user-text)]">Your personal referral link</p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row"><input ref={referralInputRef} readOnly value={data.shareUrl} aria-label="Your referral link" title={data.shareUrl} className="min-w-0 flex-1 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-3 text-sm text-[var(--user-text)] outline-none" /><button type="button" onClick={copy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"><Copy size={16} />Copy link</button></div>
-          <p className="mt-3 text-xs leading-5 text-[var(--user-text-muted)]">Rewards are added after your friend verifies their new account. Self-referrals and repeat referrals are not eligible. Points can be redeemed when the store’s rewards program is available.</p>
-          {!data.enabled && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700">The store has not activated referral rewards yet. Your link is ready; rewards will begin when the program is enabled.</p>}
-        </div>
+        {programOn ? (
+          <>
+            <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8">
+              <div className="rounded-2xl border border-[var(--user-border)] p-5"><span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--user-accent)]/10 text-[var(--user-accent)]"><Sparkles size={20} /></span><p className="mt-4 text-sm text-[var(--user-text-muted)]">Your reward for each verified friend</p><p className="mt-1 text-3xl font-black text-[var(--user-text)]">{Number(data.referrerPoints).toLocaleString()} <span className="text-base font-semibold">points</span></p></div>
+              <div className="rounded-2xl border border-[var(--user-border)] p-5"><span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600"><Gift size={20} /></span><p className="mt-4 text-sm text-[var(--user-text-muted)]">Your friend’s welcome reward</p><p className="mt-1 text-3xl font-black text-[var(--user-text)]">{Number(data.friendPoints).toLocaleString()} <span className="text-base font-semibold">points</span></p></div>
+            </div>
+            <div className="mx-5 mb-5 rounded-2xl bg-[var(--user-bg)] p-5 sm:mx-8 sm:mb-8 sm:p-6">
+              <p className="text-sm font-bold text-[var(--user-text)]">Your personal referral link</p>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row"><input ref={referralInputRef} readOnly value={data.shareUrl} aria-label="Your referral link" title={data.shareUrl} className="min-w-0 flex-1 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] px-4 py-3 text-sm text-[var(--user-text)] outline-none" /><button type="button" onClick={copy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"><Copy size={16} />Copy link</button></div>
+              <p className="mt-3 text-xs leading-5 text-[var(--user-text-muted)]">Rewards are added after your friend verifies their new account. Self-referrals and repeat referrals are not eligible. Points can be redeemed when the store’s rewards program is available.</p>
+            </div>
+          </>
+        ) : (
+          <div className="mx-5 mb-5 flex flex-col items-center gap-3 rounded-2xl bg-[var(--user-bg)] p-6 text-center sm:mx-8 sm:mb-8">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"><Info size={20} aria-hidden="true" /></span>
+            <p role="status" className="max-w-lg text-sm leading-6 text-[var(--user-text-muted)]">{t("referral.offNotice")}</p>
+          </div>
+        )}
         <div className="grid gap-4 border-t border-[var(--user-border)] p-5 sm:grid-cols-2 sm:p-8"><div className="rounded-2xl bg-[var(--user-bg)] p-5"><div className="flex items-center gap-3 text-[var(--user-text-muted)]"><Users size={18} /><span className="text-sm font-semibold">Friends who joined</span></div><p className="mt-3 text-3xl font-black text-[var(--user-text)]">{Number(data.successfulReferrals).toLocaleString()}</p></div><div className="rounded-2xl bg-[var(--user-bg)] p-5"><div className="flex items-center gap-3 text-[var(--user-text-muted)]"><CheckCircle2 size={18} /><span className="text-sm font-semibold">Referral points earned</span></div><p className="mt-3 text-3xl font-black text-[var(--user-text)]">{Number(data.pointsEarned).toLocaleString()}</p></div></div>
         {showContinue && <div className="px-5 pb-6 sm:px-8 sm:pb-8"><button type="button" onClick={() => router.push("/")} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--user-accent)]">Continue shopping <ArrowRight size={16} /></button></div>}
       </section>
