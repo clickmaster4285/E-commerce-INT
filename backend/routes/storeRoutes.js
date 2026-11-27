@@ -22,18 +22,20 @@ const storage = multer.diskStorage({
     fs.mkdir(dir, { recursive: true }, (err) => cb(err, dir));
   },
   filename: function (req, file, cb) {
-    // File ke naam mein spaces ko hyphen se replace karein taake URL mein masla na ho
-    const safeFileName = file.originalname.replace(/\s+/g, '-');
-    cb(null, Date.now() + "-" + safeFileName);
+    // 🔒 Extension client ke file name se nahi, whitelisted mimetype se — warna
+    // "logo.svg" / "x.html" naam se script wali file /uploads se serve ho sakti thi.
+    const base = path.parse(file.originalname).name.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9.\-]/g, "").slice(0, 60) || "logo";
+    cb(null, `${Date.now()}-${base}.${LOGO_TYPES[file.mimetype]}`);
   },
 });
 
-// Sirf images ko allow karein
+// Sirf raster images (SVG nahi — SVG ke andar script chal sakta hai)
+const LOGO_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image/')) {
+  if (LOGO_TYPES[file.mimetype]) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed!'), false);
+    cb(new Error('Only PNG, JPEG, WEBP or GIF images are allowed!'), false);
   }
 };
 

@@ -4,7 +4,7 @@ import FallbackImage from "@/components/common/FallbackImage";
 import { Suspense, useRef } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { productApi } from "@/apis/user/productApi";
 import { brandApi } from "@/apis/user/brandApi";
 import ProductCard from "@/components/user/ProductCard";
@@ -12,7 +12,6 @@ import PaginationBar from "@/components/user/PaginationBar";
 import { Package, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
-import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 
 const PAGE_SIZE = 20;
 const VALID_SORTS = ["featured", "newest", "price-asc", "price-desc"];
@@ -51,8 +50,7 @@ export default function BrandPage() {
 }
 
 function BrandContent({ brandId }) {
-  const { t, locale, dir } = useTranslation();
-  const queryClient = useQueryClient();
+  const { t, dir } = useTranslation();
   const { fieldOf, descriptionOf } = useLocalized();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -70,14 +68,8 @@ function BrandContent({ brandId }) {
     enabled: !!brandId,
     retry: false,
   });
-  usePageTranslations({
-    model: "Brand",
-    records: brand?._id ? [brand] : [],
-    locale,
-    ready: !!brand,
-    queryKey: ["brand", brandId],
-    queryClient,
-  });
+  // Storefront admin-only /translations/page call nahi karta (shopper ko 401 + retry storm
+  // aur har retry par list refetch). Server translations.* pehle se bhejta hai.
 
   // ✅ Server pagination + sort (?page=&sort= URL me)
   const { data, isLoading, isError, refetch, isFetching } = useQuery({

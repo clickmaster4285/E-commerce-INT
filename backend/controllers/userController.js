@@ -667,7 +667,8 @@ const getProfile = async (req, res) => {
       ? req.user
       : await User.findById(req.user._id)
         .select("-password -activities")
-        .populate("storeId");
+        // Poora Store populate karne se domainVerifyToken + activity log customer tak ja rahe the
+        .populate("storeId", "store_name logo email phone currency subdomain customDomain");
     if (!entity)
       return res
         .status(404)

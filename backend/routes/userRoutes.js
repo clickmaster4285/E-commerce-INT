@@ -21,7 +21,6 @@ const {
   deleteCheckoutDraft,
   getWishlist,
   toggleWishlist,
-  updateProfileREST,
   changePasswordREST,
   createStoreHandoff,
   exchangeStoreHandoff,
@@ -44,7 +43,7 @@ const router = express.Router();
 // ==========================================
 //  PUBLIC ROUTES
 // ==========================================
-router.post("/register", createUser);
+router.post("/register", limiters.register, createUser);
 // Signup step 1 — email/username/phone pehle se liye hue? (same limiter as register)
 router.post("/register/check", limiters.registerCheck, checkRegistration);
 router.post("/login", limiters.login, loginUser);
@@ -70,8 +69,9 @@ router.get("/email-health", getEmailHealth);
 // ==========================================
 // 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
 // ==========================================
-router.post("/send-email-otp", sendEmailVerificationOtp);
-router.post("/verify-email-otp", verifyEmailVerificationOtp);
+// Limiters pehle define the lekin mount nahi the → email bombing / OTP guessing khula tha
+router.post("/send-email-otp", limiters.sendEmailOtp, sendEmailVerificationOtp);
+router.post("/verify-email-otp", limiters.verifyEmailOtp, verifyEmailVerificationOtp);
 
 // ==========================================
 // 🔐 FORGOT PASSWORD (OTP — 5 min expiry)
@@ -108,7 +108,6 @@ router.delete("/checkout-drafts/:id", authMiddleware.requireUser, deleteCheckout
 // ✅ NEW: Wishlist routes
 router.get("/wishlist", authMiddleware.requireUser, getWishlist);
 router.put("/wishlist/toggle", authMiddleware.requireUser, toggleWishlist);
-router.put("/profile", authMiddleware.requireUser, updateProfileREST);
 router.post("/change-password", authMiddleware.requireUser, changePasswordREST);
 // ==========================================
 // 🛡️ 404 HANDLER

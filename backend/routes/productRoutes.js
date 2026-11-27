@@ -18,6 +18,8 @@ const {
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
+const { optionalAdmin } = require("../middleware/authMiddleware");
+const { redactPublic } = require("../middleware/redactPublic");
 
 const {
   productImagesUpload,
@@ -36,7 +38,8 @@ const router = express.Router();
 // ==========================================
 // 🌐 PUBLIC ROUTES — bina login (User GUI)
 // ==========================================
-router.get("/", getProducts);
+// Shared route (admin list + storefront): admin session → full, warna admin-only fields redact
+router.get("/", optionalAdmin, redactPublic(), getProducts);
 // ✅ Summary stats (stat cards) — list se alag route, taake independently load ho sake.
 //    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
 router.get("/stats", getProductStats);
@@ -57,7 +60,8 @@ router.get("/stats", getProductStats);
 router.get("/facets", publicCache(30 * 1000), getProductFacets);
 router.get("/category-tiles", publicCache(60 * 1000), getCategoryTiles);
 router.get("/admin/:id/history", authMiddleware, checkPermission("products"), getProductDocumentHistory);
-router.get("/:id", getProductById);
+// Public detail; admin session ho to admin view (cost price, PO history, actors) — warna shopper DTO
+router.get("/:id", optionalAdmin, redactPublic(), getProductById);
 
 // ==========================================
 // 🛡️ ADMIN ROUTES — login + permission

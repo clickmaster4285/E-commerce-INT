@@ -118,9 +118,26 @@ const createAuth = (allowedAudiences) => async (req, res, next) => {
   }
 };
 
+// ==========================================================
+// OPTIONAL ADMIN — public route jo admin ko zyada data deta hai
+// ----------------------------------------------------------
+// Admin panel (adminHttp) har request par `X-Auth-Aud: admin` bhejta hai → us
+// waqt strict requireAdmin chalta hai (expired token = 401 → frontend refresh
+// karta hai; admin ko kabhi chupke se shopper data nahi milta jo form save par
+// cost price wagaira mita de). Baaki sab (storefront, SSR, bots) → public view.
+// Controller `req.authAud === "admin"` dekh kar admin-only fields bhejta hai.
+// ==========================================================
+const requireAdminStrict = createAuth(["admin"]);
+const optionalAdmin = (req, res, next) => {
+  const hint = String(req.headers["x-auth-aud"] || "").trim().toLowerCase();
+  if (hint === "admin") return requireAdminStrict(req, res, next);
+  return next();
+};
+
 const authMiddleware = createAuth(["admin", "user"]);
 authMiddleware.requireAdmin = createAuth(["admin"]);
 authMiddleware.requireUser = createAuth(["user"]);
+authMiddleware.optionalAdmin = optionalAdmin;
 authMiddleware.createAuth = createAuth;
 
 module.exports = authMiddleware;

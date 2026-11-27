@@ -75,12 +75,12 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     return stat.size;
   };
 
-  if (mimeType.includes("svg")) {
-    const finalName = `store-logo-${Date.now()}-${safeName}.svg`;
-    const filePath = path.join(storeDir, finalName);
-    fs.writeFileSync(filePath, rawBuffer);
-    verifyFile(filePath, "SVG");
-    return { path: filePath, filename: finalName, mimetype: mimeType, size: rawBuffer.length, relativePath: relativeFor(filePath) };
+  // 🔒 Sirf raster images. SVG pehle raw save hota tha aur /uploads se API host par serve
+  // hota tha → SVG ke andar <script> doosre store / platform API origin par chal sakta
+  // tha (stored XSS). Ab har logo sharp se WebP me re-encode hota hai.
+  const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
+  if (!ALLOWED_LOGO_TYPES.has(mimeType.toLowerCase())) {
+    throw new Error("Only PNG, JPEG, WEBP or GIF logos are allowed");
   }
 
   // ⚠️ WEBP (alpha support) — JPEG me alpha channel nahi hota, is liye transparent
@@ -98,13 +98,9 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     const savedSize = verifyFile(filePath, "WebP");
     return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: relativeFor(filePath) };
   } catch (err) {
-    log.warn("⚠️ Sharp compression failed, saving raw:", err.message);
-    const fallbackExt = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
-    const fallbackName = `store-logo-${Date.now()}-${safeName}-raw.${fallbackExt}`;
-    const fallbackPath = path.join(storeDir, fallbackName);
-    fs.writeFileSync(fallbackPath, rawBuffer);
-    const savedSize = verifyFile(fallbackPath, "Raw fallback");
-    return { path: fallbackPath, filename: fallbackName, mimetype: mimeType, size: savedSize, relativePath: relativeFor(fallbackPath) };
+    // sharp decode na kar sake to ye asli image nahi — raw bytes save nahi karte
+    log.warn("⚠️ Logo image could not be processed:", err.message);
+    throw new Error("Invalid or corrupted image file");
   }
 };
 
@@ -1023,13 +1019,9 @@ const initSocket = (server) => {
     });
 
     // ========== RELAY EVENTS ==========
-    socket.on("productCreated", (p) => relayToStore(socket).emit("productCreated", p));
-    socket.on("productUpdated", (p) => relayToStore(socket).emit("productUpdated", p));
-    socket.on("productDeleted", (id) => relayToStore(socket).emit("productDeleted", id));
-    socket.on("employeeRelayCreated", (d) => relayToStore(socket).emit("employeeCreated", { success: true, data: d }));
-    socket.on("employeeRelayUpdated", (d) => relayToStore(socket).emit("employeeUpdated", { success: true, data: d }));
-    socket.on("employeeRelayDeleted", (id) => relayToStore(socket).emit("employeeDeleted", { success: true, data: { id } }));
-    socket.on("employeeRelayStatusToggled", (d) => relayToStore(socket).emit("employeeStatusToggled", { success: true, data: d }));
+    // Client relay events (productCreated / employeeRelay*) hata diye: koi bhi socket — guest
+    // bhi — poore store room ko jhooti events bhej sakta tha. Ye events sirf server
+    // controllers se emit hote hain. Frontend inhe kabhi emit nahi karta tha.
 
     socket.on("disconnect", (reason) => {});
   });

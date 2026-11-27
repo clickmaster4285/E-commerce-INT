@@ -197,7 +197,7 @@ function cleanCategoryDescription(text, sourceDescription, translatedName, local
     tr: (name) => name + " ürünleri",
     zh: (name) => name + "商品",
   };
-  return categoryDescriptions[locale]?.(izedName) || (izedName + (output ? " " + output : ""));
+  return categoryDescriptions[locale]?.(localizedName) || (localizedName + (output ? " " + output : ""));
 }
 
 function isUsableTranslation(source, translation, locale, options = {}) {

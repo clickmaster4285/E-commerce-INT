@@ -10,13 +10,11 @@
    ========================================================== */
 
 import { useCallback, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { dealApi } from "@/apis/user/dealApi";
 import { productApi } from "@/apis/user/productApi";
-import { useTranslation } from "@/i18n/LanguageProvider";
-import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import {
   EMPTY_HOME_FILTERS,
   hasActiveFilters,
@@ -55,9 +53,7 @@ export function filtersToFacetParams(filters, extra = {}) {
   };
 }
 
-export function useHomeCatalog(initialFilters = {}, opts = {}) {
-  const { locale } = useTranslation();
-  const queryClient = useQueryClient();
+export function useHomeCatalog(initialFilters = {}, opts = {}) {
   const search = String(opts?.search || "").trim();
   const { data: categories = [], isPending: categoriesPending } = useQuery({
     queryKey: ["categories"],
@@ -70,14 +66,8 @@ export function useHomeCatalog(initialFilters = {}, opts = {}) {
     queryFn: brandApi.getAll,
     staleTime: 5 * 60 * 1000,
   });
-  usePageTranslations({
-    model: "Brand",
-    records: brands,
-    locale,
-    ready: !brandsPending,
-    queryKey: ["brands"],
-    queryClient,
-  });
+  // Storefront admin-only /translations/page call nahi karta (shopper ko 401 + retry storm
+  // aur har retry par list refetch). Server translations.* pehle se bhejta hai.
 
   // ✅ Active deals (sidebar "Deals" filter + counts merge).
   const { data: deals = [], isPending: dealsPending } = useQuery({

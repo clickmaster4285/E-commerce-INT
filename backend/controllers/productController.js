@@ -1466,16 +1466,23 @@ const getProductById = async (req, res) => {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    const product = await Product.findOne({
-      _id: req.params.id,
-      is_deleted: { $ne: true },
-    })
+    // 🔒 Admin view (optionalAdmin middleware) vs shopper view.
+    // Shopper ko pehle cost_price, PO history (supplier invoice / cost), staff ke
+    // name+email aur inactive products bhi mil jate the.
+    const isAdminView = req.authAud === "admin";
+
+    const productFilter = { _id: req.params.id, is_deleted: { $ne: true } };
+    if (!isAdminView) productFilter.status = "active";
+    let productQuery = Product.findOne(productFilter)
       .populate("category_id", "name category_code description is_active translations")
       .populate("brand_id", "name brand_code description country is_active logo translations")
-      .populate("tag_ids", "name")
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
-      .lean();
+      .populate("tag_ids", "name");
+    if (isAdminView) {
+      productQuery = productQuery.populate("createdby", "name email").populate("updatedby", "name email");
+    } else {
+      productQuery = productQuery.select("-createdby -updatedby -deletedby -translation_source -translation_status");
+    }
+    const product = await productQuery.lean();
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
@@ -1486,19 +1493,22 @@ const getProductById = async (req, res) => {
 
     // ⭐ Populate audit users so the Activity tab can show WHO created /
     // updated each variant by name (instead of a raw ObjectId).
-    const variantDocs = await Variant.find({
+    let variantQuery = Variant.find({
       product_id: product._id,
       is_deleted: { $ne: true },
-    })
-      .sort({ created_at: 1 })
-      .lean();
+    }).sort({ created_at: 1 });
+    // Shopper: cost / stock thresholds / audit ids nahi (sirf jo detail page dikhata hai)
+    if (!isAdminView) {
+      variantQuery = variantQuery.select("-cost_price -min_qnt -max_qnt -topup -createdby -updatedby -deletedby -translation_source -translation_status");
+    }
+    const variantDocs = await variantQuery.lean();
 
     // Variant audit ids can refer to either an admin User or an Employee.
     // The schema's legacy ref points to User, so populate alone renders staff
     // creators as null; resolve both collections before returning the detail.
-    const actorIds = [...new Set(variantDocs.flatMap((variant) =>
+    const actorIds = isAdminView ? [...new Set(variantDocs.flatMap((variant) =>
       [variant.createdby, variant.updatedby].filter(Boolean).map((actor) => String(actor))
-    ))];
+    ))] : [];
     const [auditUsers, auditEmployees] = actorIds.length
       ? await Promise.all([
           User.find({ _id: { $in: actorIds } }).select("name email").lean(),
@@ -1509,13 +1519,16 @@ const getProductById = async (req, res) => {
     auditUsers.forEach((actor) => auditActors.set(String(actor._id), actor));
     auditEmployees.forEach((actor) => auditActors.set(String(actor._id), actor));
     const resolveAuditActor = (actorId) => actorId ? auditActors.get(String(actorId)) || null : null;
-    const variants = variantDocs.map((variant) => ({
-      ...variant,
-      createdby: resolveAuditActor(variant.createdby),
-      updatedby: resolveAuditActor(variant.updatedby),
-    }));
+    const variants = isAdminView
+      ? variantDocs.map((variant) => ({
+          ...variant,
+          createdby: resolveAuditActor(variant.createdby),
+          updatedby: resolveAuditActor(variant.updatedby),
+        }))
+      : variantDocs;
 
-    const purchaseOrders = await PurchaseOrder.find({
+    // PO history (cost price, supplier invoice no, received_by) — sirf admin
+    const purchaseOrders = !isAdminView ? [] : await PurchaseOrder.find({
       "items.product_id": product._id,
       "receivings.0": { $exists: true },
       is_deleted: { $ne: true },
@@ -1560,7 +1573,8 @@ const getProductById = async (req, res) => {
     // without a Tag document, so the Tags tab showed "—" for Created By.
     // Create any missing Tag docs, attributing them to the user who last
     // updated the variant (most plausible assigner).
-    try {
+    // Public GET par DB write nahi — healing sirf admin view me
+    if (isAdminView) try {
       const tagCreatorByName = new Map();
       // Audit users are populated objects now, so unwrap the id before it is
       // stored as a Tag's createdby (otherwise Mongoose casting fails).
@@ -1600,21 +1614,22 @@ const getProductById = async (req, res) => {
     let ratingSummary = { avg: 0, count: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
     try {
       const Review = require("../models/Review");
-      const ratings = await Review.find({
-        product_id: product._id,
-        status: "active",
-        is_deleted: { $ne: true },
-      })
-        .select("rating")
-        .lean();
+      // Har rating Node me load karne ke bajaye DB me $group (rating → count)
+      const buckets = await Review.aggregate([
+        { $match: { product_id: product._id, status: "active", is_deleted: { $ne: true } } },
+        { $group: { _id: "$rating", count: { $sum: 1 } } },
+      ]);
       let sum = 0;
-      ratings.forEach((r) => {
-        const rating = Number(r.rating) || 0;
-        sum += rating;
-        if (ratingSummary.distribution[rating] !== undefined) ratingSummary.distribution[rating] += 1;
+      let count = 0;
+      buckets.forEach((b) => {
+        const rating = Number(b._id) || 0;
+        const n = Number(b.count) || 0;
+        sum += rating * n;
+        count += n;
+        if (ratingSummary.distribution[rating] !== undefined) ratingSummary.distribution[rating] += n;
       });
-      ratingSummary.count = ratings.length;
-      ratingSummary.avg = ratings.length ? Math.round((sum / ratings.length) * 10) / 10 : 0;
+      ratingSummary.count = count;
+      ratingSummary.avg = count ? Math.round((sum / count) * 10) / 10 : 0;
     } catch (summaryErr) {
       log.error("⚠️ [getProductById] Rating summary skipped:", summaryErr?.message || summaryErr);
     }
@@ -1622,7 +1637,7 @@ const getProductById = async (req, res) => {
     return res.status(200).json({
       ...(hasLocaleProjection ? projectProductLocale(product, productLocale) : product),
       variants,
-      purchaseOrderHistory,
+      ...(isAdminView ? { purchaseOrderHistory } : {}),
       ratingSummary,
     });
   } catch (error) {

@@ -709,7 +709,7 @@ export default function StoreInfoPage() {
   const processLogoFile = (file) => {
     if (!file) return;
     
-    const validTypes = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+    const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       toast.error(t("admin.storeInfo.toast.imageType"));
       return;
@@ -1109,7 +1109,7 @@ export default function StoreInfoPage() {
                       onDrop={handleLogoDrop}
                     >
                     <label className="flex flex-col items-center cursor-pointer">
-                      <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" onChange={handleLogoChange} className="hidden" />
+                      <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoChange} className="hidden" />
                       <div className="relative">
                       <div className="w-28 h-28 rounded-xl flex items-center justify-center overflow-hidden"
                         style={{ backgroundColor: logoPreview && !logoError ? "#ffffff" : "var(--bg-tertiary)", border: "1px dashed var(--border-color)", boxShadow: logoPreview && !logoError ? "var(--shadow-sm)" : "none" }}>

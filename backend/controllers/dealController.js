@@ -406,7 +406,7 @@ const getDealTargets = async (req, res) => {
     const config = {
       products: { ids: deal.productIds, Model: require("../models/Product"), fields: ["name", `translations.name.${locale}`, "variants.images.img_url"].join(" ") },
       categories: { ids: deal.categoryIds, Model: require("../models/Category"), fields: ["name", `translations.name.${locale}`].join(" ") },
-      brands: { ids: deal.brandIds, Model: require("../models/Brand"), fields: ["name", `translations.name.${locale}`, "logo.img_url"].join(" ") },
+      brands: { ids: deal.brandIds, Model: require("../models/brand"), fields: ["name", `translations.name.${locale}`, "logo.img_url"].join(" ") },
     }[type];
     if (!config || type !== `${deal.applyTo}s` && !(type === "products" && deal.applyTo === "product") && !(type === "categories" && deal.applyTo === "category") && !(type === "brands" && deal.applyTo === "brand")) {
       return res.status(400).json({ success: false, message: "Invalid deal target type" });
@@ -583,6 +583,8 @@ const getActiveDeals = async (req, res) => {
     const now = new Date();
     const limitRaw = parseInt(req.query.limit, 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0; // 0 = legacy mode (cap 50)
+    const pageRaw = parseInt(req.query.page, 10);
+    const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1; // paginated mode me pehle undefined tha → har request throw
 
     const query = {
       isActive: true,

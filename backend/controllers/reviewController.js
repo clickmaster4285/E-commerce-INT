@@ -7,6 +7,7 @@ const Order = require("../models/Order");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const { queueTranslationSync } = require("../utils/translationService");
+const log = require("../utils/logger"); // catch blocks log.error use karte hain — pehle require hi nahi tha
 
 // ==========================================
 // 🔌 SOCKET HELPER (baqi controllers ki tarah)

@@ -8,12 +8,4 @@ export const bannerApi = {
       if (Array.isArray(d)) return d;
       return [];
     }),
-
-  getAll: () =>
-    userHttp.get("/banners").then((res) => {
-      const d = res.data;
-      if (Array.isArray(d?.data)) return d.data;
-      if (Array.isArray(d)) return d;
-      return [];
-    }),
 };

@@ -26,6 +26,8 @@ const {
 } = require("../services/emailService");
 const log = require("../utils/logger");
 const { pushStoreActivity, getChanges } = require("../utils/activityHelper");
+// approveRequest aur createSellerStore dono ko chahiye (pehle sirf createSellerStore ke andar tha → approve par ReferenceError)
+const { uniqueUsername } = require("../utils/username");
 
 // Best-effort seller notification — delivery failure must never reverse a decision
 const notifySeller = async (sendFn, payload, action, entityId) => {
@@ -812,7 +814,6 @@ const PPP_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const createSellerStore = async (req, res) => {
   const PendingRegistration = require("../models/PendingRegistration");
   const { validateStoreAddress } = require("../utils/tenantHost");
-  const { uniqueUsername } = require("../utils/username");
   const b = req.body || {};
   const str = (v, max = 300) => String(v ?? "").trim().slice(0, max);
   const name = str(b.name, 80);

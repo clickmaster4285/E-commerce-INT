@@ -1,5 +1,4 @@
 const multer = require("../utils/tenantMulter") /* store-context safe multer */;
-const path = require("path");
 const fs = require("fs");
 
 const { uploadDirFor } = require("../utils/uploadPaths");
@@ -12,13 +11,16 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `deal-${uniqueSuffix}${path.extname(file.originalname)}`);
+    // 🔒 Extension whitelisted mimetype se (client ka ".svg"/".html" naam nahi)
+    cb(null, `deal-${uniqueSuffix}.${IMAGE_TYPES[file.mimetype]}`);
   },
 });
 
+// Sirf raster images — SVG me script chal sakta hai (stored XSS)
+const IMAGE_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype && file.mimetype.startsWith("image/")) cb(null, true);
-  else cb(new Error("Only image files are allowed"), false);
+  if (IMAGE_TYPES[file.mimetype]) cb(null, true);
+  else cb(new Error("Only PNG, JPEG, WEBP or GIF images are allowed"), false);
 };
 
 const upload = multer({

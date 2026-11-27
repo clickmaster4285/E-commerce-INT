@@ -20,6 +20,45 @@ Rule for the whole plan: **one module per PR**, with tests first. Never change a
 
 ---
 
+## Step 0: Dependency upgrades and `package.json` hygiene (do first, one PR per project)
+
+Baseline before the upgrade: the backend passes `npm test` (177/177). Frontend `npm run lint` reports **118 errors and 41 warnings already**, so the upgrade must not raise that number. Runtime: Node 24.20, npm 11.19.
+
+**Backend (`backend/package.json`):**
+- [x] Minor and patch upgrades within the current majors:
+  - `express` 5.3.0, `express-rate-limit` 8.7.5, `rate-limit-redis` 6.0.2
+  - `mongoose` 9.13.1, `ioredis` 6.1.0
+  - `multer` 2.5.0, `sharp` 0.35.5, `socket.io` 4.8.4
+  - `nodemailer` 10.6.1, `fs-extra` 11.4.1
+- [x] Remove the unused dependencies `image-size`, `jose` and `uuid` (no `require` anywhere, §8.1).
+- [x] Hold `dotenv` at 17.x. Version 18 is a major release; `config/env.js` (§5.5) will replace the ad-hoc loading anyway, and Node 24's `process.loadEnvFile` is an option then.
+- [x] Metadata:
+  - `"private": true`, `"main": "server.js"` (today it says `index.js`, which does not exist)
+  - `"engines": { "node": ">=24" }`
+  - scripts: `migrate:indexes`, `migrate:attributes`
+- [ ] New dependencies are added **in the PR that first uses them**, not ahead of time: `helmet`, `pino` + `pino-http` (§7.1), `zod` (§5.3), and dev-only `supertest` + `mongodb-memory-server` (§7.2).
+
+**Frontend (`frontend/package.json`):**
+- [x] Minor and patch upgrades within the current majors:
+  - `next` + `eslint-config-next` 16.4.6, `react` + `react-dom` 19.3.1
+  - `@tanstack/react-query` 5.108, `axios` 1.21, `dompurify` 3.5, `socket.io-client` 4.8.4
+  - all `@tiptap/*` packages 3.35, `recharts` 3.11, `radix-ui` 1.8, `lucide-react` 1.82
+  - `tailwindcss` + `@tailwindcss/postcss` 4.3.5, `tailwind-merge` 3.7, `zustand` 5.1, `sonner` 2.0.8, `libphonenumber-js` 1.13.17, `shadcn` 4.23
+  - Redux packages (removed later, §9.4)
+- [x] Remove the unused dependencies `react-select` and `next-themes` (no imports, §9.4).
+- [x] Hold `eslint` at 9.x until `eslint-config-next`'s bundled plugins support ESLint 10.
+- [x] Metadata: `"private": true` and `"engines": { "node": ">=24" }`.
+- [x] Verify: `npm run build` succeeds, and lint is no worse than the baseline.
+
+**Step 0 result (done on `optimizing_v1`):**
+- Backend: tests 177/177; the server boots and `/health` responds. `npm audit fix` cleared the high findings (`body-parser`, `engine.io`, `brace-expansion`). The 2 moderate findings left are in dev-only `nodemon`, and the only fix is a downgrade.
+- Frontend: `next build` succeeds, and `npm audit` reports 0 vulnerabilities. Lint errors are unchanged at 118. Warnings went from 41 to 48, all 7 new ones from the new `@next/next/no-location-assign-relative-destination` rule in eslint-config-next 16.4 (existing code, fix in §9.4).
+- The `@tiptap/*` packages pin exact peer versions, so upgrade them together. If npm reports `ERESOLVE`, remove `node_modules/@tiptap` and their lockfile entries, then reinstall.
+- npm 11 does not run install scripts by default (`unrs-resolver` postinstall was skipped; lint still works). Review them with `npm install-scripts ls`.
+- Restart both dev servers after pulling this change.
+
+**Ongoing:** run `npm audit` and `npm outdated` in CI weekly. Keep both lockfiles committed, and upgrade majors one at a time, in their own PR, after reading the changelog.
+
 ## 0. Current state in numbers
 
 - The local MongoDB 8.3 **is already a single-node replica set** (`mongod.cfg` → `replication.replSetName: rs0`; `rs.status()` → `127.0.0.1:27017 PRIMARY`), so transactions work on this machine today. The app does not use them:
@@ -66,13 +105,13 @@ So:
 ## 2. P0: Security and broken code (do first, small PRs)
 
 ### 2.1 Data leaks
-- [ ] Public `GET /products` (the no-limit branch) returns full variants with **`cost_price`**, populates `createdby`/`updatedby` **name and email**, and honours `?status=` from the query, so inactive products are public too (`productController.js:919-935`, `routes/productRoutes.js:39`). Add a public projection, force `status:"active"`, remove the creator populates, and require pagination.
-- [ ] Public `GET /banners` and `GET /banners/:id` run the **admin** handler, which returns every status plus creator and updater emails (`routes/bannerRoutes.js:17,21`, `bannerController.js:148-152`).
+- [ ] Public `GET /products` (the no-limit branch) returns full variants with **`cost_price`**, populates `createdby`/`updatedby` **name and email**, and honours `?status=` from the query, so inactive products are public too (`productController.js:919-935`, `routes/productRoutes.js:39`). Add a public projection, force `status:"active"`, remove the creator populates, and require pagination. — **partly done:** `GET /products` and `/products/:id` now go through `optionalAdmin` + `redactPublic()` (cost/threshold/actor/translation-internal fields are stripped for non-admin requests, test `test/publicRedaction.test.js`), and the detail requires `status:"active"` for shoppers. Still open: the list status filter, required pagination and a real DTO (§9.2)
+- [x] Public `GET /banners` and `GET /banners/:id` run the **admin** handler, which returns every status plus creator and updater emails (`routes/bannerRoutes.js:17,21`, `bannerController.js:148-152`). — **done:** both now need `requireAdmin` + `checkPermission("banners")`; the storefront uses only `/banners/active`
 - [ ] Public `GET /products/:id` and `GET /brands/:id/details` expose creator emails.
-- [ ] `getPublicStoreInfo` returns the whole Store, **including the `activity` log** (`storeController.js:182-184`). Return an explicit public field list.
-- [ ] `createEmployee` deletes the password only from `result.userId`, so **`result.password` (the bcrypt hash) is returned and broadcast to the store room** (`employeeController.js:498-509`). `updateEmployee` and `toggleStatus` broadcast the full doc too (`:721-732`, `:909-923`).
+- [x] `getPublicStoreInfo` returns the whole Store, **including the `activity` log** (`storeController.js:182-184`). Return an explicit public field list. — **done:** `activity`, `planId`, `domainVerifyToken` and `__v` are excluded
+- [x] `createEmployee` deletes the password only from `result.userId`, so **`result.password` (the bcrypt hash) is returned and broadcast to the store room** (`employeeController.js:498-509`). `updateEmployee` and `toggleStatus` broadcast the full doc too (`:721-732`, `:909-923`). — **done:** password and activities are stripped from the create, update and status-toggle responses and broadcasts. `select:false` on the schema is still open (§9.3)
 - [ ] **Every socket on a store host, including anonymous storefront visitors, joins `store:<id>`** (`utils/socket.js:444`). `io.emit` therefore sends full orders (address and phone), vendors (bank details), POs and discounts to the public. Split rooms into `store:<id>:admin` (staff only) and `store:<id>:public` (storefront-safe events), and audit every `req.io.emit`.
-- [ ] Remove the client relay events. Any socket, guests included, can emit `productCreated` or `employeeRelay*` to the whole store (`utils/socket.js:1026-1032`). Only the server should emit.
+- [x] Remove the client relay events. Any socket, guests included, can emit `productCreated` or `employeeRelay*` to the whole store (`utils/socket.js:1026-1032`). Only the server should emit. — **done**
 - [ ] `sellerApplyStatus` is public and unthrottled, so anyone can look up an email's application status (`sellerApplicationController.js:138`).
 - [ ] 500 responses return raw `error.message`, which leaks Mongo internals. The central error handler (§5.2) fixes this.
 
@@ -90,7 +129,7 @@ So:
 - [ ] A store admin can reopen a store the super admin closed (`storeController.js:81`). `store_status` should be writable by the super admin only.
 
 ### 2.3 Auth and abuse
-- [ ] **Rate limiters `register`, `sendEmailOtp` and `verifyEmailOtp` are defined but never mounted** (`routes/userRoutes.js:47,73-74`). This allows email bombing and OTP guessing.
+- [x] **Rate limiters `register`, `sendEmailOtp` and `verifyEmailOtp` are defined but never mounted** (`routes/userRoutes.js:47,73-74`). This allows email bombing and OTP guessing. — **done**
 - [ ] OTP attempt counters are read, incremented and saved non-atomically, so parallel guesses get past the limit (`otpController.js:127-128,301-302`). Use `findOneAndUpdate({attempts: {$lt: max}}, {$inc: {attempts: 1}})`.
 - [ ] Customer login, forgot-password and reset on the **platform host** use `User.findOne({email})` with no store, which picks an arbitrary store's customer (`userController.js:432`, `otpController.js:169,598,720`). Require store context, or refuse.
 - [ ] Legacy `Store.findOne()` fallbacks with no store context can edit an arbitrary store (`userController.js:704,856,976`, `employeeController.js:461`). Remove them.
@@ -114,17 +153,17 @@ So:
   Use one shared `escapeRegex` (§8).
 
 ### 2.4 Uploads
-- [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet).
+- [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **partly done:** the store logo (socket and HTTP) and deal images accept only png/jpeg/webp/gif, and the extension now comes from the MIME type. The socket logo is re-encoded to WebP, with no raw fallback. Still open: `nosniff`/helmet and full re-encoding in the upload factory (§5.6)
 - [ ] Review upload: 50MB memory storage × 6 files, about 300MB of RAM per request, and it runs **before** the rate limiter (`reviewUploadMiddleware.js:41-49`, `reviewRoutes.js:57-59`). Rate-limit first, then cap images at about 8MB and use disk or stream storage for video.
 - [ ] Store logos and KYC documents bypass `uploadDirFor` and go to global folders (`userController.js:48`, `sellerApplicationController.js:18,292`).
 
 ### 2.5 Code that crashes or silently does nothing
-- [ ] `approveRequest` calls `uniqueUsername`, which is not in scope (it is only required inside `createSellerStore`, `superAdminController.js:525` vs `:815`). The call throws **after** the application is marked approved.
-- [ ] `utils/translationService.js:200` uses `izedName`, which is undefined (should be `localizedName`), so it throws a ReferenceError.
-- [ ] `reviewController.js` calls `log.error` 6 times but never requires `log`, so every catch block throws again.
-- [ ] `getActiveDeals` paginated mode uses `page`, which is never defined, so it always throws (`dealController.js:627`).
-- [ ] `require("../models/Brand")` but the file is `models/brand.js`, which crashes on Linux (`dealController.js:409`; the `loadBrandModel` hack in `productController.js:18-34`). Rename the file to `Brand.js` and fix every import.
-- [ ] Duplicate `PUT /users/profile` (`userRoutes.js:88` and `:111`), so the second handler can never run.
+- [x] `approveRequest` calls `uniqueUsername`, which is not in scope (it is only required inside `createSellerStore`, `superAdminController.js:525` vs `:815`). The call throws **after** the application is marked approved. — **done:** imported at module level
+- [x] `utils/translationService.js:200` uses `izedName`, which is undefined (should be `localizedName`), so it throws a ReferenceError. — **done**
+- [x] `reviewController.js` calls `log.error` 6 times but never requires `log`, so every catch block throws again. — **done**
+- [x] `getActiveDeals` paginated mode uses `page`, which is never defined, so it always throws (`dealController.js:627`). — **done**
+- [ ] `require("../models/Brand")` but the file is `models/brand.js`, which crashes on Linux (`dealController.js:409`; the `loadBrandModel` hack in `productController.js:18-34`). Rename the file to `Brand.js` and fix every import. — **partly done:** `dealController` now requires `../models/brand`. The file rename and `loadBrandModel` cleanup are still open
+- [x] Duplicate `PUT /users/profile` (`userRoutes.js:88` and `:111`), so the second handler can never run. — **done:** the unreachable route was removed (the `updateProfileREST` handler is left for §8.1)
 - [ ] Fields written or read that **are not in the schema** (strict mode drops them silently):
   - [ ] **Variant `is_deleted`**: missing entirely. Every `is_deleted:{$ne:true}` filter on Variant does nothing, and `deleteProduct` never soft-deletes variants (`productController.js:2388-2400`). Add the field and backfill it.
   - [ ] Discount `priceMin`, `priceMax`, `maxDiscountAmount`, `priority`, `usageCount`: price-range discounts and `max_discount` never work.
@@ -811,7 +850,7 @@ What is already good and should be kept:
 - Theme links and CSS values are allowlisted (`storefront/themeLinks.js`, `themeCss.js:83`).
 - No secret is `NEXT_PUBLIC_*`.
 
-- [ ] **P0 Raw SVG store logo is stored XSS that crosses stores.**
+- [ ] **P0 Raw SVG store logo is stored XSS that crosses stores.** — **done for new uploads:** SVG was removed from the admin picker, the backend and the locale strings; no `.svg` files exist in local `uploads/`. Still open: the `/uploads` CSP/`nosniff` headers, and checking production uploads
   - The admin accepts `image/svg+xml` (`app/admin/store-info/page.js:712,1112`), and the backend writes the raw buffer (`backend/utils/socket.js:78-83`).
   - `/uploads` is served by plain `express.static` on **every** API host (`backend/server.js:180`). A seller's SVG therefore runs script on another store's API origin, or on the platform API origin, where host-only `a_at`/`sa_at` cookies are sent.
   - Fix:
@@ -858,7 +897,7 @@ What is already good and should be kept:
 Translations are **sliced to the active locale on the server**: send `name` already localized, or `{name, nameLocal}`, never `translations.*` maps for every locale and never `translation_source`/`translation_status`. `storeId`, `__v`, audit refs and timestamps are left out unless the page shows them.
 
 **P0: sensitive data reaching public storefront responses** (in addition to §2.1):
-- [ ] `GET /products/:id` returns:
+- [x] `GET /products/:id` returns: — **done:** see §2.1 (`optionalAdmin` + `redactPublic`; PO history, actors and tag healing are admin-only; ratings now use a ``)
   - `purchaseOrderHistory[]`, with `cost_price`, `sell_price`, `po_number`, `invoice_no` and `received_by_name` (`productController.js:1518-1555,1625`)
   - raw variants with `cost_price`
   - staff `createdby`/`updatedby` `{name,email}` (`:1490-1513`)
@@ -867,7 +906,7 @@ Translations are **sliced to the active locale on the server**: send `name` alre
 - [ ] `GET /products` (every mode) returns full Variant docs (`cost_price`, `min_qnt/max_qnt/topup`, audit ids). Without `slim=1` it also returns staff name and email.
   - The non-slim callers are the Header search (`components/user/Header.js:393`), `BundleCard.js:83`, `app/(user)/brand/[id]/page.js:86`, related products (`product/[id]/page.js:119`) and `search/page.js:36`.
   - Public reads also have **no `status:"active"` filter** (`buildProductFilter`, `productController.js:261-283`), and `getProductById` does not check status.
-- [ ] `GET /users/profile` (customer) runs `.populate("storeId")`, which sends the **whole Store document including `domainVerifyToken`**, `activity[]` and `planId` (`userController.js:668-670`). It also sends `google_id`, `provider` and `status`.
+- [x] `GET /users/profile` (customer) runs `.populate("storeId")`, which sends the **whole Store document including `domainVerifyToken`**, `activity[]` and `planId` (`userController.js:668-670`). It also sends `google_id`, `provider` and `status`. — **done:** it populates only `store_name logo email phone currency subdomain customDomain`
 - [ ] `GET /store/public` sends `activity[]`, `planId`, `logo.public_id`, quote/invoice terms and their translations, and `__v` (`storeController.js:169-181`).
 - [ ] `GET /deals/active/:id` returns the full Deal (`createdBy`, `usageLimit`, `usedCount`, `perUserLimit`), full products and variants (`cost_price`), and has **no active/date check**, so expired deals can be read by id (`dealController.js:673-756`).
 - [ ] `GET /discounts/public` sends every active discount's `code`, `usageLimit`, `perUserLimit` and `minOrderValue` (`discountController.js:837-848`). Send only what the badge shows, and validate codes at checkout.
@@ -893,7 +932,7 @@ Translations are **sliced to the active locale on the server**: send `name` alre
 - [ ] **One endpoint, one shape.** Replace the `slim=1` flag and the legacy no-limit modes with dedicated endpoints (`/products/tiles`, `/products/:id`, `/products/:id/variants`), each always paginated where it is a list.
 
 **Duplicate and wasted requests (P1):**
-- [ ] **Storefront calls an admin endpoint.** `usePageTranslations` (imported from `hooks/admin/`) runs in `hooks/user/useHomeCatalog.js:73` and `app/(user)/brand/[id]/page.js:73`, and calls `POST /translations/page`, which is `requireAdmin` (`backend/routes/translationRoutes.js:7`).
+- [x] **Storefront calls an admin endpoint.** `usePageTranslations` (imported from `hooks/admin/`) runs in `hooks/user/useHomeCatalog.js:73` and `app/(user)/brand/[id]/page.js:73`, and calls `POST /translations/page`, which is `requireAdmin` (`backend/routes/translationRoutes.js:7`). — **done:** removed from `useHomeCatalog` and `brand/[id]`
   - For `ur`/`ar` customers that is a 401, then **3 retries every 5s, and each retry invalidates `["brands"]`, so the list refetches up to 4× per page load**.
   - Remove it from the storefront. The server returns localized text (above).
 - [ ] **Wishlist on every page:** `/users/wishlist` runs on every page (`WishlistContext.js:12-19`, no `staleTime`, and guests get a 401 every time), and it returns full products plus variants (`userController.js:1226-1259`). The provider needs only ids.

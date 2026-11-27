@@ -179,7 +179,8 @@ const getPublicStoreInfo = async (req, res) => {
       return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found for this address." });
     }
     // Store host par Store.findOne() tenant-scoped hai → sirf isi host ka store (fresh, cache nahi)
-    const store = await Store.findOne().lean();
+    // Public endpoint: audit log (activity), plan aur domain token kabhi storefront par nahi
+    const store = await Store.findOne().select("-activity -planId -domainVerifyToken -__v").lean();
     if (!store) return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found." });
     return res.status(200).json({ success: true, data: publicStorePayload(store) });
   } catch (error) {

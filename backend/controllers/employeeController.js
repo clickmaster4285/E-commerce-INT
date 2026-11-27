@@ -495,11 +495,13 @@ exports.createEmployee = async (req, res) => {
       }
     );
 
-    const result = {
-      ...newEmployee.toObject(),
-      userId: newEmployee.toObject(),
-    };
-    delete result.userId.password;
+    // ⚠️ password hash kabhi response / socket me nahi jana chahiye.
+    // Pehle sirf result.userId.password delete hota tha, result.password (bcrypt hash)
+    // response aur poore store room ke socket broadcast me ja raha tha.
+    const safeEmployee = newEmployee.toObject();
+    delete safeEmployee.password;
+    delete safeEmployee.activities;
+    const result = { ...safeEmployee, userId: { ...safeEmployee } };
 
     if (req.io) {
       req.io.emit("employeeCreated", {
@@ -719,6 +721,7 @@ exports.updateEmployee = async (req, res) => {
     });
 
     const updatedEmployee = await Employee.findById(id)
+      .select("-password -activities") // hash / activity log socket broadcast me nahi
       .populate("createdby", "name email")
       .populate("updatedby", "name email")
       .lean();
@@ -910,6 +913,7 @@ exports.toggleStatus = async (
       await Employee.findById(
         req.params.id
       )
+        .select("-password -activities") // hash / activity log socket broadcast me nahi
         .populate("createdby", "name email")
         .populate("updatedby", "name email")
         .lean();
