@@ -20,17 +20,91 @@ let io = null;
 // Baaki rooms (employee:<id>, chat:conversation:<id> ...) pehle se unique IDs hain.
 // Platform context (super admin) me sab kuch pehle jaisa global.
 // ==========================================
+// ==========================================
+// ROOMS (optimizeplan.md §2.1 / §9.3)
+// ------------------------------------------
+//   store:<id>:admin  → sirf authenticated employee sockets (admin panel)
+//   store:<id>        → storefront sockets (guest + customer) — PUBLIC
+//   customer:<userId> → ek customer ke apne sockets (order updates)
+//
+// Pehle har socket (anonymous visitor bhi) `store:<id>` join karta tha aur
+// io.emit poore room ko jata tha → orders (address/phone), vendor bank details,
+// employee docs, cost prices public tak pahunchte the.
+// Ab io.emit ka FULL payload sirf admin room me jata hai. Storefront ke kaam ke
+// events (PUBLIC_EVENTS) public room me sirf ids ke sath jate hain — storefront
+// apna data REST se dobara fetch karta hai. Order events sirf us customer ko.
+// ==========================================
 const storeRoom = (storeId) => `store:${storeId}`;
+const adminRoom = (storeId) => `store:${storeId}:admin`;
+const customerRoom = (userId) => `customer:${userId}`;
 const SHARED_ROOMS = new Set(["chat:admins"]);
 const mapRoom = (room, storeId) =>
   typeof room === "string" && SHARED_ROOMS.has(room) ? `${room}:${storeId}` : room;
+
+const unwrap = (payload) => (payload && typeof payload === "object" && payload.success === true && payload.data ? payload.data : payload);
+const idOf = (payload) => {
+  if (typeof payload === "string") return payload;
+  const p = unwrap(payload);
+  const raw = p?._id || p?.id || payload?._id || payload?.id || null;
+  return raw ? String(raw) : null;
+};
+const onlyId = (payload) => {
+  const id = idOf(payload);
+  return id ? { _id: id } : {};
+};
+
+// Storefront jin events par cache refresh karta hai — public payload kya ho
+const PUBLIC_EVENTS = new Map([
+  ...["productCreated", "productUpdated", "productDeleted",
+    "deal:created", "deal:updated", "deal:deleted",
+    "discountCreated", "discountUpdated", "discountDeleted",
+    "discount:created", "discount:updated", "discount:deleted",
+    "banner:created", "banner:updated", "banner:deleted", "bannerCreated", "bannerUpdated", "bannerDeleted",
+    "category:created", "category:updated", "category:deleted", "categoryCreated", "categoryUpdated", "categoryDeleted",
+    "brand:created", "brand:updated", "brand:deleted", "brandCreated", "brandUpdated", "brandDeleted",
+  ].map((event) => [event, onlyId]),
+  ["discount:activity", (payload) => ({ ...onlyId(payload), action: payload?.action || "" })],
+  ["stockUpdated", (payload) => {
+    const p = unwrap(payload) || {};
+    const out = {};
+    const productId = p.productId || p.product_id;
+    const variantId = p.variantId || p.variant_id;
+    if (productId) out.productId = String(productId);
+    if (variantId) out.variantId = String(variantId);
+    if (typeof p.quantity === "number") out.quantity = p.quantity;
+    return out;
+  }],
+  ...["storeUpdated", "storeInfoChangedForProfile",
+    "shippingConfigUpdated", "shippingRuleCreated", "shippingRuleUpdated", "shippingRuleDeleted", "shippingRuleToggled",
+  ].map((event) => [event, () => ({ changed: true })]),
+]);
+
+// Order events: customer ko sirf uska apna order id (admin ko full order)
+const ORDER_EVENTS = new Set(["order:created", "order:updated", "order:deleted", "order:statusChanged", "order:paymentUpdated"]);
+const orderOwnerOf = (payload) => {
+  const p = unwrap(payload);
+  const owner = p?.user_id?._id || p?.user_id || null;
+  return owner ? String(owner) : null;
+};
+
+function emitToStore(target, storeId, event, payload, ...rest) {
+  target.to(adminRoom(storeId)).emit(event, payload, ...rest);
+  if (ORDER_EVENTS.has(event)) {
+    const owner = orderOwnerOf(payload);
+    if (owner) target.to(customerRoom(owner)).emit(event, onlyId(payload));
+    return true;
+  }
+  const shape = PUBLIC_EVENTS.get(event);
+  if (shape) target.to(storeRoom(storeId)).emit(event, shape(payload));
+  return true;
+}
 
 function createTenantIO(server) {
   return new Proxy(server, {
     get(target, prop) {
       const storeId = getStoreId();
       if (storeId) {
-        if (prop === "emit") return (...args) => target.to(storeRoom(storeId)).emit(...args);
+        if (prop === "emit") return (event, payload, ...rest) => emitToStore(target, storeId, event, payload, ...rest);
         if (prop === "to" || prop === "in") {
           return (room) => target.to(Array.isArray(room) ? room.map((r) => mapRoom(r, storeId)) : mapRoom(room, storeId));
         }
@@ -437,13 +511,18 @@ const initSocket = (server) => {
   io.on("connection", (socket) => {
     // Har event handler bhi isi store ke context me (tenantScope plugin queries scope karta hai)
     socket.use((packet, next) => runWithStore(socket.tenantStoreId, next));
-    if (socket.tenantStoreId) socket.join(storeRoom(socket.tenantStoreId));
+    // Admin (verified employee) → sirf admin room; baaki sab → public store room.
+    // Admin public room me nahi — warna har event do baar (full + sirf-id) aata.
+    if (socket.tenantStoreId) {
+      socket.join(socket.userType === "employee" ? adminRoom(socket.tenantStoreId) : storeRoom(socket.tenantStoreId));
+    }
     // Access token expire tha (session marker maujood) → client refresh + reconnect kare
     if (socket.needsRefresh) socket.emit("auth:refresh-needed", { aud: socket.needsRefresh });
 
     if (socket.userId) socket.join(`employee:${socket.userId}`);
     if (socket.userId && socket.userType === "user" && String(socket.userRole || "").toLowerCase() === "user") {
       socket.join(`chat:customer:${socket.userId}`);
+      socket.join(customerRoom(socket.userId)); // apne orders ke live updates
     }
 
     // Chat rooms are always joined through authenticated, server-side authorization.
@@ -616,7 +695,16 @@ const initSocket = (server) => {
 
     // ========== STORE EVENTS ==========
     socket.on("getStoreInfo", async () => {
-      // ✅ PUBLIC — sab ko allow (guest + logged-in)
+      // Guest / customer ko sirf public fields (activity log, plan, domain token nahi).
+      // Pura store document sirf verified admin (employee) socket ko.
+      if (socket.userType !== "employee") {
+        try {
+          const Store = require("../models/Store");
+          const store = await Store.findOne().select("-activity -planId -domainVerifyToken -__v").lean();
+          socket.emit("storeInfo", store ? { success: true, data: store } : { success: false, message: "Store not found." });
+        } catch (e) { socket.emit("storeInfo", { success: false, message: "Store info unavailable" }); }
+        return;
+      }
       try {
         const { getStoreInfo } = require("../controllers/storeController");
         const req = { user: { id: socket.userId, role: socket.userRole } };
@@ -874,17 +962,8 @@ const initSocket = (server) => {
     });
 
     // ========== PRODUCT EVENTS (PUBLIC read) ==========
-    socket.on("getProducts", async () => {
-      try {
-        const Product = require("../models/Product");
-        const products = await Product.find({ is_deleted: false, status: "active" })
-          .select("name variants").lean();
-        socket.emit("productsList", products);
-      } catch (e) {
-        log.error("❌ Socket getProducts error:", e.message);
-        socket.emit("productsList", []);
-      }
-    });
+    // "getProducts" socket event hata diya: frontend use nahi karta tha, aur koi bhi
+    // guest poore catalog ka unbounded scan trigger kar sakta tha. Products REST se.
 
     // ========== DISCOUNT EVENTS ==========
     socket.on("getDiscounts", async () => {
@@ -1029,9 +1108,14 @@ const initSocket = (server) => {
   return io;
 };
 
-/** socket.broadcast ka store-safe version: sirf usi store ke baaki sockets */
+/**
+ * socket.broadcast ka store-safe version: sirf usi store ke baaki sockets —
+ * admin socket → doosre admins (admin room), storefront socket → public room.
+ * Admin data kabhi public room me relay nahi hota.
+ */
 function relayToStore(socket) {
-  return socket.tenantStoreId ? socket.to(storeRoom(socket.tenantStoreId)) : socket.broadcast;
+  if (!socket.tenantStoreId) return socket.broadcast;
+  return socket.to(socket.userType === "employee" ? adminRoom(socket.tenantStoreId) : storeRoom(socket.tenantStoreId));
 }
 
 const getIO = () => {
@@ -1039,4 +1123,12 @@ const getIO = () => {
   return io;
 };
 
-module.exports = { initSocket, getIO, compressAndSaveLogo, processEmployeeAvatar };
+module.exports = {
+  initSocket,
+  getIO,
+  compressAndSaveLogo,
+  processEmployeeAvatar,
+  relayToStore,
+  // tests ke liye (room routing)
+  _rooms: { emitToStore, createTenantIO, PUBLIC_EVENTS, ORDER_EVENTS, adminRoom, storeRoom, customerRoom },
+};

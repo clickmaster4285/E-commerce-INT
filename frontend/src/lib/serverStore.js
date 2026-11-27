@@ -15,6 +15,22 @@
 // next/headers ki wajah se ye module sirf server components me chalta hai
 import { headers } from "next/headers";
 import { cache } from "react";
+import { parseTenantHost } from "./tenantHost";
+
+/**
+ * Current request ka store host — ASLI `Host` header se (proxy.js jaisa parse).
+ *
+ * 🔒 Pehle `x-store-host` header padha jata tha. proxy.js usay overwrite karta hai,
+ *    lekin jin paths par proxy chalta hi nahi tha (matcher `.png/.jpg` wagaira
+ *    skip karta tha, e.g. /product/abc.png) wahan client ka apna `x-store-host`
+ *    server component tak pahunch jata tha aur INTERNAL_PROXY_SECRET ke saath
+ *    backend ko forward hota → host A par store B ka data (spoofing / cache
+ *    poisoning). `Host` client spoof nahi kar sakta (browser/nginx set karta hai).
+ */
+export async function getServerStoreHost() {
+  const tenant = parseTenantHost((await headers()).get("host") || "");
+  return tenant.type === "subdomain" || tenant.type === "custom" ? tenant.host || "" : "";
+}
 
 // Har storefront SSR is par wait karta hai — backend slow ho to jaldi default par
 const DEFAULT_TIMEOUT_MS = 1500;
@@ -30,7 +46,7 @@ export async function serverApiGet(path, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}
   const base = SERVER_API_BASE;
   if (!base) return null;
   try {
-    const storeHost = (await headers()).get("x-store-host") || "";
+    const storeHost = await getServerStoreHost();
     if (!storeHost) return null;
     const res = await fetch(`${base}${path}`, {
       headers: {

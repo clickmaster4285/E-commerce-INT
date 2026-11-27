@@ -70,6 +70,9 @@ export async function proxy(request) {
 
   // Server components `headers().get('x-store-host')` se tenant parh sakte hain
   const requestHeaders = new Headers(request.headers);
+  // 🔒 Client ke bheje internal headers kabhi aage nahi jate (sirf yahan set hote hain)
+  requestHeaders.delete('x-store-subdomain');
+  requestHeaders.delete('x-internal-proxy-secret');
   requestHeaders.set('x-tenant-type', tenant.type);
   requestHeaders.set('x-store-host', tenant.host || '');
   if (tenant.type === 'subdomain') requestHeaders.set('x-store-subdomain', tenant.subdomain);
@@ -128,8 +131,12 @@ export async function proxy(request) {
   return redirect('/');
 }
 
+// 🔒 Pehle `.svg|png|jpg|jpeg|gif|webp` par khatam hone wale SAARE paths skip the —
+//    dynamic routes (/product/abc.png) bhi — aur wahan proxy na chalne se client ka
+//    `x-store-host` header server components tak jata tha. Ab sirf Next ke apne
+//    static assets skip; public/ files upar `pass()` se (bina backend call) nikal jati hain.
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

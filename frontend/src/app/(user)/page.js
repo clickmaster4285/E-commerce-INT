@@ -11,16 +11,17 @@
      header me bhejte hain (src/proxy.js ye header set karta hai).
    ========================================================== */
 
-import { headers } from "next/headers";
 import HomeClient from "./HomeClient";
-import { SERVER_API_BASE } from "@/lib/serverStore";
+import { SERVER_API_BASE, getServerStoreHost } from "@/lib/serverStore";
 
 async function getInitialBanners() {
   try {
     // Internal URL (proxy.js jaisa) — public HTTPS cert Node me fail hota tha
     const base = SERVER_API_BASE;
     if (!base) return null;
-    const storeHost = (await headers()).get("x-store-host") || "";
+    // Tenant asli Host se (client ka x-store-host kabhi forward nahi) — lib/serverStore.js
+    const storeHost = await getServerStoreHost();
+    if (!storeHost) return null;
     const res = await fetch(`${base}/banners/active?limit=12`, {
       // Backend `x-store-host` sirf INTERNAL_PROXY_SECRET ke saath maanta hai (server-only env)
       headers: {
