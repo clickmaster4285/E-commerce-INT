@@ -14,12 +14,33 @@
 const Counter = require("../models/Counter");
 const { getStoreId } = require("./tenantContext");
 
+// ⚠️ `session` sirf tab pass karo jab ho: `{ session: undefined }` Mongoose ke
+// transaction AsyncLocalStorage session ko override kar deta hai (query
+// transaction se bahar chali jati hai).
+const withSession = (options, session) => (session ? { ...options, session } : options);
+
 async function increment(key, session) {
   return Counter.findOneAndUpdate(
     { key },
     { $inc: { seq: 1 } },
-    { returnDocument: "after", session, projection: { seq: 1 } },
+    withSession({ returnDocument: "after", projection: { seq: 1 } }, session),
   ).lean();
+}
+
+/**
+ * Counter na ho to seed se bana do — TRANSACTION SE BAHAR chalao.
+ * (Transaction ke andar duplicate-key race poori transaction abort kar deti
+ * hai; bahar ye sirf "kisi aur ne bana diya" hai.)
+ */
+async function ensureSeeded(key, { seed } = {}) {
+  if (!getStoreId()) throw new Error(`Counter "${key}" needs a store context`);
+  if (await Counter.exists({ key })) return;
+  const start = Math.max(0, Number(seed ? await seed() : 0) || 0);
+  try {
+    await Counter.create({ key, seq: start });
+  } catch (error) {
+    if (error?.code !== 11000) throw error; // kisi aur request ne abhi seed kar diya — theek
+  }
 }
 
 async function nextSeq(key, { seed, session } = {}) {
@@ -29,7 +50,7 @@ async function nextSeq(key, { seed, session } = {}) {
 
   const start = Math.max(0, Number(seed ? await seed() : 0) || 0);
   try {
-    await Counter.create([{ key, seq: start }], session ? { session } : undefined);
+    await Counter.create([{ key, seq: start }], withSession({}, session));
   } catch (error) {
     if (error?.code !== 11000) throw error; // kisi aur request ne abhi seed kar diya — theek
   }
@@ -66,4 +87,4 @@ async function maxNumericSuffix(Model, field, prefixRegex) {
   return row?.max || 0;
 }
 
-module.exports = { nextSeq, peekSeq, formatNumber, maxNumericSuffix };
+module.exports = { nextSeq, ensureSeeded, peekSeq, formatNumber, maxNumericSuffix };

@@ -159,6 +159,8 @@ process.on("uncaughtException", (error) => {
 const startServer = async () => {
   try {
     await connectDB();
+    // Replica set? (checkout transactions) — nahi to bari warning (utils/tx.js)
+    await require("./utils/tx").supportsTransactions();
     await ChatConversation.ensureChatIndexes();
     createUploadDirectories();
     await seedDefaultData();

@@ -9,8 +9,9 @@ const Deal = require("../models/Deal");
 const Bundle = require("../models/Bundle");
 const discountController = require("./discountController");
 const log = require("../utils/logger");
-const { nextSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
+const { nextSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter");
 const { priceCheckout } = require("../services/pricing/checkout"); // server-side cart pricing
+const { withTx, TxAbort, supportsTransactions } = require("../utils/tx"); // one transaction per checkout
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
@@ -54,6 +55,16 @@ const placeOrder = async (req, res) => {
 
     if (!items || !items.length) {
       return res.status(400).json({ success: false, message: "Cart is empty" });
+    }
+
+    // 🔁 IDEMPOTENCY — ek checkout attempt = ek key (frontend Idempotency-Key header).
+    // Double click / network retry same key ke sath aaye to naya order NAHI,
+    // pehle wala order lautao (unique index {storeId, idempotency_key}).
+    const rawIdemKey = String(req.get("Idempotency-Key") || req.body?.idempotency_key || "").trim();
+    const idempotencyKey = /^[A-Za-z0-9_-]{8,100}$/.test(rawIdemKey) ? rawIdemKey : undefined;
+    if (idempotencyKey) {
+      const existing = await Order.findOne({ user_id: req.user._id, idempotency_key: idempotencyKey }).lean();
+      if (existing) return res.status(200).json({ success: true, data: existing, replayed: true });
     }
     if (!["cod", "bank", "card"].includes(payment_method)) {
       return res.status(400).json({ success: false, message: "Invalid payment method" });
@@ -210,7 +221,7 @@ const placeOrder = async (req, res) => {
       endDate: { $gte: now },
     }).select("type value discountValue applyTo selectedProducts selectedCategories selectedBrands isActive name").lean();
 
-    const DEAL_PRICING_FIELDS = "name type applyTo productIds categoryIds brandIds discountValue buyQuantity getQuantity minQuantity isActive startDate endDate freeShippingMethods";
+    const DEAL_PRICING_FIELDS = "name type applyTo productIds categoryIds brandIds discountValue buyQuantity getQuantity minQuantity isActive startDate endDate freeShippingMethods usageLimit perUserLimit";
     const BUNDLE_DEAL_FIELDS = "name type isActive startDate endDate bundleRule bundlePrice bundleProducts";
     const pricingLines = [];
     const shippingItems = [];
@@ -406,39 +417,6 @@ const placeOrder = async (req, res) => {
       }
     }
 
-    // ✅ Stock decrement = PAID + FREE (total ship hone wale) — ATOMIC + CONDITIONAL.
-    // Pehle upar wala check aur ye $inc alag the → do concurrent orders dono check
-    // pass kar ke stock negative / oversell kar dete. Ab `quantity >= n` shart
-    // update ke andar hai: stock na ho to update match hi nahi karta. Fail par
-    // is order ne jo stock liya wo wapas, aur 400.
-    const stockTouchedOnOrder = [];
-    const restoreOrderStock = async () => {
-      for (const touched of stockTouchedOnOrder) {
-        await Variant.updateOne({ _id: touched.variant_id }, { $inc: { quantity: -touched.change } }).catch(() => {});
-      }
-      stockTouchedOnOrder.length = 0;
-    };
-    for (const oi of orderItems) {
-      const need = oi.qty + (oi.free_items || 0);
-      const result = await Variant.updateOne(
-        { _id: oi.variant_id, quantity: { $gte: need } },
-        { $inc: { quantity: -need } }
-      );
-      if (!result.modifiedCount) {
-        await restoreOrderStock();
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for "${oi.name}". Please refresh your cart.`,
-        });
-      }
-      stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -need });
-    }
-
-    // ✅ Live update — order place hote hi manage-stock page apne aap refresh
-    if (stockTouchedOnOrder.length > 0) {
-      emitStockEvent({ variants: stockTouchedOnOrder, source: "order_placed" });
-    }
-
     // ✅ Custom shipping method support:
     //    'standard'/'express' as-is; koi bhi aur code sirf tab accepted
     //    jab wo active custom ShippingMethod ho — warna standard fallback.
@@ -488,24 +466,74 @@ const placeOrder = async (req, res) => {
     const tax = Math.round(taxTotal);
     const total = subtotal + shipping + tax;
 
-    // ✅ ATOMIC ORDER NUMBER (utils/counter.js)
-    // Pehle `sort({ order_number: -1 })` STRING sort tha → ORD-99999 ke baad
-    // "ORD-100000" chhota maana jata, har naya order duplicate number par fail
-    // hota; aur do concurrent checkouts ko same number milta tha.
-    const getNextOrderNumber = async () => {
-      const seq = await nextSeq("order", { seed: () => maxNumericSuffix(Order, "order_number", /^ORD-/) });
-      return formatNumber("ORD-", seq, 5);
-    };
+    // =====================================================
+    // 🔒 ONE TRANSACTION (utils/tx.js): stock + deal usage + order number +
+    // order + draft — sab ek saath commit, ya kuch bhi nahi. Pehle ye alag
+    // alag writes the: beech me fail → stock kam, order nahi; deal usedCount
+    // order ke BAAD aur bina limit check ke badhta tha.
+    // Business rule fail → TxAbort → poora rollback (manual restore ki zaroorat nahi).
+    // =====================================================
+    // Order counter transaction se PEHLE seed (andar seed race tx abort kar deti)
+    const orderSeed = () => maxNumericSuffix(Order, "order_number", /^ORD-/);
+    await ensureSeeded("order", { seed: orderSeed });
 
+    let stockTouchedOnOrder = [];
+    let dealsIncremented = [];
     let order;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const order_number = await getNextOrderNumber();
-      try {
-        order = await Order.create({
+    const transactional = await supportsTransactions();
+    try {
+      ({ result: order } = await withTx(async () => {
+        stockTouchedOnOrder = []; // driver retry par callback dobara chalta hai
+        dealsIncremented = [];
+
+        // 1) Stock — conditional decrement (PAID + FREE)
+        for (const oi of orderItems) {
+          const need = oi.qty + (oi.free_items || 0);
+          const result = await Variant.updateOne(
+            { _id: oi.variant_id, quantity: { $gte: need } },
+            { $inc: { quantity: -need } },
+          );
+          if (!result.modifiedCount) {
+            throw new TxAbort(400, { success: false, message: `Insufficient stock for "${oi.name}". Please refresh your cart.` });
+          }
+          stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -need });
+        }
+
+        // 2) Deal usage — global usageLimit (atomic conditional $inc) + perUserLimit
+        for (const dId of uniqueDealIds) {
+          const dealDoc = pricingLines.find((l) => l.dealDoc && String(l.dealDoc._id) === String(dId))?.dealDoc;
+          const perUserLimit = Number(dealDoc?.perUserLimit) || 0;
+          if (perUserLimit > 0) {
+            const used = await Order.countDocuments({ user_id: req.user._id, deal_ids: dId, status: { $ne: "cancelled" } });
+            if (used >= perUserLimit) {
+              throw new TxAbort(400, { success: false, code: "DEAL_LIMIT_REACHED", message: `You have already used the deal "${dealDoc?.name || ""}" the maximum number of times.` });
+            }
+          }
+          const inc = await Deal.updateOne(
+            {
+              _id: dId,
+              $or: [
+                { usageLimit: null },
+                { usageLimit: { $lte: 0 } },
+                { $expr: { $lt: [{ $ifNull: ["$usedCount", 0] }, "$usageLimit"] } },
+              ],
+            },
+            { $inc: { usedCount: 1 } },
+          );
+          if (inc.matchedCount) dealsIncremented.push(dId);
+          if (!inc.matchedCount) {
+            throw new TxAbort(400, { success: false, code: "DEAL_LIMIT_REACHED", message: `The deal "${dealDoc?.name || ""}" has reached its usage limit. Please update your cart.` });
+          }
+        }
+
+        // 3) Order number (atomic counter) + order
+        const seq = await nextSeq("order", { seed: orderSeed });
+        const [created] = await Order.create([{
           shipping_method,
-          order_number,
+          order_number: formatNumber("ORD-", seq, 5),
           user_id: req.user._id,
           checkout_draft_id: checkoutDraftId,
+          idempotency_key: idempotencyKey,
           items: orderItems,
           address_id: address._id,
           address_snapshot: {
@@ -529,47 +557,52 @@ const placeOrder = async (req, res) => {
           total_deal_savings: orderItems.reduce((sum, i) => sum + (i.deal_savings || 0), 0),
           bundle_ids: Array.from(uniqueBundleIds),
           total_bundle_savings: orderItems.reduce((sum, i) => sum + (i.bundle_savings || 0), 0),
-        });
-        break;
-      } catch (err) {
-        if (err.code === 11000 && attempt < 4) continue;
-        // Order save nahi hua → is checkout ka liya hua stock wapas (pehle permanent leak)
-        await restoreOrderStock();
-        throw err;
-      }
-    }
+        }]);
 
-    // Order persisted successfully: complete all active drafts for this user.
-    // Completing every active entry also clears duplicate legacy drafts. When
-    // this checkout supplied an id, the order link is a fallback for the list
-    // endpoint if this status update cannot be written.
-    try {
-      await CheckoutDraft.updateOne(
-        { user_id: req.user._id },
-        {
-          $set: {
-            "drafts.$[draft].status": "completed",
-            "drafts.$[draft].order_id": order._id,
-            "drafts.$[draft].updatedAt": new Date(),
+        // 4) Complete all active drafts for this user (same transaction)
+        await CheckoutDraft.updateOne(
+          { user_id: req.user._id },
+          {
+            $set: {
+              "drafts.$[draft].status": "completed",
+              "drafts.$[draft].order_id": created._id,
+              "drafts.$[draft].updatedAt": new Date(),
+            },
           },
-        },
-        { arrayFilters: [{ "draft.status": { $ne: "completed" } }] },
-      );
-    } catch (draftError) {
-      log.error("[placeOrder] Draft completion failed after order creation:", draftError);
+          { arrayFilters: [{ "draft.status": { $ne: "completed" } }] },
+        );
+        return created;
+      }));
+    } catch (txError) {
+      // Standalone MongoDB (no transactions): jo liya tha wapas do (compensation)
+      if (!transactional) {
+        for (const t of stockTouchedOnOrder) {
+          await Variant.updateOne({ _id: t.variant_id }, { $inc: { quantity: -t.change } }).catch(() => {});
+        }
+        for (const dId of dealsIncremented) {
+          await Deal.updateOne({ _id: dId, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } }).catch(() => {});
+        }
+      }
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      // Do concurrent submits same Idempotency-Key ke sath → doosra unique index par
+      // fail; pehle wala order hi lautao (double order nahi).
+      if (txError?.code === 11000 && idempotencyKey && /idempotency_key/.test(String(txError.message || ""))) {
+        const existing = await Order.findOne({ user_id: req.user._id, idempotency_key: idempotencyKey }).lean();
+        if (existing) return res.status(200).json({ success: true, data: existing, replayed: true });
+      }
+      throw txError;
     }
 
-    // ✅ Increment deal usage count
-    for (const dId of uniqueDealIds) {
-      await Deal.findByIdAndUpdate(dId, { $inc: { usedCount: 1 } });
+    // ✅ Commit ke BAAD hi events (rollback hua order kabhi broadcast na ho)
+    if (stockTouchedOnOrder.length > 0) {
+      emitStockEvent({ variants: stockTouchedOnOrder, source: "order_placed" });
     }
-
     emitOrderEvent("order:created", { success: true, data: order });
     emitOrderEvent("order:updated", { success: true, data: order });
     res.status(201).json({ success: true, data: order });
   } catch (error) {
     log.error("❌ [placeOrder] Error:", error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: "Could not place your order. Please try again." });
   }
 };
 

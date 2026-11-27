@@ -11,6 +11,8 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
     checkout_draft_id: { type: mongoose.Schema.Types.ObjectId, default: null, index: true },
+    // Checkout attempt ki key (Idempotency-Key header) — double submit par ek hi order
+    idempotency_key: { type: String, default: undefined },
 
     items: [
       {
@@ -120,5 +122,9 @@ orderSchema.index({ user_id: 1, status: 1, created_at: -1 });
 // ── Multi-tenant ──
 orderSchema.plugin(tenantScope); // har store ka data alag (storeId)
 orderSchema.index({ storeId: 1, order_number: 1 }, { unique: true }); // unique per store
+orderSchema.index(
+  { storeId: 1, idempotency_key: 1 },
+  { unique: true, partialFilterExpression: { idempotency_key: { $type: "string" } } },
+);
 
 module.exports = mongoose.model("Order", orderSchema);

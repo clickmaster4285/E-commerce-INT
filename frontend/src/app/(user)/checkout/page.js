@@ -411,6 +411,9 @@ function CheckoutContent() {
   const savingPhoneRef = useRef(false);
   const draftCreateInFlight = useRef(false);
   const placingRef = useRef(false);
+  // 🔁 Ek checkout attempt ki idempotency key — double click / retry par backend
+  // naya order nahi banata, pehle wala lautata hai. Kamyab order ke baad reset.
+  const idempotencyKeyRef = useRef(null);
   const phoneValidationError = getPhoneValidationError(phone, t);
   const phoneError = phoneTouched || phoneSubmitted ? phoneValidationError : "";
   const phoneIsValid = !phoneValidationError;
@@ -924,8 +927,12 @@ function CheckoutContent() {
     placingRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
     try {
       await orderApi.place({
+        idempotency_key: idempotencyKeyRef.current,
         items: itemsWithDiscounts,
         address_id: selectedAddressId,
         payment_method: paymentMethod,
@@ -935,6 +942,7 @@ function CheckoutContent() {
         bank_sender_name: paymentMethod === "bank" ? bankForm.senderName.trim() : null,
         bank_transaction_ref: paymentMethod === "bank" ? bankForm.transactionRef.trim() : null,
       });
+      idempotencyKeyRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
       if (currentDraftId) {
         queryClient.setQueryData(["checkoutDrafts"], (drafts = []) =>

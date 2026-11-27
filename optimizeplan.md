@@ -201,11 +201,11 @@ A replica set enables transactions, retryable writes, change streams and `majori
   - remove the `retryWrites=false` rewrite
   - fail fast at boot if `db.hello().setName` is missing (`"MongoDB must be a replica set"`)
   - set the pool and timeout options listed below
-- [ ] `utils/tx.js`: `withTx(fn)` = `mongoose.connection.transaction(fn, { readConcern: "snapshot", writeConcern: { w: "majority" } })`. It retries `TransientTransactionError` and `UnknownTransactionCommitResult` automatically.
+- [x] `utils/tx.js`: `withTx(fn)` = `mongoose.connection.transaction(fn, { readConcern: "snapshot", writeConcern: { w: "majority" } })`. It retries `TransientTransactionError` and `UnknownTransactionCommitResult` automatically. — **done:** `utils/tx.js` (`transactionAsyncLocalStorage` on, snapshot/majority, `TxAbort` for business-rule rollbacks). On a standalone server it runs without a transaction and the caller compensates (`placeOrder` does), and startup logs a loud warning (`supportsTransactions()` in `server.js`)
   - The tenant ALS context must be kept inside the callback, so add a test for that.
   - Pass `{ session }` to every read and write inside it.
 - [ ] Delete the fallbacks: `supportsTx()` (`purchaseOrderController.js:402-408`), the "standalone" manual compensations (`posController.js:576`, `createProduct`'s rollback at `productController.js:1917`, `createSellerStore`'s manual rollback), and every "if transactions unsupported" branch.
-- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge.
+- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **partly done:** checkout (`placeOrder`). Still open: cancel/edit, POS, invoice, PO, manual adjust, signup/approval, store purge
 - [ ] Tests: `MongoMemoryReplSet` (from `mongodb-memory-server`) so tests run against a real replica set.
 - [ ] Later uses of the replica set: **change streams** for cross-instance cache invalidation (`store:changed`, `publicCache` namespaces), socket fan-out of admin events, and the read-model refresh (§3.4). They can replace some Redis pub/sub.
 - [ ] Connection options: `maxPoolSize` (for example 50), `minPoolSize`, `serverSelectionTimeoutMS: 5000`, `socketTimeoutMS`, and **`autoIndex: false` in production**. Build indexes through a migration script, not on boot.
@@ -576,7 +576,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 
 ### 4.2 Checkout and pricing (P1)
 - [ ] `services/pricing.js`: **one** implementation of line pricing, discounts, deals (BOGO), bundles, tax, rounding and shipping. Today it is written 6 times, each slightly differently: `placeOrder`, `editOrder`, `buildInvoice`, `buildQuote` (no flat discount, different rounding, so quote → invoice totals can differ), `savePosSale` and PO `buildItems`. Discount math is triplicated inside `productController` (`:418-457,534,561`). — **partly done:** the storefront checkout rules are in `services/pricing/`. Still open: invoice, quote, POS and PO math (they have their own formulas) and tax/rounding moving to `utils/money.js` (§3.9)
-- [ ] `placeOrder` as one transaction:
+- [x] `placeOrder` as one transaction: — **done:** stock (conditional) + deal usage (`usageLimit` atomic, `perUserLimit`) + counter number + `Order.create` + draft completion commit together; events fire only after commit. Steps 1–4 and 6–8 are done. Still open: step 5, discount usage recording (the Discount schema has no `usageCount`, §2.5). Tested in `test/placeOrderPricing.test.js` (rollback, deal limit, standalone fallback)
   1. load variants, products, deals and bundles with **`$in` (no N+1)**
   2. compute prices on the server
   3. `stock.reserve`
@@ -585,7 +585,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   6. `counter.next("order")`
   7. `Order.create`
   8. complete the draft
-- [ ] Idempotency: a unique partial `{storeId, checkout_draft_id}` or an `Idempotency-Key` header, so a double-click cannot create two orders.
+- [x] Idempotency: a unique partial `{storeId, checkout_draft_id}` or an `Idempotency-Key` header, so a double-click cannot create two orders. — **done:** `Order.idempotency_key` with a unique partial `{storeId, idempotency_key}`; checkout sends one key per attempt (reset after success); a repeat or a concurrent duplicate returns the existing order (`replayed: true`). Tested with 5 concurrent submits → 1 order
 - [ ] Split `placeOrder` (470 lines, 100 of them card validation), `savePosSale` (310), `recordReturn` (185) and `getFinanceOverview` (190) into service functions.
 - [ ] Invoice `recordPayment` and `recordPOPayment`: use a conditional `$inc` on `amount_paid` with `remaining_balance >= amount`, inside a transaction (today concurrent payments can overpay).
 - [ ] Shipping config and active rules: cache per store (Redis, invalidated on write), since every quote currently re-reads them (`shippingController.js:14,40`). Remove `supportsTx()`'s `admin.hello()` call on every PO delivery.
