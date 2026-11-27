@@ -149,21 +149,31 @@ export default function WelcomeRewardModal() {
 
   const { data: rewards } = useQuery({
     queryKey: ["myRewards", "welcome"],
-    queryFn: () => loyaltyApi.me({ limit: 5 }),
+    queryFn: () => loyaltyApi.me({ limit: 10 }),
     enabled: Boolean(user),
     retry: false,
     staleTime: 60 * 1000,
     select: (d) => {
-      const txn = d?.program?.enabled
-        ? (d.transactions || []).find((x) => x.type === "signup" && x.status === "available")
+      const txns = d?.transactions || [];
+      const isFresh = (x) => Boolean(x) && Date.now() - new Date(x.created_at).getTime() <= FRESH_MS;
+      // Signup bonus sirf tab jab rewards program on ho.
+      const signup = d?.program?.enabled
+        ? txns.find((x) => x.type === "signup" && x.status === "available")
         : null;
-      const fresh = txn && Date.now() - new Date(txn.created_at).getTime() <= FRESH_MS;
-      return { ...d, welcomeTxn: fresh ? txn : null };
+      // Referral points program se independent credit hote hain — hamesha check karo.
+      const referral = txns.find((x) => x.type === "referral" && x.status === "available");
+      return { ...d, welcomeTxn: isFresh(signup) ? signup : null, referralTxn: isFresh(referral) ? referral : null };
     },
   });
 
   const bonus = useMemo(() => {
     const txn = rewards?.welcomeTxn;
+    if (!txn || typeof window === "undefined" || seen(txn._id)) return null;
+    return txn;
+  }, [rewards]);
+
+  const referralBonus = useMemo(() => {
+    const txn = rewards?.referralTxn;
     if (!txn || typeof window === "undefined" || seen(txn._id)) return null;
     return txn;
   }, [rewards]);
@@ -198,23 +208,40 @@ export default function WelcomeRewardModal() {
   }, []);
 
   const welcomeOpen = Boolean(bonus) && dismissed !== bonus?._id;
+  const referralOpen = !welcomeOpen && Boolean(referralBonus) && dismissed !== referralBonus?._id;
   const orderOpen = Boolean(orderReward);
   const preorderOpen = Boolean(preorderClaim);
-  const open = welcomeOpen || orderOpen || preorderOpen;
-  const mode = preorderOpen ? "preorder" : orderOpen ? "order" : "welcome";
-  const displayPoints = mode === "preorder" ? preorderClaim.points : mode === "order" ? orderReward.points : (bonus?.points || 0);
+  const open = welcomeOpen || referralOpen || orderOpen || preorderOpen;
+  const mode = preorderOpen ? "preorder" : orderOpen ? "order" : referralOpen ? "referral" : "welcome";
+  const displayPoints = mode === "preorder"
+    ? preorderClaim.points
+    : mode === "order"
+      ? orderReward.points
+      : mode === "referral"
+        ? (referralBonus?.points || 0)
+        : (bonus?.points || 0);
   const count = useCountUp(displayPoints, open);
-  const successPoints = mode === "order" ? orderReward.points : claimedPoints;
+  const successPoints = mode === "order"
+    ? orderReward.points
+    : mode === "referral"
+      ? (referralBonus?.points || 0)
+      : claimedPoints;
 
   useEffect(() => {
-    stateRef.current = { bonus, orderReward, preorderClaim, phase };
-  }, [bonus, orderReward, preorderClaim, phase]);
+    stateRef.current = { mode, bonus, referralBonus, orderReward, preorderClaim, phase };
+  }, [mode, bonus, referralBonus, orderReward, preorderClaim, phase]);
 
   const close = useCallback(() => {
     const s = stateRef.current;
     if (s.phase === "claiming" || s.phase === "flying") return;
     if (s.preorderClaim) { s.preorderClaim.resolve?.(false); setPreorderClaim(null); return; }
     if (s.orderReward) { setOrderReward(null); return; }
+    // Referral reward sirf dikhaya jata hai (points already credited hain).
+    if (s.mode === "referral" && s.referralBonus) {
+      markSeen(s.referralBonus._id);
+      setDismissed(s.referralBonus._id);
+      return;
+    }
     if (!s.bonus) return;
     markSeen(s.bonus._id);
     setDismissed(s.bonus._id);
@@ -223,8 +250,9 @@ export default function WelcomeRewardModal() {
   // Link navigation ko modal state change se race na karne dein. Browser/Next
   // ko destination par navigate karne dein; welcome reward bas dobara na khule.
   const markWelcomeSeenForNavigation = useCallback(() => {
-    const currentBonus = stateRef.current.bonus;
-    if (currentBonus?._id) markSeen(currentBonus._id);
+    const s = stateRef.current;
+    if (s.mode === "referral" && s.referralBonus?._id) markSeen(s.referralBonus._id);
+    if (s.bonus?._id) markSeen(s.bonus._id);
   }, []);
 
   // Pre-order claim → checkout ko continue karne deta hai (order ab place hota hai).
@@ -329,18 +357,24 @@ export default function WelcomeRewardModal() {
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
 
-        {phase === "success" ? (
+        {phase === "success" || mode === "referral" ? (
           <div className="px-6 pb-7 pt-10 text-center">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--user-accent-soft)] text-[var(--user-accent)] motion-safe:animate-[rewardCheck_.5s_cubic-bezier(.2,1.2,.3,1)_both]">
               <Check size={26} strokeWidth={1.8} />
             </span>
             <h2 id="welcome-reward-title" className="mt-5 text-xl font-semibold leading-snug tracking-tight text-[var(--user-text)]">
-              {mode === "order" ? t("rewards.orderEarned.successTitle") : t("rewards.claim.successTitle")}
+              {mode === "order"
+                ? t("rewards.orderEarned.successTitle")
+                : mode === "referral"
+                  ? t("rewards.referralEarned.title")
+                  : t("rewards.claim.successTitle")}
             </h2>
             <p id="welcome-reward-desc" className="mt-2 text-[0.8125rem] leading-6 text-[var(--user-text-muted)]">
               {mode === "order"
                 ? t("rewards.orderEarned.successText", { points: n(successPoints) })
-                : t("rewards.claim.successText", { points: n(successPoints) })}
+                : mode === "referral"
+                  ? t("rewards.referralEarned.text", { points: n(successPoints) })
+                  : t("rewards.claim.successText", { points: n(successPoints) })}
             </p>
             <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
               <a href="/account?tab=rewards" onClick={markWelcomeSeenForNavigation}

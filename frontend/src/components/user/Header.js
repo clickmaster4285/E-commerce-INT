@@ -321,7 +321,12 @@ export default function Header() {
     enabled: Boolean(user),
     retry: false,
     staleTime: 60 * 1000,
-    select: (d) => (d?.program?.enabled ? d.account?.balance || 0 : null),
+    // Referral points rewards program band hone par bhi credit hote hain,
+    // is liye balance > 0 ho to badge dikhao (warna off par chhupa rahe).
+    select: (d) => {
+      const balance = Number(d?.account?.balance) || 0;
+      return d?.program?.enabled || balance > 0 ? balance : null;
+    },
   });
 
   // Reward modal ke coins yahan pahunchte hain; badge khud count-up aur chip sambhalta hai.

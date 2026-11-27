@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Clock, Coins, Gift, History, Loader2, RotateCcw, ShoppingBag, SlidersHorizontal, Sparkles, TicketPercent } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Coins, Gift, History, Loader2, RotateCcw, ShoppingBag, SlidersHorizontal, Sparkles, TicketPercent, Users } from "lucide-react";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import AccountPageHeader from "@/components/user/AccountPageHeader";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { pointsToValue } from "@/lib/loyalty";
 
-const TYPE_ICON = { signup: Sparkles, earn: ShoppingBag, redeem: TicketPercent, refund: RotateCcw, adjust: SlidersHorizontal };
+const TYPE_ICON = { signup: Sparkles, earn: ShoppingBag, redeem: TicketPercent, refund: RotateCcw, adjust: SlidersHorizontal, referral: Users };
 
 const n = (v, locale) => Number(v || 0).toLocaleString(locale);
 
@@ -46,24 +46,25 @@ export default function RewardsView() {
   const { program, account, transactions, pagination } = data;
   const name = program.programName || "Rewards";
 
-  if (!program.enabled) {
+  // Referral rewards program se independent hain. Program off ho lekin
+  // balance maujood ho to points/history dikhate rahein.
+  if (!program.enabled && !(account.balance > 0)) {
     return (
       <div className="w-full">
         <div className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-8 text-center">
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"><Gift size={20} strokeWidth={1.7} /></span>
           <p className="mt-4 text-base font-semibold text-[var(--user-text)]">{t("rewards.offTitle")}</p>
           <p className="mt-1 text-[0.8125rem] leading-6 text-[var(--user-text-muted)]">{t("rewards.offText")}</p>
-          {account.balance > 0 && <p className="mt-2 text-xs text-[var(--user-text-muted)]">{t("rewards.offTextBalance", { points: n(account.balance, locale) })}</p>}
         </div>
       </div>
     );
   }
 
   const worth = pointsToValue(program, account.balance);
-  const canRedeem = program.redeem.enabled && account.balance >= program.redeem.minPoints;
+  const canRedeem = program.enabled && program.redeem.enabled && account.balance >= program.redeem.minPoints;
   const toUnlock = Math.max(0, program.redeem.minPoints - account.balance);
 
-  const cards = [
+  const cards = program.enabled ? [
     program.earn?.enabled && {
       icon: ShoppingBag,
       title: t("rewards.card.shopTitle"),
@@ -74,11 +75,21 @@ export default function RewardsView() {
       title: t("rewards.card.redeemTitle"),
       text: t("rewards.way.redeemText", { points: n(program.redeem.redeemPoints, locale), value: n(program.redeem.redeemValue, locale), pct: program.redeem.maxPercent }),
     },
-  ].filter(Boolean);
+  ].filter(Boolean) : [];
 
   return (
     <div className="w-full space-y-4">
       <AccountPageHeader title={t("rewards.pageTitle")} subtitle={t("rewards.pageSubtitle")} />
+
+      {!program.enabled && (
+        <div className="flex items-start gap-3 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-4">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"><Gift size={17} strokeWidth={1.7} /></span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[var(--user-text)]">{t("rewards.offTitle")}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--user-text-muted)]">{t("rewards.offTextBalance", { points: n(account.balance, locale) })}</p>
+          </div>
+        </div>
+      )}
 
       {/* Balance */}
       <section className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-5 sm:p-6">
@@ -92,7 +103,7 @@ export default function RewardsView() {
               <span className="text-[2.75rem] font-medium leading-none tracking-tight tabular-nums text-[var(--user-text)]">{n(account.balance, locale)}</span>
               <span className="text-sm font-medium text-[var(--user-text-muted)]">{t("rewards.points")}</span>
             </p>
-            {program.redeem.enabled && (
+            {program.enabled && program.redeem.enabled && (
               <p className="mt-2 text-[0.8125rem] text-[var(--user-text-muted)]">
                 {canRedeem ? t("rewards.worth", { value: n(worth, locale) }) : t("rewards.toUnlock", { points: n(toUnlock, locale) })}
               </p>
@@ -128,7 +139,7 @@ export default function RewardsView() {
         </div>
       )}
 
-      {program.signupBonus.enabled && program.signupBonus.points > 0 && (
+      {program.enabled && program.signupBonus.enabled && program.signupBonus.points > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-2.5 text-xs text-[var(--user-text-muted)]">
           <Sparkles size={14} strokeWidth={1.8} className="shrink-0 text-[var(--user-accent)]" />
           {t("rewards.way.signupText", { points: n(program.signupBonus.points, locale) })}
