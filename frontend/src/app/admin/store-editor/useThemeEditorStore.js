@@ -36,12 +36,23 @@ export const useThemeEditorStore = create((set, get) => ({
 
   // Har edit yahan se — updater(draftCopy) mutate kar sakta hai
   update: (updater) => {
-    const { draft, past } = get();
+    const { draft, past, batch } = get();
     if (!draft) return;
     const next = clone(draft);
     updater(next);
+    // Batch (drag gesture) chal raha ho → sirf pehla change history me, baqi usi step me merge
+    if (batch?.pushed) {
+      set({ draft: next, future: [], dirty: true });
+      return;
+    }
+    if (batch) batch.pushed = true;
     set({ draft: next, past: [...past, draft].slice(-HISTORY_LIMIT), future: [], dirty: true });
   },
+
+  // Color picker drag jaisi continuous edits → ek hi undo step
+  batch: null,
+  beginBatch: () => set({ batch: { pushed: false } }),
+  endBatch: () => set({ batch: null }),
 
   undo: () => {
     const { past, draft, future } = get();

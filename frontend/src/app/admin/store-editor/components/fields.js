@@ -26,6 +26,9 @@ const RichTextEditor = dynamic(() => import("@/components/admin/RichTextEditor")
 });
 
 // Leaflet window chahiye → sirf client par
+// Custom picker (drag + eyedropper + swatches); native <input type=color> drag par band ho jata tha
+import ColorPicker from "./ColorPicker";
+
 const GeoPicker = dynamic(() => import("./GeoPicker"), {
   ssr: false,
   loading: () => <div className="h-72 animate-pulse rounded-lg bg-subtle" />,
@@ -289,47 +292,6 @@ function ImageInput({ value, onChange }) {
   );
 }
 
-function ColorInput({ value, onChange }) {
-  const [text, setText] = useState(value || "");
-  const valid = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="color"
-        value={valid.test(value || "") && value.length === 7 ? value : "#000000"}
-        onChange={(e) => {
-          setText(e.target.value);
-          onChange(e.target.value);
-        }}
-        className="h-9 w-11 shrink-0 cursor-pointer rounded-lg border border-line bg-input p-1"
-      />
-      <input
-        className={inputCls}
-        placeholder="Default"
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          if (valid.test(e.target.value)) onChange(e.target.value);
-          if (!e.target.value) onChange(null);
-        }}
-      />
-      {value ? (
-        <button
-          type="button"
-          onClick={() => {
-            setText("");
-            onChange(null);
-          }}
-          title="Reset to default"
-          className="rounded-lg p-2 text-fg-muted hover:bg-subtle hover:text-fg"
-        >
-          <RotateCcw size={14} />
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
 /** Ek schema field render karo */
 export function SettingField({ field, value, onChange, linkTypes }) {
   const label = field.label || humanize(field.key);
@@ -361,10 +323,15 @@ export function SettingField({ field, value, onChange, linkTypes }) {
         </FieldShell>
       );
     case "color":
+      // <label> nahi (FieldShell) — label click swatch button ko trigger kar deta
       return (
-        <FieldShell label={label} hint={field.hint}>
-          <ColorInput key={value || "empty"} value={value} onChange={onChange} />
-        </FieldShell>
+        <div className="space-y-1.5">
+          <span className="flex min-h-5 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-fg-secondary">{label}</span>
+          </span>
+          <ColorPicker value={value} onChange={onChange} inputCls={inputCls} label={label} />
+          {field.hint ? <span className="block text-[11px] text-fg-muted">{field.hint}</span> : null}
+        </div>
       );
     case "select":
       return (
