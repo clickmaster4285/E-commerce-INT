@@ -9,6 +9,7 @@ const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const { escapeRegex } = require("../utils/escapeRegex");
 const log = require("../utils/logger");
 const { queueTranslationSync } = require("../utils/translationService");
+const { hydrate } = require("../utils/hydrate");
 
 // createdBy/updatedBy creator User ya Employee dono ho sakta hai.
 // Model ref sirf User hai, isliye populate fail hone par Employee se resolve karo.
@@ -405,14 +406,15 @@ exports.getDiscounts = async (req, res) => {
     // ---- LEGACY MODE (no limit) → hard-capped (§4.5) ----
     if (!limit) {
       const { legacyCap } = require("../utils/legacyListCap");
-      const discounts = await Discount.find(filter)
+      let discounts = await Discount.find(filter)
         .populate("selectedProducts", "name translations sku selling_price")
         .populate("selectedCategories", "name translations")
         .populate("selectedBrands", "name translations")
-        .populate("createdBy", "name email")
-        .populate("updatedBy", "name email")
         .sort({ createdAt: -1 })
-        .limit(legacyCap(0, 50));
+        .limit(legacyCap(0, 50))
+        .lean();
+      discounts = await hydrate(discounts, { field: "createdBy", model: Employee, select: "name email" });
+      discounts = await hydrate(discounts, { field: "updatedBy", model: Employee, select: "name email" });
       return res.status(200).json(discounts);
     }
 

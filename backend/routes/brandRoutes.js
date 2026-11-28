@@ -16,6 +16,8 @@ const { checkPermission } = require("../middleware/checkPermission");
 const processBrandLogo = require("../middleware/imageMiddleware");
 const { publicCache } = require("../utils/publicCache");
 const { invalidateOn } = require("../middleware/invalidateOn");
+const { validate } = require("../middleware/validate");
+const brandValidators = require("../validators/brandValidators");
 const router = express.Router();
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
@@ -35,8 +37,8 @@ router.get("/:id", getBrandById);
 // 🛡️ ADMIN ROUTES — token + permission
 // ==========================================
 router.get("/admin/all", authMiddleware, checkPermission("brands"), getBrandsAdmin);
-router.post("/", authMiddleware, checkPermission("brands"), dropBrandsCache, processBrandLogo.upload, processBrandLogo, createBrand);
-router.put("/:id", authMiddleware, checkPermission("brands"), dropBrandsCache, processBrandLogo.upload, processBrandLogo, updateBrand);
-router.delete("/:id", authMiddleware, checkPermission("brands"), dropBrandsCache, deleteBrand);
+router.post("/", authMiddleware, checkPermission("brands"), dropBrandsCache, processBrandLogo.upload, processBrandLogo, validate(brandValidators.createBrand), createBrand);
+router.put("/:id", authMiddleware, checkPermission("brands"), dropBrandsCache, processBrandLogo.upload, processBrandLogo, validate(brandValidators.updateBrand), updateBrand);
+router.delete("/:id", authMiddleware, checkPermission("brands"), validate(brandValidators.brandId), dropBrandsCache, deleteBrand);
 
 module.exports = router;

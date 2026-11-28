@@ -44,6 +44,7 @@
     "dompurify": "^3.5.0",
     "framer-motion": "^14.14.0",
     "html2canvas": "^1.4.1",
+    "isomorphic-dompurify": "^4.9.0",
     "js-cookie": "^3.0.8",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",

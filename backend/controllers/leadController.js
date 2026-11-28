@@ -10,6 +10,7 @@ const PosSale = require("../models/PosSale");
 const Quote = require("../models/Quote");
 const Invoice = require("../models/Invoice");
 const syncLeadCustomer = require("../utils/syncLeadCustomer");
+const { hydrate } = require("../utils/hydrate");
 
 const { escapeRegex } = require("../utils/escapeRegex");
 const enumValues = {
@@ -198,10 +199,9 @@ exports.listLeads = async (req, res) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const activeLeads = { is_deleted: { $ne: true } };
-    const [items, total, allLeads, newThisMonth, qualified, followUpsDue] = await Promise.all([
+    const [rawItems, total, allLeads, newThisMonth, qualified, followUpsDue] = await Promise.all([
       Lead.find(filter)
-        .select("-activities -history -translation_source -translation_status -createdby -updatedby -is_deleted -deleted_at")
-        .populate("assigned_employee_id", "name")
+        .select("-activities -history -translation_source -translation_status -updatedby -is_deleted -deleted_at")
         .populate("category_id", "name")
         .sort({ [sortField]: sortOrder, _id: 1 })
         .skip((page - 1) * limit).limit(limit).lean(),
@@ -211,6 +211,8 @@ exports.listLeads = async (req, res) => {
       Lead.countDocuments({ ...activeLeads, status: "Qualified" }),
       Lead.countDocuments({ ...activeLeads, next_follow_up_date: { $ne: null, $lte: now } }),
     ]);
+    let items = await hydrate(rawItems, { field: "assigned_employee_id", model: Employee, select: "name" });
+    items = await hydrate(items, { field: "createdby", model: Employee, select: "name" });
     const pages = Math.max(1, Math.ceil(total / limit));
     const safePage = Math.min(page, pages);
 

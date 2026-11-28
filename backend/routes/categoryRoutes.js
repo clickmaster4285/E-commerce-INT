@@ -20,6 +20,8 @@ const {
 
 const { publicCache } = require("../utils/publicCache");
 const { invalidateOn } = require("../middleware/invalidateOn");
+const { validate } = require("../middleware/validate");
+const categoryValidators = require("../validators/categoryValidators");
 
 const router = express.Router();
 
@@ -42,9 +44,9 @@ router.get("/", authMiddleware, checkPermission("products"), getCategories);
 router.get("/:id", authMiddleware, checkPermission("products"), getCategoryById);
 router.get("/:id/attributes", authMiddleware, checkPermission("products"), getCategoryAttributes);
 router.get("/:id/attributes-hierarchy", authMiddleware, checkPermission("products"), getCategoryAttributesHierarchical);
-router.post("/", authMiddleware, checkPermission("products"), dropCategoriesCache, createCategory);
-router.put("/:id", authMiddleware, checkPermission("products"), dropCategoriesCache, updateCategory);
-router.put("/:id/attributes", authMiddleware, checkPermission("products"), dropCategoriesCache, assignCategoryAttributes);
-router.delete("/:id", authMiddleware, checkPermission("products"), dropCategoriesCache, deleteCategory);
+router.post("/", authMiddleware, checkPermission("products"), validate(categoryValidators.createCategory), dropCategoriesCache, createCategory);
+router.put("/:id", authMiddleware, checkPermission("products"), validate(categoryValidators.updateCategory), dropCategoriesCache, updateCategory);
+router.put("/:id/attributes", authMiddleware, checkPermission("products"), validate(categoryValidators.categoryId), dropCategoriesCache, assignCategoryAttributes);
+router.delete("/:id", authMiddleware, checkPermission("products"), validate(categoryValidators.categoryId), dropCategoriesCache, deleteCategory);
 
 module.exports = router;

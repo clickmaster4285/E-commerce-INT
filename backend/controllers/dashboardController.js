@@ -130,7 +130,9 @@ const buildBuckets = (start, end, bucket, timeZone) => {
 //  • stats ki sab se purani day previous-range start ko cover kare (partial history se galat totals na aayein)
 // Warna null => caller purani Order aggregations chalata hai.
 const readDailyStats = async ({ prevStart, start, end, prevEnd, bucket, tz }) => {
-  if (process.env.DASHBOARD_USE_DAILY_STATS !== "1" || tz !== "UTC") return null;
+  // Default ON — set DASHBOARD_USE_DAILY_STATS=0 to force live aggregations
+  if (process.env.DASHBOARD_USE_DAILY_STATS === "0") return null;
+  void tz; // day keys are UTC; live agg still used when history incomplete (below)
   const { dayKey } = require("../services/storeStats");
   const StoreDailyStats = require("../models/StoreDailyStats");
   const earliest = await StoreDailyStats.findOne({}).sort({ day: 1 }).select("day").lean();
@@ -167,6 +169,22 @@ const getDashboardStats = async (req, res) => {
     const rangeKey = RANGES[req.query.range] ? req.query.range : "7d";
     const locale = /^[a-z]{2,3}$/i.test(String(req.query.locale || "en")) ? String(req.query.locale || "en").toLowerCase() : "en";
     const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 10));
+
+    // 60s Redis (or memory) cache per store+range (§4.3)
+    const storeId = req.store?._id || "platform";
+    const cacheKey = `dash:${storeId}:${rangeKey}:${locale}:${limit}`;
+    try {
+      const redis = String(process.env.REDIS_URL || "").trim()
+        ? require("../middleware/rateLimit").getRedisClient()
+        : null;
+      if (redis) {
+        const hit = await redis.get(cacheKey);
+        if (hit) {
+          res.set("X-Dashboard-Cache", "HIT");
+          return res.status(200).json(JSON.parse(hit));
+        }
+      }
+    } catch { /* cache miss path */ }
     const makePage = (total, requested) => {
       const pages = Math.max(1, Math.ceil(total / limit));
       const page = Math.min(pages, Math.max(1, Number.parseInt(requested, 10) || 1));
@@ -439,7 +457,7 @@ const getDashboardStats = async (req, res) => {
     const visibleActivities = auditActivities || activities.slice(activitiesPagination.skip, activitiesPagination.skip + limit);
 
     // ---- Response ----
-    res.status(200).json({
+    const payload = {
       success: true,
       data: {
         range: rangeKey,
@@ -462,7 +480,15 @@ const getDashboardStats = async (req, res) => {
         activities: visibleActivities,
         activitiesPagination: (({ skip, ...pagination }) => pagination)(activitiesPagination),
       },
-    });
+    };
+    try {
+      const redis = String(process.env.REDIS_URL || "").trim()
+        ? require("../middleware/rateLimit").getRedisClient()
+        : null;
+      if (redis) await redis.set(cacheKey, JSON.stringify(payload), "EX", 60);
+    } catch { /* ignore cache write */ }
+    res.set("X-Dashboard-Cache", "MISS");
+    res.status(200).json(payload);
 
 
 

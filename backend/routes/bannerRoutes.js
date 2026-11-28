@@ -7,6 +7,8 @@ const authMiddleware = require('../middleware/authMiddleware').requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
 const { publicCache } = require("../utils/publicCache");
 const { invalidateOn } = require("../middleware/invalidateOn");
+const { validate } = require("../middleware/validate");
+const bannerValidators = require("../validators/bannerValidators");
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
 const dropBannersCache = invalidateOn("banners"); // 2xx ke BAAD drop (finish hook)
@@ -24,10 +26,10 @@ router.get("/", authMiddleware, checkPermission("banners"), ctrl.getAllBanners);
 
 // ✅ Dynamic routes baad mein
 router.get("/:id", authMiddleware, checkPermission("banners"), ctrl.getBanner);
-router.post("/", authMiddleware, checkPermission("banners"), dropBannersCache, upload, ctrl.createBanner);
-router.put("/:id", authMiddleware, checkPermission("banners"), dropBannersCache, upload, ctrl.updateBanner);
-router.patch("/:id/toggle", authMiddleware, checkPermission("banners"), dropBannersCache, ctrl.toggleStatus);
-router.post("/:id/duplicate", authMiddleware, checkPermission("banners"), dropBannersCache, ctrl.duplicateBanner);
-router.delete("/:id", authMiddleware, checkPermission("banners"), dropBannersCache, ctrl.deleteBanner);
+router.post("/", authMiddleware, checkPermission("banners"), dropBannersCache, upload, validate(bannerValidators.createBanner), ctrl.createBanner);
+router.put("/:id", authMiddleware, checkPermission("banners"), dropBannersCache, upload, validate(bannerValidators.updateBanner), ctrl.updateBanner);
+router.patch("/:id/toggle", authMiddleware, checkPermission("banners"), validate(bannerValidators.bannerId), dropBannersCache, ctrl.toggleStatus);
+router.post("/:id/duplicate", authMiddleware, checkPermission("banners"), validate(bannerValidators.bannerId), dropBannersCache, ctrl.duplicateBanner);
+router.delete("/:id", authMiddleware, checkPermission("banners"), validate(bannerValidators.bannerId), dropBannersCache, ctrl.deleteBanner);
 
 module.exports = router;

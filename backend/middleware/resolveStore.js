@@ -243,7 +243,16 @@ async function resolveStore(req, res, next) {
     }
   }
 
-  return runWithStore(store._id, next);
+  return runWithStore(store._id, async () => {
+    // Optional StoreSettings overlay (§3.10) — checkout/admin can read req.storeSettings
+    try {
+      const StoreSettings = require("../models/StoreSettings");
+      req.storeSettings = await StoreSettings.findOne({}).lean();
+    } catch {
+      req.storeSettings = null;
+    }
+    return next();
+  });
 }
 
 module.exports = {

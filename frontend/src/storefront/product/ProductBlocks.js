@@ -8,8 +8,8 @@
    Preview me har block clickable (editor me select: "product:<zone>:<id>").
    ========================================================== */
 
-import DOMPurify from "dompurify";
 import { useMemo } from "react";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { BadgeCheck, CalendarClock, MessageCircle, RotateCcw, ShieldCheck, Truck } from "lucide-react";
 import { useStoreTheme, selectSectionInEditor } from "../ThemeProvider";
 import { buildDefaultProductTemplate } from "../themeDefaults";
@@ -134,11 +134,7 @@ export function WhatsAppButton({ settings = {}, productName = "", isPreview = fa
 }
 
 export function TextBlock({ settings = {}, boxed = false }) {
-  const clean = useMemo(() => {
-    const html = settings.body || "";
-    if (!html || typeof window === "undefined" || !DOMPurify.isSupported) return html;
-    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
-  }, [settings.body]);
+  const clean = useMemo(() => sanitizeHtml(settings.body || ""), [settings.body]);
   if (!settings.heading && !clean) return null;
   return (
     <div className={boxed ? "bg-user-card" : ""}>

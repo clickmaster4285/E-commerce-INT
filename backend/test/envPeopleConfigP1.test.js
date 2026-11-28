@@ -8,7 +8,7 @@ const { validateEnv, loadEnv } = require("../config/env");
 const { validate } = require("../middleware/validate");
 const { z } = require("zod");
 
-const goodEnv = { PORT: "5000", MONGO_URI: "mongodb://localhost/x", API_PREFIX: "/api" };
+const goodEnv = { PORT: "5000", MONGO_URI: "mongodb://localhost/x" };
 
 test("env validation accepts minimal good env", () => {
   assert.equal(validateEnv(goodEnv).ok, true);

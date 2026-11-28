@@ -8,8 +8,8 @@
    ========================================================== */
 
 import Link from "next/link";
-import DOMPurify from "dompurify";
 import { useMemo, useState } from "react";
+import { sanitizeHtml } from "@/lib/sanitizeHtml";
 import { useQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { productApi } from "@/apis/user/productApi";
@@ -24,12 +24,7 @@ const API_ORIGIN = (process.env.NEXT_PUBLIC_SERVERURL || "").replace(/\/api\/?$/
 const imageSrc = (url) => (!url ? "" : /^https?:/i.test(url) ? url : `${API_ORIGIN}${url}`);
 
 function SafeHtml({ html, className = "" }) {
-  const clean = useMemo(() => {
-    if (!html) return "";
-    // SSR par DOMPurify (window nahi) — backend sanitized HTML hi render
-    if (typeof window === "undefined" || !DOMPurify.isSupported) return html;
-    return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
-  }, [html]);
+  const clean = useMemo(() => sanitizeHtml(html), [html]);
   if (!clean) return null;
   return <div className={`user-rich-text ${className}`} dangerouslySetInnerHTML={{ __html: clean }} />;
 }

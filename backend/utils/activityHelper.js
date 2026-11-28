@@ -61,11 +61,16 @@ const pushStoreActivity = async (storeId, req, action, summary, details = null) 
   const actor = req?.superAdmin || req?.user;
   const actorType = req?.superAdmin ? "superadmin" : req?.user ? "employee" : "system";
   const actorName = actor?.name || actor?.email || (actorType === "superadmin" ? "Super Admin" : actorType === "employee" ? "Employee" : "System");
-  const Store = require("../models/Store");
-  await Store.updateOne(
-    { _id: storeId },
-    { $push: { activity: { $each: [{ action, summary, actorType, actorId: actor?._id || actor?.id || null, actorName, at: new Date(), details }], $position: 0, $slice: 100 } } },
-  ).setOptions({ skipTenantScope: true }); // activity log: employee lookup cross-store (background helper)
+  // AuditEvent only — Store.activity embedding stopped (§3.5 cutover)
+  audit.record({
+    entityType: "store",
+    entityId: storeId,
+    action: String(action || "activity"),
+    actorType,
+    actorId: actor?._id || actor?.id || null,
+    actorName,
+    meta: { summary, details },
+  });
 };
 
 /**
@@ -73,6 +78,7 @@ const pushStoreActivity = async (storeId, req, action, summary, details = null) 
  */
 const pushActivityToUser = async (userId, activityData) => {
   try {
+    // AuditEvent only — User.activities embedding stopped (§3.5 cutover)
     audit.record({
       entityType: "user",
       entityId: userId || null,
@@ -81,16 +87,6 @@ const pushActivityToUser = async (userId, activityData) => {
       actorId: userId || null,
       actorName: activityData?.performedByName || "",
       meta: activityData || {},
-    });
-    if (!userId) return;
-    await User.findByIdAndUpdate(userId, {
-      $push: {
-        activities: {
-          $each: [{ ...activityData, timestamp: new Date() }],
-          $position: 0, // Newest first
-          $slice: 100,  // Keep last 100
-        },
-      },
     });
   } catch (err) {
     log.error("⚠️ pushActivityToUser error:", err.message);

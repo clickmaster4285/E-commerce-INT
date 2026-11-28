@@ -3,6 +3,7 @@ const express = require("express");
 const {
   createProduct,
   getProducts,
+  getProductTiles,
   getProductStats,
   getProductFacets,
   getCategoryTiles,
@@ -42,6 +43,8 @@ const router = express.Router();
 // ==========================================
 // Shared route (admin list + storefront): admin session → full, warna admin-only fields redact
 router.get("/", optionalAdmin, redactPublic(), getProducts);
+// Dedicated ProductTile DTO (§9.2) — "/:id" se pehle
+router.get("/tiles", publicCache(30 * 1000), getProductTiles);
 // ✅ Summary stats (stat cards) — list se alag route, taake independently load ho sake.
 //    Note: "/:id" se PEHLE register hona zaroori hai warna "stats" id samajh liya jayega.
 router.get("/stats", getProductStats);

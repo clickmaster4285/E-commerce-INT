@@ -104,7 +104,9 @@ test("global rate limit is mounted before resolveStore in app.js", () => {
   const src = fs.readFileSync(path.join(__dirname, "../app.js"), "utf8");
   const rateAt = src.indexOf("limiters.global");
   const resolveAt = src.indexOf("app.use(API_PREFIX, resolveStore)");
-  assert.ok(rateAt > 0 && resolveAt > rateAt);
+  const indexAt = src.indexOf("app.use(API_PREFIX, indexRouter)");
+  assert.ok(rateAt > 0 && resolveAt > rateAt, "rate limit before resolveStore");
+  assert.ok(indexAt > resolveAt, "indexRouter after resolveStore");
 });
 
 test("password fields use select:false", () => {

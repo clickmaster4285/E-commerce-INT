@@ -8,7 +8,7 @@ const {
   pushGlobalActivity,
 } = require("../utils/activityHelper");
 const { withTx, TxAbort } = require("../utils/tx");
-
+const stock = require("../services/stock");
 
 const { escapeRegex } = require("../utils/escapeRegex");
 const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
@@ -345,55 +345,48 @@ const adjustStock = async (req, res) => {
     const variantTitle = variant.title || "";
     const previousSnapshot = variant.quantity ?? 0;
 
-    // Conditional $inc / versioned set + history in one withTx (optimizeplan §4.1)
+    // services/stock.js — stock_levels + movements + Variant dual-write (§3.9 / §4.1)
     let history;
     let previousQuantity;
-    let newQuantity;    let stockTouched = null;
+    let newQuantity;
+    let stockTouched = null;
     try {
       ({ result: { history, previousQuantity, newQuantity } } = await withTx(async () => {
         stockTouched = null;
-        let updated;
-        let prev;
-        let next;
-        if (type === "add") {
-          updated = await Variant.findOneAndUpdate(
-            { _id: variant._id, is_deleted: { $ne: true } },
-            { $inc: { quantity: qty }, $set: { updatedby: performerId } },
-            { returnDocument: "after" },
-          );
-          if (!updated) throw new TxAbort(404, { message: "Variant not found" });
-          next = updated.quantity ?? 0;
-          prev = next - qty;
-        } else if (type === "remove") {
-          updated = await Variant.findOneAndUpdate(
-            { _id: variant._id, is_deleted: { $ne: true }, quantity: { $gte: qty } },
-            { $inc: { quantity: -qty }, $set: { updatedby: performerId } },
-            { returnDocument: "after" },
-          );
-          if (!updated) {
-            throw new TxAbort(400, {
-              message: `Cannot remove ${qty} units. Only ${previousSnapshot} in stock.`,
-            });
-          }
-          next = updated.quantity ?? 0;
-          prev = next + qty;
-        } else {
-          // set: claim on unchanged __v so concurrent set/add cannot race silently
-          updated = await Variant.findOneAndUpdate(
-            { _id: variant._id, is_deleted: { $ne: true }, __v: variant.__v },
-            { $set: { quantity: qty, updatedby: performerId }, $inc: { __v: 1 } },
-            { returnDocument: "after" },
-          );
-          if (!updated) {
-            throw new TxAbort(409, {
-              code: "STOCK_CHANGED",
-              message: "Stock was changed by someone else. Refresh and try again.",
-            });
-          }
-          prev = previousSnapshot;
-          next = qty;
+        const input =
+          type === "set"
+            ? { setTo: qty, kind: "count_set" }
+            : type === "add"
+              ? { qty_delta: qty, kind: "adjust_add" }
+              : { qty_delta: -qty, kind: "adjust_remove" };
+
+        const result = await stock.adjust({
+          variant_id: variant._id,
+          ...input,
+          reason: reasonText,
+          explanation: explanationText,
+          actor: { id: performerId, name: performerName },
+          ref_type: "manual_adjust",
+        });
+        if (!result.ok) {
+          throw new TxAbort(result.status || 400, {
+            message:
+              result.message ||
+              (type === "remove"
+                ? `Cannot remove ${qty} units. Only ${previousSnapshot} in stock.`
+                : "Stock adjust failed"),
+          });
         }
+
+        const next = result.on_hand ?? previousSnapshot;
+        const prev =
+          type === "set"
+            ? previousSnapshot
+            : type === "add"
+              ? next - qty
+              : next + qty;
         stockTouched = { variant_id: variant._id, from: prev, to: next };
+
         const [row] = await StockHistory.create([{
           variant_id: variant._id,
           product_id: productId,

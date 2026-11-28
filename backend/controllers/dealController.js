@@ -7,6 +7,7 @@ const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const { escapeRegex } = require("../utils/escapeRegex");
 const { queueTranslationSync } = require("../utils/translationService");
 const { withoutProtected } = require("../utils/sanitizeBody");
+const { hydrate } = require("../utils/hydrate");
 // Client usedCount / createdBy / storeId wagaira set na kar sake (mass assignment)
 const DEAL_PROTECTED = ["usedCount"];
 
@@ -252,15 +253,13 @@ const getDeals = async (req, res) => {
     const [deals, dealCounts] =
       await Promise.all([
         (adminList
-          ? Deal.find(query).select(["name", "code", "translations.name." + locale, "type", "applyTo", "discountValue", "buyQuantity", "getQuantity", "getDiscountValue", "bundlePrice", "bundleRule.rewardType", "bundleRule.value", "bundleRule.buyQuantity", "bundleRule.freeQuantity", "bundleRule.freeProduct", "isActive", "startDate", "endDate", "isFeatured", "priority", "createdAt"].join(" "))
+          ? Deal.find(query).select(["name", "code", "translations.name." + locale, "type", "applyTo", "discountValue", "buyQuantity", "getQuantity", "getDiscountValue", "bundlePrice", "bundleRule.rewardType", "bundleRule.value", "bundleRule.buyQuantity", "bundleRule.freeQuantity", "bundleRule.freeProduct", "isActive", "startDate", "endDate", "isFeatured", "priority", "createdAt", "createdBy", "updatedBy"].join(" "))
             .populate("bundleRule.freeProduct", ["name", `translations.name.${locale}`, "sku"].join(" "))
           : Deal.find(query)
           .populate("productIds", "name translations sku images selling_price")
           .populate("bundleRule.freeProduct", `${BUNDLE_FREE_PRODUCT_FIELDS} translations`)
           .populate("categoryIds", "name translations code")
-          .populate("brandIds", "name translations logo")
-          .populate("createdBy", "name email role")
-          .populate("updatedBy", "name email role"))
+          .populate("brandIds", "name translations logo"))
           .sort({
             priority: -1,
             createdAt: -1,
@@ -287,7 +286,13 @@ const getDeals = async (req, res) => {
     const expiredCount = dealCounts.expired;
     const disabledCount = dealCounts.disabled;
 
-    const pageDeals = adminList ? deals.map((deal) => ({
+    let hydratedDeals = deals;
+    if (!adminList) {
+      hydratedDeals = await hydrate(deals, { field: "createdBy", model: Employee, select: "name email role" });
+      hydratedDeals = await hydrate(hydratedDeals, { field: "updatedBy", model: Employee, select: "name email role" });
+    }
+
+    const pageDeals = adminList ? hydratedDeals.map((deal) => ({
       _id: deal._id,
       name: deal.name,
       code: deal.code,
@@ -304,7 +309,7 @@ const getDeals = async (req, res) => {
       startDate: deal.startDate,
       endDate: deal.endDate,
       isFeatured: deal.isFeatured,
-    })) : deals;
+    })) : hydratedDeals;
 
     res.status(200).json({
       success: true,

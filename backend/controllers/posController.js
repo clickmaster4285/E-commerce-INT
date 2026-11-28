@@ -8,6 +8,10 @@ const Customer = require("../models/Customer");
 const StockHistory = require("../models/StockHistory");
 const { escapeRegex } = require("../utils/escapeRegex");
 const { recordReturn } = require("../services/posService"); // POS return core (§4.2)
+const stock = require("../services/stock");
+const payments = require("../services/payments");
+const { toMinor } = require("../utils/money");
+const { normalizeMethod: normalizePayMethod } = require("../config/paymentMethods");
 
 const supportedLocales = new Set(["en", "ur", "ar", "es", "fr", "de", "hi", "zh", "pt", "tr"]);
 const getLocale = (value) => supportedLocales.has(String(value || "").toLowerCase()) ? String(value).toLowerCase() : "en";
@@ -662,18 +666,18 @@ const savePosSale = async (req, res, existingSale = null) => {
 
         const line = normalizedItems.find((item) => String(item.variant_id) === variantId)
           || (originalSale?.items || []).find((item) => String(item.variant_id?._id || item.variant_id) === variantId);
-        const updated = stockChange < 0
-          ? await Variant.findOneAndUpdate(
-            { _id: variantId, quantity: { $gte: Math.abs(stockChange) } },
-            { $inc: { quantity: stockChange } },
-            { returnDocument: "after" },
-          )
-          : await Variant.findOneAndUpdate(
-            { _id: variantId },
-            { $inc: { quantity: stockChange } },
-            { returnDocument: "after" },
-          );
-        if (!updated) throw new Error(`Stock changed while saving ${line?.product_name || "this sale"}. Please retry.`);
+        const adj = await stock.adjust({
+          variant_id: variantId,
+          qty_delta: stockChange,
+          kind: stockChange < 0 ? "sale" : "return",
+          ref_type: "pos_sale",
+          ref_id: saleId,
+          reason: historyReason,
+          explanation: historyExplanation,
+          actor: { id: req.user?._id || null, name: req.user?.name || "Administrator" },
+        });
+        if (!adj.ok) throw new Error(`Stock changed while saving ${line?.product_name || "this sale"}. Please retry.`);
+        const newQty = Number(adj.on_hand) || 0;
 
         historyRows.push({
           variant_id: variantId,
@@ -681,8 +685,8 @@ const savePosSale = async (req, res, existingSale = null) => {
           product_name: line?.product_name || "",
           sku: line?.sku || "",
           variant_title: line?.variant_title || "",
-          previous_quantity: (Number(updated.quantity) || 0) - stockChange,
-          new_quantity: Number(updated.quantity) || 0,
+          previous_quantity: newQty - stockChange,
+          new_quantity: newQty,
           change_quantity: stockChange,
           adjustment_type: stockChange > 0 ? "add" : "remove",
           reason: historyReason,
@@ -701,6 +705,30 @@ const savePosSale = async (req, res, existingSale = null) => {
         : (await PosSale.create([{ ...saleData, _id: saleId }]))[0];
       if (!savedSale) throw new Error(existingSale ? "This sale was changed by someone else. Please reload and try again." : "Sale could not be saved.");
       if (historyRows.length) await StockHistory.insertMany(historyRows);
+
+      // Append-only Payment + ledger for new sales (§3.9 dual-write)
+      if (!existingSale) {
+        const collected = Math.max(
+          0,
+          (Number(savedSale.payment?.amount_received) || Number(savedSale.total) || 0)
+            - (Number(savedSale.payment?.change_due) || 0),
+        );
+        if (collected > 0) {
+          await payments.record({
+            direction: "in",
+            method_code: normalizePayMethod(savedSale.payment?.method || "cash"),
+            amount_minor: toMinor(collected),
+            status: "captured",
+            ref_type: "pos_sale",
+            ref_id: savedSale._id,
+            party_type: savedSale.customer_id ? "customer" : null,
+            party_id: savedSale.customer_id || null,
+            reference: savedSale.sale_number || "",
+            received_by: req.user?._id || null,
+            idempotency_key: `pos_sale:${savedSale._id}:capture`,
+          });
+        }
+      }
       return savedSale;
     });
     return res.status(existingSale ? 200 : 201).json({ success: true, data: savedSaleResult });

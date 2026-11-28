@@ -5,6 +5,7 @@ const { withTx } = require("../utils/tx"); // POS sale / return transactions
 const Variant = require("../models/Variant");
 const PosSale = require("../models/PosSale");
 const StockHistory = require("../models/StockHistory");
+const stock = require("./stock");
 
 const reply = (status, body) => ({ status, body });
 
@@ -55,16 +56,26 @@ async function recordReturn({ saleId, payload, user }) {
       const historyExplanation = `Return ${returnRecordId} for ${sale.sale_number}: ${reason}`;
       const historyRows = [];
       for (const line of returnLines) {
-        const variant = await Variant.findOneAndUpdate({ _id: line.variant_id }, { $inc: { quantity: line.quantity } }, { returnDocument: "after" });
-        if (!variant) throw new Error(`Could not restore stock for ${line.product_name}`);
+        const adj = await stock.adjust({
+          variant_id: line.variant_id,
+          qty_delta: line.quantity,
+          kind: "return",
+          ref_type: "pos_sale",
+          ref_id: sale._id,
+          reason: "POS sale return",
+          explanation: historyExplanation,
+          actor: { id: user?._id || null, name: user?.name || "Administrator" },
+        });
+        if (!adj.ok) throw new Error(`Could not restore stock for ${line.product_name}`);
+        const newQty = Number(adj.on_hand) || 0;
         historyRows.push({
           variant_id: line.variant_id,
           product_id: sale.items.find((item) => String(item.variant_id) === String(line.variant_id))?.product_id,
           product_name: line.product_name,
           sku: line.sku,
           variant_title: line.variant_title,
-          previous_quantity: variant.quantity - line.quantity,
-          new_quantity: variant.quantity,
+          previous_quantity: newQty - line.quantity,
+          new_quantity: newQty,
           change_quantity: line.quantity,
           adjustment_type: "add",
           reason: "POS sale return",

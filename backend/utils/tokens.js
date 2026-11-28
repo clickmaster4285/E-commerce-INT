@@ -35,7 +35,8 @@ const num = (value, fallback) => {
 const userAccessDays = () => num(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS, 7);
 const staffAccessMinutes = () => num(process.env.JWT_ACCESS_TOKEN_EXPIREE_MINUTES, 60);
 const refreshDays = () => num(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS, 30);
-const apiPrefix = () => String(process.env.API_PREFIX || "").replace(/\/+$/, "");
+const { API_PREFIX } = require("../config/constants");
+const apiPrefix = () => API_PREFIX;
 
 const AUDIENCES = {
   user: {

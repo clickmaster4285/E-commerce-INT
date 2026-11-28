@@ -63,6 +63,10 @@ async function syncLeadCustomer(lead, actorId = null) {
     customer.updatedby = actorId;
     customerChanged = true;
   }
+  if (String(customer.lead_id || "") !== String(lead._id)) {
+    customer.lead_id = lead._id;
+    customerChanged = true;
+  }
   if (customerChanged) await customer.save();
 
   let leadChanged = false;

@@ -33,9 +33,9 @@ const { initSocket } = require("./utils/socket");
 const { ROOT_DOMAIN } = require("./utils/tenantHost");
 const bannerScheduler = require("./utils/bannerScheduler");
 
+const { API_PREFIX } = require("./config/constants");
 const PORT = Number(process.env.PORT);
 const HOST = process.env.HOST;
-const API_PREFIX = process.env.API_PREFIX;
 const SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS);
 const UPLOAD_DIR = process.env.UPLOAD_DIR;
 const STARTUP_MESSAGE = process.env.SERVER_STARTUP_MESSAGE;
@@ -201,7 +201,7 @@ const startServer = async () => {
       const address = server.address();
       const boundHost = typeof address === "object" && address ? address.address : HOST;
       const isWildcardHost = !boundHost || ["0.0.0.0", "::", "::ffff:0.0.0.0"].includes(boundHost);
-      const apiPath = API_PREFIX ? `/${String(API_PREFIX).replace(/^\/+|\/+$/g, "")}` : "";
+      const apiPath = API_PREFIX;
       console.log(`🔗 Local: http://localhost:${PORT}${apiPath}`);
       if (isWildcardHost) {
         const localIPv4s = [...new Set(Object.values(os.networkInterfaces()).flatMap((interfaces) =>

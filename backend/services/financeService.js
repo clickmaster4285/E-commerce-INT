@@ -5,8 +5,11 @@ const PosSale = require("../models/PosSale");
 const Order = require("../models/Order");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
+const Payment = require("../models/Payment");
+const AccountBalance = require("../models/AccountBalance");
 
 const { roundMoney } = require("../utils/roundMoney");
+const { fromMinor } = require("../utils/money");
 const { readLedgerRange } = require("./financeRead");
 const positiveAmount = (value) => Math.max(0, Number(value) || 0);
 const toDate = (value) => {
@@ -95,12 +98,97 @@ const transactionSorter = (sort) => {
 
 const reply = (status, body) => ({ status, body });
 
+/** Prefer append-only Payment collection when it has rows for the range (§3.9 / §4.3). */
+async function buildOverviewFromPayments(query, locale, period, range) {
+  const payFilter = { status: { $in: ["captured", "refunded"] } };
+  if (range) payFilter.at = { $gte: range.start, $lte: range.end };
+
+  const [rows, balances, invoiceRecv, poPay] = await Promise.all([
+    Payment.find(payFilter).sort({ at: -1 }).lean(),
+    AccountBalance.find({}).lean(),
+    Invoice.find({ is_deleted: { $ne: true } }).select("remaining_balance total amount_paid").lean(),
+    PurchaseOrder.find({ is_deleted: { $ne: true } }).select("due_amount").lean(),
+  ]);
+
+  if (!rows.length) return null; // caller falls back to legacy scan
+
+  const CATEGORY = {
+    invoice: { in: "Invoice payment", out: "Invoice refund" },
+    pos_sale: { in: "POS sale", out: "POS refund" },
+    order: { in: "Online order payment", out: "Online order refund" },
+    purchase_order: { in: "Vendor refund", out: "Vendor payment" },
+  };
+
+  const transactions = rows.map((p) => {
+    const major = fromMinor(p.amount_minor, p.currency || "PKR");
+    const signed = p.direction === "out" ? -Math.abs(major) : Math.abs(major);
+    const cats = CATEGORY[p.ref_type] || { in: "Payment", out: "Payout" };
+    const category = p.direction === "out" ? cats.out : cats.in;
+    return transaction({
+      id: `payment-${p._id}`,
+      kind: signed < 0 ? "expense" : "income",
+      category,
+      reference: p.reference || String(p.ref_id || "").slice(-6),
+      title: category,
+      counterparty: p.party_type || "Not recorded",
+      amount: signed,
+      date: p.at,
+      method: p.method_code,
+      status: p.status,
+      description: p.reference || "",
+      items: [],
+      history: [makeEvent(p.direction === "out" ? "return" : "payment", category, p.at, "Ledger", p.reference || "")],
+      source: { sourceType: p.ref_type, sourceId: String(p.ref_id), paymentId: String(p._id), ledger: true },
+    });
+  });
+
+  const filtered = transactions.filter((entry) => inRange(entry.date, range)).sort(transactionSorter(query.sort));
+  const search = String(query.search || "").trim().toLowerCase();
+  const searched = search
+    ? filtered.filter((entry) => `${entry.reference} ${entry.title} ${entry.category} ${entry.counterparty} ${entry.method}`.toLowerCase().includes(search))
+    : filtered;
+  const kind = ["income", "expense"].includes(query.kind) ? query.kind : "all";
+  const matched = kind === "all" ? searched : searched.filter((entry) => entry.kind === kind);
+  const requestedPageSize = Number.parseInt(query.limit ?? query.pageSize, 10) || 20;
+  const pageSize = Math.min(100, Math.max(10, requestedPageSize));
+  const pageCount = Math.max(1, Math.ceil(matched.length / pageSize));
+  const page = Math.min(pageCount, Math.max(1, Number.parseInt(query.page, 10) || 1));
+  const income = roundMoney(filtered.reduce((sum, entry) => sum + Math.max(0, entry.amount), 0));
+  const expenses = roundMoney(filtered.reduce((sum, entry) => sum + Math.max(0, -entry.amount), 0));
+
+  const ar = balances.find((b) => b.account === "accounts_receivable" && !b.party_id);
+  const ap = balances.find((b) => b.account === "accounts_payable" && !b.party_id);
+  const receivable = ar
+    ? roundMoney(fromMinor(Math.max(0, ar.balance_minor), "PKR"))
+    : roundMoney(invoiceRecv.reduce((sum, invoice) => sum + positiveAmount(invoice.remaining_balance ?? (Number(invoice.total || 0) - Number(invoice.amount_paid || 0))), 0));
+  const payable = ap
+    ? roundMoney(fromMinor(Math.max(0, -ap.balance_minor), "PKR") || fromMinor(Math.abs(ap.balance_minor), "PKR"))
+    : roundMoney(poPay.reduce((sum, order) => sum + positiveAmount(order.due_amount), 0));
+
+  return reply(200, {
+    success: true,
+    data: {
+      locale,
+      period,
+      source: "payments_ledger",
+      summary: { income, expenses, net: roundMoney(income - expenses), receivable, payable, transactionCount: filtered.length },
+      transactions: matched.slice((page - 1) * pageSize, page * pageSize),
+      pagination: { page, pageSize, total: matched.length, pages: pageCount },
+    },
+  });
+}
+
 /** @param {object} query  req.query (locale, period, startDate, endDate, lean, sort, search, kind, page, limit) */
 async function buildFinanceOverview(query) {
   const locale = parseFinanceLocale(query.locale);
   const period = ["today", "yesterday", "7d", "30d", "month", "lastMonth", "year", "all", "custom"].includes(query.period) ? query.period : "today";
   const range = getDateRange(period, query.startDate, query.endDate);
   if (period === "custom" && !range) return reply(400, { success: false, message: "Choose a valid start and end date." });
+
+  // Prefer Payment / ledger path when dual-write has data
+  const fromLedger = await buildOverviewFromPayments(query, locale, period, range);
+  if (fromLedger) return fromLedger;
+
   // ?lean=1: history arrays (activity / edit_history / receivings) DB se hi nahi aate — memory + payload kam
   const leanMode = ["1", "true"].includes(String(query.lean || ""));
   const [invoices, sales, orders, purchaseOrders, purchasePayments] = await Promise.all([

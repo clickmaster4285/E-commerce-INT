@@ -30,6 +30,16 @@ const employeeSchema = new mongoose.Schema(
       default: "staff",
       enum: ["storehandler", "admin", "manager", "staff"],
     },
+    // Optional Role document ref (§3.10) — permissions can come from role + overrides
+    role_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Role",
+      default: null,
+    },
+    permission_overrides: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     // Seller-owner account created at signup stays pending until Super Admin approves.
     // While pending: the admin panel opens in read-only mode (GETs allowed, mutations blocked).
     seller_pending: { type: Boolean, default: false, index: true },

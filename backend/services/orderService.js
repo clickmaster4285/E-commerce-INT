@@ -18,6 +18,7 @@ const { withTx, TxAbort } = require("../utils/tx"); // one transaction per check
 const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
 const loyalty = require("../utils/loyaltyService");
 const LoyaltyTransaction = require("../models/LoyaltyTransaction");
+const stock = require("./stock");
 
 const reply = (status, body) => ({ status, body });
 
@@ -413,14 +414,18 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
       dealsIncremented = [];
       discountsIncremented = [];
 
-      // 1) Stock — conditional decrement (PAID + FREE)
+      // 1) Stock — services/stock.js (stock_levels + Variant dual-write)
       for (const oi of orderItems) {
         const need = oi.qty + (oi.free_items || 0);
-        const result = await Variant.updateOne(
-          { _id: oi.variant_id, quantity: { $gte: need } },
-          { $inc: { quantity: -need } },
-        );
-        if (!result.modifiedCount) {
+        const result = await stock.adjust({
+          variant_id: oi.variant_id,
+          qty_delta: -need,
+          kind: "sale",
+          ref_type: "order",
+          reason: "checkout",
+          explanation: `Order line ${oi.name || ""}`,
+        });
+        if (!result.ok) {
           throw new TxAbort(400, { success: false, message: `Insufficient stock for "${oi.name}". Please refresh your cart.` });
         }
         stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -need });

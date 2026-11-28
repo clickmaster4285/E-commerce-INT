@@ -9,6 +9,7 @@ const { statusCounts, sumCounts } = require("../utils/statusCounts");
 const { keysetFilter, encodeCursor } = require("../utils/keysetPaginate");
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
 const loyalty = require("../utils/loyaltyService");
+const stock = require("../services/stock");
 
 // placeOrder ka core + socket emit helpers services/orderService.js me hain (§4.2)
 const { placeOrderCore, emitOrderEvent, emitStockEvent } = require("../services/orderService");
@@ -615,10 +616,16 @@ const updateOrderStatus = async (req, res) => {
       for (const item of order.items || []) {
         if (!item.variant_id) continue;
         const restoreQty = (Number(item.qty) || 0) + (Number(item.free_items) || 0);
-        await Variant.updateOne(
-          { _id: item.variant_id },
-          { $inc: { quantity: restoreQty } }
-        );
+        if (!restoreQty) continue;
+        await stock.adjust({
+          variant_id: item.variant_id,
+          qty_delta: restoreQty,
+          kind: "sale_cancel",
+          ref_type: "order",
+          ref_id: order._id,
+          reason: "order cancelled",
+          explanation: `Order ${order.order_number || order._id} cancelled`,
+        });
         restoredVariants.push({ variant_id: item.variant_id, change: restoreQty });
       }
       // ✅ Live update — stock restore hote hi manage-stock page khud refresh
@@ -792,16 +799,20 @@ const editOrder = async (req, res) => {
         applied.length = 0;
         for (const change of stockDeltas) {
           const inc = -change.delta;
-          const result = change.delta > 0
-            ? await Variant.updateOne(
-              { _id: change.variant_id, quantity: { $gte: change.delta } },
-              { $inc: { quantity: inc } },
-            )
-            : await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: inc } });
-          if (change.delta > 0 && !result.modifiedCount) {
+          if (!inc) continue;
+          const result = await stock.adjust({
+            variant_id: change.variant_id,
+            qty_delta: inc,
+            kind: inc < 0 ? "sale" : "sale_cancel",
+            ref_type: "order",
+            ref_id: order._id,
+            reason: "order edit",
+            explanation: `Order edit ${order.order_number || order._id}`,
+          });
+          if (!result.ok) {
             throw new TxAbort(400, { success: false, message: `Insufficient stock for "${change.name}". Please refresh and try again.` });
           }
-          if (result.modifiedCount) applied.push({ variant_id: change.variant_id, change: inc });
+          if (result.changed) applied.push({ variant_id: change.variant_id, change: inc });
         }
         const updated = await Order.findOneAndUpdate(
           { _id: order._id, user_id: req.user._id, status: "pending", updated_at: seenUpdatedAt },
@@ -858,15 +869,22 @@ const deleteOrder = async (req, res) => {
       return res.status(409).json({ success: false, message: "Order was already changed or deleted" });
     }
 
-    // ✅ Stock wapas restore = PAID + FREE (total jo ship hone wala tha)
+    // ✅ Stock wapas restore = PAID + FREE via services/stock.js
     const restoredVariants = [];
     for (const item of deletedOrder.items) {
       if (item.variant_id) {
-        await Variant.updateOne(
-          { _id: item.variant_id },
-          { $inc: { quantity: item.qty + (item.free_items || 0) } }
-        );
-        restoredVariants.push({ variant_id: item.variant_id, change: item.qty + (item.free_items || 0) });
+        const restoreQty = (Number(item.qty) || 0) + (Number(item.free_items) || 0);
+        if (!restoreQty) continue;
+        await stock.adjust({
+          variant_id: item.variant_id,
+          qty_delta: restoreQty,
+          kind: "sale_cancel",
+          ref_type: "order",
+          ref_id: deletedOrder._id,
+          reason: "order deleted",
+          explanation: `Pending order ${deletedOrder.order_number || deletedOrder._id} deleted`,
+        });
+        restoredVariants.push({ variant_id: item.variant_id, change: restoreQty });
       }
     }
 

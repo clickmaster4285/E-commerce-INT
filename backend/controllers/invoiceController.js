@@ -8,6 +8,10 @@ const Variant = require("../models/Variant");
 const { calculateReturnLine, capReturnLines, calculateReturnSettlement, getOriginalInvoiceTotal } = require("../utils/invoiceReturnMath");
 const StockHistory = require("../models/StockHistory");
 const { getInvoiceStockAdjustments } = require("../utils/invoiceStockAdjustments");
+const stock = require("../services/stock");
+const payments = require("../services/payments");
+const { toMinor } = require("../utils/money");
+const { normalizeMethod: normalizePayMethod } = require("../config/paymentMethods");
 
 const { roundMoney: round } = require("../utils/roundMoney");
 const { escapeRegex } = require("../utils/escapeRegex");
@@ -292,6 +296,19 @@ exports.createInvoice = async (req, res) => {
   const deductedStock = [];
   try {
     const data = buildInvoice(req.body);
+    // DocumentTemplate defaults when body left blank (§3.10)
+    if (!data.terms || !data.bank_details || !Object.keys(data.pdf_design || {}).length) {
+      try {
+        const tpl = await require("../services/documentTemplates").getDefaultTemplate("invoice");
+        if (tpl) {
+          if (!data.terms) data.terms = tpl.terms || "";
+          if (!data.bank_details) data.bank_details = tpl.bank_details || "";
+          if (!Object.keys(data.pdf_design || {}).length) data.pdf_design = tpl.pdf_design || {};
+          data.template_id = tpl._id;
+          data.template_version = tpl.version;
+        }
+      } catch { /* template optional */ }
+    }
     if (!data.customer_id) return res.status(400).json({ success: false, message: "Select a valid customer" });
     const customer = await Customer.findOne({ _id: data.customer_id, is_deleted: { $ne: true } }).select("name email phone address").lean();
     if (!customer) return res.status(400).json({ success: false, message: "Selected customer was not found" });
@@ -310,17 +327,25 @@ exports.createInvoice = async (req, res) => {
     const { result: invoice } = await withTx(async () => {
       deductedStock.length = 0; // driver retry par reset
       for (const [variantId, entry] of quantitiesByVariant) {
-        const variant = await Variant.findOneAndUpdate(
-          { _id: variantId, product_id: entry.product_id, quantity: { $gte: entry.quantity }, status: "active" },
-          { $inc: { quantity: -entry.quantity } },
-          { returnDocument: "after", select: "_id quantity product_id" },
-        );
-        if (!variant) {
-          const current = await Variant.findOne({ _id: variantId, product_id: entry.product_id }).select("quantity").lean();
-          if (!current) throw new TxAbort(400, { success: false, message: `Variant for "${entry.name}" was not found` });
-          throw new TxAbort(400, { success: false, message: `Insufficient stock for "${entry.name}" (available: ${current.quantity || 0})` });
+        const exists = await Variant.findOne({ _id: variantId, product_id: entry.product_id, status: "active" })
+          .select("_id quantity")
+          .lean();
+        if (!exists) throw new TxAbort(400, { success: false, message: `Variant for "${entry.name}" was not found` });
+        const result = await stock.adjust({
+          variant_id: variantId,
+          qty_delta: -entry.quantity,
+          kind: "sale",
+          ref_type: "invoice",
+          reason: "invoice create",
+          explanation: `Invoice line ${entry.name}`,
+        });
+        if (!result.ok) {
+          throw new TxAbort(400, {
+            success: false,
+            message: `Insufficient stock for "${entry.name}" (available: ${exists.quantity || 0})`,
+          });
         }
-        deductedStock.push({ variant_id: variant._id, quantity: entry.quantity });
+        deductedStock.push({ variant_id: variantId, quantity: entry.quantity });
       }
 
       const [created] = await Invoice.create([{
@@ -392,28 +417,25 @@ exports.updateInvoice = async (req, res) => {
       stockChanges.length = 0;
       for (const adjustment of adjustments) {
         const product_id = productByVariant.get(adjustment.variant_id);
-        let updatedVariant;
-        if (adjustment.quantity > 0) {
-          updatedVariant = await Variant.findOneAndUpdate(
-            { _id: adjustment.variant_id, product_id, quantity: { $gte: adjustment.quantity }, status: "active" },
-            { $inc: { quantity: -adjustment.quantity } },
-            { returnDocument: "after", select: "_id quantity product_id" },
-          );
-          if (!updatedVariant) {
-            const existing = await Variant.findOne({ _id: adjustment.variant_id, product_id }).select("quantity").lean();
-            if (!existing) throw new TxAbort(400, { success: false, message: "An invoice variant was not found" });
-            throw new TxAbort(400, { success: false, message: `Insufficient stock for the updated invoice (available: ${existing.quantity || 0})` });
-          }
-          stockChanges.push({ variant_id: adjustment.variant_id, stockChange: -adjustment.quantity });
-        } else {
-          updatedVariant = await Variant.findOneAndUpdate(
-            { _id: adjustment.variant_id, product_id },
-            { $inc: { quantity: -adjustment.quantity } },
-            { returnDocument: "after", select: "_id quantity product_id" },
-          );
-          if (!updatedVariant) throw new TxAbort(400, { success: false, message: "An invoice variant was not found" });
-          stockChanges.push({ variant_id: adjustment.variant_id, stockChange: -adjustment.quantity });
+        const exists = await Variant.findOne({ _id: adjustment.variant_id, product_id }).select("_id quantity").lean();
+        if (!exists) throw new TxAbort(400, { success: false, message: "An invoice variant was not found" });
+        const delta = -adjustment.quantity;
+        if (!delta) continue;
+        const result = await stock.adjust({
+          variant_id: adjustment.variant_id,
+          qty_delta: delta,
+          kind: delta < 0 ? "sale" : "return",
+          ref_type: "invoice",
+          reason: "invoice update",
+          explanation: "Invoice item qty change",
+        });
+        if (!result.ok) {
+          throw new TxAbort(400, {
+            success: false,
+            message: `Insufficient stock for the updated invoice (available: ${exists.quantity || 0})`,
+          });
         }
+        stockChanges.push({ variant_id: adjustment.variant_id, stockChange: delta });
       }
 
       const next = await Invoice.findOneAndUpdate(
@@ -469,25 +491,52 @@ exports.recordPayment = async (req, res) => {
       before: "—",
       after: `${method} · ${amount} · ${paymentDate.toISOString().slice(0, 10)}${paymentTime ? ` ${paymentTime}` : ""}${String(req.body.note || "").trim() ? ` · ${String(req.body.note).trim()}` : ""}`,
     }, { action: "balance", field: "Remaining balance", before: priorRemaining, after: remaining }]);
-    const updated = await Invoice.findOneAndUpdate(
-      { _id: invoice._id, is_deleted: false, amount_paid: invoice.amount_paid },
-      {
-        $push: {
-          payments: { amount, payment_date: paymentDate, payment_time: paymentTime, payment_method: method, note: String(req.body.note || "").trim() },
-          activity: activityEntry,
-        },
-        $set: {
-          amount_paid: paid,
-          remaining_balance: remaining,
-          status: remaining <= 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid",
-          paid_at: remaining <= 0 ? paymentDate : null,
-          updatedby: req.user?._id || null,
-        },
-      },
-      { returnDocument: "after", runValidators: true },
-    );
-    if (!updated) {
-      return res.status(409).json({ success: false, code: "INVOICE_CHANGED", message: "Another payment was recorded at the same time. Refresh the invoice and try again." });
+    let updated;
+    try {
+      ({ result: updated } = await withTx(async () => {
+        const next = await Invoice.findOneAndUpdate(
+          { _id: invoice._id, is_deleted: false, amount_paid: invoice.amount_paid },
+          {
+            $push: {
+              payments: { amount, payment_date: paymentDate, payment_time: paymentTime, payment_method: method, note: String(req.body.note || "").trim() },
+              activity: activityEntry,
+            },
+            $set: {
+              amount_paid: paid,
+              remaining_balance: remaining,
+              status: remaining <= 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid",
+              paid_at: remaining <= 0 ? paymentDate : null,
+              updatedby: req.user?._id || null,
+            },
+          },
+          { returnDocument: "after", runValidators: true },
+        );
+        if (!next) {
+          throw new TxAbort(409, {
+            success: false,
+            code: "INVOICE_CHANGED",
+            message: "Another payment was recorded at the same time. Refresh the invoice and try again.",
+          });
+        }
+        // Append-only Payment + ledger (§3.9) — dual-write with embedded payments[]
+        await payments.record({
+          direction: "in",
+          method_code: normalizePayMethod(method),
+          amount_minor: toMinor(amount),
+          status: "captured",
+          ref_type: "invoice",
+          ref_id: invoice._id,
+          party_type: "customer",
+          party_id: invoice.customer_id || null,
+          reference: String(req.body.note || invoice.invoice_number || "").trim(),
+          received_by: req.user?._id || null,
+          idempotency_key: `invoice:${invoice._id}:pay:${priorPaid}:${amount}:${paymentDate.toISOString()}`,
+        });
+        return next;
+      }));
+    } catch (txError) {
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
     }
     res.json({ success: true, data: updated });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
@@ -625,12 +674,20 @@ exports.recordReturn = async (req, res) => {
       stockChanges.length = 0;
       const stockHistoryRows = [];
       for (const restore of restockByVariant.values()) {
-        const variant = await Variant.findOneAndUpdate(
-          { _id: restore.variant_id, product_id: restore.product_id },
-          { $inc: { quantity: restore.quantity } },
-          { returnDocument: "after", select: "_id quantity product_id title sku" },
-        );
+        const variant = await Variant.findOne({ _id: restore.variant_id, product_id: restore.product_id })
+          .select("_id quantity product_id title sku")
+          .lean();
         if (!variant) throw new TxAbort(400, { success: false, message: `Could not restore stock for ${restore.name}` });
+        const result = await stock.adjust({
+          variant_id: restore.variant_id,
+          qty_delta: restore.quantity,
+          kind: "return",
+          ref_type: "invoice",
+          reason: "Invoice return",
+          explanation: stockHistoryExplanation,
+          actor: { id: req.user?._id || null, name: req.user?.name || "Administrator" },
+        });
+        if (!result.ok) throw new TxAbort(400, { success: false, message: `Could not restore stock for ${restore.name}` });
         stockChanges.push({ variant_id: variant._id, quantity: restore.quantity });
         stockHistoryRows.push({
           variant_id: variant._id,
@@ -638,8 +695,8 @@ exports.recordReturn = async (req, res) => {
           product_name: restore.name,
           sku: restore.sku || variant.sku || "",
           variant_title: variant.title || restore.title,
-          previous_quantity: variant.quantity - restore.quantity,
-          new_quantity: variant.quantity,
+          previous_quantity: (variant.quantity || 0),
+          new_quantity: (variant.quantity || 0) + restore.quantity,
           change_quantity: restore.quantity,
           adjustment_type: "add",
           reason: "Invoice return",

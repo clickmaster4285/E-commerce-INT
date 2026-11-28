@@ -13,6 +13,10 @@ const { pushGlobalActivity } = require("../utils/activityHelper");
 const { aggregateVendorBalances } = require("../utils/vendorBalance");
 const { auditEvent, diffFields, diffItems } = require("../utils/auditHistory");
 const { escapeRegex } = require("../utils/escapeRegex");
+const stock = require("../services/stock");
+const payments = require("../services/payments");
+const { toMinor } = require("../utils/money");
+const { normalizeMethod: normalizePayMethod } = require("../config/paymentMethods");
 
 const emitPO = (event, data) => { try { const io = getIO(); if (io) io.emit(event, data); } catch {} };
 const emitStock = (data) => emitPO("stockUpdated", data);
@@ -461,10 +465,18 @@ const deliverPO = async (req, res) => {
           const variant = await Variant.findById(n.variant_id);
           if (!variant) throw new TxAbort(400, { success: false, message: "Variant not found" });
           const prev = variant.quantity ?? 0;
+          const unitCostMinor = Math.round((Math.max(0, Number(n.item.cost_price) || 0) * 100));
+          const recv = await stock.receive({
+            variant_id: variant._id,
+            qty: n.qty,
+            ref_type: "purchase_order",
+            ref_id: claimed._id,
+            unit_cost_minor: unitCostMinor,
+          });
+          if (!recv.ok) throw new TxAbort(400, { success: false, message: recv.message || "Could not receive stock" });
           await Variant.updateOne(
             { _id: variant._id },
             {
-              $inc: { quantity: n.qty },
               $set: {
                 cost_price: Math.max(0, Number(n.item.cost_price) || 0),
                 selling_price: Math.max(0, Number(n.item.sell_price) || 0),
@@ -573,6 +585,20 @@ const recordPOPayment = async (req, res) => {
           po_id: po._id, vendor_id: po.vendor_id, amount, method,
           paid_at: req.body?.paid_at || new Date(), createdby: req.user?._id || null,
         }]);
+        // Append-only Payment + ledger (§3.9) — dual-write with PurchasePayment
+        await payments.record({
+          direction: "out",
+          method_code: normalizePayMethod(method === "bank" ? "bank_transfer" : method),
+          amount_minor: toMinor(amount),
+          status: "captured",
+          ref_type: "purchase_order",
+          ref_id: po._id,
+          party_type: "vendor",
+          party_id: po.vendor_id || null,
+          reference: po.po_number || "",
+          received_by: req.user?._id || null,
+          idempotency_key: `po:${po._id}:pay:${oldPaidAmount}:${amount}`,
+        });
         return { updatedPO: nextPO, pay: created };
       }));
     } catch (txError) {

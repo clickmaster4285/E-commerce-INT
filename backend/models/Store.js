@@ -146,6 +146,32 @@ storeSchema.post("save", function (doc) {
       .catch((error) => {
         console.error("[store] attribute seed failed:", error.message);
       });
+    // Default Role docs (Admin/Manager/Cashier/Staff) — §3.10
+    require("../utils/seedRoles").seedRolesForStore(storeId)
+      .then((roles) => {
+        console.log(`🎭 Roles seeded for new store ${storeId} — ${roles?.length || 0} roles.`);
+      })
+      .catch((error) => {
+        console.error("[store] role seed failed:", error.message);
+      });
+    // Default TaxClass (Standard 0%) + empty StoreSettings
+    const { runWithStore } = require("../utils/tenantContext");
+    runWithStore(storeId, async () => {
+      const TaxClass = require("./TaxClass");
+      await TaxClass.findOneAndUpdate(
+        { name: "Standard" },
+        { $setOnInsert: { name: "Standard", rate_bp: 0, inclusive: false } },
+        { upsert: true },
+      ).catch(() => {});
+      const StoreSettings = require("./StoreSettings");
+      await StoreSettings.findOneAndUpdate(
+        {},
+        { $setOnInsert: { tax: { rate: 0, inclusive: false } } },
+        { upsert: true },
+      ).catch(() => {});
+    }).catch((error) => {
+      console.error("[store] tax/settings seed failed:", error.message);
+    });
   });
 });
 

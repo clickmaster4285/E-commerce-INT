@@ -24,7 +24,7 @@ const sharp = require("sharp");
 
 const multer = require("../utils/tenantMulter");
 const AppError = require("../utils/AppError");
-const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
+const { uploadDirFor, uploadUrlFor, maybeUploadToObjectStorage } = require("../utils/uploadPaths");
 
 // Sirf raster images — SVG me <script> chal sakta hai (stored XSS)
 const IMAGE_MIMES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"]);
@@ -131,21 +131,46 @@ function mapUploadError(err, { maxBytes }) {
  * @param {number}   [cfg.maxBytes]
  * @param {string}   [cfg.reqKey]       req[reqKey] = processed result(s)
  * @param {boolean}  [cfg.allowVideo]   mp4/webm as-is (sniffed)
+ * @param {"memory"|"disk"} [cfg.storage="memory"]  disk — badi video ke liye RAM bachao
  */
 function createImageUpload(cfg = {}) {
   const {
     fields, maxCount = 1, kind, idFrom, resize, quality = 85, rotate = true,
     maxPixels = DEFAULT_MAX_PIXELS, maxBytes = DEFAULT_MAX_MB * 1024 * 1024,
-    reqKey, allowVideo = false,
+    reqKey, allowVideo = false, storage: storageMode = "memory",
   } = cfg;
   if (!fields) throw new Error("createImageUpload: `fields` required");
   if (!kind) throw new Error("createImageUpload: `kind` required");
 
   const fieldList = typeof fields === "string" ? [{ name: fields, maxCount }] : fields;
   const isSingle = typeof fields === "string" && maxCount === 1;
+  const useDisk = storageMode === "disk" || (allowVideo && storageMode !== "memory");
+
+  const storage = useDisk
+    ? multer.diskStorage({
+        destination: (req, file, cb) => {
+          try {
+            const sub = (() => {
+              if (!idFrom) return [];
+              const id = typeof idFrom === "function" ? idFrom(req) : req.params?.[idFrom];
+              return id ? [String(id)] : [];
+            })();
+            const dir = uploadDirFor(req, kind, ...sub, "_tmp");
+            fs.mkdirSync(dir, { recursive: true });
+            cb(null, dir);
+          } catch (err) {
+            cb(err);
+          }
+        },
+        filename: (req, file, cb) => {
+          const ext = path.extname(file.originalname || "").slice(1) || "bin";
+          cb(null, uniqueName("up", ext.replace(/[^a-z0-9]/gi, "") || "bin"));
+        },
+      })
+    : multer.memoryStorage();
 
   const upload = multer({
-    storage: multer.memoryStorage(),
+    storage,
     limits: { fileSize: maxBytes, files: fieldList.reduce((n, f) => n + (f.maxCount || 1), 0) },
     fileFilter: (req, file, cb) => {
       const mime = String(file.mimetype || "").toLowerCase();
@@ -166,21 +191,55 @@ function createImageUpload(cfg = {}) {
 
   // Ek file: validate → process → disk
   async function handleFile(req, dir, file) {
-    const sniffed = sniffType(file.buffer);
+    const tmpPath = file.path || null;
+    const mime = String(file.mimetype || "").toLowerCase();
+    const looksVideo = allowVideo && VIDEO_MIMES.has(mime);
+
+    // Video on disk: sniff header only (12 bytes) — poori file RAM me mat lao
+    if (looksVideo && tmpPath) {
+      const fd = await fs.promises.open(tmpPath, "r");
+      const head = Buffer.alloc(12);
+      await fd.read(head, 0, 12, 0);
+      await fd.close();
+      const sniffed = sniffType(head) || (mime.includes("webm") ? "webm" : "mp4");
+      if (sniffed !== "mp4" && sniffed !== "webm") {
+        await fs.promises.unlink(tmpPath).catch(() => {});
+        throw invalidImage("Only MP4 or WebM videos are allowed");
+      }
+      const filePath = path.join(dir, uniqueName(kind.replace(/[^a-z0-9]/gi, "").slice(0, 12) || "vid", sniffed));
+      await fs.promises.rename(tmpPath, filePath).catch(async () => {
+        await fs.promises.copyFile(tmpPath, filePath);
+        await fs.promises.unlink(tmpPath).catch(() => {});
+      });
+      trackUploadedFile(req, filePath);
+      const remoteUrl = await maybeUploadToObjectStorage(filePath, `video/${sniffed}`);
+      const url = remoteUrl || uploadUrlFor(filePath);
+      return {
+        img_url: url, img_size: file.size, mimeType: `video/${sniffed}`, width: undefined, height: undefined,
+        originalSize: file.size, fieldname: file.fieldname, originalname: file.originalname, path: filePath,
+        filename: path.basename(filePath), mimetype: `video/${sniffed}`, size: file.size,
+      };
+    }
+
+    const buffer = file.buffer || (tmpPath ? await fs.promises.readFile(tmpPath) : null);
+    if (!buffer) return null;
+    if (tmpPath) await fs.promises.unlink(tmpPath).catch(() => {});
+    const sniffed = sniffType(buffer);
     let out;
     let ext = "webp";
     if (allowVideo && (sniffed === "mp4" || sniffed === "webm")) {
       ext = sniffed;
-      out = { buffer: file.buffer, size: file.buffer.length, mimeType: `video/${sniffed}`, width: undefined, height: undefined };
+      out = { buffer, size: buffer.length, mimeType: `video/${sniffed}`, width: undefined, height: undefined };
     } else {
       const fieldResize = typeof resize === "function" ? resize(file) : resize;
-      if (typeof resize === "function" && !fieldResize) return null; // is field ko skip
-      out = await processImage(file.buffer, { resize: fieldResize, quality, rotate, maxPixels });
+      if (typeof resize === "function" && !fieldResize) return null;
+      out = await processImage(buffer, { resize: fieldResize, quality, rotate, maxPixels });
     }
     const filePath = path.join(dir, uniqueName(kind.replace(/[^a-z0-9]/gi, "").slice(0, 12) || "img", ext));
     await fs.promises.writeFile(filePath, out.buffer);
     trackUploadedFile(req, filePath);
-    const url = uploadUrlFor(filePath);
+    const remoteUrl = await maybeUploadToObjectStorage(filePath, out.mimeType);
+    const url = remoteUrl || uploadUrlFor(filePath);
     return {
       img_url: url, img_size: out.size, mimeType: out.mimeType, width: out.width, height: out.height,
       // multer-compatible fields — purane controllers req.file.path / filename use karte hain

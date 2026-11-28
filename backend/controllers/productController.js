@@ -2515,6 +2515,13 @@ const deleteProduct = async (req, res) => {
       }
     );
 
+    // Bundle / Deal / Discount / cart refs (§3.7)
+    try {
+      await require("../services/referentialCleanup").cleanupProductReferences(product._id);
+    } catch (cleanupErr) {
+      log.warn("[deleteProduct] referential cleanup:", cleanupErr?.message || cleanupErr);
+    }
+
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
@@ -2954,11 +2961,57 @@ const getProductOptions = async (req, res) => {
 };
 
 // ======================================================
+// GET /products/tiles — dedicated ProductTile DTO list (§9.2)
+// ======================================================
+const { toProductTile } = require("../dto/productDto");
+
+const getProductTiles = async (req, res) => {
+  try {
+    // Force public slim path through getProducts shape, then map to tiles
+    req.query = { ...(req.query || {}), slim: "1" };
+    req.authAud = undefined; // never admin view for tiles
+    const locale = String(req.query.locale || req.get("x-lang") || "en").trim().toLowerCase() || "en";
+    const limit = Math.min(48, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+
+    const filter = { is_deleted: { $ne: true }, status: "active" };
+    if (req.query.category_id) filter.category_id = req.query.category_id;
+    if (req.query.brand_id) filter.brand_id = req.query.brand_id;
+    if (req.query.ids) {
+      const ids = String(req.query.ids).split(",").map((s) => s.trim()).filter(Boolean);
+      if (ids.length) filter._id = { $in: ids };
+    }
+
+    const [total, products] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter)
+        .select("name translations category_id brand_id price_from stock_total variant_count primary_image rating_avg rating_count compare_at")
+        .populate({ path: "brand_id", select: "name translations" })
+        .sort({ created_at: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+    ]);
+
+    const data = products.map((p) => toProductTile(p, locale)).filter(Boolean);
+    return res.status(200).json({
+      success: true,
+      data,
+      meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
+  } catch (error) {
+    log.error("[getProductTiles]", error);
+    return res.status(500).json({ success: false, message: "Could not load product tiles" });
+  }
+};
+
+// ======================================================
 // EXPORTS
 // ======================================================
 module.exports = {
   createProduct,
   getProducts,
+  getProductTiles,
   getProductStats,
   getProductFacets,
   getCategoryTiles,

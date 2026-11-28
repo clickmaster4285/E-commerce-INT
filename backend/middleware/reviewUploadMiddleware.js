@@ -31,6 +31,7 @@ const reviewMediaUpload = createImageUpload({
   quality: 85,
   maxBytes: MAX_VIDEO_SIZE,
   allowVideo: true,
+  storage: "disk", // video 50MB RAM me na rahe — disk stream (§2.4)
 });
 
 // ==========================================

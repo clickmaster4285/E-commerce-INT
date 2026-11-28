@@ -1,9 +1,8 @@
-const Variant = require("../models/Variant");
-const StockHistory = require("../models/StockHistory");
 const Product = require("../models/Product");
+const stock = require("../services/stock");
 
 /**
- * Variant ko absolute target quantity par le jao — race-safe $inc + StockHistory (§4.1).
+ * Variant ko absolute target quantity par le jao — services/stock.js (§4.1 / §3.9).
  * Direct `variant.quantity = x` + save overwrite concurrent stock changes.
  */
 async function adjustVariantQuantityToTarget({
@@ -13,10 +12,14 @@ async function adjustVariantQuantityToTarget({
   performerName = "Admin",
   reason = "",
   explanation = "Variant quantity updated",
+  session = null,
 }) {
   const previousQuantity = variant.quantity ?? 0;
-  const delta = newQty - previousQuantity;
-  if (delta === 0) {
+  const target = Number(newQty);
+  if (Number.isNaN(target) || target < 0) {
+    return { ok: false, status: 400, message: "Quantity must be a non-negative number" };
+  }
+  if (target === previousQuantity) {
     return {
       ok: true,
       changed: false,
@@ -26,68 +29,43 @@ async function adjustVariantQuantityToTarget({
     };
   }
 
-  let updated;
-  if (delta < 0) {
-    const absDelta = Math.abs(delta);
-    updated = await Variant.findOneAndUpdate(
-      { _id: variant._id, is_deleted: { $ne: true }, quantity: { $gte: absDelta } },
-      { $inc: { quantity: delta }, $set: { updatedby: performerId } },
-      { returnDocument: "after" },
-    );
-    if (!updated) {
-      return {
-        ok: false,
-        status: 400,
-        message: `Cannot reduce stock below zero. Only ${previousQuantity} in stock.`,
-      };
-    }
-  } else {
-    updated = await Variant.findOneAndUpdate(
-      { _id: variant._id, is_deleted: { $ne: true } },
-      { $inc: { quantity: delta }, $set: { updatedby: performerId } },
-      { returnDocument: "after" },
-    );
-    if (!updated) {
-      return { ok: false, status: 404, message: "Variant not found" };
-    }
+  const result = await stock.adjust(
+    {
+      variant_id: variant._id,
+      setTo: target,
+      kind: "count_set",
+      reason: String(reason || "").trim(),
+      explanation: String(explanation || "").trim(),
+      actor: { id: performerId, name: performerName },
+      ref_type: "variant",
+      ref_id: variant._id,
+    },
+    session,
+  );
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      status: result.status || 400,
+      message: result.message || `Cannot reduce stock below zero. Only ${previousQuantity} in stock.`,
+    };
   }
 
-  const newQuantity = updated.quantity ?? 0;
-  const productId = updated.product_id?._id || updated.product_id || null;
-  let productName = "";
-  if (productId) {
-    const product = await Product.findById(productId).select("name").lean();
-    productName = product?.name || "";
+  const newQuantity = result.on_hand ?? target;
+  const productId = variant.product_id?._id || variant.product_id || null;
+  if (productId && !result.changed) {
+    // no-op already handled above
   }
-
-  // Form se absolute target aati hai — history me "set" (manage-stock adjust jaisa)
-  const adjustment_type = "set";
-
-  await StockHistory.create({
-    variant_id: variant._id,
-    product_id: productId,
-    product_name: productName,
-    sku: variant.sku || updated.sku || "",
-    variant_title: variant.title || updated.title || "",
-    previous_quantity: previousQuantity,
-    new_quantity: newQuantity,
-    change_quantity: newQuantity - previousQuantity,
-    adjustment_type,
-    reason: String(reason || "").trim(),
-    explanation: String(explanation || "").trim(),
-    performed_by: performerId,
-    performed_by_name: performerName,
-  });
 
   variant.quantity = newQuantity;
 
   return {
     ok: true,
-    changed: true,
+    changed: Boolean(result.changed),
     previousQuantity,
     newQuantity,
     productId,
-    variant: updated,
+    variant: result.movement ? { ...variant, quantity: newQuantity } : variant,
   };
 }
 

@@ -12,7 +12,6 @@ require("dotenv").config({ path: path.join(__dirname, ".env"), quiet: true });
 
 const crypto = require("crypto");
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
 const compression = require("compression");
 const cookieParser = require("cookie-parser");
@@ -23,10 +22,10 @@ const log = require("./utils/logger");
 const { resolveStore, resolveStoreByHost } = require("./middleware/resolveStore");
 const { isPlatformFamilyHost } = require("./utils/tenantHost");
 const { errorHandler } = require("./middleware/errorHandler");
+const { API_PREFIX } = require("./config/constants");
 
 const NODE_ENV = process.env.NODE_ENV;
 const IS_PRODUCTION = String(NODE_ENV || "").toLowerCase() === "production";
-const API_PREFIX = process.env.API_PREFIX;
 const CLIENT_URL = process.env.CLIENT_URL;
 const REQUEST_SIZE_LIMIT = process.env.REQUEST_SIZE_LIMIT;
 const UPLOAD_CACHE_MAX_AGE = process.env.UPLOAD_CACHE_MAX_AGE;
@@ -250,110 +249,12 @@ app.use(
 app.use((req, res, next) => { req.io = app.get("io") || null; next(); });
 
 // ==========================================
-// ROUTES
+// ROUTES — saari feature mounts routes/indexRouter.js me
 // ==========================================
-// Routers ek jagah require (style unify) — mount neeche
-const categoryRoutes = require("./routes/categoryRoutes");
-const brandRoutes = require("./routes/brandRoutes");
-const productRoutes = require("./routes/productRoutes");
-const userRoutes = require("./routes/userRoutes");
-const variantRoutes = require("./routes/variantRoutes");
-const storeRoutes = require("./routes/storeRoutes");
-const employeeRoutes = require("./routes/employeeRoutes");
-const discountRoutes = require("./routes/discountRoutes");
-const dealRoutes = require("./routes/dealRoutes");
-const bundleRoutes = require("./routes/bundleRoutes");
-const tagRoutes = require("./routes/tagRoutes");
-const addressRoutes = require("./routes/addressRoutes");
-const bannerRoutes = require("./routes/bannerRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const cartRoutes = require("./routes/cartRoutes");
-const stockRoutes = require("./routes/stockRoutes");
-const reviewRoutes = require("./routes/reviewRoutes");
-const attributeRoutes = require("./routes/attributeRoutes");
-const shippingRoutes = require("./routes/shippingRoutes");
-const dashboardRoutes = require("./routes/dashboardRoutes");
-const vendorRoutes = require("./routes/vendorRoutes");
-const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
-const customerRoutes = require("./routes/customerRoutes");
-const leadRoutes = require("./routes/leadRoutes");
-const quoteRoutes = require("./routes/quoteRoutes");
-const invoiceRoutes = require("./routes/invoiceRoutes");
-const posRoutes = require("./routes/posRoutes");
-const financeRoutes = require("./routes/financeRoutes");
-const translationRoutes = require("./routes/translationRoutes");
-const chatRoutes = require("./routes/chatRoutes");
-const loyaltyRoutes = require("./routes/loyaltyRoutes");
-const themeRoutes = require("./routes/themeRoutes");
-const pageRoutes = require("./routes/pageRoutes");
-const subscriberRoutes = require("./routes/subscriberRoutes");
-const contactRoutes = require("./routes/contactRoutes");
-const superAdminRoutes = require("./routes/superAdminRoutes");
-const sellerApplicationRoutes = require("./routes/sellerApplicationRoutes");
-
-app.use(`${API_PREFIX}/categories`, categoryRoutes);
-app.use(`${API_PREFIX}/brands`, brandRoutes);
-app.use(`${API_PREFIX}/products`, productRoutes);
-app.use(`${API_PREFIX}/users`, userRoutes);
-app.use(`${API_PREFIX}/variants`, variantRoutes);
-app.use(`${API_PREFIX}/store`, storeRoutes);
-app.use(`${API_PREFIX}/employees`, employeeRoutes);
-app.use(`${API_PREFIX}/discounts`, discountRoutes);
-app.use(`${API_PREFIX}/deals`, dealRoutes);
-app.use(`${API_PREFIX}/bundles`, bundleRoutes);
-app.use(`${API_PREFIX}/tags`, tagRoutes);
-app.use(`${API_PREFIX}/addresses`, addressRoutes);
-app.use(`${API_PREFIX}/banners`, bannerRoutes);
-app.use(`${API_PREFIX}/orders`, orderRoutes);
-app.use(`${API_PREFIX}/cart`, cartRoutes);
-app.use(`${API_PREFIX}/stock`, stockRoutes);
-app.use(`${API_PREFIX}/reviews`, reviewRoutes);
-app.use(`${API_PREFIX}/attributes`, attributeRoutes);
-app.use(`${API_PREFIX}/shipping`, shippingRoutes);
-app.use(`${API_PREFIX}/dashboard`, dashboardRoutes);
-app.use(`${API_PREFIX}/vendors`, vendorRoutes);
-app.use(`${API_PREFIX}/purchase-orders`, purchaseOrderRoutes);
-app.use(`${API_PREFIX}/customers`, customerRoutes);
-app.use(`${API_PREFIX}/leads`, leadRoutes);
-app.use(`${API_PREFIX}/quotes`, quoteRoutes);
-app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
-app.use(`${API_PREFIX}/pos`, posRoutes);
-app.use(`${API_PREFIX}/finance`, financeRoutes);
-app.use(`${API_PREFIX}/translations`, translationRoutes);
-app.use(`${API_PREFIX}/chats`, chatRoutes);
-app.use(`${API_PREFIX}/loyalty`, loyaltyRoutes);
-// ── Store editor (theme draft/publish) + custom pages ──
-app.use(`${API_PREFIX}/theme`, themeRoutes);
-app.use(`${API_PREFIX}/pages`, pageRoutes);
-// ── Newsletter subscribers (store editor newsletter section) ──
-app.use(`${API_PREFIX}/newsletter`, subscriberRoutes);
-// ── Contact form messages (store editor contact section) ──
-app.use(`${API_PREFIX}/contact`, contactRoutes);
-// ── Super Admin module (separate namespace + auth) ──
-app.use(`${API_PREFIX}/super-admin`, superAdminRoutes);
-// ── Public seller application (pending-review queue) ──
-app.use(`${API_PREFIX}/seller`, sellerApplicationRoutes);
+const indexRouter = require("./routes/indexRouter");
+app.use(API_PREFIX, indexRouter);
 
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
-app.get(`${API_PREFIX}/health`, (req, res) => {
-  res.status(200).json({ success: true, message: "API is running", environment: NODE_ENV, timestamp: new Date() });
-});
-app.get(`${API_PREFIX}/ready`, async (req, res) => {
-  // READINESS: Mongo connected + (REDIS_URL ho to) Redis ping. Liveness /health alag aur halka rehta hai.
-  const checks = { mongo: mongoose.connection.readyState === 1, redis: null };
-  if (String(process.env.REDIS_URL || "").trim()) {
-    try {
-      const client = require("./middleware/rateLimit").getRedisClient();
-      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("redis ping timeout")), 1500));
-      checks.redis = client ? (await Promise.race([client.ping(), timeout])) === "PONG" : false;
-    } catch {
-      checks.redis = false;
-    }
-  }
-  const ok = checks.mongo && checks.redis !== false;
-  if (ok) return res.status(200).json({ ok: true });
-  return res.status(503).json({ ok: false, checks });
-});
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found", path: req.originalUrl });
 });

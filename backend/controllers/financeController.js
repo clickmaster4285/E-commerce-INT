@@ -1,15 +1,12 @@
 const { readLedgerRange } = require("../services/financeRead");
 const { buildFinanceOverview } = require("../services/financeService"); // overview assembly (§4.2)
+const asyncHandler = require("../utils/asyncHandler");
+const AppError = require("../utils/AppError");
 
-exports.getFinanceOverview = async (req, res) => {
-  try {
-    const out = await buildFinanceOverview(req.query);
-    return res.status(out.status).json(out.body);
-  } catch (error) {
-    console.error("Finance overview error:", error);
-    return res.status(500).json({ success: false, message: "Unable to load finance overview" });
-  }
-};
+exports.getFinanceOverview = asyncHandler(async (req, res) => {
+  const out = await buildFinanceOverview(req.query);
+  return res.status(out.status).json(out.body);
+});
 // Ledger slice — finance overview yahan shift ho sakta hai jab reporting stable ho
 exports.readLedgerRangeForStore = async (req, res) => {
   try {

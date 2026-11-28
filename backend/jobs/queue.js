@@ -1,41 +1,72 @@
 // ==========================================================
-// JOBS QUEUE (optimizeplan.md §6.3) — halka in-process queue
-// ----------------------------------------------------------
-//   queue.register("translation", async (payload, job) => {...});
-//   await queue.add("translation", payload, { jobId, attempts: 3, backoffMs: 1000 });
-//
-// • Dedupe: wahi jobId pending ho to dobara add nahi hota ({ deduped: true }).
-//   Agar wahi jobId abhi RUN ho rahi hai to ek rerun mark hota hai (naya data miss na ho).
-// • Retry: fail ho to `attempts` tak setTimeout backoff ke saath dobara.
-// • add() sirf "queued" hone par resolve hota hai — handler ka wait nahi (fire-and-forget).
-//   Tests / OTP jaisi jagah jahan result chahiye: `queue.whenIdle()`.
-// • Process ke andar hai: restart par pending jobs kho jati hain, aur multi-instance par
-//   dedupe sirf is process tak.
-//
-// NEXT STEP: REDIS_URL ho to BullMQ (persistent + shared dedupe + alag worker process) par
-// shift karna hai — add()/register() ka interface wahi rakha gaya hai taake callers na badlen.
-// Abhi BullMQ workers WIRE NAHI hain (ye sirf scaffolding hai).
+// JOBS QUEUE (§6.3) — same API: register / add / whenIdle / size
+// REDIS_URL → BullMQ (persistent, shared across instances)
+// warna in-process Map + setTimeout (dev / tests)
 // ==========================================================
 
 const log = require("../utils/logger");
 
-const handlers = new Map(); // name -> fn (jobs/email.js, translationService import par register karte hain)
-const jobs = new Map(); // jobId -> { state: "pending"|"running", rerun, ... }
+const handlers = new Map();
+const localJobs = new Map();
 const idleWaiters = [];
+const bullQueues = new Map();
+const bullWorkers = new Map();
 
 const keyOf = (name, jobId) => `${name}:${jobId}`;
 
-const notifyIdle = () => {
-  if (jobs.size) return;
+function useBull() {
+  return Boolean(String(process.env.REDIS_URL || "").trim());
+}
+
+function notifyIdle() {
+  if (localJobs.size) return;
   while (idleWaiters.length) idleWaiters.shift()();
-};
+}
+
+function getConnection() {
+  const url = String(process.env.REDIS_URL || "").trim();
+  // BullMQ accepts a connection object or URL via ioredis options
+  return { url, maxRetriesPerRequest: null };
+}
+
+function ensureBull(name) {
+  if (bullQueues.has(name)) return bullQueues.get(name);
+  const { Queue, Worker } = require("bullmq");
+  const connection = getConnection();
+  const queue = new Queue(`ce:${name}`, { connection });
+  bullQueues.set(name, queue);
+
+  if (!bullWorkers.has(name)) {
+    const worker = new Worker(
+      `ce:${name}`,
+      async (job) => {
+        const handler = handlers.get(name);
+        if (!handler) throw new Error(`No handler registered for job "${name}"`);
+        await handler(job.data, { jobId: job.id, name, attemptsMade: job.attemptsMade });
+      },
+      { connection, concurrency: 2 },
+    );
+    worker.on("failed", (job, err) => {
+      log.error(`[jobs/bull] ${name} (${job?.id}) failed:`, err?.message || err);
+    });
+    bullWorkers.set(name, worker);
+  }
+  return queue;
+}
 
 function register(name, handler) {
   if (typeof handler !== "function") throw new Error("queue.register: handler must be a function");
   handlers.set(name, handler);
+  if (useBull()) {
+    try {
+      ensureBull(name);
+    } catch (err) {
+      log.warn(`[jobs] BullMQ init failed for ${name}, falling back to in-process:`, err?.message || err);
+    }
+  }
 }
 
-async function run(job) {
+async function runLocal(job) {
   const handler = handlers.get(job.name);
   job.state = "running";
   job.attemptsMade += 1;
@@ -46,22 +77,20 @@ async function run(job) {
     if (job.attemptsMade < job.attempts) {
       job.state = "pending";
       const delay = job.backoffMs * 2 ** (job.attemptsMade - 1);
-      job.timer = setTimeout(() => run(job), delay);
+      job.timer = setTimeout(() => runLocal(job), delay);
       job.timer.unref?.();
       return;
     }
-    // Final fail — original request pe koi asar nahi, sirf log
     log.error(`[jobs] ${job.name} (${job.jobId}) failed after ${job.attemptsMade} attempt(s):`, error?.message || error);
   }
   if (job.rerun) {
-    // Chalte waqt dobara add hui thi → fresh payload ke saath ek aur baar
     job.rerun = false;
     job.attemptsMade = 0;
     job.state = "pending";
-    setImmediate(() => run(job));
+    setImmediate(() => runLocal(job));
     return;
   }
-  jobs.delete(job.key);
+  localJobs.delete(job.key);
   notifyIdle();
 }
 
@@ -69,12 +98,37 @@ async function run(job) {
  * @param {string} name
  * @param {any} payload
  * @param {{ jobId?: string, attempts?: number, backoffMs?: number, delayMs?: number }} [opts]
- * @returns {Promise<{ queued: boolean, deduped: boolean, jobId: string }>}
  */
 async function add(name, payload, opts = {}) {
   const jobId = String(opts.jobId || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+  const attempts = Math.max(1, Number(opts.attempts) || 1);
+
+  if (useBull() && handlers.has(name)) {
+    try {
+      const queue = ensureBull(name);
+      const existing = await queue.getJob(jobId);
+      if (existing) {
+        const state = await existing.getState();
+        if (state === "active" || state === "waiting" || state === "delayed") {
+          return { queued: false, deduped: true, jobId };
+        }
+      }
+      await queue.add(name, payload, {
+        jobId,
+        attempts,
+        backoff: { type: "exponential", delay: Math.max(1, Number(opts.backoffMs) || 1000) },
+        delay: Number(opts.delayMs) > 0 ? Number(opts.delayMs) : undefined,
+        removeOnComplete: 1000,
+        removeOnFail: 5000,
+      });
+      return { queued: true, deduped: false, jobId };
+    } catch (err) {
+      log.warn(`[jobs] BullMQ add failed, in-process fallback:`, err?.message || err);
+    }
+  }
+
   const key = keyOf(name, jobId);
-  const existing = jobs.get(key);
+  const existing = localJobs.get(key);
   if (existing) {
     if (existing.state === "running") {
       existing.payload = payload;
@@ -83,35 +137,66 @@ async function add(name, payload, opts = {}) {
     return { queued: false, deduped: true, jobId };
   }
   const job = {
-    key, name, jobId, payload,
-    attempts: Math.max(1, Number(opts.attempts) || 1),
+    key,
+    name,
+    jobId,
+    payload,
+    attempts,
     backoffMs: Math.max(1, Number(opts.backoffMs) || 1000),
-    attemptsMade: 0, state: "pending", rerun: false, timer: null,
+    attemptsMade: 0,
+    state: "pending",
+    rerun: false,
+    timer: null,
   };
-  jobs.set(key, job);
+  localJobs.set(key, job);
   if (opts.delayMs > 0) {
-    job.timer = setTimeout(() => run(job), opts.delayMs);
+    job.timer = setTimeout(() => runLocal(job), opts.delayMs);
     job.timer.unref?.();
   } else {
-    setImmediate(() => run(job));
+    setImmediate(() => runLocal(job));
   }
   return { queued: true, deduped: false, jobId };
 }
 
-/** Saari pending/running jobs khatam hone par resolve (tests / graceful shutdown) */
 function whenIdle() {
-  if (!jobs.size) return Promise.resolve();
+  if (!localJobs.size) return Promise.resolve();
   return new Promise((resolve) => idleWaiters.push(resolve));
 }
 
-const size = () => jobs.size;
+const size = () => localJobs.size;
 const _hasHandler = (name) => handlers.has(name);
 
+async function close() {
+  for (const job of localJobs.values()) if (job.timer) clearTimeout(job.timer);
+  localJobs.clear();
+  for (const worker of bullWorkers.values()) {
+    try { await worker.close(); } catch { /* ignore */ }
+  }
+  for (const queue of bullQueues.values()) {
+    try { await queue.close(); } catch { /* ignore */ }
+  }
+  bullWorkers.clear();
+  bullQueues.clear();
+  notifyIdle();
+}
+
 function _reset() {
-  for (const job of jobs.values()) if (job.timer) clearTimeout(job.timer);
-  jobs.clear();
+  for (const job of localJobs.values()) if (job.timer) clearTimeout(job.timer);
+  localJobs.clear();
   handlers.clear();
   notifyIdle();
 }
 
-module.exports = { register, add, whenIdle, size, _hasHandler, _reset };
+async function ping() {
+  if (!useBull()) return { ok: true, driver: "memory" };
+  try {
+    const redis = require("../middleware/rateLimit").getRedisClient();
+    if (!redis) return { ok: false, driver: "bullmq", error: "no redis" };
+    const pong = await redis.ping();
+    return { ok: pong === "PONG", driver: "bullmq" };
+  } catch (err) {
+    return { ok: false, driver: "bullmq", error: err?.message || String(err) };
+  }
+}
+
+module.exports = { register, add, whenIdle, size, close, ping, _hasHandler, _reset };

@@ -13,6 +13,7 @@ const { escapeRegex } = require("../utils/escapeRegex");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 const { countProductsUsingCategory } = require("../services/referentialCleanup");
+const { hydrate } = require("../utils/hydrate");
 
 // Populated attribute ke saath `translations` zaroori — attribute ka `name`
 // translate hota hai aur options ke labels `values[].label_translations` me
@@ -959,11 +960,13 @@ const getAdminCategories = async (req, res) => {
 
     /* ---------- LEGACY: full list (attributes ke sath) ---------- */
     if (!wantsPagination) {
-      const categories = await Category.find({ is_deleted: false })
+      let categories = await Category.find({ is_deleted: false })
         .select(CATEGORY_LIST_SELECT)
         .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
         .sort({ created_at: -1 })
         .lean();
+      categories = await hydrate(categories, { field: "createdby", model: Employee, select: "name email" });
+      categories = await hydrate(categories, { field: "updatedby", model: Employee, select: "name email" });
 
       return res.status(200).json({ success: true, data: categories, count: categories.length });
     }

@@ -51,6 +51,12 @@ const customerSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    // Reverse link from Lead convert (§3.6)
+    lead_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Lead",
+      default: null,
+    },
     is_deleted: {
       type: Boolean,
       default: false,

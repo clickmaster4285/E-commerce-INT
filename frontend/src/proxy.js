@@ -116,8 +116,28 @@ export async function proxy(request) {
   requestHeaders.set('x-tenant-type', tenant.type);
   requestHeaders.set('x-store-host', tenant.host || '');
   if (tenant.type === 'subdomain') requestHeaders.set('x-store-subdomain', tenant.subdomain);
-  const pass = () => NextResponse.next({ request: { headers: requestHeaders } });
-  const rewrite = (path) => NextResponse.rewrite(new URL(path, request.url), { request: { headers: requestHeaders } });
+  // CSP nonce (§9.1) — Report-Only headers me use; enforced CSP baad me
+  const cspNonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+  requestHeaders.set('x-nonce', cspNonce);
+  const withNonce = (res) => {
+    const scriptSrc = `script-src 'self' 'nonce-${cspNonce}' 'strict-dynamic' https://accounts.google.com https://apis.google.com`;
+    const report = [
+      "default-src 'self'",
+      scriptSrc,
+      "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+      "img-src 'self' data: blob: http: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' http: https: ws: wss:",
+      "frame-src 'self' https://accounts.google.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ');
+    res.headers.set('Content-Security-Policy-Report-Only', report);
+    return res;
+  };
+  const pass = () => withNonce(NextResponse.next({ request: { headers: requestHeaders } }));
+  const rewrite = (path) => withNonce(NextResponse.rewrite(new URL(path, request.url), { request: { headers: requestHeaders } }));
   const redirect = (path) => NextResponse.redirect(new URL(path, request.url));
   // Platform-only page store host par → "page not available" (super admin waghera)
   const notAvailable = () => rewrite('/store-not-found?reason=page');

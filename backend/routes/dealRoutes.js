@@ -5,6 +5,8 @@ const { checkPermission } = require("../middleware/checkPermission");
 const uploadDealImageFile = require("../middleware/dealImageMiddleware");
 const { publicCache } = require("../utils/publicCache");
 const { invalidateOn } = require("../middleware/invalidateOn");
+const { validate } = require("../middleware/validate");
+const dealValidators = require("../validators/dealValidators");
 
 const {
   createDeal,
@@ -45,9 +47,9 @@ router.get("/:id/targets", authMiddleware, checkPermission("deals"), getDealTarg
 router.get("/:id", authMiddleware, checkPermission("deals"), getDealById);
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
 const dropDealsCache = invalidateOn("deals");
-router.post("/", authMiddleware, checkPermission("deals"), dropDealsCache, createDeal);
-router.put("/:id", authMiddleware, checkPermission("deals"), dropDealsCache, updateDeal);
-router.delete("/:id", authMiddleware, checkPermission("deals"), dropDealsCache, deleteDeal);
+router.post("/", authMiddleware, checkPermission("deals"), validate(dealValidators.createDeal), dropDealsCache, createDeal);
+router.put("/:id", authMiddleware, checkPermission("deals"), validate(dealValidators.updateDeal), dropDealsCache, updateDeal);
+router.delete("/:id", authMiddleware, checkPermission("deals"), validate(dealValidators.dealId), dropDealsCache, deleteDeal);
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("deals"), dropDealsCache, toggleDealStatus);
 
 // 404 global handler (app.js) sambhalta hai

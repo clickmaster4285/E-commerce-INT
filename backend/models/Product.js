@@ -77,6 +77,12 @@ const productSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    // Prefer TaxClass ref (§3.10); `tax` kept as snapshot/fallback during cutover
+    tax_class_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "TaxClass",
+      default: null,
+    },
 
     isPerishable: {
       type: Boolean,

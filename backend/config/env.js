@@ -3,7 +3,7 @@
 // ----------------------------------------------------------
 // `loadEnv()` sirf server.js startup par chalta hai (app.js / tests require
 // karte waqt nahi) taake supertest / node --test par koi side effect na ho.
-// - Hamesha: PORT / MONGO_URI / API_PREFIX required aur format-checked.
+// - Hamesha: PORT / MONGO_URI required aur format-checked. API_PREFIX code me hardcoded (/api).
 // - Production: JWT secrets (6 alag), INTERNAL_PROXY_SECRET, ROOT_DOMAIN wagairah bhi required.
 // - Dev/test: baaki sab optional (existing code apne checks khud karta hai).
 // ==========================================================
@@ -20,7 +20,6 @@ const baseSchema = z.object({
   PORT: nonEmpty("PORT").pipe(z.coerce.number().int("PORT must be an integer").min(1, "PORT must be 1-65535").max(65535, "PORT must be 1-65535")),
   HOST: optionalStr,
   MONGO_URI: nonEmpty("MONGO_URI").refine((v) => /^mongodb(\+srv)?:\/\//.test(v), "MONGO_URI must start with mongodb:// or mongodb+srv://"),
-  API_PREFIX: nonEmpty("API_PREFIX").refine((v) => v.startsWith("/"), "API_PREFIX must start with '/'"),
   REDIS_URL: blankToUndef(z.string().regex(/^rediss?:\/\//, "REDIS_URL must start with redis:// or rediss://").optional()),
   BCRYPT_SALT_ROUNDS: blankToUndef(z.coerce.number().int().min(4).max(15).optional()),
   JWT_SECRET: optionalStr,
