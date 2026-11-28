@@ -34,11 +34,13 @@ const getCustomersAdmin = async (req, res) => {
     if (contactFilter === "phone") listFilter.phone = { $nin: ["", null] };
     else if (contactFilter === "email") listFilter.email = { $nin: ["", null] };
 
-    // Calls without `page` retain the full-list response for POS/invoice flows.
+    // Calls without `page` retain the list response for POS/invoice flows (hard-capped §4.5).
     if (req.query.page === undefined) {
+      const { legacyCap } = require("../utils/legacyListCap");
       const customers = await Customer.find(listFilter)
         .select("_id name phone email address created_at translations")
         .sort({ created_at: -1, _id: -1 })
+        .limit(legacyCap(req.query.limit, 100))
         .lean();
       return res.status(200).json({ success: true, data: customers });
     }
@@ -110,9 +112,9 @@ const getCustomerById = async (req, res) => {
     if (!customer) return res.status(404).json({ success: false, message: "Customer not found" });
 
     const [sales, quotes, invoices] = await Promise.all([
-      PosSale.find({ customer_id: customer._id }).sort({ created_at: -1 }).lean(),
-      Quote.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
-      Invoice.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
+      PosSale.find({ customer_id: customer._id }).sort({ created_at: -1 }).limit(50).lean(),
+      Quote.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).limit(50).lean(),
+      Invoice.find({ customer_id: customer._id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).limit(50).lean(),
     ]);
     const totalSpent = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
 

@@ -23,8 +23,8 @@ const addressSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } },
 );
 
-// ── Multi-tenant (optimizeplan.md §3.6) — pehle storeId bilkul nahi tha
-addressSchema.plugin(tenantScope);
+// ── Multi-tenant (§3.6) — compound index already covers storeId (§3.3 index:false)
+addressSchema.plugin(tenantScope, { index: false });
 addressSchema.index({ storeId: 1, user_id: 1 });
 
 module.exports = mongoose.model("Address", addressSchema);

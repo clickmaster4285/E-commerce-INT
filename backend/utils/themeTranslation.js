@@ -106,13 +106,24 @@ function planTranslations(entries, existing = {}, locales = [], hashText) {
   return { next, pending };
 }
 
-/** Public endpoint ke liye: hash hatao → { key: { ur, ar } } */
-function publicTranslations(stored) {
+/**
+ * Public endpoint ke liye: hash hatao.
+ * @param {object} stored
+ * @param {string} [locale] — agar diya ho to sirf us locale ka string (fallback en source missing → first available)
+ */
+function publicTranslations(stored, locale) {
+  const want = String(locale || "").trim().toLowerCase().slice(0, 2);
   const out = {};
   for (const [key, value] of Object.entries(stored || {})) {
     if (!value || typeof value !== "object") continue;
     const { h, ...locales } = value;
-    if (Object.keys(locales).length) out[key] = locales;
+    if (!Object.keys(locales).length) continue;
+    if (want) {
+      const text = locales[want] || locales.en || Object.values(locales).find(Boolean);
+      if (text) out[key] = { [want]: text };
+    } else {
+      out[key] = locales;
+    }
   }
   return out;
 }

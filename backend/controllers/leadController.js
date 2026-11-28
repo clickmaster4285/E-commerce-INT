@@ -264,16 +264,8 @@ exports.getLead = async (req, res) => {
       category_id: cleanLead.category_id ? slimLeadRef(cleanLead.category_id) : null,
     };
 
-    let customerHistory = { pos: [], quotes: [], invoices: [] };
-    if ((responseLead.status === "Customer" || responseLead.status === "Converted") && responseLead.customer_id) {
-      const [pos, quotes, invoices] = await Promise.all([
-        PosSale.find({ customer_id: responseLead.customer_id }).sort({ created_at: -1 }).lean(),
-        Quote.find({ customer_id: responseLead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
-        Invoice.find({ customer_id: responseLead.customer_id, is_deleted: { $ne: true } }).select("-activity").sort({ created_at: -1 }).lean(),
-      ]);
-      customerHistory = { pos, quotes, invoices };
-    }
-    res.json({ success: true, data: { ...responseLead, customer_history: customerHistory } });
+    // customer_history (full PosSale/Quote/Invoice docs) removed — no screen reads it (§9.3)
+    res.json({ success: true, data: responseLead });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to load lead" }); }
 };
 

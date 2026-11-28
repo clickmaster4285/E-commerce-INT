@@ -138,7 +138,8 @@ const updateShippingConfig = async (req, res) => {
 // ==========================================
 const getShippingRules = async (req, res) => {
   try {
-    const rules = await ShippingRule.find().sort({ createdAt: -1 }).lean();
+    const { legacyCap } = require("../utils/legacyListCap");
+    const rules = await ShippingRule.find().sort({ createdAt: -1 }).limit(legacyCap(req.query.limit, 50)).lean();
     res.json({ success: true, data: rules });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

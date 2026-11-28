@@ -342,7 +342,7 @@ Per collection (add ✚, drop ✖):
 - [x] **Wishlist**: ✚ unique `{storeId, user_id}`. **ShippingConfig**: ✚ unique `{storeId}` (concurrent `getConfig()` calls currently create duplicates). — **done:** both unique indexes; `getConfig` upserts safely on E11000. `test/hardeningP0.test.js`
 - [ ] **Otp**: ✖ `{email}` (covered by `{email, purpose, created_at}`)
 - [x] Soft-delete unique indexes `{storeId, code, is_deleted}` on Attribute, Category, Brand and Vendor fail with E11000 the second time the same code is deleted. Convert them to a **partial unique index on `is_deleted:false`**. — **done:** schema partial uniques; `migrateTenantIndexes.js` drops the legacy compounds before `createIndexes`. `test/integrityPhaseP0.test.js`
-- [ ] **Plugin change**: stop auto-adding the single `storeId` index when the schema already declares a compound index starting with `storeId` (an option such as `tenantScope(schema, { index: false })`). It is pure write overhead.
+- [x] **Plugin change**: stop auto-adding the single `storeId` index when the schema already declares a compound index starting with `storeId` (an option such as `tenantScope(schema, { index: false })`). It is pure write overhead. — **done:** `tenantScope(..., { index: false })` on Wishlist, ShippingMethod, Address, ShippingConfig. `test/storefrontContractsP0.test.js`
 - [ ] Update `scripts/migrateTenantIndexes.js` to read the desired indexes from the models, diff them against the live database, then drop and create (dry run by default). Verify with `explain()` that each hot query does an `IXSCAN` with no `SORT` stage.
 - [ ] Partial-filter check: confirm with `explain()` that `Store.findOne({subdomain})` uses the partial unique index (`Store.js:84-91`).
 
@@ -399,7 +399,7 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
   - tag → `$pull` from `Product.tag_ids`
   - product → Bundle/Deal/Discount/cart references
   - brand/category delete → block while products reference them
-- [ ] Store deletion: `store.status = "deleted"`, then an offline `scripts/purgeStore.js` that deletes every store-owned collection by `storeId` and the `uploads/stores/<id>` folder.
+- [x] Store deletion: `store.status = "deleted"`, then an offline `scripts/purgeStore.js` that deletes every store-owned collection by `storeId` and the `uploads/stores/<id>` folder. — **done:** soft-delete via `is_deleted`; `scripts/purgeStore.js --storeId … [--apply] [--hard-store]` purges tenantScope collections + RefreshSession + uploads. `test/storefrontContractsP0.test.js`
 - [x] Store suspension: `resolveStore` should check `store_status` (closed, suspended, maintenance) **once**, instead of looping over every user and employee to block them (`superAdminController.js:780-786`). The current approach also wrongly unblocks individually blocked accounts. — **done:** non-open stores return 503 `STORE_CLOSED`/`STORE_MAINTENANCE` for storefront; `/store/public` and `X-Auth-Aud: admin` bypass. Employee mass inactive/active on status change can still be simplified later. `test/hardeningP0.test.js`
 - [ ] Retention TTLs:
   - RefreshSession: on revoke, set `expiresAt` to now plus grace (today revoked sessions live 30 days, about 720 docs per admin per month)
@@ -620,20 +620,20 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 ### 4.5 Sales, CRM and the rest (P3)
 - [ ] Add `.lean()` to every read-only query. There are 211 `find(` calls and 353 `.lean()` calls, but `placeOrder`, brand, variant and bundle reads, and the theme admin are missing it.
 - [ ] Drop populates that duplicate snapshots (orders, POs). Use `$slice` projections for `edit_history` instead of slicing in JS (`posController.js:196-208`).
-- [ ] Remove the remaining unbounded "legacy mode" lists, or put a hard cap of 50 on them:
-  - [ ] `getMyOrders`
-  - [ ] `listInvoices` (also ignores filters)
-  - [ ] `getDiscounts`
-  - [ ] `getActiveDeals`
-  - [ ] `listQuotes`
-  - [ ] `getVendorsAdmin`
-  - [ ] `getShippingRules`
-  - [ ] `getCustomerPosHistory`
-  - [ ] `getVariants`
-  - [ ] `getCategories`
-  - [ ] chat `listMine`
-  - [ ] `getMyReviews`
-  - [ ] customer and lead history (PosSale, Quote, Invoice with no limit)
+- [x] Remove the remaining unbounded "legacy mode" lists, or put a hard cap of 50 on them: — **done:** `utils/legacyListCap.js`; caps on getMyOrders, listInvoices (also uses filters), getDiscounts, getActiveDeals, listQuotes, getVendorsAdmin, getShippingRules, getCustomerPosHistory, getVariants (+is_deleted, no cost_price), getCategories, chat listMine, getMyReviews, customers legacy list + customer detail history (50). Socket `getProducts` still open.
+  - [x] `getMyOrders`
+  - [x] `listInvoices` (also ignores filters)
+  - [x] `getDiscounts`
+  - [x] `getActiveDeals`
+  - [x] `listQuotes`
+  - [x] `getVendorsAdmin`
+  - [x] `getShippingRules`
+  - [x] `getCustomerPosHistory`
+  - [x] `getVariants`
+  - [x] `getCategories`
+  - [x] chat `listMine`
+  - [x] `getMyReviews`
+  - [x] customer and lead history (PosSale, Quote, Invoice with no limit)
   - [ ] socket `getProducts`
 - [ ] Leads:
   - remove the double sync and double 6-populate in `getLead`/`updateLead` (`leadController.js:243-256,312,330`)
@@ -903,14 +903,14 @@ Translations are **sliced to the active locale on the server**: send `name` alre
   - staff `createdby`/`updatedby` `{name,email}` (`:1490-1513`)
 
   It also runs 3 extra DB queries and **writes Tags** on a public GET (`:1563-1596`). Move the document history to an admin-only endpoint.
-- [ ] `GET /products` (every mode) returns full Variant docs (`cost_price`, `min_qnt/max_qnt/topup`, audit ids). Without `slim=1` it also returns staff name and email.
+- [x] `GET /products` (every mode) returns full Variant docs (`cost_price`, `min_qnt/max_qnt/topup`, audit ids). Without `slim=1` it also returns staff name and email. — **done for public:** public lists always slim + variant projection without cost/thresholds/audit; admin legacy unchanged. Status `active` already forced for shoppers. `test/storefrontContractsP0.test.js`
   - The non-slim callers are the Header search (`components/user/Header.js:393`), `BundleCard.js:83`, `app/(user)/brand/[id]/page.js:86`, related products (`product/[id]/page.js:119`) and `search/page.js:36`.
   - Public reads also have **no `status:"active"` filter** (`buildProductFilter`, `productController.js:261-283`), and `getProductById` does not check status.
 - [x] `GET /users/profile` (customer) runs `.populate("storeId")`, which sends the **whole Store document including `domainVerifyToken`**, `activity[]` and `planId` (`userController.js:668-670`). It also sends `google_id`, `provider` and `status`. — **done:** it populates only `store_name logo email phone currency subdomain customDomain`
-- [ ] `GET /store/public` sends `activity[]`, `planId`, `logo.public_id`, quote/invoice terms and their translations, and `__v` (`storeController.js:169-181`).
+- [x] `GET /store/public` sends `activity[]`, `planId`, `logo.public_id`, quote/invoice terms and their translations, and `__v` (`storeController.js:169-181`). — **done:** `STORE_PUBLIC_SELECT` + `publicStorePayload` whitelist. `test/storefrontContractsP0.test.js`
 - [x] `GET /deals/active/:id` returns the full Deal (`createdBy`, `usageLimit`, `usedCount`, `perUserLimit`), full products and variants (`cost_price`), and has **no active/date check**, so expired deals can be read by id (`dealController.js:673-756`). — **done:** requires active + date window; strips usage/createdBy; variants omit `cost_price`. `test/hardeningP0.test.js`
-- [ ] `GET /discounts/public` sends every active discount's `code`, `usageLimit`, `perUserLimit` and `minOrderValue` (`discountController.js:837-848`). Send only what the badge shows, and validate codes at checkout.
-- [ ] `GET /reviews/product/:id` sends `storeResponse.responded_by_name` and other customers' `user_id` (`reviewController.js:131-137`).
+- [x] `GET /discounts/public` sends every active discount's `code`, `usageLimit`, `perUserLimit` and `minOrderValue` (`discountController.js:837-848`). Send only what the badge shows, and validate codes at checkout. — **done:** badge/pricing fields only. `test/storefrontContractsP0.test.js`
+- [x] `GET /reviews/product/:id` sends `storeResponse.responded_by_name` and other customers' `user_id` (`reviewController.js:131-137`). — **done:** ReviewItem DTO (`user:{name,avatar}`, storeResponse without responder). `test/storefrontContractsP0.test.js`
 - [x] Socket `productCreated`/`productUpdated` events carry full variants (`cost_price`) and staff emails to every storefront visitor (`productController.js:1893-1905,2336-2350`). Socket events should carry **`{ _id, changed: true }` only** and let the client refetch its own DTO. Today `useUserSocketSync.js:86-89` also *replaces* the detail cache with that partial payload, so after any admin edit the product page loses its description, category and brand. — **done:** storefront payloads are id-only, and `useUserSocketSync` now invalidates by id instead of writing payloads into the cache
 
 **DTOs to build (P1):**
@@ -945,7 +945,7 @@ Translations are **sliced to the active locale on the server**: send `name` alre
   - The home banners are server-rendered, but `BannerSlider` uses `staleTime:0, refetchOnMount:"always"` (`BannerSlider.js:161-170`), so it refetches right after hydration. The SSR fetch also has no `type` filter.
 
   Pass the SSR result as `initialData`, and set `staleTime` to 60s or more.
-- [ ] `/theme/public` serializes translations for **all locales** into every page's RSC payload (`themeController.js:64-81`). Slice them to the `lang` cookie on the server.
+- [x] `/theme/public` serializes translations for **all locales** into every page's RSC payload (`themeController.js:64-81`). Slice them to the `lang` cookie on the server. — **done:** slices when `locale` / `x-lang` / `lang` cookie is known; otherwise all locales for backward compat.
 - [ ] **Waterfalls on product detail:** `getById` → related products, and `/users/profile` → `/reviews/my` (`product/[id]/page.js:108-126,679-692`). Fetch them in parallel or server-render them.
 - [ ] Cart and checkout: the shipping-quote query key includes `Math.round(subtotal)` (`cart/page.js:245-262`, `checkout/page.js:761-767`), so **every quantity click POSTs a new quote**. Debounce it, and key by item ids plus method.
 - [ ] Header search: 400ms debounce, but it fires at 1 character and without slim (`Header.js:384-397`). Use a 2-character minimum, `limit 8` and `ProductTile`.
@@ -969,7 +969,7 @@ Translations are **sliced to the active locale on the server**: send `name` alre
 - [x] `vendorCreated` sends `bank_details.account_no` (`vendorController.js:95`). `bank_details` is also in both vendor list modes (`:48,108`); keep it on the detail page only. — **done:** socket admin-only; list/legacy omit `bank_details`. `test/hardeningP0.test.js`
 - [x] Product events send variants with `cost_price` and staff emails (`productController.js:1898,2340`). — **done** (admin room only; public gets `{_id}`)
 - [ ] **Split the product endpoints:** `GET /products/admin/:id` (auth, current payload) and the public `GET /products/:id` (`ProductDetail`, §9.2). The admin edit page reuses the public endpoint today (`app/admin/products/[id]/page.js:1146`).
-- [ ] Lead detail embeds full PosSale, Quote and Invoice documents in `customer_history`, which no screen reads (`leadController.js:268-276`). Delete it.
+- [x] Lead detail embeds full PosSale, Quote and Invoice documents in `customer_history`, which no screen reads (`leadController.js:268-276`). Delete it. — **done.** `test/storefrontContractsP0.test.js`
 - [x] The super-admin applications list sends `documents[]` (KYC), phone, address and rejection text (`superAdminController.js:276-281`). Whitelist `_id, name, email, store_name, business_category, city, country, logo, status, created_at`. — **done:** list select whitelist (no documents/address/passwordHash). `test/hardeningP0.test.js`
 - [x] `GET /employees` has no permission check, so any staff member lists every employee's email and phone (§2.3). — **done earlier** (§2.3)
 

@@ -579,14 +579,14 @@ const getMyOrders = async (req, res) => {
       }
     }
 
-    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    // ---- LEGACY MODE (no limit) → hard-capped (§4.5) ----
     if (!limit) {
-      let query = Order.find(filter);
-      // Sort
+      const { legacyCap } = require("../utils/legacyListCap");
+      let query = Order.find(filter).limit(legacyCap(0, 50));
       if (sort === "oldest") query = query.sort({ created_at: 1 });
       else if (sort === "total_high") query = query.sort({ total: -1 });
       else if (sort === "total_low") query = query.sort({ total: 1 });
-      else query = query.sort({ created_at: -1 }); // newest (default)
+      else query = query.sort({ created_at: -1 });
 
       const orders = await query.lean();
       return res.status(200).json({ success: true, data: orders });

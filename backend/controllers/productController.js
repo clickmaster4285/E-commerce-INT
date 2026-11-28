@@ -839,8 +839,11 @@ const getProducts = async (req, res) => {
     const adminProductSelect = adminListContext === "featured" || adminListContext === "featured-manager"
       ? "name translations category_id brand_id status is_featured"
       : "name description translations category_id brand_id tax status is_featured";
-    // ✅ Storefront lists (?slim=1) — 3 populates kam (payload + DB round-trips)
-    const slimList = String(req.query.slim || "") === "1";
+    // Storefront always slim (no staff emails/tags). Admin keeps ?slim=1 opt-in.
+    const slimList = !isAdminView || String(req.query.slim || "") === "1";
+    // Public list variants: no cost_price / stock thresholds / audit (§9.2)
+    const PUBLIC_LIST_VARIANT_SELECT =
+      "_id product_id sku title selling_price quantity attributes images translations status created_at";
 
     // ---- Filter build ----
     // ✅ Shared helper — same filter summary stats endpoint (/products/stats) bhi use karta hai.
@@ -1001,12 +1004,12 @@ const getProducts = async (req, res) => {
           },
         });
       }
-      const dVariants = await Variant.find({
+      let dVarQuery = Variant.find({
         product_id: { $in: pageIds },
         is_deleted: { $ne: true },
-      })
-        .sort({ created_at: 1, _id: 1 })
-        .lean();
+      }).sort({ created_at: 1, _id: 1 });
+      if (!isAdminView) dVarQuery = dVarQuery.select(PUBLIC_LIST_VARIANT_SELECT);
+      const dVariants = await dVarQuery.lean();
       const dMap = {};
       dVariants.forEach((v) => {
         const pid = String(v.product_id);
@@ -1106,10 +1109,12 @@ const getProducts = async (req, res) => {
       });
     }
 
-    const variants = await Variant.find({
+    let varQuery = Variant.find({
       product_id: { $in: pageIds },
       is_deleted: { $ne: true },
-    }).sort({ created_at: 1, _id: 1 }).lean();
+    }).sort({ created_at: 1, _id: 1 });
+    if (!isAdminView) varQuery = varQuery.select(PUBLIC_LIST_VARIANT_SELECT);
+    const variants = await varQuery.lean();
 
     const variantsMap = {};
     variants.forEach((v) => {

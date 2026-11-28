@@ -703,8 +703,12 @@ const updatePosSale = async (req, res) => {
 
 const getCustomerPosHistory = async (req, res) => {
   try {
+    const { legacyCap } = require("../utils/legacyListCap");
     const customerId = req.params.customerId;
-    const sales = await PosSale.find({ customer_id: customerId }).sort({ created_at: -1 }).lean();
+    const sales = await PosSale.find({ customer_id: customerId })
+      .sort({ created_at: -1 })
+      .limit(legacyCap(req.query.limit, 50))
+      .lean();
     const totalSpent = sales.reduce((sum, sale) => sum + (Number(sale.total) || 0), 0);
     res.status(200).json({ success: true, data: { sales, total_spent: totalSpent, total_sales: sales.length } });
   } catch (error) {

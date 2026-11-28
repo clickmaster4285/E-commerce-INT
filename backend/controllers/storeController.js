@@ -169,9 +169,39 @@ const buildStoreUrls = (store) => {
   };
 };
 
+const STORE_PUBLIC_SELECT = [
+  "store_name", "tagline", "logo.img_url", "phone", "email",
+  "support_email", "support_phone", "address", "city", "state", "country", "zip_code",
+  "social_links", "currency", "tax_rate", "store_status", "maintenance_message",
+  "subdomain", "customDomain", "business_category",
+].join(" ");
+
 const publicStorePayload = (store) => {
-  const { domainVerifyToken, ...rest } = store;
-  return { ...rest, ...buildStoreUrls(store) };
+  const logoUrl = store?.logo?.img_url || "";
+  return {
+    _id: store._id,
+    store_name: store.store_name,
+    tagline: store.tagline || "",
+    logo: logoUrl ? { img_url: logoUrl } : null,
+    phone: store.phone || "",
+    email: store.email || "",
+    support_email: store.support_email || "",
+    support_phone: store.support_phone || "",
+    address: store.address || "",
+    city: store.city || "",
+    state: store.state || "",
+    country: store.country || "",
+    zip_code: store.zip_code || "",
+    social_links: store.social_links || {},
+    currency: store.currency || "PKR",
+    tax_rate: store.tax_rate ?? 0,
+    store_status: store.store_status || "open",
+    maintenance_message: store.maintenance_message || "",
+    subdomain: store.subdomain || "",
+    customDomain: store.customDomain || null,
+    business_category: store.business_category || "",
+    ...buildStoreUrls(store),
+  };
 };
 
 // @desc  Storefront store info — jis host par page khula hai usi store ki info
@@ -181,9 +211,8 @@ const getPublicStoreInfo = async (req, res) => {
     if (req.storeMissing) {
       return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found for this address." });
     }
-    // Store host par Store.findOne() tenant-scoped hai → sirf isi host ka store (fresh, cache nahi)
-    // Public endpoint: audit log (activity), plan aur domain token kabhi storefront par nahi
-    const store = await Store.findOne().select("-activity -planId -domainVerifyToken -__v").lean();
+    // Whitelist only (optimizeplan.md §9.2 StorePublic) — no activity/plan/terms/public_id
+    const store = await Store.findOne().select(STORE_PUBLIC_SELECT).lean();
     if (!store) return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found." });
     return res.status(200).json({ success: true, data: publicStorePayload(store) });
   } catch (error) {

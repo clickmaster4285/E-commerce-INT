@@ -19,8 +19,8 @@ const shippingMethodSchema = new mongoose.Schema(
 );
 
 
-// ── Multi-tenant ──
-shippingMethodSchema.plugin(tenantScope); // har store ka data alag (storeId)
+// ── Multi-tenant — compound unique already covers storeId (§3.3 index:false)
+shippingMethodSchema.plugin(tenantScope, { index: false });
 shippingMethodSchema.index({ storeId: 1, code: 1 }, { unique: true }); // unique per store
 
 module.exports = mongoose.model("ShippingMethod", shippingMethodSchema);

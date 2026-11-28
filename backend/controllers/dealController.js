@@ -595,11 +595,10 @@ const getActiveDeals = async (req, res) => {
       endDate: { $gte: now },
     };
 
-    // ---- LEGACY MODE (no limit) → exact old behavior ----
-    // ✅ slim=1 (opt-in, home storefront): sirf wahi fields jo user GUI
-    // padhta hai (name/type/pricing/matching/cover/bundleRule). Bina slim
-    // ke response bilkul purana — koi caller nahi toot ta.
+    // ---- LEGACY MODE (no limit) → hard-capped 50 (§4.5) ----
     if (!limit) {
+      const { legacyCap } = require("../utils/legacyListCap");
+      const cap = legacyCap(0, 50);
       if (req.query.slim === "1") {
         const deals = await Deal.find(query)
           .select(
@@ -610,6 +609,7 @@ const getActiveDeals = async (req, res) => {
           .populate("brandIds", "_id")
           .populate("bundleRule.freeProduct", "_id name images.img_url")
           .sort({ priority: -1, createdAt: -1 })
+          .limit(cap)
           .lean();
 
         return res.status(200).json({ success: true, data: deals });
@@ -621,6 +621,7 @@ const getActiveDeals = async (req, res) => {
         .populate("bundleProducts.product", "name sku images selling_price")
         .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS)
         .sort({ priority: -1, createdAt: -1 })
+        .limit(cap)
         .lean();
 
       return res.status(200).json({ success: true, data: deals });

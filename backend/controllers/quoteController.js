@@ -123,11 +123,13 @@ exports.listQuotes = async (req, res) => {
       if (req.query.dateTo) filter.quote_date.$lte = new Date(`${req.query.dateTo}T23:59:59.999Z`);
     }
 
-    // Keep the unpaginated shape for callers outside the Quotes list.
+    // Keep the unpaginated shape for callers outside the Quotes list (hard-capped §4.5).
     if (req.query.page === undefined) {
+      const { legacyCap } = require("../utils/legacyListCap");
       const quotes = await Quote.find(filter)
         .select("_id quote_number customer_type customer_name customer_email customer_phone quote_date expiry_date total status created_at updated_at translations")
         .sort({ created_at: -1, _id: -1 })
+        .limit(legacyCap(0, 50))
         .lean();
       return res.json({ success: true, data: quotes });
     }

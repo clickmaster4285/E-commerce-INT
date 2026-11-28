@@ -75,10 +75,16 @@ exports.getPublicTheme = async (req, res) => {
     res.set("ETag", etag);
     if (req.headers["if-none-match"] === etag) return res.status(304).end();
 
+    const localeRaw = String(req.query.locale || req.headers["x-lang"] || req.cookies?.lang || "").trim().toLowerCase();
+    const locale = /^[a-z]{2}/.test(localeRaw) ? localeRaw.slice(0, 2) : "";
     return res.status(200).json({
       success: true,
-      // translations: { "<key>": { ur, ar } } — storefront current locale par apply karta hai
-      data: { theme: doc?.published || buildDefaultTheme(), version, translations: publicTranslations(doc?.translations) },
+      // Slice to one locale when known (optimizeplan.md §9.2) — else all locales for backward compat
+      data: {
+        theme: doc?.published || buildDefaultTheme(),
+        version,
+        translations: publicTranslations(doc?.translations, locale || undefined),
+      },
     });
   } catch (error) {
     return fail(res, 500, "Failed to load theme");

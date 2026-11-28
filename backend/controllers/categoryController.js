@@ -519,14 +519,13 @@ const getCategories = async (req, res) => {
   try {
     // ❌ REMOVED: const tenantId = getTenantId(req);
 
-    // ✅ FIX: Fetch all categories globally
+    const { legacyCap } = require("../utils/legacyListCap");
     const categories = await Category.find({ is_deleted: false })
-      .select("-__v")
+      .select("-__v -createdby -updatedby")
       .populate("parent_category_id", "name category_code translations")
       .populate("attributes.attribute_id", ATTRIBUTE_POPULATE_SELECT)
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
       .sort({ sort_order: 1, created_at: -1 })
+      .limit(legacyCap(req.query.limit, 200))
       .lean();
 
     return res.status(200).json({ success: true, data: categories });

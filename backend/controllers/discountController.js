@@ -409,15 +409,17 @@ exports.getDiscounts = async (req, res) => {
       return { is_deleted: false, ...(all.length ? { $and: all } : {}) };
     };
 
-    // ---- LEGACY MODE (no limit) -> exact old behavior ----
+    // ---- LEGACY MODE (no limit) → hard-capped (§4.5) ----
     if (!limit) {
+      const { legacyCap } = require("../utils/legacyListCap");
       const discounts = await Discount.find(filter)
         .populate("selectedProducts", "name translations sku selling_price")
         .populate("selectedCategories", "name translations")
         .populate("selectedBrands", "name translations")
         .populate("createdBy", "name email")
         .populate("updatedBy", "name email")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .limit(legacyCap(0, 50));
       return res.status(200).json(discounts);
     }
 
@@ -834,6 +836,7 @@ exports.getPublicDiscounts = async (req, res) => {
   try {
     const now = new Date();
 
+    // Badge/pricing fields only — no code, usageLimit, perUserLimit, minOrderValue (§9.2)
     const discounts = await Discount.find({
       is_deleted: false,
       isActive: true,
@@ -841,11 +844,12 @@ exports.getPublicDiscounts = async (req, res) => {
       startDate: { $lte: now },
       endDate: { $gte: now },
     })
-      .populate("selectedProducts", "_id name selling_price")
+      .populate("selectedProducts", "_id name")
       .populate("selectedCategories", "_id name")
       .populate("selectedBrands", "_id name")
-      .select("-createdBy -usageCount -__v")
-      .sort({ priority: -1, createdAt: -1 });
+      .select("_id name type value applyTo selectedProducts selectedCategories selectedBrands selectedTags priority startDate endDate isActive status isStackable translations.name")
+      .sort({ priority: -1, createdAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,

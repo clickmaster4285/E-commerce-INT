@@ -104,7 +104,12 @@ const getVendorsAdmin = async (req, res) => {
     if (req.query.page === undefined && req.query.limit === undefined) {
       // ---- LEGACY MODE (no page/limit) -> exact old behavior ----
       // (purchase-orders pages vendor dropdown isi par depend karte hain)
-      const vendors = await Vendor.find({ is_deleted: false }).select("-activity -bank_details").sort({ created_at: -1 }).lean();
+      const { legacyCap } = require("../utils/legacyListCap");
+      const vendors = await Vendor.find({ is_deleted: false })
+        .select("-activity -bank_details")
+        .sort({ created_at: -1 })
+        .limit(legacyCap(0, 100))
+        .lean();
       return res.status(200).json({ success: true, data: vendors });
     }
     // ---- SERVER SIDE PAGINATION (brand admin list ka exact pattern) ----

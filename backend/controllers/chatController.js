@@ -305,7 +305,13 @@ exports.requireGuestChat = async (req, res, next) => {
 exports.listMine = async (req, res) => {
   try {
     if (!isCustomer(req)) return fail(res, 403, "Customer account required");
-    const rows = await populateConversation(ChatConversation.find({ customer_id: req.user._id }).sort({ last_message_at: -1 }).lean());
+    const { legacyCap } = require("../utils/legacyListCap");
+    const rows = await populateConversation(
+      ChatConversation.find({ customer_id: req.user._id })
+        .sort({ last_message_at: -1 })
+        .limit(legacyCap(req.query.limit, 50))
+        .lean(),
+    );
     res.json({ success: true, data: rows.map(publicConversation) });
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };

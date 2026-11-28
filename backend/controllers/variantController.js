@@ -115,11 +115,13 @@ const getNextSkuNumber = async (req, res) => {
 // GET ALL VARIANTS
 const getVariants = async (req, res) => {
   try {
-    const variants = await Variant.find()
-      .select("-__v")
+    const { legacyCap } = require("../utils/legacyListCap");
+    const variants = await Variant.find({ is_deleted: { $ne: true } })
+      .select("-__v -cost_price")
       .populate("product_id", "name translations.name")
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email");
+      .sort({ created_at: -1 })
+      .limit(legacyCap(req.query.limit, 50))
+      .lean();
 
     res.status(200).json(variants);
   } catch (error) {

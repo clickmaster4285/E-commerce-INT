@@ -35,11 +35,8 @@ shippingConfigSchema.statics.getConfig = async function () {
 };
 
 
-// Declare storeId without a plain index so the unique compound below is the only one (§3.3)
-shippingConfigSchema.add({
-  storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
-});
-shippingConfigSchema.plugin(tenantScope); // har store ka data alag (storeId)
+// storeId via plugin with index:false — unique {storeId} below is the only index (§3.3)
+shippingConfigSchema.plugin(tenantScope, { index: false });
 // One config doc per store — concurrent getConfig() must not create duplicates
 shippingConfigSchema.index({ storeId: 1 }, { unique: true });
 

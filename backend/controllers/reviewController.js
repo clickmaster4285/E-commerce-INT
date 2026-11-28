@@ -129,13 +129,29 @@ const getProductReviews = async (req, res) => {
     }
     const total = await Review.countDocuments(filter);
 
-    const reviews = await Review.find(filter)
+    const reviewsRaw = await Review.find(filter)
       .select("-helpfulCount -helpfulBy")
       .populate("user_id", "name avatar")
       .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit)
       .lean();
+
+    // Public DTO: no raw user_id / staff responder name (§9.2 ReviewItem)
+    const reviews = reviewsRaw.map((r) => ({
+      _id: r._id,
+      rating: r.rating,
+      title: r.title,
+      comment: r.comment,
+      images: r.images,
+      videos: r.videos,
+      verifiedPurchase: r.verifiedPurchase,
+      created_at: r.created_at,
+      user: r.user_id ? { name: r.user_id.name, avatar: r.user_id.avatar } : null,
+      storeResponse: r.storeResponse
+        ? { message: r.storeResponse.message, responded_at: r.storeResponse.responded_at }
+        : null,
+    }));
 
     // ✅ Summary is computed from all reviews (not just the current page / filter)
     const allRatings = await Review.find(baseFilter).select("rating").lean();
@@ -172,12 +188,15 @@ const getMyReviews = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: "Login required" });
     }
+    const { legacyCap } = require("../utils/legacyListCap");
+    const limit = legacyCap(req.query.limit, 50);
     const reviews = await Review.find({
       user_id: toObjectId(userId),
       is_deleted: { $ne: true },
     })
       .select("product_id rating title comment images videos status created_at updated_at storeResponse")
       .sort({ created_at: -1 })
+      .limit(limit)
       .lean();
     return res.status(200).json({ success: true, reviews });
   } catch (error) {
