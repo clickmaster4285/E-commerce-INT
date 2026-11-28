@@ -20,6 +20,8 @@ export default function LoyaltyPage() {
   const { t, dir } = useTranslation();
   const [tab, setTab] = useState("settings");
   const [memberId, setMemberId] = useState(null);
+  const [headerActions, setHeaderActions] = useState(null);
+  const updateHeaderActions = useCallback((node) => setHeaderActions(node), []);
 
   // ?tab= URL ke saath sync — refresh / back button par wahi tab
   useEffect(() => {
@@ -43,7 +45,11 @@ export default function LoyaltyPage() {
 
   return (
     <div dir={dir} className="min-h-full space-y-4 text-[var(--text-primary)]">
-      <AdminPageHeader title={t("admin.loyalty.title")} subtitle={t("admin.loyalty.subtitle")} />
+      <AdminPageHeader
+        title={t("admin.loyalty.title")}
+        subtitle={t("admin.loyalty.subtitle")}
+        actions={tab === "settings" ? headerActions : null}
+      />
 
       <div role="tablist" aria-label={t("admin.loyalty.title")} className="flex gap-1 overflow-x-auto border-b border-[var(--border-color)] [scrollbar-width:none]">
         {TABS.map(({ id, icon: Icon }) => {
@@ -61,7 +67,7 @@ export default function LoyaltyPage() {
 
       {tab === "members" && <MembersTab onOpenMember={setMemberId} />}
       {tab === "history" && <HistoryTab onOpenMember={setMemberId} />}
-      {tab === "settings" && <SettingsTab />}
+      {tab === "settings" && <SettingsTab onHeaderActions={updateHeaderActions} />}
 
       <MemberDrawer key={memberId || "none"} userId={memberId} onClose={closeMember} />
     </div>

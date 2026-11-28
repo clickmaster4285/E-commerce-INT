@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, BookOpen, Coins, Gift, Info, Lightbulb, Loader2, Percent, RotateCcw, Save, ShoppingBag, TicketPercent } from "lucide-react";
@@ -129,7 +129,7 @@ function Section({ step, icon: Icon, title, text, enabled, onToggle, children })
   );
 }
 
-export default function SettingsTab() {
+export default function SettingsTab({ onHeaderActions }) {
   const { t, locale } = useTranslation();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["loyalty-admin", "settings"], queryFn: loyaltyApi.getSettings });
@@ -159,6 +159,31 @@ export default function SettingsTab() {
       toast.error(d.message || t("admin.loyalty.settings.saveFailed"));
     },
   });
+
+  const discard = useCallback(() => { setDraft(null); setErrors({}); }, []);
+  const actions = useMemo(() => (
+    <div className="flex items-center gap-2">
+      <button type="button" className={secondaryBtn} onClick={discard} disabled={!dirty || save.isPending}>
+        <RotateCcw size={14} aria-hidden="true" />{t("admin.loyalty.settings.discard")}
+      </button>
+      <button type="button" className={primaryBtn} style={primaryStyle} onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
+        {save.isPending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}{t("admin.loyalty.settings.save")}
+      </button>
+    </div>
+  ), [dirty, discard, t, save]);
+  const status = useMemo(() => (
+    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium" style={{ color: dirty ? "var(--warning-text)" : "var(--text-muted)" }}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: dirty ? "var(--warning)" : "var(--success)" }} aria-hidden="true" />
+      {dirty ? t("admin.loyalty.settings.unsaved") : t("admin.loyalty.settings.allSaved")}
+    </span>
+  ), [dirty, t]);
+
+  useEffect(() => {
+    onHeaderActions?.(
+      <div className="flex flex-wrap items-center justify-end gap-3">{status}{actions}</div>,
+    );
+    return () => onHeaderActions?.(null);
+  }, [onHeaderActions, status, actions]);
 
   if (isLoading || !form) {
     return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]"><div className="h-[620px] animate-pulse rounded-xl bg-[var(--bg-tertiary)]" /><div className="h-96 animate-pulse rounded-xl bg-[var(--bg-tertiary)]" /></div>;
@@ -212,24 +237,6 @@ export default function SettingsTab() {
   const discount = p.redeem.enabled && quote.ok ? quote.discount : 0;
   const earned = p.earn.enabled ? pointsForAmount(program, sampleAmount - discount) : 0;
 
-  // Save / Discard buttons — card ke andar hi (alag dabba nahi)
-  const discard = () => { setDraft(null); setErrors({}); };
-  const actions = (
-    <div className="flex items-center gap-2">
-      <button type="button" className={secondaryBtn} onClick={discard} disabled={!dirty || save.isPending}>
-        <RotateCcw size={14} aria-hidden="true" />{t("admin.loyalty.settings.discard")}
-      </button>
-      <button type="button" className={primaryBtn} style={primaryStyle} onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
-        {save.isPending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}{t("admin.loyalty.settings.save")}
-      </button>
-    </div>
-  );
-  const status = (
-    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-medium" style={{ color: dirty ? "var(--warning-text)" : "var(--text-muted)" }}>
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: dirty ? "var(--warning)" : "var(--success)" }} aria-hidden="true" />
-      {dirty ? t("admin.loyalty.settings.unsaved") : t("admin.loyalty.settings.allSaved")}
-    </span>
-  );
 
   return (
     <div>
@@ -348,11 +355,6 @@ export default function SettingsTab() {
               </div>
               <Explain>{t("admin.loyalty.settings.redeemExplain", { min: fmtPoints(p.redeem.minPoints, locale), pct: p.redeem.maxPercent, cap: fmtRs(Math.floor((5000 * p.redeem.maxPercent) / 100), locale) })}</Explain>
             </Section>
-          </div>
-          {/* Save bar stays in the settings card flow so it never floats over the page while scrolling. */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-3">
-            {status}
-            {actions}
           </div>
         </Card>
 
