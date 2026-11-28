@@ -1,4 +1,4 @@
-// S3-compatible object storage (§6.4) — used when STORAGE_DRIVER=s3
+// S3-compatible object storage (§6.4) — used when STORAGE_DRIVER=s3 + credentials
 const path = require("path");
 const fs = require("fs");
 
@@ -21,10 +21,16 @@ function s3Config() {
   };
 }
 
+/** True when S3 driver can actually talk to a bucket. */
+function isConfigured() {
+  const cfg = s3Config();
+  return Boolean(cfg.bucket && cfg.credentials.accessKeyId && cfg.credentials.secretAccessKey);
+}
+
 function getClient() {
   if (client) return client;
   const cfg = s3Config();
-  if (!cfg.bucket || !cfg.credentials.accessKeyId) {
+  if (!isConfigured()) {
     if (!warned) {
       warned = true;
       try {
@@ -67,7 +73,7 @@ async function putLocalFile(absolutePath, contentType) {
 
   if (cfg.publicBaseUrl) return `${cfg.publicBaseUrl}/${Key}`;
   if (cfg.endpoint) return `${cfg.endpoint.replace(/\/+$/, "")}/${cfg.bucket}/${Key}`;
-  return `https://${cfg.bucket}.s3.amazonaws.com/${Key}`;
+  return `https://${cfg.bucket}.s3.${cfg.region}.amazonaws.com/${Key}`;
 }
 
 async function removeKey(keyOrUrl) {
@@ -82,10 +88,29 @@ async function removeKey(keyOrUrl) {
     } catch {
       return false;
     }
+  } else if (Key.startsWith("/uploads/")) {
+    Key = Key.slice("/uploads/".length);
+  } else if (Key.startsWith("uploads/")) {
+    Key = Key.slice("uploads/".length);
   }
+  if (!Key) return false;
   const { DeleteObjectCommand } = require("@aws-sdk/client-s3");
   await s3.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key }));
   return true;
 }
 
-module.exports = { putLocalFile, removeKey, getClient, s3Config, keyFromAbsolute };
+/** Test helper — drop cached client after env changes. */
+function _resetClient() {
+  client = null;
+  warned = false;
+}
+
+module.exports = {
+  putLocalFile,
+  removeKey,
+  getClient,
+  s3Config,
+  isConfigured,
+  keyFromAbsolute,
+  _resetClient,
+};

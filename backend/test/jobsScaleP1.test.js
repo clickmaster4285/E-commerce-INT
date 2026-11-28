@@ -152,11 +152,27 @@ test("migrateLegacyUploads plans moves under uploads/stores/<id>", async () => {
   assert.ok(unresolved.some((u) => u.path.startsWith("store")));
 });
 
-test("storage driver stub stays local; error tracker hook is safe", () => {
+test("storage driver is local without S3 creds; live when configured", () => {
+  const objectStorage = require("../utils/objectStorage");
+  objectStorage._resetClient();
   process.env.STORAGE_DRIVER = "s3";
+  delete process.env.S3_BUCKET;
+  delete process.env.S3_ACCESS_KEY_ID;
+  delete process.env.S3_SECRET_ACCESS_KEY;
   const { storageDriver } = require("../utils/uploadPaths");
-  assert.equal(storageDriver().effective, "local");
+  assert.equal(storageDriver().name, "s3");
+  assert.equal(storageDriver().effective, "local", "no creds → stay local");
+
+  process.env.S3_BUCKET = "ce-test";
+  process.env.S3_ACCESS_KEY_ID = "ak";
+  process.env.S3_SECRET_ACCESS_KEY = "sk";
+  objectStorage._resetClient();
+  assert.equal(storageDriver().effective, "s3");
   delete process.env.STORAGE_DRIVER;
+  delete process.env.S3_BUCKET;
+  delete process.env.S3_ACCESS_KEY_ID;
+  delete process.env.S3_SECRET_ACCESS_KEY;
+  objectStorage._resetClient();
 
   const { captureError } = require("../utils/errorTracker");
   const captured = [];
@@ -166,4 +182,23 @@ test("storage driver stub stays local; error tracker hook is safe", () => {
   assert.doesNotThrow(() => captureError(new Error("bad2")));
   delete global.__errorTracker;
   assert.deepEqual(captured, [["bad", "/x"]]);
+});
+
+test("queueOtpEmail is non-blocking and registers email/audit/stats/summary workers", async () => {
+  require("../jobs"); // bootstrap
+  const queue = require("../jobs/queue");
+  assert.equal(queue._hasHandler("email"), true);
+  assert.equal(queue._hasHandler("audit.batch"), true);
+  assert.equal(queue._hasHandler("stats.bump"), true);
+  assert.equal(queue._hasHandler("product.summary"), true);
+
+  const { queueOtpEmail } = require("../utils/sendEmail");
+  const result = queueOtpEmail({
+    to: "otp@test.local",
+    otp: "123456",
+    purpose: "email_verification",
+    expiresInMinutes: 10,
+  });
+  assert.equal(typeof result.queued, "boolean");
+  assert.ok("delivered" in result);
 });

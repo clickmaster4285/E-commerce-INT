@@ -1,7 +1,7 @@
 const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const Banner = require("../models/Banner");
 const fs = require("fs");
-const { uploadUrlFor, localPathForUrl } = require("../utils/uploadPaths");
+const { uploadUrlFor, localPathForUrl, maybeRemoveFromObjectStorage } = require("../utils/uploadPaths");
 const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const { escapeRegex } = require("../utils/escapeRegex");
 const { parseLocale } = require("../utils/parseLocale");
@@ -17,6 +17,7 @@ const deleteFile = (filePath) => {
   // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ kabhi nahi
   const fullPath = localPathForUrl(null, filePath);
   if (fullPath && fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+  void maybeRemoveFromObjectStorage(filePath);
 };
 
 // ==========================================

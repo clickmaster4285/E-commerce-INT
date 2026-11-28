@@ -8,7 +8,7 @@ const Otp = require("../models/Otp");
 const User = require("../models/User");
 const PendingRegistration = require("../models/PendingRegistration");
 const Store = require("../models/Store");
-const { sendOtpEmail } = require("../utils/sendEmail");
+const { queueOtpEmail } = require("../utils/sendEmail");
 const SellerApplication = require("../models/SellerApplication");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
@@ -73,22 +73,14 @@ const issueOtp = async ({ email, purpose }) => {
 
   const created = await Otp.create({ email, purpose, code_hash, expires_at });
 
-  let delivery;
-  try {
-    delivery = await sendOtpEmail({
-      to: email,
-      otp: code,
-      purpose,
-      expiresInMinutes: OTP_EXPIRE_MINUTES,
-    });
-  } catch (emailError) {
-    // âœ… Email fail ho to bekaar OTP DB mein na chhodo â€” user dobara try kar sake
-    await Otp.deleteOne({ _id: created._id }).catch(() => {});
-    emailError.statusCode = 503;
-    emailError.retryAfter = SMTP_RETRY_SECONDS;
-    throw emailError;
-  }
-  if (!delivery.delivered && process.env.NODE_ENV === "production") {
+  // §6.3 — queue OTP email (SMTP await nahi); prod bina SMTP → rollback
+  const delivery = queueOtpEmail({
+    to: email,
+    otp: code,
+    purpose,
+    expiresInMinutes: OTP_EXPIRE_MINUTES,
+  });
+  if (!delivery.queued && !delivery.debugOtp && process.env.NODE_ENV === "production") {
     await Otp.deleteOne({ _id: created._id }).catch(() => {});
     const error = new Error("The email server did not accept the verification email. Please retry shortly.");
     error.statusCode = 503;
@@ -96,14 +88,12 @@ const issueOtp = async ({ email, purpose }) => {
     throw error;
   }
 
-  // ðŸ§ª DEV ONLY â€” SMTP off ho to bhi flow test ho sake (prod mein kabhi OTP expose nahi hoga)
-  const debugOtp =
-    !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
+  const debugOtp = delivery.debugOtp || undefined;
   if (debugOtp) {
-    log.warn(`ðŸ§ª [DEV] OTP for ${email} (${purpose}): ${code} â€” SMTP set karne par real email jayegi`);
+    log.warn(`[DEV] OTP for ${email} (${purpose}): ${code} — SMTP set karne par real email jayegi`);
   }
 
-  return { delivered: delivery.delivered, debugOtp };
+  return { delivered: Boolean(delivery.delivered || delivery.queued), debugOtp, queued: Boolean(delivery.queued) };
 };
 
 // ==========================================
@@ -219,23 +209,13 @@ const sendVerificationOtpForEmail = async (rawEmail, storeId = null) => {
     }
     const code = generateOtpCode();
     const otpHash = await bcrypt.hash(code, 10);
-    let delivery;
-    try {
-      delivery = await sendOtpEmail({
-        to: email,
-        otp: code,
-        purpose: "email_verification",
-        expiresInMinutes: OTP_EXPIRE_MINUTES,
-      });
-    } catch (emailError) {
-      const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
-      pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
-      await pending.save();
-      emailError.statusCode = 503;
-      emailError.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
-      throw emailError;
-    }
-    if (!delivery.delivered) {
+    const delivery = queueOtpEmail({
+      to: email,
+      otp: code,
+      purpose: "email_verification",
+      expiresInMinutes: OTP_EXPIRE_MINUTES,
+    });
+    if (!delivery.queued && !delivery.debugOtp) {
       const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
       pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
       await pending.save();
@@ -244,19 +224,23 @@ const sendVerificationOtpForEmail = async (rawEmail, storeId = null) => {
       error.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
       throw error;
     }
-    // Sirf email successfully delivered hone par naya OTP active karein;
-    // SMTP failure purane valid code ko revoke na kare.
+    // Queue accepted (ya dev console) — naya OTP active
     pending.otpHash = otpHash;
     pending.expiresAt = new Date(Date.now() + OTP_EXPIRE_MINUTES * 60 * 1000);
     pending.attempts = 0;
     pending.lastSentAt = new Date();
     await pending.save();
-    const debugOtp =
-      !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
+    const debugOtp = delivery.debugOtp || undefined;
     if (debugOtp) {
-      log.warn(`ðŸ§ª [DEV] OTP for ${email} (email_verification): ${code} â€” SMTP set karne par real email jayegi`);
+      log.warn(`[DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
     }
-    return { alreadyVerified: false, email, delivered: delivery.delivered, debugOtp };
+    return {
+      alreadyVerified: false,
+      email,
+      delivered: Boolean(delivery.delivered || delivery.queued),
+      debugOtp,
+      queued: Boolean(delivery.queued),
+    };
   }
 
   // âœ… Legacy fallback: fix se PEHLE bana unverified User (ab User pehle nahi banta,

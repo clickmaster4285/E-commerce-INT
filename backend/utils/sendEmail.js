@@ -60,4 +60,14 @@ const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresIn
   return sendEmail({ to, subject, html, text });
 };
 
-module.exports = { sendEmail, sendOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig };
+/** Non-blocking OTP — see jobs/email.js (BullMQ / in-process queue). */
+const queueOtpEmail = (...args) => require("../jobs/email").queueOtpEmail(...args);
+
+module.exports = {
+  sendEmail,
+  sendOtpEmail,
+  queueOtpEmail,
+  isSmtpConfigured,
+  verifySmtpConnection,
+  getSmtpConfig,
+};

@@ -63,3 +63,56 @@ test("other namespaces are untouched by invalidate", async () => {
   runWithStore(STORE_A, () => invalidate("brands"));
   assert.equal((await get(url, STORE_A, brands)).cache, "HIT");
 });
+
+test("Redis version keys: INCR bumps namespace so next GET misses", async () => {
+  const kv = new Map();
+  const redis = {
+    get: async (k) => (kv.has(k) ? kv.get(k) : null),
+    set: async (k, v, ..._rest) => { kv.set(k, v); return "OK"; },
+    incr: async (k) => {
+      const n = Number(kv.get(k) || 0) + 1;
+      kv.set(k, String(n));
+      return n;
+    },
+  };
+
+  const {
+    publicCache: pc,
+    invalidate: inv,
+    cacheKey,
+    versionKey,
+    _setRedisForTests,
+  } = require("../utils/publicCache");
+  _setRedisForTests(redis);
+
+  const url = "/api/brands?slim=1&t=redis-v";
+  const storeId = STORE_A;
+
+  const hitOnce = () =>
+    new Promise((resolve) => {
+      const req = { method: "GET", originalUrl: url, store: { _id: storeId } };
+      const res = {
+        statusCode: 200,
+        headers: {},
+        set(k, v) { this.headers[k] = v; return this; },
+        status(c) { this.statusCode = c; return this; },
+        json(body) { resolve({ cache: this.headers["X-Cache"], body }); return this; },
+      };
+      runWithStore(storeId, () => pc(60 * 1000)(req, res, () => res.json({ data: ["a"] })));
+    });
+
+  try {
+    assert.equal((await hitOnce()).cache, "MISS");
+    assert.equal((await hitOnce()).cache, "HIT");
+    const v0 = await redis.get(await versionKey(storeId, "brands"));
+    runWithStore(storeId, () => inv("brands"));
+    await new Promise((r) => setImmediate(r));
+    const v1 = await redis.get(await versionKey(storeId, "brands"));
+    assert.notEqual(String(v1 || "0"), String(v0 || "0"));
+    const keyAfter = await cacheKey(storeId, "brands", url);
+    assert.match(keyAfter, /:v\d+:/);
+    assert.equal((await hitOnce()).cache, "MISS");
+  } finally {
+    _setRedisForTests(null);
+  }
+});

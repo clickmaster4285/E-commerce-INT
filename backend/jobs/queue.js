@@ -14,7 +14,19 @@ const bullWorkers = new Map();
 
 const keyOf = (name, jobId) => `${name}:${jobId}`;
 
+function underNodeTest() {
+  return (
+    Boolean(process.env.NODE_TEST) ||
+    process.execArgv.some((arg) => arg === "--test" || arg.startsWith("--test="))
+  );
+}
+
 function useBull() {
+  // Under `node --test`, stay in-process (whenIdle + no orphan BullMQ workers).
+  // Opt in with JOBS_USE_BULL=1 for Redis-backed job integration tests.
+  if (underNodeTest() && String(process.env.JOBS_USE_BULL || "") !== "1") {
+    return false;
+  }
   return Boolean(String(process.env.REDIS_URL || "").trim());
 }
 

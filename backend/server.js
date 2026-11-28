@@ -178,6 +178,8 @@ const startServer = async () => {
     // §3.9 stock reservation expiry + nightly money/stock drift alerts
     require("./jobs/reservationSweeper").start();
     require("./jobs/nightlyReconcile").start();
+    // §6.3 BullMQ / in-process workers (email, audit, stats, product summary)
+    require("./jobs");
 
     // 📧 SMTP check — BACKGROUND me (await NAHI): startup ~12s SMTP handshake par
     // nahi rukta. Email bhejna is check par depend nahi karta — sirf early warning.

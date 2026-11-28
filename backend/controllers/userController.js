@@ -18,7 +18,7 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { getChanges } = require("../utils/activityHelper");
-const { sendOtpEmail } = require("../utils/sendEmail");
+const { queueOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { persistAvatar } = require("../utils/avatarFiles");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
@@ -376,37 +376,39 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 📧 Verification OTP bhejo — SMTP khaali ho to dev console fallback (sendEmail ke andar)
-    let delivery;
-    try {
-      delivery = await sendOtpEmail({
-        to: email,
-        otp: code,
-        purpose: "email_verification",
-        expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
-      });
-    } catch (emailError) {
+    // §6.3 — OTP email queue (SMTP await nahi)
+    const delivery = queueOtpEmail({
+      to: email,
+      otp: code,
+      purpose: "email_verification",
+      expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
+    });
+    if (!delivery.queued && !delivery.debugOtp && process.env.NODE_ENV === "production") {
       await PendingRegistration.deleteOne({ email, storeId: signupStoreId || null }).catch(() => {});
-      log.error("createUser otp error:", emailError.cause || emailError);
-      return res.status(500).json({ success: false, message: emailError.message });
+      return res.status(503).json({
+        success: false,
+        message: "Email delivery is unavailable. Please try again shortly.",
+      });
     }
 
-    // 🧪 DEV ONLY — SMTP off ho to bhi flow test ho sake (prod me kabhi OTP expose nahi hoga)
-    const debugOtp =
-      !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
+    const debugOtp = delivery.debugOtp || undefined;
     if (debugOtp) {
-      log.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      log.warn(`[DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
     }
 
+    const accepted = Boolean(delivery.delivered || delivery.queued || debugOtp);
     // ⚠️ Is step par User NAHI bana — sirf pending + OTP. Cookies verify ke baad milenge.
     return res.status(201).json({
       success: true,
-      message: delivery.delivered
+      message: delivery.queued
         ? `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
-        : `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein. (expires in ${REGISTER_OTP_EXPIRE_MINUTES} min)`,
+        : debugOtp
+          ? `SMTP set nahi hai — code email par nahi gaya. Backend console par OTP dekhein. (expires in ${REGISTER_OTP_EXPIRE_MINUTES} min)`
+          : `We’re sending a verification code to ${email}.`,
       requireVerification: true,
-      otpSent: true,
-      delivered: delivery.delivered,
+      otpSent: accepted,
+      deliveryPending: Boolean(delivery.queued),
+      delivered: Boolean(delivery.delivered || delivery.queued),
       email,
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
       resendAfterSeconds: REGISTER_OTP_RESEND_SECONDS,

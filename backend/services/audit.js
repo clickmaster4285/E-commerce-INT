@@ -1,11 +1,10 @@
 // ==========================================================
-// AUDIT SERVICE — non-blocking buffer, §3.5
+// AUDIT SERVICE — non-blocking buffer, §3.5 / §6.3
 // ----------------------------------------------------------
 // record() kabhi caller ko throw nahi karta; events memory me queue
-// hokar ~200ms par insertMany se flush hoti hain.
+// hokar ~200ms par insertMany / BullMQ flush hoti hain.
 // ==========================================================
 
-const AuditEvent = require("../models/AuditEvent");
 const { getStoreId } = require("../utils/tenantContext");
 const log = require("../utils/logger");
 
@@ -28,9 +27,16 @@ async function flush() {
   flushing = true;
   const batch = buffer.splice(0, buffer.length);
   try {
-    await AuditEvent.insertMany(batch, { ordered: false });
+    const { enqueueAuditBatch } = require("../jobs/audit");
+    await enqueueAuditBatch(batch);
   } catch (err) {
     log.error("audit flush error:", err.message);
+    try {
+      const AuditEvent = require("../models/AuditEvent");
+      await AuditEvent.insertMany(batch, { ordered: false });
+    } catch (e) {
+      log.error("audit inline insert error:", e.message);
+    }
   } finally {
     flushing = false;
     if (buffer.length) scheduleFlush();

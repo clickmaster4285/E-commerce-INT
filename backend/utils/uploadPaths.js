@@ -23,18 +23,31 @@ const { getStoreId } = require("./tenantContext");
 const STORAGE_DRIVERS = ["local", "s3"];
 function storageDriver() {
   const name = String(process.env.STORAGE_DRIVER || "local").trim().toLowerCase();
-  const driver = STORAGE_DRIVERS.includes(name) ? name : "local";
-  return { name: driver, effective: driver };
+  const wanted = STORAGE_DRIVERS.includes(name) ? name : "local";
+  if (wanted !== "s3") return { name: "local", effective: "local" };
+  const ready = require("./objectStorage").isConfigured();
+  return { name: "s3", effective: ready ? "s3" : "local" };
 }
 
-/** After local write: if S3 driver, upload and return public URL (else null). */
+/** After local write: if S3 driver+creds, upload and return public URL (else null). */
 async function maybeUploadToObjectStorage(absolutePath, contentType) {
-  if (storageDriver().name !== "s3") return null;
+  if (storageDriver().effective !== "s3") return null;
   try {
     return await require("./objectStorage").putLocalFile(absolutePath, contentType);
   } catch (err) {
     try { require("./logger").error("[uploadPaths] S3 put failed:", err?.message || err); } catch { /* ignore */ }
     return null;
+  }
+}
+
+/** Delete remote object when S3 is live (best-effort; local unlink stays caller's job). */
+async function maybeRemoveFromObjectStorage(urlOrPath) {
+  if (storageDriver().effective !== "s3") return false;
+  try {
+    return await require("./objectStorage").removeKey(urlOrPath);
+  } catch (err) {
+    try { require("./logger").warn("[uploadPaths] S3 delete failed:", err?.message || err); } catch { /* ignore */ }
+    return false;
   }
 }
 
@@ -96,4 +109,5 @@ module.exports = {
   localPathForUrl,
   storeIdFor,
   maybeUploadToObjectStorage,
+  maybeRemoveFromObjectStorage,
 };

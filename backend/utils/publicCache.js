@@ -16,13 +16,21 @@ const now = () => Date.now();
 
 const scopeOf = (storeId = getStoreId()) => (storeId ? String(storeId) : "platform");
 
+let testRedis = null; // node:test inject — avoids opening a real ioredis client
+
 function getRedis() {
+  if (testRedis) return testRedis;
   if (!String(process.env.REDIS_URL || "").trim()) return null;
   try {
     return require("../middleware/rateLimit").getRedisClient() || null;
   } catch {
     return null;
   }
+}
+
+/** @param {import("ioredis").Redis | null} client */
+function _setRedisForTests(client) {
+  testRedis = client;
 }
 
 function hashUrl(url) {
@@ -160,4 +168,13 @@ function keyOf(req) {
   return localKeyOf(req);
 }
 
-module.exports = { publicCache, invalidate, keyOf };
+module.exports = {
+  publicCache,
+  invalidate,
+  keyOf,
+  cacheKey,
+  versionKey,
+  nsFromUrl,
+  hashUrl,
+  _setRedisForTests,
+};

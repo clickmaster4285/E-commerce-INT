@@ -1,9 +1,9 @@
   const path = require("path");
   const fs = require("fs-extra");
 const log = require("./logger");
-const { UPLOAD_ROOT, uploadDirFor, localPathForUrl } = require("./uploadPaths");
+const { UPLOAD_ROOT, uploadDirFor, localPathForUrl, maybeRemoveFromObjectStorage } = require("./uploadPaths");
 
-  // Single image delete
+  // Single image delete (local + S3 when live)
   const deleteImageFile = async (imgUrl) => {
     try {
       if (!imgUrl) return;
@@ -14,6 +14,7 @@ const { UPLOAD_ROOT, uploadDirFor, localPathForUrl } = require("./uploadPaths");
       if (filePath && (await fs.pathExists(filePath))) {
         await fs.remove(filePath);
       }
+      await maybeRemoveFromObjectStorage(imgUrl);
     } catch (error) {
       log.error(
         "Image delete error:",

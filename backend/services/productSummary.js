@@ -111,11 +111,17 @@ async function refresh(productId, { session } = {}) {
   return patch;
 }
 
-/** Fire-and-forget — request path pe await mat karo unless transaction me ho */
+/** Fire-and-forget — request path pe await mat karo unless transaction me ho (§6.3 queue) */
 function refreshAsync(productId) {
-  Promise.resolve()
-    .then(() => refresh(productId))
-    .catch((err) => log.warn("productSummary.refresh failed:", err?.message || err));
+  if (!productId) return;
+  try {
+    const { enqueueProductSummary } = require("../jobs/productSummary");
+    enqueueProductSummary(productId);
+  } catch (err) {
+    Promise.resolve()
+      .then(() => refresh(productId))
+      .catch((e) => log.warn("productSummary.refresh failed:", e?.message || e));
+  }
 }
 
 module.exports = { refresh, refreshAsync, emptyDist };

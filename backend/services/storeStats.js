@@ -1,5 +1,3 @@
-const StoreDailyStats = require("../models/StoreDailyStats");
-const PlatformStats = require("../models/PlatformStats");
 const log = require("../utils/logger");
 const { getStoreId } = require("../utils/tenantContext");
 
@@ -8,7 +6,7 @@ function dayKey(date = new Date()) {
 }
 
 /**
- * Fire-and-forget daily counter bump (order / POS / invoice).
+ * Fire-and-forget daily counter bump (order / POS / invoice) via job queue (§6.3).
  * @param {{ revenue?: number, orders?: number, items?: number, newCustomers?: number }} delta
  */
 function bumpStoreDaily(delta = {}) {
@@ -21,9 +19,16 @@ function bumpStoreDaily(delta = {}) {
     if (n) $inc[k] = n;
   }
   if (!Object.keys($inc).length) return;
-  StoreDailyStats.updateOne({ day }, { $inc, $setOnInsert: { day } }, { upsert: true }).catch((err) =>
-    log.warn("storeStats.bumpStoreDaily:", err?.message || err),
-  );
+
+  const { enqueueStoreDailyBump } = require("../jobs/stats");
+  enqueueStoreDailyBump(storeId, day, $inc).then((res) => {
+    if (res?.queued) return;
+    // In-process / enqueue miss → direct write (same as before)
+    const StoreDailyStats = require("../models/StoreDailyStats");
+    StoreDailyStats.updateOne({ day }, { $inc, $setOnInsert: { day } }, { upsert: true }).catch((err) =>
+      log.warn("storeStats.bumpStoreDaily:", err?.message || err),
+    );
+  });
 }
 
 function bumpPlatform(delta = {}) {
@@ -33,19 +38,25 @@ function bumpPlatform(delta = {}) {
     if (n) $inc[k] = n;
   }
   if (!Object.keys($inc).length) return;
-  PlatformStats.updateOne(
-    { key: "global" },
-    { $inc, $set: { updated_at: new Date() }, $setOnInsert: { key: "global" } },
-    { upsert: true },
-  ).catch((err) => log.warn("storeStats.bumpPlatform:", err?.message || err));
+
+  const { enqueuePlatformBump } = require("../jobs/stats");
+  enqueuePlatformBump($inc).then((res) => {
+    if (res?.queued) return;
+    const PlatformStats = require("../models/PlatformStats");
+    PlatformStats.updateOne(
+      { key: "global" },
+      { $inc, $set: { updated_at: new Date() }, $setOnInsert: { key: "global" } },
+      { upsert: true },
+    ).catch((err) => log.warn("storeStats.bumpPlatform:", err?.message || err));
+  });
 }
 
 // Super-admin dashboard: PlatformStats se counters (fresh ho to) — warna null, caller live countDocuments chalata hai.
-// Fresh = updated_at PLATFORM_STATS_MAX_AGE_MS (default 5 min) ke andar; 0/missing field = "pata nahi" → fallback.
 const PLATFORM_STATS_MAX_AGE_MS = Number(process.env.PLATFORM_STATS_MAX_AGE_MS) || 5 * 60 * 1000;
 
 async function readPlatformTotals() {
   try {
+    const PlatformStats = require("../models/PlatformStats");
     const doc = await PlatformStats.findOne({ key: "global" }).lean();
     if (!doc) return null;
     const age = Date.now() - new Date(doc.updated_at || 0).getTime();
