@@ -1,7 +1,6 @@
 const Attribute = require("../models/Attribute");
 const Category = require("../models/Category");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity } = require("../utils/activityHelper");
 const { queueTranslationSync, hashText } = require("../utils/translationService");
 const log = require("../utils/logger");
 const { pullAttributeFromCategories } = require("../services/referentialCleanup");
@@ -357,17 +356,7 @@ const createAttribute = async (req, res) => {
     emitSocket("attributeCreated", attribute.toObject());
 
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${req.user?.name || "Admin"} created attribute "${attribute.name}"`,
-        category: "Category Management",
-        performedBy: req.user?._id || null,
-        performedByName: req.user?.name || "Admin",
-        details: { attributeId: attribute._id, code: attribute.code },
-      },
-      req.user?._id || null
-    );
+
     res.status(201).json({ success: true, data: attribute });
   } catch (error) {
     if (error.code === 11000) {

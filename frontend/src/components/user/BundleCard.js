@@ -30,10 +30,13 @@ export const getBundleImageUrl = (img) => {
 const getProductPrice = (product) => {
   if (!product) return 0;
   const direct = Number(product.price || product.selling_price || 0);
+  if (direct > 0) return direct;
+  const tile = Number(product.singleVariant?.price || 0);
+  if (tile > 0) return tile;
   const variant = product.variants?.[0]?.selling_price
     ? Number(product.variants[0].selling_price)
     : 0;
-  return direct > 0 ? direct : variant;
+  return variant;
 };
 
 /**
@@ -49,9 +52,19 @@ export function resolveBundleItems(bundle, products = []) {
       if (!pid) return null;
       const product = list.find((p) => String(p._id || p.id) === pid);
       if (!product) return null;
+      const tile = product.singleVariant;
+      const variant = product.variants?.[0] || (tile
+        ? {
+            _id: tile._id,
+            sku: tile.sku,
+            selling_price: tile.price,
+            quantity: tile.qty,
+            images: tile.image ? [{ img_url: tile.image }] : [],
+          }
+        : null);
       return {
         product,
-        variant: product.variants?.[0] || null,
+        variant,
         quantity: Math.max(1, Number(entry?.quantity) || 1),
       };
     })
@@ -76,11 +89,11 @@ export default function BundleCard({ bundle, className = "" }) {
     return ids.slice(0, 50);
   }, [bundle]);
 
-  // ✅ Cart lines banane ke liye products (variants / prices / images) chahiye
+  // ✅ Cart lines — ProductTile DTO (ids + prices/stock/image)
   const { data: bundleProductsData, isLoading } = useQuery({
-    queryKey: ["bundle-products", bundle?._id || bundle?.id, bundleProductIds.join(",")],
+    queryKey: ["bundle-products", "tiles", bundle?._id || bundle?.id, bundleProductIds.join(",")],
     queryFn: () =>
-      productApi.getAllPaginated({ page: 1, limit: 50, ids: bundleProductIds, slim: 1 }),
+      productApi.getTiles({ page: 1, limit: 50, ids: bundleProductIds }),
     enabled: bundleProductIds.length > 0,
     staleTime: 60 * 1000,
   });
@@ -128,10 +141,12 @@ export default function BundleCard({ bundle, className = "" }) {
       {/* ✅ SIRF bundle ki manual cover image — individual product images nahi */}
       <div className="relative aspect-square bg-user-hover overflow-hidden shrink-0">
         <FallbackImage
+          nextImage
           src={image}
           alt={name}
-          loading="lazy"
-          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          className="object-cover group-hover:scale-105 transition duration-500"
         />
 
         <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1.5 items-start">

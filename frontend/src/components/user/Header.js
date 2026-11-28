@@ -429,9 +429,9 @@ export default function Header() {
   }, [searchTerm]);
 
   const { data: searchData } = useQuery({
-    queryKey: ["headerSearch", debouncedSearch],
+    queryKey: ["headerSearch", "tiles", debouncedSearch],
     queryFn: () =>
-      productApi.getAllPaginated({ page: 1, limit: 8, search: debouncedSearch, slim: 1 }),
+      productApi.getTiles({ page: 1, limit: 8, search: debouncedSearch }),
     enabled: debouncedSearch.length >= 2,
     staleTime: 60 * 1000,
     retry: 1,

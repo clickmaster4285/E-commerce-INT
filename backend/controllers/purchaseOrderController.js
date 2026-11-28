@@ -9,7 +9,6 @@ const Product = require("../models/Product");
 const StockHistory = require("../models/StockHistory");
 const log = require("../utils/logger");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity } = require("../utils/activityHelper");
 const { aggregateVendorBalances } = require("../utils/vendorBalance");
 const { auditEvent, diffFields, diffItems } = require("../utils/auditHistory");
 const { escapeRegex } = require("../utils/escapeRegex");

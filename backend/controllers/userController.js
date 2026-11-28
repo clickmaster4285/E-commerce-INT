@@ -17,7 +17,7 @@ const { toPublicUser } = require("../services/auth");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { persistAvatar } = require("../utils/avatarFiles");
@@ -497,17 +497,7 @@ const loginUser = async (req, res) => {
     let io = req.io || null;
     try { if (!io) io = getIO(); } catch { /* tests / socket not booted */ }
     if (io) {
-      await pushGlobalActivity(
-        io,
-        {
-          action: `${user.name} logged in`,
-          category: "Authentication",
-          performedBy: user._id,
-          performedByName: user.name,
-          details: { ip: req.ip },
-        },
-        user._id,
-      );
+
     }
     await tokens.issueSession(req, res, "user", user);
     res.json({
@@ -576,17 +566,7 @@ const loginAdmin = async (req, res) => {
     const io = req.io || getIO();
     // Keep the activity audit, but don't make a successful login wait for
     // secondary activity fan-out writes across the staff collection.
-    void pushGlobalActivity(
-      io,
-      {
-        action: `${employee.name} (${employee.role}) logged in to admin panel`,
-        category: "Authentication",
-        performedBy: employee._id,
-        performedByName: employee.name,
-        details: { ip: req.ip, role: employee.role },
-      },
-      employee._id,
-    );
+
     await tokens.issueSession(req, res, "admin", employee);
     res.json({
       success: true,
@@ -638,16 +618,7 @@ const logoutUser = async (req, res) => {
   try {
     if (req.user?._id) {
       const io = req.io || getIO();
-      await pushGlobalActivity(
-        io,
-        {
-          action: `${req.user.name || "User"} logged out`,
-          category: "Authentication",
-          performedBy: req.user._id,
-          performedByName: req.user.name || "User",
-        },
-        req.user._id,
-      );
+
     }
     for (const aud of auds) {
       await tokens.revokeCurrentSession(req, aud).catch((e) => log.error("logout revoke failed:", e.message));
@@ -755,8 +726,6 @@ const updateProfile = async (req, res) => {
     const Model = userType === 'employee' ? Employee : User;
 
     // ✅ Sirf jo fields actually aayi hain unhi ko update karo
-    // (pehle name/username bhejne par username silently drop ho jata tha
-    //  kyunki updateProfileREST route kabhi match hi nahi hota tha)
     // ⚠️ role/status/permissions yahan JAANBOOZH kar update nahi kiye —
     // privilege escalation hoti (koi apni permission khud nahi badha sakta;
     // permissions sirf dusra authorized staff updateEmployee se change kar sakta hai)
@@ -826,16 +795,7 @@ const changePassword = async (req, res) => {
     await user.save();
     await revokeOtherSessions(req, req.userType, user._id);
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${user.name} changed password`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-      },
-      user._id,
-    );
+
     res.json({ success: true, message: "✅ Password changed successfully!" });
   } catch (error) {
     log.error("changePassword error:", error);
@@ -1026,17 +986,7 @@ const googleLogin = async (req, res) => {
       return res.status(403).json({ success: false, message: "Your account is inactive. Please contact administrator." });
 
     const io = req.io || getIO();
-    void pushGlobalActivity(
-      io,
-      {
-        action: `${employee.name} (${employee.role}) logged in to admin panel via Google`,
-        category: "Authentication",
-        performedBy: employee._id,
-        performedByName: employee.name,
-        details: { ip: req.ip, role: employee.role, provider: "google" },
-      },
-      employee._id,
-    );
+
 
     await tokens.issueSession(req, res, "admin", employee);
     return res.json({
@@ -1095,17 +1045,7 @@ const googleCustomerLogin = async (req, res) => {
     }
 
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${user.name} logged in via Google`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { ip: req.ip, provider: "google" },
-      },
-      user._id,
-    );
+
 
     if (req.store?._id) {
       await upsertCustomerForUser({ storeId: req.store._id, user }).catch((err) => {

@@ -17,7 +17,7 @@ const Employee = require("../models/Employee");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { getChanges } = require("../utils/activityHelper");
 const { sendOtpEmail } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
@@ -157,17 +157,7 @@ const loginAdmin = async (req, res) => {
     const io = req.io || getIO();
     // Keep the activity audit, but don't make a successful login wait for
     // secondary activity fan-out writes across the staff collection.
-    void pushGlobalActivity(
-      io,
-      {
-        action: `${employee.name} (${employee.role}) logged in to admin panel`,
-        category: "Authentication",
-        performedBy: employee._id,
-        performedByName: employee.name,
-        details: { ip: req.ip, role: employee.role },
-      },
-      employee._id,
-    );
+
     await tokens.issueSession(req, res, "admin", employee);
     res.json({
       success: true,
@@ -240,17 +230,7 @@ const googleLogin = async (req, res) => {
       return res.status(403).json({ success: false, message: "Your account is inactive. Please contact administrator." });
 
     const io = req.io || getIO();
-    void pushGlobalActivity(
-      io,
-      {
-        action: `${employee.name} (${employee.role}) logged in to admin panel via Google`,
-        category: "Authentication",
-        performedBy: employee._id,
-        performedByName: employee.name,
-        details: { ip: req.ip, role: employee.role, provider: "google" },
-      },
-      employee._id,
-    );
+
 
     await tokens.issueSession(req, res, "admin", employee);
     return res.json({

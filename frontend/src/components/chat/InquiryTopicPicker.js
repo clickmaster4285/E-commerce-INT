@@ -61,7 +61,7 @@ export default function InquiryTopicPicker({ conversation, orders = [], cartItem
     const timer = window.setTimeout(() => setDebouncedSearch(productSearch.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [productSearch]);
-  const catalogQuery = useQuery({ queryKey: ["chat-product-picker", debouncedSearch], queryFn: () => productApi.getAllPaginated({ page: 1, limit: 20, search: debouncedSearch, slim: 1 }), enabled: type === "product", staleTime: 60_000, retry: false });
+  const catalogQuery = useQuery({ queryKey: ["chat-product-picker", "tiles", debouncedSearch], queryFn: () => productApi.getTiles({ page: 1, limit: 20, search: debouncedSearch }), enabled: type === "product", staleTime: 60_000, retry: false });
   const productGroups = useMemo(() => {
     const groups = new Map();
     const addVariant = (productId, name, variant) => {

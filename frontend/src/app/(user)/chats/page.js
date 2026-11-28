@@ -12,19 +12,13 @@ import { useUserSocket } from "@/hooks/user/useUserSocket";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import ChatThread from "@/components/chat/ChatThread";
 
-const GUEST_TOKEN_KEY = "support-chat-guest-token";
-const subscribeGuestToken = (callback) => {
-  window.addEventListener("storage", callback);
-  window.addEventListener("support-chat:guest-token", callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("support-chat:guest-token", callback);
-  };
-};
-const getGuestToken = () => {
-  try { return window.localStorage.getItem(GUEST_TOKEN_KEY) || ""; } catch { return ""; }
-};
-const getServerGuestToken = () => "";
+import {
+  subscribeGuestToken,
+  getGuestToken,
+  getGuestTokenServerSnapshot,
+  setGuestToken,
+} from "@/lib/guestChatToken";
+
 export default function CustomerChatsPage({ initialConversationId = null }) {
   const [selectedId, setSelectedId] = useState(initialConversationId || undefined);
   const [switchingOrder, setSwitchingOrder] = useState(false);
@@ -35,7 +29,7 @@ export default function CustomerChatsPage({ initialConversationId = null }) {
   const [guestBusy, setGuestBusy] = useState(false);
   const [guestError, setGuestError] = useState("");
   const [customerAccessDenied, setCustomerAccessDenied] = useState(false);
-  const guestToken = useSyncExternalStore(subscribeGuestToken, getGuestToken, getServerGuestToken);
+  const guestToken = useSyncExternalStore(subscribeGuestToken, getGuestToken, getGuestTokenServerSnapshot);
   const queryClient = useQueryClient();
   const { socket } = useUserSocket();
   const cartState = useCart();
@@ -128,7 +122,7 @@ export default function CustomerChatsPage({ initialConversationId = null }) {
     setGuestError("");
     try {
       const result = await guestChatApi.start(guestName, guestEmail, guestToken);
-      window.localStorage.setItem(GUEST_TOKEN_KEY, result.token);
+      setGuestToken(result.token);
       setGuestConversation(result.conversation);
       setGuestName(result.conversation?.guest_name || guestName.trim());
       setGuestEmail(result.conversation?.guest_email || guestEmail.trim());

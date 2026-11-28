@@ -539,6 +539,18 @@ const initSocket = (server) => {
     };
   }
 
+  /** §5.6 / §8 — mutations REST pe; socket writes deprecated (chat/presence keep). */
+  function rejectSocketWrite(socket, eventName, callback, restHint) {
+    const payload = {
+      success: false,
+      code: "SOCKET_WRITE_REMOVED",
+      message: `Use REST ${restHint || "API"} instead of socket "${eventName}"`,
+    };
+    if (typeof callback === "function") callback(payload);
+    else if (eventName) socket.emit(eventName, payload);
+    return payload;
+  }
+
   // Aakhri middleware: connection handler isi store ke context me chale
   io.use((socket, next) => runWithStore(socket.tenantStoreId, next));
 
@@ -670,14 +682,8 @@ const initSocket = (server) => {
       } catch (e) { socket.emit("shippingConfigData", { success: false, message: e.message }); }
     });
 
-    socket.on("updateShippingConfig", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { updateShippingConfig } = require("../controllers/shippingController");
-        const req = createReq(socket, payload);
-        const res = createRes(socket, "shippingConfigUpdated", callback);
-        await updateShippingConfig(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("updateShippingConfig", async (_payload, callback) => {
+      rejectSocketWrite(socket, "shippingConfigUpdated", callback, "PUT /shipping/config");
     });
 
     socket.on("getShippingRules", async () => {
@@ -689,45 +695,20 @@ const initSocket = (server) => {
       } catch (e) { socket.emit("shippingRulesList", { success: false, message: e.message }); }
     });
 
-    socket.on("createShippingRule", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { createShippingRule } = require("../controllers/shippingController");
-        const req = createReq(socket, payload);
-        const res = createRes(socket, "shippingRuleCreated", callback);
-        await createShippingRule(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("createShippingRule", async (_payload, callback) => {
+      rejectSocketWrite(socket, "shippingRuleCreated", callback, "POST /shipping/rules");
     });
 
-    socket.on("updateShippingRule", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { updateShippingRule } = require("../controllers/shippingController");
-        const { id, ...data } = payload || {};
-        const req = createReq(socket, data, { id });
-        const res = createRes(socket, "shippingRuleUpdated", callback);
-        await updateShippingRule(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("updateShippingRule", async (_payload, callback) => {
+      rejectSocketWrite(socket, "shippingRuleUpdated", callback, "PUT /shipping/rules/:id");
     });
 
-    socket.on("deleteShippingRule", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { deleteShippingRule } = require("../controllers/shippingController");
-        const req = createReq(socket, {}, { id });
-        const res = createRes(socket, "shippingRuleDeleted", callback);
-        await deleteShippingRule(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("deleteShippingRule", async (_payload, callback) => {
+      rejectSocketWrite(socket, "shippingRuleDeleted", callback, "DELETE /shipping/rules/:id");
     });
 
-    socket.on("toggleShippingRule", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { toggleShippingRule } = require("../controllers/shippingController");
-        const req = createReq(socket, {}, { id });
-        const res = createRes(socket, "shippingRuleToggled", callback);
-        await toggleShippingRule(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("toggleShippingRule", async (_payload, callback) => {
+      rejectSocketWrite(socket, "shippingRuleToggled", callback, "PATCH /shipping/rules/:id/status");
     });
 
     // ========== STORE EVENTS ==========
@@ -753,64 +734,12 @@ const initSocket = (server) => {
       } catch (e) { socket.emit("storeInfo", { success: false, message: e.message }); }
     });
 
-    socket.on("updateStoreInfo", async (payload, callback) => {
-      // ✅ Jis staff ko 'store' permission hai woh update kar sakta hai (sirf admin nahi)
-      const gate = await requireSocketPermission(socket, "store", callback, { strict: true });
-      if (!gate.allowed) return;
-      try {
-        const { updateStoreInfo } = require("../controllers/storeController");
-        const Store = require("../models/Store");
-        const existingStore = await Store.findOne().select("logo.img_url").lean();
-        const previousLogoUrl = existingStore?.logo?.img_url || "";
-        let logoFile = null;
-        if (payload?.logoBase64) {
-          try {
-            logoFile = await compressAndSaveLogo(payload.logoBase64, payload.logoFileName);
-            if (!logoFile) throw new Error("Logo processing returned no file");
-          } catch (e) {
-            log.error("❌ Logo processing error:", e.message);
-            if (callback) callback({ success: false, message: `Logo upload failed: ${e.message}` });
-            return;
-          }
-        }
-        const { logoBase64, logoFileName, logoMimeType, ...bodyData } = payload || {};
-        const req = {
-          user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: gate.name || socket.userName, permissions: gate.permissions || {} },
-          body: bodyData, file: logoFile, io
-        };
-        let updateResponse = null;
-        const respond = (data) => {
-          updateResponse = data;
-          if (callback) callback(data);
-          if (data?.success) { io.emit("storeUpdated", data.data); io.emit("storeInfoChangedForProfile", data.data); }
-        };
-        const res = {
-          status: () => ({ json: respond }),
-          json: respond,
-        };
-        await updateStoreInfo(req, res);
-        if (updateResponse?.success && logoFile && previousLogoUrl && previousLogoUrl !== logoFile.relativePath) {
-          await deleteOldLogo(previousLogoUrl);
-        }
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("updateStoreInfo", async (_payload, callback) => {
+      rejectSocketWrite(socket, "storeUpdated", callback, "PUT /store + POST /store/logo");
     });
 
-    socket.on("deleteStoreLogo", async (_, callback) => {
-      // ✅ 'store' permission wala staff bhi logo hata sakta hai
-      const gate = await requireSocketPermission(socket, "store", callback, { strict: true });
-      if (!gate.allowed) return;
-      try {
-        await deleteOldLogo();
-        const Store = require("../models/Store");
-        let store = await Store.findOne();
-        if (store) {
-          store.logo = { img_url: "", public_id: "" };
-          await store.save();
-          const plain = store.toObject();
-          if (callback) callback({ success: true, data: plain });
-          io.emit("storeUpdated", plain);
-        }
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("deleteStoreLogo", async (_payload, callback) => {
+      rejectSocketWrite(socket, "storeUpdated", callback, "DELETE /store/logo");
     });
 
     // ========== PROFILE EVENTS (Auth required) ==========
@@ -855,41 +784,12 @@ const initSocket = (server) => {
       }
     });
 
-    socket.on("updateProfile", async (payload, callback) => {
-      if (!requireAuth(socket, callback)) return;
-      // REST jaisa: pending seller sirf dekh sakta hai, badal nahi sakta
-      if (socket.sellerPending) { if (typeof callback === "function") callback(SELLER_PENDING_ERR); return; }
-      try {
-        const { updateProfileInfo } = require("../controllers/userController");
-        const req = {
-          user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
-          userType: socket.userType || 'user',
-          body: payload, io
-        };
-        const res = {
-          status: (c) => ({ json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("profileUpdated", d); if (d.store) io.emit("storeUpdated", d.store); } } }),
-          json: (d) => { if (callback) callback(d); if (d?.success) { io.emit("profileUpdated", d); if (d.store) io.emit("storeUpdated", d.store); } },
-        };
-        await updateProfileInfo(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("updateProfile", async (_payload, callback) => {
+      rejectSocketWrite(socket, "profileUpdated", callback, "PUT /users/profile");
     });
 
-    socket.on("changePassword", async (payload, callback) => {
-      if (!requireAuth(socket, callback)) return;
-      // REST jaisa: pending seller sirf dekh sakta hai, badal nahi sakta
-      if (socket.sellerPending) { if (typeof callback === "function") callback(SELLER_PENDING_ERR); return; }
-      try {
-        const { changePasswordSocket } = require("../controllers/userController");
-        const req = {
-          user: { _id: socket.userId, id: socket.userId, role: socket.userRole, name: socket.userName, permissions: socket.userPermissions || {} },
-          userType: socket.userType || 'user',
-          // Password badalne par baaki sessions revoke — ye wala (current) bacha rahe
-          sessionId: socket.sessionId || null,
-          body: payload, io
-        };
-        const res = { status: () => ({ json: (d) => { if (callback) callback(d); } }), json: (d) => { if (callback) callback(d); } };
-        await changePasswordSocket(req, res);
-      } catch (e) { if (callback) callback({ success: false, message: e.message }); }
+    socket.on("changePassword", async (_payload, callback) => {
+      rejectSocketWrite(socket, "passwordChanged", callback, "PUT /users/password");
     });
 
     // ========== EMPLOYEE EVENTS (Admin-only) ==========
@@ -918,84 +818,20 @@ const initSocket = (server) => {
       }
     });
 
-    socket.on("createEmployee", async (payload, callback) => {
-      // ✅ Jis staff ko 'employees' permission hai woh add kar sakta hai (sirf admin nahi)
-      const gate = await requireSocketPermission(socket, "employees", callback);
-      if (!gate.allowed) return;
-      try {
-        const { createEmployee } = require("../controllers/employeeController");
-        const { avatarBase64, avatarFileName, ...data } = payload || {};
-        // Avatar drag & drop se aayi base64 image ko optimize kar ke store karo
-        if (avatarBase64) {
-          try {
-            data.avatar = await processEmployeeAvatar(avatarBase64);
-          } catch (e) {
-            if (callback) callback({ success: false, message: `Profile picture: ${e.message}` });
-            return;
-          }
-        }
-        const req = createPermittedReq(socket, gate, data);
-        const res = createRes(socket, "employeeCreated", callback);
-        await createEmployee(req, res);
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("employeeCreated", { success: false, message: e.message });
-      }
+    socket.on("createEmployee", async (_payload, callback) => {
+      rejectSocketWrite(socket, "employeeCreated", callback, "POST /employees");
     });
 
-    socket.on("updateEmployee", async (payload, callback) => {
-      // ✅ 'employees' permission wala staff update kar sakta hai;
-      // khud ki permission change karna controller me blocked hai
-      const gate = await requireSocketPermission(socket, "employees", callback);
-      if (!gate.allowed) return;
-      try {
-        const { updateEmployee } = require("../controllers/employeeController");
-        const { id, avatarBase64, avatarFileName, ...data } = payload || {};
-        if (avatarBase64) {
-          try {
-            data.avatar = await processEmployeeAvatar(avatarBase64);
-          } catch (e) {
-            if (callback) callback({ success: false, message: `Profile picture: ${e.message}` });
-            return;
-          }
-        }
-        const req = createPermittedReq(socket, gate, data, { id });
-        const res = createRes(socket, "employeeUpdated", callback);
-        await updateEmployee(req, res);
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("employeeUpdated", { success: false, message: e.message });
-      }
+    socket.on("updateEmployee", async (_payload, callback) => {
+      rejectSocketWrite(socket, "employeeUpdated", callback, "PUT /employees/:id");
     });
 
-    socket.on("deleteEmployee", async ({ id }, callback) => {
-      // ✅ 'employees' permission wala staff delete kar sakta hai
-      const gate = await requireSocketPermission(socket, "employees", callback);
-      if (!gate.allowed) return;
-      try {
-        const { deleteEmployee } = require("../controllers/employeeController");
-        const req = createPermittedReq(socket, gate, {}, { id });
-        const res = createRes(socket, "employeeDeleted", callback);
-        await deleteEmployee(req, res);
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("employeeDeleted", { success: false, message: e.message });
-      }
+    socket.on("deleteEmployee", async (_payload, callback) => {
+      rejectSocketWrite(socket, "employeeDeleted", callback, "DELETE /employees/:id");
     });
 
-    socket.on("toggleEmployeeStatus", async ({ id }, callback) => {
-      // ✅ 'employees' permission wala staff status toggle kar sakta hai
-      const gate = await requireSocketPermission(socket, "employees", callback);
-      if (!gate.allowed) return;
-      try {
-        const { toggleStatus } = require("../controllers/employeeController");
-        const req = createPermittedReq(socket, gate, {}, { id });
-        const res = createRes(socket, "employeeStatusToggled", callback);
-        await toggleStatus(req, res);
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("employeeStatusToggled", { success: false, message: e.message });
-      }
+    socket.on("toggleEmployeeStatus", async (_payload, callback) => {
+      rejectSocketWrite(socket, "employeeStatusToggled", callback, "PATCH /employees/:id/status");
     });
 
     // ========== PRODUCT EVENTS (PUBLIC read) ==========
@@ -1029,59 +865,16 @@ const initSocket = (server) => {
       } catch (e) { socket.emit("discountsList", { success: false, message: e.message }); }
     });
 
-    socket.on("createDiscount", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { createDiscount } = require("../controllers/discountController");
-        const req = createReq(socket, payload);
-        const res = createRes(socket, "discountCreated", callback);
-        await createDiscount(req, res);
-        io.emit("discount:activity", {
-          action: "created", discountId: req.body?.id || null,
-          user: { _id: socket.userId, name: socket.userName, role: socket.userRole },
-          timestamp: new Date(),
-        });
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("discountCreated", { success: false, message: e.message });
-      }
+    socket.on("createDiscount", async (_payload, callback) => {
+      rejectSocketWrite(socket, "discountCreated", callback, "POST /discounts");
     });
 
-    socket.on("updateDiscount", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { updateDiscount } = require("../controllers/discountController");
-        const { id, ...data } = payload || {};
-        const req = createReq(socket, data, { id });
-        const res = createRes(socket, "discountUpdated", callback);
-        await updateDiscount(req, res);
-        io.emit("discount:activity", {
-          action: "updated", discountId: id,
-          user: { _id: socket.userId, name: socket.userName, role: socket.userRole },
-          timestamp: new Date(),
-        });
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("discountUpdated", { success: false, message: e.message });
-      }
+    socket.on("updateDiscount", async (_payload, callback) => {
+      rejectSocketWrite(socket, "discountUpdated", callback, "PUT /discounts/:id");
     });
 
-    socket.on("deleteDiscount", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { deleteDiscount } = require("../controllers/discountController");
-        const req = createReq(socket, {}, { id });
-        const res = createRes(socket, "discountDeleted", callback);
-        await deleteDiscount(req, res);
-        io.emit("discount:activity", {
-          action: "deleted", discountId: id,
-          user: { _id: socket.userId, name: socket.userName, role: socket.userRole },
-          timestamp: new Date(),
-        });
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("discountDeleted", { success: false, message: e.message });
-      }
+    socket.on("deleteDiscount", async (_payload, callback) => {
+      rejectSocketWrite(socket, "discountDeleted", callback, "DELETE /discounts/:id");
     });
 
     // ========== DEALS EVENTS ==========
@@ -1094,61 +887,20 @@ const initSocket = (server) => {
       } catch (e) { socket.emit("dealsList", { success: false, message: e.message }); }
     });
 
-    socket.on("createDeal", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { createDeal } = require("../controllers/dealController");
-        const req = createReq(socket, payload);
-        const res = createRes(socket, "dealCreated", callback);
-        await createDeal(req, res);
-        io.emit("deal:created");
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("dealCreated", { success: false, message: e.message });
-      }
+    socket.on("createDeal", async (_payload, callback) => {
+      rejectSocketWrite(socket, "dealCreated", callback, "POST /deals");
     });
 
-    socket.on("updateDeal", async (payload, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { updateDeal } = require("../controllers/dealController");
-        const { id, ...data } = payload || {};
-        const req = createReq(socket, data, { id });
-        const res = createRes(socket, "dealUpdated", callback);
-        await updateDeal(req, res);
-        io.emit("deal:updated", { id });
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("dealUpdated", { success: false, message: e.message });
-      }
+    socket.on("updateDeal", async (_payload, callback) => {
+      rejectSocketWrite(socket, "dealUpdated", callback, "PUT /deals/:id");
     });
 
-    socket.on("deleteDeal", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { deleteDeal } = require("../controllers/dealController");
-        const req = createReq(socket, {}, { id });
-        const res = createRes(socket, "dealDeleted", callback);
-        await deleteDeal(req, res);
-        io.emit("deal:deleted", { id });
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("dealDeleted", { success: false, message: e.message });
-      }
+    socket.on("deleteDeal", async (_payload, callback) => {
+      rejectSocketWrite(socket, "dealDeleted", callback, "DELETE /deals/:id");
     });
 
-    socket.on("toggleDealStatus", async ({ id }, callback) => {
-      if (!requireRole(socket, ["admin", "employee"], callback)) return;
-      try {
-        const { toggleDealStatus } = require("../controllers/dealController");
-        const req = createReq(socket, {}, { id });
-        const res = createRes(socket, "dealStatusToggled", callback);
-        await toggleDealStatus(req, res);
-        io.emit("deal:updated", { id });
-      } catch (e) {
-        if (callback) callback({ success: false, message: e.message });
-        else socket.emit("dealStatusToggled", { success: false, message: e.message });
-      }
+    socket.on("toggleDealStatus", async (_payload, callback) => {
+      rejectSocketWrite(socket, "dealStatusToggled", callback, "PATCH /deals/:id/status");
     });
 
     // ========== RELAY EVENTS ==========

@@ -40,6 +40,7 @@ import {
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import adminHttp from "@/apis/axiosInstance";
+import { storeApi } from "@/apis/admin/storeApi";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
@@ -767,20 +768,19 @@ export default function StoreInfoPage() {
     if (file) processLogoFile(file);
   };
 
-  // Saved logo ka actual delete — toast ke "Remove" action se call hota hai
-  const removeSavedLogo = () => {
-    socket.emit("deleteStoreLogo", null, (resp) => {
-      if (resp?.success) {
-        setLogoFile(null);
-        setLogoPreview("");
-        setLogoError(false);
-        setFormData((p) => ({ ...p, logo: { img_url: "", public_id: "" } }));
-        if (resp.data) syncStoreCache(resp.data);
-        toast.success(t("admin.storeInfo.toast.logoRemoved"));
-      } else {
-        toast.error(t("admin.storeInfo.toast.logoRemoveFailed"));
-      }
-    });
+  // Saved logo ka actual delete — toast ke "Remove" action se call hota hai (REST)
+  const removeSavedLogo = async () => {
+    try {
+      const saved = await storeApi.deleteLogo();
+      setLogoFile(null);
+      setLogoPreview("");
+      setLogoError(false);
+      setFormData((p) => ({ ...p, logo: { img_url: "", public_id: "" } }));
+      if (saved) syncStoreCache(saved);
+      toast.success(t("admin.storeInfo.toast.logoRemoved"));
+    } catch {
+      toast.error(t("admin.storeInfo.toast.logoRemoveFailed"));
+    }
   };
 
   const handleRemoveLogo = () => {
@@ -839,95 +839,72 @@ export default function StoreInfoPage() {
       return;
     }
 
-    // ✅ Check socket connection first
-    if (!socket || !isConnected) {
-      toast.error(t("admin.storeInfo.toast.connectionLost"));
-      return;
-    }
-
     setLoading(true);
 
     try {
-      let logoBase64 = null;
-      let logoFileName = null;
-      let logoMimeType = null;
-
+      // REST cutover — socket updateStoreInfo / base64 logo deprecated
+      let saved = await storeApi.update({
+        store_name: formData.store_name,
+        tagline: formData.tagline,
+        email: formData.email,
+        phone: formData.phone,
+        support_email: formData.support_email,
+        support_phone: formData.support_phone,
+        country: formData.country,
+        state: formData.state,
+        city: formData.city,
+        zip_code: formData.zip_code,
+        address: formData.address,
+        currency: formData.currency,
+        tax_rate: formData.tax_rate,
+        weight_unit: formData.weight_unit,
+        business_type: formData.business_type,
+        total_employees: formData.total_employees,
+        year_established: formData.year_established,
+        maintenance_message: formData.maintenance_message,
+        meta_title: formData.meta_title,
+        meta_description: formData.meta_description,
+        meta_keywords: formData.meta_keywords,
+        return_policy: formData.return_policy,
+        privacy_policy: formData.privacy_policy,
+        terms_conditions: formData.terms_conditions,
+        quote_terms_conditions: formData.quote_terms_conditions,
+        invoice_terms_conditions: formData.invoice_terms_conditions,
+        social_links: formData.social_links,
+      });
       if (logoFile) {
-        logoFileName = logoFile.name;
-        logoMimeType = logoFile.type;
+        saved = (await storeApi.uploadLogo(logoFile)) || saved;
+      }
+      setFormData((p) => ({
+        ...p,
+        ...saved,
+        social_links: { ...p.social_links, ...(saved?.social_links || {}) },
+      }));
+      syncStoreCache(saved);
 
-        logoBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error("Failed to read file"));
-          reader.readAsDataURL(logoFile);
-        });
-
+      const url = getLogoUrl(saved);
+      if (url) {
+        setLogoPreview(url);
+        setLogoError(false);
+      } else {
+        setLogoPreview("");
       }
 
-      const dataToSend = {
-        ...formData,
-        logoBase64,
-        logoFileName,
-        logoMimeType,
-      };
-
-      socket.emit(
-        "updateStoreInfo",
-        dataToSend,
-        (resp) => {
-
-          // ✅ CHECK FOR PERMISSION ERROR
-          if (resp?.success === false && resp?.message?.toLowerCase().includes("permission")) {
-            toast.error(t("admin.storeInfo.toast.updateFailed"), {
-              duration: 6000,
-              description: t("admin.storeInfo.toast.accessDeniedBody"),
-            });
-            setLoading(false);
-            return;
-          }
-
-          if (resp?.success) {
-            const saved = resp.data || formData;
-            setFormData((p) => ({
-              ...p,
-              ...saved,
-              social_links: { ...p.social_links, ...(saved.social_links || {}) },
-            }));
-            syncStoreCache(saved);
-
-            const url = getLogoUrl(saved);
-            if (url) {
-              setLogoPreview(url);
-              setLogoError(false);
-            } else {
-              setLogoPreview("");
-            }
-
-            setLogoFile(null);
-            setIsEditing(false);
-            toast.success(t("admin.storeInfo.toast.updated"));
-          } else {
-            toast.error(resp?.message || t("admin.storeInfo.toast.updateFailed"));
-          }
-          setLoading(false);
-        }
-      );
-
-      const timeoutId = setTimeout(() => {
-        setLoading((prev) => {
-          if (prev) {
-            toast.error(t("admin.storeInfo.toast.timeout"));
-            return false;
-          }
-          return prev;
-        });
-      }, 15000);
-
-      return () => clearTimeout(timeoutId);
+      setLogoFile(null);
+      setIsEditing(false);
+      toast.success(t("admin.storeInfo.toast.updated"));
     } catch (err) {
       console.error("❌ Submit error:", err);
-      toast.error(t("admin.storeInfo.toast.saveError"));
+      const msg = err?.response?.data?.message || t("admin.storeInfo.toast.saveError");
+      if (String(msg).toLowerCase().includes("permission")) {
+        toast.error(t("admin.storeInfo.toast.updateFailed"), {
+          duration: 6000,
+          description: t("admin.storeInfo.toast.accessDeniedBody"),
+        });
+      } else {
+        toast.error(msg);
+      }
+    } finally {
       setLoading(false);
     }
   };

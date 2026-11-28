@@ -116,21 +116,42 @@ function ProductCardInner({
   const productId = product._id || product.id;
   const liked = isWishlisted(productId);
 
-  const variants = product.variants || [];
+  // ProductTile DTO (§9.2) — singleVariant / variantCount / totalStock / rating / brand
+  const tileSingle = product.singleVariant || null;
+  const variants = product.variants?.length
+    ? product.variants
+    : tileSingle
+      ? [{
+          _id: tileSingle._id,
+          sku: tileSingle.sku,
+          selling_price: tileSingle.price,
+          quantity: tileSingle.qty,
+          images: tileSingle.image ? [{ img_url: tileSingle.image }] : [],
+        }]
+      : [];
   const firstVariant = variants[0];
   const pricedVariant = variants.find((variant) => Number(variant?.selling_price) > 0) || firstVariant;
 
   const image =
     firstVariant?.images?.[0]?.img_url ||
     product.image ||
-    product.images?.[0]?.img_url;
+    product.images?.[0]?.img_url ||
+    tileSingle?.image;
   const variantPrice =
     Number(pricedVariant?.selling_price) ||
     Number(product.price) ||
     Number(product.selling_price) ||
     Number(pricedVariant?.price) ||
+    Number(tileSingle?.price) ||
     0;
-  const variantOldPrice = Number(pricedVariant?.price || product.regularPrice || product.price || variantPrice || 0);
+  const variantOldPrice = Number(
+    product.compareAt ||
+      pricedVariant?.price ||
+      product.regularPrice ||
+      product.price ||
+      variantPrice ||
+      0,
+  );
 
   let price = variantPrice;
   let oldPrice = variantOldPrice;
@@ -164,12 +185,18 @@ function ProductCardInner({
     ? deal || matchedDeal || getActiveDealForProduct(product)
     : null;
 
-  const totalStock = variants.length
-    ? variants.reduce((s, v) => s + Number(v.quantity || 0), 0)
-    : product.quantity || 99;
+  const totalStock = Number.isFinite(Number(product.totalStock))
+    ? Number(product.totalStock)
+    : variants.length
+      ? variants.reduce((s, v) => s + Number(v.quantity || 0), 0)
+      : Number(product.stock_total ?? product.quantity) || 0;
 
   const displayName = productNameOf(product) || product.name || "";
-  const brandName = fieldOf(product.brand_id, "name") || product.brand || "";
+  const brandName =
+    fieldOf(product.brand_id, "name") ||
+    product.brand?.name ||
+    (typeof product.brand === "string" ? product.brand : "") ||
+    "";
   const activeDeal = showDealPricing ? deal || matchedDeal : deal;
   const activeDealName = fieldOf(activeDeal, "name");
   const out = totalStock < 1;
@@ -193,9 +220,10 @@ function ProductCardInner({
     : 0;
 
   // Multi-variant (>1) → "Choose Options" drawer; single variant → direct Add / Buy.
-  const hasMultipleVariants = variants.length > 1;
-  const rating = Number(product.ratingSummary?.avg) || 0;
-  const ratingCount = Number(product.ratingSummary?.count) || 0;
+  const variantCount = Number(product.variantCount) || variants.length || 0;
+  const hasMultipleVariants = variantCount > 1;
+  const rating = Number(product.rating?.avg ?? product.ratingSummary?.avg) || 0;
+  const ratingCount = Number(product.rating?.count ?? product.ratingSummary?.count) || 0;
   const discountPercent =
     oldPrice > price && oldPrice > 0 && price > 0
       ? Math.round(((oldPrice - price) / oldPrice) * 100)
@@ -238,6 +266,10 @@ function ProductCardInner({
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
+    if (!firstVariant?._id) {
+      router.push(`/product/${productId}`);
+      return;
+    }
     setAdding(true);
     addToCart(product, firstVariant, 1, buildDealInfo());
     setTimeout(() => {
@@ -252,6 +284,10 @@ function ProductCardInner({
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
+    if (!firstVariant?._id) {
+      router.push(`/product/${productId}`);
+      return;
+    }
     const dealInfo = buildDealInfo();
     addToCart(product, firstVariant, 1, dealInfo);
     if (dealInfo && getEffectiveMinQuantity({
@@ -266,11 +302,15 @@ function ProductCardInner({
     router.push("/checkout");
   };
 
-  // Multi-variant: global options drawer kholo (CartDrawer jaisa)
+  // Multi-variant: options drawer — tiles DTO me variants nahi hote to PDP pe jao
   const handleOpenOptions = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (out) return;
+    if (!product.variants?.length) {
+      router.push(`/product/${productId}`);
+      return;
+    }
     openQuickBuy?.(product, buildDealInfo());
   };
 

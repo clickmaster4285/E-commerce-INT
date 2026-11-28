@@ -9,7 +9,6 @@ process.env.JWT_ADMIN_ACCESS_SECRET = process.env.JWT_ADMIN_ACCESS_SECRET || "te
 
 const app = require("../app");
 const tokens = require("../utils/tokens");
-const { pushGlobalActivity } = require("../utils/activityHelper");
 const Store = require("../models/Store");
 const Employee = require("../models/Employee");
 const Product = require("../models/Product");
@@ -86,8 +85,11 @@ test("Brand model resolves from models/Brand (case-sensitive path)", () => {
   assert.ok(require.resolve("../models/Brand"));
 });
 
-test("pushGlobalActivity is a no-op (no User scan)", async () => {
-  await assert.doesNotReject(() => pushGlobalActivity(null, { action: "x" }, null));
+test("activityHelper no longer exports pushGlobalActivity", () => {
+  const activity = require("../utils/activityHelper");
+  assert.equal(typeof activity.pushGlobalActivity, "undefined");
+  assert.equal(typeof activity.pushActivityToUser, "undefined");
+  assert.equal(typeof activity.pushStoreActivity, "function");
 });
 
 test("schema paths exist for previously dropped fields", () => {

@@ -13,21 +13,14 @@ import { useUserSocket } from "@/hooks/user/useUserSocket";
 import { getAdminSocket } from "@/hooks/admin/useAdminSocket";
 import ChatThread from "@/components/chat/ChatThread";
 
-const GUEST_TOKEN_KEY = "support-chat-guest-token";
+import {
+  subscribeGuestToken,
+  getGuestToken,
+  getGuestTokenServerSnapshot,
+  setGuestToken,
+} from "@/lib/guestChatToken";
+
 const WIDGET_POSITION_KEY = "support-chat-widget-position";
-let fallbackGuestToken = "";
-const subscribeGuestToken = (callback) => {
-  window.addEventListener("storage", callback);
-  window.addEventListener("support-chat:guest-token", callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("support-chat:guest-token", callback);
-  };
-};
-const getGuestToken = () => {
-  try { return window.localStorage.getItem(GUEST_TOKEN_KEY) || fallbackGuestToken; } catch { return fallbackGuestToken; }
-};
-const getGuestTokenServerSnapshot = () => "";
 const subscribeWidgetPosition = (callback) => {
   window.addEventListener("storage", callback);
   window.addEventListener("support-chat:widget-position", callback);
@@ -321,9 +314,7 @@ export default function SupportChatWidget() {
     setError("");
     try {
       const result = await guestChatApi.start(guestName, guestEmail, guestToken);
-      fallbackGuestToken = result.token;
-      try { window.localStorage.setItem(GUEST_TOKEN_KEY, result.token); } catch {}
-      window.dispatchEvent(new Event("support-chat:guest-token"));
+      setGuestToken(result.token);
       setGuestConversation(result.conversation);
       setGuestName(result.conversation?.guest_name || guestName.trim());
       setGuestEmail(result.conversation?.guest_email || guestEmail.trim());

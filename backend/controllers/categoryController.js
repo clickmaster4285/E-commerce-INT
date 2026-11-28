@@ -10,7 +10,7 @@ const { getNextCategoryCode, peekNextCategoryCode } = require("../utils/category
 const { getIO } = require("../utils/socket");
 const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const { escapeRegex } = require("../utils/escapeRegex");
-const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 const { countProductsUsingCategory } = require("../services/referentialCleanup");
 const { hydrate } = require("../utils/hydrate");
@@ -486,18 +486,7 @@ const createCategory = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    await pushGlobalActivity(io, {
-      action: `${performerName} created category "${category.name}"`,
-      category: "Category Management",
-      performedBy: performerId,
-      performedByName: performerName,
-      details: {
-        categoryId: category._id,
-        categoryCode: category.category_code,
-        categoryName: category.name,
-        parentCategoryId: category.parent_category_id,
-      },
-    }, performerId);
+
 
     emitSocketEvent("categoryCreated", category.toObject());
 
@@ -789,13 +778,7 @@ const assignCategoryAttributes = async (req, res) => {
       attributes,
     });
 
-    await pushGlobalActivity(io, {
-      action: `Admin updated attributes for category "${category.name}"`,
-      category: "Category Management",
-      performedBy: req.user?._id || null,
-      performedByName: req.user?.name || "Admin",
-      details: { categoryId: category._id, attributeCount: attributes.length },
-    }, req.user?._id || null);
+
 
     return res.status(200).json({ success: true, message: "Category attributes updated successfully", data: attributes });
   } catch (error) {

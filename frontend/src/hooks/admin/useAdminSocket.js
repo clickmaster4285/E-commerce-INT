@@ -226,17 +226,11 @@ export function socketCall(
 }
 
 /* ==========================================================
-   EMPLOYEE SOCKET API
+   EMPLOYEE SOCKET API — reads only (writes → employeeApi REST)
    ========================================================== */
 export const employeeSocketApi = {
   getAll: () => socketCall("getEmployees", "employeesList"),
   getById: (id) => socketCall("getEmployeeById", "employeeDetails", { id }),
-  create: (data) => socketCall("createEmployee", "employeeCreated", data),
-  update: ({ id, data }) =>
-    socketCall("updateEmployee", "employeeUpdated", { id, ...data }),
-  delete: (id) => socketCall("deleteEmployee", "employeeDeleted", { id }),
-  toggleStatus: (id) =>
-    socketCall("toggleEmployeeStatus", "employeeStatusToggled", { id }),
 };
 
 /* ==========================================================

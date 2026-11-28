@@ -117,9 +117,9 @@ function useProductDetail(productId) {
 // ✅ Related — same category, server se (khud ko filter karke 10 tak)
 function useRelatedProducts(product, categoryId) {
   const { data } = useQuery({
-    queryKey: ["relatedProducts", product?._id || product?.id, categoryId],
+    queryKey: ["relatedProducts", "tiles", product?._id || product?.id, categoryId],
     queryFn: () =>
-      productApi.getAllPaginated({
+      productApi.getTiles({
         page: 1,
         limit: MAX_RELATED + 1,
         category_id: categoryId || undefined,

@@ -694,6 +694,10 @@ export default function AccountPage() {
     try {
       await userHttp.post("/users/logout");
     } catch {}
+    try {
+      const { clearSensitiveClientStorage } = await import("@/lib/clientStorage");
+      clearSensitiveClientStorage("user");
+    } catch { /* ignore */ }
     queryClient.removeQueries({ queryKey: ["userProfile"] });
     queryClient.removeQueries({ queryKey: ["myOrders"] });
     queryClient.removeQueries({ queryKey: ["addresses"] });

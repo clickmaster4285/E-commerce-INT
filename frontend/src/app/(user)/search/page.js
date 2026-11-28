@@ -31,9 +31,9 @@ function SearchContent() {
   const page = safePageParam(searchParams.get("page"));
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["shopSearch", q, sortBy, page],
+    queryKey: ["shopSearch", "tiles", q, sortBy, page],
     queryFn: () =>
-      productApi.getAllPaginated({ page, limit: PAGE_SIZE, search: q, sort: sortBy }),
+      productApi.getTiles({ page, limit: PAGE_SIZE, search: q, sort: sortBy }),
     enabled: q.length > 0,
     retry: 1,
     staleTime: 60 * 1000,

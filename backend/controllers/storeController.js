@@ -1,7 +1,7 @@
 const Store = require("../models/Store");
 const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity, pushStoreActivity, getChanges } = require("../utils/activityHelper");
+const { pushStoreActivity, getChanges } = require("../utils/activityHelper");
 const { validatePhone } = require("../utils/phoneValidator");
 const { normalizeCountryCode, countryDisplayName } = require("../utils/geo");
 const log = require("../utils/logger");
@@ -128,13 +128,7 @@ const updateStoreInfo = async (req, res) => {
     if (changes.length > 0) {
         const changedFields = changes.map((c) => c.field).join(", ");
         if (io) {
-          await pushGlobalActivity(io, {
-              action: `${performerName} updated ${changedFields} for Store`,
-              category: "Store Management",
-              performedBy: performerId,
-              performedByName: performerName,
-              details: { changes },
-          }, performerId);
+
         }
         await pushStoreActivity(updatedStore._id, req, "updated", `${performerName} updated store settings`, { changes });
     }
@@ -361,7 +355,41 @@ const uploadStoreLogo = async (req, res) => {
   return updateStoreInfo(req, res);
 };
 
+/** DELETE /store/logo — clear logo (socket deleteStoreLogo cutover) */
+const deleteStoreLogo = async (req, res) => {
+  try {
+    if (!hasPermission(req.user, "store", "requireTrue")) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You don't have permission to edit store settings.",
+      });
+    }
+    const store = await Store.findOne();
+    if (!store) {
+      return res.status(404).json({ success: false, code: "STORE_NOT_FOUND", message: "Store not found." });
+    }
+    const previous = store.logo?.img_url || "";
+    store.logo = { img_url: "", public_id: "" };
+    await store.save();
+    if (previous) {
+      try {
+        const { localPathForUrl } = require("../utils/uploadPaths");
+        const absolute = localPathForUrl(req, previous);
+        if (absolute) await require("fs").promises.unlink(absolute).catch(() => {});
+      } catch (_) { /* best-effort */ }
+    }
+    const plain = store.toObject();
+    try {
+      req.io?.emit("storeUpdated", plain);
+    } catch (_) { /* optional */ }
+    return res.json({ success: true, data: plain });
+  } catch (error) {
+    log.error("deleteStoreLogo:", error);
+    return res.status(500).json({ success: false, message: "Could not remove logo" });
+  }
+};
+
 module.exports = {
-  getStoreInfo, updateStoreInfo, uploadStoreLogo,
+  getStoreInfo, updateStoreInfo, uploadStoreLogo, deleteStoreLogo,
   getPublicStoreInfo, resolveTenant, checkSubdomain, updateStoreDomain,
 };

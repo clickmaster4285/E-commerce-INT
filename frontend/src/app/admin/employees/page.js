@@ -18,7 +18,7 @@ import { localizedStrictField } from "@/i18n/localize";
 
 import { employeeApi } from "@/apis/admin/employeeApi";
 import adminHttp from "@/apis/axiosInstance";
-import { employeeSocketApi, useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
+import { useEmployeeSocketSync } from "@/hooks/admin/useAdminSocket";
 
 const DEFAULT_PAGE_SIZE = 20;
 const PREDEFINED_DEPARTMENTS = ["HR", "Manager", "IT", "Finance", "Marketing", "Customer Service"];
@@ -313,7 +313,7 @@ export default function EmployeesPage() {
   const employeeSummary = paginatedEmployeesData?.summary || { total: pagination.total, active: 0, inactive: 0 };
 
   const createMutation = useMutation({
-    mutationFn: employeeSocketApi.create,
+    mutationFn: (data) => employeeApi.create(data),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success(t("admin.employees.toast.created"));
@@ -323,7 +323,7 @@ export default function EmployeesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: employeeSocketApi.update,
+    mutationFn: ({ id, data }) => employeeApi.update(id, data),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success(t("admin.employees.toast.updated"));
@@ -333,7 +333,7 @@ export default function EmployeesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: employeeSocketApi.delete,
+    mutationFn: (id) => employeeApi.delete(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success(t("admin.employees.toast.deleted"));
@@ -345,7 +345,7 @@ export default function EmployeesPage() {
   });
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: (ids) => Promise.all(ids.map((id) => employeeSocketApi.delete(id))),
+    mutationFn: (ids) => Promise.all(ids.map((id) => employeeApi.delete(id))),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success(t("admin.employees.toast.bulkDeleted", { count: new Intl.NumberFormat(employeeLocaleTag(locale)).format(selectedIds.length) }));
@@ -356,7 +356,7 @@ export default function EmployeesPage() {
   });
 
   const toggleStatusMutation = useMutation({
-    mutationFn: employeeSocketApi.toggleStatus,
+    mutationFn: (id) => employeeApi.toggleStatus(id),
     onSuccess: async (updatedEmployee) => {
       queryClient.setQueryData(["employees"], (oldData) => {
         if (!Array.isArray(oldData)) return oldData;

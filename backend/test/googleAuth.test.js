@@ -79,8 +79,6 @@ function loadHandler({ email, employeesByStore, platformOwner }) {
   Employee.findOne = (filter) => ({
     select: () => Promise.resolve(employeesByStore.current?.find((e) => e.email === filter.email) || null),
   });
-  const activity = require("../utils/activityHelper");
-  activity.pushGlobalActivity = async () => {};
   const { googleLogin } = require("../controllers/adminAuthController");
   return { googleLogin, issued };
 }

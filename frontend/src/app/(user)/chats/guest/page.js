@@ -9,22 +9,14 @@ import { useCart } from "@/components/user/CartContext";
 import { useUserSocket } from "@/hooks/user/useUserSocket";
 import ChatThread from "@/components/chat/ChatThread";
 
-const TOKEN_KEY = "support-chat-guest-token";
-const subscribe = (callback) => {
-  window.addEventListener("storage", callback);
-  window.addEventListener("support-chat:guest-token", callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("support-chat:guest-token", callback);
-  };
-};
-const getToken = () => {
-  try { return window.localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; }
-};
-const getServerToken = () => "";
+import {
+  subscribeGuestToken,
+  getGuestToken,
+  getGuestTokenServerSnapshot,
+} from "@/lib/guestChatToken";
 
 export default function GuestFullChatPage() {
-  const token = useSyncExternalStore(subscribe, getToken, getServerToken);
+  const token = useSyncExternalStore(subscribeGuestToken, getGuestToken, getGuestTokenServerSnapshot);
   const { socket } = useUserSocket();
   const cartState = useCart();
   const cartItems = Array.isArray(cartState?.cart) ? cartState.cart : [];

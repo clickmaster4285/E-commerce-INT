@@ -20,7 +20,7 @@ import {
   isRtl,
   normalizeLocale,
 } from "./config";
-import { translate, loadLocale, registerLocale } from "./translations";
+import { translate, loadLocale, loadAdminLocale, registerLocale } from "./translations";
 
 const LanguageContext = createContext(null);
 
@@ -48,24 +48,31 @@ export function LanguageProvider({
   if (initialMessages) registerLocale(normalizedInitialLocale, initialMessages);
   const [locale, setLocale] = useState(normalizedInitialLocale);
 
+  const isAdminSurface = Boolean(legacyCookieName);
+
   useEffect(() => {
     if (legacyCookieName) Cookies.remove(legacyCookieName, { path: "/" });
     const stored = readStoredLocale(normalizedInitialLocale);
     let cancelled = false;
     // Languages are split into lazy chunks: fetch the stored one, then switch.
-    loadLocale(stored).then(() => {
+    // Admin surface also merges admin.* so panel strings resolve.
+    const boot = isAdminSurface
+      ? loadLocale(stored).then(() => loadAdminLocale(stored))
+      : loadLocale(stored);
+    boot.then(() => {
       if (!cancelled) setLocale(stored);
     });
     return () => {
       cancelled = true;
     };
-  }, [legacyCookieName, normalizedInitialLocale]);
+  }, [legacyCookieName, normalizedInitialLocale, isAdminSurface]);
 
   const changeLocale = useCallback(async (next) => {
     const code = normalizeLocale(next);
     // Download the dictionary BEFORE switching so the UI never shows a
     // half-English state. Cached after the first time.
     await loadLocale(code);
+    if (isAdminSurface) await loadAdminLocale(code);
     try {
       Cookies.set(LANG_COOKIE, code, {
         expires: 365,
@@ -77,7 +84,7 @@ export function LanguageProvider({
       /* cookie unavailable (private mode) — still switch for this session */
     }
     setLocale(code);
-  }, [legacyCookieName]);
+  }, [legacyCookieName, isAdminSurface]);
 
   const dir = isRtl(locale) ? "rtl" : "ltr";
 

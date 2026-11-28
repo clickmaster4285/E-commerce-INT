@@ -4,9 +4,7 @@ const Product = require("../models/Product");
 const StockHistory = require("../models/StockHistory");
 const { getIO } = require("../utils/socket");
 const { emitSocketEvent } = require("../utils/emitSocketEvent");
-const {
-  pushGlobalActivity,
-} = require("../utils/activityHelper");
+const { } = require("../utils/activityHelper");
 const { withTx, TxAbort } = require("../utils/tx");
 const stock = require("../services/stock");
 
@@ -417,25 +415,7 @@ const adjustStock = async (req, res) => {
 
     let io = req.io || null;
     try { io = io || getIO(); } catch { /* tests / pre-listen */ }
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${performerName} adjusted stock for "${variant.product_id?.name || "Unknown Product"} - ${variant.title}" (${type} ${qty})`,
-        category: "Stock Management",
-        performedBy: performerId,
-        performedByName: performerName,
-        details: {
-          variantId: variant._id,
-          sku: variant.sku,
-          previousQuantity,
-          newQuantity,
-          adjustmentType: type,
-          reason: reasonText,
-          explanation: explanationText,
-        },
-      },
-      performerId
-    );
+
 
     /* =====================================================
        SOCKET — realtime sync for all browsers

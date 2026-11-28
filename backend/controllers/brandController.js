@@ -7,7 +7,7 @@ const { escapeRegex } = require("../utils/escapeRegex");
 const log = require("../utils/logger");
 const { countProductsUsingBrand } = require("../services/referentialCleanup");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
-const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { getChanges } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter");
 
@@ -101,17 +101,7 @@ const createBrand = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    void pushGlobalActivity(io, {
-      action: `${performerName} created brand "${updatedBrand.brand_name || updatedBrand.name}"`,
-      category: "Brand Management",
-      performedBy: performerId,
-      performedByName: performerName,
-      details: {
-        brandId: updatedBrand._id,
-        brandCode: updatedBrand.brand_code,
-        brandName: updatedBrand.brand_name || updatedBrand.name,
-      },
-    }, performerId).catch(() => {});
+
 
     emitSocketEvent("brandCreated", updatedBrand.toObject());
 
@@ -301,13 +291,7 @@ const updateBrand = async (req, res) => {
       ? `${performerName} updated ${changedFields} for brand "${brand.brand_name || brand.name}"`
       : `${performerName} updated brand "${brand.brand_name || brand.name}"`;
 
-    void pushGlobalActivity(io, {
-      action: actionMsg,
-      category: "Brand Management",
-      performedBy: performerId,
-      performedByName: performerName,
-      details: { changes, brandId: brand._id },
-    }, performerId).catch(() => {});
+
 
     emitSocketEvent("brandUpdated", brand.toObject());
 
@@ -354,13 +338,7 @@ const deleteBrand = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    void pushGlobalActivity(io, {
-      action: `${performerName} deleted brand "${brand.brand_name || brand.name}"`,
-      category: "Brand Management",
-      performedBy: performerId,
-      performedByName: performerName,
-      details: { brandId: brand._id, brandCode: brand.brand_code },
-    }, performerId).catch(() => {});
+
 
     emitSocketEvent("brandDeleted", { _id: brand._id.toString() });
 

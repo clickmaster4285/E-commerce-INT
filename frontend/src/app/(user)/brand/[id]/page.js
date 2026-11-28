@@ -50,7 +50,7 @@ export default function BrandPage() {
 }
 
 function BrandContent({ brandId }) {
-  const { t, dir } = useTranslation();
+  const { t, dir } = useTranslation();
   const { fieldOf, descriptionOf } = useLocalized();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -73,9 +73,9 @@ function BrandContent({ brandId }) {
 
   // ✅ Server pagination + sort (?page=&sort= URL me)
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["brandProducts", brandId, sortBy, page],
+    queryKey: ["brandProducts", "tiles", brandId, sortBy, page],
     queryFn: () =>
-      productApi.getAllPaginated({ page, limit: PAGE_SIZE, sort: sortBy, brand_id: brandId }),
+      productApi.getTiles({ page, limit: PAGE_SIZE, sort: sortBy, brand_id: brandId }),
     enabled: !!brandId,
     retry: 1,
     staleTime: 60 * 1000,

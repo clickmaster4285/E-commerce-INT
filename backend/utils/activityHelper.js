@@ -1,60 +1,4 @@
-const User = require("../models/User");
-const log = require("./logger");
 const audit = require("../services/audit");
-
-const CATEGORY_ENTITY = {
-  "Brand Management": "brand",
-  "Category Management": "category",
-  "Product Management": "product",
-  "Vendor Management": "vendor",
-  "Stock Management": "stock",
-  "Authentication": "auth",
-  "Employee Management": "employee",
-  "Store Management": "store",
-  "Order Management": "order",
-  "Coupon Management": "discount",
-};
-
-const inferAction = (activityData) => {
-  const text = String(activityData?.action || "").toLowerCase();
-  if (text.includes("created")) return "created";
-  if (text.includes("deleted")) return "deleted";
-  if (text.includes("updated") || text.includes("modified")) return "updated";
-  return "activity";
-};
-
-const pickEntityId = (details = {}) => {
-  if (!details || typeof details !== "object") return null;
-  return (
-    details.brandId
-    || details.categoryId
-    || details.vendorId
-    || details.productId
-    || details.orderId
-    || details.discountId
-    || details.dealId
-    || null
-  );
-};
-
-const auditFromActivity = (activityData, performerId) => {
-  const details = activityData?.details || {};
-  const category = activityData?.category || "";
-  audit.record({
-    entityType: CATEGORY_ENTITY[category] || String(category || "activity").toLowerCase().replace(/\s+/g, "_"),
-    entityId: pickEntityId(details),
-    action: inferAction(activityData),
-    actorType: "employee",
-    actorId: activityData?.performedBy || performerId || null,
-    actorName: activityData?.performedByName || "Admin",
-    changes: Array.isArray(activityData?.changes) ? activityData.changes : [],
-    meta: {
-      category,
-      summary: activityData?.action || "",
-      details,
-    },
-  });
-};
 
 const pushStoreActivity = async (storeId, req, action, summary, details = null) => {
   if (!storeId) return;
@@ -71,38 +15,6 @@ const pushStoreActivity = async (storeId, req, action, summary, details = null) 
     actorName,
     meta: { summary, details },
   });
-};
-
-/**
- * Pushes activity to a specific user's array
- */
-const pushActivityToUser = async (userId, activityData) => {
-  try {
-    // AuditEvent only — User.activities embedding stopped (§3.5 cutover)
-    audit.record({
-      entityType: "user",
-      entityId: userId || null,
-      action: String(activityData?.action || activityData?.type || "activity"),
-      actorType: "system",
-      actorId: userId || null,
-      actorName: activityData?.performedByName || "",
-      meta: activityData || {},
-    });
-  } catch (err) {
-    log.error("⚠️ pushActivityToUser error:", err.message);
-  }
-};
-
-/**
- * §3.5: purana User-scan wala global push hata diya — sirf audit_events me likhte hain.
- * Embedded document pushes (Store.activity waghera) alag migration se aayenge.
- */
-const pushGlobalActivity = async (_io, activityData, performerId) => {
-  try {
-    auditFromActivity(activityData || {}, performerId);
-  } catch (err) {
-    log.debug?.("pushGlobalActivity audit skip:", err.message);
-  }
 };
 
 /**
@@ -161,8 +73,6 @@ const isSameList = (a, b) => {
 
 module.exports = {
   pushStoreActivity,
-  pushActivityToUser,
-  pushGlobalActivity,
   getChanges,
   stableStringify,
   isSameValue,

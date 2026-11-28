@@ -77,15 +77,15 @@ export function ImageWithTextSection({ settings = {} }) {
 
 export function ProductCarouselSection({ settings = {} }) {
   const limit = Math.min(24, Math.max(4, Number(settings.limit) || 8));
-  const params = { page: 1, limit, slim: 1 };
+  const params = { page: 1, limit };
   if (settings.source === "new") params.sort = "newest";
-  if (settings.source === "offers") params.sort = "discount-desc";
+  if (settings.source === "offers") params.sort = "featured";
   if (settings.source === "category" && settings.categoryId) params.category_id = settings.categoryId;
   if (settings.source === "brand" && settings.brandId) params.brand_id = settings.brandId;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["themeProductCarousel", params],
-    queryFn: () => productApi.getAllPaginated(params),
+    queryKey: ["themeProductCarousel", "tiles", params],
+    queryFn: () => productApi.getTiles(params),
     staleTime: 2 * 60 * 1000,
   });
   const products = data?.products || [];

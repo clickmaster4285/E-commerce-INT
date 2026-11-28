@@ -32,6 +32,7 @@ import {
   MapPinCheck,
 } from "lucide-react";
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
+import adminHttp from "@/apis/axiosInstance";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 
@@ -347,11 +348,13 @@ export default function ProfilePage() {
       payload.address = editForm.address || "";
       payload.store_name = editForm.storeName || "";
     }
-    socket.emit("updateProfile", payload, (res) => {
-      if (res?.success) {
+    (async () => {
+      try {
+        const res = await adminHttp.put("/users/profile", payload);
+        const body = res.data || {};
         toast.success(t("admin.profile.toast.storeUpdated"));
         setIsEditing(false);
-        const userData = res.data || res.user || res;
+        const userData = body.data || body.user || body;
         if (userData && (userData.name || userData._id)) {
           const data = buildData(userData);
           if (data) {
@@ -359,12 +362,13 @@ export default function ProfilePage() {
             setEditForm(data);
           }
         }
-        if (res.store) {
-          window.dispatchEvent(new CustomEvent("storeUpdated", { detail: res.store }));
+        if (body.store) {
+          window.dispatchEvent(new CustomEvent("storeUpdated", { detail: body.store }));
         }
-      } else {
-        const msg = t("admin.profile.toast.updateFailed");
-        if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
+        if (socket?.connected) socket.emit("getProfile");
+      } catch (err) {
+        const msg = err?.response?.data?.message || t("admin.profile.toast.updateFailed");
+        if (String(msg).toLowerCase().includes("permission") || String(msg).toLowerCase().includes("access denied")) {
           toast.error(msg, {
             duration: 6000,
             description: t("admin.profile.toast.permissionDescription"),
@@ -372,21 +376,14 @@ export default function ProfilePage() {
         } else {
           toast.error(msg);
         }
+      } finally {
+        setIsSaving(false);
       }
-      setIsSaving(false);
-    });
-    setTimeout(() => {
-      if (socket?.connected) socket.emit("getProfile");
-    }, 2000);
+    })();
   };
 
   /* ── CHANGE PASSWORD ── */
   const handleChangePassword = () => {
-    if (!socket || !isConnected) {
-      toast.error(t("admin.profile.toast.connectionLost"));
-      return;
-    }
-
     if (!hasProfilePermission) {
       toast.error(t("admin.profile.passwordPermission"), {
         duration: 6000,
@@ -408,27 +405,28 @@ export default function ProfilePage() {
       return;
     }
     setIsChangingPassword(true);
-    socket.emit(
-      "changePassword",
-      { currentPassword: passwords.current, newPassword: passwords.new },
-      (res) => {
-        if (res?.success) {
-          toast.success(t("admin.profile.toast.passwordChanged"));
-          setPasswords({ current: "", new: "", confirm: "" });
+    (async () => {
+      try {
+        await adminHttp.put("/users/password", {
+          currentPassword: passwords.current,
+          newPassword: passwords.new,
+        });
+        toast.success(t("admin.profile.toast.passwordChanged"));
+        setPasswords({ current: "", new: "", confirm: "" });
+      } catch (err) {
+        const msg = err?.response?.data?.message || t("admin.profile.toast.passwordFailed");
+        if (String(msg).toLowerCase().includes("permission") || String(msg).toLowerCase().includes("access denied")) {
+          toast.error(msg, {
+            duration: 6000,
+            description: t("admin.profile.toast.permissionDescription"),
+          });
         } else {
-          const msg = t("admin.profile.toast.passwordFailed");
-          if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("access denied")) {
-            toast.error(msg, {
-              duration: 6000,
-              description: t("admin.profile.toast.permissionDescription"),
-            });
-          } else {
-            toast.error(msg);
-          }
+          toast.error(msg);
         }
+      } finally {
         setIsChangingPassword(false);
       }
-    );
+    })();
   };
 
   /* ── RETRY ── */

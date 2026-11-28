@@ -118,9 +118,9 @@ function BrandRow({ brand, items }) {
 /* Ek brand row ke products — server (?brand_id=, cap 30 slider headroom) */
 function useBrandRowItems(brandId) {
   const { data } = useQuery({
-    queryKey: ["brandRowProducts", brandId],
+    queryKey: ["brandRowProducts", "tiles", brandId],
     queryFn: () =>
-      productApi.getAllPaginated({ page: 1, limit: 30, brand_id: brandId, slim: 1 }),
+      productApi.getTiles({ page: 1, limit: 30, brand_id: brandId }),
     enabled: !!brandId,
     staleTime: 5 * 60 * 1000,
     retry: 1,

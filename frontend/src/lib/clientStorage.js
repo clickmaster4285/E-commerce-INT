@@ -9,6 +9,8 @@
 // Logout par shared-computer par admin ka kaam / preview token na rahe:
 // ==========================================================
 
+import { clearGuestToken, GUEST_TOKEN_KEY } from "@/lib/guestChatToken";
+
 const ADMIN_LOCAL_KEYS = ["admin-pos-held-carts"];
 const ADMIN_SESSION_PREFIXES = ["admin-new-quote-number-reservation", "store-theme-preview"];
 
@@ -32,6 +34,12 @@ export function clearSensitiveClientStorage(aud = "user") {
     } else {
       // Customer: preview/share token session se; cart rakhte hain (guest bhi use karta hai)
       removeByPrefix(window.sessionStorage, ["store-theme-preview"]);
+      // Guest support-chat token — logout / account switch pe clear (§9.1 TTL)
+      try {
+        clearGuestToken();
+      } catch {
+        try { window.localStorage.removeItem(GUEST_TOKEN_KEY); } catch { /* ignore */ }
+      }
     }
   } catch {
     // ignore

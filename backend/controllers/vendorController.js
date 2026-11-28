@@ -4,7 +4,6 @@ const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/c
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity } = require("../utils/activityHelper");
 const { auditEvent, diffFields } = require("../utils/auditHistory");
 const { withoutProtected } = require("../utils/sanitizeBody");
 // Balances sirf PO / payment flow se badalte hain — client body se kabhi nahi
@@ -91,7 +90,7 @@ const createVendor = async (req, res) => {
     }
     const vendor = await Vendor.create({ ...withoutProtected(req.body, VENDOR_PROTECTED), vendor_code: code, createdby: req.user?._id || null, activity: [auditEvent(req, "created", [{ field: "Vendor", before: "—", after: String(req.body?.name || "").trim() }])] });
     const io = req.io || getIO();
-    await pushGlobalActivity(io, { action: `${req.user?.name || "Admin"} created vendor "${vendor.name}"`, category: "Vendor Management", performedBy: req.user?._id || null, performedByName: req.user?.name || "Admin", details: { vendorId: vendor._id, vendor_code: code } }, req.user?._id || null).catch(() => {});
+
     try { io.emit("vendorCreated", vendor.toObject()); } catch {}
     res.status(201).json({ success: true, message: "Vendor created successfully", data: vendor });
   } catch (e) {

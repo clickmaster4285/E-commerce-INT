@@ -13,7 +13,6 @@ const SellerApplication = require("../models/SellerApplication");
 const { sendApplicationReceivedEmail } = require("../services/emailService");
 const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
 const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
 
@@ -448,17 +447,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
         await setAuthCookies(req, res, customer);
 
         const io = req.io || getIO();
-        await pushGlobalActivity(
-          io,
-          {
-            action: `${customer.name} verified their email`,
-            category: "Authentication",
-            performedBy: customer._id,
-            performedByName: customer.name,
-            details: { email: customer.email },
-          },
-          customer._id,
-        );
+
 
         return res.json({
           success: true,
@@ -587,17 +576,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
         }
       } catch (e) { /* ignore */ }
       const io = req.io || getIO();
-      await pushGlobalActivity(
-        io,
-        {
-          action: `${employee.name} verified their email`,
-          category: "Authentication",
-          performedBy: employee._id,
-          performedByName: employee.name,
-          details: { email: employee.email },
-        },
-        employee._id,
-      );
+
 
       return res.json({
         success: true,
@@ -637,17 +616,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
     await setAuthCookies(req, res, user);
 
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${user.name} verified their email`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { email: user.email },
-      },
-      user._id,
-    );
+
 
     return res.json({
       success: true,
@@ -830,17 +799,7 @@ const resetPasswordWithOtp = async (req, res) => {
     await record.save();
 
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${user.name} reset their password via OTP`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { email: user.email },
-      },
-      user._id,
-    );
+
 
     // âœ… Security: is account ke SAARE sessions (har device) band + cookies clear
     await tokens.revokeAllForSubject("user", user._id, { reason: "password_reset" });

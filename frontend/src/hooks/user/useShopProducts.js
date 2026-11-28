@@ -42,13 +42,12 @@ export function useShopProducts({
     discountBands: [...(discountBands || [])].map(Number).filter((n) => Number.isFinite(n)),
     minDiscount,
     featured,
-    // ✅ Storefront grids ko tags/createdby nahi chahiye (payload + DB kam)
-    slim: 1,
   };
 
   const query = useQuery({
     queryKey: [
       "shopProducts",
+      "tiles",
       params.page,
       params.limit,
       params.search,
@@ -64,7 +63,7 @@ export function useShopProducts({
       params.featured,
     ],
     queryFn: () =>
-      productApi.getAllPaginated({
+      productApi.getTiles({
         page: params.page,
         limit: params.limit,
         search: params.search,
@@ -78,7 +77,6 @@ export function useShopProducts({
         discount: params.discountBands,
         minDiscount: params.minDiscount,
         featured: params.featured,
-        slim: 1,
       }),
     enabled,
     retry: 1,

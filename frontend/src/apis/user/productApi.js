@@ -103,6 +103,44 @@ export const productApi = {
       .get("/products/category-tiles", { params: { limit } })
       .then((res) => res.data?.data || []),
 
+  // ✅ Dedicated ProductTile DTO (§9.2) — shop / home / brand / bundles
+  getTiles: ({
+    page = 1,
+    limit = 12,
+    search = "",
+    sort = "featured",
+    brand_id,
+    category_id,
+    minPrice = null,
+    maxPrice = null,
+    stock = [],
+    deal = [],
+    discount = [],
+    minDiscount = null,
+    featured = "",
+    ids = [],
+  } = {}) =>
+    userHttp
+      .get("/products/tiles", {
+        params: {
+          page,
+          limit,
+          search: search || undefined,
+          sort: sort && sort !== "featured" ? sort : "featured",
+          brand_ids: brand_id || undefined,
+          category_ids: category_id || undefined,
+          minPrice: minPrice ?? undefined,
+          maxPrice: maxPrice ?? undefined,
+          stockStates: (stock || []).length ? stock.join(",") : undefined,
+          dealIds: (deal || []).length ? deal.join(",") : undefined,
+          discount: (discount || []).length ? discount.join(",") : undefined,
+          minDiscount: minDiscount ?? undefined,
+          featured: featured || undefined,
+          ids: (ids || []).length ? ids.join(",") : undefined,
+        },
+      })
+      .then((res) => paginated(res, limit)),
+
   getById: (id) =>
     userHttp.get(`/products/${id}`).then((res) => res.data?.data || res.data),
 

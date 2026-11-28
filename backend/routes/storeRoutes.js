@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const {
-  getStoreInfo, updateStoreInfo, uploadStoreLogo,
+  getStoreInfo, updateStoreInfo, uploadStoreLogo, deleteStoreLogo,
   getPublicStoreInfo, resolveTenant, checkSubdomain, updateStoreDomain,
 } = require("../controllers/storeController");
 // Sirf admin/employee session (a_at) — customer token yahan 401
@@ -39,6 +39,7 @@ router.route("/")
   .put(authMiddleware, checkPermission("store"), upload, updateStoreInfo);
 // ✅ REST logo upload (socket base64 "updateStoreInfo" deprecated) — multipart field "logo"
 router.post("/logo", authMiddleware, checkPermission("store"), upload, uploadStoreLogo);
+router.delete("/logo", authMiddleware, checkPermission("store"), deleteStoreLogo);
 
 module.exports = router;
 

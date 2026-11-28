@@ -17,7 +17,7 @@ const Employee = require("../models/Employee");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
-const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
+const { getChanges } = require("../utils/activityHelper");
 const { queueOtpEmail, isSmtpConfigured } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
@@ -504,16 +504,7 @@ const loginUser = async (req, res) => {
       });
 
     const io = req.io || getIO();
-    await pushGlobalActivity( io,
-      {
-        action: `${user.name} logged in`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { ip: req.ip },
-      },
-      user._id,
-    );
+
     await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
@@ -596,17 +587,7 @@ const googleCustomerLogin = async (req, res) => {
     }
 
     const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${user.name} logged in via Google`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { ip: req.ip, provider: "google" },
-      },
-      user._id,
-    );
+
 
     await tokens.issueSession(req, res, "user", user);
     res.json({
@@ -651,16 +632,7 @@ const logoutUser = async (req, res) => {
   try {
     if (req.user?._id) {
       const io = req.io || getIO();
-      await pushGlobalActivity(
-        io,
-        {
-          action: `${req.user.name || "User"} logged out`,
-          category: "Authentication",
-          performedBy: req.user._id,
-          performedByName: req.user.name || "User",
-        },
-        req.user._id,
-      );
+
     }
     for (const aud of auds) {
       await tokens.revokeCurrentSession(req, aud).catch((e) => log.error("logout revoke failed:", e.message));

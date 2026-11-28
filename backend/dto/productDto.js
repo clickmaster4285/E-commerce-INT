@@ -30,6 +30,18 @@ function toProductTile(doc, locale = "en") {
   const price = Number(doc.price ?? doc.price_from ?? doc.variants?.[0]?.selling_price) || 0;
   const totalStock = Number(doc.stock_total ?? doc.variants?.[0]?.quantity) || 0;
   const first = Array.isArray(doc.variants) && doc.variants[0] ? doc.variants[0] : null;
+  const img = imageUrl(doc);
+
+  // singleVariant only when we have a real Variant doc — fake product-_id breaks cart lines
+  const singleVariant = variantCount === 1 && first
+    ? {
+        _id: first._id,
+        sku: first.sku || "",
+        price: Number(first.selling_price) || price,
+        qty: Number(first.quantity) || totalStock,
+        image: first.images?.[0]?.img_url || img,
+      }
+    : undefined;
 
   return {
     _id: doc._id,
@@ -39,20 +51,12 @@ function toProductTile(doc, locale = "en") {
     price,
     compareAt: doc.compare_at != null ? Number(doc.compare_at) : undefined,
     totalStock,
-    image: imageUrl(doc),
+    image: img,
     variantCount,
     rating: doc.rating_avg != null
       ? { avg: Number(doc.rating_avg) || 0, count: Number(doc.rating_count) || 0 }
       : undefined,
-    singleVariant: variantCount === 1 && first
-      ? {
-          _id: first._id,
-          sku: first.sku || "",
-          price: Number(first.selling_price) || price,
-          qty: Number(first.quantity) || totalStock,
-          image: first.images?.[0]?.img_url || imageUrl(doc),
-        }
-      : undefined,
+    singleVariant,
   };
 }
 

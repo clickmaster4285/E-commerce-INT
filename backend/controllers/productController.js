@@ -24,7 +24,7 @@ const { emitSocketEvent } = require("../utils/emitSocketEvent");
 const { escapeRegex } = require("../utils/escapeRegex");
 const { normalizeLocale } = require("../utils/parseLocale");
 const { ratingSummaryFromBuckets } = require("../utils/ratingSummary");
-const { pushGlobalActivity, isSameValue, isSameList } = require("../utils/activityHelper");
+const { isSameValue, isSameList } = require("../utils/activityHelper");
 const { queueTranslationSync } = require("../utils/translationService");
 const { refreshAsync: refreshProductSummary } = require("../services/productSummary");
 const { adjustVariantQuantityToTarget } = require("../utils/variantQuantityAdjust");
@@ -1988,21 +1988,7 @@ const createProduct = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${performerName} created product "${createdProduct.name}"`,
-        category: "Product Management",
-        performedBy: performerId,
-        performedByName: performerName,
-        details: {
-          productId: createdProduct._id,
-          variantCount: createdVariants.length,
-          tagCount: tagIds.length,
-        },
-      },
-      performerId
-    );
+
 
     const populatedProduct = await Product.findById(createdProduct._id)
       .populate("createdby", "name email")
@@ -2430,23 +2416,7 @@ const updateProduct = async (req, res) => {
         ? `${performerName} ${variantChangeSummary} in product "${product.name}"`
         : `${performerName} updated product "${product.name}"`;
 
-    await pushGlobalActivity(
-      io,
-      {
-        action: actionMessage,
-        category: "Product Management",
-        performedBy: performerId,
-        performedByName: performerName,
-        details: {
-          productId: product._id,
-          variantCount: updatedVariants.length,
-          addedVariants: addedVariantCount,
-          changedVariants: updatedVariantCount,
-          tagCount: product.tag_ids ? product.tag_ids.length : 0,
-        },
-      },
-      performerId
-    );
+
 
     const populatedProduct = await Product.findById(product._id)
       .populate("createdby", "name email")
@@ -2526,17 +2496,7 @@ const deleteProduct = async (req, res) => {
     const performerId = req.user?._id || null;
     const io = req.io || getIO();
 
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${performerName} deleted product "${product.name}"`,
-        category: "Product Management",
-        performedBy: performerId,
-        performedByName: performerName,
-        details: { productId: product._id },
-      },
-      performerId
-    );
+
 
     emitSocketEvent("productDeleted", product._id);
 
@@ -2614,17 +2574,7 @@ const toggleProductStatus = async (req, res) => {
 
     setImmediate(async () => {
       try {
-        await pushGlobalActivity(
-          io,
-          {
-            action: `${performerName} ${nextStatus === "active" ? "activated" : "deactivated"} product "${productName}"`,
-            category: "Product Management",
-            performedBy: performerId,
-            performedByName: performerName,
-            details: { productId, status: nextStatus },
-          },
-          performerId
-        );
+
       } catch (activityErr) {
         log.error("⚠️ [toggleProductStatus] activity log failed:", activityErr?.message || activityErr);
       }
@@ -2748,17 +2698,7 @@ const toggleProductFeatured = async (req, res) => {
 
     setImmediate(async () => {
       try {
-        await pushGlobalActivity(
-          io,
-          {
-            action: `${performerName} ${nextFeatured ? "marked" : "removed"} product "${productName}" ${nextFeatured ? "as featured" : "from featured"}`,
-            category: "Product Management",
-            performedBy: performerId,
-            performedByName: performerName,
-            details: { productId, is_featured: nextFeatured },
-          },
-          performerId
-        );
+
       } catch (activityErr) {
         log.error("⚠️ [toggleProductFeatured] activity log failed:", activityErr?.message || activityErr);
       }
@@ -2852,17 +2792,7 @@ const bulkProductFeatured = async (req, res) => {
       setImmediate(async () => {
         try {
           const io = req.io || getIO();
-          await pushGlobalActivity(
-            io,
-            {
-              action: `${req.user?.name || "Admin"} marked ${activeIds.length} product${activeIds.length === 1 ? "" : "s"} as featured`,
-              category: "Product Management",
-              performedBy: actor,
-              performedByName: req.user?.name || "Admin",
-              details: { ids: activeIds, is_featured: true },
-            },
-            actor
-          );
+
           emitSocketEvent("productUpdated", { ids: activeIds, is_featured: true, bulk: true });
         } catch (e) {
           log.error("⚠️ [bulkProductFeatured] background task failed:", e?.message || e);
@@ -2888,17 +2818,7 @@ const bulkProductFeatured = async (req, res) => {
     setImmediate(async () => {
       try {
         const io = req.io || getIO();
-        await pushGlobalActivity(
-          io,
-          {
-            action: `${req.user?.name || "Admin"} removed ${result.modifiedCount || 0} product${(result.modifiedCount || 0) === 1 ? "" : "s"} from featured`,
-            category: "Product Management",
-            performedBy: actor,
-            performedByName: req.user?.name || "Admin",
-            details: { ids, is_featured: false },
-          },
-          actor
-        );
+
         emitSocketEvent("productUpdated", { ids, is_featured: false, bulk: true });
       } catch (e) {
         log.error("⚠️ [bulkProductFeatured] background task failed:", e?.message || e);
@@ -2967,37 +2887,72 @@ const { toProductTile } = require("../dto/productDto");
 
 const getProductTiles = async (req, res) => {
   try {
-    // Force public slim path through getProducts shape, then map to tiles
-    req.query = { ...(req.query || {}), slim: "1" };
     req.authAud = undefined; // never admin view for tiles
-    const locale = String(req.query.locale || req.get("x-lang") || "en").trim().toLowerCase() || "en";
+    const locale = normalizeLocale(req.query.locale || req.get("x-lang") || "en");
     const limit = Math.min(48, Math.max(1, Number.parseInt(req.query.limit, 10) || 24));
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
 
-    const filter = { is_deleted: { $ne: true }, status: "active" };
-    if (req.query.category_id) filter.category_id = req.query.category_id;
-    if (req.query.brand_id) filter.brand_id = req.query.brand_id;
-    if (req.query.ids) {
-      const ids = String(req.query.ids).split(",").map((s) => s.trim()).filter(Boolean);
-      if (ids.length) filter._id = { $in: ids };
+    const { filter } = await buildProductFilter(req.query);
+    filter.status = "active";
+
+    const shop = parseShopParams(req.query);
+    if (shop.ids.length) {
+      filter._id = { $in: shop.ids };
+    } else if (shop.hasShopFilters) {
+      const facetIds = await applyShopFacets(filter, shop);
+      filter._id = { $in: facetIds && facetIds.length ? facetIds : [new mongoose.Types.ObjectId()] };
     }
+
+    const sortKey = String(req.query.sort || "newest");
+    let sort = { created_at: -1 };
+    if (sortKey === "price-asc") sort = { price_from: 1, created_at: -1 };
+    else if (sortKey === "price-desc") sort = { price_from: -1, created_at: -1 };
+    else if (sortKey === "featured") sort = { is_featured: -1, created_at: -1 };
 
     const [total, products] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
-        .select("name translations category_id brand_id price_from stock_total variant_count primary_image rating_avg rating_count compare_at")
+        .select("name translations category_id brand_id price_from stock_total variant_count primary_image rating_avg rating_count compare_at is_featured")
         .populate({ path: "brand_id", select: "name translations" })
-        .sort({ created_at: -1 })
+        .sort(sort)
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
     ]);
 
+    // Single-variant tiles need a real Variant._id for Add to Cart
+    const singleIds = products.filter((p) => Number(p.variant_count) === 1).map((p) => p._id);
+    if (singleIds.length) {
+      const firstVariants = await Variant.aggregate([
+        { $match: { product_id: { $in: singleIds }, is_deleted: { $ne: true } } },
+        { $sort: { created_at: 1, _id: 1 } },
+        { $group: {
+          _id: "$product_id",
+          variant: { $first: { _id: "$_id", sku: "$sku", selling_price: "$selling_price", quantity: "$quantity", images: "$images" } },
+        } },
+      ]);
+      const byProduct = new Map(firstVariants.map((row) => [String(row._id), row.variant]));
+      for (const p of products) {
+        const v = byProduct.get(String(p._id));
+        if (v) p.variants = [v];
+      }
+    }
+
     const data = products.map((p) => toProductTile(p, locale)).filter(Boolean);
+    const totalPages = Math.max(1, Math.ceil(total / limit) || 1);
     return res.status(200).json({
       success: true,
       data,
-      meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+      products: data,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+      meta: { page, limit, total, totalPages },
     });
   } catch (error) {
     log.error("[getProductTiles]", error);
