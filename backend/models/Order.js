@@ -22,6 +22,8 @@ const orderSchema = new mongoose.Schema(
         variantTitle: { type: String, default: "" },
         image: { type: String, default: "" },
         price: { type: Number, required: true },
+        // Minor-unit snapshot (§3.9) — float `price` FE ke liye; money math `*_minor` se
+        price_minor: { type: Number, default: 0, min: 0 },
         // Checkout par product.tax ka snapshot (percent). Default nahi: purane
         // orders me field missing rehti hai, taake edit "0%" aur "pata nahi" alag rakhe.
         tax_rate: { type: Number, min: 0, max: 100 },
@@ -77,6 +79,13 @@ const orderSchema = new mongoose.Schema(
     loyalty_discount: { type: Number, default: 0 },
     loyalty_points_earned: { type: Number, default: 0 },
     total: { type: Number, required: true },
+    // Integer minor units (§3.9) — float fields upar FE/compat ke liye rehte hain
+    currency: { type: String, default: "PKR", trim: true, uppercase: true },
+    subtotal_minor: { type: Number, default: 0, min: 0 },
+    shipping_minor: { type: Number, default: 0, min: 0 },
+    tax_minor: { type: Number, default: 0, min: 0 },
+    loyalty_discount_minor: { type: Number, default: 0, min: 0 },
+    total_minor: { type: Number, default: 0, min: 0 },
 
     status: {
       type: String,

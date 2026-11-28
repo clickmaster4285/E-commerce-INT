@@ -10,6 +10,7 @@ const StockHistory = require("../models/StockHistory");
 const { getInvoiceStockAdjustments } = require("../utils/invoiceStockAdjustments");
 const stock = require("../services/stock");
 const payments = require("../services/payments");
+const SaleReturn = require("../models/SaleReturn");
 const { toMinor } = require("../utils/money");
 const { normalizeMethod: normalizePayMethod } = require("../config/paymentMethods");
 
@@ -532,6 +533,9 @@ exports.recordPayment = async (req, res) => {
           received_by: req.user?._id || null,
           idempotency_key: `invoice:${invoice._id}:pay:${priorPaid}:${amount}:${paymentDate.toISOString()}`,
         });
+        try {
+          require("../services/storeStats").bumpStoreDaily({ revenue: Number(amount) || 0 });
+        } catch (_) { /* fire-and-forget */ }
         return next;
       }));
     } catch (txError) {
@@ -683,6 +687,8 @@ exports.recordReturn = async (req, res) => {
           qty_delta: restore.quantity,
           kind: "return",
           ref_type: "invoice",
+          ref_id: invoice._id,
+          idempotency_key: `invoice:${invoice._id}:return:${returnRecord.return_id}:${restore.variant_id}`,
           reason: "Invoice return",
           explanation: stockHistoryExplanation,
           actor: { id: req.user?._id || null, name: req.user?.name || "Administrator" },
@@ -706,6 +712,40 @@ exports.recordReturn = async (req, res) => {
         });
       }
       if (stockHistoryRows.length) await StockHistory.insertMany(stockHistoryRows);
+
+      let refundPaymentId = null;
+      const cashMinor = toMinor(amountToRefund);
+      if (cashMinor > 0) {
+        const { payment } = await payments.record({
+          direction: "out",
+          method_code: normalizePayMethod(refundPaymentMethod),
+          amount_minor: cashMinor,
+          status: "captured",
+          ref_type: "invoice",
+          ref_id: invoice._id,
+          party_type: "customer",
+          party_id: invoice.customer_id || null,
+          reference: `Refund return ${returnRecord.return_id}`,
+          received_by: req.user?._id || null,
+          idempotency_key: `invoice:${invoice._id}:return:${returnRecord.return_id}:pay`,
+        });
+        refundPaymentId = payment?._id || null;
+      }
+
+      await SaleReturn.create([{
+        ref_type: "invoice",
+        ref_id: invoice._id,
+        lines: itemsReturned.map((item) => ({
+          line_id: item.item_id,
+          qty: item.qty,
+          amount_minor: toMinor(item.return_value),
+        })),
+        refund_payment_id: refundPaymentId,
+        method: refundMethod,
+        reason,
+        actor_id: req.user?._id || null,
+        at: new Date(),
+      }]);
 
       const next = await Invoice.findOneAndUpdate(
         { _id: invoice._id, is_deleted: false, amount_paid: priorPaid, total: priorTotal, __v: invoice.__v },

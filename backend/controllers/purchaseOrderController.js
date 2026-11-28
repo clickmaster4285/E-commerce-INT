@@ -472,6 +472,7 @@ const deliverPO = async (req, res) => {
             ref_type: "purchase_order",
             ref_id: claimed._id,
             unit_cost_minor: unitCostMinor,
+            party_id: claimed.vendor_id || claimed.vendor || null,
           });
           if (!recv.ok) throw new TxAbort(400, { success: false, message: recv.message || "Could not receive stock" });
           await Variant.updateOne(

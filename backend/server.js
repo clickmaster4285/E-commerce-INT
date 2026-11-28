@@ -175,6 +175,9 @@ const startServer = async () => {
     require("./utils/themeImageCleanup").start();
     // ⏰ Store editor scheduled publish (har minute, multi-instance safe)
     require("./utils/themeScheduler").start();
+    // §3.9 stock reservation expiry + nightly money/stock drift alerts
+    require("./jobs/reservationSweeper").start();
+    require("./jobs/nightlyReconcile").start();
 
     // 📧 SMTP check — BACKGROUND me (await NAHI): startup ~12s SMTP handshake par
     // nahi rukta. Email bhejna is check par depend nahi karta — sirf early warning.

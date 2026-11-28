@@ -10,6 +10,7 @@ const StockLevel = require("../models/StockLevel");
 const StockMovement = require("../models/StockMovement");
 const StockReservation = require("../models/StockReservation");
 const { refresh, refreshAsync } = require("./productSummary");
+const ledger = require("./ledger");
 
 const withSession = (opts, session) => (session ? { ...opts, session } : opts);
 const q = (query, session) => (session ? query.session(session) : query);
@@ -168,10 +169,29 @@ async function adjust(input, session) {
 
 /**
  * Checkout reserve — on_hand - reserved >= qty hona chahiye.
+ * idempotency_key: tx retry par pehli active reservation wapas.
  */
-async function reserve({ variant_id, location_id = "main", qty, checkout_draft_id, expires_at, session }) {
+async function reserve({
+  variant_id,
+  location_id = "main",
+  qty,
+  checkout_draft_id,
+  expires_at,
+  idempotency_key = null,
+  session,
+}) {
   const n = Number(qty);
   if (!(n > 0)) throw new Error("reserve qty must be positive");
+
+  if (idempotency_key) {
+    const existing = await q(
+      StockReservation.findOne({ idempotency_key, status: { $in: ["active", "committed"] } }),
+      session,
+    );
+    if (existing) {
+      return { ok: true, reservation: existing, idempotent: true };
+    }
+  }
 
   await ensureLevel({ variant_id, location_id, session });
 
@@ -189,27 +209,65 @@ async function reserve({ variant_id, location_id = "main", qty, checkout_draft_i
     return { ok: false, status: 400, message: "Cannot reserve — insufficient available stock" };
   }
 
-  const [row] = await StockReservation.create(
-    [
-      {
-        variant_id,
-        location_id,
-        qty: n,
-        checkout_draft_id: checkout_draft_id || null,
-        expires_at: expires_at || new Date(Date.now() + 15 * 60 * 1000),
-        status: "active",
-      },
-    ],
-    withSession({}, session),
-  );
-
-  return { ok: true, reservation: row, level: updated };
+  try {
+    const [row] = await StockReservation.create(
+      [
+        {
+          variant_id,
+          location_id,
+          qty: n,
+          checkout_draft_id: checkout_draft_id || null,
+          expires_at: expires_at || new Date(Date.now() + 15 * 60 * 1000),
+          status: "active",
+          idempotency_key: idempotency_key || undefined,
+        },
+      ],
+      withSession({}, session),
+    );
+    return { ok: true, reservation: row, level: updated };
+  } catch (err) {
+    // Race on unique idempotency_key — reserved bump rollback + reuse
+    if (err?.code === 11000 && idempotency_key) {
+      await StockLevel.updateOne(
+        { variant_id, location_id, reserved: { $gte: n } },
+        { $inc: { reserved: -n } },
+        withSession({}, session),
+      );
+      const existing = await q(
+        StockReservation.findOne({ idempotency_key, status: { $in: ["active", "committed"] } }),
+        session,
+      );
+      if (existing) return { ok: true, reservation: existing, idempotent: true };
+    }
+    throw err;
+  }
 }
 
 /** Sale confirm: reserved → on_hand kam, reserved release */
-async function commit({ reservation_id, kind = "sale", ref_type = "", ref_id = null, session }) {
-  const reservation = await q(StockReservation.findOne({ _id: reservation_id, status: "active" }), session);
+async function commit({
+  reservation_id,
+  kind = "sale",
+  ref_type = "",
+  ref_id = null,
+  idempotency_key = null,
+  session,
+}) {
+  if (idempotency_key) {
+    const existingMov = await q(StockMovement.findOne({ idempotency_key }), session).lean();
+    if (existingMov) {
+      const reservation = await q(StockReservation.findById(reservation_id), session);
+      return { ok: true, movement: existingMov, reservation, idempotent: true };
+    }
+  }
+
+  const reservation = await q(StockReservation.findOne({ _id: reservation_id }), session);
   if (!reservation) return { ok: false, status: 404, message: "Reservation not found" };
+  if (reservation.status === "committed") {
+    return { ok: true, reservation, idempotent: true };
+  }
+  if (reservation.status !== "active") {
+    return { ok: false, status: 400, message: `Reservation is ${reservation.status}` };
+  }
 
   const { variant_id, location_id, qty } = reservation;
   const n = Number(qty);
@@ -246,11 +304,32 @@ async function commit({ reservation_id, kind = "sale", ref_type = "", ref_id = n
         ref_id,
         sku: variant?.sku || "",
         variant_title: variant?.title || "",
+        idempotency_key: idempotency_key || undefined,
         at: new Date(),
       },
     ],
     withSession({}, session),
   );
+
+  // COGS journal when weighted avg cost known (§3.9)
+  const avgCost = Number(updated.avg_cost_minor) || 0;
+  if (avgCost > 0 && n > 0) {
+    const cogsMinor = Math.round(avgCost * n);
+    if (cogsMinor > 0) {
+      await ledger.post(
+        {
+          ref_type: `stock:${ref_type || "sale"}`,
+          ref_id: ref_id || reservation._id,
+          memo: `COGS ${kind}`,
+          lines: [
+            { account: "cogs", debit_minor: cogsMinor, credit_minor: 0 },
+            { account: "inventory", debit_minor: 0, credit_minor: cogsMinor },
+          ],
+        },
+        session,
+      );
+    }
+  }
 
   if (variant?.product_id) refreshAsync(variant.product_id);
   return { ok: true, movement, reservation };
@@ -273,21 +352,73 @@ async function release({ reservation_id, session }) {
   return { ok: true, reservation };
 }
 
-/** PO receive stub — purchase_receive movement */
-async function receive({ variant_id, location_id = "main", qty, ref_type = "purchase_order", ref_id, unit_cost_minor = 0, session }) {
-  return adjust(
+/** PO receive — movement + weighted avg_cost + inventory/AP ledger */
+async function receive({
+  variant_id,
+  location_id = "main",
+  qty,
+  ref_type = "purchase_order",
+  ref_id,
+  unit_cost_minor = 0,
+  party_id = null,
+  session,
+}) {
+  const n = Number(qty);
+  const unitCost = Math.max(0, Number(unit_cost_minor) || 0);
+  const levelBefore = await ensureLevel({ variant_id, location_id, session });
+  const onHandBefore = Math.max(0, Number(levelBefore.on_hand) || 0);
+  const avgBefore = Math.max(0, Number(levelBefore.avg_cost_minor) || 0);
+
+  const result = await adjust(
     {
       variant_id,
       location_id,
-      qty_delta: Number(qty),
+      qty_delta: n,
       kind: "purchase_receive",
       ref_type,
       ref_id,
-      unit_cost_minor,
+      unit_cost_minor: unitCost,
       reason: "PO receive",
     },
     session,
   );
+  if (!result.ok) return result;
+
+  if (n > 0) {
+    const newOnHand = onHandBefore + n;
+    const newAvg = newOnHand > 0
+      ? Math.round(((onHandBefore * avgBefore) + (n * unitCost)) / newOnHand)
+      : unitCost;
+    await StockLevel.updateOne(
+      { variant_id, location_id },
+      { $set: { avg_cost_minor: newAvg } },
+      withSession({}, session),
+    );
+
+    const inventoryMinor = Math.round(unitCost * n);
+    if (inventoryMinor > 0) {
+      await ledger.post(
+        {
+          ref_type: `stock:${ref_type}`,
+          ref_id: ref_id || null,
+          memo: "PO receive inventory",
+          lines: [
+            { account: "inventory", debit_minor: inventoryMinor, credit_minor: 0 },
+            {
+              account: "accounts_payable",
+              party_type: "vendor",
+              party_id: party_id || null,
+              debit_minor: 0,
+              credit_minor: inventoryMinor,
+            },
+          ],
+        },
+        session,
+      );
+    }
+  }
+
+  return result;
 }
 
 module.exports = { adjust, reserve, commit, release, receive, ensureLevel };

@@ -30,6 +30,9 @@ async function upsertCustomerForUser({ storeId, user, addressSnapshot = null } =
       address,
       user_id: user._id,
     });
+    try {
+      require("../services/storeStats").bumpPlatform({ customers: 1 });
+    } catch (_) { /* fire-and-forget */ }
     return customer;
   }
 

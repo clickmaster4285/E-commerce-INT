@@ -19,6 +19,10 @@ const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
 const loyalty = require("../utils/loyaltyService");
 const LoyaltyTransaction = require("../models/LoyaltyTransaction");
 const stock = require("./stock");
+const payments = require("./payments");
+const { toMinor } = require("../utils/money");
+const { normalizeMethod } = require("../config/paymentMethods");
+const { bumpStoreDaily } = require("./storeStats");
 
 const reply = (status, body) => ({ status, body });
 
@@ -313,14 +317,27 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
   });
   subtotal = roundMoney(subtotal);
 
-  // ✅ Stock check TOTAL (paid + free) par — free items ab server se pata hain
-  for (const [index, oi] of orderItems.entries()) {
-    const lineVariant = pricingLines[index].variant;
-    if (Number(lineVariant.quantity) < oi.qty + oi.free_items) {
-      return reply(400, {
-        success: false,
-        message: `Insufficient stock for "${oi.name}" (available: ${lineVariant.quantity})`,
-      });
+  // ✅ Stock check TOTAL (paid + free) — same variant ki lines merge karke
+  {
+    const needByVariant = new Map();
+    for (const [index, oi] of orderItems.entries()) {
+      const lineVariant = pricingLines[index].variant;
+      const need = (Number(oi.qty) || 0) + (Number(oi.free_items) || 0);
+      const key = String(oi.variant_id || lineVariant?._id || "");
+      if (!key) continue;
+      const prev = needByVariant.get(key) || { need: 0, name: oi.name, available: Number(lineVariant.quantity) || 0 };
+      prev.need += need;
+      prev.available = Number(lineVariant.quantity) || 0;
+      if (!prev.name) prev.name = oi.name;
+      needByVariant.set(key, prev);
+    }
+    for (const row of needByVariant.values()) {
+      if (row.available < row.need) {
+        return reply(400, {
+          success: false,
+          message: `Insufficient stock for "${row.name}" (available: ${row.available})`,
+        });
+      }
     }
   }
 
@@ -389,6 +406,15 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
   }
 
   const total = subtotal + shipping + tax - redemption.discount;
+  const currency = String(store?.currency || "PKR").toUpperCase();
+  const subtotal_minor = toMinor(subtotal, currency);
+  const shipping_minor = toMinor(shipping, currency);
+  const tax_minor = toMinor(tax, currency);
+  const loyalty_discount_minor = toMinor(redemption.discount, currency);
+  const total_minor = toMinor(total, currency);
+  for (const oi of orderItems) {
+    oi.price_minor = toMinor(oi.price, currency);
+  }
 
   // =====================================================
   // 🔒 ONE TRANSACTION (utils/tx.js): stock + deal usage + order number +
@@ -414,21 +440,62 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
       dealsIncremented = [];
       discountsIncremented = [];
 
-      // 1) Stock — services/stock.js (stock_levels + Variant dual-write)
+      // 1) Stock — reserve → commit (§3.9). Same variant ki lines pehle merge
+      // (warna do lines ek hi idempotency key share karti thin → under-decrement).
+      const needByVariant = new Map();
       for (const oi of orderItems) {
-        const need = oi.qty + (oi.free_items || 0);
-        const result = await stock.adjust({
-          variant_id: oi.variant_id,
-          qty_delta: -need,
+        const need = (Number(oi.qty) || 0) + (Number(oi.free_items) || 0);
+        if (!need || !oi.variant_id) continue;
+        const key = String(oi.variant_id);
+        const prev = needByVariant.get(key) || { variant_id: oi.variant_id, need: 0, name: oi.name };
+        prev.need += need;
+        if (!prev.name) prev.name = oi.name;
+        needByVariant.set(key, prev);
+      }
+      // Pre-check total need vs live quantity (multi-line same SKU)
+      for (const row of needByVariant.values()) {
+        const live = await Variant.findById(row.variant_id).select("quantity").lean();
+        if (!live || Number(live.quantity) < row.need) {
+          throw new TxAbort(400, {
+            success: false,
+            message: `Insufficient stock for "${row.name}". Please refresh your cart.`,
+          });
+        }
+      }
+      const reservationIds = [];
+      for (const row of needByVariant.values()) {
+        const reserved = await stock.reserve({
+          variant_id: row.variant_id,
+          qty: row.need,
+          checkout_draft_id: checkoutDraftId || orderId,
+          expires_at: new Date(Date.now() + 30 * 60 * 1000),
+          idempotency_key: `order:${orderId}:${row.variant_id}:reserve`,
+        });
+        if (!reserved.ok) {
+          throw new TxAbort(400, { success: false, message: `Insufficient stock for "${row.name}". Please refresh your cart.` });
+        }
+        reservationIds.push({
+          reservation_id: reserved.reservation._id,
+          variant_id: row.variant_id,
+          change: -row.need,
+          name: row.name,
+        });
+      }
+      for (const row of reservationIds) {
+        const committed = await stock.commit({
+          reservation_id: row.reservation_id,
           kind: "sale",
           ref_type: "order",
-          reason: "checkout",
-          explanation: `Order line ${oi.name || ""}`,
+          ref_id: orderId,
+          idempotency_key: `order:${orderId}:${row.variant_id}:sale`,
         });
-        if (!result.ok) {
-          throw new TxAbort(400, { success: false, message: `Insufficient stock for "${oi.name}". Please refresh your cart.` });
+        if (!committed.ok) {
+          throw new TxAbort(400, {
+            success: false,
+            message: `Insufficient stock for "${row.name}". Please refresh your cart.`,
+          });
         }
-        stockTouchedOnOrder.push({ variant_id: oi.variant_id, change: -need });
+        stockTouchedOnOrder.push({ variant_id: row.variant_id, change: row.change });
       }
 
       // 2) Deal usage — global usageLimit (atomic conditional $inc) + perUserLimit
@@ -510,6 +577,12 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
         loyalty_points_redeemed: redemption.points,
         loyalty_discount: redemption.discount,
         total,
+        currency,
+        subtotal_minor,
+        shipping_minor,
+        tax_minor,
+        loyalty_discount_minor,
+        total_minor,
         status: "pending",
         notes: notes || "",
         deal_ids: Array.from(uniqueDealIds),
@@ -517,6 +590,23 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
         bundle_ids: Array.from(uniqueBundleIds),
         total_bundle_savings: orderItems.reduce((sum, i) => sum + (i.bundle_savings || 0), 0),
       }]);
+
+      // Payment pending (no ledger) — capture on mark-paid (§3.9)
+      if (total_minor > 0) {
+        await payments.record({
+          direction: "in",
+          method_code: normalizeMethod(payment_method),
+          amount_minor: total_minor,
+          currency,
+          status: "pending",
+          ref_type: "order",
+          ref_id: orderId,
+          party_type: "customer",
+          party_id: user._id,
+          reference: created.order_number || "",
+          idempotency_key: `order:${orderId}:place`,
+        });
+      }
 
       // 4) Complete all active drafts for this user (same transaction)
       await CheckoutDraft.updateOne(
@@ -572,7 +662,6 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
   const itemQty = (order.items || []).reduce((sum, line) => sum + Math.max(0, Number(line.qty) || 0), 0);
   setImmediate(() => {
     try {
-      const { bumpStoreDaily } = require("./storeStats");
       bumpStoreDaily({ revenue: Number(order.total) || 0, orders: 1, items: itemQty });
     } catch (_) { /* fire-and-forget */ }
   });

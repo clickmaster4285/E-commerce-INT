@@ -35,6 +35,13 @@ function journalLinesForPayment({ direction, method_code, amount_minor, party_ty
       { account: "sales_revenue", party_type: null, party_id: null, debit_minor: 0, credit_minor: amount_minor },
     ];
   }
+  // Customer refund / sale return — sales_returns Dr / cash Cr
+  if (pt === "customer") {
+    return [
+      { account: "sales_returns", party_type: null, party_id: null, debit_minor: amount_minor, credit_minor: 0 },
+      { account: asset, party_type: null, party_id: null, debit_minor: 0, credit_minor: amount_minor },
+    ];
+  }
   // vendor / payout — AP debit, cash credit
   return [
     { account: "accounts_payable", party_type: pt || "vendor", party_id: party, debit_minor: amount_minor, credit_minor: 0 },

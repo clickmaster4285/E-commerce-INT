@@ -728,6 +728,17 @@ const savePosSale = async (req, res, existingSale = null) => {
             idempotency_key: `pos_sale:${savedSale._id}:capture`,
           });
         }
+        const itemQty = (savedSale.items || []).reduce(
+          (sum, line) => sum + Math.max(0, Number(line.quantity) || 0),
+          0,
+        );
+        try {
+          require("../services/storeStats").bumpStoreDaily({
+            revenue: Number(savedSale.total) || collected || 0,
+            orders: 1,
+            items: itemQty,
+          });
+        } catch (_) { /* fire-and-forget */ }
       }
       return savedSale;
     });

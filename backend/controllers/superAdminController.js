@@ -1058,6 +1058,9 @@ const deleteStore = async (req, res) => {
     store.customDomain = undefined;
     store.domainVerified = false;
     await store.save();
+    try {
+      require("../services/storeStats").bumpPlatform({ stores: -1 });
+    } catch (_) { /* fire-and-forget */ }
     await Employee.updateMany(
       { storeId: store._id, status: { $ne: "inactive" } },
       { status: "inactive" },

@@ -94,6 +94,7 @@ test("honest order → created with SERVER prices, stock decremented", async (t)
   assert.equal(order.items[0].price, 1000);
   assert.equal(order.subtotal, 2000);
   assert.equal(order.total, order.subtotal + order.shipping + order.tax);
+  assert.equal(order.total_minor, Math.round(Number(order.total) * 100));
   assert.match(order.order_number, /^ORD-\d{5,}$/);
   assert.equal((await Variant.collection.findOne({ _id: ctx.variantId })).quantity, 3);
 });

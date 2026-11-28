@@ -138,6 +138,9 @@ storeSchema.post("save", function (doc) {
   const storeId = doc?._id || this._id;
   if (!created || !storeId) return;
   setImmediate(() => {
+    try {
+      require("../services/storeStats").bumpPlatform({ stores: 1 });
+    } catch (_) { /* fire-and-forget */ }
     const { seedAttributesForStore } = require("../services/seedAttributes");
     seedAttributesForStore(storeId)
       .then((result) => {

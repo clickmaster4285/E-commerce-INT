@@ -110,7 +110,9 @@ async function buildOverviewFromPayments(query, locale, period, range) {
     PurchaseOrder.find({ is_deleted: { $ne: true } }).select("due_amount").lean(),
   ]);
 
-  if (!rows.length) return null; // caller falls back to legacy scan
+  // Legacy 5-collection scan jab is range me koi Payment na ho.
+  // Historical paid docs: `node scripts/backfillOrderPayments.js --apply`
+  if (!rows.length) return null;
 
   const CATEGORY = {
     invoice: { in: "Invoice payment", out: "Invoice refund" },

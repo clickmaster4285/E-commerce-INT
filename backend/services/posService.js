@@ -5,7 +5,11 @@ const { withTx } = require("../utils/tx"); // POS sale / return transactions
 const Variant = require("../models/Variant");
 const PosSale = require("../models/PosSale");
 const StockHistory = require("../models/StockHistory");
+const SaleReturn = require("../models/SaleReturn");
 const stock = require("./stock");
+const payments = require("./payments");
+const { toMinor } = require("../utils/money");
+const { normalizeMethod } = require("../config/paymentMethods");
 
 const reply = (status, body) => ({ status, body });
 
@@ -62,6 +66,7 @@ async function recordReturn({ saleId, payload, user }) {
           kind: "return",
           ref_type: "pos_sale",
           ref_id: sale._id,
+          idempotency_key: `pos_sale:${sale._id}:return:${returnRecordId}:${line.variant_id}`,
           reason: "POS sale return",
           explanation: historyExplanation,
           actor: { id: user?._id || null, name: user?.name || "Administrator" },
@@ -85,6 +90,41 @@ async function recordReturn({ saleId, payload, user }) {
         });
       }
       await StockHistory.insertMany(historyRows);
+
+      let refundPaymentId = null;
+      const refundMinor = toMinor(refundTotal);
+      if (refundMinor > 0) {
+        const { payment } = await payments.record({
+          direction: "out",
+          method_code: normalizeMethod(sale.payment?.method || "cash"),
+          amount_minor: refundMinor,
+          status: "captured",
+          ref_type: "pos_sale",
+          ref_id: sale._id,
+          party_type: sale.customer_id ? "customer" : "customer",
+          party_id: sale.customer_id || null,
+          reference: `Return ${returnRecordId} ${sale.sale_number || ""}`.trim(),
+          received_by: user?._id || null,
+          idempotency_key: `pos_sale:${sale._id}:return:${returnRecordId}:pay`,
+        });
+        refundPaymentId = payment?._id || null;
+      }
+
+      await SaleReturn.create([{
+        ref_type: "pos_sale",
+        ref_id: sale._id,
+        lines: returnLines.map((line) => ({
+          variant_id: line.variant_id,
+          qty: line.quantity,
+          amount_minor: toMinor(line.refund_amount),
+        })),
+        refund_payment_id: refundPaymentId,
+        method: "cash",
+        reason,
+        actor_id: user?._id || null,
+        at: new Date(),
+      }]);
+
       sale.returns.push({
         _id: returnRecordId,
         returned_by: user?._id || null,

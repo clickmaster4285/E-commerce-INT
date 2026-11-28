@@ -187,6 +187,9 @@ const createCustomer = async (req, res) => {
       createdby: req.user?._id || null,
       activity: [auditEvent(req, "created", [{ field: "Customer", before: "—", after: String(name).trim() }])],
     });
+    try {
+      require("../services/storeStats").bumpPlatform({ customers: 1 });
+    } catch (_) { /* fire-and-forget */ }
 
     res.status(201).json({ success: true, data: customer });
   } catch (error) {

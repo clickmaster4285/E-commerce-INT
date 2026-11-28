@@ -10,6 +10,10 @@ const { keysetFilter, encodeCursor } = require("../utils/keysetPaginate");
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
 const loyalty = require("../utils/loyaltyService");
 const stock = require("../services/stock");
+const payments = require("../services/payments");
+const { toMinor } = require("../utils/money");
+const { normalizeMethod } = require("../config/paymentMethods");
+const { bumpStoreDaily } = require("../services/storeStats");
 
 // placeOrder ka core + socket emit helpers services/orderService.js me hain (§4.2)
 const { placeOrderCore, emitOrderEvent, emitStockEvent } = require("../services/orderService");
@@ -623,6 +627,7 @@ const updateOrderStatus = async (req, res) => {
           kind: "sale_cancel",
           ref_type: "order",
           ref_id: order._id,
+          idempotency_key: `order:${order._id}:${item.variant_id}:sale_cancel`,
           reason: "order cancelled",
           explanation: `Order ${order.order_number || order._id} cancelled`,
         });
@@ -632,6 +637,43 @@ const updateOrderStatus = async (req, res) => {
       if (restoredVariants.length > 0) {
         emitStockEvent({ variants: restoredVariants, source: "order_cancelled" });
       }
+
+      // Paid order cancel → refund Payment (immutable; naya row)
+      const wasPaid = order.payment?.status === "paid";
+      const currency = String(order.currency || "PKR").toUpperCase();
+      const amountMinor = Number(order.total_minor) > 0
+        ? Number(order.total_minor)
+        : toMinor(order.total, currency);
+      if (wasPaid && amountMinor > 0) {
+        await payments.record({
+          direction: "out",
+          method_code: normalizeMethod(order.payment?.method || "cod"),
+          amount_minor: amountMinor,
+          currency,
+          status: "captured",
+          ref_type: "order",
+          ref_id: order._id,
+          party_type: "customer",
+          party_id: order.user_id,
+          reference: `Refund ${order.order_number || order._id}`,
+          received_by: req.user?._id || null,
+          idempotency_key: `order:${order._id}:refund`,
+        }).catch((err) => log.warn("order cancel refund payment:", err?.message || err));
+        if (order.payment) {
+          order.payment.status = "refunded";
+          await order.save().catch(() => {});
+        }
+      }
+
+      const itemQty = (order.items || []).reduce(
+        (sum, line) => sum + Math.max(0, Number(line.qty) || 0),
+        0,
+      );
+      bumpStoreDaily({
+        revenue: -(Number(order.total) || 0),
+        orders: -1,
+        items: -itemQty,
+      });
     }
 
     emitOrderEvent("order:updated", { success: true, data: order });
@@ -744,11 +786,20 @@ const editOrder = async (req, res) => {
 
       // Points discount subtotal se zyada kabhi nahi (qty kam hone par)
       const pointsDiscount = Math.min(Number(order.loyalty_discount || 0), subtotal);
+      const nextTotal = subtotal + order.shipping + tax - pointsDiscount;
+      const currency = String(order.currency || "PKR").toUpperCase();
+      for (const item of nextItems) {
+        item.price_minor = toMinor(item.price, currency);
+      }
       $set.items = nextItems;
       $set.subtotal = subtotal;
       $set.tax = tax;
       $set.loyalty_discount = pointsDiscount;
-      $set.total = subtotal + order.shipping + tax - pointsDiscount;
+      $set.total = nextTotal;
+      $set.subtotal_minor = toMinor(subtotal, currency);
+      $set.tax_minor = toMinor(tax, currency);
+      $set.loyalty_discount_minor = toMinor(pointsDiscount, currency);
+      $set.total_minor = toMinor(nextTotal, currency);
       $set.total_deal_savings = nextItems.reduce((sum, item) => sum + (Number(item.deal_savings) || 0), 0);
     }
 
@@ -806,6 +857,7 @@ const editOrder = async (req, res) => {
             kind: inc < 0 ? "sale" : "sale_cancel",
             ref_type: "order",
             ref_id: order._id,
+            idempotency_key: `order:${order._id}:edit:${seenUpdatedAt?.getTime?.() || seenUpdatedAt}:${change.variant_id}:${inc}`,
             reason: "order edit",
             explanation: `Order edit ${order.order_number || order._id}`,
           });
@@ -881,6 +933,7 @@ const deleteOrder = async (req, res) => {
           kind: "sale_cancel",
           ref_type: "order",
           ref_id: deletedOrder._id,
+          idempotency_key: `order:${deletedOrder._id}:${item.variant_id}:delete_cancel`,
           reason: "order deleted",
           explanation: `Pending order ${deletedOrder.order_number || deletedOrder._id} deleted`,
         });
@@ -892,6 +945,17 @@ const deleteOrder = async (req, res) => {
     if (restoredVariants.length > 0) {
       emitStockEvent({ variants: restoredVariants, source: "order_deleted" });
     }
+
+    // Pending delete — placeOrder ne daily stats bump ki thi, wapas undo
+    const delItemQty = (deletedOrder.items || []).reduce(
+      (sum, line) => sum + Math.max(0, Number(line.qty) || 0),
+      0,
+    );
+    bumpStoreDaily({
+      revenue: -(Number(deletedOrder.total) || 0),
+      orders: -1,
+      items: -delItemQty,
+    });
 
     // ✅ Loyalty: pending points hatao, kharch kiye points wapas
     await loyalty.onOrderDeleted(deletedOrder);
@@ -949,15 +1013,85 @@ const updatePaymentStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    order.payment.status = status;
-    await order.save();
+    const previous = order.payment?.status || "pending";
+    if (previous === status) {
+      return res.status(200).json({
+        success: true,
+        message: `Payment already ${status}`,
+        data: order,
+      });
+    }
 
-    emitOrderEvent("order:updated", { success: true, data: order });
-    emitOrderEvent("order:paymentUpdated", { success: true, data: order });
+    const currency = String(order.currency || "PKR").toUpperCase();
+    const amountMinor = Number(order.total_minor) > 0
+      ? Number(order.total_minor)
+      : toMinor(order.total, currency);
+
+    let saved;
+    try {
+      ({ result: saved } = await withTx(async () => {
+        // Conditional claim — concurrent mark-paid dono ledger na banayein
+        const filter = { _id: order._id, "payment.status": previous };
+        const updated = await Order.findOneAndUpdate(
+          filter,
+          { $set: { "payment.status": status } },
+          { returnDocument: "after" },
+        );
+        if (!updated) {
+          throw new TxAbort(409, {
+            success: false,
+            code: "ORDER_PAYMENT_CHANGED",
+            message: "Payment status changed at the same time. Refresh and try again.",
+          });
+        }
+
+        if (status === "paid" && amountMinor > 0) {
+          await payments.record({
+            direction: "in",
+            method_code: normalizeMethod(updated.payment?.method || "cod"),
+            amount_minor: amountMinor,
+            currency,
+            status: "captured",
+            ref_type: "order",
+            ref_id: updated._id,
+            party_type: "customer",
+            party_id: updated.user_id,
+            reference: updated.order_number || "",
+            received_by: req.user?._id || null,
+            idempotency_key: `order:${updated._id}:capture`,
+          });
+        }
+
+        if (status === "refunded" && previous === "paid" && amountMinor > 0) {
+          await payments.record({
+            direction: "out",
+            method_code: normalizeMethod(updated.payment?.method || "cod"),
+            amount_minor: amountMinor,
+            currency,
+            status: "captured",
+            ref_type: "order",
+            ref_id: updated._id,
+            party_type: "customer",
+            party_id: updated.user_id,
+            reference: `Refund ${updated.order_number || updated._id}`,
+            received_by: req.user?._id || null,
+            idempotency_key: `order:${updated._id}:refund`,
+          });
+        }
+
+        return updated;
+      }));
+    } catch (txError) {
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
+    }
+
+    emitOrderEvent("order:updated", { success: true, data: saved });
+    emitOrderEvent("order:paymentUpdated", { success: true, data: saved });
     res.status(200).json({
       success: true,
       message: status === "paid" ? "Payment marked as received" : `Payment marked as ${status}`,
-      data: order,
+      data: saved,
     });
   } catch (error) {
     log.error("❌ [updatePaymentStatus] Error:", error);

@@ -32,6 +32,12 @@ const stockReservationSchema = new mongoose.Schema(
       enum: ["active", "committed", "released", "expired"],
       default: "active",
     },
+    // Tx retry / double submit — same key → existing reservation reuse (§3.9)
+    idempotency_key: {
+      type: String,
+      trim: true,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
@@ -43,5 +49,9 @@ stockReservationSchema.plugin(tenantScope);
 
 stockReservationSchema.index({ storeId: 1, expires_at: 1 });
 stockReservationSchema.index({ storeId: 1, checkout_draft_id: 1 });
+stockReservationSchema.index(
+  { storeId: 1, idempotency_key: 1 },
+  { unique: true, partialFilterExpression: { idempotency_key: { $type: "string" } } },
+);
 
 module.exports = mongoose.model("StockReservation", stockReservationSchema);
