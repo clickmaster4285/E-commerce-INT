@@ -15,10 +15,9 @@ const { checkPermission } = require("../middleware/checkPermission");
 // ✅ Authentication required for all employee routes
 router.use(authMiddleware);
 
-// GET — no permission check (allows auto-migration of legacy permissions)
-router.get("/", getAllEmployees);
-router.get("/:id/activities", getEmployeeActivities);
-router.get("/:id", getEmployeeById);
+router.get("/", checkPermission("employees"), getAllEmployees);
+router.get("/:id/activities", checkPermission("employees"), getEmployeeActivities);
+router.get("/:id", checkPermission("employees"), getEmployeeById);
 
 // WRITE operations — employees permission required
 router.post("/", checkPermission("employees"), createEmployee);

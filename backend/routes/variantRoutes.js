@@ -13,7 +13,8 @@ const Variant = require("../models/Variant");
 
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
-const { staffPermissionCheck } = require("../middleware/checkPermission");
+const { staffPermissionCheck, checkPermission } = require("../middleware/checkPermission");
+const requireProducts = checkPermission("products");
 
 const {
   productImagesUpload,
@@ -64,6 +65,7 @@ router.post(
   "/",
   authMiddleware,
   staffPermissionCheck,
+  requireProducts,
   dropProductsCache,
   productImagesUpload,
   validateProductImages,
@@ -76,6 +78,7 @@ router.get(
   "/next-sku",
   authMiddleware,
   staffPermissionCheck,
+  requireProducts,
   getNextSkuNumber
 );
 
@@ -84,6 +87,7 @@ router.put(
   "/:id",
   authMiddleware,
   staffPermissionCheck,
+  requireProducts,
   dropProductsCache,
   setUpdateProductId,
   productImagesUpload,
@@ -98,6 +102,7 @@ router.delete(
   "/:id",
   authMiddleware,
   staffPermissionCheck,
+  requireProducts,
   dropProductsCache,
   deleteVariant
 );
@@ -108,6 +113,7 @@ router.get(
   "/",
   authMiddleware,
   staffPermissionCheck,
+  requireProducts,
   getVariants
 );
 
@@ -117,6 +123,7 @@ router.get(
   "/:id",
   authMiddleware,
   staffPermissionCheck,
+  requireProducts,
   getVariantById
 );
 

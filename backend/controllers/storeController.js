@@ -41,7 +41,7 @@ const updateStoreInfo = async (req, res) => {
       country, state, city, zip_code, address,
       currency, tax_rate, weight_unit,
       business_type, total_employees, year_established,
-      store_status, maintenance_message,
+      maintenance_message,
       meta_title, meta_description, meta_keywords,
       return_policy, privacy_policy, terms_conditions,
       quote_terms_conditions, invoice_terms_conditions,
@@ -78,7 +78,7 @@ const updateStoreInfo = async (req, res) => {
     if (business_type !== undefined) store.business_type = business_type;
     if (total_employees !== undefined) store.total_employees = total_employees;
     if (year_established !== undefined) store.year_established = year_established;
-    if (store_status !== undefined) store.store_status = store_status;
+    // store_status is super-admin only (optimizeplan.md §2.2) — ignored here even if sent
     if (maintenance_message !== undefined) store.maintenance_message = maintenance_message;
     if (meta_title !== undefined) store.meta_title = meta_title;
     if (meta_description !== undefined) store.meta_description = meta_description;
@@ -116,22 +116,25 @@ const updateStoreInfo = async (req, res) => {
 
     const performerName = req.user?.name || "Admin";
     const performerId = req.user?._id || null;
-    const io = req.io || getIO();
+    let io = req.io || null;
+    try { if (!io) io = getIO(); } catch { /* tests / socket not booted */ }
 
     if (changes.length > 0) {
         const changedFields = changes.map((c) => c.field).join(", ");
-        await pushGlobalActivity(io, {
-            action: `${performerName} updated ${changedFields} for Store`,
-            category: "Store Management",
-            performedBy: performerId,
-            performedByName: performerName,
-            details: { changes },
-        }, performerId);
+        if (io) {
+          await pushGlobalActivity(io, {
+              action: `${performerName} updated ${changedFields} for Store`,
+              category: "Store Management",
+              performedBy: performerId,
+              performedByName: performerName,
+              details: { changes },
+          }, performerId);
+        }
         await pushStoreActivity(updatedStore._id, req, "updated", `${performerName} updated store settings`, { changes });
     }
 
     try {
-      io.emit("storeUpdated", updatedStore.toObject());
+      if (io) io.emit("storeUpdated", updatedStore.toObject());
     } catch (_) {}
 
     res.status(200).json({

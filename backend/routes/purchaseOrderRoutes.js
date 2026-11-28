@@ -5,7 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
 const router = express.Router();
 
-router.get("/next-code", authMiddleware, getNextPONumber);
+router.get("/next-code", authMiddleware, checkPermission("purchaseOrders"), getNextPONumber);
 router.get("/admin/all", authMiddleware, checkPermission("purchaseOrders"), getAllPOs);
 router.post("/", authMiddleware, checkPermission("purchaseOrders"), createPO);
 router.get("/admin/:id", authMiddleware, checkPermission("purchaseOrders"), getPOByIdAdmin);

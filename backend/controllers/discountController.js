@@ -349,8 +349,8 @@ exports.getDiscounts = async (req, res) => {
     if (search) {
       andClauses.push({
         $or: [
-          { name: { $regex: search, $options: "i" } },
-          { code: { $regex: search, $options: "i" } },
+          { name: { $regex: require("../utils/escapeRegex").escapeRegex(search), $options: "i" } },
+          { code: { $regex: require("../utils/escapeRegex").escapeRegex(search), $options: "i" } },
         ],
       });
     }

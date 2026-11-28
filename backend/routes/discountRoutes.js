@@ -4,6 +4,7 @@ const router = express.Router();
 
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
+const { checkPermission } = require("../middleware/checkPermission");
 
 const {
   createDiscount,
@@ -30,16 +31,16 @@ router.get("/public", publicCache(60 * 1000), getPublicDiscounts);
 // ADMIN ROUTES
 // =====================================================
 
-router.post("/", authMiddleware, dropDiscountsCache, createDiscount);
+router.post("/", authMiddleware, checkPermission("discounts"), dropDiscountsCache, createDiscount);
 
-router.get("/", authMiddleware, getDiscounts);
+router.get("/", authMiddleware, checkPermission("discounts"), getDiscounts);
 
-router.get("/:id/targets", authMiddleware, getDiscountTargets);
+router.get("/:id/targets", authMiddleware, checkPermission("discounts"), getDiscountTargets);
 
-router.get("/:id", authMiddleware, getDiscountById);
+router.get("/:id", authMiddleware, checkPermission("discounts"), getDiscountById);
 
-router.put("/:id", authMiddleware, dropDiscountsCache, updateDiscount);
+router.put("/:id", authMiddleware, checkPermission("discounts"), dropDiscountsCache, updateDiscount);
 
-router.delete("/:id", authMiddleware, dropDiscountsCache, deleteDiscount);
+router.delete("/:id", authMiddleware, checkPermission("discounts"), dropDiscountsCache, deleteDiscount);
 
 module.exports = router;

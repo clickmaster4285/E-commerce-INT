@@ -5,7 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
 const router = express.Router();
 
-router.get("/next-code", authMiddleware, getNextVendorCode);
+router.get("/next-code", authMiddleware, checkPermission("vendors"), getNextVendorCode);
 router.get("/admin/all", authMiddleware, checkPermission("vendors"), getVendorsAdmin);
 router.get("/:id/details", authMiddleware, checkPermission("vendors"), getVendorWithPOs);
 router.get("/:id", authMiddleware, checkPermission("vendors"), getVendorById);

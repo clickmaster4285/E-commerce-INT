@@ -26,7 +26,7 @@ const dropBrandsCache = (req, res, next) => { invalidate("brands"); next(); };
 // ==========================================
 // ✅ 1000 brands / 247KB — 60s memo (output same)
 router.get("/", publicCache(60 * 1000), getBrandsPublic);
-router.get("/next-code", authMiddleware, getNextBrandCode); // ✅ STATIC route FIRST
+router.get("/next-code", authMiddleware, checkPermission("brands"), getNextBrandCode); // ✅ STATIC route FIRST
 router.get("/:id/details", getBrandWithProducts);           // ✅ dynamic AFTER static
 router.get("/:id", getBrandById);
 

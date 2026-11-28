@@ -159,7 +159,7 @@ router.get("/admin/options", authMiddleware, checkPermission("products"), async 
   }
 });
 
-router.get("/admin/all", authMiddleware, async (req, res) => {
+router.get("/admin/all", authMiddleware, checkPermission("products"), async (req, res) => {
   try {
     const wantsPagination =
       req.query.page !== undefined || req.query.limit !== undefined;

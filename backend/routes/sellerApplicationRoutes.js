@@ -8,7 +8,7 @@ const router = express.Router();
 
 // Public — apply + lightweight status lookup by email
 router.post("/apply", limiters.sellerApply, sellerApplicationController.sellerApply);
-router.get("/apply/status", sellerApplicationController.sellerApplyStatus);
+router.get("/apply/status", limiters.sellerApplyStatus, sellerApplicationController.sellerApplyStatus);
 // Public — store setup (details confirmation + verification documents) keyed by email
 router.get("/apply/setup", sellerApplicationController.sellerSetupState);
 router.post("/apply/complete-setup", limiters.sellerApply, sellerApplicationController.completeSetup);

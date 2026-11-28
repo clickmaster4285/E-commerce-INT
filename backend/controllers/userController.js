@@ -429,6 +429,15 @@ const loginUser = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Please provide email and password" });
+    // Platform host par User.findOne({email}) kisi bhi store ka customer pakad
+    // sakta tha (optimizeplan.md §2.3). Customer login sirf store host par.
+    if (!req.store) {
+      return res.status(400).json({
+        success: false,
+        code: "STORE_REQUIRED",
+        message: "Customer login must be on a store host.",
+      });
+    }
     const user = await User.findOne({ email });
     if (!user)
       return res
@@ -479,18 +488,21 @@ const loginUser = async (req, res) => {
           "Your email is not verified. Please verify it with the code we sent to your email.",
       });
 
-    const io = req.io || getIO();
-    await pushGlobalActivity(
-      io,
-      {
-        action: `${user.name} logged in`,
-        category: "Authentication",
-        performedBy: user._id,
-        performedByName: user.name,
-        details: { ip: req.ip },
-      },
-      user._id,
-    );
+    let io = req.io || null;
+    try { if (!io) io = getIO(); } catch { /* tests / socket not booted */ }
+    if (io) {
+      await pushGlobalActivity(
+        io,
+        {
+          action: `${user.name} logged in`,
+          category: "Authentication",
+          performedBy: user._id,
+          performedByName: user.name,
+          details: { ip: req.ip },
+        },
+        user._id,
+      );
+    }
     await tokens.issueSession(req, res, "user", user);
     res.json({
       success: true,
@@ -696,15 +708,15 @@ const getMe = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
-    // ✅ Employee ka storeId null ho to default store fallback
+    // Employee ka storeId null ho to current store host (kabhi cross-store Store.findOne nahi)
     let storeDoc = entity.storeId || null;
     if (!storeDoc || !storeDoc.store_name) {
       try {
         storeDoc = storeDoc?._id
           ? await Store.findById(storeDoc._id).lean()
-          : await Store.findOne().lean();
+          : (req.store ? await Store.findById(req.store._id).lean() : null);
       } catch (e) { /* ignore, fallback below */ }
-      if (!storeDoc) storeDoc = entity.storeId || {};
+      if (!storeDoc) storeDoc = req.store || entity.storeId || {};
     }
      res.json({
        success: true,
@@ -847,16 +859,15 @@ const getProfileInfo = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
-    // ✅ Employee ka storeId null ho to default store fallback
-    // taake employee login par store name / address blank na ho
+    // Employee ka storeId null ho to current store host (cross-store fallback hata diya)
     let store = user.storeId && user.storeId.store_name ? user.storeId : null;
     if (!store) {
       try {
         store = user.storeId?._id
           ? await Store.findById(user.storeId._id).lean()
-          : await Store.findOne().lean();
+          : (req.store ? await Store.findById(req.store._id).lean() : null);
       } catch (e) { /* ignore */ }
-      if (!store) store = user.storeId || {};
+      if (!store) store = req.store || user.storeId || {};
     }
     const profileData = {
       _id: user._id,
@@ -960,8 +971,7 @@ const updateProfileInfo = async (req, res) => {
     if (city !== undefined) storeUpdateFields.city = city;
     if (state !== undefined) storeUpdateFields.state = state;
     if (zip_code !== undefined) storeUpdateFields.zip_code = zip_code;
-    if (store_status !== undefined)
-      storeUpdateFields.store_status = store_status;
+    // store_status sirf super admin — store admin se reopen nahi (optimizeplan.md §2.2)
     if (email !== undefined) storeUpdateFields.email = email;
     if (phone !== undefined) storeUpdateFields.phone = phone ? normalizePhone(phone) : phone;
     if (address !== undefined) storeUpdateFields.address = address;
@@ -974,8 +984,8 @@ const updateProfileInfo = async (req, res) => {
       let store = updatedUser.storeId
         ? await Store.findById(updatedUser.storeId)
         : null;
-      if (!store) store = await Store.findOne();
-      // Blank store khud se nahi banta (multi-tenant)
+      if (!store && req.store?._id) store = await Store.findById(req.store._id);
+      // Blank / cross-store Store.findOne() hata diya (multi-tenant)
       if (store) {
         Object.assign(store, storeUpdateFields);
         updatedStore = await store.save();

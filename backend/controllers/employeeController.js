@@ -208,11 +208,13 @@ exports.getAllEmployees = async (req, res) => {
     const filter = { is_deleted: false, role: { $nin: ADMIN_ROLES } };
     const conditions = [];
     if (search) {
+      const { escapeRegex } = require("../utils/escapeRegex");
+      const rx = escapeRegex(search);
       conditions.push({
         $or: [
-          { name: { $regex: search, $options: "i" } },
-          { email: { $regex: search, $options: "i" } },
-          { phone: { $regex: search, $options: "i" } },
+          { name: { $regex: rx, $options: "i" } },
+          { email: { $regex: rx, $options: "i" } },
+          { phone: { $regex: rx, $options: "i" } },
         ],
       });
     }
@@ -455,12 +457,12 @@ exports.createEmployee = async (req, res) => {
 
     // ✅ Naye employee ko default store se link karo
     // taake uski profile me store name / address blank na aaye
-    let defaultStoreId = null;
-    try {
-      const Store = require("../models/Store");
-      const defaultStore = await Store.findOne().select("_id").lean();
-      if (defaultStore) defaultStoreId = defaultStore._id;
-    } catch (e) { /* ignore */ }
+    // Current store host only — pehle Store.findOne() bina context ke kisi bhi store
+    // ko pakad sakta tha (optimizeplan.md §2.3).
+    const defaultStoreId = req.store?._id || null;
+    if (!defaultStoreId) {
+      return res.status(400).json({ success: false, message: "Store context is required to create an employee." });
+    }
 
     const newEmployee = await Employee.create({
       name,

@@ -1,5 +1,5 @@
 const express = require("express");
-const { requireSuperAdmin } = require("../middleware/superAdminAuth");
+const { requireSuperAdmin, requireSuperAdminRole } = require("../middleware/superAdminAuth");
 const superAdminController = require("../controllers/superAdminController");
 
 const router = express.Router();
@@ -47,16 +47,15 @@ router.post("/users/:id/password", superAdminController.setUserPassword);
 router.post("/stores/:id/admin-access", superAdminController.openStoreAdmin);
 router.patch("/users/:id/status", superAdminController.setUserStatus);
 
-/* Team (super admin + staff accounts) — staff bhi dekh/add kar sakta hai;
-   kis account ko kaun badal sakta hai controller me manageBlockReason() decide karta hai */
-router.get("/team", superAdminController.listTeam);
-router.post("/team", superAdminController.createTeamMember);
-router.get("/team/:id", superAdminController.getTeamMember);
-router.get("/team/:id/activity", superAdminController.teamMemberActivity);
-router.patch("/team/:id", superAdminController.updateTeamMember);
-router.patch("/team/:id/status", superAdminController.setTeamMemberStatus);
-router.post("/team/:id/password", superAdminController.resetTeamMemberPassword);
-router.delete("/team/:id", superAdminController.deleteTeamMember);
+/* Team — only role "superadmin" (requireSuperAdminRole). Staff accounts are blocked. */
+router.get("/team", requireSuperAdminRole, superAdminController.listTeam);
+router.post("/team", requireSuperAdminRole, superAdminController.createTeamMember);
+router.get("/team/:id", requireSuperAdminRole, superAdminController.getTeamMember);
+router.get("/team/:id/activity", requireSuperAdminRole, superAdminController.teamMemberActivity);
+router.patch("/team/:id", requireSuperAdminRole, superAdminController.updateTeamMember);
+router.patch("/team/:id/status", requireSuperAdminRole, superAdminController.setTeamMemberStatus);
+router.post("/team/:id/password", requireSuperAdminRole, superAdminController.resetTeamMemberPassword);
+router.delete("/team/:id", requireSuperAdminRole, superAdminController.deleteTeamMember);
 
 /* Plans — platform subscription catalog (limits + feature tiers) */
 router.get("/plans", superAdminController.listPlans);

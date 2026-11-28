@@ -318,6 +318,12 @@ const limiters = {
     max: num(process.env.RATE_LIMIT_SELLER_APPLY_MAX) || 10,
     keyBy: "ip",
   }),
+  // Public email → application status lookup (enumeration / scraping)
+  sellerApplyStatus: createRateLimiter({
+    name: "seller-apply-status",
+    max: num(process.env.RATE_LIMIT_SELLER_APPLY_STATUS_MAX) || 20,
+    keyBy: "ip",
+  }),
   adminLogin: createRateLimiter({
     name: "admin-login",
     max: num(process.env.RATE_LIMIT_ADMIN_LOGIN_MAX),

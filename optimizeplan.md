@@ -112,12 +112,12 @@ So:
 - [x] `createEmployee` deletes the password only from `result.userId`, so **`result.password` (the bcrypt hash) is returned and broadcast to the store room** (`employeeController.js:498-509`). `updateEmployee` and `toggleStatus` broadcast the full doc too (`:721-732`, `:909-923`). — **done:** password and activities are stripped from the create, update and status-toggle responses and broadcasts. `select:false` on the schema is still open (§9.3)
 - [x] **Every socket on a store host, including anonymous storefront visitors, joins `store:<id>`** (`utils/socket.js:444`). `io.emit` therefore sends full orders (address and phone), vendors (bank details), POs and discounts to the public. Split rooms into `store:<id>:admin` (staff only) and `store:<id>:public` (storefront-safe events), and audit every `req.io.emit`. — **done:** employee sockets join `store:<id>:admin` and everyone else `store:<id>`. In store context `io.emit` sends the full payload to the admin room only; `PUBLIC_EVENTS` reach the storefront as `{_id}` / `{changed:true}`; order events go only to the owner (`customer:<userId>`) as `{_id}` (`utils/socket.js`, `test/socketRooms.test.js`)
 - [x] Remove the client relay events. Any socket, guests included, can emit `productCreated` or `employeeRelay*` to the whole store (`utils/socket.js:1026-1032`). Only the server should emit. — **done**
-- [ ] `sellerApplyStatus` is public and unthrottled, so anyone can look up an email's application status (`sellerApplicationController.js:138`).
+- [x] `sellerApplyStatus` is public and unthrottled, so anyone can look up an email's application status (`sellerApplicationController.js:138`). — **done:** `limiters.sellerApplyStatus` (IP, default 20/window) mounted on `GET /seller/apply/status`
 - [ ] 500 responses return raw `error.message`, which leaks Mongo internals. The central error handler (§5.2) fixes this.
 
 ### 2.2 Money and trust
 - [x] **Checkout trusts client prices.** `displayPrice`, `savings`, `freeItems`, `payableItems`, `dealSavings` and the shipping `brandId`/`categoryId` all come from the request body (`orderController.js:235-246,320,406`). Recompute price, deal, bundle, tax and shipping on the server from DB data. The client sends only `{variant_id, qty}`. — **done:** `services/pricing/{dealRules,discountRules,bundleRules,checkout}.js` price every line from DB data (variant price, active Discounts, Deal/Bundle docs, gift validation, shipping category/brand from the product). A mismatch with the client price returns **409 `PRICE_CHANGED`** (the storefront refreshes prices and shows a message). Parity with the storefront rules is enforced by `test/pricingParity.test.js` (3,500 randomized cases against the real frontend source); the end-to-end test `test/placeOrderPricing.test.js` covers tamper → 409, honest → server prices, over-stock → 400. `PRICING_MODE=log` is an emergency switch only
-- [ ] Remove the raw card number and CVV handling (`orderController.js:44-47`). Nothing is charged, and receiving them puts you in PCI scope. Use a payment provider's token flow when card payments are added.
+- [x] Remove the raw card number and CVV handling (`orderController.js:44-47`). Nothing is charged, and receiving them puts you in PCI scope. Use a payment provider's token flow when card payments are added. — **done:** any `card_number` / `card_cvv` / `card_expiry` / `card_holder_name` → 400 `CARD_DATA_REJECTED`; `payment_method: "card"` remains as intent only until a provider token flow lands
 - [x] Mass assignment: `...req.body` is spread into — **done (guard):** `utils/sanitizeBody.js#withoutProtected` now strips ids, `storeId`, audit/soft-delete/translation/activity fields, `$` operators and dotted keys in all five controllers below (deal also `usedCount`, vendor also the balances). Per-endpoint zod schemas are still §5.3
   - [x] Deal (`dealController.js:143-149,452`): can set `usedCount` and `createdBy`
   - [x] Vendor (`vendorController.js:349,525`): can set `balance_payable` and `is_deleted`
@@ -126,29 +126,29 @@ So:
   - [x] Banner (`bannerController.js:263,312`)
 
   Whitelist fields per endpoint (validation schemas in §5.3).
-- [ ] A store admin can reopen a store the super admin closed (`storeController.js:81`). `store_status` should be writable by the super admin only.
+- [x] A store admin can reopen a store the super admin closed (`storeController.js:81`). `store_status` should be writable by the super admin only. — **done:** store-admin `PUT /store` and profile store updates ignore `store_status`; only super-admin `PATCH /stores/:id/status` can change it
 
 ### 2.3 Auth and abuse
 - [x] **Rate limiters `register`, `sendEmailOtp` and `verifyEmailOtp` are defined but never mounted** (`routes/userRoutes.js:47,73-74`). This allows email bombing and OTP guessing. — **done**
-- [ ] OTP attempt counters are read, incremented and saved non-atomically, so parallel guesses get past the limit (`otpController.js:127-128,301-302`). Use `findOneAndUpdate({attempts: {$lt: max}}, {$inc: {attempts: 1}})`.
-- [ ] Customer login, forgot-password and reset on the **platform host** use `User.findOne({email})` with no store, which picks an arbitrary store's customer (`userController.js:432`, `otpController.js:169,598,720`). Require store context, or refuse.
-- [ ] Legacy `Store.findOne()` fallbacks with no store context can edit an arbitrary store (`userController.js:704,856,976`, `employeeController.js:461`). Remove them.
-- [ ] Missing permission checks:
-  - [ ] discount CRUD (`routes/discountRoutes.js:33-43`)
-  - [ ] tags (check commented out, `routes/tagRoutes.js:7`)
-  - [ ] `GET /employees` (`employeeRoutes.js:19-21`)
-  - [ ] the `next-code` endpoints (brand, vendor, PO)
-  - [ ] `GET /categories/admin/all` (`categoryRoutes.js:162`)
-  - [ ] dashboard (`dashboardRoutes.js:10`)
-  - [ ] the variants route, which has no permission key
-- [ ] `requireSuperAdminRole` is never used, so super-admin team management has no route-level role gate (`superAdminAuth.js:57`).
-- [ ] Unescaped user input goes into `RegExp` (injection and ReDoS) in:
-  - [ ] `employeeController.js:212`
-  - [ ] `orderController.js:527`
-  - [ ] `discountController.js:352`
-  - [ ] `bundleController.js:247`
-  - [ ] `attributeController.js:188`
-  - [ ] `tagController.js:74,130`
+- [x] OTP attempt counters are read, incremented and saved non-atomically, so parallel guesses get past the limit (`otpController.js:127-128,301-302`). Use `findOneAndUpdate({attempts: {$lt: max}}, {$inc: {attempts: 1}})`. — **done:** `verifyOtpCode` and pending-registration verify both use conditional `$inc` on `attempts < max`
+- [x] Customer login, forgot-password and reset on the **platform host** use `User.findOne({email})` with no store, which picks an arbitrary store's customer (`userController.js:432`, `otpController.js:169,598,720`). Require store context, or refuse. — **done:** `resolveStore` already returns 404 `STORE_REQUIRED` for these on the platform host; controllers also refuse when `!req.store` (`STORE_REQUIRED`)
+- [x] Legacy `Store.findOne()` fallbacks with no store context can edit an arbitrary store (`userController.js:704,856,976`, `employeeController.js:461`). Remove them. — **done:** profile/store lookups use `req.store` / linked `storeId` only; employee create requires `req.store._id`
+- [x] Missing permission checks: — **done:** all gated; tags/variants use `products`. Tested in `test/authAbuseP0.test.js`
+  - [x] discount CRUD (`routes/discountRoutes.js:33-43`)
+  - [x] tags (check commented out, `routes/tagRoutes.js:7`)
+  - [x] `GET /employees` (`employeeRoutes.js:19-21`)
+  - [x] the `next-code` endpoints (brand, vendor, PO)
+  - [x] `GET /categories/admin/all` (`categoryRoutes.js:162`)
+  - [x] dashboard (`dashboardRoutes.js:10`)
+  - [x] the variants route, which has no permission key
+- [x] `requireSuperAdminRole` is never used, so super-admin team management has no route-level role gate (`superAdminAuth.js:57`). — **done:** every `/super-admin/team*` route mounts `requireSuperAdminRole`
+- [x] Unescaped user input goes into `RegExp` (injection and ReDoS) in: — **done:** shared `utils/escapeRegex.js`; listed call sites (and order list) use it
+  - [x] `employeeController.js:212`
+  - [x] `orderController.js:527`
+  - [x] `discountController.js:352`
+  - [x] `bundleController.js:247`
+  - [x] `attributeController.js:188`
+  - [x] `tagController.js:74,130`
 
   Use one shared `escapeRegex` (§8).
 

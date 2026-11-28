@@ -44,10 +44,6 @@ const placeOrder = async (req, res) => {
       shipping_method: reqShippingMethod,
       bank_sender_name,
       bank_transaction_ref,
-      card_number,
-      card_holder_name,
-      card_expiry,
-      card_cvv,
     } = req.body;
     const checkoutDraftId = mongoose.isValidObjectId(rawCheckoutDraftId)
       ? rawCheckoutDraftId
@@ -70,113 +66,19 @@ const placeOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid payment method" });
     }
 
-    // ✅ Validate card fields when payment method is card
-    if (payment_method === "card") {
-      const trimmedCardNumber = (card_number || "").replace(/\s/g, "").trim();
-      const trimmedCardHolderName = (card_holder_name || "").trim();
-      const trimmedCardExpiry = (card_expiry || "").trim();
-      const trimmedCardCVV = (card_cvv || "").trim();
-
-      // 1. Card Number validation
-      if (!trimmedCardNumber) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter your card number.",
-        });
-      }
-      if (trimmedCardNumber.length < 13 || trimmedCardNumber.length > 19) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid card number.",
-        });
-      }
-      // Luhn algorithm check
-      let sum = 0;
-      let isEven = false;
-      for (let i = trimmedCardNumber.length - 1; i >= 0; i--) {
-        let digit = parseInt(trimmedCardNumber[i], 10);
-        if (isEven) {
-          digit *= 2;
-          if (digit > 9) digit -= 9;
-        }
-        sum += digit;
-        isEven = !isEven;
-      }
-      if (sum % 10 !== 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid card number.",
-        });
-      }
-
-      // 2. Card Holder Name validation
-      if (!trimmedCardHolderName) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter the card holder name.",
-        });
-      }
-      if (trimmedCardHolderName.length < 3) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid card holder name.",
-        });
-      }
-      if (!/^[a-zA-Z\s.\-']+$/.test(trimmedCardHolderName)) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid card holder name.",
-        });
-      }
-
-      // 3. Expiry validation
-      if (!trimmedCardExpiry) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter the card expiry date.",
-        });
-      }
-      if (!/^\d{2}\/\d{2}$/.test(trimmedCardExpiry)) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid expiry date (MM/YY).",
-        });
-      }
-      const [month, year] = trimmedCardExpiry.split("/").map(Number);
-      if (month < 1 || month > 12) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid expiry date (MM/YY).",
-        });
-      }
-      const now = new Date();
-      const currentYear = now.getFullYear() % 100;
-      const currentMonth = now.getMonth() + 1;
-      if (year < currentYear || (year === currentYear && month < currentMonth)) {
-        return res.status(400).json({
-          success: false,
-          message: "Your card has expired. Please use a valid card.",
-        });
-      }
-
-      // 4. CVV validation
-      if (!trimmedCardCVV) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter the CVV.",
-        });
-      }
-      const isAmex = trimmedCardNumber.startsWith("34") || trimmedCardNumber.startsWith("37");
-      const expectedCVVLength = isAmex ? 4 : 3;
-      if (trimmedCardCVV.length !== expectedCVVLength) {
-        return res.status(400).json({
-          success: false,
-          message: "Please enter a valid CVV.",
-        });
-      }
-      
-      // ✅ IMPORTANT: DO NOT store or log raw card data
-      // Card data should only be validated, never saved to database
+    // 🔒 PCI: raw PAN / CVV / expiry kabhi accept nahi (optimizeplan.md §2.2).
+    // payment_method "card" ab sirf intent hai; charged provider token flow baad me.
+    if (
+      req.body?.card_number != null
+      || req.body?.card_cvv != null
+      || req.body?.card_expiry != null
+      || req.body?.card_holder_name != null
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: "CARD_DATA_REJECTED",
+        message: "Card details must not be sent to this server. Choose another payment method.",
+      });
     }
 
     // ✅ Validate bank transfer fields when payment method is bank
@@ -716,7 +618,7 @@ const getOrderById = async (req, res) => {
 // ==========================================
 // ✅ FIX: Search text ko safe regex banane ke liye — warna ".", "[", "(" jaise
 //    special characters query ko bigaad dete hain (ya crash/slow kar dete hain).
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 // ==========================================
 // ✅ SHARED ADMIN ORDER FILTER

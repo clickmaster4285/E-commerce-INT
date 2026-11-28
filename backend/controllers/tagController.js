@@ -71,7 +71,7 @@ const createTag = async (req, res) => {
     // Check duplicate by name OR slug
     const existing = await Tag.findOne({ 
       $or: [
-        { name: { $regex: new RegExp(`^${cleanName}$`, 'i') } }, 
+        { name: { $regex: `^${require("../utils/escapeRegex").escapeRegex(cleanName)}$`, $options: "i" } },
         { slug: slug }
       ], 
       is_deleted: { $ne: true } 
@@ -127,7 +127,7 @@ const updateTag = async (req, res) => {
       : null;
 
     const duplicateQuery = {
-      $or: [{ name: { $regex: new RegExp(`^${cleanName}$`, 'i') } }, { slug: slug }],
+      $or: [{ name: { $regex: `^${require("../utils/escapeRegex").escapeRegex(cleanName)}$`, $options: "i" } }, { slug: slug }],
       is_deleted: { $ne: true }
     };
     if (excludeId) {

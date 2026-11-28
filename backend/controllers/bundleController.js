@@ -244,8 +244,8 @@ const getBundles = async (req, res) => {
     const filter = {};
     if (String(search).trim()) {
       filter.$or = [
-        { name: { $regex: String(search).trim(), $options: "i" } },
-        { description: { $regex: String(search).trim(), $options: "i" } },
+        { name: { $regex: require("../utils/escapeRegex").escapeRegex(String(search).trim()), $options: "i" } },
+        { description: { $regex: require("../utils/escapeRegex").escapeRegex(String(search).trim()), $options: "i" } },
       ];
     }
     if (status === "active") filter.isActive = true;

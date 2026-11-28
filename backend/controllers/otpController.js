@@ -124,9 +124,21 @@ const verifyOtpCode = async ({ email, purpose, otp }) => {
 
   const isMatch = await bcrypt.compare(String(otp), record.code_hash);
   if (!isMatch) {
-    record.attempts += 1;
-    await record.save();
-    const left = Math.max(OTP_MAX_ATTEMPTS - record.attempts, 0);
+    // 🔒 Atomic claim: parallel wrong guesses pehle dono attempts padh kar
+    // limit se zyada try kar sakte the. Ab sirf attempts < max wala $inc hota hai.
+    const updated = await Otp.findOneAndUpdate(
+      { _id: record._id, consumed: false, attempts: { $lt: OTP_MAX_ATTEMPTS } },
+      { $inc: { attempts: 1 } },
+      { returnDocument: "after" },
+    );
+    if (!updated) {
+      await Otp.deleteOne({ _id: record._id }).catch(() => {});
+      const error = new Error("Too many incorrect attempts. Please request a new code.");
+      error.statusCode = 429;
+      throw error;
+    }
+    const left = Math.max(OTP_MAX_ATTEMPTS - updated.attempts, 0);
+    if (left <= 0) await Otp.deleteOne({ _id: record._id }).catch(() => {});
     const error = new Error(
       left > 0
         ? `Incorrect code. ${left} attempt${left === 1 ? "" : "s"} remaining.`
@@ -298,15 +310,19 @@ const verifyEmailVerificationOtp = async (req, res) => {
       }
       const isMatch = await bcrypt.compare(String(otp), pending.otpHash);
       if (!isMatch) {
-        pending.attempts += 1;
-        await pending.save();
-        const left = Math.max(OTP_MAX_ATTEMPTS - pending.attempts, 0);
-        if (left <= 0) {
-          await PendingRegistration.deleteOne({ _id: pending._id });
+        // 🔒 Atomic attempts (same as Otp) — concurrent wrong guesses cannot bypass the limit
+        const updated = await PendingRegistration.findOneAndUpdate(
+          { _id: pending._id, attempts: { $lt: OTP_MAX_ATTEMPTS } },
+          { $inc: { attempts: 1 } },
+          { returnDocument: "after" },
+        );
+        if (!updated || updated.attempts >= OTP_MAX_ATTEMPTS) {
+          await PendingRegistration.deleteOne({ _id: pending._id }).catch(() => {});
           return res
             .status(429)
             .json({ success: false, message: "Too many incorrect attempts. Please register again to get a new code." });
         }
+        const left = Math.max(OTP_MAX_ATTEMPTS - updated.attempts, 0);
         return res
           .status(400)
           .json({ success: false, message: `Incorrect code. ${left} attempt${left === 1 ? "" : "s"} remaining.` });
@@ -595,6 +611,16 @@ const sendForgotPasswordOtp = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Please provide a valid email address" });
 
+    // Customer accounts are per-store — refuse on the platform host so we never
+    // reset an arbitrary store's user by email alone (optimizeplan.md §2.3).
+    if (!req.store) {
+      return res.status(400).json({
+        success: false,
+        code: "STORE_REQUIRED",
+        message: "Password reset must be started on a store host.",
+      });
+    }
+
     const user = await User.findOne({ email });
     if (!user)
       return res
@@ -697,6 +723,13 @@ const resetPasswordWithOtp = async (req, res) => {
     }
 
     const requestStoreId = req.store?._id ? String(req.store._id) : null;
+    if (!requestStoreId) {
+      return res.status(400).json({
+        success: false,
+        code: "STORE_REQUIRED",
+        message: "Password reset must be completed on a store host.",
+      });
+    }
     if (
       payload.purpose !== "password_reset" ||
       normalizeEmail(payload.email) !== email ||
