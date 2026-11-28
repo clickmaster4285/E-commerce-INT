@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import LanguageSwitcher from "@/components/user/LanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import { SignupBonusBanner } from "@/components/user/LoyaltyCheckout";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -28,6 +30,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
     ? store.logo.img_url.startsWith("http")
       ? store.logo.img_url
       : `${API_ORIGIN}/${store.logo.img_url}`
+      
     : null;
   const letter = (store?.store_name || "C").charAt(0).toUpperCase();
 
@@ -46,6 +49,9 @@ export default function UserLoginPage() {
   const { t } = useTranslation();
   const { nameOf } = useLocalized();
   const [isLogin, setIsLogin] = useState(true);
+  const [referralCode] = useState(() => typeof window === "undefined" ? "" : String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24));
+  // Loyalty welcome bonus banner (register mode) — program off ho to kuch nahi dikhta
+  const { data: loyaltyProgram } = useQuery({ queryKey: ["loyaltyProgram"], queryFn: loyaltyApi.program, staleTime: 5 * 60 * 1000, retry: false });
 
   // Open directly in register mode when linked with ?mode=register
   const [approvedInfo, setApprovedInfo] = useState(false);
@@ -55,6 +61,7 @@ export default function UserLoginPage() {
         if (new URLSearchParams(window.location.search).get("approved") === "1") {
           setApprovedInfo(true);
         }
+        if (new URLSearchParams(window.location.search).get("mode") === "register") setIsLogin(false);
       } catch {
         /* ignore */
       }
@@ -171,24 +178,25 @@ export default function UserLoginPage() {
         window.location.href = "/";
         return;
       }
+      console.log("Login successful");
 
       // ✅ REGISTER → User NAHI banta, sirf pending + OTP jata hai, phir verify screen
-      const res = await authApi.register({ name, username, phone, email, password });
+      const res = await authApi.register({ name, username, phone, email, password, referralCode });
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
-      setLoading(false);
+      if (res?.delivered) toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
+      else toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen dikhao
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
         toast.info(t("auth.login.verifyEmail"));
-        setLoading(false);
         return;
       }
       parseBackendError(err);
       toast.error(getApiErrorMessage(err, t(isLogin ? "auth.login.loginFailed" : "auth.login.registrationFailed")));
+    } finally {
       setLoading(false);
     }
   };
@@ -196,6 +204,12 @@ export default function UserLoginPage() {
   // ==========================================
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
+  // Verification ke baad storefront par bhejein; referral setup account section me available hai.
+  const goAfterSignup = () => {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- hard redirect: full reload se auth state/cookies reset
+    window.location.href = "/";
+  };
+
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     toast.success(t("auth.login.emailVerified"));
@@ -205,7 +219,8 @@ export default function UserLoginPage() {
 
   const handleResendEmailOtp = async () => {
     const res = await authApi.sendEmailOtp(otpEmail);
-    toast.success(t("auth.login.verificationResent"));
+    if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
+    else toast.success(t("auth.login.verificationResent"));
   };
 
   // ==========================================
@@ -387,7 +402,7 @@ export default function UserLoginPage() {
             <span className="text-user-fg font-black text-lg tracking-wide">{storeName}</span>
           </button>
 
-          <div className="bg-user-card border border-user-line rounded-2xl p-6 sm:p-8 shadow-[var(--user-shadow-lg)]">
+          <div className="bg-user-card border border-user-line rounded-2xl p-6 sm:p-8 shadow-lg">
 
             {/* ═══ STEP: EMAIL VERIFICATION OTP ═══ */}
             {step === "verify-email" && (
@@ -556,6 +571,8 @@ export default function UserLoginPage() {
                 <p className="text-user-danger text-sm">{generalError}</p>
               </div>
             )}
+
+            {!isLogin && <SignupBonusBanner program={loyaltyProgram} className="mb-4" />}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>

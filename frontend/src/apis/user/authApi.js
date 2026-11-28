@@ -9,11 +9,15 @@ import { toUserMessage } from "@/lib/toUserMessage";
 export const authApi = {
   // 🔑 Login / Register
   login: (data) => userHttp.post("/users/login", data).then((res) => res.data),
-  register: (data) => userHttp.post("/users/register", data).then((res) => res.data),
+  // Registration ko artificial client timeout mat do — slow network / email
+  // par signup fail ho jata tha ("timeout of 15000ms exceeded"). Backend apne
+  // SMTP timeouts khud manage karta hai, is liye yahan default (no timeout) sahi hai.
+  register: (data) =>
+    userHttp.post("/users/register", data).then((res) => res.data),
   // Signup step 1 — email/username/phone already taken? → { available, errors: { email?, username?, phone? }, code? }
   checkRegistration: (data) => userHttp.post("/users/register/check", data).then((res) => res.data),
-  googleCustomerLogin: (credential) =>
-    userHttp.post("/users/google-customer-login", { credential }).then((res) => res.data),
+  googleCustomerLogin: (credential, referralCode = "") =>
+    userHttp.post("/users/google-customer-login", { credential, referralCode }).then((res) => res.data),
 
   // 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
   sendEmailOtp: (email) =>

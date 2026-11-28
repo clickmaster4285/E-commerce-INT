@@ -25,6 +25,17 @@ import {
   Menu,
   ChevronsLeft,
   ChevronsRight,
+  ChevronRight,
+  LayoutGrid,
+  Package,
+  Megaphone,
+  Gift,
+  Settings2,
+  ShoppingCart,
+  Users,
+  Wallet,
+  Store,
+  UsersRound,
 } from "lucide-react";
 import { getNavModules, getSidebarSections } from "@/lib/adminModules";
 
@@ -42,7 +53,6 @@ function StoreMark({
   logoUrl,
   name,
   letter,
-  color = "var(--accent)",
   sizeClass = "h-8 w-8",
   roundedClass = "rounded-lg",
 }) {
@@ -60,7 +70,7 @@ function StoreMark({
       className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden shadow-sm ${
         showLogo ? "bg-white ring-1 ring-black/10" : "text-white ring-1 ring-white/20"
       }`}
-      style={showLogo ? undefined : { background: `linear-gradient(135deg, ${color}, #4338ca)` }}
+      style={showLogo ? undefined : { background: "linear-gradient(135deg, var(--sidebar-accent), #4338ca)" }}
     >
       {showLogo ? (
         <FallbackImage
@@ -82,6 +92,18 @@ function StoreMark({
 // Modules catalog — shared with Super Admin Plans (`@/lib/adminModules`)
 const sidebarSections = getSidebarSections();
 const allMenuItems = getNavModules();
+const sectionIcons = {
+  overview: LayoutGrid,
+  catalog: Package,
+  sales: Megaphone,
+  rewards: Gift,
+  operations: Settings2,
+  purchasing: ShoppingCart,
+  pos: Users,
+  finance: Wallet,
+  store: Store,
+  team: UsersRound,
+};
 
 // ============================================================
 // SIDEBAR SOCKET
@@ -174,6 +196,17 @@ export default function Sidebar({ onNavigate, userData }) {
   const toggleCollapse = useCallback(() => {
     setCollapsed(!getCollapsedSnapshot());
   }, []);
+
+  const routeSectionId = sidebarSections.find((section) =>
+    allMenuItems.some((item) => section.items.includes(item.name) &&
+      (pathname === item.path || pathname.startsWith(`${item.path}/`)))
+  )?.id || null;
+  const [openSection, setOpenSection] = useState(routeSectionId);
+  const [lastRouteSectionId, setLastRouteSectionId] = useState(routeSectionId);
+  if (routeSectionId && routeSectionId !== lastRouteSectionId) {
+    setLastRouteSectionId(routeSectionId);
+    setOpenSection(routeSectionId);
+  }
 
   // Icon-only mode applies to desktop only — the mobile drawer always stays expanded
   const iconOnly = isCollapsed && !isMobileOpen;
@@ -503,7 +536,6 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   const displayName = storeName || "My Store";
-  const displayColor = "var(--accent)";
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || "S";
   const logoUrl = storeLogo?.img_url
     ? storeLogo.img_url.startsWith("http")
@@ -557,10 +589,10 @@ export default function Sidebar({ onNavigate, userData }) {
         <div
           className="
             fixed inset-0 z-40
-            bg-black/50
             backdrop-blur-sm
-            md:hidden
+            lg:hidden
           "
+          style={{ background: "var(--sidebar-overlay)" }}
           onClick={handleCloseMobile}
         />
       )}
@@ -582,6 +614,7 @@ export default function Sidebar({ onNavigate, userData }) {
           ${iconOnly ? "md:w-[64px]" : "md:w-[var(--sidebar-width)]"}
           ${isMobileOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full"}
         `}
+        style={{ background: "var(--sidebar-bg-gradient)" }}
       >
         {/* ==================================================
             HEADER
@@ -602,10 +635,12 @@ export default function Sidebar({ onNavigate, userData }) {
             aria-label={iconOnly ? displayName : undefined}
           >
             <StoreMark
+              key={logoUrl || displayName}
               logoUrl={logoUrl}
               name={displayName}
               letter={firstLetter}
-              color={displayColor}
+              sizeClass="h-9 w-9"
+              roundedClass="rounded-lg"
             />
             {!iconOnly && (
               <span className="flex min-w-0 flex-col leading-tight">
@@ -661,10 +696,10 @@ export default function Sidebar({ onNavigate, userData }) {
         ================================================== */}
         <nav
           aria-label={t("admin.sidebar.navigation")}
-          className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-2"}`}
+          className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-3"}`}
         >
           {sidebarSections.map((section) => {
-            const sectionTitle = section.sidebarTitle || section.title;
+            const sectionTitle = section.title;
             const sectionItems = visibleMenuItems.filter((item) => section.items.includes(item.name));
             if (sectionItems.length === 0) return null;
             return (

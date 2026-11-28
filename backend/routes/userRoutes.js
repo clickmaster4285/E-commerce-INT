@@ -50,12 +50,7 @@ router.post("/register/check", limiters.registerCheck, checkRegistration);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
-// ✅ ADMIN refresh alias — purana endpoint untouched (compat). Sirf
-// employee-type refresh token accept karta hai (user going admin panel
-// ke liye nahi). Shape/logic purani jaisi.
 router.post("/admin/refresh-token", refreshAdminAccessToken);
-// Multi-tenant: platform par login ke baad store subdomain ke admin panel me bhejna
-// Pending sellers need this right after signup to reach their (view-only) admin panel
 router.post("/admin/handoff", allowPendingSeller, authMiddleware.requireAdmin, createStoreHandoff);
 router.post("/admin/handoff/exchange", limiters.adminLogin, exchangeStoreHandoff);
 router.post("/logout", logoutUser);
@@ -63,26 +58,26 @@ router.post("/google-login", limiters.adminLogin, googleLogin);
 router.post("/google-customer-login", limiters.googleLogin, googleCustomerLogin);
 
 // ==========================================
-// 📧 EMAIL HEALTH (SMTP diagnose — bina DB ke bhi chalega)
+// EMAIL HEALTH
 // ==========================================
 router.get("/email-health", getEmailHealth);
 
 // ==========================================
-// 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
+// EMAIL VERIFICATION (OTP)
 // ==========================================
 // Limiters pehle define the lekin mount nahi the → email bombing / OTP guessing khula tha
 router.post("/send-email-otp", limiters.sendEmailOtp, sendEmailVerificationOtp);
 router.post("/verify-email-otp", limiters.verifyEmailOtp, verifyEmailVerificationOtp);
 
 // ==========================================
-// 🔐 FORGOT PASSWORD (OTP — 5 min expiry)
+// FORGOT PASSWORD (OTP)
 // ==========================================
 router.post("/forgot-password", limiters.forgotPassword, sendForgotPasswordOtp);
 router.post("/verify-reset-otp", limiters.verifyResetOtp, verifyForgotPasswordOtp);
 router.post("/reset-password", limiters.resetPassword, resetPasswordWithOtp);
 
 // ==========================================
-// 🔒 PROTECTED ROUTES
+// PROTECTED ROUTES
 // ==========================================
 router.get("/me", authMiddleware, getMe);
 router.get("/profile", authMiddleware, getProfile);
@@ -100,7 +95,7 @@ router.put(
 );
 router.put("/phone", authMiddleware.requireUser, updatePhone);
 
-// ✅ MULTIPLE CHECKOUT DRAFTS
+// MULTIPLE CHECKOUT DRAFTS
 router.post("/checkout-drafts", authMiddleware.requireUser, createCheckoutDraft);
 router.get("/checkout-drafts", authMiddleware.requireUser, getCheckoutDrafts);
 router.get("/checkout-drafts/:id", authMiddleware.requireUser, getCheckoutDraft);

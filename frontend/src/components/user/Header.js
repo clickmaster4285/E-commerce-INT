@@ -10,6 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCart } from "./CartContext";
 import { useWishlist } from "./WishlistContext";
 import { userHttp } from "@/apis/axiosInstance";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import { categoryApi } from "@/apis/user/categoryApi";
 import { brandApi } from "@/apis/user/brandApi";
 import { productApi } from "@/apis/user/productApi";
@@ -17,6 +18,7 @@ import { storeApi } from "@/apis/user/storeApi";
 import Cookies from "js-cookie";
 import LoginModal from "./LoginModal";
 import LanguageSwitcher from "./LanguageSwitcher";
+import PointsBadge from "./PointsBadge";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { clearSensitiveClientStorage } from "@/lib/clientStorage";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
@@ -49,6 +51,7 @@ import {
   Package,
   Settings,
   MessageCircle,
+  Gift,
 } from "lucide-react";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
@@ -272,6 +275,9 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState("light");
   const [isMobile, setIsMobile] = useState(false);
+  const [coinBoost, setCoinBoost] = useState(false);
+  const [coinDelta, setCoinDelta] = useState(null);
+  const coinTimersRef = useRef([]);
   const { count, setIsCartOpen } = useCart();
   const { count: wishlistCount } = useWishlist();
   const queryClient = useQueryClient();
@@ -329,6 +335,39 @@ export default function Header() {
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Loyalty balance for the header coin indicator (checkout redemption refreshes this key).
+  const { data: rewardsInfo, isLoading: coinsLoading } = useQuery({
+    queryKey: ["myRewards", "header"],
+    queryFn: () => loyaltyApi.me({ limit: 1 }),
+    enabled: Boolean(user),
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+  // Rewards program admin se off ho to header me badge/entry bilkul na dikhe.
+  const rewardsEnabled = Boolean(rewardsInfo?.program?.enabled);
+  const coinBalance = rewardsEnabled ? Number(rewardsInfo?.account?.balance) || 0 : null;
+
+  // Reward modal ke coins yahan pahunchte hain; badge khud count-up aur chip sambhalta hai.
+  useEffect(() => {
+    const onCoinsIncoming = (event) => {
+      const points = Math.max(0, Number(event.detail?.points) || 0);
+      if (!points) return;
+
+      coinTimersRef.current.forEach(clearTimeout);
+      coinTimersRef.current = [];
+      setCoinDelta(points);
+      setCoinBoost(true);
+      coinTimersRef.current.push(window.setTimeout(() => setCoinBoost(false), 1400));
+      coinTimersRef.current.push(window.setTimeout(() => setCoinDelta(null), 1900));
+    };
+
+    window.addEventListener("loyalty:coins-incoming", onCoinsIncoming);
+    return () => {
+      window.removeEventListener("loyalty:coins-incoming", onCoinsIncoming);
+      coinTimersRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const { data: store = null } = useQuery({
     queryKey: ["storeInfo"],
@@ -439,13 +478,17 @@ export default function Header() {
   };
 
   const storeName = store?.store_name || "";
+  const n = (v) => Number(v || 0).toLocaleString(locale);
+  const showCoins = Boolean(user) && rewardsEnabled && coinBalance !== null;
 
   const iconBtn =
     "relative flex h-9 w-9 items-center justify-center rounded-xl text-user-fg-secondary transition-colors hover:bg-user-hover hover:text-user-fg active:scale-[0.96] lg:h-10 lg:w-10";
 
   return (
     <>
-      <style>{`@keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }`}</style>
+      <style>{`
+        @keyframes badgePop { 0% { transform: scale(0.4); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+      `}</style>
 
       {open && (
         <div
@@ -456,7 +499,7 @@ export default function Header() {
 
       <header
         className={`storefront-header ${isSticky ? "sticky top-0" : "relative"} z-50 border-b border-user-line transition-shadow duration-300 ${
-          scrolled ? "shadow-[var(--user-shadow-md)]" : ""
+          scrolled ? "shadow-md" : ""
         }`}
       >
         <div         className="pointer-events-none absolute inset-0 bg-user-elevated/95 backdrop-blur-md" />
@@ -579,7 +622,7 @@ export default function Header() {
                         className="fixed inset-0 z-40"
                         onClick={() => setProfileOpen(false)}
                       />
-                      <div dir={dir} lang={locale} className="storefront-popover absolute end-0 top-11 z-50 w-60 rounded-2xl border border-user-line bg-user-card p-2 shadow-[var(--user-shadow-lg)]">
+                      <div dir={dir} lang={locale} className="storefront-popover absolute end-0 top-11 z-50 w-60 rounded-2xl border border-user-line bg-user-card p-2 shadow-lg">
                         <div className="px-3 py-2.5 border-b border-user-line mb-1">
                           <p className="truncate text-sm font-medium text-user-fg">
                             {user.name || user.username}
@@ -729,7 +772,7 @@ export default function Header() {
                 <Link
                   href="/account"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-user-accent/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
                     <User size={18} className="text-user-accent" />
@@ -742,7 +785,7 @@ export default function Header() {
                 <Link
                   href="/orders"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-user-accent/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
                     <Package size={18} className="text-user-accent" />
@@ -755,7 +798,7 @@ export default function Header() {
                 <Link
                   href="/wishlist"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-user-accent/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center relative">
                     <Heart size={18} className="text-user-accent" />
@@ -773,7 +816,7 @@ export default function Header() {
                 <Link
                   href="/chats"
                   onClick={() => setOpen(false)}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-user-accent/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
                     <MessageCircle size={18} className="text-user-accent" />
@@ -783,6 +826,31 @@ export default function Header() {
                   </span>
                 </Link>
 
+                {rewardsEnabled && (
+                  <Link
+                    href="/account?tab=rewards"
+                    onClick={() => {
+                      setOpen(false);
+                      window.dispatchEvent(
+                        new CustomEvent("account:tab", { detail: "rewards" }),
+                      );
+                    }}
+                    className="sidebar-item relative flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-user-accent/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
+                      <Gift size={18} className="text-user-accent" />
+                    </div>
+                    {coinBalance !== null && (
+                      <span className="absolute end-2 top-2 rounded-full bg-user-accent px-1.5 py-0.5 text-[0.625rem] font-medium leading-none text-user-accent-fg">
+                        {n(coinBalance)}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-user-fg">
+                      {t("header.rewards")}
+                    </span>
+                  </Link>
+                )}
+
                 <Link
                   href="/account?tab=settings"
                   onClick={() => {
@@ -791,7 +859,7 @@ export default function Header() {
                       new CustomEvent("account:tab", { detail: "settings" }),
                     );
                   }}
-                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  className="sidebar-item flex flex-col items-center gap-2 p-3 rounded-xl bg-user-card border border-user-line hover:border-user-accent hover:shadow-lg hover:shadow-user-accent/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
                 >
                   <div className="w-10 h-10 rounded-lg bg-user-accent/10 flex items-center justify-center">
                     <Settings size={18} className="text-user-accent" />

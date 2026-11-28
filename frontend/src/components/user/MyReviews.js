@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import AccountPageHeader from "@/components/user/AccountPageHeader";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";

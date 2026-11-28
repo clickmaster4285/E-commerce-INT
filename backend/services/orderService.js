@@ -16,6 +16,8 @@ const { nextSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../ut
 const { priceCheckout } = require("./pricing/checkout"); // server-side cart pricing
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
 const { upsertCustomerForUser } = require("../utils/linkUserCustomer");
+const loyalty = require("../utils/loyaltyService");
+const LoyaltyTransaction = require("../models/LoyaltyTransaction");
 
 const reply = (status, body) => ({ status, body });
 
@@ -45,6 +47,7 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
     shipping_method: reqShippingMethod,
     bank_sender_name,
     bank_transaction_ref,
+    loyalty_points,
   } = body;
   const checkoutDraftId = mongoose.isValidObjectId(rawCheckoutDraftId)
     ? rawCheckoutDraftId
@@ -367,7 +370,24 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
   }
 
   const tax = Math.round(taxTotal);
-  const total = subtotal + shipping + tax;
+
+  // ✅ Loyalty points — order banne se PEHLE kaat lo (atomic). orderId pehle
+  //    se bana lete hain taake order/tx fail ho to points wapas ho saken.
+  const orderId = new mongoose.Types.ObjectId();
+  let redemption = { points: 0, discount: 0 };
+  if (Number(loyalty_points) > 0) {
+    try {
+      redemption = await loyalty.redeemForCheckout(user._id, {
+        requested: loyalty_points,
+        subtotal,
+        orderId,
+      });
+    } catch (err) {
+      return reply(err.status || 400, { success: false, message: err.message });
+    }
+  }
+
+  const total = subtotal + shipping + tax - redemption.discount;
 
   // =====================================================
   // 🔒 ONE TRANSACTION (utils/tx.js): stock + deal usage + order number +
@@ -457,9 +477,10 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
         }
       }
 
-      // 3) Order number (atomic counter) + order
+      // 3) Order number (atomic counter) + order (fixed _id so redeem source_key matches)
       const seq = await nextSeq("order", { seed: orderSeed });
       const [created] = await Order.create([{
+        _id: orderId,
         shipping_method,
         order_number: formatNumber("ORD-", seq, 5),
         user_id: user._id,
@@ -481,6 +502,8 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
         subtotal,
         shipping,
         tax,
+        loyalty_points_redeemed: redemption.points,
+        loyalty_discount: redemption.discount,
         total,
         status: "pending",
         notes: notes || "",
@@ -505,6 +528,10 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
       return created;
     }));
   } catch (txError) {
+    // Order/tx nahi bana → kaate hue points wapas
+    if (redemption.points > 0) {
+      await loyalty.rollbackRedemption(user._id, orderId);
+    }
     if (txError instanceof TxAbort) return reply(txError.status, txError.body);
     // Do concurrent submits same Idempotency-Key ke sath → doosra unique index par
     // fail; pehle wala order hi lautao (double order nahi).
@@ -514,6 +541,15 @@ async function placeOrderCore({ body, user, store, idempotencyHeader }) {
     }
     throw txError;
   }
+
+  // Redeem txn par order number likh do + earn points pending
+  if (redemption.points > 0) {
+    await LoyaltyTransaction.updateOne(
+      { source_key: `redeem:${order._id}` },
+      { $set: { order_number: order.order_number, note: `Order ${order.order_number}` } },
+    ).catch(() => {});
+  }
+  await loyalty.addOrderEarn(order);
 
   // ✅ Commit ke BAAD hi events (rollback hua order kabhi broadcast na ho)
   if (store?._id && user) {

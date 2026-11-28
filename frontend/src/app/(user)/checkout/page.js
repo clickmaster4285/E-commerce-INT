@@ -38,6 +38,10 @@ import {
   matchShippingRule,
 } from "@/utils/dealCalculator";
 import { shippingApi } from "@/apis/user/shippingApi";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import { pointsForAmount, quoteRedemption } from "@/lib/loyalty";
+import { requestRewardClaim } from "@/lib/rewardClaim";
+import { RewardsSummaryBox, PointsSummaryRow } from "@/components/user/LoyaltyCheckout";
 import { useCart } from "@/components/user/CartContext";
 import { useDiscounts } from "@/components/user/DiscountContext";
 import { useLocalized } from "@/i18n/localize";
@@ -49,6 +53,12 @@ import {
   Truck, Loader2, ChevronDown, Zap, ShoppingBag, X, Pencil, Trash2, Tag,
   TrendingUp, Gift, BadgePercent, Sparkles,
 } from "lucide-react";
+
+// Component body ke bahar — react-hooks/purity Date.now / Math.random ko
+// render impure nahi samajhta jab ye module-scope helper ho.
+const newIdempotencyKey = () =>
+  globalThis.crypto?.randomUUID?.() ||
+  `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function PrimaryButton({
   children,
@@ -375,7 +385,7 @@ const CardPreview = ({ number, name, expiry, t }) => (
 function CheckoutContent() {
   const router = useRouter();
   const { text } = useLocalized();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const urlDraftId = searchParams.get("draftId");
@@ -452,6 +462,17 @@ function CheckoutContent() {
   useEffect(() => {
     if (!userLoading && !user) router.replace("/login?redirect=/checkout");
   }, [user, userLoading, router]);
+
+  // ✅ Loyalty — balance + program rules (points use karne ke liye)
+  const { data: rewards = null, refetch: refetchRewards } = useQuery({
+    queryKey: ["myRewards", "checkout"],
+    queryFn: () => loyaltyApi.me({ limit: 1 }),
+    enabled: Boolean(user),
+    retry: false,
+    staleTime: 30 * 1000,
+  });
+  const [usePoints, setUsePoints] = useState(false);
+  const [pointsWanted, setPointsWanted] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -821,7 +842,30 @@ function CheckoutContent() {
     : (shipQuote?.reason || "");
 
   const tax = Math.round(itemsWithDiscounts.reduce((s, i) => s + i.displayPrice * i.payableItems * (Number(i.tax || 0) / 100), 0));
-  const grandTotal = Math.round(subtotal + shipping + tax);
+  // ✅ Loyalty — server wala hi formula (lib/loyalty); aakhri hisaab server karta hai
+  const loyaltyProgram = rewards?.program;
+  const pointsBalance = rewards?.account?.balance || 0;
+  const maxPointsQuote = quoteRedemption(loyaltyProgram, { balance: pointsBalance, subtotal, requested: pointsBalance });
+  const pointsQuote = usePoints
+    ? quoteRedemption(loyaltyProgram, { balance: pointsBalance, subtotal, requested: pointsWanted || maxPointsQuote.points })
+    : { ok: false, points: 0, discount: 0 };
+  const pointsDiscount = pointsQuote.ok ? pointsQuote.discount : 0;
+  const pointsToEarn = pointsForAmount(loyaltyProgram, subtotal - pointsDiscount);
+  const grandTotal = Math.round(subtotal + shipping + tax - pointsDiscount);
+  const pointsCardProps = {
+    rewards,
+    usePoints,
+    points: pointsQuote.ok ? pointsQuote.points : pointsWanted,
+    quote: pointsQuote,
+    maxQuote: maxPointsQuote,
+    earnPoints: pointsToEarn,
+    onPoints: setPointsWanted,
+    onToggle: (on) => {
+      setUsePoints(on);
+      // Pehli dafa on karne par max points (sab se zyada bachat)
+      if (on && !pointsWanted) setPointsWanted(maxPointsQuote.points);
+    },
+  };
   const draftDiscount = itemsWithDiscounts.reduce((sum, item) => {
     const originalPrice = Number(item.originalPrice) || 0;
     const salePrice = Number(item.displayPrice) || 0;
@@ -940,14 +984,21 @@ function CheckoutContent() {
     }
     const dealIssue = getDealRequirementIssues(itemsWithDiscounts)[0];
     if (dealIssue) return toast.error(formatDealRequirementIssue(dealIssue, { t, localizedName: text(dealIssue.item?.name, dealIssue.item?.translations?.name) }));
+    // ✅ Order place karne se PEHLE wahi welcome-style claim popup (coins available ho to).
+    if (pointsToEarn > 0) {
+      const claimed = await requestRewardClaim(pointsToEarn);
+      if (!claimed) return; // user ne claim nahi kiya → order place nahi hoga
+    }
     placingRef.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setPlacing(true);
     if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Module-level helper — react-hooks/purity Date.now/Math.random ko
+      // component body me render impure samajhta hai.
+      idempotencyKeyRef.current = newIdempotencyKey();
     }
     try {
-      await orderApi.place({
+      const placed = await orderApi.place({
         idempotency_key: idempotencyKeyRef.current,
         items: itemsWithDiscounts,
         address_id: selectedAddressId,
@@ -955,11 +1006,13 @@ function CheckoutContent() {
         shipping_method: shippingMethod,
         shipping,
         checkout_draft_id: currentDraftId || null,
+        loyalty_points: pointsQuote.ok ? pointsQuote.points : 0,
         bank_sender_name: paymentMethod === "bank" ? bankForm.senderName.trim() : null,
         bank_transaction_ref: paymentMethod === "bank" ? bankForm.transactionRef.trim() : null,
       });
       idempotencyKeyRef.current = null;
       queryClient.invalidateQueries({ queryKey: ["myOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["myRewards"] });
       if (currentDraftId) {
         queryClient.setQueryData(["checkoutDrafts"], (drafts = []) =>
           drafts.filter((draft) => String(draft._id) !== String(currentDraftId)),
@@ -973,6 +1026,15 @@ function CheckoutContent() {
       removeItems(orderedKeys);
       setDraftItems([]);
       setCurrentDraftId(null);
+      // ✅ Loyalty — order confirm par animated reward popup (layout me mounted hai).
+      if (Number(placed?.loyalty_points_earned) > 0) {
+        window.dispatchEvent(new CustomEvent("loyalty:order-earned", {
+          detail: {
+            points: Number(placed.loyalty_points_earned),
+            orderId: String(placed._id || placed.order_number || newIdempotencyKey()),
+          },
+        }));
+      }
       router.push("/orders");
     } catch (e) {
       // 409 PRICE_CHANGED: server ne price khud nikali aur cart wali se alag thi
@@ -2056,6 +2118,7 @@ function CheckoutContent() {
               <p className="text-[0.6875rem] font-black uppercase tracking-wider text-user-fg-muted flex items-center gap-1.5">
                 <PackageCheck size={13} /> {t("checkout.summary.title")}
               </p>
+              <RewardsSummaryBox {...pointsCardProps} />
               <div className="space-y-1.5 text-[0.75rem]">
                 <div className="flex justify-between text-user-fg-muted">
                   <span>{t("checkout.summary.itemsTotal", { count: itemsWithDiscounts.length })}</span>

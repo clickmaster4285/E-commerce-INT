@@ -4,6 +4,9 @@ const {
 } = require("./mailer");
 const { buildOtpEmail } = require("../services/email/otpTemplate");
 
+// Fail quickly when the SMTP server accepts TCP but never completes its greeting.
+const SMTP_TIMEOUTS = Object.freeze({ connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 12000 });
+
 // ==========================================
 // ✉️ EMAIL UTILITY (facade) — SMTP transport ab utils/mailer.js me, OTP template
 // services/email/otpTemplate.js me. Public API (sendEmail / sendOtpEmail / ...) wahi hai.

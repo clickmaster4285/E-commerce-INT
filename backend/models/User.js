@@ -21,6 +21,8 @@ const userSchema = new mongoose.Schema(
     // Account status — super admin can block a seller without deleting data
     status: { type: String, default: "active", enum: ["active", "blocked"], index: true },
     role: { type: String, default: "user", enum: ["user"] },
+    referralCode: { type: String, trim: true, uppercase: true, default: null },
+    referredByCode: { type: String, trim: true, uppercase: true, default: "", maxlength: 24 },
 
     // ✅ Account page fields — ye pehle schema mein the hi nahi,
     // isliye avatar save aur preferences silently drop ho rahe the
@@ -71,6 +73,10 @@ userSchema.index({ storeId: 1, email: 1 }, { unique: true }); // unique per stor
 userSchema.index({ storeId: 1, phone: 1 });
 userSchema.index({ storeId: 1, google_id: 1 }, { sparse: true });
 userSchema.index({ storeId: 1, created_at: -1 });
+userSchema.index(
+  { storeId: 1, referralCode: 1 },
+  { unique: true, partialFilterExpression: { referralCode: { $type: "string" } } },
+);
 // Platform seller accounts (storeId null) — super admin list sort
 userSchema.index({ created_at: -1 });
 

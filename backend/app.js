@@ -283,6 +283,7 @@ const posRoutes = require("./routes/posRoutes");
 const financeRoutes = require("./routes/financeRoutes");
 const translationRoutes = require("./routes/translationRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const loyaltyRoutes = require("./routes/loyaltyRoutes");
 const themeRoutes = require("./routes/themeRoutes");
 const pageRoutes = require("./routes/pageRoutes");
 const subscriberRoutes = require("./routes/subscriberRoutes");
@@ -320,6 +321,7 @@ app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 app.use(`${API_PREFIX}/chats`, chatRoutes);
+app.use(`${API_PREFIX}/loyalty`, loyaltyRoutes);
 // ── Store editor (theme draft/publish) + custom pages ──
 app.use(`${API_PREFIX}/theme`, themeRoutes);
 app.use(`${API_PREFIX}/pages`, pageRoutes);

@@ -4,7 +4,7 @@
 // ADMIN HANDOFF — platform se store subdomain par sign-in
 // ----------------------------------------------------------
 // Platform (192.168.88.35.nip.io) par login/signup ke baad backend ek
-// 2-minute, ek-baar wala token deta hai aur yahan bhejta hai:
+// 10-minute, ek-baar wala token deta hai aur yahan bhejta hai:
 //   http://<store>.192.168.88.35.nip.io:3000/admin-handoff#token=...
 // 🔒 Login-CSRF: koi attacker apna token wala link bhej kar victim ko apne
 // account me sign-in na kara de — is liye load par auto-exchange NAHI hota;
@@ -48,7 +48,7 @@ export default function AdminHandoffPage() {
       <div className="w-full max-w-sm">
         {error ? (
           <>
-            <h1 className="text-[20px] font-extrabold text-white">Sign-in link expired</h1>
+            <h1 className="text-[20px] font-extrabold text-white">Could not open your store admin</h1>
             <p className="mt-3 text-[14px] text-slate-300">{error}</p>
             <a
               href="/admin/login"

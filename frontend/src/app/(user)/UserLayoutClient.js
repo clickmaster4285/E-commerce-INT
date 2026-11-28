@@ -16,14 +16,15 @@ import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext
 import { useUserSocketSync } from "../../hooks/user/useUserSocketSync";
 import { initThemeFromCookie } from "@/lib/theme";
 import { useTranslation } from "@/i18n/LanguageProvider";
-const SupportChatWidget = dynamic(() => import("@/components/chat/SupportChatWidget"), { ssr: false });
 import AnnouncementBar from "@/storefront/AnnouncementBar";
 import FloatingWhatsApp from "@/storefront/FloatingWhatsApp";
 import StorePopup from "@/storefront/StorePopup";
 import SharePreviewBar from "@/storefront/SharePreviewBar";
 import { useStoreTheme } from "@/storefront/ThemeProvider";
 import dynamic from "next/dynamic";
+import WelcomeRewardModal from "@/components/user/WelcomeRewardModal";
 
+const SupportChatWidget = dynamic(() => import("@/components/chat/SupportChatWidget"), { ssr: false });
 // Store editor Edit mode overlay — sirf editor iframe me load hota hai
 const VisualEditor = dynamic(() => import("@/storefront/VisualEditor"), { ssr: false });
 
@@ -206,6 +207,7 @@ export default function UserLayoutClient({ children, initialStore = null }) {
           <FloatingWhatsApp />
           <StorePopup />
           <MobileNav />
+          <WelcomeRewardModal />
         </div>
         </QuickBuyProvider>
       </CartProvider>

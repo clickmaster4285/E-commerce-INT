@@ -12,8 +12,8 @@ export const NAV = [
   { href: "/super-admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/super-admin/applications", label: "Signup Requests", icon: ClipboardList, badgeKey: "pending" },
   { href: "/super-admin/stores", label: "Stores", icon: Store },
-  { href: "/super-admin/plans", label: "Plans", icon: BadgeDollarSign },
   { href: "/super-admin/store-admins", label: "Store Admins", icon: ShieldCheck },
+  { href: "/super-admin/plans", label: "Plans", icon: BadgeDollarSign },
   { href: "/super-admin/team", label: "Employees", icon: UserCog },
 ];
 

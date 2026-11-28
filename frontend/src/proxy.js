@@ -23,7 +23,7 @@ const PLATFORM_ONLY = ['/landing', '/super-admin', '/store-setup', '/seller/appl
 const PLATFORM_ALLOWED = [...PLATFORM_ONLY, '/admin/login', '/store-not-found'];
 const matches = (pathname, list) => list.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-// ── Store exists? (backend /store/resolve, 60s cache) ──
+// ── Store lookup (backend /store/resolve, 60s cache) ──
 // Server-side resolve: NEXT_INTERNAL_API_URL (localhost http) — public HTTPS
 // NEXT_PUBLIC_SERVERURL nginx/TLS se Node me fail ho sakta hai.
 const API_BASE = (
@@ -133,7 +133,8 @@ export async function proxy(request) {
   if (isStore) {
     if (matches(pathname, PLATFORM_ONLY)) return notAvailable();
 
-    if (!(await storeExists(tenant.host))) {
+    const storeStatus = await storeExists(tenant.host);
+    if (storeStatus === false) {
       return pathname === '/store-not-found' ? pass() : rewrite('/store-not-found');
     }
 

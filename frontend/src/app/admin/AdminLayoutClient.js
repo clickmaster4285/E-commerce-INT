@@ -47,6 +47,7 @@ const ROUTE_PERMISSIONS = {
   '/admin/discounts': 'discounts',
   '/admin/deals': 'deals',
   '/admin/banners': 'banners',
+  '/admin/loyalty': 'loyalty',
   '/admin/manage-stock': 'manageStock',
   '/admin/vendors': 'vendors',
   '/admin/purchase-orders': 'purchaseOrders',
@@ -744,7 +745,8 @@ export default function AdminLayout({ children }) {
       {sidebarOpen && (
         <div
           onClick={closeSidebar}
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: "var(--sidebar-overlay)" }}
           aria-hidden="true"
         />
       )}
@@ -757,13 +759,13 @@ export default function AdminLayout({ children }) {
           h-screen
           z-50
           fixed
-          md:relative
+          lg:relative
           top-0
           ${dir === 'rtl' ? 'right-0 left-auto' : 'left-0 right-auto'}
           transition-transform
           duration-300
           ease-in-out
-          md:translate-x-0
+          lg:translate-x-0
           ${
             sidebarOpen
               ? 'translate-x-0'

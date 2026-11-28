@@ -215,6 +215,19 @@ const startServer = async () => {
       if (ROOT_DOMAIN) {
         console.log(`🏬 Platform: http://${ROOT_DOMAIN}  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}`);
       }
+
+      // SMTP is optional for serving pages and APIs. Verify it after the HTTP
+      // server is listening so a slow mail provider cannot delay startup.
+      try {
+        const { isSmtpConfigured, verifySmtpConnection } = require("./utils/sendEmail");
+        if (isSmtpConfigured()) {
+          verifySmtpConnection().catch((smtpError) => {
+            log.error("❌ SMTP check failed:", smtpError.message);
+          });
+        }
+      } catch (smtpError) {
+        log.error("❌ SMTP check failed:", smtpError.message);
+      }
     });
   } catch (error) {
     startupLog.error(`Server start failed: ${error.message}`);

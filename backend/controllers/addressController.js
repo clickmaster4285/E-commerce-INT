@@ -1,13 +1,11 @@
 const Address = require("../models/Address");
-const { isValidPhone, normalizePhone } = require("../utils/phoneValidator");
+const { normalizePhone } = require("../utils/phoneValidator");
 
 const phoneValidationMessage = (phone) => {
   if (typeof phone !== "string" || !phone.trim()) return "Phone number is required";
   const value = phone;
   if (!/^\d+$/.test(value)) return "Phone number must contain digits only";
-  if (value.length < 10) return "Phone number must be at least 10 digits";
-  if (value.length > 16) return "Phone number must be at most 16 digits";
-  return isValidPhone(value) ? "" : "Please enter a valid phone number";
+  return "";
 };
 
 // GET /api/addresses — meri addresses

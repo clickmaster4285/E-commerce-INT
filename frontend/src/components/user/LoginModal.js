@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import LazyGoogleLogin from "./LazyGoogleLogin";
 import {
   Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck, X, AlertCircle,
@@ -187,19 +188,20 @@ export default function LoginModal({ isOpen, onClose }) {
       }
 
       // ✅ REGISTER → OTP email jata hai, phir verify screen
-      const res = await authApi.register({ name, username, phone, email, password });
+      const referralCode = String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24);
+      const res = await authApi.register({ name, username, phone, email, password, referralCode });
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      setLoading(false);
+      if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
-        setLoading(false);
         return;
       }
       parseBackendError(err);
+    } finally {
       setLoading(false);
     }
   };
@@ -207,6 +209,7 @@ export default function LoginModal({ isOpen, onClose }) {
   // ==========================================
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
+  // Referral program on ho to naya customer setup page par jata hai.
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     queryClient.invalidateQueries({ queryKey: ["userProfile"] });
@@ -215,7 +218,8 @@ export default function LoginModal({ isOpen, onClose }) {
   };
 
   const handleResendEmailOtp = async () => {
-    await authApi.sendEmailOtp(otpEmail);
+    const res = await authApi.sendEmailOtp(otpEmail);
+    if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
   };
 
   // ==========================================
@@ -267,7 +271,8 @@ export default function LoginModal({ isOpen, onClose }) {
     setGeneralError("");
     setLoading(true);
     try {
-      await authApi.googleCustomerLogin(credential);
+      const referralCode = String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24);
+      await authApi.googleCustomerLogin(credential, referralCode);
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       resetForm();
       onClose();

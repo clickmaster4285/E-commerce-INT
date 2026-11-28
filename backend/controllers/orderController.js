@@ -8,6 +8,7 @@ const log = require("../utils/logger");
 const { statusCounts, sumCounts } = require("../utils/statusCounts");
 const { keysetFilter, encodeCursor } = require("../utils/keysetPaginate");
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
+const loyalty = require("../utils/loyaltyService");
 
 // placeOrder ka core + socket emit helpers services/orderService.js me hain (§4.2)
 const { placeOrderCore, emitOrderEvent, emitStockEvent } = require("../services/orderService");
@@ -318,6 +319,9 @@ const mapFrontOrder = (order, locale) => ({
   subtotal: order.subtotal,
   shipping: order.shipping,
   tax: order.tax,
+  loyalty_points_redeemed: order.loyalty_points_redeemed || 0,
+  loyalty_discount: order.loyalty_discount || 0,
+  loyalty_points_earned: order.loyalty_points_earned || 0,
   total: order.total,
   status: order.status,
   notes: order.notes ?? "",
@@ -603,6 +607,9 @@ const updateOrderStatus = async (req, res) => {
 
     await order.save();
 
+    // ✅ Loyalty: delivered → points available, cancelled → reverse + refund
+    await loyalty.onOrderStatusChange(order, previousStatus, status);
+
     if (restoreClaimed) {
       const restoredVariants = [];
       for (const item of order.items || []) {
@@ -728,10 +735,13 @@ const editOrder = async (req, res) => {
         if (delta !== 0) stockDeltas.push({ variant_id: key, delta, name: names.get(key) || "item" });
       }
 
+      // Points discount subtotal se zyada kabhi nahi (qty kam hone par)
+      const pointsDiscount = Math.min(Number(order.loyalty_discount || 0), subtotal);
       $set.items = nextItems;
       $set.subtotal = subtotal;
       $set.tax = tax;
-      $set.total = subtotal + order.shipping + tax;
+      $set.loyalty_discount = pointsDiscount;
+      $set.total = subtotal + order.shipping + tax - pointsDiscount;
       $set.total_deal_savings = nextItems.reduce((sum, item) => sum + (Number(item.deal_savings) || 0), 0);
     }
 
@@ -811,6 +821,7 @@ const editOrder = async (req, res) => {
     if (applied.length) {
       emitStockEvent({ variants: applied.map((row) => ({ variant_id: row.variant_id, change: row.change })), source: "order_edited" });
     }
+    await loyalty.syncOrderEarn(saved);
     emitOrderEvent("order:updated", { success: true, data: saved });
     res.status(200).json({ success: true, message: "Order updated successfully", data: saved });
   } catch (error) {
@@ -863,6 +874,9 @@ const deleteOrder = async (req, res) => {
     if (restoredVariants.length > 0) {
       emitStockEvent({ variants: restoredVariants, source: "order_deleted" });
     }
+
+    // ✅ Loyalty: pending points hatao, kharch kiye points wapas
+    await loyalty.onOrderDeleted(deletedOrder);
 
     emitOrderEvent("order:deleted", { success: true, data: { id: req.params.id } });
     emitOrderEvent("order:updated", { success: true, data: { id: req.params.id, deleted: true } });

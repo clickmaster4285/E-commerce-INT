@@ -15,6 +15,9 @@ import {
 
 import { productApi } from "@/apis/user/productApi";
 import { storeApi } from "@/apis/user/storeApi";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import { pointsForAmount } from "@/lib/loyalty";
+import { EarnHint } from "@/components/user/LoyaltyCheckout";
 import { userHttp } from "@/apis/axiosInstance";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating, { ReviewMediaGallery, StoreResponse } from "@/components/user/ProductReviews";
@@ -695,6 +698,8 @@ function ProductDetailContent({ params }) {
   });
 
   const { data: store = null } = useQuery({ queryKey: ["storeInfo"], queryFn: storeApi.getPublic, staleTime: 5 * 60 * 1000 });
+  // Loyalty — "Earn X points" price ke neeche
+  const { data: loyaltyProgram } = useQuery({ queryKey: ["loyaltyProgram"], queryFn: loyaltyApi.program, staleTime: 5 * 60 * 1000, retry: false });
   const storeName = store?.store_name || "";
 
   const variants = product?.variants?.length ? product.variants : [{ _id: "default", images: [] }];
@@ -1154,6 +1159,7 @@ function ProductDetailContent({ params }) {
                     </p>
                   )}
                 </div>
+                <EarnHint points={pointsForAmount(loyaltyProgram, activePrice * (quantity || 1))} className="mt-2" />
 
                 {/* Purchase options — 1) Regular (original + admin discount)  2) Deals dropdown */}
                 {hasDeal && (
