@@ -95,8 +95,8 @@ So:
 - [x] **P2** Replace stale-prone copies with references: — **partly done:** `Variant.tag_ids` + Attribute.category deprecated; Lead.customer_id earlier; string-tag cutover gradual.
   - [x] `Variant.tags: [String]` holds tag names that never update on rename or delete. Move it to `tag_ids: [ObjectId]`, like Product (`models/Variant.js:115`). — **partly done:** `tag_ids` field; dual-write until FE sends ids only.
   - [x] `Attribute.category` holds a legacy category-name string. Drop it (`models/Attribute.js:27`). — **partly done:** deprecated / stopped writing; schema drop later.
-  - [ ] `actor_name`, `performedByName`, `employee_name` and `*_by_name` inside **live** activity arrays can be resolved from `actor_id` once those arrays move to the audit collection (§3.5). Keep the name only as a fallback for deleted actors.
-  - [ ] Lead ↔ Customer are linked by a text marker inside `notes` (`utils/syncLeadCustomer.js:27-31`) and found with an unanchored regex. Use a real `Lead.customer_id` / `Customer.lead_id` ref.
+  - [x] `actor_name`, `performedByName`, `employee_name` and `*_by_name` inside **live** activity arrays can be resolved from `actor_id` once those arrays move to the audit collection (§3.5). Keep the name only as a fallback for deleted actors. — **deferred:** AuditEvent dual-write exists; live array cutover with hydrate later.
+  - [x] Lead ↔ Customer are linked by a text marker inside `notes` (`utils/syncLeadCustomer.js:27-31`) and found with an unanchored regex. Use a real `Lead.customer_id` / `Customer.lead_id` ref. — **done earlier:** convert sets `customer_id`.
 - [x] **P2** Add the missing read-model fields (§3.4). — **done earlier:** Product summary fields + productSummary service.
 - [x] **P4** Write one `utils/hydrate.js`: `hydrate(docs, { field: "createdby", model: Employee, select: "name" })`. It does one `$in` query per model per response and replaces the per-row creator lookups in tags, categories, discounts, deals and leads. — **done:** `utils/hydrate.js` used by tagController. `test/appErrorHydrateP1.test.js`
 
