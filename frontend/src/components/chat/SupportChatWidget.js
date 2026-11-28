@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isStaffRole } from "@/lib/roles";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Expand, Loader2, MessageCircle, X } from "lucide-react";
@@ -159,7 +160,7 @@ export default function SupportChatWidget() {
   });
   const user = userQuery.data || null;
   const userRole = String(user?.role || "").toLowerCase();
-  const adminMode = ["admin", "manager", "staff"].includes(userRole);
+  const adminMode = isStaffRole(userRole);
   const customerMode = Boolean(user && !adminMode);
   const adminSocket = adminMode ? getAdminSocket() : null;
   const ordersQuery = useQuery({ queryKey: ["myOrders"], queryFn: orderApi.myOrders, enabled: customerMode, staleTime: 60_000, retry: false });
@@ -265,7 +266,7 @@ export default function SupportChatWidget() {
       const orderId = event.detail?.orderId;
       if (orderId) {
         pendingOrderRef.current = String(orderId);
-        if (userRef.current && !["admin", "manager", "staff"].includes(String(userRef.current.role || "").toLowerCase())) {
+        if (userRef.current && !isStaffRole(userRef.current.role)) {
           openingOrderChatRef.current = true;
           openCustomerChat(String(orderId)).finally(() => { pendingOrderRef.current = ""; openingOrderChatRef.current = false; });
         }

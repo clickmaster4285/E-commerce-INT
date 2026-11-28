@@ -1,16 +1,16 @@
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 const path = require("path");
 const fs = require("fs");
 const sharp = require("sharp");
 
-// Aapke existing server.js ke UPLOAD_DIR ke andar 'banners' folder banayega
-const uploadDir = path.join(__dirname, "../uploads/banners");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const { uploadDirFor } = require("../utils/uploadPaths");
 
+// Store ka apna folder: uploads/stores/<storeId>/banners (utils/uploadPaths.js)
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
+  destination: (req, file, cb) => {
+    const dir = uploadDirFor(req, "banners");
+    fs.mkdir(dir, { recursive: true }, (err) => cb(err, dir));
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, `banner-${uniqueSuffix}${path.extname(file.originalname)}`);
@@ -67,7 +67,7 @@ const processBannerImage = async (file) => {
   if (!maxWidth) return;
 
   const processedName = `${path.basename(file.filename, path.extname(file.filename))}.webp`;
-  const processedPath = path.join(uploadDir, processedName);
+  const processedPath = path.join(path.dirname(file.path), processedName);
 
   // Buffer ke through process karo taaki same-name (pehle se .webp) par overwrite safe rahe
   const buffer = await sharp(file.path, { limitInputPixels: MAX_INPUT_PIXELS })

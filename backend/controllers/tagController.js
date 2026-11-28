@@ -148,7 +148,7 @@ const updateTag = async (req, res) => {
         updatedby: req.user?._id || null,
         updatedAt: new Date()
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!updatedTag) {
@@ -181,7 +181,7 @@ const deleteTag = async (req, res) => {
         deleted_at: new Date(), 
         deletedby: req.user?._id || null 
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!deletedTag) {

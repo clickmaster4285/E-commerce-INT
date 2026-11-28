@@ -1,14 +1,5 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import NotFoundPage from "@/components/common/NotFoundPage";
 
 export default function StoreNotFound() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/");
-  }, [router]);
-
-  return null;
+  return <NotFoundPage />;
 }

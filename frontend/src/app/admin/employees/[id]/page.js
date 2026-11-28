@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole, roleLabel } from "@/lib/roles";
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
@@ -62,6 +63,7 @@ const ALLOWED_PERMISSIONS = {
   products: { label: "Products", default: true },
   featuredProducts: { label: "Featured Products", default: true },
   reviews: { label: "Reviews", default: true },
+  loyalty: { label: "Loyalty", default: false },
   brands: { label: "Brands", default: true },
   categories: { label: "Categories", default: true },
   discounts: { label: "Discounts", default: true },
@@ -342,13 +344,14 @@ function EmployeeOverview({
     return t("admin.employees.detail.daysAgo", { days: Math.floor(minutes / 1440) });
   };
 
+  const isAdminEmployee = isAdminRole(role);
+
   const infoItems = [
     [t("admin.employees.form.fullName"), name, User],
     [t("admin.employees.form.username"), email.split("@")[0], IdCard],
     [t("admin.profile.email"), email, Mail],
     [t("admin.profile.phone"), phone || "—", Phone],
-    [t("admin.employees.form.departmentPlaceholder"), department, Layers],
-    [t("admin.employees.detail.employeeCode"), empId, Tag],
+    ...(isAdminEmployee ? [] : [[t("admin.employees.form.departmentPlaceholder"), department, Layers], [t("admin.employees.detail.employeeCode"), empId, Tag]]),
     [t("admin.employees.detail.joinedAt"), joinDate, Clock],
   ];
 
@@ -471,12 +474,12 @@ function EmployeeOverview({
                   <StatusBadge status={status} />
                   {role && role !== "staff" && (
                     <span className="badge badge-neutral capitalize">
-                      {role === "admin" ? (
+                      {isAdminRole(role) ? (
                         <ShieldCheck className="h-3 w-3" />
                       ) : (
                         <Briefcase className="h-3 w-3" />
                       )}
-                      {role}
+                      {roleLabel(role)}
                     </span>
                   )}
                 </div>
@@ -503,7 +506,7 @@ function EmployeeOverview({
                     </span>
                   )}
 
-                  {department && department !== "Not assigned" && (
+                  {!isAdminEmployee && department && department !== "Not assigned" && (
                     <span
                       className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium"
                       style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
@@ -546,8 +549,7 @@ function EmployeeOverview({
               }}
             >
               {[
-                [t("admin.employees.detail.employeeCode"), empId, IdCard],
-                [t("admin.employees.form.department"), employeeDepartmentLabel(department, t), Layers],
+                ...(isAdminEmployee ? [] : [[t("admin.employees.detail.employeeCode"), empId, IdCard], [t("admin.employees.form.department"), employeeDepartmentLabel(department, t), Layers]]),
                 [t("admin.employees.detail.joinedAt"), joinDate, Calendar],
                 [t("admin.employees.detail.accessLevel"), `${enabledCount}/${totalCount}`, ShieldCheck],
               ].map(([label, value, Icon]) => (
@@ -584,6 +586,7 @@ function EmployeeOverview({
       </section>
 
       {/* ============ PERFORMANCE STATS ============ */}
+      {!isAdminEmployee && (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, tone, hint }) => {
           const toneStyle = STAT_TONES[tone];
@@ -626,6 +629,7 @@ function EmployeeOverview({
           );
         })}
       </div>
+      )}
 
       {/* ============ MAIN CONTENT GRID ============ */}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
@@ -1079,6 +1083,7 @@ export default function EmployeeDetailPage() {
     products: true,
     featuredProducts: true,
     reviews: true,
+    loyalty: false,
     brands: true,
     categories: true,
     discounts: true,
@@ -1120,8 +1125,7 @@ export default function EmployeeDetailPage() {
 
   // ✅ Jis ko 'employees' permission hai wahi dusre employee ko edit / permission de sakta hai
   // (admin bypass). Khud ki permission change karna waise bhi blocked hai (neeche + backend).
-  const isCurrentAdmin =
-    String(currentUserProfile?.role || "").toLowerCase() === "admin";
+  const isCurrentAdmin = isAdminRole(currentUserProfile?.role);
   const canManageEmployees =
     isCurrentAdmin || currentUserProfile?.permissions?.employees !== false;
   const denyEmployeesAccess = () =>

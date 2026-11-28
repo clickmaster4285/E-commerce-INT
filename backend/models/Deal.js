@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 const dealSchema = new mongoose.Schema(
   {
@@ -305,5 +306,9 @@ dealSchema.index({ applyTo: 1 });
 dealSchema.index({ productIds: 1 });
 dealSchema.index({ categoryIds: 1 });
 dealSchema.index({ brandIds: 1 });
+
+
+// ── Multi-tenant ──
+dealSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Deal", dealSchema);

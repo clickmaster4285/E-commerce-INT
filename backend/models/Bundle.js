@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const tenantScope = require("../utils/tenantScopePlugin");
 
 // ==========================================
 // BUNDLE PRODUCT (product + quantity)
@@ -87,5 +88,9 @@ const bundleSchema = new mongoose.Schema(
 // ==========================================
 bundleSchema.index({ isActive: 1, createdAt: -1 });
 bundleSchema.index({ "products.product": 1 });
+
+
+// ── Multi-tenant ──
+bundleSchema.plugin(tenantScope); // har store ka data alag (storeId)
 
 module.exports = mongoose.model("Bundle", bundleSchema);

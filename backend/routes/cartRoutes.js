@@ -1,6 +1,7 @@
 const express = require("express");
 const { getCart, saveCart } = require("../controllers/cartController");
-const authMiddleware = require("../middleware/authMiddleware");
+// Sirf customer session (u_at)
+const authMiddleware = require("../middleware/authMiddleware").requireUser;
 
 const router = express.Router();
 

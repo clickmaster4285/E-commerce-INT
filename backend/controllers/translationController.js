@@ -1,4 +1,5 @@
 const Brand = require("../models/brand");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 const Discount = require("../models/Discount");
@@ -32,7 +33,7 @@ async function translatePage(req, res) {
     return res.status(400).json({ success: false, message: "Unsupported translation language" });
   }
   const permission = PERMISSIONS[model];
-  if (req.user?.role?.toLowerCase() !== "admin" && req.user?.permissions?.[permission] === false) {
+  if (!isAdminRole(req.user?.role) && req.user?.permissions?.[permission] === false) {
     return res.status(403).json({ success: false, message: `Access denied: ${permission}` });
   }
 

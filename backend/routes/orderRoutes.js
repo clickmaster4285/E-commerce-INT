@@ -19,20 +19,20 @@ const {
 const router = express.Router();
 
 // User Routes
-router.post("/", authMiddleware, limiters.orderCreate, placeOrder);
-router.get("/my", authMiddleware, getMyOrders);
-router.get("/:id", authMiddleware, getOrderById);
+router.post("/", authMiddleware.requireUser, limiters.orderCreate, placeOrder);
+router.get("/my", authMiddleware.requireUser, getMyOrders);
+router.get("/:id", authMiddleware.requireUser, getOrderById);
 // ✅ User ke apne orders ke liye (edit + delete)
-router.put("/:id/edit", authMiddleware, editOrder);
-router.delete("/:id", authMiddleware, deleteOrder);
+router.put("/:id/edit", authMiddleware.requireUser, editOrder);
+router.delete("/:id", authMiddleware.requireUser, deleteOrder);
 
 // ✅ Admin Routes (Requires 'order' permission)
-router.get("/admin/all", authMiddleware, checkPermission("order"), getAllOrders);
+router.get("/admin/all", authMiddleware.requireAdmin, checkPermission("order"), getAllOrders);
 // ⚠️ Ye /admin/:id se PEHLE hona zaroori hai, warna "product-summary" id samajh aayega
-router.get("/admin/product-summary", authMiddleware, checkPermission("order"), getProductSummary);
-router.get("/admin/:id", authMiddleware, checkPermission("order"), getOrderByIdAdmin); // ✅ NEW
+router.get("/admin/product-summary", authMiddleware.requireAdmin, checkPermission("order"), getProductSummary);
+router.get("/admin/:id", authMiddleware.requireAdmin, checkPermission("order"), getOrderByIdAdmin); // ✅ NEW
 
-router.patch("/admin/:id/status", authMiddleware, checkPermission("order"), updateOrderStatus);
-router.patch("/admin/:id/payment", authMiddleware, checkPermission("order"), updatePaymentStatus);
+router.patch("/admin/:id/status", authMiddleware.requireAdmin, checkPermission("order"), updateOrderStatus);
+router.patch("/admin/:id/payment", authMiddleware.requireAdmin, checkPermission("order"), updatePaymentStatus);
 
 module.exports = router;

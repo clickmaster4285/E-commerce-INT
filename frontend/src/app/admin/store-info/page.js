@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import { isAdminRole } from "@/lib/roles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDispatch } from "react-redux";
@@ -504,7 +505,7 @@ export default function StoreInfoPage() {
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
-  const isCurrentAdmin = String(currentUserProfile?.role || "").toLowerCase() === "admin";
+  const isCurrentAdmin = isAdminRole(currentUserProfile?.role);
   const canEditStore = isCurrentAdmin || !!currentUserProfile?.permissions?.store;
   const denyStoreAccess = () =>
     toast.error(t("admin.storeInfo.toast.accessDenied"), {

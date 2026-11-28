@@ -302,7 +302,7 @@ exports.createInvoice = async (req, res) => {
       const variant = await Variant.findOneAndUpdate(
         { _id: variantId, product_id: entry.product_id, quantity: { $gte: entry.quantity }, status: "active" },
         { $inc: { quantity: -entry.quantity } },
-        { new: true, select: "_id quantity product_id" },
+        { returnDocument: "after", select: "_id quantity product_id" },
       );
       if (!variant) {
         const current = await Variant.findOne({ _id: variantId, product_id: entry.product_id }).select("quantity").lean();
@@ -378,7 +378,7 @@ exports.updateInvoice = async (req, res) => {
         updatedVariant = await Variant.findOneAndUpdate(
           { _id: adjustment.variant_id, product_id, quantity: { $gte: adjustment.quantity }, status: "active" },
           { $inc: { quantity: -adjustment.quantity } },
-          { new: true, select: "_id quantity product_id" },
+          { returnDocument: "after", select: "_id quantity product_id" },
         );
         if (!updatedVariant) {
           const existing = await Variant.findOne({ _id: adjustment.variant_id, product_id }).select("quantity").lean();
@@ -390,7 +390,7 @@ exports.updateInvoice = async (req, res) => {
         updatedVariant = await Variant.findOneAndUpdate(
           { _id: adjustment.variant_id, product_id },
           { $inc: { quantity: -adjustment.quantity } },
-          { new: true, select: "_id quantity product_id" },
+          { returnDocument: "after", select: "_id quantity product_id" },
         );
         if (!updatedVariant) throw new Error("An invoice variant was not found");
         stockChanges.push({ variant_id: adjustment.variant_id, stockChange: -adjustment.quantity });
@@ -417,7 +417,7 @@ exports.updateInvoice = async (req, res) => {
     const updatedInvoice = await Invoice.findOneAndUpdate(
       { _id: current._id, is_deleted: false, sent_at: null, __v: current.__v ?? 0 },
       update,
-      { new: true, runValidators: true },
+      { returnDocument: "after", runValidators: true },
     );
     if (!updatedInvoice) {
       const rollbackFailed = await rollbackStock();
@@ -593,7 +593,7 @@ exports.recordReturn = async (req, res) => {
       const variant = await Variant.findOneAndUpdate(
         { _id: restore.variant_id, product_id: restore.product_id },
         { $inc: { quantity: restore.quantity } },
-        { new: true, select: "_id quantity product_id title sku" },
+        { returnDocument: "after", select: "_id quantity product_id title sku" },
       );
       if (!variant) throw new Error(`Could not restore stock for ${restore.name}`);
       stockChanges.push({ variant_id: variant._id, quantity: restore.quantity });
@@ -639,7 +639,7 @@ exports.recordReturn = async (req, res) => {
     const updatedInvoice = await Invoice.findOneAndUpdate(
       { _id: invoice._id, is_deleted: false, amount_paid: priorPaid, total: priorTotal, __v: invoice.__v },
       update,
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
     if (!updatedInvoice) {
       const rollbackFailed = await rollbackRestock();

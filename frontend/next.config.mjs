@@ -1,6 +1,10 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Dev host — e.g. "192.168.88.53.nip.io" → IP "192.168.88.53"
+const DEV_ROOT = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || "").trim().replace(/:\d+$/, "");
+const DEV_IP = DEV_ROOT.replace(/\.nip\.io$/, "");
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ==========================================
@@ -9,17 +13,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ⚠️ NO locale ROUTING is configured on purpose.
 //    The app keeps its existing URLs and the language is carried in a plain
 //    `lang` cookie (see src/i18n/config.js) that covers both the admin panel
-//    and the storefront. Translations live in src/i18n/translations.js and are
-//    consumed client-side through src/i18n/LanguageProvider.js — no next-intl
+//    and the storefront. Translations live in
+//    src/i18n/locales/*.json (one file per language) and are consumed client-side through src/i18n/LanguageProvider.js — no next-intl
 //    plugin, no route rewriting.
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /**
+   * Build speed: the project is 100% JavaScript (no .ts/.tsx files), but
+   * `allowJs` in tsconfig made `next build` run a full TypeScript pass over
+   * every .js file (~35s) that could not report real errors anyway
+   * (`checkJs` is off). Skipping it changes nothing at runtime.
+   * Use `npm run lint` to catch mistakes.
+   */
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
+  // IP .env (NEXT_PUBLIC_ROOT_DOMAIN) se — IP badle to sirf .env update karo
   allowedDevOrigins: [
-    '192.168.88.62',
+    DEV_IP,
     'localhost',
     '127.0.0.1',
-  ],
+    // Multi-tenant dev: nip.io root + har store subdomain + hosts-file custom domains (*.test)
+    DEV_ROOT,
+    `*.${DEV_ROOT}`,
+    '*.test',
+  ].filter(Boolean),
 
   turbopack: {
     root: __dirname,
@@ -44,6 +64,22 @@ const nextConfig = {
         source: '/category/:id',
         destination: '/filtering-product?category=:id',
         permanent: true,
+      },
+      {
+        source: '/super-admin/settings',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      // Activity log feature hata diya — purane links dashboard par
+      {
+        source: '/super-admin/activity-logs',
+        destination: '/super-admin/dashboard',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/activity',
+        destination: '/super-admin/dashboard',
+        permanent: false,
       },
     ];
   },

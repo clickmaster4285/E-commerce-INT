@@ -810,7 +810,7 @@ exports.deleteDiscount = async (req, res) => {
     const deletedDiscount = await Discount.findOneAndUpdate(
       { _id: req.params.id, is_deleted: false },
       { is_deleted: true },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!deletedDiscount) {

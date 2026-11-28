@@ -1,15 +1,15 @@
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 const path = require("path");
 const fs = require("fs");
 
-// server.js ke /uploads static route ke andar 'deals' folder banega
-const uploadDir = path.join(__dirname, "../uploads/deals");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const { uploadDirFor } = require("../utils/uploadPaths");
 
+// Store ka apna folder: uploads/stores/<storeId>/deals (utils/uploadPaths.js)
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
+  destination: (req, file, cb) => {
+    const dir = uploadDirFor(req, "deals");
+    fs.mkdir(dir, { recursive: true }, (err) => cb(err, dir));
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, `deal-${uniqueSuffix}${path.extname(file.originalname)}`);

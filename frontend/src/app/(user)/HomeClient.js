@@ -184,10 +184,11 @@ function HomeContent({ initialBanners = null }) {
     stockFacet,
     discountFacet,
     isLoading,
+    facetsLoading,
   } = useHomeCatalog();
 
   // Category tiles (rails — count + fromPrice + image, server)
-  const { data: categoryTiles = [] } = useQuery({
+  const { data: categoryTiles = [], isPending: categoryTilesPending } = useQuery({
     queryKey: ["categoryTiles", 100],
     queryFn: () => productApi.getCategoryTiles({ limit: 100 }),
     staleTime: 5 * 60 * 1000,
@@ -213,6 +214,19 @@ function HomeContent({ initialBanners = null }) {
     () => (facets?.discounts || []).some((b) => (b.count || 0) > 0),
     [facets],
   );
+
+  // Store khali hai (product/category/brand/deal/category-tile kuch nahi) →
+  // All Products section sab se upar aur baaki empty sections chhupa do.
+  const isEmptyStorefront =
+    !isLoading &&
+    !facetsLoading &&
+    !dealsLoading &&
+    !categoryTilesPending &&
+    totalProducts === 0 &&
+    categories.length === 0 &&
+    brands.length === 0 &&
+    deals.length === 0 &&
+    categoryTiles.length === 0;
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const router = useRouter();
@@ -319,40 +333,47 @@ function HomeContent({ initialBanners = null }) {
               </span>
             </div>
 
-            {/* HERO BANNER */}
-            <div className="overflow-hidden rounded-2xl border border-[var(--user-border)]">
-              <BannerSlider initialBanners={initialBanners} />
-            </div>
-
-            {/* CATEGORY TILES */}
-            <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full">
-              <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} />
-            </ViewportSection>
-
-            {/* TODAY'S DEALS */}
-            <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full">
-              <DealsSection embedded />
-            </ViewportSection>
-
-            {/* FEATURED PRODUCTS — server tabs */}
-            <ViewportSection minHeight={640}>
+            {isEmptyStorefront ? (
+              /* Khal store — All Products sab se upar, baaki sections chhupe */
               <FeaturedProducts hasOffers={hasOffers} />
-            </ViewportSection>
+            ) : (
+              <>
+                {/* HERO BANNER */}
+                <div className="overflow-hidden rounded-2xl border border-[var(--user-border)]">
+                  <BannerSlider initialBanners={initialBanners} />
+                </div>
 
-            {/* POPULAR CATEGORIES */}
-            <ViewportSection minHeight={260}>
-              <PopularCategories tiles={categoryTiles} isLoading={isLoading} />
-            </ViewportSection>
+                {/* CATEGORY TILES */}
+                <ViewportSection minHeight={220} className="w-full min-w-0 max-w-full">
+                  <HomeCategories tiles={categoryTiles} totalProducts={totalProducts} isLoading={isLoading} />
+                </ViewportSection>
 
-            {/* BRANDS */}
-            <ViewportSection minHeight={120}>
-              <BrandStrip brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
-            </ViewportSection>
+                {/* TODAY'S DEALS */}
+                <ViewportSection minHeight={420} className="w-full min-w-0 max-w-full">
+                  <DealsSection embedded />
+                </ViewportSection>
 
-            {/* BRAND SPOTLIGHT (LAST) */}
-            <ViewportSection minHeight={520}>
-              <BrandShowcase brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
-            </ViewportSection>
+                {/* FEATURED PRODUCTS — server tabs */}
+                <ViewportSection minHeight={640}>
+                  <FeaturedProducts hasOffers={hasOffers} />
+                </ViewportSection>
+
+                {/* POPULAR CATEGORIES */}
+                <ViewportSection minHeight={260}>
+                  <PopularCategories tiles={categoryTiles} isLoading={isLoading} />
+                </ViewportSection>
+
+                {/* BRANDS */}
+                <ViewportSection minHeight={120}>
+                  <BrandStrip brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
+                </ViewportSection>
+
+                {/* BRAND SPOTLIGHT (LAST) */}
+                <ViewportSection minHeight={520}>
+                  <BrandShowcase brands={brands} brandCounts={brandCounts} isLoading={isLoading} />
+                </ViewportSection>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,9 @@
 const nodemailer = require("nodemailer");
 const log = require("./logger");
 
+// Fail quickly when the SMTP server accepts TCP but never completes its greeting.
+const SMTP_TIMEOUTS = Object.freeze({ connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 12000 });
+
 // ==========================================
 // ✉️ EMAIL UTILITY (Nodemailer + SMTP)
 // ==========================================
@@ -12,10 +15,13 @@ const trimEnv = (value) => String(value || "").trim().replace(/^["']|["']$/g, ""
 
 const getSmtpConfig = () => {
   let host = trimEnv(process.env.SMTP_HOST);
-  const user = trimEnv(process.env.SMTP_USER);
-  const pass = trimEnv(process.env.SMTP_PASS).replace(/\s+/g, "");
-  const port = Number(trimEnv(process.env.SMTP_PORT));
-  const from = trimEnv(process.env.SMTP_FROM);
+  // Gmail shorthand: EMAIL_USER/EMAIL_PASS (or SMTP_USER/SMTP_PASS)
+  const user = trimEnv(process.env.EMAIL_USER) || trimEnv(process.env.SMTP_USER);
+  const pass = (trimEnv(process.env.EMAIL_PASS) || trimEnv(process.env.SMTP_PASS)).replace(/\s+/g, "");
+  // If only credentials are provided, default to Gmail (smtp.gmail.com:587 STARTTLS)
+  if (!host && user && pass) host = "smtp.gmail.com";
+  const port = Number(trimEnv(process.env.SMTP_PORT)) || (user && pass ? 587 : NaN);
+  const from = trimEnv(process.env.SMTP_FROM) || trimEnv(process.env.EMAIL_FROM);
 
   // Gmail host sirf env se aata hai (SMTP_HOST) — yahan koi hardcoded default nahi
 
@@ -46,10 +52,8 @@ const getTransporter = () => {
     port,
     secure,
     auth: { user, pass },
-    // ✅ Timeouts taake request hang na ho — fail fast aur clear error mile
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
+    // SMTP timeout so an unresponsive provider cannot hold signup / OTP requests.
+    ...SMTP_TIMEOUTS,
     // ✅ Port 587 par STARTTLS force karo (Gmail/zyada providers ke liye zaroori)
     ...(secure === false && port === 587 ? { requireTLS: true } : {}),
     tls: { minVersion: "TLSv1.2" },
@@ -136,7 +140,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
   }
 
   const { user, from } = getSmtpConfig();
-  const storeName = trimEnv(process.env.DEFAULT_STORE_NAME);
+  const storeName = trimEnv(process.env.PLATFORM_NAME);
   // ✅ "Name <email>" format — Gmail/spam filter ke liye behtar
   const fromAddress = from || user;
   const fromHeader = /</.test(fromAddress)
@@ -171,40 +175,62 @@ const PURPOSE_COPY = {
 
 const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresInMinutes }) => {
   const copy = PURPOSE_COPY[purpose] || PURPOSE_COPY.email_verification;
-  const storeName = process.env.DEFAULT_STORE_NAME;
+  const storeName = process.env.PLATFORM_NAME;
   const safeStore = escapeHtml(storeName);
   const safeOtp = escapeHtml(otp);
+  // Shared email design (seller emails jaisa hi look)
+  const { hero, note, paragraph, renderEmail, BRAND } = require("./emailLayout");
 
-  const html = `
-  <div style="font-family:Inter,Segoe UI,Arial,sans-serif;background:#f4f4f5;padding:28px 12px;">
-    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
-      <div style="background:#0a0a0a;padding:22px 26px;">
-        <p style="margin:0;color:#ffffff;font-size:17px;font-weight:800;letter-spacing:.3px;">${safeStore}</p>
-      </div>
-      <div style="padding:26px;">
-        <h2 style="margin:0 0 8px;color:#0a0a0a;font-size:21px;">${copy.heading}</h2>
-        <p style="margin:0 0 22px;color:#525252;font-size:14px;line-height:1.6;">${copy.lead}</p>
-        <div style="text-align:center;margin:0 0 22px;">
-          <div style="display:inline-block;background:#f4f4f5;border:1px dashed #d4d4d8;border-radius:12px;padding:14px 26px;">
-            <span style="font-size:30px;font-weight:800;letter-spacing:9px;color:#0a0a0a;">${safeOtp}</span>
-          </div>
-        </div>
-        <p style="margin:0 0 6px;color:#ef4444;font-size:13px;font-weight:700;">
-          This code expires in ${expiresInMinutes} minutes.
-        </p>
-        <p style="margin:0;color:#737373;font-size:12.5px;line-height:1.6;">
-          Never share this code with anyone. ${safeStore} will never ask you for it.
-        </p>
-      </div>
-      <div style="padding:16px 26px;background:#fafafa;border-top:1px solid #f0f0f0;">
-        <p style="margin:0;color:#a3a3a3;font-size:11.5px;">© ${new Date().getFullYear()} ${safeStore}. All rights reserved.</p>
-      </div>
-    </div>
-  </div>`;
+  const codeBox = `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px;">
+  <tr><td align="center" style="padding:22px 16px;background:#fff4ec;border:1px dashed #fdba74;border-radius:12px;">
+    <p style="margin:0 0 6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#c2410c;">Your verification code</p>
+    <p style="margin:0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:34px;font-weight:800;letter-spacing:10px;color:${BRAND.text};">${safeOtp}</p>
+  </td></tr>
+</table>`;
+
+  const content = [
+    hero({ tone: "brand", symbol: "&#128274;", title: copy.heading, introHtml: escapeHtml(copy.lead) }),
+    codeBox,
+    paragraph(`This code expires in <strong style="color:#b91c1c;">${escapeHtml(String(expiresInMinutes))} minutes</strong>.`),
+    note("Keep this code private", `Never share this code with anyone. ${safeStore} will never ask you for it.`, "neutral"),
+  ].join("");
+
+  const html = renderEmail({
+    preheader: `Your ${storeName} code is ${otp}. It expires in ${expiresInMinutes} minutes.`,
+    content,
+    footerNote: "If you didn't request this code, you can safely ignore this email.",
+  });
 
   const text = `${copy.heading}\n\nYour code is: ${otp}\n\nThis code expires in ${expiresInMinutes} minutes. Never share it with anyone.\n\n${storeName}`;
 
   return sendEmail({ to, subject: `${copy.subject} — ${storeName}`, html, text });
 };
 
-module.exports = { sendEmail, sendOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig };
+/**
+ * Fire-and-forget OTP email.
+ * Signup / resend request ko SMTP par block nahi karta — response foran jata hai
+ * aur delivery background me hoti hai. Failure console par log hoti hai.
+ * @returns {{ queued: boolean }} queued = SMTP configured hai.
+ */
+const queueOtpEmail = (args) => {
+  const queued = isSmtpConfigured();
+  Promise.resolve()
+    .then(() => sendOtpEmail(args))
+    .then((result) => {
+      if (!result?.delivered) {
+        console.warn(
+          `[email] OTP (${args?.purpose || "email_verification"}) to ${args?.to} not delivered: ${result?.reason || "unknown"}`,
+        );
+      }
+    })
+    .catch((error) => {
+      console.error(
+        `[email] OTP (${args?.purpose || "email_verification"}) to ${args?.to} failed:`,
+        error?.cause || error,
+      );
+    });
+  return { queued };
+};
+
+module.exports = { sendEmail, sendOtpEmail, queueOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig, SMTP_TIMEOUTS };

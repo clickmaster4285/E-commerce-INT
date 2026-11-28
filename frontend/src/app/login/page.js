@@ -1,7 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import LazyGoogleLogin from "@/components/user/LazyGoogleLogin";
@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import LanguageSwitcher from "@/components/user/LanguageSwitcher";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
+import { loyaltyApi } from "@/apis/user/loyaltyApi";
+import { SignupBonusBanner } from "@/components/user/LoyaltyCheckout";
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 
@@ -28,6 +30,7 @@ function StoreLogo({ store, sizeClass = "w-10 h-10" }) {
     ? store.logo.img_url.startsWith("http")
       ? store.logo.img_url
       : `${API_ORIGIN}/${store.logo.img_url}`
+      
     : null;
   const letter = (store?.store_name || "C").charAt(0).toUpperCase();
 
@@ -46,6 +49,25 @@ export default function UserLoginPage() {
   const { t } = useTranslation();
   const { nameOf } = useLocalized();
   const [isLogin, setIsLogin] = useState(true);
+  const [referralCode] = useState(() => typeof window === "undefined" ? "" : String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24));
+  // Loyalty welcome bonus banner (register mode) — program off ho to kuch nahi dikhta
+  const { data: loyaltyProgram } = useQuery({ queryKey: ["loyaltyProgram"], queryFn: loyaltyApi.program, staleTime: 5 * 60 * 1000, retry: false });
+
+  // Open directly in register mode when linked with ?mode=register
+  const [approvedInfo, setApprovedInfo] = useState(false);
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      try {
+        if (new URLSearchParams(window.location.search).get("approved") === "1") {
+          setApprovedInfo(true);
+        }
+        if (new URLSearchParams(window.location.search).get("mode") === "register") setIsLogin(false);
+      } catch {
+        /* ignore */
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
@@ -155,24 +177,25 @@ export default function UserLoginPage() {
         window.location.href = "/";
         return;
       }
+      console.log("Login successful");
 
       // ✅ REGISTER → User NAHI banta, sirf pending + OTP jata hai, phir verify screen
-      const res = await authApi.register({ name, username, phone, email, password });
+      const res = await authApi.register({ name, username, phone, email, password, referralCode });
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
-      setLoading(false);
+      if (res?.delivered) toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
+      else toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen dikhao
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
         toast.info(t("auth.login.verifyEmail"));
-        setLoading(false);
         return;
       }
       parseBackendError(err);
       toast.error(getApiErrorMessage(err, t(isLogin ? "auth.login.loginFailed" : "auth.login.registrationFailed")));
+    } finally {
       setLoading(false);
     }
   };
@@ -180,15 +203,21 @@ export default function UserLoginPage() {
   // ==========================================
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
+  // Verification ke baad storefront par bhejein; referral setup account section me available hai.
+  const goAfterSignup = () => {
+    window.location.href = "/";
+  };
+
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     toast.success(t("auth.login.emailVerified"));
-    window.location.href = "/";
+    await goAfterSignup();
   };
 
   const handleResendEmailOtp = async () => {
     const res = await authApi.sendEmailOtp(otpEmail);
-    toast.success(t("auth.login.verificationResent"));
+    if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
+    else toast.success(t("auth.login.verificationResent"));
   };
 
   // ==========================================
@@ -241,8 +270,8 @@ export default function UserLoginPage() {
   const handleGoogleLogin = async (credential) => {
     setLoading(true);
     try {
-      await authApi.googleCustomerLogin(credential);
-      window.location.href = "/";
+      const res = await authApi.googleCustomerLogin(credential, referralCode);
+      await goAfterSignup(res?.isNewUser !== false);
     } catch (err) {
       toast.error(getApiErrorMessage(err, t("auth.login.googleFailed")));
       setLoading(false);
@@ -523,12 +552,23 @@ export default function UserLoginPage() {
               </>
             )}
 
+            {approvedInfo && (
+              <div className="mb-4 px-4 py-3 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 flex items-start gap-2">
+                <span aria-hidden="true" className="mt-0.5 shrink-0 text-[#10b981]">✓</span>
+                <div>
+                  <p className="text-sm font-semibold text-[#059669]">Application approved</p>
+                  <p className="text-[11px] text-[#047857]">A confirmation email was sent. Sign in below to open your store.</p>
+                </div>
+              </div>
+            )}
             {generalError && (
               <div className="mb-4 px-4 py-3 rounded-xl bg-[var(--user-danger)]/10 border border-[var(--user-danger)]/30 flex items-start gap-2">
                 <AlertCircle size={16} className="text-[var(--user-danger)] shrink-0 mt-0.5" />
                 <p className="text-[var(--user-danger)] text-sm">{generalError}</p>
               </div>
             )}
+
+            {!isLogin && <SignupBonusBanner program={loyaltyProgram} className="mb-4" />}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-3.5" noValidate>

@@ -316,7 +316,7 @@ exports.updateLead = async (req, res) => {
     if (typeof mergedValidation === "string") return validationError(res, mergedValidation);
     if (payload.lead_type === "Individual") { payload.company_name = ""; payload.business_type = ""; payload.business_address = ""; payload.city = ""; }
     const before = current.toObject();
-    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, { $set: { ...payload, updatedby: actorId(req) } }, { new: true, runValidators: true });
+    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, { $set: { ...payload, updatedby: actorId(req) } }, { returnDocument: "after", runValidators: true });
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
     const changes = await buildHistoryChanges(before, lead.toObject());
     if (changes.length) {
@@ -361,7 +361,7 @@ exports.updateStatus = async (req, res) => {
       : req.body.status === "Lost" ? "Lost reason updated" : "Lead status confirmed";
     const update = { $set: updates };
     if (changes.length) update.$push = { history: await historyEntry(req, "status", summary, changes) };
-    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, update, { new: true, runValidators: true });
+    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, update, { returnDocument: "after", runValidators: true });
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
     if (lead.status === "Customer") await syncLeadCustomer(lead, actorId(req));
     res.json({ success: true, data: lead });
@@ -379,7 +379,7 @@ exports.addActivity = async (req, res) => {
     const activity = { type, notes: String(notes).trim(), follow_up_date: follow_up_date || null, employee_id: actorId(req), employee_name: employee?.name || "Staff", created_at: new Date() };
     const update = { $push: { activities: activity }, $set: { updatedby: actorId(req) } };
     if (follow_up_date) update.$set.next_follow_up_date = follow_up_date;
-    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, update, { new: true, runValidators: true }).populate("activities.employee_id", "name email");
+    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, is_deleted: { $ne: true } }, update, { returnDocument: "after", runValidators: true }).populate("activities.employee_id", "name email");
     if (!lead) return res.status(404).json({ success: false, message: "Lead not found" });
     res.status(201).json({ success: true, data: lead.activities[lead.activities.length - 1] });
   } catch (error) { res.status(500).json({ success: false, message: "Unable to add activity" }); }

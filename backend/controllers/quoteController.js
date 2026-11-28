@@ -187,7 +187,7 @@ exports.createQuote = async (req, res) => {
         createdby: req.user?._id || null,
         consumed_at: null,
         expires_at: { $gt: new Date() },
-      }, { $set: { consumed_at: new Date() } }, { new: true });
+      }, { $set: { consumed_at: new Date() } }, { returnDocument: "after" });
       if (!reservation) return res.status(409).json({ success: false, message: "Quote number reservation expired. Please refresh the editor." });
     }
     let quote;

@@ -2,6 +2,7 @@ const sharp = require("sharp");
 const fs = require("fs-extra");
 const path = require("path");
 const crypto = require("crypto");
+const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 
 
 
@@ -22,11 +23,8 @@ const processBrandLogo = async (req, res, next) => {
 
 
 
-    const uploadFolder = path.join(
-      __dirname,
-      "../uploads/brands",
-      brandId
-    );
+    // Store ka apna folder: uploads/stores/<storeId>/brands/<brandId>
+    const uploadFolder = uploadDirFor(req, "brands", brandId);
 
 
 
@@ -79,7 +77,7 @@ const processBrandLogo = async (req, res, next) => {
     req.brandImage = {
 
       img_url:
-      `uploads/brands/${brandId}/${fileName}`,
+      uploadUrlFor(filePath).slice(1), // DB format bina leading slash
 
       img_size:
       stats.size,

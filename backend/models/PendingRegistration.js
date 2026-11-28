@@ -20,6 +20,22 @@ const pendingRegistrationSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     username: { type: String, required: true, trim: true },
     phone: { type: String, default: "" },
+    // Seller application — collected on the same signup page
+    // Customer signup kis store par hua (store host). null = platform seller signup.
+    // Verify isi store par hota hai — store A ka code store B / platform par nahi.
+    storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null },
+    referralCode: { type: String, trim: true, uppercase: true, default: "", maxlength: 24 },
+    storeName: { type: String, default: "", trim: true },
+    // Seller ka chuna hua store web address — "ahmed-electronics" → ahmed-electronics.<ROOT_DOMAIN>
+    subdomain: { type: String, default: "", trim: true, lowercase: true },
+    storeDescription: { type: String, default: "", trim: true },
+    businessCategory: { type: String, default: "", trim: true },
+    businessType: { type: String, enum: ["individual", "registered_business"], default: "individual" },
+    country: { type: String, default: "", trim: true },
+    city: { type: String, default: "", trim: true },
+    address: { type: String, default: "", trim: true },
+    zipCode: { type: String, default: "", trim: true },
+    storeLogoUrl: { type: String, default: "", trim: true },
     // ✅ bcrypt-hashed login password (User.create mein seedha pass hoga, dobara hash nahi hoga)
     passwordHash: { type: String, required: true },
     // ✅ bcrypt-hashed 6-digit OTP

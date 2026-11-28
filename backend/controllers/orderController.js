@@ -9,6 +9,8 @@ const Deal = require("../models/Deal");
 const Bundle = require("../models/Bundle");
 const discountController = require("./discountController");
 const log = require("../utils/logger");
+const loyalty = require("../utils/loyaltyService");
+const LoyaltyTransaction = require("../models/LoyaltyTransaction");
 const calculateDiscountedPrice = discountController.calculateDiscountedPrice;
 
 const emitOrderEvent = (event, data) => {
@@ -45,6 +47,7 @@ const placeOrder = async (req, res) => {
       card_holder_name,
       card_expiry,
       card_cvv,
+      loyalty_points,
     } = req.body;
     const checkoutDraftId = mongoose.isValidObjectId(rawCheckoutDraftId)
       ? rawCheckoutDraftId
@@ -411,7 +414,24 @@ const placeOrder = async (req, res) => {
     }
 
     const tax = Math.round(taxTotal);
-    const total = subtotal + shipping + tax;
+
+    // ✅ Loyalty points — order banne se PEHLE kaat lo (atomic). orderId pehle
+    //    se bana lete hain taake order fail ho to points wapas ho saken.
+    const orderId = new mongoose.Types.ObjectId();
+    let redemption = { points: 0, discount: 0 };
+    if (Number(loyalty_points) > 0) {
+      try {
+        redemption = await loyalty.redeemForCheckout(req.user._id, {
+          requested: loyalty_points,
+          subtotal,
+          orderId,
+        });
+      } catch (err) {
+        return res.status(err.status || 400).json({ success: false, message: err.message });
+      }
+    }
+
+    const total = subtotal + shipping + tax - redemption.discount;
 
     // ✅ SAFE ORDER NUMBER
     const getNextOrderNumber = async () => {
@@ -428,10 +448,12 @@ const placeOrder = async (req, res) => {
     };
 
     let order;
+    try {
     for (let attempt = 0; attempt < 5; attempt++) {
       const order_number = await getNextOrderNumber();
       try {
         order = await Order.create({
+          _id: orderId,
           shipping_method,
           order_number,
           user_id: req.user._id,
@@ -452,6 +474,8 @@ const placeOrder = async (req, res) => {
           subtotal,
           shipping,
           tax,
+          loyalty_points_redeemed: redemption.points,
+          loyalty_discount: redemption.discount,
           total,
           status: "pending",
           notes: notes || "",
@@ -466,6 +490,20 @@ const placeOrder = async (req, res) => {
         throw err;
       }
     }
+    } catch (createErr) {
+      // Order nahi bana → kaate hue points wapas
+      if (redemption.points > 0) await loyalty.rollbackRedemption(req.user._id, orderId);
+      throw createErr;
+    }
+
+    // Redeem txn par order number likh do (history me dikhe) + earn points pending
+    if (redemption.points > 0) {
+      await LoyaltyTransaction.updateOne(
+        { source_key: `redeem:${order._id}` },
+        { $set: { order_number: order.order_number, note: `Order ${order.order_number}` } },
+      ).catch(() => {});
+    }
+    await loyalty.addOrderEarn(order);
 
     // Order persisted successfully: complete all active drafts for this user.
     // Completing every active entry also clears duplicate legacy drafts. When
@@ -763,6 +801,9 @@ const mapFrontOrder = (order, locale) => ({
   subtotal: order.subtotal,
   shipping: order.shipping,
   tax: order.tax,
+  loyalty_points_redeemed: order.loyalty_points_redeemed || 0,
+  loyalty_discount: order.loyalty_discount || 0,
+  loyalty_points_earned: order.loyalty_points_earned || 0,
   total: order.total,
   status: order.status,
   notes: order.notes ?? "",
@@ -1030,6 +1071,9 @@ const updateOrderStatus = async (req, res) => {
 
     await order.save();
 
+    // ✅ Loyalty: delivered → points available, cancelled → reverse + refund
+    await loyalty.onOrderStatusChange(order, previousStatus, status);
+
     if (shouldRestoreStock) {
       const restoredVariants = [];
       for (const item of order.items || []) {
@@ -1107,7 +1151,10 @@ const editOrder = async (req, res) => {
 
       order.subtotal = Math.round(subtotal);
       order.tax = Math.round(taxTotal);
-      order.total = order.subtotal + order.shipping + order.tax;
+      // Points discount subtotal se zyada kabhi nahi (qty kam hone par)
+      const pointsDiscount = Math.min(Number(order.loyalty_discount || 0), order.subtotal);
+      order.total = order.subtotal + order.shipping + order.tax - pointsDiscount;
+      await loyalty.syncOrderEarn(order);
     }
 
     // ✅ Update Address — FIXED: supports address_override
@@ -1196,6 +1243,8 @@ const deleteOrder = async (req, res) => {
     }
 
     await Order.findByIdAndDelete(id);
+    // ✅ Loyalty: pending points hatao, kharch kiye points wapas
+    await loyalty.onOrderDeleted(order);
 
     emitOrderEvent("order:deleted", { success: true, data: { id: req.params.id } });
     emitOrderEvent("order:updated", { success: true, data: { id: req.params.id, deleted: true } });

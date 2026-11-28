@@ -1,8 +1,9 @@
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 const path = require("path");
 const fs = require("fs-extra");
 const sharp = require("sharp");
 const mongoose = require("mongoose");
+const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 const Review = require("../models/Review");
 
 // ==========================================
@@ -106,7 +107,8 @@ const saveReviewMedia = async (req, res, next) => {
       }
     }
 
-    const uploadDirectory = path.join(process.cwd(), "uploads", "reviews", productId);
+    // Store ka apna folder: uploads/stores/<storeId>/reviews/<productId>
+    const uploadDirectory = uploadDirFor(req, "reviews", String(productId));
     await fs.ensureDir(uploadDirectory);
 
     const savedImages = [];
@@ -131,7 +133,7 @@ const saveReviewMedia = async (req, res, next) => {
       const metadata = await sharp(filePath).metadata();
       const stats = await fs.stat(filePath);
       savedImages.push({
-        img_url: `/uploads/reviews/${productId}/${fileName}`,
+        img_url: uploadUrlFor(filePath),
         img_size: stats.size,
         mimeType: "image/webp",
         width: metadata.width || null,
@@ -153,7 +155,7 @@ const saveReviewMedia = async (req, res, next) => {
       const filePath = path.join(uploadDirectory, fileName);
       await fs.writeFile(filePath, file.buffer);
       savedVideos.push({
-        video_url: `/uploads/reviews/${productId}/${fileName}`,
+        video_url: uploadUrlFor(filePath),
         file_size: file.size,
         mimeType: file.mimetype,
       });

@@ -23,7 +23,7 @@ const saveCart = async (req, res) => {
     const cart = await Cart.findOneAndUpdate(
       { user_id: userId },
       { user_id: userId, items },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true }
     );
 
     res.json({ success: true, data: cart.items });

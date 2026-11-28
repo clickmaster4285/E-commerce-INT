@@ -1,6 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
+import AccountPageHeader from "@/components/user/AccountPageHeader";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -61,10 +62,15 @@ export default function MyReviews() {
 
   return (
     <section className="space-y-5">
-      <header className="flex flex-col gap-1 border-b border-[var(--user-border)] pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0"><p className="text-[0.625rem] font-black uppercase tracking-[0.16em] text-[var(--user-accent)]">{t("admin.reviews.ui.managementTitle")}</p><h1 className="mt-1 break-words text-2xl font-black tracking-tight text-[var(--user-text)] sm:text-3xl">{t("admin.nav.item.reviews")}</h1><p className="mt-1 break-words text-sm text-[var(--user-text-muted)]">{t("admin.reviews.ui.managementSubtitle")}</p></div>
-        {!isLoading && !isError && <span className="inline-flex w-fit shrink-0 items-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-1 text-xs font-bold text-[var(--user-text-secondary)]">{reviews.length} · {t("admin.reviews.ui.totalReviews")}</span>}
-      </header>
+      <AccountPageHeader
+        title={t("account.header.reviews.title")}
+        subtitle={t("admin.reviews.ui.managementSubtitle")}
+        action={!isLoading && !isError ? (
+          <span className="inline-flex w-fit items-center rounded-full border border-[var(--user-border)] bg-[var(--user-bg-card)] px-3 py-1 text-xs font-medium text-[var(--user-text-muted)]">
+            {reviews.length} · {t("admin.reviews.ui.totalReviews")}
+          </span>
+        ) : null}
+      />
 
       {isLoading ? <div className="flex min-h-48 items-center justify-center"><Loader2 size={26} className="animate-spin text-[var(--user-accent)]" /></div>
         : isError ? <div className="rounded-2xl border border-[var(--user-border)] bg-[var(--user-bg-card)] p-8 text-center text-sm text-[var(--user-text-muted)]">{t("admin.reviews.ui.loadFailed")}</div>

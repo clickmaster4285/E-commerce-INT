@@ -1,4 +1,7 @@
+﻿const loyalty = require("../utils/loyaltyService");
+const referrals = require("../utils/referralService");
 const crypto = require("crypto");
+const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Otp = require("../models/Otp");
@@ -6,70 +9,47 @@ const User = require("../models/User");
 const PendingRegistration = require("../models/PendingRegistration");
 const Store = require("../models/Store");
 const { sendOtpEmail } = require("../utils/sendEmail");
+const SellerApplication = require("../models/SellerApplication");
+const { sendApplicationReceivedEmail } = require("../services/emailService");
+const { storeAdminBaseUrl } = require("../utils/storeUrl");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity } = require("../utils/activityHelper");
 const log = require("../utils/logger");
 
 // ==========================================
-// ⚙️ OTP CONFIG (sirf env se — koi hardcoded fallback nahi)
+// âš™ï¸ OTP CONFIG (sirf env se â€” koi hardcoded fallback nahi)
 // ==========================================
 const OTP_EXPIRE_MINUTES = Number(process.env.EMAIL_OTP_EXPIRE_MINUTES);
 const OTP_MAX_ATTEMPTS = Number(process.env.EMAIL_OTP_MAX_ATTEMPTS);
 const OTP_RESEND_SECONDS = Number(process.env.EMAIL_OTP_RESEND_SECONDS);
 const OTP_LENGTH = Number(process.env.OTP_LENGTH);
 const RESET_TOKEN_EXPIRE_MINUTES = Number(process.env.RESET_TOKEN_EXPIRE_MINUTES);
+const SMTP_RETRY_SECONDS = 10;
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-// ✅ Cryptographically secure 6-digit code
+// âœ… Cryptographically secure 6-digit code
 const generateOtpCode = () =>
   String(crypto.randomInt(0, 10 ** OTP_LENGTH)).padStart(OTP_LENGTH, "0");
 
-// ✅ Env guards — .env me value missing/typo ho to Number() NaN deta hai aur
-// jwt.sign invalid expiresIn ("NaNd") pe THROW kar deta hai → OTP verify ke
-// baad login fail. Is liye validated fallback.
-const getUserAccessDays = () => {
-  const days = Number(process.env.JWT_USER_ACCESS_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 7;
-};
+// âœ… Sessions utils/tokens.js se â€” customer (aud "user") aur seller admin
+// (aud "admin") ke alag secrets + cookies. Pehle yahan hard-coded
+// secure:false / 7-din wale employee tokens the.
+const tokens = require("../utils/tokens");
 
-const getRefreshTokenDays = () => {
-  const days = Number(process.env.JWT_REFRESH_TOKEN_EXPIREE_DAYS);
-  return Number.isFinite(days) && days > 0 ? days : 30;
-};
+const setAuthCookies = (req, res, user) => tokens.issueSession(req, res, "user", user);
 
-const setAuthCookies = (res, userId, role) => {
-  const accessToken = jwt.sign(
-    { userId, role, type: "user" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getUserAccessDays()}d` },
-  );
-  const refreshToken = jwt.sign(
-    { userId, role, type: "user" },
-    process.env.JWT_SECRET,
-    { expiresIn: `${getRefreshTokenDays()}d` },
-  );
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getUserAccessDays() * 24 * 60 * 60 * 1000,
-  });
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-    maxAge: getRefreshTokenDays() * 24 * 60 * 60 * 1000,
-  });
-};
+// Seller admin session. Pending sellers get this too, so they can open the
+// admin panel read-only until the Super Admin approves them.
+const setEmployeeAuthCookies = (req, res, employee) => tokens.issueSession(req, res, "admin", employee);
 
 // ==========================================
-// 🔁 ISSUE + SEND OTP (shared)
+// ðŸ” ISSUE + SEND OTP (shared)
 // ==========================================
 const issueOtp = async ({ email, purpose }) => {
-  // 🛑 Resend throttle — bar bar OTP request par spam rokta hai
+  // ðŸ›‘ Resend throttle â€” bar bar OTP request par spam rokta hai
   const recent = await Otp.findOne({ email, purpose }).sort({ created_at: -1 });
   if (recent) {
     const elapsed = (Date.now() - new Date(recent.created_at).getTime()) / 1000;
@@ -84,7 +64,7 @@ const issueOtp = async ({ email, purpose }) => {
     }
   }
 
-  // ✅ Purane codes invalid — ek waqt mein sirf latest OTP valid rehta hai
+  // âœ… Purane codes invalid â€” ek waqt mein sirf latest OTP valid rehta hai
   await Otp.deleteMany({ email, purpose });
 
   const code = generateOtpCode();
@@ -102,23 +82,32 @@ const issueOtp = async ({ email, purpose }) => {
       expiresInMinutes: OTP_EXPIRE_MINUTES,
     });
   } catch (emailError) {
-    // ✅ Email fail ho to bekaar OTP DB mein na chhodo — user dobara try kar sake
+    // âœ… Email fail ho to bekaar OTP DB mein na chhodo â€” user dobara try kar sake
     await Otp.deleteOne({ _id: created._id }).catch(() => {});
+    emailError.statusCode = 503;
+    emailError.retryAfter = SMTP_RETRY_SECONDS;
     throw emailError;
   }
+  if (!delivery.delivered && process.env.NODE_ENV === "production") {
+    await Otp.deleteOne({ _id: created._id }).catch(() => {});
+    const error = new Error("The email server did not accept the verification email. Please retry shortly.");
+    error.statusCode = 503;
+    error.retryAfter = SMTP_RETRY_SECONDS;
+    throw error;
+  }
 
-  // 🧪 DEV ONLY — SMTP off ho to bhi flow test ho sake (prod mein kabhi OTP expose nahi hoga)
+  // ðŸ§ª DEV ONLY â€” SMTP off ho to bhi flow test ho sake (prod mein kabhi OTP expose nahi hoga)
   const debugOtp =
     !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
   if (debugOtp) {
-    log.warn(`🧪 [DEV] OTP for ${email} (${purpose}): ${code} — SMTP set karne par real email jayegi`);
+    log.warn(`ðŸ§ª [DEV] OTP for ${email} (${purpose}): ${code} â€” SMTP set karne par real email jayegi`);
   }
 
   return { delivered: delivery.delivered, debugOtp };
 };
 
 // ==========================================
-// 🔎 VERIFY OTP (shared) — verified OTP document return karta hai
+// ðŸ”Ž VERIFY OTP (shared) â€” verified OTP document return karta hai
 // ==========================================
 const verifyOtpCode = async ({ email, purpose, otp }) => {
   const record = await Otp.findOne({ email, purpose, consumed: false }).sort({
@@ -172,12 +161,15 @@ const sendError = (res, error) => {
   });
 };
 
-// 🧪 DEV ONLY helper — prod mein debugOtp kabhi response mein nahi jata
-const withDebugOtp = (payload, debugOtp) =>
-  debugOtp ? { ...payload, debugOtp } : payload;
+// ðŸ§ª DEV ONLY helper â€” prod mein debugOtp kabhi response mein nahi jata
+// OTPs must never be included in API responses, including development responses.
+const withDebugOtp = (payload) => {
+  const { debugOtp, ...safePayload } = payload;
+  return safePayload;
+};
 
 // ==========================================
-// 1️⃣ EMAIL VERIFICATION — SEND OTP (reusable helper)
+// 1ï¸âƒ£ EMAIL VERIFICATION â€” SEND OTP (reusable helper)
 // PendingRegistration flow: User tabhi banega jab OTP verify hoga.
 // Isliye resend sabse pehle Pending me dekhta hai.
 // ==========================================
@@ -190,10 +182,10 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
   }
 
   const user = await User.findOne({ email });
-  // ✅ Verified (ya purana user jisme field undefined hai) — dobara OTP nahi
+  // âœ… Verified (ya purana user jisme field undefined hai) â€” dobara OTP nahi
   if (user && user.emailVerified !== false) return { alreadyVerified: true, email };
 
-  // ✅ Pending registration hai to wahi par naya OTP issue karo (throttle ke saath)
+  // âœ… Pending registration hai to wahi par naya OTP issue karo (throttle ke saath)
   const pending = await PendingRegistration.findOne({ email });
   if (pending) {
     if (new Date(pending.expiresAt).getTime() < Date.now()) {
@@ -213,12 +205,7 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
       throw error;
     }
     const code = generateOtpCode();
-    pending.otpHash = await bcrypt.hash(code, 10);
-    pending.expiresAt = new Date(Date.now() + OTP_EXPIRE_MINUTES * 60 * 1000);
-    pending.attempts = 0;
-    pending.lastSentAt = new Date();
-    await pending.save();
-
+    const otpHash = await bcrypt.hash(code, 10);
     let delivery;
     try {
       delivery = await sendOtpEmail({
@@ -228,18 +215,39 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
         expiresInMinutes: OTP_EXPIRE_MINUTES,
       });
     } catch (emailError) {
+      const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
+      pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
+      await pending.save();
+      emailError.statusCode = 503;
+      emailError.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
       throw emailError;
     }
+    if (!delivery.delivered) {
+      const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
+      pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
+      await pending.save();
+      const error = new Error("Email delivery is unavailable. The verification code was not sent. Please retry shortly.");
+      error.statusCode = 503;
+      error.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
+      throw error;
+    }
+    // Sirf email successfully delivered hone par naya OTP active karein;
+    // SMTP failure purane valid code ko revoke na kare.
+    pending.otpHash = otpHash;
+    pending.expiresAt = new Date(Date.now() + OTP_EXPIRE_MINUTES * 60 * 1000);
+    pending.attempts = 0;
+    pending.lastSentAt = new Date();
+    await pending.save();
     const debugOtp =
       !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
-      log.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      log.warn(`ðŸ§ª [DEV] OTP for ${email} (email_verification): ${code} â€” SMTP set karne par real email jayegi`);
     }
     return { alreadyVerified: false, email, delivered: delivery.delivered, debugOtp };
   }
 
-  // ✅ Legacy fallback: fix se PEHLE bana unverified User (ab User pehle nahi banta,
-  // lekin deploy se pehle ke adhoore accounts ke liye purana Otp flow chalنے do)
+  // âœ… Legacy fallback: fix se PEHLE bana unverified User (ab User pehle nahi banta,
+  // lekin deploy se pehle ke adhoore accounts ke liye purana Otp flow chalÙ†Û’ do)
   if (user && user.emailVerified === false) {
     const { delivered, debugOtp } = await issueOtp({ email, purpose: "email_verification" });
     return { alreadyVerified: false, email, delivered, debugOtp };
@@ -251,7 +259,7 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
 };
 
 // ==========================================
-// 1️⃣ EMAIL VERIFICATION — SEND OTP
+// 1ï¸âƒ£ EMAIL VERIFICATION â€” SEND OTP
 // ==========================================
 const sendEmailVerificationOtp = async (req, res) => {
   try {
@@ -276,7 +284,7 @@ const sendEmailVerificationOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: result.delivered
             ? `Verification code sent to ${result.email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP is not configured — the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : "Email delivery is unavailable right now. The code was not sent. Please try again later or contact support.",
         },
         result.debugOtp,
       ),
@@ -288,7 +296,7 @@ const sendEmailVerificationOtp = async (req, res) => {
 
 
 // ==========================================
-// 1️⃣ EMAIL VERIFICATION — VERIFY OTP
+// 1ï¸âƒ£ EMAIL VERIFICATION â€” VERIFY OTP
 // Request/response shape same: {email, otp} -> {success, message, user} + cookies.
 // Sahi OTP par hi User document banta hai, pending record delete hota hai.
 // ==========================================
@@ -304,7 +312,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
     if (!otp)
       return res.status(400).json({ success: false, message: "Please enter the code" });
 
-    // ✅ Naya flow: PendingRegistration se verify -> User create
+    // âœ… Naya flow: PendingRegistration se verify -> User create
     const pending = await PendingRegistration.findOne({ email });
     if (pending) {
       if (new Date(pending.expiresAt).getTime() < Date.now()) {
@@ -335,22 +343,34 @@ const verifyEmailVerificationOtp = async (req, res) => {
           .json({ success: false, message: `Incorrect code. ${left} attempt${left === 1 ? "" : "s"} remaining.` });
       }
 
-      // ✅ Sahi OTP — ab User banao (is se pehle User exist nahi karta)
+      // âœ… Sahi OTP â€” ab identity banao (customer = User, seller = Employee)
+      const Employee = require("../models/Employee");
       const existingUser = await User.findOne({ email });
       if (existingUser && existingUser.emailVerified !== false) {
+        const pendingApp = await SellerApplication.findOne({ email, status: "pending" }).select("status").lean();
+        if (pendingApp) {
+          await PendingRegistration.deleteOne({ _id: pending._id });
+          return res.status(403).json({
+            success: false,
+            code: "SELLER_PENDING",
+            message: "Your application is already under review. You will be notified by email once it is approved.",
+          });
+        }
         await PendingRegistration.deleteOne({ _id: pending._id });
         return res
           .status(400)
           .json({ success: false, message: "This email is already registered. Please log in." });
       }
       if (existingUser && existingUser.emailVerified === false) {
-        // Legacy adhoora record — naye verified User ke liye jagah banao
+        // Legacy adhoora record â€” naye account ke liye jagah banao
         await User.deleteOne({ _id: existingUser._id });
       }
+      // Seller ka identity Employee (admin_users) me hai â€” username/phone wahan check karo
       if (pending.username) {
-        const clash = await User.findOne({
-          username: String(pending.username).toLowerCase().trim(),
-        });
+        const uname = String(pending.username).toLowerCase().trim();
+        const clash = pending.storeId
+          ? await User.findOne({ username: uname })
+          : await Employee.findOne({ username: uname }).setOptions({ skipTenantScope: true });
         if (clash) {
           return res
             .status(400)
@@ -358,59 +378,225 @@ const verifyEmailVerificationOtp = async (req, res) => {
         }
       }
       if (pending.phone) {
-        const phoneClash = await User.findOne({ phone: String(pending.phone).trim() });
+        const phone = String(pending.phone).trim();
+        const phoneClash = pending.storeId
+          ? await User.findOne({ phone })
+          : await Employee.findOne({ phone }).setOptions({ skipTenantScope: true });
         if (phoneClash) {
           return res
             .status(400)
             .json({ success: false, message: "This phone number is already registered." });
         }
       }
-      const defaultStore = await Store.findOne();
-      const user = await User.create({
+      // â”€â”€ Store customer signup (storefront register) â”€â”€
+      // Seller approval / SellerApplication / blocked status sirf platform seller
+      // signup ke liye â€” customer foran active hota hai aur login ho jata hai.
+      if (pending.storeId) {
+        if (!req.store || String(req.store._id) !== String(pending.storeId)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Please verify your email on the store where you registered." });
+        }
+        const customer = await User.create({
+          name: pending.name,
+          username: pending.username,
+          phone: pending.phone || "",
+          email: pending.email,
+          // âœ… passwordHash pehle se bcrypt-hashed hai â€” dobara hash nahi karna
+          password: pending.passwordHash,
+          storeId: req.store._id,
+          role: "user",
+          emailVerified: true,
+          status: "active",
+          referralCode: null,
+          referredByCode: pending.referralCode || "",
+        });
+        await PendingRegistration.deleteOne({ _id: pending._id });
+        // âœ… Loyalty welcome bonus (program off ho to kuch nahi hota)
+        await loyalty.awardSignupBonus(customer._id);
+        try {
+          await referrals.ensureReferralCode(customer);
+        } catch (referralError) {
+          console.error("[referrals] could not create referral code:", referralError.message);
+        }
+        try {
+          await referrals.processSignupReferral(customer, pending.referralCode);
+        } catch (referralError) {
+          console.error("[referrals] signup processing failed:", referralError.message);
+        }
+        await setAuthCookies(req, res, customer);
+
+        const io = req.io || getIO();
+        await pushGlobalActivity(
+          io,
+          {
+            action: `${customer.name} verified their email`,
+            category: "Authentication",
+            performedBy: customer._id,
+            performedByName: customer.name,
+            details: { email: customer.email },
+          },
+          customer._id,
+        );
+
+        return res.json({
+          success: true,
+          message: "Email verified. Welcome!",
+          user: {
+            id: customer._id,
+            name: customer.name,
+            username: customer.username,
+            phone: customer.phone,
+            email: customer.email,
+            role: customer.role,
+            avatar: customer.avatar || null,
+          },
+        });
+      }
+
+      // â”€â”€ Platform seller signup (naya store, Super Admin approval) â”€â”€
+      if (req.store) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Please verify your seller account on the main signup page." });
+      }
+      const isSeller = !!(pending.storeName && String(pending.storeName).trim().length >= 3);
+
+      const Store = require("../models/Store");
+
+      // Seller store is created up-front (closed) and stays read-only until approval.
+      let store = null;
+      if (isSeller) {
+        // Seller ka chuna hua address â€” beech me kisi ne le liya ho to us se milta-julta free address
+        let subdomain = String(pending.subdomain || "").trim().toLowerCase();
+        if (!subdomain || (await Store.exists({ subdomain }).setOptions({ skipTenantScope: true }))) {
+          subdomain = await Store.generateUniqueSubdomain(subdomain || pending.storeName);
+        }
+        store = await Store.create({
+          store_name: pending.storeName,
+          subdomain,
+          tagline: "Welcome to our store",
+          description: pending.storeDescription || "",
+          business_category: pending.businessCategory || "",
+          business_type: pending.businessType || "individual",
+          logo: pending.storeLogoUrl
+            ? { img_url: pending.storeLogoUrl, public_id: "" }
+            : { img_url: "", public_id: "" },
+          email: pending.email,
+          phone: pending.phone || "",
+          country: pending.country || "PK",
+          city: pending.city || "",
+          address: pending.address || "",
+          zip_code: pending.zipCode || "",
+          store_status: "closed",
+          currency: "PKR",
+          tax_rate: 17,
+          weight_unit: "kg",
+        });
+      }
+
+      // Seller ka identity sirf Employee (admin_users) + SellerApplication hai â€”
+      // customer_users me seller ka duplicate account nahi banta.
+
+      // Seller application queue â€” Super Admin reviews from here (everything supplied at signup)
+      const application = await SellerApplication.create({
+        name: pending.name,
+        email: pending.email,
+        phone: pending.phone || "",
+        username: pending.username || "",
+        passwordHash: pending.passwordHash,
+        store_name: isSeller ? pending.storeName : `${String(pending.name || "").trim().slice(0, 40) || "New"}'s Store`,
+        store_description: isSeller ? pending.storeDescription || "" : "",
+        logo: isSeller && pending.storeLogoUrl
+          ? { img_url: pending.storeLogoUrl, public_id: "" }
+          : { img_url: "", public_id: "" },
+        business_category: isSeller ? pending.businessCategory || "" : "",
+        business_type: isSeller ? pending.businessType || "individual" : "individual",
+        country: isSeller ? pending.country || "" : "",
+        city: isSeller ? pending.city || "" : "",
+        address: isSeller ? pending.address || "" : "",
+        zip_code: isSeller ? pending.zipCode || "" : "",
+        status: "pending",
+        user_id: null,
+        store_id: isSeller ? store._id : null,
+      });
+
+      // Seller gets an employee session in read-only mode (all pages viewable, nothing editable).
+      // Store owner = "admin" role (full panel access); read-only is enforced by seller_pending, not role.
+      const employee = await Employee.create({
         name: pending.name,
         username: pending.username,
-        phone: pending.phone || "",
         email: pending.email,
-        // ✅ passwordHash pehle se bcrypt-hashed hai — dobara hash nahi karna
+        phone: pending.phone || "",
         password: pending.passwordHash,
-        storeId: defaultStore?._id,
-        role: "user",
-        emailVerified: true,
+        role: OWNER_ROLE,
+        status: "active",
+        storeId: isSeller ? store._id : null,
+        seller_pending: true,
       });
+
       await PendingRegistration.deleteOne({ _id: pending._id });
+      const storeName = isSeller ? pending.storeName : ((application.store_name) || "Your store");
+      // Best-effort â€” failure must not block signup
+      try {
+        await sendApplicationReceivedEmail({
+          name: pending.name,
+          email: pending.email,
+          storeName,
+          adminUrl: storeAdminBaseUrl(store), // store null ho to null â†’ generic link
+        });
+      } catch (emailError) {
+        console.error("[signup] pending-approval email failed:", emailError.message);
+      }
 
-      // ✅ Verified hone par seedha login karwa dete hain
-      setAuthCookies(res, user._id, user.role);
-
+      // Pending approval â€” sirf read-only employee session (customer account nahi banta).
+      await setEmployeeAuthCookies(req, res, employee);
+      // Store handoff URL for frontend redirect (avoids a second call)
+      let handoffUrl = null;
+      try {
+        const { storeAdminBaseUrl } = require("../utils/storeUrl");
+        const baseUrl = storeAdminBaseUrl(store);
+        if (baseUrl) {
+          const token = jwt.sign(
+            { type: "store_handoff", employeeId: String(employee._id), storeId: String(store._id), jti: crypto.randomUUID() },
+            process.env.JWT_SECRET,
+            { expiresIn: 10 * 60 },
+          );
+          handoffUrl = baseUrl + "/admin-handoff#token=" + encodeURIComponent(token);
+        }
+      } catch (e) { /* ignore */ }
       const io = req.io || getIO();
       await pushGlobalActivity(
         io,
         {
-          action: `${user.name} verified their email`,
+          action: `${employee.name} verified their email`,
           category: "Authentication",
-          performedBy: user._id,
-          performedByName: user.name,
-          details: { email: user.email },
+          performedBy: employee._id,
+          performedByName: employee.name,
+          details: { email: employee.email },
         },
-        user._id,
+        employee._id,
       );
 
       return res.json({
         success: true,
-        message: "Email verified successfully",
+        storeSubdomain: store?.subdomain || null,
+        handoffUrl,
+        pendingApproval: true,
+        message: "Your application is pending Super Admin approval. We'll email you once it is approved.",
         user: {
-          id: user._id,
-          name: user.name,
-          username: user.username,
-          phone: user.phone,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar || null,
+          id: employee._id,
+          name: employee.name,
+          username: employee.username,
+          phone: employee.phone,
+          email: employee.email,
+          role: employee.role,
+          avatar: employee.avatar || null,
         },
       });
     }
 
-    // ✅ Legacy fallback: fix se pehle bana unverified User + Otp record
+    // âœ… Legacy fallback: fix se pehle bana unverified User + Otp record
     const record = await verifyOtpCode({ email, purpose: "email_verification", otp });
 
     const user = await User.findOne({ email });
@@ -421,12 +607,13 @@ const verifyEmailVerificationOtp = async (req, res) => {
 
     user.emailVerified = true;
     await user.save();
+    if (user.role === "user" && user.storeId) await loyalty.awardSignupBonus(user._id);
     record.verified = true;
     record.consumed = true;
     await record.save();
 
-    // ✅ Verified hone par seedha login karwa dete hain
-    setAuthCookies(res, user._id, user.role);
+    // âœ… Verified hone par seedha login karwa dete hain
+    await setAuthCookies(req, res, user);
 
     const io = req.io || getIO();
     await pushGlobalActivity(
@@ -460,7 +647,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
 };
 
 // ==========================================
-// 2️⃣ FORGOT PASSWORD — SEND OTP
+// 2ï¸âƒ£ FORGOT PASSWORD â€” SEND OTP
 // ==========================================
 const sendForgotPasswordOtp = async (req, res) => {
   try {
@@ -494,7 +681,7 @@ const sendForgotPasswordOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: delivered
             ? `Password reset code sent to ${email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP is not configured — the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : "Email delivery is unavailable right now. The code was not sent. Please try again later or contact support.",
         },
         debugOtp,
       ),
@@ -505,7 +692,7 @@ const sendForgotPasswordOtp = async (req, res) => {
 };
 
 // ==========================================
-// 2️⃣ FORGOT PASSWORD — VERIFY OTP
+// 2ï¸âƒ£ FORGOT PASSWORD â€” VERIFY OTP
 // (success par short-lived reset token milta hai)
 // ==========================================
 const verifyForgotPasswordOtp = async (req, res) => {
@@ -525,8 +712,9 @@ const verifyForgotPasswordOtp = async (req, res) => {
     record.verified = true;
     await record.save();
 
+    // storeId token me â€” reset sirf usi store (host) par complete hoga
     const resetToken = jwt.sign(
-      { email, purpose: "password_reset", otpId: String(record._id) },
+      { email, purpose: "password_reset", otpId: String(record._id), storeId: req.store?._id ? String(req.store._id) : null },
       process.env.JWT_SECRET,
       { expiresIn: `${RESET_TOKEN_EXPIRE_MINUTES}m` },
     );
@@ -543,7 +731,7 @@ const verifyForgotPasswordOtp = async (req, res) => {
 };
 
 // ==========================================
-// 2️⃣ FORGOT PASSWORD — SET NEW PASSWORD
+// 2ï¸âƒ£ FORGOT PASSWORD â€” SET NEW PASSWORD
 // ==========================================
 const resetPasswordWithOtp = async (req, res) => {
   try {
@@ -570,7 +758,12 @@ const resetPasswordWithOtp = async (req, res) => {
         .json({ success: false, message: "Reset link expired. Please start again." });
     }
 
-    if (payload.purpose !== "password_reset" || normalizeEmail(payload.email) !== email)
+    const requestStoreId = req.store?._id ? String(req.store._id) : null;
+    if (
+      payload.purpose !== "password_reset" ||
+      normalizeEmail(payload.email) !== email ||
+      (payload.storeId || null) !== requestStoreId // store A ka reset store B par nahi
+    )
       return res
         .status(400)
         .json({ success: false, message: "Invalid reset request. Please start again." });
@@ -611,9 +804,9 @@ const resetPasswordWithOtp = async (req, res) => {
       user._id,
     );
 
-    // ✅ Security: purane sessions invalid karne ke liye cookies clear
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    // âœ… Security: is account ke SAARE sessions (har device) band + cookies clear
+    await tokens.revokeAllForSubject("user", user._id, { reason: "password_reset" });
+    tokens.clearAuthCookies(res, "user");
 
     return res.json({
       success: true,
@@ -625,7 +818,7 @@ const resetPasswordWithOtp = async (req, res) => {
 };
 
 // ==========================================
-// 📧 EMAIL HEALTH — SMTP diagnose karne ke liye
+// ðŸ“§ EMAIL HEALTH â€” SMTP diagnose karne ke liye
 // GET /api/users/email-health
 // ==========================================
 const getEmailHealth = async (req, res) => {
@@ -637,14 +830,14 @@ const getEmailHealth = async (req, res) => {
       return res.json({
         success: false,
         configured: false,
-        message: "SMTP is not configured — OTP will only be printed to the console.",
+        message: "Email delivery is unavailable; verification codes cannot be sent until email is configured.",
         hint: "Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM in .env. For Gmail, use an App Password.",
         config: {
           host: cfg.host || "(empty)",
           port: cfg.port,
           secure: cfg.secure,
           user: cfg.user ? `${cfg.user.slice(0, 3)}***` : "(empty)",
-          from: cfg.from || "(empty → SMTP_USER use hoga)",
+          from: cfg.from || "(empty â†’ SMTP_USER use hoga)",
         },
       });
     }
@@ -652,7 +845,7 @@ const getEmailHealth = async (req, res) => {
     return res.json({
       success: true,
       configured: true,
-        message: `SMTP OK — emails can be sent via ${cfg.host}:${cfg.port}.`,
+        message: `SMTP OK â€” emails can be sent via ${cfg.host}:${cfg.port}.`,
       config: {
         host: cfg.host,
         port: cfg.port,

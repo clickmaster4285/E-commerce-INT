@@ -2,24 +2,24 @@ const express = require("express");
 const router = express.Router();
 const path = require("path");
 const fs = require("fs");
-const { getStoreInfo, updateStoreInfo } = require("../controllers/storeController");
-const authMiddleware = require("../middleware/authMiddleware");
+const {
+  getStoreInfo, updateStoreInfo,
+  getPublicStoreInfo, resolveTenant, checkSubdomain, updateStoreDomain,
+} = require("../controllers/storeController");
+// Sirf admin/employee session (a_at) — customer token yahan 401
+const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission"); // ✅ ADDED
 
 // ✅ Multer setup for file upload (Logo)
-const multer = require("multer");
+const multer = require("../utils/tenantMulter") /* store-context safe multer */;
 
-// Uploads folder ka path set karein
-const uploadDir = path.join(__dirname, "../uploads");
-
-// Agar uploads folder nahi hai toh automatically bana dein (Crash se bachne ke liye)
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const { uploadDirFor } = require("../utils/uploadPaths");
 
 const storage = multer.diskStorage({
+  // Store ka apna folder: uploads/stores/<storeId>/store (utils/uploadPaths.js)
   destination: function (req, file, cb) {
-    cb(null, uploadDir);
+    const dir = uploadDirFor(req, process.env.STORE_UPLOAD_SUBDIR || "store");
+    fs.mkdir(dir, { recursive: true }, (err) => cb(err, dir));
   },
   filename: function (req, file, cb) {
     // File ke naam mein spaces ko hyphen se replace karein taake URL mein masla na ho
@@ -47,8 +47,15 @@ const upload = multer({
 // Master-data: short public cache (60s). Protected PUT/admin GET untouched.
 router.get("/public", (req, res, next) => {
   res.set("Cache-Control", "public, max-age=60, must-revalidate");
+  // Host ke hisaab se alag store → cache bhi host-wise alag rehna chahiye
+  res.set("Vary", "Origin, Host");
   next();
-}, getStoreInfo);
+}, getPublicStoreInfo);
+
+// ✅ MULTI-TENANT
+router.get("/resolve", resolveTenant);                       // public — ye host kis store ka hai
+router.get("/check-subdomain", checkSubdomain);              // public — signup / store-setup me availability
+router.put("/domain", authMiddleware, checkPermission("store"), updateStoreDomain);
 
 // ✅ PROTECTED ROUTES — Admin only
 router.route("/")
