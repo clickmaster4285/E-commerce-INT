@@ -245,8 +245,7 @@ export default function CartPage() {
     queryKey: [
       "shippingQuote",
       shippingMethod,
-      Math.round(totals.subtotal),
-      totals.allItems.map((i) => i.raw.productId || i.raw.id).join(","),
+      totals.allItems.map((i) => `${i.raw.productId || i.raw.id}:${i.raw.qty || i.qty || 1}`).join(","),
     ],
     queryFn: () =>
       shippingApi.quote({

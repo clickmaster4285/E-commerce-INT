@@ -54,7 +54,9 @@ export const adminProductApi = {
     adminHttp.get("/products", { params: { brand_id: brandId, brand_detail: 1, locale } }).then(list),
 
   getById: (id, locale = "") =>
-    adminHttp.get(`/products/${id}`, locale ? { params: { locale } } : undefined).then((res) => res.data?.data || res.data),
+    adminHttp
+      .get(`/products/admin/${id}`, locale ? { params: { locale } } : undefined)
+      .then((res) => res.data?.data || res.data),
 
   getDocumentHistory: (id) =>
     adminHttp.get(`/products/admin/${id}/history`).then((res) => res.data?.data || res.data || {}),

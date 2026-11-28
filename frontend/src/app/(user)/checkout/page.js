@@ -761,7 +761,7 @@ function CheckoutContent() {
   });
 
   const { data: shipQuote } = useQuery({
-    queryKey: ["shippingQuote", shippingMethod, Math.round(subtotal), activeItems.map((i) => i.productId || i.id).join(",")],
+    queryKey: ["shippingQuote", shippingMethod, activeItems.map((i) => `${i.productId || i.id}:${i.qty || 1}`).join(",")],
     queryFn: () => shippingApi.quote({
       items: activeItems.map((i) => ({ productId: i.productId || i.id, brandId: i.brandId, categoryId: i.categoryId })),
       method: shippingMethod, subtotal,

@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const {
   getAllEmployees,
+  getEmployeeOptions,
   getEmployeeById,
   getEmployeeActivities,
   createEmployee,
@@ -16,6 +17,7 @@ const { checkPermission } = require("../middleware/checkPermission");
 router.use(authMiddleware);
 
 router.get("/", checkPermission("employees"), getAllEmployees);
+router.get("/options", checkPermission("employees"), getEmployeeOptions);
 router.get("/:id/activities", checkPermission("employees"), getEmployeeActivities);
 router.get("/:id", checkPermission("employees"), getEmployeeById);
 

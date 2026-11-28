@@ -104,7 +104,7 @@ function NewPOPage() {
 
   const pushEvent = (label) => setEvents((e) => [...e, { t: nowStamp(locale), label }]);
 
-  const { data: vendorsRaw } = useQuery({ queryKey: ["vendors-all"], queryFn: () => vendorApi.getAll() });
+  const { data: vendorsRaw } = useQuery({ queryKey: ["vendor-options"], queryFn: () => vendorApi.getOptions({ limit: 50 }) });
   const vendorList = useMemo(() => {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted && v.is_active);
@@ -158,7 +158,7 @@ function NewPOPage() {
   const { data: nextCode } = useQuery({ queryKey: ["po-next-code"], queryFn: () => purchaseOrderApi.getNextCode() });
 
   // Full variant list once (cached) — grouped into products for the picker.
-  const { data: stockAll, isLoading: stockLoading } = useQuery({ queryKey: ["stock-all"], queryFn: () => stockApi.getAll(), staleTime: 2 * 60 * 1000 });
+  const { data: stockAll, isLoading: stockLoading } = useQuery({ queryKey: ["stock-all"], queryFn: () => variantApi.getPicker({ limit: 50 }), staleTime: 2 * 60 * 1000 });
 
   useEffect(() => {
     if (!editId || !editPO || !vendorsRaw || !stockAll || editPrefilledId === editId) return;

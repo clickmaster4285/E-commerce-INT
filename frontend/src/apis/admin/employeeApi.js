@@ -30,6 +30,11 @@ const paginated = (res, fallbackLimit) => {
 };
 
 export const employeeApi = {
+  getOptions: ({ search = "", limit = 50 } = {}) =>
+    adminHttp
+      .get("/employees/options", { params: { search: search || undefined, limit } })
+      .then((res) => (Array.isArray(res.data?.data) ? res.data.data : [])),
+
   // ==========================================================
   // GET ALL EMPLOYEES
   // ==========================================================

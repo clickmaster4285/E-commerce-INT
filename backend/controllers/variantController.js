@@ -129,6 +129,40 @@ const getVariants = async (req, res) => {
   }
 };
 
+// GET /variants/picker — quote/invoice/PO dropdowns (§9.3)
+const getVariantPicker = async (req, res) => {
+  try {
+    const { legacyCap } = require("../utils/legacyListCap");
+    const search = String(req.query.search || "").trim();
+    const limit = legacyCap(req.query.limit, 20);
+    const filter = { is_deleted: { $ne: true }, status: { $ne: "inactive" } };
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ sku: rx }, { title: rx }];
+    }
+    const variants = await Variant.find(filter)
+      .select("_id sku title selling_price quantity images product_id")
+      .populate("product_id", "_id name")
+      .sort({ updated_at: -1, _id: -1 })
+      .limit(limit)
+      .lean();
+    const data = variants.map((v) => ({
+      _id: v._id,
+      sku: v.sku || "",
+      title: v.title || "",
+      selling_price: Number(v.selling_price) || 0,
+      quantity: Number(v.quantity) || 0,
+      image: v.images?.[0]?.img_url || "",
+      product: v.product_id
+        ? { _id: v.product_id._id || v.product_id, name: v.product_id.name || "" }
+        : null,
+    }));
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // GET VARIANT BY ID
 const getVariantById = async (req, res) => {
   try {
@@ -284,6 +318,7 @@ const deleteVariant = async (req, res) => {
 module.exports = {
   createVariant,
   getVariants,
+  getVariantPicker,
   getVariantById,
   updateVariant,
   deleteVariant,

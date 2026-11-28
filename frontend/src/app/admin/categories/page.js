@@ -354,7 +354,7 @@ const [viewMode, setViewMode] = useState(() => {
       locale,
     }),
     retry: false,
-    staleTime: 0,
+    staleTime: 60 * 1000,
   });
 
   const { data: categoryOptions = [] } = useQuery({

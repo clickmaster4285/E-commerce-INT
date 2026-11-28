@@ -196,6 +196,32 @@ const needsPermissionMigration = (perms) => {
 // GET ALL EMPLOYEES
 // =====================================================
 
+// GET /employees/options — lead/assign dropdowns (§9.3)
+exports.getEmployeeOptions = async (req, res) => {
+  try {
+    const { legacyCap } = require("../utils/legacyListCap");
+    const search = String(req.query.search || "").trim();
+    const limit = legacyCap(req.query.limit, 20);
+    const filter = { is_deleted: false, status: "active" };
+    if (search) {
+      const { escapeRegex } = require("../utils/escapeRegex");
+      const rx = escapeRegex(search);
+      filter.$or = [
+        { name: { $regex: rx, $options: "i" } },
+        { email: { $regex: rx, $options: "i" } },
+      ];
+    }
+    const employees = await Employee.find(filter)
+      .select("_id name role")
+      .sort({ name: 1 })
+      .limit(limit)
+      .lean();
+    return res.json({ success: true, data: employees });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getAllEmployees = async (req, res) => {
   try {
     const limitRaw = parseInt(req.query.limit, 10);

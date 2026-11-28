@@ -84,7 +84,7 @@ export default function LeadsPage() {
     }),
     retry: false,
   });
-  const { data: employeeData } = useQuery({ queryKey: ["lead-list-employees"], queryFn: () => employeeApi.getAll() });
+  const { data: employeeData } = useQuery({ queryKey: ["lead-employee-options"], queryFn: () => employeeApi.getOptions({ limit: 50 }) });
   const employees = Array.isArray(employeeData) ? employeeData : employeeData?.data || employeeData?.items || [];
   const leads = Array.isArray(data?.data) ? data.data : [];
   const stats = data?.stats || {};

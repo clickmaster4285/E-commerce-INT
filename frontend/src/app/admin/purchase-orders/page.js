@@ -222,7 +222,7 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const { data: vendorsRaw } = useQuery({ queryKey: ["vendors-all"], queryFn: () => vendorApi.getAll() });
+  const { data: vendorsRaw } = useQuery({ queryKey: ["vendor-options"], queryFn: () => vendorApi.getOptions({ limit: 50 }) });
   const vendorList = useMemo(() => {
     const arr = Array.isArray(vendorsRaw) ? vendorsRaw : vendorsRaw?.data || [];
     return arr.filter((v) => !v.is_deleted);

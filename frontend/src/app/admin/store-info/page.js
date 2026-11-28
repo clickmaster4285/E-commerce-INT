@@ -45,12 +45,17 @@ import adminHttp from "@/apis/axiosInstance"
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
-import { Country, State, City } from "country-state-city";
 import cc from "currency-codes";
 
 // ======================================================
 // CONFIG
 // ======================================================
+
+let __geoMod = null;
+const loadGeo = () => {
+  if (__geoMod) return Promise.resolve(__geoMod);
+  return import("country-state-city").then((m) => { __geoMod = m; return m; });
+};
 
 const getServerUrl = () => {
   // Sirf `NEXT_PUBLIC_SERVERURL` — `NEXT_PUBLIC_API_URL` kabhi define nahi hua,
@@ -494,6 +499,12 @@ export default function StoreInfoPage() {
   const [logoFile, setLogoFile] = useState(null);
   const [logoError, setLogoError] = useState(false);
   const [isLogoDragOver, setIsLogoDragOver] = useState(false);
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    loadGeo().then((m) => { if (alive) setGeo(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // ✅ Current user — 'store' permission wala hi edit kar sakta hai (admin bypass)
   const { data: currentUserProfile } = useQuery({
@@ -521,24 +532,24 @@ export default function StoreInfoPage() {
   //    nahi hain) — dropdown me A→Z hona chahiye warna dhoondhna mushkil hota hai.
   const countryOptions = useMemo(
     () =>
-      Country.getAllCountries()
+      (geo?.Country || { getAllCountries: () => [] }).getAllCountries()
         .map((c) => ({
           value: c.isoCode,
           label: new Intl.DisplayNames([locale === "ur" ? "ur-PK" : locale], { type: "region" }).of(c.isoCode) || c.name,
         }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [locale]
+    [locale, geo]
   );
 
   const stateOptions = useMemo(() => {
     if (!formData.country) return [];
-    return State.getStatesOfCountry(formData.country)
+    return (geo?.State || { getStatesOfCountry: () => [] }).getStatesOfCountry(formData.country)
       .map((s) => ({
         value: s.isoCode,
         label: s.name,
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [formData.country]);
+  }, [formData.country, geo]);
 
   // ✅ City list ka BUG FIX: pehle sirf selected state ki cities dikhti thi. Dataset
   //    me bahut jagah city data missing hai — UK ke 247 states/counties me se 243 ke
@@ -549,7 +560,7 @@ export default function StoreInfoPage() {
     if (!formData.country || !formData.state) {
       return { cityOptions: [], cityFallbackToCountry: false };
     }
-    const inState = (City.getCitiesOfState(formData.country, formData.state) || []).map((c) => ({
+    const inState = ((geo?.City || { getCitiesOfState: () => [] }).getCitiesOfState(formData.country, formData.state) || []).map((c) => ({
       value: c.name,
       label: c.name,
     }));
@@ -559,13 +570,13 @@ export default function StoreInfoPage() {
         cityFallbackToCountry: false,
       };
     }
-    const inCountry = (City.getCitiesOfCountry(formData.country) || []).map((c) => ({
+    const inCountry = ((geo?.City || { getCitiesOfCountry: () => [] }).getCitiesOfCountry(formData.country) || []).map((c) => ({
       value: c.name,
       label: c.name,
     }));
     inCountry.sort((a, b) => a.label.localeCompare(b.label));
     return { cityOptions: inCountry, cityFallbackToCountry: inCountry.length > 0 };
-  }, [formData.country, formData.state]);
+  }, [formData.country, formData.state, geo]);
 
   // Placeholders/hint — dataset me data hai ya nahi, uska saaf signal
   const statePlaceholder = !formData.country

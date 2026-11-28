@@ -80,7 +80,7 @@ export default function BundleCard({ bundle, className = "" }) {
   const { data: bundleProductsData, isLoading } = useQuery({
     queryKey: ["bundle-products", bundle?._id || bundle?.id, bundleProductIds.join(",")],
     queryFn: () =>
-      productApi.getAllPaginated({ page: 1, limit: 50, ids: bundleProductIds }),
+      productApi.getAllPaginated({ page: 1, limit: 50, ids: bundleProductIds, slim: 1 }),
     enabled: bundleProductIds.length > 0,
     staleTime: 60 * 1000,
   });

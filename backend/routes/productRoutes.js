@@ -60,6 +60,11 @@ router.get("/stats", getProductStats);
 router.get("/facets", publicCache(30 * 1000), getProductFacets);
 router.get("/category-tiles", publicCache(60 * 1000), getCategoryTiles);
 router.get("/admin/:id/history", authMiddleware, checkPermission("products"), getProductDocumentHistory);
+// Dedicated admin detail (§9.3) — always admin DTO (cost, PO history, actors)
+router.get("/admin/:id", authMiddleware, checkPermission("products"), (req, res, next) => {
+  req.authAud = "admin";
+  return getProductById(req, res, next);
+});
 // Public detail; admin session ho to admin view (cost price, PO history, actors) — warna shopper DTO
 router.get("/:id", optionalAdmin, redactPublic(), getProductById);
 

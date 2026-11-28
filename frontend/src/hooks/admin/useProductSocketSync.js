@@ -123,20 +123,18 @@ export function useProductSocketSync() {
     if (!socket || !isConnected) return;
 
     // ✅ Helper: Invalidate all related queries at once
-    function invalidateAll() {
-      queryClient.invalidateQueries({ queryKey: ["brands"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      // ✅ Featured Products page ki lists (same product data ka subset)
+    function invalidateAll(productId) {
+      // Narrow keys only (§9.3) — avoid brands N+1 + every product detail
+      queryClient.invalidateQueries({ queryKey: ["products", "paginated"] });
       queryClient.invalidateQueries({ queryKey: ["featured-products"] });
       queryClient.invalidateQueries({ queryKey: ["manage-featured"] });
-      // ✅ Detail page queries ["product", id] — PREFIX invalidation se saari
-      // ids match hoti hain, is liye detail page har socket update pe fresh
-      // ho jata hai (socket _id vs URL id ke mismatch ka chance hi khatam).
-      queryClient.invalidateQueries({ queryKey: ["product"] });
+      if (productId) {
+        queryClient.invalidateQueries({ queryKey: ["product", String(productId)] });
+      }
     }
 
     const handleCreated = (data) => {
-      invalidateAll();
+      invalidateAll(data?._id || data?.id);
     };
 
     const handleUpdated = (data) => {
@@ -154,20 +152,13 @@ export function useProductSocketSync() {
         return;
       }
 
-      invalidateAll();
-      // Individual product query bhi invalidate karein
-      if (productId) {
-        queryClient.invalidateQueries({ queryKey: ["product", productId] });
-      }
+      invalidateAll(productId);
     };
 
     const handleDeleted = (data) => {
-      invalidateAll();
-      // Deleted product ki individual query remove karein
       const productId = typeof data === "string" ? data : (data?.id || data?._id);
-      if (productId) {
-        queryClient.removeQueries({ queryKey: ["product", productId] });
-      }
+      invalidateAll(productId);
+      if (productId) queryClient.removeQueries({ queryKey: ["product", String(productId)] });
     };
 
     socket.on("productCreated", handleCreated);

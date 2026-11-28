@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { Country, State, City } from "country-state-city";
 import { Building2, Landmark, MapPin, Phone, Star, X } from "lucide-react";
 
 export const emptyVendorForm = {
@@ -39,11 +38,21 @@ const phoneValue = (value) => {
 
 export default function VendorFormModal({ open, form, setForm, editing = false, isPending = false, onSave, onClose }) {
   const { t } = useTranslation();
-  const countries = useMemo(() => Country.getAllCountries(), []);
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    let alive = true;
+    import("country-state-city").then((m) => { if (alive) setGeo(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, [open]);
+  const Country = geo?.Country;
+  const State = geo?.State;
+  const City = geo?.City;
+  const countries = useMemo(() => (Country ? Country.getAllCountries() : []), [Country]);
   const countryCode = countries.find((country) => country.name === form.country)?.isoCode || "";
-  const states = useMemo(() => countryCode ? State.getStatesOfCountry(countryCode) : [], [countryCode]);
+  const states = useMemo(() => (countryCode && State ? State.getStatesOfCountry(countryCode) : []), [countryCode, State]);
   const stateCode = states.find((state) => state.name === form.state)?.isoCode || "";
-  const cities = useMemo(() => countryCode && stateCode ? City.getCitiesOfState(countryCode, stateCode).map((city) => city.name) : [], [countryCode, stateCode]);
+  const cities = useMemo(() => (countryCode && stateCode && City ? City.getCitiesOfState(countryCode, stateCode).map((city) => city.name) : []), [countryCode, stateCode, City]);
   const stateOptions = useMemo(() => {
     const names = states.map((state) => state.name);
     return form.state && !names.includes(form.state) ? [form.state, ...names] : names;

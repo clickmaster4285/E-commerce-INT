@@ -1,7 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
-import { use, useState, useMemo } from "react";
+import { use, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,7 +12,6 @@ import { addressApi } from "@/apis/user/addressApi";
 import { reviewApi } from "@/apis/user/reviewApi";
 import ProductRating from "@/components/user/ProductReviews";
 import { useLocalized } from "@/i18n/localize";
-import { Country, State, City } from "country-state-city";
 import {
   ArrowLeft, CheckCircle2, Package, Loader2, MapPin, CreditCard, Calendar,
   Truck, Clock, XCircle, Banknote, Landmark, Zap, Phone, FileText, ShieldCheck,
@@ -159,9 +158,18 @@ const AddressModal = ({ order, addresses, onClose, onSuccess }) => {
     is_default: currentAddress?.is_default || false,
   });
 
-  const allCountries = Country.getAllCountries();
-  const allStates = (() => { const c = allCountries.find(x => x.name === form.country); return c ? State.getStatesOfCountry(c.isoCode) : []; })();
-  const allCities = (() => { const c = allCountries.find(x => x.name === form.country); const s = allStates.find(x => x.name === form.state); return c && s ? City.getCitiesOfState(c.isoCode, s.isoCode) : []; })();
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import("country-state-city").then((m) => { if (alive) setGeo(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const Country = geo?.Country;
+  const State = geo?.State;
+  const City = geo?.City;
+  const allCountries = Country ? Country.getAllCountries() : [];
+  const allStates = (() => { const c = allCountries.find(x => x.name === form.country); return c && State ? State.getStatesOfCountry(c.isoCode) : []; })();
+  const allCities = (() => { const c = allCountries.find(x => x.name === form.country); const s = allStates.find(x => x.name === form.state); return c && s && City ? City.getCitiesOfState(c.isoCode, s.isoCode) : []; })();
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["addresses"] });

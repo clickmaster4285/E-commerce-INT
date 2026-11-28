@@ -15,7 +15,7 @@ const primaryButtonStyle = { background: "linear-gradient(135deg, #2563eb 0%, #1
 
 export default function LeadFormModal({ open, form, setForm, editing = false, isPending = false, onSave, onClose }) {
   const { t } = useTranslation();
-  const { data: employeesRaw = [] } = useQuery({ queryKey: ["lead-form-employees"], queryFn: () => employeeApi.getAll(), enabled: open });
+  const { data: employeesRaw = [] } = useQuery({ queryKey: ["lead-employee-options"], queryFn: () => employeeApi.getOptions({ limit: 50 }), enabled: open });
   const employees = Array.isArray(employeesRaw) ? employeesRaw : employeesRaw?.data || employeesRaw?.items || [];
   if (!open) return null;
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));

@@ -321,4 +321,29 @@ const restoreVendor = async (req, res) => {
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 
-module.exports = { getNextVendorCode, createVendor, getVendorsAdmin, getVendorById, getVendorWithPOs, updateVendor, deleteVendor, restoreVendor };
+// GET /vendors/options — PO/invoice dropdowns (§9.3)
+const getVendorOptions = async (req, res) => {
+  try {
+    const { legacyCap } = require("../utils/legacyListCap");
+    const search = String(req.query.search || "").trim();
+    const limit = legacyCap(req.query.limit, 20);
+    const filter = { is_deleted: false, is_active: { $ne: false } };
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      filter.$or = [{ name: rx }, { vendor_code: rx }, { company_name: rx }];
+    }
+    const vendors = await Vendor.find(filter)
+      .select("_id name vendor_code")
+      .sort({ name: 1 })
+      .limit(limit)
+      .lean();
+    return res.status(200).json({ success: true, data: vendors });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+module.exports = {
+  getNextVendorCode, createVendor, getVendorsAdmin, getVendorOptions,
+  getVendorById, getVendorWithPOs, updateVendor, deleteVendor, restoreVendor,
+};

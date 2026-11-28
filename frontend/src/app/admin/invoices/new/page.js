@@ -69,8 +69,7 @@ export default function NewInvoicePage() {const { t } = useTranslation();
   const { data: editingInvoice, isLoading: isLoadingInvoice } = useQuery({ queryKey: ["invoice-admin", editInvoiceId], queryFn: () => invoiceApi.getById(editInvoiceId), enabled: Boolean(editInvoiceId) });
   const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });
   const { data: prefilledQuote } = useQuery({ queryKey: ["invoice-quote-prefill", prefillQuoteId], queryFn: () => quoteApi.getById(prefillQuoteId), enabled: Boolean(prefillQuoteId) });const { data: companySettings } = useQuery({ queryKey: ["admin-store-info"], queryFn: storeApi.get });
-  const { data: rawStock = [] } = useQuery({ queryKey: ["invoice-product-stock"], queryFn: stockApi.getAll, staleTime: 2 * 60 * 1000 });
-  const { data: rawVariants = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variants"], queryFn: variantApi.getAll, staleTime: 2 * 60 * 1000 });
+  const { data: pickerRaw = [], isLoading: productsLoading } = useQuery({ queryKey: ["invoice-variant-picker"], queryFn: () => variantApi.getPicker({ limit: 50 }), staleTime: 2 * 60 * 1000 });
   const customers = useMemo(() => listOf(rawCustomers).filter((customer) => !customer.is_deleted), [rawCustomers]);useEffect(() => { const defaultTerms = companySettings?.invoice_terms_conditions ?? ""; if (!editInvoiceId && !prefillQuoteId && defaultTerms !== undefined && defaultTerms !== null) setForm((current) => ({ ...current, terms: defaultTerms })); }, [editInvoiceId, prefillQuoteId, companySettings?.invoice_terms_conditions]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -89,15 +88,25 @@ export default function NewInvoicePage() {const { t } = useTranslation();
     });
   }, [prefillCustomerId, prefilledCustomer, prefillQuoteId]);
   const variants = useMemo(() => {
-    const stockByVariant = new Map();
-    listOf(rawStock).forEach((item) => stockByVariant.set(String(item.variant_id?._id || item.variant_id || item._id || ""), item));
-    return listOf(rawVariants).filter((variant) => !variant.is_deleted).map((variant) => {
-      const stock = stockByVariant.get(String(variant._id || "")) || {};
-      const product = variant.product_id && typeof variant.product_id === "object" ? variant.product_id : {};
-      const productId = mongoIdOf(product) || mongoIdOf(variant.product_id);
-      return { id: String(variant._id || ""), product_id: String(productId), productName: stock.product_name || product.name || variant.name || "Product", variantName: variant.title || variant.sku || "Variant", sku: variant.sku || "", price: Number(variant.selling_price ?? stock.selling_price ?? stock.sell_price ?? 0), image: variant.images?.[0]?.img_url || stock.image || "", stock: Number(variant.quantity ?? stock.quantity ?? stock.stock ?? 0), categoryId: String(stock.category_id?._id || stock.category_id || ""), categoryName: stock.category_name || stock.category_id?.name || "", brandId: String(stock.brand_id?._id || stock.brand_id || ""), brandName: stock.brand_name || stock.brand_id?.name || "" };
+    return listOf(pickerRaw).map((variant) => {
+      const product = variant.product && typeof variant.product === "object" ? variant.product : {};
+      const productId = mongoIdOf(product) || mongoIdOf(variant.product);
+      return {
+        id: String(variant._id || ""),
+        product_id: String(productId || ""),
+        productName: product.name || "Product",
+        variantName: variant.title || variant.sku || "Variant",
+        sku: variant.sku || "",
+        price: Number(variant.selling_price || 0),
+        image: variant.image || "",
+        stock: Number(variant.quantity || 0),
+        categoryId: "",
+        categoryName: "",
+        brandId: "",
+        brandName: "",
+      };
     }).filter((variant) => variant.id && variant.product_id);
-  }, [rawVariants, rawStock]);
+  }, [pickerRaw]);
   useEffect(() => {
     if (!editInvoiceId || !editingInvoice || editInvoiceLoaded || productsLoading) return;
     if (editingInvoice.sent_at) {

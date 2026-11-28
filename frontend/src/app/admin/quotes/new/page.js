@@ -267,14 +267,9 @@ function QuoteEditor({ quoteId, quote, customerId }) {
     queryFn: () => customerApi.getById(customerId),
     enabled: Boolean(customerId && !quoteId),
   });
-  const { data: stockRaw = [] } = useQuery({
-    queryKey: ["quote-product-variants-stock"],
-    queryFn: () => stockApi.getAll(),
-    staleTime: 2 * 60 * 1000,
-  });
-  const { data: variantsRaw = [], isLoading: productsLoading } = useQuery({
-    queryKey: ["quote-all-variants"],
-    queryFn: () => variantApi.getAll(),
+  const { data: pickerRaw = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["quote-variant-picker", productSearch],
+    queryFn: () => variantApi.getPicker({ search: productSearch.trim().length >= 2 ? productSearch.trim() : "", limit: 50 }),
     staleTime: 2 * 60 * 1000,
   });
   const customers = useMemo(
@@ -319,66 +314,31 @@ function QuoteEditor({ quoteId, quote, customerId }) {
     );
   }, [customers, customerSearch]);
   const products = useMemo(() => {
-    const stockByVariant = new Map();
-    unwrapList(stockRaw).forEach((item) =>
-      stockByVariant.set(
-        String(item.variant_id?._id || item.variant_id || item._id || ""),
-        item,
-      ),
-    );
-    return unwrapList(variantsRaw)
-      .filter((variant) => !variant.is_deleted)
+    return unwrapList(pickerRaw)
       .map((variant) => {
         const id = String(variant._id || "");
-        const stock = stockByVariant.get(id) || {};
-        const product =
-          variant.product_id && typeof variant.product_id === "object"
-            ? variant.product_id
-            : {};
-        const sourceName = stock.product_name || product.name || "Product";
+        const product = variant.product && typeof variant.product === "object" ? variant.product : {};
+        const sourceName = product.name || "Product";
         const sourceVariant = variant.title || variant.sku || "Variant";
         return {
           id,
-          product_id: product._id || variant.product_id || null,
+          product_id: product._id || null,
           sourceName,
           sourceVariant,
-          name: localizedField(
-            sourceName,
-            stock.product_translations?.name || product.translations?.name,
-            locale,
-          ),
-          variant: localizedField(
-            sourceVariant,
-            variant.translations?.title || stock.translations?.title,
-            locale,
-          ),
+          name: localizedField(sourceName, null, locale),
+          variant: localizedField(sourceVariant, null, locale),
           sku: variant.sku || "",
-          price: Number(
-            variant.selling_price ??
-              stock.selling_price ??
-              stock.sell_price ??
-              0,
-          ),
-          image: variant.images?.[0]?.img_url || stock.image || "",
-          stock: Number(variant.quantity ?? stock.quantity ?? stock.stock ?? 0),
-          categoryId: String(stock.category_id?._id || stock.category_id || ""),
-          categoryName: localizedField(
-            stock.category_name || stock.category_id?.name || "",
-            stock.category_translations?.name ||
-              stock.category_id?.translations?.name,
-            locale,
-          ),
-          brandId: String(stock.brand_id?._id || stock.brand_id || ""),
-          brandName: localizedField(
-            stock.brand_name || stock.brand_id?.name || "",
-            stock.brand_translations?.name ||
-              stock.brand_id?.translations?.name,
-            locale,
-          ),
+          price: Number(variant.selling_price || 0),
+          image: variant.image || "",
+          stock: Number(variant.quantity || 0),
+          categoryId: "",
+          categoryName: "",
+          brandId: "",
+          brandName: "",
         };
       })
       .filter((variant) => variant.id);
-  }, [variantsRaw, stockRaw, locale]);
+  }, [pickerRaw, locale]);
   const matchingProducts = useMemo(() => {
     const query = productSearch.trim().toLowerCase();
     return products.filter((product) => {

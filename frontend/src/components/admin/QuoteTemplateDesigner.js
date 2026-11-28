@@ -388,13 +388,14 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
 
   const { data: rawVariants = [] } = useQuery({
     queryKey: ["variant-search-options"],
-    queryFn: () => variantApi.getAll(),
+    queryFn: () => variantApi.getPicker({ limit: 50 }),
     staleTime: 5 * 60 * 1000,
   });
   const variantOptions = useMemo(() => {
     const listOf = (value) => Array.isArray(value) ? value : Array.isArray(value?.data) ? value.data : Array.isArray(value?.items) ? value.items : [];
     return listOf(rawVariants).filter((variant) => !variant.is_deleted).map((variant) => {
-      const product = variant.product_id && typeof variant.product_id === "object" ? variant.product_id : {};
+      const product = (variant.product && typeof variant.product === "object" ? variant.product : null)
+        || (variant.product_id && typeof variant.product_id === "object" ? variant.product_id : {}) || {};
       const sourceName = product.name || variant.name || "";
       const sourceVariant = variant.title || "";
       return {
@@ -406,7 +407,7 @@ export default function QuoteTemplateDesigner({ form, totals, quoteNumber, quote
         variant: localizedVariantTitleOf(variant, locale) || sourceVariant,
         sku: variant.sku || "",
         price: Number(variant.selling_price ?? 0),
-        image: firstProductImage(
+        image: variant.image || firstProductImage(
           product.images,
           product.image,
           product.image_url,

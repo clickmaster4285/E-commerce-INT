@@ -4,7 +4,6 @@ import { use, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { quoteApi } from "@/apis/admin/quoteApi";
-import { variantApi } from "@/apis/admin/variantApi";
 import { storeApi } from "@/apis/admin/storeApi";
 import QuoteTemplateDesigner from "@/components/admin/QuoteTemplateDesigner";
 import { downloadQuotePdf, printQuotePdf } from "@/lib/invoicePdf";
@@ -28,15 +27,17 @@ export default function QuoteDetailPage({ params }) {const { t } = useTranslatio
   const quotePreviewRef = useRef(null);
   const { data: quote, isLoading, isError, error } = useQuery({ queryKey: ["quote-admin", id], queryFn: () => quoteApi.getById(id) });
   const { data: store = null, isLoading: isStoreLoading } = useQuery({ queryKey: ["store-public"], queryFn: () => storeApi.getPublic(), staleTime: 5 * 60 * 1000 });
-  const { data: variants = [], isLoading: isVariantsLoading } = useQuery({ queryKey: ["quote-all-variants"], queryFn: () => variantApi.getAll(), staleTime: 5 * 60 * 1000 });
-  const variantsById = new Map(variants.map((variant) => [String(variant._id), variant]));
-  const quoteWithVariantNames = quote ? {
-    ...quote,
-    items: (quote.items || []).map((item) => {
-      const variant = variantsById.get(String(item.variant_id?._id || item.variant_id || ""));
-      return { ...item, variant_name: item.variant_name || variant?.title || "" };
-    }),
-  } : null;
+  // getQuote already returns item names — no full /variants load (§9.3)
+  const quoteWithVariantNames = quote
+    ? {
+        ...quote,
+        items: (quote.items || []).map((item) => ({
+          ...item,
+          variant_name: item.variant_name || item.variant_id?.title || "",
+        })),
+      }
+    : null;
+  const isVariantsLoading = false;
   useEffect(() => {
     if (searchParams.get("print") !== "1" || !quote || isLoading || isStoreLoading || isVariantsLoading || printHandled.current) return undefined;
     printHandled.current = true;

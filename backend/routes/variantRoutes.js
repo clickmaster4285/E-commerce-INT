@@ -3,6 +3,7 @@ const express = require("express");
 const {
   createVariant,
   getVariants,
+  getVariantPicker,
   getVariantById,
   updateVariant,
   deleteVariant,
@@ -80,6 +81,14 @@ router.get(
   staffPermissionCheck,
   requireProducts,
   getNextSkuNumber
+);
+
+router.get(
+  "/picker",
+  authMiddleware,
+  staffPermissionCheck,
+  requireProducts,
+  getVariantPicker
 );
 
 // UPDATE

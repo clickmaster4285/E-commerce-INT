@@ -1,5 +1,10 @@
 import adminHttp from "../axiosInstance";
 export const variantApi = {
+  getPicker: ({ search = "", limit = 20 } = {}) =>
+    adminHttp
+      .get("/variants/picker", { params: { search: search || undefined, limit } })
+      .then((res) => (Array.isArray(res.data?.data) ? res.data.data : [])),
+
   getNextSku: () =>
     adminHttp.get("/variants/next-sku").then((res) => res.data?.data || res.data),
 

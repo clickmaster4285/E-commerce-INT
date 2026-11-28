@@ -517,7 +517,7 @@ export default function AttributesPage() {
         admin_list: true,
       }),
     retry: false,
-    staleTime: 0,
+    staleTime: 60 * 1000,
   });
 
   // Normalize response (handles both paginated and legacy array)
@@ -616,7 +616,7 @@ export default function AttributesPage() {
     queryKey: ["attributes", "stats"],
     queryFn: attributeApi.getStats,
     retry: false,
-    staleTime: 0,
+    staleTime: 60 * 1000,
   });
 
   const goToAttributePage = (p) => {

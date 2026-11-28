@@ -12,6 +12,11 @@ const paginated = (res) => {
 };
 
 export const vendorApi = {
+  getOptions: ({ search = "", limit = 50 } = {}) =>
+    adminHttp
+      .get("/vendors/options", { params: { search: search || undefined, limit } })
+      .then((res) => (Array.isArray(res.data?.data) ? res.data.data : [])),
+
   // ✅ Legacy full-list (purchase-orders pages ka vendor dropdown isi par depend hai)
   getAll: () => adminHttp.get("/vendors/admin/all").then((res) => res.data?.data || res.data || []),
 
