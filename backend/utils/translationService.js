@@ -42,24 +42,8 @@ const TranslationMemory = require("../models/TranslationMemory");
 // ==========================================
 // WHICH FIELDS GET TRANSLATED (per model)
 // ==========================================
-const TRANSLATABLE_FIELDS = {
-  Brand: ["name", "description"],
-  Category: ["name", "description"],
-  Product: ["name", "description"],
-  Attribute: ["name"], // + values[].label (values[].value raw rehta hai)
-  Review: ["title", "comment", "storeResponse.message"],
-  Discount: ["name", "description"],
-  Deal: ["name", "description"],
-  Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
-  Variant: ["title"],
-  Order: ["notes", "cancel_reason"],
-  PurchaseOrder: ["notes", "cancel_reason"],
-  Vendor: ["name", "company_name", "address", "city", "state", "country"],
-  ShippingMethod: ["name"],
-  // Customer/Lead/Quote/Invoice/Employee/StockHistory: people naam / log fields translate NAHI hote (plan §3.6)
-  StorePage: ["title"],
-};
-
+// ⚠️ TRANSLATABLE_FIELDS ab CONTENT_FIELDS se DERIVE hota hai (neeche) — pehle dono list
+// alag alag copy thi aur drift ho sakti thi. Naya field sirf CONTENT_FIELDS me add karo.
 // Ye sab translatable *content* fields hain. Jo is list me hain par
 // TRANSLATABLE_FIELDS me nahi — unka status hamesha `skipped` set hota hai,
 // taake admin UI / debugging me pata chale ke wo jaan-boojh kar chhore gaye
@@ -82,6 +66,15 @@ const CONTENT_FIELDS = {
   // content (HTML) abhi skipped — LibreTranslate markup tod sakta hai
   StorePage: ["title", "content"],
 };
+
+// Jaan-boojh kar translate NAHI hone wale (CONTENT_FIELDS me hain, status `skipped`)
+const SKIPPED_FIELDS = { StorePage: ["content"] };
+const TRANSLATABLE_FIELDS = Object.fromEntries(
+  Object.entries(CONTENT_FIELDS).map(([model, fields]) => [
+    model,
+    fields.filter((f) => !(SKIPPED_FIELDS[model] || []).includes(f)),
+  ]),
+);
 
 // Translation writes update Mongo directly (outside the normal CRUD routes),
 // so invalidate public API memoized responses as soon as translated data lands.

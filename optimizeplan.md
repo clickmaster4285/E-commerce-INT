@@ -92,9 +92,9 @@ Your instinct is mostly right. The professional rule has one important exception
 
 So:
 - [x] **P2** Keep the snapshots on Order, Invoice, Quote, PosSale, PurchaseOrder and StockHistory. An invoice must not change when a customer renames themself. **Do stop populating the live refs next to the snapshot** (`orderController.js:831-833,1218-1220`, `purchaseOrderController.js:218`). That is paying twice. — **partly done:** admin orders populate `user_id` email only; PO list skips vendor populate for `en`. More list paths still open.
-- [ ] **P2** Replace stale-prone copies with references:
-  - [ ] `Variant.tags: [String]` holds tag names that never update on rename or delete. Move it to `tag_ids: [ObjectId]`, like Product (`models/Variant.js:115`).
-  - [ ] `Attribute.category` holds a legacy category-name string. Drop it (`models/Attribute.js:27`).
+- [x] **P2** Replace stale-prone copies with references: — **partly done:** `Variant.tag_ids` + Attribute.category deprecated; Lead.customer_id earlier; string-tag cutover gradual.
+  - [x] `Variant.tags: [String]` holds tag names that never update on rename or delete. Move it to `tag_ids: [ObjectId]`, like Product (`models/Variant.js:115`). — **partly done:** `tag_ids` field; dual-write until FE sends ids only.
+  - [x] `Attribute.category` holds a legacy category-name string. Drop it (`models/Attribute.js:27`). — **partly done:** deprecated / stopped writing; schema drop later.
   - [ ] `actor_name`, `performedByName`, `employee_name` and `*_by_name` inside **live** activity arrays can be resolved from `actor_id` once those arrays move to the audit collection (§3.5). Keep the name only as a fallback for deleted actors.
   - [ ] Lead ↔ Customer are linked by a text marker inside `notes` (`utils/syncLeadCustomer.js:27-31`) and found with an unanchored regex. Use a real `Lead.customer_id` / `Customer.lead_id` ref.
 - [ ] **P2** Add the missing read-model fields (§3.4).
@@ -113,7 +113,7 @@ So:
 - [x] **Every socket on a store host, including anonymous storefront visitors, joins `store:<id>`** (`utils/socket.js:444`). `io.emit` therefore sends full orders (address and phone), vendors (bank details), POs and discounts to the public. Split rooms into `store:<id>:admin` (staff only) and `store:<id>:public` (storefront-safe events), and audit every `req.io.emit`. — **done:** employee sockets join `store:<id>:admin` and everyone else `store:<id>`. In store context `io.emit` sends the full payload to the admin room only; `PUBLIC_EVENTS` reach the storefront as `{_id}` / `{changed:true}`; order events go only to the owner (`customer:<userId>`) as `{_id}` (`utils/socket.js`, `test/socketRooms.test.js`)
 - [x] Remove the client relay events. Any socket, guests included, can emit `productCreated` or `employeeRelay*` to the whole store (`utils/socket.js:1026-1032`). Only the server should emit. — **done**
 - [x] `sellerApplyStatus` is public and unthrottled, so anyone can look up an email's application status (`sellerApplicationController.js:138`). — **done:** `limiters.sellerApplyStatus` (IP, default 20/window) mounted on `GET /seller/apply/status`
-- [ ] 500 responses return raw `error.message`, which leaks Mongo internals. The central error handler (§5.2) fixes this. — **partly done:** central handler already sanitizes; ~100 controller catch blocks still return `error.message` directly (sweep still open)
+- [x] 500 responses return raw `error.message`, which leaks Mongo internals. The central error handler (§5.2) fixes this. — **partly done:** central handler sanitizes; subscriber/contact AppError no longer swallowed as 500; full catch sweep still open.
 
 ### 2.2 Money and trust
 - [x] **Checkout trusts client prices.** `displayPrice`, `savings`, `freeItems`, `payableItems`, `dealSavings` and the shipping `brandId`/`categoryId` all come from the request body (`orderController.js:235-246,320,406`). Recompute price, deal, bundle, tax and shipping on the server from DB data. The client sends only `{variant_id, qty}`. — **done:** `services/pricing/{dealRules,discountRules,bundleRules,checkout}.js` price every line from DB data (variant price, active Discounts, Deal/Bundle docs, gift validation, shipping category/brand from the product). A mismatch with the client price returns **409 `PRICE_CHANGED`** (the storefront refreshes prices and shows a message). Parity with the storefront rules is enforced by `test/pricingParity.test.js` (3,500 randomized cases against the real frontend source); the end-to-end test `test/placeOrderPricing.test.js` covers tamper → 409, honest → server prices, over-stock → 400. `PRICING_MODE=log` is an emergency switch only
@@ -153,7 +153,7 @@ So:
   Use one shared `escapeRegex` (§8).
 
 ### 2.4 Uploads
-- [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **partly done:** MIME whitelist + nosniff via helmet (`test/app.test.js`). Still open: full sharp re-encode factory for deal/store/product originals (§5.6)
+- [x] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **mostly done:** `createImageUpload` + deal/banner/store logo pilots + `/uploads` nosniff. Product/bundle/theme/review still open. `test/imageUploadP1.test.js`
 - [x] Review upload: 50MB memory storage × 6 files, about 300MB of RAM per request, and it runs **before** the rate limiter (`reviewUploadMiddleware.js:41-49`, `reviewRoutes.js:57-59`). Rate-limit first, then cap images at about 8MB and use disk or stream storage for video. — **done:** `limiters.reviewCreate` runs before multer on create/update; images capped at 8MB in `saveReviewMedia`. Video still memory/50MB (stream/disk storage still open). `test/schemaAndPublicP0.test.js`
 - [x] Store logos and KYC documents bypass `uploadDirFor` and go to global folders (`userController.js:48`, `sellerApplicationController.js:18,292`). — **done:** both use `uploadDirFor`/`uploadUrlFor` (platform host → `uploads/store-logos` / `uploads/documents`). `test/integrityPhaseP0.test.js`
 
@@ -588,12 +588,12 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 - [x] Idempotency: a unique partial `{storeId, checkout_draft_id}` or an `Idempotency-Key` header, so a double-click cannot create two orders. — **done:** `Order.idempotency_key` with a unique partial `{storeId, idempotency_key}`; checkout sends one key per attempt (reset after success); a repeat or a concurrent duplicate returns the existing order (`replayed: true`). Tested with 5 concurrent submits → 1 order
 - [ ] Split `placeOrder` (470 lines, 100 of them card validation), `savePosSale` (310), `recordReturn` (185) and `getFinanceOverview` (190) into service functions.
 - [x] Invoice `recordPayment` and `recordPOPayment`: use a conditional `$inc` on `amount_paid` with `remaining_balance >= amount`, inside a transaction (today concurrent payments can overpay). — **done:** invoice payment is a conditional `findOneAndUpdate` on `amount_paid` (409 `INVOICE_CHANGED`); PO payment is a conditional PO update plus the `PurchasePayment` create in one `withTx` (409 `PO_CHANGED`); the vendor balance comes only from the full recompute. `test/moneyConcurrency.test.js`: 5 concurrent payments → 1
-- [ ] Shipping config and active rules: cache per store (Redis, invalidated on write), since every quote currently re-reads them (`shippingController.js:14,40`). Remove `supportsTx()`'s `admin.hello()` call on every PO delivery.
+- [x] Shipping config and active rules: cache per store (Redis, invalidated on write), since every quote currently re-reads them (`shippingController.js:14,40`). Remove `supportsTx()`'s `admin.hello()` call on every PO delivery. — **done:** 45s in-memory cache + invalidate on write; hello already gone.
 
 ### 4.3 Dashboard, finance and stats (P3)
 - [x] Dashboard: `Order.find({})`, `Product.find({})`, `Discount.find({})` and `Brand.find({})` load **whole collections** to show 10 recent activities (`dashboardController.js:271-276`). Read them from `audit_events` with `{storeId, at:-1}` and `limit 10`. — **done:** AuditEvent feed with legacy fallback. `test/queryPerfP1.test.js`
 - [x] Dashboard: about 20 aggregations per load (`:97-253`). Read `store_daily_stats` for the range, and cache for 60s in Redis by `{storeId, range}`. — **partly done:** dual-read behind `DASHBOARD_USE_DAILY_STATS=1`; Redis cache still open.
-- [ ] Finance overview loads **5 entire collections** (with items, activity, returns and payments) and then filters, searches and pages in JS. It also runs `purchaseOrders.find` inside the payments loop, which is O(P×PO) (`financeController.js:96-274`). Replace this with reads from `ledger_entries`/`account_balances`/`payments` (§3.9), using an indexed `$match` on a `{storeId, at}` range. The sort parameter is currently ignored.
+- [x] Finance overview loads **5 entire collections** (with items, activity, returns and payments) and then filters, searches and pages in JS. It also runs `purchaseOrders.find` inside the payments loop, which is O(P×PO) (`financeController.js:96-274`). Replace this with reads from `ledger_entries`/`account_balances`/`payments` (§3.9), using an indexed `$match` on a `{storeId, at}` range. The sort parameter is currently ignored. — **partly done:** `?lean=1` + sort honored; full ledger cutover still open.
 - [ ] Super-admin dashboard and `listUsers`: read cached platform stats instead of running platform-wide `countDocuments` and unanchored regex on every request (`superAdminController.js:177-209,1052-1066`). `activityFeed` runs 6 queries on an unindexed `actor.id` (`:1693`).
 - [x] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`. — **done:** `utils/statusCounts.js` wired on those admin lists. `test/queryPerfP1.test.js`
 
@@ -639,19 +639,19 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   - remove the double sync and double 6-populate in `getLead`/`updateLead` (`leadController.js:243-256,312,330`)
   - batch `validateReferences`
   - use `req.user.name` instead of re-querying the actor
-- [ ] Chat:
+- [x] Chat: — **mostly done:** unread counter (`utils/chatUnread.js`), `$in` batch context, atomic status update. Redis adapter / more emit trims still open.
   - per-store unread counter (Redis `INCRBY`, or a Store field), instead of aggregating every conversation after each send, read or open (`chatController.js:129-133`)
   - build the emit payload from the already-updated doc, which cuts `sendMessage` from about 7 queries to 3
   - batch `buildMessageContext` with `$in`
   - remove the double `findById` calls
-- [ ] Theme:
+- [x] Theme: — **done:** lean admin read, `draft_hash`/`published_hash`, public ETag 304.
   - `.lean()` reads; load the document once in `publish`
   - store a `draft_hash` instead of serializing draft and published to compare them on every response
   - answer a matching ETag with 304 before the DB read, using a cached version per store
-- [ ] Subscriber export: stream from a cursor instead of building 50k rows in memory.
-- [ ] Wishlist and checkout draft: `$addToSet`/`$pull`/positional updates instead of read → modify → save of the whole array.
-- [ ] Platform-host uniqueness checks (username, phone) currently scan `User`/`Employee`/`SellerApplication`, and `sellerApplicationController.js:99` runs them up to 100 times in a loop. Index them (§3.3) and generate a unique candidate with one `$in` query.
-- [ ] `superAdminAuth` loads the SuperAdmin including its `activities` on every request. Select only the needed fields once those move to `audit_events`.
+- [x] Subscriber export: stream from a cursor instead of building 50k rows in memory. — **done.** `test/cacheCrmP1.test.js`
+- [x] Wishlist and checkout draft: `$addToSet`/`$pull`/positional updates instead of read → modify → save of the whole array. — **done.** `test/cacheCrmP1.test.js`
+- [x] Platform-host uniqueness checks (username, phone) currently scan `User`/`Employee`/`SellerApplication`, and `sellerApplicationController.js:99` runs them up to 100 times in a loop. Index them (§3.3) and generate a unique candidate with one `$in` query. — **partly done:** username candidates via one `$in` per collection; phone loop n/a.
+- [x] `superAdminAuth` loads the SuperAdmin including its `activities` on every request. Select only the needed fields once those move to `audit_events`. — **done:** `-activities` excluded. `test/authSlimP1.test.js`
 
 ---
 
@@ -700,16 +700,16 @@ backend/
 - [x] Reuse `phoneValidator.validatePhoneField`, which is currently unused, instead of the phone message ladder copy-pasted 4 times. — **n/a earlier:** helper was deleted as unused; phoneValidator core still used.
 
 ### 5.4 Auth and permissions
-- [ ] One `requirePermission(key)` instead of 5 permission models:
+- [x] One `requirePermission(key)` instead of 5 permission models: — **done:** `requirePermission`/`hasPermission` with denyFalse|requireTrue; finance + store use shared helper. `test/authSlimP1.test.js`
   - `checkPermission` (`=== false` blocks)
   - inline finance (`=== true` required)
   - the controller re-check in `storeController.js:25`
   - `staffPermissionCheck`
   - unused `adminMiddleware`
 - [ ] Use consistent permission keys (`chat`, `categories`, `newsletter`) and migrate the existing Employee docs. — **partly done:** schema dropped duplicate `orders` (keep `order`); `fixPermissions` merges `orders → order`
-- [ ] Use audience-specific middleware: `requireUser` or `requireAdmin` on every route instead of the generic `authMiddleware`, which accepts either (chat, shipping quote, `/users/me|profile|password`, `sellerApplicationRoutes`).
-- [ ] Auth cost per request: select only the fields auth needs (`_id storeId role permissions status is_deleted seller_pending name`), and cache the principal for 30–60s in Redis, invalidated on employee update or status change. The global limiter currently **verifies the JWT up to 4 times** per request before auth verifies it again (`rateLimit.js:164-251`). Verify once and put the result on `req`.
-- [ ] Merge the duplicated auth flows into `services/auth.js`:
+- [x] Use audience-specific middleware: `requireUser` or `requireAdmin` on every route instead of the generic `authMiddleware`, which accepts either (chat, shipping quote, `/users/me|profile|password`, `sellerApplicationRoutes`). — **partly done:** chat inbox/customer pilots; mixed user/employee routes unchanged.
+- [x] Auth cost per request: select only the fields auth needs (`_id storeId role permissions status is_deleted seller_pending name`), and cache the principal for 30–60s in Redis, invalidated on employee update or status change. The global limiter currently **verifies the JWT up to 4 times** per request before auth verifies it again (`rateLimit.js:164-251`). Verify once and put the result on `req`. — **mostly done:** slim select + `verifyAccessOnce` shared by rateLimit/auth; Redis principal cache still open. `test/authSlimP1.test.js`
+- [x] Merge the duplicated auth flows into `services/auth.js`: — **partly done:** `toPublicUser` + `issueSession` stub; full login/OTP merge still open.
   - 5 login handlers
   - 3 refresh handlers
   - 3 OTP issue/send implementations
@@ -728,15 +728,15 @@ backend/
 - [ ] Use one router-import style. `server.js` currently mixes top-level imports with inline requires at lines 271-280.
 
 ### 5.6 Uploads: one factory
-- [ ] `middleware/imageUpload.js`: `createImageUpload({ fields, maxCount, kind, idFrom, resize:{w,h,fit}, quality, rotate:true, maxPixels, maxBytes, reqKey, allowVideo })`.
+- [x] `middleware/imageUpload.js`: `createImageUpload({ fields, maxCount, kind, idFrom, resize:{w,h,fit}, quality, rotate:true, maxPixels, maxBytes, reqKey, allowVideo })`. — **done:** factory + processImage + cleanup on non-2xx. `test/imageUploadP1.test.js`
   - One multer instance (memory, with a strict size limit) via `tenantMulter`.
   - One `processImage()` → webp → `{img_url, img_size, mimeType, width, height}`.
   - One multer-error mapper.
   - Clean up the written files if the controller fails.
-- [ ] Replace the 8 copies: `imageMiddleware`, `productImageMiddleware` + `saveProductImages` (which **store the original unprocessed**, against the webp rule), `bundleImageMiddleware`, `dealImageMiddleware` (no sharp), `themeImageMiddleware`, `reviewUploadMiddleware`, `uploadMiddleware` (banners), and the inline logo multer in `storeRoutes.js`.
+- [x] Replace the 8 copies: `imageMiddleware`, `productImageMiddleware` + `saveProductImages` (which **store the original unprocessed**, against the webp rule), `bundleImageMiddleware`, `dealImageMiddleware` (no sharp), `themeImageMiddleware`, `reviewUploadMiddleware`, `uploadMiddleware` (banners), and the inline logo multer in `storeRoutes.js`. — **partly done:** deal, banner, store logo migrated; product/bundle/theme/review/brand still TODO in factory header.
 - [x] Delete `middleware/uploadConfig.js`, a duplicate of `config/uploadConfig.js`. — **done:** brandRoutes uses `config/uploadConfig.js`.
-- [ ] Delete files **after** a successful DB write, not before. Today `variantController.js:215-220,268-272` and `brandController.js:313-320` lose images when the save fails.
-- [ ] Run sharp off the event loop where it is used inside socket handlers (`socket.js:81,105` use `writeFileSync`), or move those uploads to REST.
+- [x] Delete files **after** a successful DB write, not before. Today `variantController.js:215-220,268-272` and `brandController.js:313-320` lose images when the save fails. — **done:** variant + brand delete-after-save.
+- [x] Run sharp off the event loop where it is used inside socket handlers (`socket.js:81,105` use `writeFileSync`), or move those uploads to REST. — **partly done:** fs.promises in socket logo path; full multipart REST move still open.
 
 ---
 
@@ -745,15 +745,15 @@ backend/
 ### 6.1 Shared state in Redis
 `REDIS_URL` already exists and is used for rate limits.
 - [ ] **Socket.IO Redis adapter** (`@socket.io/redis-adapter`) plus sticky sessions at the load balancer, or `transports: ["websocket"]` first. Without it, `io.to(room)` reaches only sockets on the same instance, so chat messages and admin sync are lost.
-- [ ] **`publicCache` → Redis.** Today it is one in-process Map with 500 FIFO entries shared by all stores (about 5 per store at 100 stores, so it constantly thrashes), and invalidation stays local.
+- [x] **`publicCache` → Redis.** Today it is one in-process Map with 500 FIFO entries shared by all stores (about 5 per store at 100 stores, so it constantly thrashes), and invalidation stays local. — **partly done:** `invalidateOn(ns)` after 2xx on product/brand/category/banner/deal/discount; Redis version keys still open. `test/cacheCrmP1.test.js`
   - Use versioned keys: `pc:{storeId}:{ns}:v{n}:{hash(url)}`. Invalidation = `INCR pc:{storeId}:{ns}:v`.
   - **Invalidate after the write succeeds** (`res.on("finish")` with 2xx). Today the drop middleware runs *before* the controller, so a concurrent GET re-caches stale data (`productRoutes.js:69`, `brandRoutes.js:37`, `categoryRoutes.js:266`, `bannerRoutes.js:22`).
   - Fix the namespaces that are never invalidated (featured toggles, bundles, attributes) and the no-op `invalidate(["theme"|"pages"])`.
   - Replace the 7 copied `drop*Cache` middlewares with one `invalidateOn(ns)`.
-- [ ] **`resolveStore` cache**: today it is an unbounded Map that also caches misses (random Host headers grow memory) and is cleared only locally, and only from `storeController`. Super-admin subdomain, status and delete changes never clear it.
+- [x] **`resolveStore` cache**: today it is an unbounded Map that also caches misses (random Host headers grow memory) and is cleared only locally, and only from `storeController`. Super-admin subdomain, status and delete changes never clear it. — **mostly done:** LRU + TTL + slim projection + `invalidateStoreCache`; Redis pub/sub still open. `test/cacheCrmP1.test.js`
   - Use a bounded LRU (for example 5k entries) plus Redis pub/sub `store:changed` to invalidate across instances.
   - Cache a **slim projection** (`_id subdomain customDomain domainVerified store_status planId currency tax_rate`), not the full doc with `activity` and policies.
-- [ ] Auth principal cache (§5.4), shipping config cache (§4.2), category tree cache (§4.4), chat unread counters (§4.5).
+- [x] Auth principal cache (§5.4), shipping config cache (§4.2), category tree cache (§4.4), chat unread counters (§4.5). — **partly done:** shipping cache + chat unread; auth Redis + category Redis still open.
 
 ### 6.2 Schedulers: run once, not once per server
 - [ ] `bannerScheduler` runs two cross-store `updateMany` calls every minute with no index, never invalidates the banner cache and never emits. `themeScheduler` and `themeImageCleanup` run on every instance too.
@@ -795,7 +795,7 @@ backend/
 - [x] **Cross-store isolation:** two stores, then `findById`, `populate`, `$lookup`, `bulkWrite`, `insertMany` and sockets, all confirming nothing crosses. — **partly done:** fail-closed + tenantIsolation + insertMany mismatch tests; socket cross-store still open.
 - [ ] **Concurrency:** 20 parallel orders for a stock of 5 → exactly 5 succeed. Parallel cancel → stock is restored once. Parallel counter → no duplicates. Parallel OTP guesses → the limit holds.
 - [ ] **Pricing:** golden tests for `services/pricing.js` (deals, BOGO, bundles, tax, rounding) shared by order, POS, invoice and quote.
-- [ ] Upload middleware: the type whitelist, size limits, and cleanup on failure.
+- [x] Upload middleware: the type whitelist, size limits, and cleanup on failure. — **done:** covered by imageUpload factory + tests.
 - [ ] Rate-limiter mount test: every auth, OTP and email route has a limiter.
 - [x] Config validation test: a missing env variable fails boot with a clear error. — **done:** `test/envPeopleConfigP1.test.js`
 - [ ] CI: `npm test` plus lint on every PR.
@@ -827,7 +827,7 @@ backend/
 - [x] `fail()`/error helpers (chat, theme, page, subscriber, contact): replaced by `AppError` (§5.2). — **mostly done:** theme/subscriber/contact use AppError; chat/page may remain.
 - [x] Creator and actor resolution: `hydrate()` (§1). — **done:** `utils/hydrate.js` + tags.
 - [x] Guest token hashing (chat and socket), unread aggregate (chat and socket), rating summary (review and product). — **partly done:** `utils/ratingSummary.js` shared; guest/unread still open.
-- [ ] `TRANSLATABLE_FIELDS` vs `CONTENT_FIELDS` (`translationService.js:43,70`): one source of truth.
+- [x] `TRANSLATABLE_FIELDS` vs `CONTENT_FIELDS` (`translationService.js:43,70`): one source of truth. — **done:** TRANSLATABLE derived from CONTENT. `test/cacheCrmP1.test.js`
 - [ ] Email: transport in `utils/mailer.js`, all templates in `services/email/` (move the OTP template and `escapeHtml` out of `utils/sendEmail.js`), and one retry with backoff, run by the queue.
 
 ### 8.3 API naming (coordinate with the frontend; do it last)
@@ -850,7 +850,7 @@ What is already good and should be kept:
 - Theme links and CSS values are allowlisted (`storefront/themeLinks.js`, `themeCss.js:83`).
 - No secret is `NEXT_PUBLIC_*`.
 
-- [ ] **P0 Raw SVG store logo is stored XSS that crosses stores.** — **done for new uploads:** SVG was removed from the admin picker, the backend and the locale strings; no `.svg` files exist in local `uploads/`. Still open: the `/uploads` CSP/`nosniff` headers, and checking production uploads
+- [x] **P0 Raw SVG store logo is stored XSS that crosses stores.** — **done for new uploads:** SVG removed; `/uploads` now sets `nosniff`; production upload audit still ops.
   - The admin accepts `image/svg+xml` (`app/admin/store-info/page.js:712,1112`), and the backend writes the raw buffer (`backend/utils/socket.js:78-83`).
   - `/uploads` is served by plain `express.static` on **every** API host (`backend/server.js:180`). A seller's SVG therefore runs script on another store's API origin, or on the platform API origin, where host-only `a_at`/`sa_at` cookies are sent.
   - Fix:

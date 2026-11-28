@@ -46,6 +46,11 @@ exports.submitMessage = async (req, res) => {
     } catch (_) {}
     return res.status(201).json({ success: true });
   } catch (error) {
+    // AppError (validation / store missing) — 500 me mat dabao
+    if (error instanceof AppError || error?.isOperational) {
+      const extra = { ...(error.code ? { code: error.code } : {}), ...(error.details || {}) };
+      return fail(res, error.status || 400, error.message, extra);
+    }
     return fail(res, 500, "Could not send your message right now");
   }
 };

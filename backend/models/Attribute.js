@@ -23,7 +23,9 @@ const attributeSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, trim: true, lowercase: true },
 
-    // Category field for filtering attributes by type
+    // ⚠️ DEPRECATED (§3.7): free-text category string. Ab koi code ise nahi likhta
+    // (seedAttributes $unset karta hai); sirf purane docs ke liye read-fallback.
+    // Asli link CategoryAttribute / Category.attributes se hota hai.
     category: { type: String, trim: true, lowercase: true, index: true },
 
     data_type: {

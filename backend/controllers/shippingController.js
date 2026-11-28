@@ -2,7 +2,42 @@ const ShippingConfig = require("../models/ShippingConfig");
 const ShippingRule = require("../models/ShippingRule");
 const ShippingMethod = require("../models/ShippingMethod");
 
+const { getStoreId } = require("../utils/tenantContext");
+
+// ── Per-store memo (§4.2 / §6.1): checkout/quote har baar config + active rules DB se
+// padhta tha. Ab storeId ke hisaab se 45s TTL cache; har write par drop (emit() me).
+const SHIP_CACHE_TTL_MS = 45 * 1000;
+const SHIP_CACHE_MAX = 2000;
+const shipCache = new Map(); // storeId → { config, rules, expires }
+
+const shipKey = () => String(getStoreId() || "platform");
+
+function dropShippingCache() {
+  const id = getStoreId();
+  if (id) shipCache.delete(String(id));
+  else shipCache.clear();
+}
+
+async function getCachedShipping({ withRules = false } = {}) {
+  const key = shipKey();
+  let entry = shipCache.get(key);
+  if (!entry || entry.expires <= Date.now()) {
+    // getConfig() singleton upsert hai → pehli baar doc bana bhi deta hai
+    const config = (await ShippingConfig.getConfig()).toObject();
+    entry = { config, rules: null, expires: Date.now() + SHIP_CACHE_TTL_MS };
+    shipCache.delete(key);
+    while (shipCache.size >= SHIP_CACHE_MAX) shipCache.delete(shipCache.keys().next().value);
+    shipCache.set(key, entry);
+  }
+  if (withRules && !entry.rules) {
+    entry.rules = await ShippingRule.find({ is_active: true }).lean();
+  }
+  return entry;
+}
+
+// Har shipping write isi emit se guzarta hai → cache yahin drop (write ke BAAD, pehle nahi)
 const emit = (event, data) => {
+  dropShippingCache();
   try {
     const { getIO } = require("../utils/socket");
     getIO().emit(event, data);
@@ -11,7 +46,7 @@ const emit = (event, data) => {
 
 // ✅ Core calculator — checkout + placeOrder dono use karenge
 const calculateShipping = async ({ items = [], method = "standard", subtotal = 0 }) => {
-  const config = await ShippingConfig.getConfig();
+  const { config } = await getCachedShipping();
 
   // ✅ Custom method support: agar method standard/express nahi, to ShippingMethod
   //    collection se uski fee nikalo (inactive/missing => standard fee fallback).
@@ -37,7 +72,7 @@ const calculateShipping = async ({ items = [], method = "standard", subtotal = 0
 
   // ✅ Brand / Category / Product / All rules
   if (!free && items.length) {
-    const rules = await ShippingRule.find({ is_active: true }).lean();
+    const { rules } = await getCachedShipping({ withRules: true });
     outer: for (const item of items) {
       for (const r of rules) {
         const refId = String(r.ref_id || "");
@@ -342,6 +377,7 @@ const toggleShippingMethod = async (req, res) => {
 };
 
 module.exports = {
+  dropShippingCache,
   calculateShipping,
   getShippingConfig,
   getActiveShippingRules,

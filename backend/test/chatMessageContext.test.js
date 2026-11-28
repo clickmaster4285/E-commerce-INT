@@ -22,10 +22,31 @@ const replace = (object, key, value, restore) => {
   object[key] = value;
   restore.push(() => { object[key] = previous; });
 };
+
+/** Batch $in mocks — buildMessageContext ab Product.find / Variant.find use karta hai (fail-closed safe). */
+const mockCatalogMaps = (products, variants, restore) => {
+  replace(Product, "find", (filter) => {
+    const ids = (filter?._id?.$in || []).map(String);
+    return asQuery(ids.map((id) => products.get(id)).filter(Boolean));
+  }, restore);
+  replace(Product, "findOne", (filter) => asQuery(products.get(String(filter._id)) || null), restore);
+  replace(Variant, "find", (filter) => {
+    const ids = (filter?._id?.$in || []).map(String);
+    return asQuery(ids.map((id) => variants.get(id)).filter(Boolean));
+  }, restore);
+  replace(Variant, "findOne", (filter) => {
+    const v = variants.get(String(filter._id));
+    if (!v) return asQuery(null);
+    if (filter.product_id && String(filter.product_id) !== String(v.product_id)) return asQuery(null);
+    return asQuery(v);
+  }, restore);
+};
+
 const withCatalog = async (callback) => {
   const restore = [];
-  replace(Product, "findOne", () => asQuery(product), restore);
-  replace(Variant, "findOne", () => asQuery(variant), restore);
+  const products = new Map([[String(productId), product]]);
+  const variants = new Map([[String(variantId), variant]]);
+  mockCatalogMaps(products, variants, restore);
   try { await callback(); } finally { restore.reverse().forEach((fn) => fn()); }
 };
 
@@ -48,8 +69,7 @@ test("multiple product variants are independently verified and kept as one messa
   const secondVariantId = new mongoose.Types.ObjectId();
   const products = new Map([[String(productId), product], [String(secondProductId), { _id: secondProductId, name: "Verified trousers", description: "Denim trousers" }]]);
   const variants = new Map([[String(variantId), variant], [String(secondVariantId), { _id: secondVariantId, product_id: secondProductId, title: "Black / 32", sku: "TROUSER-B32", selling_price: 33300 }]]);
-  replace(Product, "findOne", (filter) => asQuery(products.get(String(filter._id))), restore);
-  replace(Variant, "findOne", (filter) => asQuery(String(filter.product_id) === String(variants.get(String(filter._id))?.product_id) ? variants.get(String(filter._id)) : null), restore);
+  mockCatalogMaps(products, variants, restore);
   try {
     const snapshot = await controller._buildMessageContext({ body: { context: { kind: "product", products: [{ productId, variantId }, { productId: secondProductId, variantId: secondVariantId }] } } }, {});
     assert.equal(snapshot.item_count, 2);
@@ -176,4 +196,3 @@ test("HTTP chat sends reject message 31 before save and leave admins unrestricte
     for (let index = 0; index < 31; index += 1) assert.equal((await invoke(new mongoose.Types.ObjectId(), "employee", "admin", `Admin reply ${index + 1}`)).status, 201);
   } finally { restore.reverse().forEach((fn) => fn()); }
 });
-

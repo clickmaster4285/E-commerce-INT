@@ -87,6 +87,8 @@ const UPLOAD_CSP = "default-src 'none'; img-src 'self' data:; media-src 'self'; 
 app.use((req, res, next) => {
   if (req.path.startsWith("/uploads/")) {
     if (!req.path.startsWith("/uploads/documents")) res.setHeader("Content-Security-Policy", UPLOAD_CSP);
+    // helmet default me deta hai, par static ke liye explicit — MIME sniffing se script na bane
+    res.setHeader("X-Content-Type-Options", "nosniff");
   } else if (API_PREFIX && req.path.startsWith(API_PREFIX)) {
     res.setHeader("Content-Security-Policy", API_CSP);
   }

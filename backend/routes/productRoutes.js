@@ -29,10 +29,11 @@ const {
 
 const saveProductImages = require("../middleware/saveProductImages");
 
-const { publicCache, invalidate } = require("../utils/publicCache");
+const { publicCache } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
-const dropProductsCache = (req, res, next) => { invalidate("products"); next(); };
+const dropProductsCache = invalidateOn("products");
 
 const router = express.Router();
 

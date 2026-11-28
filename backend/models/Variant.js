@@ -113,8 +113,14 @@ const variantSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
     },
     // ✅ NEW: Tags field added here
+    // Legacy string tags — naya code tag_ids use kare (tag_ids aaye to ye likhna band)
     tags: {
       type: [String],
+      default: [],
+    },
+    // Tag refs (§3.7) — naam badalne par har variant me string update nahi karni padti
+    tag_ids: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag" }],
       default: [],
     },
     images: {

@@ -43,6 +43,17 @@ const resolveTags = async (tagNames, userId) => {
   return finalTagIds;
 };
 
+/** body.tag_ids (array / JSON string) → valid ObjectId list; na aaye to null (legacy string-tags path) */
+const parseTagIds = (raw) => {
+  if (raw === undefined || raw === null || raw === "") return null;
+  let list = raw;
+  if (typeof raw === "string") {
+    try { list = JSON.parse(raw); } catch { return null; }
+  }
+  if (!Array.isArray(list)) return null;
+  return [...new Set(list.map(String).filter((id) => require("mongoose").isValidObjectId(id)))];
+};
+
 // CREATE VARIANT
 const createVariant = async (req, res) => {
   try {
@@ -59,8 +70,14 @@ const createVariant = async (req, res) => {
     if (!Array.isArray(tags)) tags = [];
 
     // Ensure Tag docs exist so Created By is tracked for variant tags too
-    if (tags.length > 0) {
-      await resolveTags(tags, req.user?._id);
+    // tag_ids (§3.7): Tag refs; body.tag_ids aaye to wahi (string tags nahi likhte), warna names se resolve
+    let tagIds = [];
+    const bodyTagIds = parseTagIds(req.body.tag_ids);
+    if (bodyTagIds) {
+      tagIds = bodyTagIds;
+      tags = [];
+    } else if (tags.length > 0) {
+      tagIds = await resolveTags(tags, req.user?._id);
     }
 
     const variant = await Variant.create({
@@ -78,7 +95,8 @@ const createVariant = async (req, res) => {
       max_qnt: Number(req.body.max_qnt || 0),
       topup: Number(req.body.topup) || 0,
       attributes,
-      tags, // ✅ Tags saved here
+      tags, // ✅ Tags saved here (legacy string tags — tag_ids aaye to khaali)
+      tag_ids: tagIds,
       images: req.savedImages || [],
       createdby: req.user?._id || null,
       // A newly-created variant has no editor yet. Set this only on a real edit.
@@ -245,26 +263,30 @@ const updateVariant = async (req, res) => {
     }
 
     // ✅ Update tags agar request mein aaye hain
-    if (req.body.tags !== undefined) {
+    const updateTagIds = parseTagIds(req.body.tag_ids);
+    if (updateTagIds) {
+      // tag_ids diye gaye → refs update, string tags ko haath nahi lagate
+      variant.tag_ids = updateTagIds;
+    } else if (req.body.tags !== undefined) {
       const parsedTags = typeof req.body.tags === "string"
         ? JSON.parse(req.body.tags)
         : req.body.tags;
       const variantTagList = Array.isArray(parsedTags) ? parsedTags : [];
       // Ensure Tag docs exist so Created By is tracked for variant tags too
-      if (variantTagList.length > 0) {
-        await resolveTags(variantTagList, req.user?._id);
-      }
+      const resolvedIds = variantTagList.length > 0 ? await resolveTags(variantTagList, req.user?._id) : [];
       // ✅ FIX: tags waqai badle hon to hi assign karo
       if (!isSameList(variant.tags, variantTagList)) {
         variant.tags = variantTagList;
+        variant.tag_ids = resolvedIds; // string tags ke saath refs bhi sync
       }
     }
 
     // Agar new images upload hui hain
+    // ⚠️ Purani files DB save ke BAAD delete hongi (§5.6 delete-after-write) —
+    // save fail ho to purani images disk par bachi rehti hain.
+    let oldImageUrls = [];
     if (req.savedImages?.length) {
-      for (const image of variant.images) {
-        await deleteImageFile(image.img_url);
-      }
+      oldImageUrls = variant.images.map((image) => image.img_url);
       variant.images = req.savedImages;
     }
 
@@ -274,6 +296,11 @@ const updateVariant = async (req, res) => {
     if (variant.isModified()) {
       variant.updatedby = req.user?._id || null;
       await variant.save();
+
+      // ✅ Save kamyab — ab purani image files hatao (best-effort)
+      for (const url of oldImageUrls) {
+        try { await deleteImageFile(url); } catch (_) { /* orphan reh jana behtar */ }
+      }
 
       if (req.savedImages?.length) {
         emitSocketEvent("productUpdated", {

@@ -27,25 +27,31 @@ const actorId = (req) => (req.userType === "employee" && req.user?._id ? req.use
 
 /** Isi store ka theme document — pehli baar default se banta hai (race-safe) */
 async function getOrCreateTheme() {
-  const existing = await StoreTheme.findOne();
+  // .lean(): callers sirf padhte hain (writes findOneAndUpdate se hote hain) — hydrate ka kharcha nahi
+  const existing = await StoreTheme.findOne().lean();
   if (existing) return existing;
   const defaults = buildDefaultTheme();
+  const h = themeHash(defaults);
   try {
-    return await StoreTheme.create({ draft: defaults, published: defaults });
+    const created = await StoreTheme.create({ draft: defaults, published: defaults, draft_hash: h, published_hash: h });
+    return created.toObject();
   } catch (error) {
     // Do requests ek saath → unique { storeId } index; doosra wala existing utha le
-    if (error?.code === 11000) return StoreTheme.findOne();
+    if (error?.code === 11000) return StoreTheme.findOne().lean();
     throw error;
   }
 }
 
-const themeHash = (value) => crypto.createHash("sha1").update(JSON.stringify(value || null)).digest("hex");
+function themeHash(value) {
+  return crypto.createHash("sha1").update(JSON.stringify(value || null)).digest("hex");
+}
 
 const adminView = (doc) => {
   const draft = doc.draft || buildDefaultTheme();
   const published = doc.published || buildDefaultTheme();
-  const draft_hash = themeHash(draft);
-  const published_hash = themeHash(published);
+  // Stored hash ho to use (serialize skip); purane docs ke liye fallback compute
+  const draft_hash = doc.draft_hash || themeHash(draft);
+  const published_hash = doc.published_hash || themeHash(published);
   return {
     draft,
     published,
@@ -111,7 +117,24 @@ exports.getSchema = (req, res) => res.status(200).json({ success: true, data: pu
 exports.getTheme = async (req, res) => {
   try {
     const doc = await getOrCreateTheme();
-    return res.status(200).json({ success: true, data: adminView(doc) });
+    // Purane docs me hash nahi → ek baar compute karke save (best-effort, response block nahi)
+    if (!doc.draft_hash || !doc.published_hash) {
+      const draft_hash = doc.draft_hash || themeHash(doc.draft || buildDefaultTheme());
+      const published_hash = doc.published_hash || themeHash(doc.published || buildDefaultTheme());
+      doc.draft_hash = draft_hash;
+      doc.published_hash = published_hash;
+      StoreTheme.updateOne({ _id: doc._id }, { $set: { draft_hash, published_hash } }).catch(() => {});
+    }
+    const view = adminView(doc);
+    // Optional ETag (304): hashes + revision + schedule/preview state — poora JSON hash nahi karna
+    const etag = `"${crypto.createHash("sha1").update(JSON.stringify([
+      view.draft_hash, view.published_hash, view.draftRevision, view.publishedVersion,
+      view.scheduled?.at || null, view.lastScheduleError?.at || null, view.previewLinks.map((l) => l.id),
+    ])).digest("hex")}"`;
+    res.set("ETag", etag);
+    res.set("Cache-Control", "private, no-cache");
+    if (req.headers["if-none-match"] === etag) return res.status(304).end();
+    return res.status(200).json({ success: true, data: view });
   } catch (error) {
     return fail(res, 500, "Failed to load theme");
   }
@@ -131,7 +154,7 @@ exports.saveDraft = async (req, res) => {
     const doc = await StoreTheme.findOneAndUpdate(
       { draftRevision: baseRevision },
       {
-        $set: { draft: result.data, draftUpdatedAt: new Date(), draftUpdatedBy: actorId(req) },
+        $set: { draft: result.data, draft_hash: themeHash(result.data), draftUpdatedAt: new Date(), draftUpdatedBy: actorId(req) },
         $inc: { draftRevision: 1 },
       },
       { returnDocument: "after" },
@@ -168,7 +191,7 @@ async function publishThemeData({ data, storeId, actor = null, note = "", io = n
   const doc = await StoreTheme.findOneAndUpdate(
     { publishedVersion: current.publishedVersion || 0 },
     {
-      $set: { published: result.data, publishedAt: new Date(), publishedBy: actor },
+      $set: { published: result.data, published_hash: themeHash(result.data), publishedAt: new Date(), publishedBy: actor },
       $inc: { publishedVersion: 1 },
     },
     { returnDocument: "after" },
@@ -328,7 +351,12 @@ exports.discardDraft = async (req, res) => {
     const doc = await StoreTheme.findOneAndUpdate(
       { _id: current._id },
       {
-        $set: { draft: current.published || buildDefaultTheme(), draftUpdatedAt: new Date(), draftUpdatedBy: actorId(req) },
+        $set: {
+          draft: current.published || buildDefaultTheme(),
+          draft_hash: current.published_hash || themeHash(current.published || buildDefaultTheme()),
+          draftUpdatedAt: new Date(),
+          draftUpdatedBy: actorId(req),
+        },
         $inc: { draftRevision: 1 },
       },
       { returnDocument: "after" },
@@ -370,7 +398,7 @@ exports.restoreVersion = async (req, res) => {
     const doc = await StoreTheme.findOneAndUpdate(
       { _id: current._id },
       {
-        $set: { draft: result.data, draftUpdatedAt: new Date(), draftUpdatedBy: actorId(req) },
+        $set: { draft: result.data, draft_hash: themeHash(result.data), draftUpdatedAt: new Date(), draftUpdatedBy: actorId(req) },
         $inc: { draftRevision: 1 },
       },
       { returnDocument: "after" },

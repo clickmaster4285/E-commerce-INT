@@ -28,8 +28,22 @@ const resolvePermissionValue = (permissions, permissionKey) => {
   return undefined;
 };
 
-// ✅ Specific permission check
-const checkPermission = (permissionKey) => {
+// ----------------------------------------------------------
+// hasPermission — ek jagah semantics (requirePermission + controllers dono use karein)
+//   mode "denyFalse"   (default): admin always; baqi sirf tab block jab value === false
+//                      (undefined / missing = allow, legacy records).
+//   mode "requireTrue" (finance, store-edit jaise sensitive keys): admin always; baqi
+//                      ko value === true chahiye, missing/false = deny.
+// ----------------------------------------------------------
+const hasPermission = (user, permissionKey, mode = "denyFalse") => {
+  if (!user) return false;
+  if (isAdminRole(user.role)) return true;
+  const value = resolvePermissionValue(user.permissions, permissionKey);
+  return mode === "requireTrue" ? value === true : value !== false;
+};
+
+// ✅ Specific permission check — requirePermission(key, { mode, message })
+const requirePermission = (permissionKey, { mode = "denyFalse", message } = {}) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
@@ -46,22 +60,20 @@ const checkPermission = (permissionKey) => {
       });
     }
 
-    // Admin bypass
-    if (isAdminRole(req.user.role)) {
-      return next();
-    }
-
-    // undefined = allow (legacy), only explicitly false blocks
-    if (resolvePermissionValue(req.user.permissions, permissionKey) === false) {
+    // Admin bypass + denyFalse (undefined = allow, legacy) / requireTrue (sirf true)
+    if (!hasPermission(req.user, permissionKey, mode)) {
       return res.status(403).json({
         success: false,
-        message: `Access denied. You don't have '${permissionKey}' permission. Please contact an administrator.`,
+        message: message || `Access denied. You don't have '${permissionKey}' permission. Please contact an administrator.`,
       });
     }
 
     next();
   };
 };
+
+// Purana naam — behavior same (denyFalse)
+const checkPermission = (permissionKey) => requirePermission(permissionKey);
 
 // ✅ Role-based check (admin + manager + staff)
 const staffPermissionCheck = (req, res, next) => {
@@ -83,6 +95,7 @@ const staffPermissionCheck = (req, res, next) => {
 module.exports = {
   checkPermission,
   staffPermissionCheck,
-  requirePermission: checkPermission, // Backward compatibility
+  requirePermission,
+  hasPermission,
   resolvePermissionValue,
 };

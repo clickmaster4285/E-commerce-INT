@@ -15,11 +15,12 @@ const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
 const upload = require("../config/uploadConfig");
 const processBrandLogo = require("../middleware/imageMiddleware");
-const { publicCache, invalidate } = require("../utils/publicCache");
+const { publicCache } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 const router = express.Router();
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
-const dropBrandsCache = (req, res, next) => { invalidate("brands"); next(); };
+const dropBrandsCache = invalidateOn("brands"); // 2xx ke BAAD drop (finish hook)
 
 // ==========================================
 // 🌐 PUBLIC ROUTES — bina token (User GUI)

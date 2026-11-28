@@ -5,10 +5,11 @@ const upload = require("../middleware/uploadMiddleware");
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require('../middleware/authMiddleware').requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
-const { publicCache, invalidate } = require("../utils/publicCache");
+const { publicCache } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
-const dropBannersCache = (req, res, next) => { invalidate("banners"); next(); };
+const dropBannersCache = invalidateOn("banners"); // 2xx ke BAAD drop (finish hook)
 
 // ✅ Static route pehle (Admin list ke liye)
 router.get("/admin/all", authMiddleware, checkPermission("banners"), ctrl.getAllBanners);

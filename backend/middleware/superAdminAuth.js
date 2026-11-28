@@ -30,7 +30,8 @@ const requireSuperAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
     }
 
-    const superAdmin = await SuperAdmin.findById(payload.userId).select("-passwordHash").lean();
+    // activities array (100 tak entries) har request par load nahi hoti
+    const superAdmin = await SuperAdmin.findById(payload.userId).select("-passwordHash -activities").lean();
     if (!superAdmin) {
       return res.status(401).json({ success: false, message: "Super Admin account not found." });
     }

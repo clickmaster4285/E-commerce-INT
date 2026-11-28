@@ -24,8 +24,42 @@ const Store = require("../models/Store");
 const { parseTenantHost } = require("../utils/tenantHost");
 const { runWithStore, runUnscoped } = require("../utils/tenantContext");
 
+// ── Host → store cache (§6.1) ──
+// Pehle unbounded Map me POORA Store doc (activity/policies blob samet) hamesha ke liye
+// pada rehta tha. Ab: bounded (STORE_CACHE_MAX, LRU-style eviction) + TTL + sirf SLIM fields.
+// Negative lookups (store=null) bhi cache hote hain (chhoti TTL) taake random hosts DB na maren.
 const CACHE_TTL_MS = 60 * 1000;
-const cache = new Map(); // host → { store, expires }
+const NEGATIVE_TTL_MS = 15 * 1000;
+const CACHE_MAX = () => Math.max(1, Number(process.env.STORE_CACHE_MAX) || 3000);
+const cache = new Map(); // host → { store, expires }  (Map insertion order = LRU order)
+
+// Routing + req.store consumers (storeController / dashboard timezone / maintenance) ko jo chahiye
+const STORE_SLIM_PROJECTION = [
+  "_id", "subdomain", "customDomain", "domainVerified", "store_status",
+  "maintenance_message", "store_name", "timezone", "planId", "currency", "tax_rate",
+  "is_deleted",
+].join(" ");
+
+function cacheGet(host) {
+  const hit = cache.get(host);
+  if (!hit) return null;
+  if (hit.expires <= Date.now()) { cache.delete(host); return null; }
+  // LRU: dobara insert karo taake sabse recent last me jaye
+  cache.delete(host);
+  cache.set(host, hit);
+  return hit;
+}
+
+function cacheSet(host, store) {
+  cache.delete(host);
+  const max = CACHE_MAX();
+  while (cache.size >= max) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+  cache.set(host, { store, expires: Date.now() + (store ? CACHE_TTL_MS : NEGATIVE_TTL_MS) });
+}
 
 const crypto = require("crypto");
 
@@ -89,7 +123,7 @@ function hostFromRequest(req) {
 async function findStoreForTenant(tenant) {
   const alive = { is_deleted: { $ne: true } };
   if (tenant.type === "subdomain") {
-    return Store.findOne({ subdomain: tenant.subdomain, ...alive }).lean();
+    return Store.findOne({ subdomain: tenant.subdomain, ...alive }, STORE_SLIM_PROJECTION).lean();
   }
   if (tenant.type === "custom") {
     const filter = {
@@ -98,7 +132,7 @@ async function findStoreForTenant(tenant) {
     };
     // Development me hosts-file wale domains (eastore.test) bina DNS verification ke chalne do
     if (process.env.NODE_ENV === "production") filter.domainVerified = true;
-    return Store.findOne(filter).lean();
+    return Store.findOne(filter, STORE_SLIM_PROJECTION).lean();
   }
   return null;
 }
@@ -108,19 +142,36 @@ async function resolveStoreByHost(rawHost) {
   const tenant = parseTenantHost(rawHost);
   if (tenant.type === "platform" || tenant.type === "unknown") return { tenant, store: null };
 
-  const hit = cache.get(tenant.host);
-  if (hit && hit.expires > Date.now()) return { tenant, store: hit.store };
+  const hit = cacheGet(tenant.host);
+  if (hit) return { tenant, store: hit.store };
 
   // host se store dhoondna: abhi store context bana hi nahi → jaan boojh kar unscoped
   const store = await runUnscoped(() => findStoreForTenant(tenant));
-  cache.set(tenant.host, { store, expires: Date.now() + CACHE_TTL_MS });
+  cacheSet(tenant.host, store);
   return { tenant, store };
 }
 
-/** Store ka subdomain/domain badle to purana cache hatao */
-function clearStoreHostCache() {
-  cache.clear();
+/**
+ * Cache invalidate: arg na ho → sab; host string → woh host; storeId → us store ke saare hosts.
+ * Super-admin (approve/suspend/delete) aur storeController (domain change) yahi use karte hain.
+ */
+function invalidateStoreCache(hostOrId) {
+  if (hostOrId === undefined || hostOrId === null || hostOrId === "") return cache.clear();
+  const key = String(hostOrId);
+  if (cache.delete(key)) return;
+  const parsed = parseTenantHost(key);
+  if (parsed.host) cache.delete(parsed.host);
+  for (const [host, entry] of [...cache.entries()]) {
+    if (entry.store && String(entry.store._id) === key) cache.delete(host);
+  }
 }
+
+/** Store ka subdomain/domain badle to purana cache hatao (backward-compatible alias) */
+function clearStoreHostCache(hostOrId) {
+  invalidateStoreCache(hostOrId);
+}
+
+const _cacheSize = () => cache.size;
 
 const notFound = (res, tenant) =>
   res.status(404).json({
@@ -195,4 +246,6 @@ async function resolveStore(req, res, next) {
   return runWithStore(store._id, next);
 }
 
-module.exports = { resolveStore, resolveStoreByHost, clearStoreHostCache, isPlatformRoute };
+module.exports = {
+  resolveStore, resolveStoreByHost, clearStoreHostCache, invalidateStoreCache, isPlatformRoute, _cacheSize,
+};

@@ -15,7 +15,22 @@
 const User = require("../models/User");
 const Employee = require("../models/Employee");
 const log = require("../utils/logger");
-const { AUDIENCES, verifyAccess } = require("../utils/tokens");
+const { AUDIENCES } = require("../utils/tokens");
+const { verifyAccessOnce } = require("../utils/authPayload");
+
+// ----------------------------------------------------------
+// PERMISSION KEY ALIASES (checkPermission.js ke PERMISSION_ALIASES + routes)
+//   order  <-> orders      : chat inbox `orders` se guard hota hai (controller `order`)
+//   categories → routes `products` key use karte hain (categoryRoutes)
+//   newsletter → `customers` key (subscriberRoutes)
+//   chat       → `orders` key (chatRoutes staff inbox)
+// TODO: Employee records me baqi purani keys (`order`, `attribute`, `users`)
+//       ko canonical naam par migrate karna — abhi alias se kaam chalta hai.
+// ----------------------------------------------------------
+
+// Principal (req.user) ke liye slim select — password / activities / avatar /
+// translations load nahi hote. Sirf wo fields jo controllers req.user se padhte hain.
+const PRINCIPAL_SELECT = "_id storeId role permissions status is_deleted seller_pending name email username phone";
 
 const MODEL_FOR = { admin: () => Employee, user: () => User };
 const TYPE_FOR = { admin: "employee", user: "user" };
@@ -41,7 +56,8 @@ function findAccessToken(req, audiences) {
     if (!raw) continue;
     sawToken = true;
     try {
-      return { aud, decoded: verifyAccess(aud, raw) };
+      // rateLimit ne pehle verify kiya ho to reuse (same aud + same raw token)
+      return { aud, decoded: verifyAccessOnce(req, aud, raw) };
     } catch (error) {
       if (!firstError) firstError = error;
     }
@@ -64,7 +80,7 @@ const createAuth = (allowedAudiences) => async (req, res, next) => {
     }
 
     // Tenant-scoped lookup: store host par sirf isi store ka record milta hai
-    const entity = await MODEL_FOR[aud]().findById(decoded.userId).select("-password -activities").lean();
+    const entity = await MODEL_FOR[aud]().findById(decoded.userId).select(PRINCIPAL_SELECT).lean();
 
     if (!entity || entity.is_deleted) {
       return res.status(401).json({ success: false, message: "User not found or deleted" });
@@ -139,5 +155,6 @@ authMiddleware.requireAdmin = createAuth(["admin"]);
 authMiddleware.requireUser = createAuth(["user"]);
 authMiddleware.optionalAdmin = optionalAdmin;
 authMiddleware.createAuth = createAuth;
+authMiddleware.PRINCIPAL_SELECT = PRINCIPAL_SELECT;
 
 module.exports = authMiddleware;

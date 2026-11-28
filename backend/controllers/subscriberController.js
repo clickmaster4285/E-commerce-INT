@@ -34,6 +34,10 @@ exports.subscribe = async (req, res) => {
     return res.status(200).json({ success: true, message: "Subscribed" });
   } catch (error) {
     if (error?.code === 11000) return res.status(200).json({ success: true, message: "Subscribed" });
+    // AppError (validation / store missing) — 500 me mat dabao
+    if (error instanceof AppError || error?.isOperational) {
+      return fail(res, error.status || 400, error.message, error.code ? { code: error.code } : {});
+    }
     return fail(res, 500, "Could not subscribe right now");
   }
 };
@@ -79,15 +83,36 @@ const csvCell = (v) => {
 // ── ADMIN: GET /newsletter/admin/export (CSV) ──
 exports.exportSubscribers = async (req, res) => {
   try {
-    const rows = await Subscriber.find(buildFilter(req.query)).sort({ createdAt: -1 }).limit(50000).lean();
-    const lines = [["email", "status", "locale", "subscribed_at"].join(",")];
-    for (const r of rows) {
-      lines.push([r.email, r.status, r.locale, new Date(r.createdAt).toISOString()].map(csvCell).join(","));
-    }
+    // Cursor se stream (§4.5): 50k rows ek saath memory me load nahi hote — chunk by chunk res.write
+    res.status(200);
     res.set("Content-Type", "text/csv; charset=utf-8");
     res.set("Content-Disposition", `attachment; filename="subscribers-${new Date().toISOString().slice(0, 10)}.csv"`);
-    return res.status(200).send(`﻿${lines.join("\n")}`);
+    res.write(`﻿${["email", "status", "locale", "subscribed_at"].join(",")}`);
+
+    const cursor = Subscriber.find(buildFilter(req.query))
+      .select("email status locale createdAt")
+      .sort({ createdAt: -1 })
+      .limit(50000)
+      .lean()
+      .cursor();
+    let aborted = false;
+    res.on("close", () => { aborted = true; });
+    let buf = "";
+    for await (const r of cursor) {
+      if (aborted) break;
+      buf += `\n${[r.email, r.status, r.locale, new Date(r.createdAt).toISOString()].map(csvCell).join(",")}`;
+      if (buf.length >= 16 * 1024) {
+        // backpressure: socket bhar jaye to drain ka intezar
+        if (!res.write(buf)) await new Promise((resolve) => { res.once("drain", resolve); res.once("close", resolve); });
+        buf = "";
+      }
+    }
+    await cursor.close().catch(() => {});
+    if (!aborted) res.end(buf);
+    return undefined;
   } catch (error) {
+    // Headers jaa chuke hon to JSON error nahi bhej sakte — connection band kar do
+    if (res.headersSent) return res.destroy(error);
     return fail(res, 500, "Failed to export subscribers");
   }
 };

@@ -3,7 +3,8 @@ const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
 const uploadDealImageFile = require("../middleware/dealImageMiddleware");
-const { publicCache, invalidate } = require("../utils/publicCache");
+const { publicCache } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 
 const {
   createDeal,
@@ -43,7 +44,7 @@ router.get("/", authMiddleware, checkPermission("deals"), getDeals);
 router.get("/:id/targets", authMiddleware, checkPermission("deals"), getDealTargets);
 router.get("/:id", authMiddleware, checkPermission("deals"), getDealById);
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
-const dropDealsCache = (req, res, next) => { invalidate("deals"); next(); };
+const dropDealsCache = invalidateOn("deals");
 router.post("/", authMiddleware, checkPermission("deals"), dropDealsCache, createDeal);
 router.put("/:id", authMiddleware, checkPermission("deals"), dropDealsCache, updateDeal);
 router.delete("/:id", authMiddleware, checkPermission("deals"), dropDealsCache, deleteDeal);

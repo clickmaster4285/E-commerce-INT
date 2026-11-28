@@ -23,13 +23,10 @@ const {
 } = require("../middleware/productImageMiddleware");
 
 const saveProductImages = require("../middleware/saveProductImages");
-const { invalidate } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 
 const router = express.Router();
-const dropProductsCache = (req, res, next) => {
-  invalidate("products");
-  next();
-};
+const dropProductsCache = invalidateOn("products"); // 2xx ke BAAD drop
 
 
 // Product ID set for CREATE

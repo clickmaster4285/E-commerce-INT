@@ -13,6 +13,7 @@ const CheckoutDraft = require("../models/CheckoutDraft");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 const Employee = require("../models/Employee");
+const { toPublicUser } = require("../services/auth");
 const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
@@ -511,15 +512,7 @@ const loginUser = async (req, res) => {
     res.json({
       success: true,
       message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
-      },
+      user: toPublicUser(user),
     });
   } catch (error) {
     log.error("loginUser error:", error);
@@ -597,15 +590,7 @@ const loginAdmin = async (req, res) => {
     res.json({
       success: true,
       message: "Admin login successful",
-      user: {
-        id: employee._id,
-        name: employee.name,
-        username: employee.username,
-        phone: employee.phone,
-        email: employee.email,
-        role: employee.role,
-        avatar: employee.avatar || null,
-      },
+      user: toPublicUser(employee),
     });
   } catch (error) {
     log.error("loginAdmin error:", error);
@@ -677,10 +662,10 @@ const logoutUser = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const userType = req.userType || 'user';
-    // authMiddleware already loaded the employee account, so reuse it during
-    // admin access verification instead of querying it and its store again.
+    // authMiddleware ab slim principal load karta hai (avatar/preferences wagaira nahi),
+    // is liye employee ka poora profile yahan fresh fetch hota hai.
     const entity = userType === 'employee'
-      ? req.user
+      ? await Employee.findById(req.user._id).select("-password -activities").lean()
       : await User.findById(req.user._id)
         .select("-password -activities")
         // Poora Store populate karne se domainVerifyToken + activity log customer tak ja rahe the
@@ -1048,15 +1033,7 @@ const googleLogin = async (req, res) => {
     return res.json({
       success: true,
       message: "Google login successful",
-      user: {
-        id: employee._id,
-        name: employee.name,
-        username: employee.username,
-        phone: employee.phone,
-        email: employee.email,
-        role: employee.role,
-        avatar: employee.avatar || (google.picture || null),
-      },
+      user: toPublicUser(employee, { avatar: employee.avatar || (google.picture || null) }),
     });
   } catch (error) {
     log.error("googleLogin error:", error);
@@ -1131,15 +1108,7 @@ const googleCustomerLogin = async (req, res) => {
     res.json({
       success: true,
       message: "Google login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        username: user.username,
-        phone: user.phone,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar || null,
-      },
+      user: toPublicUser(user),
     });
   } catch (error) {
     log.error("googleCustomerLogin error:", error);
@@ -1252,25 +1221,29 @@ const toggleWishlist = async (req, res) => {
         .json({ success: false, message: "Product ID required" });
     }
 
-    let wishlistDoc = await Wishlist.findOne({ user_id: req.user._id });
-    if (!wishlistDoc) {
-      wishlistDoc = await Wishlist.create({ user_id: req.user._id, products: [] });
-    }
-
-    const idx = wishlistDoc.products.findIndex(
-      (id) => id.toString() === product_id.toString(),
-    );
+    // Atomic toggle (§4.5): pehle read→splice/push→save hota tha (do tabs = lost update).
+    // Ab: pehle $pull try (product maujood ho to hi match), warna $addToSet + upsert.
+    const removedDoc = await Wishlist.findOneAndUpdate(
+      { user_id: req.user._id, products: product_id },
+      { $pull: { products: product_id } },
+      { returnDocument: "after", projection: "products" },
+    ).lean();
     let added;
-    if (idx >= 0) {
-      wishlistDoc.products.splice(idx, 1);
+    let count;
+    if (removedDoc) {
       added = false;
+      count = (removedDoc.products || []).length;
     } else {
-      wishlistDoc.products.push(product_id);
+      const addedDoc = await Wishlist.findOneAndUpdate(
+        { user_id: req.user._id },
+        { $addToSet: { products: product_id }, $setOnInsert: { user_id: req.user._id } },
+        { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, projection: "products" },
+      ).lean();
       added = true;
+      count = (addedDoc?.products || []).length;
     }
-    await wishlistDoc.save();
 
-    res.json({ success: true, added, count: wishlistDoc.products.length });
+    res.json({ success: true, added, count });
   } catch (error) {
     log.error("toggleWishlist error:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -1345,29 +1318,42 @@ const createCheckoutDraft = async (req, res) => {
 
     // Upsert the user's single draft container, then replace the most recently
     // active draft instead of appending another subdocument on each checkout.
-    const checkoutDoc = await CheckoutDraft.findOneAndUpdate(
-      { user_id: req.user._id },
-      { $setOnInsert: { user_id: req.user._id } },
-      { returnDocument: "after", upsert: true, setDefaultsOnInsert: true },
-    );
+    // Whole-array read→modify→save ki jagah atomic ops (§4.5):
+    //  1) container upsert + purane (expired) active drafts $pull
+    //  2) maujooda active draft par positional `$` $set; na ho to $push naya
     const cutoff = new Date(now.getTime() - CHECKOUT_DRAFT_MAX_AGE_MS);
-    const completedDrafts = checkoutDoc.drafts.filter((draft) => draft.status === "completed");
-    const activeDraft = checkoutDoc.drafts
-      .filter((draft) => draft.status !== "completed")
-      .filter((draft) => new Date(draft.updatedAt || 0) >= cutoff)
-      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))[0];
-
-    if (activeDraft) {
-      Object.assign(activeDraft, newDraft, { _id: activeDraft._id });
+    const base = { user_id: req.user._id };
+    try {
+      await CheckoutDraft.updateOne(
+        base,
+        {
+          $setOnInsert: { user_id: req.user._id },
+          $pull: { drafts: { status: { $ne: "completed" }, updatedAt: { $lt: cutoff } } },
+        },
+        { upsert: true },
+      );
+    } catch (err) {
+      if (err?.code !== 11000) throw err; // parallel upsert race: doc ban chuka hai, aage badho
     }
-    checkoutDoc.drafts = [
-      ...completedDrafts.map((draft) => draft.toObject()),
-      activeDraft ? activeDraft.toObject() : newDraft,
-    ];
-    await checkoutDoc.save();
+
+    const setFields = {};
+    for (const [k, v] of Object.entries(newDraft)) setFields[`drafts.$.${k}`] = v;
+    let checkoutDoc = await CheckoutDraft.findOneAndUpdate(
+      { ...base, drafts: { $elemMatch: { status: { $ne: "completed" } } } },
+      { $set: setFields },
+      { returnDocument: "after" },
+    );
+    const updatedExisting = Boolean(checkoutDoc);
+    if (!checkoutDoc) {
+      checkoutDoc = await CheckoutDraft.findOneAndUpdate(
+        base,
+        { $push: { drafts: newDraft } },
+        { returnDocument: "after" },
+      );
+    }
 
     const savedDraft = checkoutDoc.drafts.find((draft) => draft.status === "active") || checkoutDoc.drafts.at(-1);
-    res.status(activeDraft ? 200 : 201).json({ success: true, draft: savedDraft });
+    res.status(updatedExisting ? 200 : 201).json({ success: true, draft: savedDraft });
   } catch (error) {
     log.error("createCheckoutDraft error:", error);
     res.status(500).json({ success: false, message: error.message || "Checkout draft could not be saved" });
@@ -1467,15 +1453,13 @@ const getCheckoutDraft = async (req, res) => {
 
     const cutoff = new Date(Date.now() - CHECKOUT_DRAFT_MAX_AGE_MS);
     if (new Date(draft.updatedAt || checkoutDoc.updated_at || 0) < cutoff) {
-      checkoutDoc.drafts = checkoutDoc.drafts.filter((entry) => String(entry._id) !== id);
-      await checkoutDoc.save();
+      await CheckoutDraft.updateOne({ user_id: req.user._id }, { $pull: { drafts: { _id: draft._id } } });
       return res.status(404).json({ success: false, message: "This checkout draft has expired" });
     }
 
     const linkedOrder = await Order.findOne({ user_id: req.user._id, checkout_draft_id: draft._id }).select("_id").lean();
     if (linkedOrder || !(await hasAvailableDraftProducts(draft))) {
-      checkoutDoc.drafts = checkoutDoc.drafts.filter((entry) => String(entry._id) !== id);
-      await checkoutDoc.save();
+      await CheckoutDraft.updateOne({ user_id: req.user._id }, { $pull: { drafts: { _id: draft._id } } });
       return res.status(404).json({
         success: false,
         message: linkedOrder ? "This draft has already been ordered" : "A product in this draft is no longer available",
@@ -1496,24 +1480,30 @@ const updateCheckoutDraft = async (req, res) => {
       step, selectedKeys, selectedAddressId, shippingMethod, paymentMethod, saved, items,
       subtotal, shipping, tax, discount, estimatedTotal,
     } = req.body;
-    const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    const draft = checkoutDoc?.drafts.find((entry) => String(entry._id) === id);
-    if (!draft || draft.status === "completed") {
+    if (!mongoose.isValidObjectId(id)) {
       return res.status(404).json({ success: false, message: "Active checkout draft not found" });
     }
-
-    draft.step = step ?? draft.step;
-    draft.selectedKeys = Array.isArray(selectedKeys) ? selectedKeys : draft.selectedKeys;
-    draft.selectedAddressId = selectedAddressId !== undefined ? selectedAddressId : draft.selectedAddressId;
-    draft.shippingMethod = shippingMethod || draft.shippingMethod;
-    draft.paymentMethod = paymentMethod || draft.paymentMethod;
-    draft.saved = saved !== undefined ? saved : draft.saved;
-    draft.items = Array.isArray(items) ? items : draft.items;
+    // Sirf bheje gaye fields positional `$` se set (poora array save nahi)
+    const set = { "drafts.$.updatedAt": new Date() };
+    if (step !== undefined && step !== null) set["drafts.$.step"] = step;
+    if (Array.isArray(selectedKeys)) set["drafts.$.selectedKeys"] = selectedKeys;
+    if (selectedAddressId !== undefined) set["drafts.$.selectedAddressId"] = selectedAddressId;
+    if (shippingMethod) set["drafts.$.shippingMethod"] = shippingMethod;
+    if (paymentMethod) set["drafts.$.paymentMethod"] = paymentMethod;
+    if (saved !== undefined) set["drafts.$.saved"] = saved;
+    if (Array.isArray(items)) set["drafts.$.items"] = items;
     for (const [field, value] of Object.entries({ subtotal, shipping, tax, discount, estimatedTotal })) {
-      if (value !== undefined && Number.isFinite(Number(value))) draft[field] = Number(value);
+      if (value !== undefined && Number.isFinite(Number(value))) set[`drafts.$.${field}`] = Number(value);
     }
-    draft.updatedAt = new Date();
-    await checkoutDoc.save();
+    const checkoutDoc = await CheckoutDraft.findOneAndUpdate(
+      { user_id: req.user._id, drafts: { $elemMatch: { _id: id, status: { $ne: "completed" } } } },
+      { $set: set },
+      { returnDocument: "after" },
+    );
+    const draft = checkoutDoc?.drafts.find((entry) => String(entry._id) === id);
+    if (!draft) {
+      return res.status(404).json({ success: false, message: "Active checkout draft not found" });
+    }
 
     res.json({ success: true, draft });
   } catch (error) {
@@ -1525,11 +1515,9 @@ const updateCheckoutDraft = async (req, res) => {
 const deleteCheckoutDraft = async (req, res) => {
   try {
     const { id } = req.params;
-    const checkoutDoc = await CheckoutDraft.findOne({ user_id: req.user._id });
-    if (!checkoutDoc) return res.status(404).json({ success: false, message: "Checkout drafts not found" });
-
-    checkoutDoc.drafts = checkoutDoc.drafts.filter((draft) => String(draft._id) !== id);
-    await checkoutDoc.save();
+    if (!mongoose.isValidObjectId(id)) return res.status(404).json({ success: false, message: "Checkout drafts not found" });
+    const result = await CheckoutDraft.updateOne({ user_id: req.user._id }, { $pull: { drafts: { _id: id } } });
+    if (!result.matchedCount) return res.status(404).json({ success: false, message: "Checkout drafts not found" });
     res.json({ success: true, message: "Draft deleted" });
   } catch (error) {
     log.error("deleteCheckoutDraft error:", error);

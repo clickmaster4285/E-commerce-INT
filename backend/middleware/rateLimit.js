@@ -163,14 +163,16 @@ const ipPart = (req) => {
 // ==========================================
 const roleOf = (req) => {
   // Audience-wise access cookies (utils/tokens.js): admin (a_at) → user (u_at)
-  const { AUDIENCES, verifyAccess } = require("../utils/tokens");
+  const { AUDIENCES } = require("../utils/tokens");
+  const { verifyAccessOnce } = require("../utils/authPayload");
   const header = req.headers.authorization;
   const bearer = header && header.startsWith("Bearer ") ? header.slice(7).trim() : null;
   for (const aud of ["admin", "user"]) {
     const token = bearer || req.cookies?.[AUDIENCES[aud].cookies.access];
     if (!token) continue;
     try {
-      const decoded = verifyAccess(aud, token);
+      // Verify ek baar — result req._authPayload me, authMiddleware reuse karega
+      const decoded = verifyAccessOnce(req, aud, token);
       // Owner ("storehandler") + admin dono full-access (utils/roles.js)
       if (isAdminRole(decoded.role)) return "admin";
       if (decoded.userId) return "user";

@@ -5,6 +5,7 @@ const { pushGlobalActivity, pushStoreActivity, getChanges } = require("../utils/
 const { validatePhone } = require("../utils/phoneValidator");
 const { normalizeCountryCode, countryDisplayName } = require("../utils/geo");
 const log = require("../utils/logger");
+const { hasPermission } = require("../middleware/checkPermission");
 
 // @desc    Get Store Info
 const getStoreInfo = async (req, res) => {
@@ -23,7 +24,8 @@ const getStoreInfo = async (req, res) => {
 const updateStoreInfo = async (req, res) => {
   try {
     // ✅ CHECK STORE PERMISSION
-    if (!isAdminRole(req.user.role) && !req.user.permissions?.store) {
+    // Shared helper: admin always, baqi ko `store === true` (requireTrue)
+    if (!hasPermission(req.user, "store", "requireTrue")) {
       return res.status(403).json({
         success: false,
         message: "Access denied. You don't have permission to edit store settings. Please contact an administrator or another staff member to grant you store access.",

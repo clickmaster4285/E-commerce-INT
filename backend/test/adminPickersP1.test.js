@@ -153,8 +153,10 @@ test("GET /products/admin/:id requires admin auth", async (t) => {
 test("GET /pos/products filters in Mongo (source) and returns page", async (t) => {
   if (!ctx) return t.skip("no mongo");
   const src = fs.readFileSync(path.join(__dirname, "../controllers/posController.js"), "utf8");
-  assert.match(src, /Narrow products in Mongo first/);
-  assert.match(src, /productQuery\.name = rx/);
+  // POS search: Product.search_text / name prefix + Variant sku/title, capped in Mongo
+  assert.match(src, /search_text:\s*prefix/);
+  assert.match(src, /SEARCH_CAP/);
+
 
   const res = await request(app)
     .get(`${API}/pos/products?page=1&limit=10&search=Picker`)

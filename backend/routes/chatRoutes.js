@@ -5,8 +5,10 @@ const chat = require("../controllers/chatController");
 const { limiters } = require("../middleware/rateLimit");
 const router = express.Router();
 const auth = authMiddleware;
-const staff = [auth, chat.canUseInbox, checkPermission("orders")];
-const customer = [auth, chat.canUseCustomerChat];
+// Audience pilot: staff inbox sirf admin session (a_at), customer chat sirf user session (u_at).
+// Mixed routes (/:id...) neeche generic `auth` par hi hain — dono audience use karte hain.
+const staff = [authMiddleware.requireAdmin, chat.canUseInbox, checkPermission("orders")];
+const customer = [authMiddleware.requireUser, chat.canUseCustomerChat];
 // Guest chat creation has a legacy IP throttle to reduce anonymous conversation
 // spam. Authenticated chat opening is idempotent and message sends have their own
 // per-customer limiter in sendMessage, so opening a chat must not trigger a shared

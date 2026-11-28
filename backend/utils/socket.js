@@ -116,6 +116,8 @@ function createTenantIO(server) {
 
 // ==========================================
 // HELPER: COMPRESS & SAVE LOGO
+// TODO (§5.6/§9): store logo ab bhi base64-over-socket aata hai (sharp + async write,
+// loop block nahi). Poora fix: REST multipart PUT /store (createImageUpload) par shift.
 // ==========================================
 const compressAndSaveLogo = async (base64Data, fileName) => {
   if (!base64Data || typeof base64Data !== "string") return null;
@@ -133,7 +135,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
   // Store ka apna folder: uploads/stores/<storeId>/store (socket event runWithStore me chalta hai)
   const { uploadDirFor, uploadUrlFor } = require("./uploadPaths");
   const storeDir = uploadDirFor(null, process.env.STORE_UPLOAD_SUBDIR || "store");
-  if (!fs.existsSync(storeDir)) fs.mkdirSync(storeDir, { recursive: true });
+  await fs.promises.mkdir(storeDir, { recursive: true }); // async — event loop block nahi
   const relativeFor = (filePath) => uploadUrlFor(filePath).slice(1);
 
   const safeName = (fileName || "logo")
@@ -141,9 +143,9 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
     .replace(/[^a-zA-Z0-9.\-]/g, "")
     .replace(/\.[^.]+$/, "");
 
-  const verifyFile = (filePath, label) => {
-    if (!fs.existsSync(filePath)) throw new Error(`${label} file write failed — file not found: ${filePath}`);
-    const stat = fs.statSync(filePath);
+  const verifyFile = async (filePath, label) => {
+    const stat = await fs.promises.stat(filePath).catch(() => null);
+    if (!stat) throw new Error(`${label} file write failed — file not found: ${filePath}`);
     if (stat.size === 0) throw new Error(`${label} file write failed — file is empty: ${filePath}`);
     return stat.size;
   };
@@ -168,7 +170,7 @@ const compressAndSaveLogo = async (base64Data, fileName) => {
       .resize(600, 600, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: 88, alphaQuality: 100, effort: 4 })
       .toFile(filePath);
-    const savedSize = verifyFile(filePath, "WebP");
+    const savedSize = await verifyFile(filePath, "WebP");
     return { path: filePath, filename: finalName, mimetype: "image/webp", size: savedSize, relativePath: relativeFor(filePath) };
   } catch (err) {
     // sharp decode na kar sake to ye asli image nahi — raw bytes save nahi karte
@@ -223,7 +225,7 @@ const deleteOldLogo = async (logoUrlOverride) => {
       // Sirf isi store ki (ya purani shared uploads/store) file — pehle absolute
       // path bhi maana jata tha (img_url se koi bhi server file mit sakti thi)
       const filePath = require("./uploadPaths").localPathForUrl(null, imgUrl);
-      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      if (filePath) await fs.promises.unlink(filePath).catch(() => {}); // async; file missing ho to ok
     }
   } catch (e) { log.error("❌ deleteOldLogo error:", e.message); }
 };

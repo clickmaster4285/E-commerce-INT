@@ -79,17 +79,30 @@ function transaction({ id, kind, category, reference, title, counterparty, amoun
   };
 }
 
+// ?sort=date (default, newest first) | date_asc | amount_desc | amount_asc (absolute amount)
+const transactionSorter = (sort) => {
+  const ts = (e) => new Date(e.date || 0).getTime();
+  switch (String(sort || "")) {
+    case "date_asc": return (a, b) => ts(a) - ts(b);
+    case "amount_desc": return (a, b) => Math.abs(b.amount) - Math.abs(a.amount) || ts(b) - ts(a);
+    case "amount_asc": return (a, b) => Math.abs(a.amount) - Math.abs(b.amount) || ts(b) - ts(a);
+    default: return (a, b) => ts(b) - ts(a);
+  }
+};
+
 exports.getFinanceOverview = async (req, res) => {
   try {
     const locale = parseFinanceLocale(req.query.locale);
     const period = ["today", "yesterday", "7d", "30d", "month", "lastMonth", "year", "all", "custom"].includes(req.query.period) ? req.query.period : "today";
     const range = getDateRange(period, req.query.startDate, req.query.endDate);
     if (period === "custom" && !range) return res.status(400).json({ success: false, message: "Choose a valid start and end date." });
+    // ?lean=1: history arrays (activity / edit_history / receivings) DB se hi nahi aate — memory + payload kam
+    const leanMode = ["1", "true"].includes(String(req.query.lean || ""));
     const [invoices, sales, orders, purchaseOrders, purchasePayments] = await Promise.all([
-      Invoice.find({ is_deleted: { $ne: true } }).select("invoice_number customer_name customer_email customer_phone customer_address invoice_date due_date items subtotal discount tax total amount_paid remaining_balance paid_at payments returns activity status createdby updatedby created_at updated_at").lean(),
-      PosSale.find({}).select("sale_number customer_snapshot cashier_name created_by_name items subtotal discount_amount tax_amount total payment status edit_history returns created_at updated_at").lean(),
+      Invoice.find({ is_deleted: { $ne: true } }).select(`invoice_number customer_name customer_email customer_phone customer_address invoice_date due_date items subtotal discount tax total amount_paid remaining_balance paid_at payments returns ${leanMode ? "" : "activity "}status createdby updatedby created_at updated_at`).lean(),
+      PosSale.find({}).select(`sale_number customer_snapshot cashier_name created_by_name items subtotal discount_amount tax_amount total payment status ${leanMode ? "" : "edit_history "}returns created_at updated_at`).lean(),
       Order.find({}).select("order_number address_snapshot items payment subtotal shipping tax total status created_at updated_at").lean(),
-      PurchaseOrder.find({ is_deleted: { $ne: true } }).select("po_number vendor_snapshot items subtotal tax shipping discount total status payment_status paid_amount due_amount notes receivings activity created_at updated_at").lean(),
+      PurchaseOrder.find({ is_deleted: { $ne: true } }).select(`po_number vendor_snapshot items subtotal tax shipping discount total status payment_status paid_amount due_amount notes ${leanMode ? "" : "receivings activity "}created_at updated_at`).lean(),
       PurchasePayment.find({}).populate("createdby", "name username").lean(),
     ]);
 
@@ -243,7 +256,7 @@ exports.getFinanceOverview = async (req, res) => {
       }));
     }
 
-    const filtered = transactions.filter((entry) => inRange(entry.date, range)).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const filtered = transactions.filter((entry) => inRange(entry.date, range)).sort(transactionSorter(req.query.sort));
     const search = String(req.query.search || "").trim().toLowerCase();
     const searched = search ? filtered.filter((entry) => `${entry.reference} ${entry.title} ${entry.category} ${entry.counterparty} ${entry.method}`.toLowerCase().includes(search)) : filtered;
     const kind = ["income", "expense"].includes(req.query.kind) ? req.query.kind : "all";

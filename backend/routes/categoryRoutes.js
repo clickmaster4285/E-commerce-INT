@@ -18,7 +18,8 @@ const {
 
 const Category = require("../models/Category");
 const { escapeRegex } = require("../utils/escapeRegex");
-const { publicCache, invalidate } = require("../utils/publicCache");
+const { publicCache } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 
 const router = express.Router();
 
@@ -26,10 +27,7 @@ const router = express.Router();
 // "products" bhi drop karna zaroori hai — category-tiles (`/api/products/category-tiles`)
 // namespace `products` me cache hota hai, aur wahan bhi category list/counts aate hain.
 // Bina iske tiles 60s tak purana dikhate rehte the.
-const dropCategoriesCache = (req, res, next) => {
-  invalidate(["categories", "products"]);
-  next();
-};
+const dropCategoriesCache = invalidateOn(["categories", "products"]); // 2xx ke BAAD drop
 
 // ==========================================
 // ✅ PUBLIC ROUTE — Bina login ke categories (User GUI ke liye)

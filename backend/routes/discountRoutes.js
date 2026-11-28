@@ -16,10 +16,11 @@ const {
   getPublicDiscounts,
 } = require("../controllers/discountController");
 
-const { publicCache, invalidate } = require("../utils/publicCache");
+const { publicCache } = require("../utils/publicCache");
+const { invalidateOn } = require("../middleware/invalidateOn");
 
 // ✅ Admin mutation ke baad public cache drop (foran fresh)
-const dropDiscountsCache = (req, res, next) => { invalidate("discounts"); next(); };
+const dropDiscountsCache = invalidateOn("discounts");
 
 // =====================================================
 // PUBLIC ROUTES (60s memo — output same)

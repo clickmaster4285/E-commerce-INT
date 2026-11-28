@@ -249,19 +249,12 @@ const updateBrand = async (req, res) => {
       updateData.brand_code = normalizedCode;
     }
 
+    let oldImgUrlToRemove = "";
     if (req.brandImage) {
       // ⚠️ Purana FOLDER delete mat karo — middleware (imageMiddleware.js:21) ne nayi
-      // image isi brand folder me hi likhi hai (brandId = req.params.id). Folder delete
-      // karne se nayi image bhi mit jati thi aur logo 404 ho jata tha.
-      // Sirf purani FILE delete karo (tabhi jab wo local upload ho).
-      const oldImgUrl = existingBrand.logo?.img_url || "";
-      if (oldImgUrl && oldImgUrl.startsWith("uploads/")) {
-        // Sirf isi store ki (ya purani shared) file — dusre store ka path / ../ null
-        const oldFilePath = require("../utils/uploadPaths").localPathForUrl(null, oldImgUrl);
-        if (oldFilePath && (await fs.pathExists(oldFilePath))) {
-          await fs.remove(oldFilePath);
-        }
-      }
+      // image isi brand folder me hi likhi hai. Purani FILE ab DB save ke BAAD delete hogi
+      // (§5.6 delete-after-write) — save fail ho to purani image bachi rehti hai.
+      oldImgUrlToRemove = existingBrand.logo?.img_url || "";
       updateData.logo = req.brandImage;
       if (updateData.logo.img_url) {
         // Purana (uploads/brands/<id>/) aur naya (uploads/stores/<storeId>/brands/<id>/) dono
@@ -279,6 +272,14 @@ const updateBrand = async (req, res) => {
     const brand = await Brand.findByIdAndUpdate(req.params.id, updateData, { returnDocument: "after" })
       .populate("createdby", "name email")
       .populate("updatedby", "name email");
+
+    // ✅ DB save kamyab — ab purani logo file hatao (best-effort, sirf isi store ki)
+    if (oldImgUrlToRemove && oldImgUrlToRemove.startsWith("uploads/")) {
+      try {
+        const oldFilePath = require("../utils/uploadPaths").localPathForUrl(req, oldImgUrlToRemove);
+        if (oldFilePath && (await fs.pathExists(oldFilePath))) await fs.remove(oldFilePath);
+      } catch (_) { /* orphan file reh jana delete fail se behtar */ }
+    }
 
     // 🌍 English change → hash badla → translation dobara generate hogi.
     // Translation wahi rakhi jayegi jo abhi tak valid thi, is liye user ko
@@ -589,3 +590,4 @@ module.exports = {
   updateBrand,
   deleteBrand,
 };
+

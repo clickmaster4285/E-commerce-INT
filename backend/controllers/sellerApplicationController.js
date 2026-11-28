@@ -95,11 +95,15 @@ const sellerApply = async (req, res) => {
     // Diya hua username (unique banao) — warna naam se professional username (hamza.asif)
     const requested = String(username || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20).toLowerCase();
     let finalUsername = requested;
-    const usernameTaken = async (value) =>
-      (await Employee.exists({ username: value }).setOptions({ skipTenantScope: true })) || // seller signup (platform): username saare stores me unique check
-      (await SellerApplication.exists({ username: value }));
-    for (let i = 1; finalUsername && (await usernameTaken(finalUsername)) && i < 100; i += 1) {
-      finalUsername = `${requested}${i}`;
+    if (requested) {
+      // Pehle 100 sequential exists() scans the; ab saare candidates (requested, requested1..99) ek $in query me
+      const candidates = [requested, ...Array.from({ length: 99 }, (_, i) => `${requested}${i + 1}`)];
+      const [empRows, appRows] = await Promise.all([
+        Employee.find({ username: { $in: candidates } }).select("username").setOptions({ skipTenantScope: true }).lean(), // seller signup (platform): username saare stores me unique check
+        SellerApplication.find({ username: { $in: candidates } }).select("username").lean(),
+      ]);
+      const taken = new Set([...empRows, ...appRows].map((r) => r.username));
+      finalUsername = candidates.find((c) => !taken.has(c)) || ""; // sab le liye gaye → neeche uniqueUsername()
     }
     if (!finalUsername) finalUsername = await require("../utils/username").uniqueUsername(name, cleanEmail);
 

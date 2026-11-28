@@ -174,6 +174,9 @@ test("forgot-password on platform host is refused (middleware STORE_REQUIRED)", 
 
 test("parallel wrong OTP guesses cannot exceed the attempt limit", async (t) => {
   if (!ctx) return t.skip("MongoDB not reachable");
+  // Closed store → 503 before OTP logic; open for this race test
+  await Store.collection.updateOne({ _id: ctx.storeId }, { $set: { store_status: "open" } });
+  require("../middleware/resolveStore").invalidateStoreCache(ctx.host);
   const email = `otp${Date.now()}@example.com`;
   const hash = await bcrypt.hash("000000", 4);
   await Otp.collection.insertOne({
@@ -186,15 +189,23 @@ test("parallel wrong OTP guesses cannot exceed the attempt limit", async (t) => 
       .post(`${API}/users/verify-reset-otp`)
       .set("Host", ctx.host)
       .send({ email, otp: "111111" })));
+  await Store.collection.updateOne({ _id: ctx.storeId }, { $set: { store_status: "closed" } });
+  require("../middleware/resolveStore").invalidateStoreCache(ctx.host);
   const surviving = await Otp.collection.find({ email, purpose: "password_reset" }).toArray();
   // All wrong; at most one claim of the last attempt, then the record is deleted
-  assert.ok(surviving.every((r) => r.attempts <= 5));
-  assert.ok(results.every((r) => [400, 429].includes(r.status)));
+  assert.ok(surviving.every((r) => r.attempts <= 5), `attempts=${surviving.map((r) => r.attempts)}`);
+  assert.ok(
+    results.every((r) => [400, 429].includes(r.status)),
+    `unexpected statuses: ${results.map((r) => `${r.status}:${r.body?.code || r.body?.message}`).join(", ")}`,
+  );
   assert.ok(results.some((r) => r.status === 429) || surviving.length === 0);
 });
 
 test("placeOrder rejects raw card fields", async (t) => {
   if (!ctx) return t.skip("MongoDB not reachable");
+  // Store fixture starts closed (store_status tests); open briefly so card reject runs before checkout
+  await Store.collection.updateOne({ _id: ctx.storeId }, { $set: { store_status: "open" } });
+  require("../middleware/resolveStore").invalidateStoreCache(ctx.host);
   const res = await request(app)
     .post(`${API}/orders`)
     .set("Host", ctx.host)
@@ -209,6 +220,7 @@ test("placeOrder rejects raw card fields", async (t) => {
       card_expiry: "12/30",
       card_holder_name: "Test User",
     });
+  await Store.collection.updateOne({ _id: ctx.storeId }, { $set: { store_status: "closed" } });
   assert.equal(res.status, 400);
   assert.equal(res.body.code, "CARD_DATA_REJECTED");
 });

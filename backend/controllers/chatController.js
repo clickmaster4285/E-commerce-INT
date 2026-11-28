@@ -9,6 +9,8 @@ const Product = require("../models/Product");
 const Variant = require("../models/Variant");
 const Cart = require("../models/Cart");
 const { consumeChatMessageRateLimit, CHAT_MESSAGE_RATE_LIMITED_MESSAGE } = require("../middleware/rateLimit");
+const { getUnread, adjustUnread } = require("../utils/chatUnread");
+const { getStoreId } = require("../utils/tenantContext");
 
 const MAX_MESSAGE_LENGTH = 4000;
 const { escapeRegex } = require("../utils/escapeRegex");
@@ -57,16 +59,26 @@ async function buildMessageContext(req, conversation) {
     if (!selected.length || selected.length > 20) throw contextError(400, "Select between 1 and 20 product variants");
     const seenVariants = new Set();
     const items = [];
+    // Pehle validate + dedupe, phir product/variant ek-ek $in query me (N+1 nahi)
+    const picks = [];
     for (const selection of selected) {
       const productId = validId(selection.productId || selection.product_id);
       const variantId = validId(selection.variantId || selection.variant_id);
       if (!productId || !variantId) throw contextError(400, "Each selection must include a valid product variant");
       if (seenVariants.has(String(variantId))) continue;
       seenVariants.add(String(variantId));
-      const [product, variant] = await Promise.all([
-        Product.findOne({ _id: productId, is_deleted: { $ne: true }, status: { $ne: "inactive" } }).select("name description").lean(),
-        Variant.findOne({ _id: variantId, product_id: productId, is_deleted: { $ne: true }, status: { $ne: "inactive" } }).select("title sku selling_price images.img_url").lean(),
-      ]);
+      picks.push({ productId, variantId });
+    }
+    const [productDocs, variantDocs] = picks.length ? await Promise.all([
+      Product.find({ _id: { $in: picks.map((p) => p.productId) }, is_deleted: { $ne: true }, status: { $ne: "inactive" } }).select("name description").lean(),
+      Variant.find({ _id: { $in: picks.map((p) => p.variantId) }, is_deleted: { $ne: true }, status: { $ne: "inactive" } }).select("title sku selling_price product_id images.img_url").lean(),
+    ]) : [[], []];
+    const productById = new Map(productDocs.map((d) => [String(d._id), d]));
+    const variantById = new Map(variantDocs.map((d) => [String(d._id), d]));
+    for (const { productId, variantId } of picks) {
+      const product = productById.get(String(productId));
+      const found = variantById.get(String(variantId));
+      const variant = found && String(found.product_id) === String(productId) ? found : null; // variant usi product ka ho
       if (!product || !variant) throw contextError(404, "A selected product variant is no longer available");
       const unitPrice = money(Math.max(0, Number(variant.selling_price) || 0));
       items.push({ product_id: product._id, product_name: product.name, product_description: String(product.description || "").slice(0, 1000), variant_id: variant._id, variant_name: variant.title, variant_image: String(variant.images?.[0]?.img_url || "").slice(0, 300), sku: variant.sku, qty: 1, unit_price: unitPrice, line_total: unitPrice });
@@ -95,6 +107,7 @@ async function buildMessageContext(req, conversation) {
     if (sourceItems.length > 30) throw contextError(400, "A maximum of 30 cart items can be attached");
 
     const items = [];
+    const cartPicks = [];
     for (const source of sourceItems) {
       const productId = validId(source.productId || source.product_id?._id || source.product_id || source.id);
       const variantId = validId(source.variant_id?._id || source.variant_id || source.variantId);
@@ -102,10 +115,19 @@ async function buildMessageContext(req, conversation) {
       if (!productId || !variantId || !Number.isInteger(qty) || qty < 1 || qty > 999) {
         throw contextError(400, "A cart item is missing a valid product, variant, or quantity");
       }
-      const [product, variant] = await Promise.all([
-        Product.findOne({ _id: productId, is_deleted: { $ne: true } }).select("name").lean(),
-        Variant.findOne({ _id: variantId, product_id: productId, is_deleted: { $ne: true } }).select("title sku selling_price images.img_url").lean(),
-      ]);
+      cartPicks.push({ productId, variantId, qty });
+    }
+    // Batch: saare cart items ke product/variant ek-ek $in query me
+    const [cartProducts, cartVariants] = cartPicks.length ? await Promise.all([
+      Product.find({ _id: { $in: cartPicks.map((p) => p.productId) }, is_deleted: { $ne: true } }).select("name").lean(),
+      Variant.find({ _id: { $in: cartPicks.map((p) => p.variantId) }, is_deleted: { $ne: true } }).select("title sku selling_price product_id images.img_url").lean(),
+    ]) : [[], []];
+    const cartProductById = new Map(cartProducts.map((d) => [String(d._id), d]));
+    const cartVariantById = new Map(cartVariants.map((d) => [String(d._id), d]));
+    for (const { productId, variantId, qty } of cartPicks) {
+      const product = cartProductById.get(String(productId));
+      const foundVariant = cartVariantById.get(String(variantId));
+      const variant = foundVariant && String(foundVariant.product_id) === String(productId) ? foundVariant : null;
       if (!product || !variant) throw contextError(400, "A cart item is no longer available; refresh your cart and try again");
       const unitPrice = money(Math.max(0, Number(variant.selling_price) || 0));
       items.push({ product_id: product._id, product_name: product.name, variant_id: variant._id, variant_name: variant.title, variant_image: String(variant.images?.[0]?.img_url || "").slice(0, 300), sku: variant.sku, qty, unit_price: unitPrice, line_total: money(unitPrice * qty) });
@@ -126,9 +148,12 @@ async function buildMessageContext(req, conversation) {
   };
 }
 const populateConversation = (query, includeOrderDetails = false) => query.populate("customer_id", "name email phone").populate("order_id", includeOrderDetails ? ORDER_CHAT_FIELDS : ORDER_LIST_FIELDS);
+// Counter (Redis INCRBY / memory) — har bar poora aggregate nahi; cold hone par ek baar seed
 async function adminUnreadCount() {
-  const [row] = await ChatConversation.aggregate([{ $group: { _id: null, total: { $sum: "$unread_admin_count" } } }]);
-  return Number(row?.total) || 0;
+  return getUnread(getStoreId(), async () => {
+    const [row] = await ChatConversation.aggregate([{ $group: { _id: null, total: { $sum: "$unread_admin_count" } } }]);
+    return Number(row?.total) || 0;
+  });
 }
 async function emitAdminUnread(io) { if (io) { try { io.to("chat:admins").emit("chat:unread-count", { count: await adminUnreadCount() }); } catch {} } }
 async function emitConversation(io, id) {
@@ -423,6 +448,7 @@ exports.sendMessage = async (req, res) => {
       $inc: senderType === "customer" ? { unread_admin_count: 1 } : { unread_customer_count: 1 },
     }, { returnDocument: "after" }).lean();
     if (!updated) { await ChatMessage.deleteOne({ _id: message._id }); return fail(res, 409, "This conversation was closed before the message could be sent"); }
+    if (senderType === "customer") await adjustUnread(getStoreId(), 1);
     if (req.io) {
       req.io.to(roomOf(conversation._id)).emit("chat:message", { conversation_id: String(conversation._id), message: message.toObject() });
       await emitConversation(req.io, conversation._id);
@@ -441,6 +467,7 @@ exports.markRead = async (req, res) => {
     const reader = isStaff(req) ? "admin" : "customer";
     await ChatMessage.updateMany({ conversation_id: conversation._id, sender_type: { $ne: reader }, read_at: null }, { $set: { read_at: new Date() } });
     await ChatConversation.updateOne({ _id: conversation._id }, { $set: reader === "admin" ? { unread_admin_count: 0 } : { unread_customer_count: 0 } });
+    if (reader === "admin" && conversation.unread_admin_count > 0) await adjustUnread(getStoreId(), -conversation.unread_admin_count);
     if (req.io) {
       req.io.to(roomOf(conversation._id)).emit("chat:read", { conversation_id: String(conversation._id), reader_type: reader, at: new Date() });
       await emitConversation(req.io, conversation._id);
@@ -456,11 +483,10 @@ exports.updateStatus = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return fail(res, 400, "Invalid conversation id");
     const status = String(req.body?.status || "");
     if (!["open", "closed"].includes(status)) return fail(res, 400, "Status must be open or closed");
-    const conversation = await ChatConversation.findById(req.params.id);
-    if (!conversation) return fail(res, 404, "Conversation not found");
-    if (conversation.status !== status) { conversation.status = status; await conversation.save(); }
-    if (req.io) { await emitConversation(req.io, conversation._id); await emitAdminUnread(req.io); }
-    const row = await populateConversation(ChatConversation.findById(conversation._id).lean());
+    // Ek hi atomic update + populate (pehle findById + save + findById — double read)
+    const row = await populateConversation(ChatConversation.findByIdAndUpdate(req.params.id, { $set: { status } }, { returnDocument: "after" }).lean());
+    if (!row) return fail(res, 404, "Conversation not found");
+    if (req.io) { await emitConversation(req.io, row._id); await emitAdminUnread(req.io); }
     res.json({ success: true, data: publicConversation(row) });
   } catch (error) { res.status(error.code === 11000 ? 409 : 500).json({ success: false, message: error.code === 11000 ? "An open conversation already exists for this order" : error.message }); }
 };

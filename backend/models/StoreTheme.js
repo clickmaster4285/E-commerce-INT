@@ -21,6 +21,10 @@ const storeThemeSchema = new mongoose.Schema(
     draft: { type: mongoose.Schema.Types.Mixed, default: null },
     published: { type: mongoose.Schema.Types.Mixed, default: null },
 
+    // sha1 of JSON — write ke waqt ek baar; adminView har response par poora JSON serialize nahi karta (§4.5)
+    draft_hash: { type: String, default: null },
+    published_hash: { type: String, default: null },
+
     draftRevision: { type: Number, default: 0 },
     publishedVersion: { type: Number, default: 0 },
 
