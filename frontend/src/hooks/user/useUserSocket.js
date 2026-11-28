@@ -106,13 +106,21 @@ export function reconnectUserSocket() {
   return getUserSocket();
 }
 
-export function useUserSocket() {
+export function useUserSocket({ enabled = true } = {}) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
+    if (!enabled) {
+      socketRef.current = null;
+      setConnected(false);
+      return () => {
+        isMounted.current = false;
+      };
+    }
+
     const s = getUserSocket();
 
     if (!s) {
@@ -144,7 +152,7 @@ export function useUserSocket() {
         // ignore
       }
     };
-  }, []);
+  }, [enabled]);
 
-  return { socket: socketRef.current, isConnected: connected };
+  return { socket: enabled ? socketRef.current : null, isConnected: connected };
 }

@@ -4,8 +4,6 @@ import FallbackImage from "@/components/common/FallbackImage";
 import { isAdminRole } from "@/lib/roles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useDispatch } from "react-redux";
-import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
 import { toast } from "sonner";
 import { useTranslation } from "@/i18n/LanguageProvider";
 
@@ -40,8 +38,8 @@ import {
 } from "lucide-react";
 
 import { useAdminSocket } from "@/hooks/admin/useAdminSocket";
-import { useQuery } from "@tanstack/react-query";
-import adminHttp from "@/apis/axiosInstance"
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import adminHttp from "@/apis/axiosInstance";
 import PhoneInput from "react-phone-input-2";
 import "react-phone-input-2/lib/style.css";
 
@@ -488,7 +486,11 @@ function SearchSelect({
 
 export default function StoreInfoPage() {
   const { t, locale } = useTranslation();
-  const dispatch = useDispatch();
+  const queryClient = useQueryClient();
+  const syncStoreCache = (data) => {
+    if (!data) return;
+    queryClient.setQueryData(["admin-store-info"], (prev) => ({ ...(prev || {}), ...data }));
+  };
   const { socket, isConnected } = useAdminSocket();
 
   const [loading, setLoading] = useState(false);
@@ -628,7 +630,7 @@ export default function StoreInfoPage() {
           social_links: { ...EMPTY_FORM.social_links, ...(data.social_links || {}) },
         };
         setFormData(updated);
-        dispatch(setStoreInfo(data));
+        syncStoreCache(data);
 
         const url = getLogoUrl(data);
         if (url) {
@@ -648,7 +650,7 @@ export default function StoreInfoPage() {
         ...d,
         social_links: { ...prev.social_links, ...(d.social_links || {}) },
       }));
-      dispatch(setStoreInfo(d));
+      syncStoreCache(d);
 
       const url = getLogoUrl(d);
       if (url) {
@@ -666,7 +668,7 @@ export default function StoreInfoPage() {
       socket.off("storeInfo", handleStoreData);
       socket.off("storeUpdated", handleStoreUpdate);
     };
-  }, [socket, isConnected, dispatch]);
+  }, [socket, isConnected, queryClient]);
 
   // ====================================================
   // HELPERS
@@ -772,7 +774,7 @@ export default function StoreInfoPage() {
         setLogoPreview("");
         setLogoError(false);
         setFormData((p) => ({ ...p, logo: { img_url: "", public_id: "" } }));
-        if (resp.data) dispatch(setStoreInfo(resp.data));
+        if (resp.data) syncStoreCache(resp.data);
         toast.success(t("admin.storeInfo.toast.logoRemoved"));
       } else {
         toast.error(t("admin.storeInfo.toast.logoRemoveFailed"));
@@ -891,7 +893,7 @@ export default function StoreInfoPage() {
               ...saved,
               social_links: { ...p.social_links, ...(saved.social_links || {}) },
             }));
-            dispatch(setStoreInfo(saved));
+            syncStoreCache(saved);
 
             const url = getLogoUrl(saved);
             if (url) {

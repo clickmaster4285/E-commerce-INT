@@ -39,7 +39,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { usePathname } from "next/navigation";
-import { useSelector } from "react-redux";
+import { useQueryClient } from "@tanstack/react-query";
 import { DEFAULT_LOCALE, isRtl } from "@/i18n/config";
 import { translate, loadLocale, isLocaleLoaded } from "@/i18n/translations";
 
@@ -89,13 +89,16 @@ export default function LanguageTransition({
     };
   }, [locale]);
 
-  // Store identity is optional to pass — fall back to the same Redux slice the
-  // sidebar and login pages read, so callers can render this with nothing.
-  const reduxStoreName = useSelector((state) => state?.storeInfo?.storeName);
-  const reduxLogo = useSelector((state) => state?.storeInfo?.logo);
-  const storeName = storeNameProp || reduxStoreName || "";
+  // Store identity is optional — fall back to React Query cache (§9.4, Redux gone).
+  const queryClient = useQueryClient();
+  const cachedStore =
+    queryClient.getQueryData(["admin-store-info"]) ||
+    queryClient.getQueryData(["storeInfo"]) ||
+    null;
+  const storeName = storeNameProp || cachedStore?.store_name || "";
+  const cachedLogo = cachedStore?.logo;
   const logoUrl = resolveLogoUrl(
-    logoUrlProp || (typeof reduxLogo === "string" ? reduxLogo : reduxLogo?.img_url)
+    logoUrlProp || (typeof cachedLogo === "string" ? cachedLogo : cachedLogo?.img_url)
   );
 
   const pathname = usePathname();

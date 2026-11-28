@@ -23,7 +23,8 @@ import { brandApi } from "@/apis/admin/brandApi";
 import { variantApi } from "@/apis/admin/variantApi";
 import { tagApi } from "@/apis/admin/tagApi";
 import { attributeApi } from "@/apis/admin/attributeApi";
-import VariantForm from "@/components/admin/VariantForm";
+import dynamic from "next/dynamic";
+const VariantForm = dynamic(() => import("@/components/admin/VariantForm"), { ssr: false });
 
 const API_ORIGIN = process.env.NEXT_PUBLIC_SERVERURL?.replace(/\/api\/?$/, "");
 

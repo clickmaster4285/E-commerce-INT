@@ -62,7 +62,7 @@ export default function SupportChatWidget() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
-  const { socket } = useUserSocket();
+  const { socket } = useUserSocket({ enabled: open });
   const cartState = useCart();
   const cartItems = Array.isArray(cartState?.cart) ? cartState.cart : [];
   const parsedPosition = useMemo(() => {

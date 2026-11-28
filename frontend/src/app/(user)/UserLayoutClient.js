@@ -16,7 +16,7 @@ import { WishlistProvider, useWishlist } from "@/components/user/WishlistContext
 import { useUserSocketSync } from "../../hooks/user/useUserSocketSync";
 import { initThemeFromCookie } from "@/lib/theme";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import SupportChatWidget from "@/components/chat/SupportChatWidget";
+const SupportChatWidget = dynamic(() => import("@/components/chat/SupportChatWidget"), { ssr: false });
 import AnnouncementBar from "@/storefront/AnnouncementBar";
 import FloatingWhatsApp from "@/storefront/FloatingWhatsApp";
 import StorePopup from "@/storefront/StorePopup";
@@ -114,7 +114,6 @@ function NavItem({ icon, label, active }) {
 }
 
 export default function UserLayoutClient({ children, initialStore = null }) {
-  useUserSocketSync();
   const { dir, locale } = useTranslation();
   const pathname = usePathname();
   const queryClient = useQueryClient();
@@ -135,12 +134,32 @@ export default function UserLayoutClient({ children, initialStore = null }) {
     return () => window.removeEventListener("user-session-expired", onSessionExpired);
   }, [queryClient]);
 
+  const { data: profile } = useQuery({
+    queryKey: ["userProfile"],
+    queryFn: async () => {
+      const { userHttp } = await import("@/apis/axiosInstance");
+      const res = await userHttp.get("/users/profile");
+      return res.data?.user || res.data;
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: store } = useQuery({
     queryKey: ["storeInfo"],
     queryFn: storeApi.getPublic,
     initialData: initialStore || undefined,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Socket sirf jab live data chahiye (§9.4) — anonymous home pe connect storm nahi
+  const socketNeeded = Boolean(profile) ||
+    Boolean(pathname?.startsWith("/chats")) ||
+    Boolean(pathname?.startsWith("/product")) ||
+    Boolean(pathname?.startsWith("/orders")) ||
+    Boolean(pathname?.startsWith("/cart")) ||
+    Boolean(pathname?.startsWith("/checkout"));
+  useUserSocketSync({ enabled: socketNeeded });
 
   useEffect(() => {
     initThemeFromCookie();

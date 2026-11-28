@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { quoteApi } from "@/apis/admin/quoteApi";
 import { storeApi } from "@/apis/admin/storeApi";
-import QuoteTemplateDesigner from "@/components/admin/QuoteTemplateDesigner";
+import dynamic from "next/dynamic";
+const QuoteTemplateDesigner = dynamic(() => import("@/components/admin/QuoteTemplateDesigner"), { ssr: false });
 import { downloadQuotePdf, printQuotePdf } from "@/lib/invoicePdf";
 import { toast } from "sonner";
 import {

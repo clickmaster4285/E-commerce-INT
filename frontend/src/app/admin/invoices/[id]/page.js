@@ -16,7 +16,9 @@ import { downloadInvoicePdf, getDocumentPageSpec, printInvoicePdf } from "@/lib/
 import { storeApi } from "@/apis/admin/storeApi";
 import InvoicePaymentModal from "@/components/admin/InvoicePaymentModal";
 import InvoiceReturnModal from "@/components/admin/InvoiceReturnModal";
-import QuoteTemplateDesigner, { getSavedQuotePdfDesign, INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
+import dynamic from "next/dynamic";
+import { getSavedQuotePdfDesign, INVOICE_TEMPLATE_STORAGE_KEY } from "@/components/admin/QuoteTemplateDesigner";
+const QuoteTemplateDesigner = dynamic(() => import("@/components/admin/QuoteTemplateDesigner"), { ssr: false });
 import { renderRichHtml } from "@/lib/termsContent";
 
 const edge = { border: "1px solid var(--border-color)" };

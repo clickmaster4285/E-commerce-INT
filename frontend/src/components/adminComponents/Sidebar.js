@@ -1,4 +1,3 @@
-import { getAdminSocket, disposeAdminSocket } from "@/hooks/admin/useAdminSocket";
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
@@ -13,10 +12,10 @@ import {
   useCallback,
   useSyncExternalStore,
 } from "react";
-import { useSelector, useDispatch } from "react-redux";
 import { getBackendOrigin } from "@/lib/tenantHost";
-import { setStoreInfo } from "@/redux/slices/storeInfoSlice";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { storeApi } from "@/apis/admin/storeApi";
+import { getAdminSocket, disposeAdminSocket } from "@/hooks/admin/useAdminSocket";
 import { slugKey } from "@/utils/slugKey";
 import { useTranslation } from "../../i18n/LanguageProvider";
 import adminHttp from "@/apis/axiosInstance";
@@ -137,12 +136,15 @@ function setCollapsed(next) {
 export default function Sidebar({ onNavigate, userData }) {
   const pathname = usePathname();
   const router = useRouter();
-  const dispatch = useDispatch();
   const queryClient = useQueryClient();
-
-  const storeName = useSelector((state) => state.storeInfo.storeName);
-  const storeLogo = useSelector((state) => state.storeInfo.logo);
-  const isLoaded = useSelector((state) => state.storeInfo.isLoaded);
+  const { data: storeInfo, isFetched: storeFetched } = useQuery({
+    queryKey: ["admin-store-info"],
+    queryFn: storeApi.get,
+    staleTime: 5 * 60 * 1000,
+  });
+  const storeName = storeInfo?.store_name || "My Store";
+  const storeLogo = storeInfo?.logo || null;
+  const isLoaded = storeFetched || !!storeInfo;
 
   const isSelfDispatching = useRef(false);
 
@@ -424,11 +426,12 @@ export default function Sidebar({ onNavigate, userData }) {
 
   useEffect(() => {
     const socket = getSidebarSocket();
+    if (!socket) return undefined;
 
     const handleStoreData = (data) => {
       if (!data || !data.store_name) return;
       isSelfDispatching.current = true;
-      dispatch(setStoreInfo(data));
+      queryClient.setQueryData(["admin-store-info"], (prev) => ({ ...(prev || {}), ...data }));
       setTimeout(() => { isSelfDispatching.current = false; }, 100);
     };
 
@@ -437,6 +440,10 @@ export default function Sidebar({ onNavigate, userData }) {
     };
 
     const handleStoreUpdated = (data) => {
+      if (data?.changed === true || data?._id) {
+        queryClient.invalidateQueries({ queryKey: ["admin-store-info"] });
+        return;
+      }
       if (data?.store_name) handleStoreData(data);
     };
 
@@ -453,7 +460,7 @@ export default function Sidebar({ onNavigate, userData }) {
       socket.off("storeUpdated", handleStoreUpdated);
       socket.off("connect", handleConnectStore);
     };
-  }, [dispatch]);
+  }, [queryClient]);
 
   // ============================================================
   // STORE CUSTOM EVENT
@@ -464,14 +471,14 @@ export default function Sidebar({ onNavigate, userData }) {
       if (isSelfDispatching.current) return;
       if (event.detail?.store_name) {
         isSelfDispatching.current = true;
-        dispatch(setStoreInfo(event.detail));
+        queryClient.setQueryData(["admin-store-info"], (prev) => ({ ...(prev || {}), ...event.detail }));
         setTimeout(() => { isSelfDispatching.current = false; }, 100);
       }
     };
 
     window.addEventListener("storeUpdated", handleCustomEvent);
     return () => window.removeEventListener("storeUpdated", handleCustomEvent);
-  }, [dispatch]);
+  }, [queryClient]);
 
   // ============================================================
   // STORE LOAD FALLBACK

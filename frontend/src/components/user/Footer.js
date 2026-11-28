@@ -16,8 +16,8 @@ import {
   FaPinterest,
   FaTiktok,
   FaLinkedinIn,
-} from "react-icons/fa";
-import { FaXTwitter } from "react-icons/fa6";
+  FaXTwitter,
+} from "@/lib/socialIcons";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import { useLocalized } from "@/i18n/localize";
 import { useStoreTheme } from "@/storefront/ThemeProvider";

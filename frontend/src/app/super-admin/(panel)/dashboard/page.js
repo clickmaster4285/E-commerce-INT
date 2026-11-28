@@ -3,23 +3,16 @@
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Store, ClipboardList, CheckCircle2, XCircle, Ban, ShoppingBag, RefreshCw, Inbox, ArrowRight, TrendingUp } from "lucide-react";
-import { ComposedChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader, StatCard, Card, CardHeader, CardBody, Button, StatusBadge, Badge, Avatar, Alert, EmptyState, Skeleton } from "@/components/superadmin/ui";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { timeAgo } from "@/lib/superadminFormat";
 
-const ChartTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="sa-card px-3 py-2 text-[12px] shadow-[var(--shadow-pop)]">
-      <p className="font-semibold text-fg">{label}</p>
-      <p className="mt-0.5 text-fg-muted">
-        <span className="font-semibold tabular-nums text-fg">{payload[0].value}</span> signup{payload[0].value === 1 ? "" : "s"}
-      </p>
-    </div>
-  );
-};
+const SignupChart = dynamic(() => import("@/components/superadmin/SignupChart"), {
+  ssr: false,
+  loading: () => <Skeleton className="mx-3 h-56 rounded-xl" />,
+});
 
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
@@ -90,23 +83,7 @@ export default function SuperAdminDashboardPage() {
             ) : series.length === 0 || weekTotal === 0 ? (
               <EmptyState icon={Inbox} title="No signups this week" description="New customer accounts will chart here as they register." compact />
             ) : (
-              <div className="h-56 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="saRegFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} stroke="var(--border-color)" strokeDasharray="3 5" />
-                    <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11.5} stroke="var(--text-muted)" dy={6} />
-                    <YAxis tickLine={false} axisLine={false} fontSize={11.5} stroke="var(--text-muted)" allowDecimals={false} width={40} />
-                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: "var(--border-strong)", strokeDasharray: "3 3" }} />
-                    <Area type="monotone" dataKey="count" name="Signups" stroke="var(--accent)" strokeWidth={2} fill="url(#saRegFill)" dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "var(--bg-card)", fill: "var(--accent)" }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
+              <SignupChart series={series} />
             )}
           </CardBody>
         </Card>

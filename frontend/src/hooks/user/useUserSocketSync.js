@@ -26,12 +26,12 @@ const idOf = (payload) => {
   return id ? String(id) : null;
 };
 
-export function useUserSocketSync() {
+export function useUserSocketSync({ enabled = true } = {}) {
   const queryClient = useQueryClient();
-  const { socket, isConnected } = useUserSocket();
+  const { socket, isConnected } = useUserSocket({ enabled });
 
   useEffect(() => {
-    if (!socket) return;
+    if (!enabled || !socket) return;
 
     const invalidate = (...keys) => {
       keys.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
@@ -133,7 +133,7 @@ export function useUserSocketSync() {
       manager?.off?.("reconnect", onReconnect);
       for (const [event, handler] of handlers) socket.off(event, handler);
     };
-  }, [socket, queryClient]);
+  }, [enabled, socket, queryClient]);
 
   return { isConnected };
 }

@@ -2,13 +2,11 @@
 
 import FallbackImage from "@/components/common/FallbackImage";
 import Link from 'next/link';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/apis/axiosInstance';
 import { getStoreAdminUrl, isPlatformHost } from '@/apis/storeHandoff';
-import { useDispatch, useSelector } from 'react-redux';
 import { storeApi } from '@/apis/admin/storeApi';
-import { setStoreInfo } from '@/redux/slices/storeInfoSlice';
 import { toast } from 'sonner';
 import { useTranslation } from '@/i18n/LanguageProvider';
 import AdminLanguageSwitcher from '@/components/adminComponents/AdminLanguageSwitcher';
@@ -120,36 +118,24 @@ const inputClass = (hasError) =>
 export default function AdminLoginPage() {
   const { t, dir, locale } = useTranslation();
   const queryClient = useQueryClient();
-  const dispatch = useDispatch();
   const onPlatform = usePlatformHost();
 
-  // ==========================================
-  // STORE NAME / LOGO (Redux) — store host par usi store ki branding
-  // ✅ Non-blocking: store fetch background mein chalta rahe, UI block na ho
-  // ==========================================
-  const storeName = useSelector((state) => state.storeInfo.storeName);
-  const storeLogo = useSelector((state) => state.storeInfo.logo);
-  const isStoreLoaded = useSelector((state) => state.storeInfo.isLoaded);
-
+  // Store host branding — React Query (Redux hata diya, §9.4)
   const { data: storeData } = useQuery({
     queryKey: ['storeInfo'],
     queryFn: storeApi.getPublic,
     staleTime: 5 * 60 * 1000,
-    enabled: !isStoreLoaded,
     throwOnError: false,
     retry: false,
+    enabled: !onPlatform,
   });
 
-  useEffect(() => {
-    if (storeData) dispatch(setStoreInfo(storeData));
-  }, [storeData, dispatch]);
-
-  const displayName = storeName || t('admin.login.defaultStoreName');
+  const displayName = storeData?.store_name || t('admin.login.defaultStoreName');
   const firstLetter = displayName.charAt(0).toUpperCase() || 'S';
-  const logoUrl = storeLogo?.img_url
-    ? storeLogo.img_url.startsWith('http')
-      ? storeLogo.img_url
-      : `${API_ORIGIN}/${storeLogo.img_url}`
+  const logoUrl = storeData?.logo?.img_url
+    ? storeData.logo.img_url.startsWith('http')
+      ? storeData.logo.img_url
+      : `${API_ORIGIN}/${storeData.logo.img_url}`
     : null;
 
   const [email, setEmail] = useState('');

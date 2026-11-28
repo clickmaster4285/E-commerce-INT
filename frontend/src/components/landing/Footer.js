@@ -4,7 +4,7 @@ import {
   Mail,
   MapPin,
 } from "lucide-react";
-import { FaFacebookF, FaInstagram, FaXTwitter, FaYoutube } from "react-icons/fa6";
+import { FaFacebookF, FaInstagram, FaXTwitter, FaYoutube } from "@/lib/socialIcons";
 import { SITE, FOOTER } from "./content";
 
 const SOCIAL_ICONS = {

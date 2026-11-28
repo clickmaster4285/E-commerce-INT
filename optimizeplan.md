@@ -1046,8 +1046,8 @@ Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gz
   - The admin layout already reads the cookie, but it inlines the whole dictionary (about 380 KB) into the HTML; serve the admin namespace as a cached static asset instead.
 - [x] **Admin opens about 4 WebSocket connections per tab.** `AdminLayoutClient.js:84`, `Navbar.js:28`, `Sidebar.js:95` and `hooks/admin/useAdminSocket.js:96` each call `io()`. The getters reuse a socket only when it is `.connected`, so connects and reconnects create more sockets, and the old ones keep their listeners.
   - Use **one** `getAdminSocket()` module singleton. — **done:** Navbar/Sidebar/AdminLayoutClient/chats use `getAdminSocket`; logout calls `disposeAdminSocket`. `test/adminDetailTrimP1.test.js`
-  - Storefront: connect the socket only when it is needed (logged in, chat open, or a page with live stock), not for every anonymous visitor (`UserLayoutClient.js:117`).
-  - Load `SupportChatWidget` with `next/dynamic` on first open (`UserLayoutClient.js:19,184`). It currently imports `getAdminSocket`.
+  - Storefront: connect the socket only when it is needed (logged in, chat open, or a page with live stock), not for every anonymous visitor (`UserLayoutClient.js:117`). — **done:** `useUserSocketSync({ enabled })` gated on profile / chats / product / orders / cart / checkout; widget socket only while open. `test/adminFeSpeedP1.test.js`
+  - Load `SupportChatWidget` with `next/dynamic` on first open (`UserLayoutClient.js:19,184`). It currently imports `getAdminSocket`. — **partly done:** `next/dynamic` code-split; still mounts with the layout (FAB). True mount-on-first-open still open. `test/adminFeSpeedP1.test.js`
 - [ ] **Render-blocking fonts.** `app/layout.js:31-37` loads 4 Arabic and Urdu families × 4 weights on every page through a blocking stylesheet, and the "media trick" the comment describes is not there. Meanwhile `Inter` (`globals.css:308`) is never loaded.
   - Use `next/font` (self-hosted, `display: swap`).
   - Load the RTL families only when the locale is ar or ur.
@@ -1059,17 +1059,17 @@ Measured from the existing `.next` build. Today home is **940 KB raw / 259 KB gz
 - [ ] **Server-render the storefront pages.** 107 of 136 `app/` files are `"use client"`. `product/[id]` (1,410 lines, data loaded after hydration, so LCP waits on a waterfall), `brand/[id]`, `brands`, `deals/[id]`, `bundles` and `search` should become Server Components that pass DTOs to small client islands (add to cart, variant picker, gallery). Home server-renders only the banners; `HomeClient.js` fetches the rest on the client.
 
 **P2, bundle and structure:**
-- [ ] Lazy-load the remaining heavy editors and charts with `next/dynamic`:
-  - [ ] `RichTextEditor` in `admin/terms-conditions/page.js:9` (the tiptap chunk is 430 KB)
-  - [x] `QuoteTemplateDesigner` in invoices/quotes `new` and `[id]` — **partly done:** `new` pages use `next/dynamic`; `[id]` still static. Named helpers still import from the module. `test/adminDetailTrimP1.test.js`
-  - [ ] recharts in `admin/dashboard:49` and the super-admin dashboard
-  - [ ] `ColorPicker` (`fields.js:30`, `ElementPanel.js:15`)
-  - [ ] `VariantForm`
+- [x] Lazy-load the remaining heavy editors and charts with `next/dynamic`:
+  - [x] `RichTextEditor` in `admin/terms-conditions/page.js:9` (the tiptap chunk is 430 KB) — **done.** `test/adminFeSpeedP1.test.js`
+  - [x] `QuoteTemplateDesigner` in invoices/quotes `new` and `[id]` — **done** (new + `[id]`; named helpers still static-import on invoice detail). `test/adminFeSpeedP1.test.js`
+  - [x] recharts in `admin/dashboard:49` and the super-admin dashboard — **done:** extracted `DashboardCharts` / `SignupChart`. `test/adminFeSpeedP1.test.js`
+  - [x] `ColorPicker` (`fields.js:30`, `ElementPanel.js:15`) — **done.** `test/adminFeSpeedP1.test.js`
+  - [x] `VariantForm` — **done** (product detail + PO new). `test/adminFeSpeedP1.test.js`
 
   jspdf, html2canvas, leaflet, the VisualEditor and the section registry are already lazy, which is good.
 - [x] Use `libphonenumber-js/min` instead of `/max` (`AddressForm.js:7`): 84 KB vs 157 KB. — **done.** `test/adminDetailTrimP1.test.js`
-- [ ] **Remove Redux.** It is one slice (`redux/slices/storeInfoSlice.js`) mirroring server data, loaded on every storefront page through `providers.js:6`. Use the React Query `storeInfo` key instead, and drop `@reduxjs/toolkit`, `react-redux` and the root Provider. Keep Zustand for the store editor only.
-- [ ] Remove unused dependencies: `react-select` and `next-themes` (no imports). Replace the 3 `react-icons` uses with lucide or inline SVG, and drop that package too.
+- [x] **Remove Redux.** It is one slice (`redux/slices/storeInfoSlice.js`) mirroring server data, loaded on every storefront page through `providers.js:6`. Use the React Query `storeInfo` key instead, and drop `@reduxjs/toolkit`, `react-redux` and the root Provider. Keep Zustand for the store editor only. — **done:** `["admin-store-info"]` / `["storeInfo"]`; packages removed. `test/adminFeSpeedP1.test.js`
+- [x] Remove unused dependencies: `react-select` and `next-themes` (no imports). Replace the 3 `react-icons` uses with lucide or inline SVG, and drop that package too. — **done:** inline `@/lib/socialIcons`; `react-icons` removed (react-select/next-themes already gone). `test/adminFeSpeedP1.test.js`
 - [ ] One `src/lib/queryKeys.js` factory. There are about 150 distinct key heads today, and the store document alone is cached under 4 keys (`storeInfo`, `store`, `admin-store-info`, `store-public`), so invalidations miss some. `setQueryData(["products"], arr)` writes an orphan key (`useUserSocketSync.js:76`).
 - [x] Axios: add a default `timeout` (for example 15s) to `axios.create`. Today only the refresh call has one, so a hung backend leaves spinners forever. — **done:** `timeout: 15000` on shared axios.create. `test/adminDetailTrimP1.test.js`
 - [ ] Split the giant files, starting with the most-edited ones:

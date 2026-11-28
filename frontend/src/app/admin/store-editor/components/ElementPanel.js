@@ -12,7 +12,8 @@ import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ChevronLeft, EyeOff, 
 import { useThemeEditorStore } from "../useThemeEditorStore";
 import { applyFieldValue, readFieldValue } from "../editableFields";
 import { ELEMENT_RANGES, FONT_WEIGHTS, KIND_PROPS, parseElementKey } from "@/storefront/elementStyles";
-import ColorPicker from "./ColorPicker";
+import dynamic from "next/dynamic";
+const ColorPicker = dynamic(() => import("./ColorPicker"), { ssr: false });
 import { Collapsible } from "./panels";
 import { inputCls } from "./fields";
 import { sectionLabel } from "./sectionCatalog";

@@ -6,7 +6,11 @@ import { Check, Save } from "lucide-react";
 import { toast } from "sonner";
 import { storeApi } from "@/apis/admin/storeApi";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import RichTextEditor from "@/components/admin/RichTextEditor";
+import dynamic from "next/dynamic";
+const RichTextEditor = dynamic(() => import("@/components/admin/RichTextEditor"), {
+  ssr: false,
+  loading: () => <div className="h-40 animate-pulse rounded-xl bg-subtle" />,
+});
 
 const DOCUMENTS = [
   { key: "quote", base: "quote_terms_conditions" },

@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   Timer,
 } from "lucide-react";
-import { FaWhatsapp, FaFacebookF, FaInstagram } from "react-icons/fa6";
+import { FaWhatsapp, FaFacebookF, FaInstagram } from "@/lib/socialIcons";
 
 /* ============================================================
    GO LIVE IN 15 MINUTES — 4-step onboarding, code-built previews

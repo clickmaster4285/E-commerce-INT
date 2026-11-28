@@ -27,7 +27,7 @@ const RichTextEditor = dynamic(() => import("@/components/admin/RichTextEditor")
 
 // Leaflet window chahiye → sirf client par
 // Custom picker (drag + eyedropper + swatches); native <input type=color> drag par band ho jata tha
-import ColorPicker from "./ColorPicker";
+const ColorPicker = dynamic(() => import("./ColorPicker"), { ssr: false });
 
 const GeoPicker = dynamic(() => import("./GeoPicker"), {
   ssr: false,
