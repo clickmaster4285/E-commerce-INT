@@ -51,7 +51,7 @@ function priceCheckout({ lines, discounts, now = new Date() }) {
   for (const line of lines) {
     const qty = Math.max(1, Math.floor(Number(line.qty) || 1));
     const regularPrice = Number(line.variant?.selling_price) || 0;
-    const base = { index: line.index, qty, regularPrice, unit: regularPrice, free: 0, perItemSavings: 0, dealSavings: 0, bundleSavings: 0, dealActive: false, discountName: "" };
+    const base = { index: line.index, qty, regularPrice, unit: regularPrice, free: 0, perItemSavings: 0, dealSavings: 0, bundleSavings: 0, dealActive: false, discountName: "", discountId: null };
 
     if (line.bundleId) {
       const key = String(line.bundleId);
@@ -86,6 +86,7 @@ function priceCheckout({ lines, discounts, now = new Date() }) {
       unit: disc.discountedPrice,
       perItemSavings: Math.max(0, regularPrice - disc.discountedPrice),
       discountName: disc.discountName || "",
+      discountId: disc.discountId || null,
     });
   }
 

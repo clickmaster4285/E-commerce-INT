@@ -399,12 +399,7 @@ const closePO = async (req, res) => {
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 
-// Replica set check ab utils/tx.js me cached hai (pehle har delivery par admin.hello() chalta tha)
-const supportsTx = supportsTransactions;
-
 const deliverPO = async (req, res) => {
-  const useTx = await supportsTx();
-  let session = null;
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ success: false, message: "Purchase order not found" });
@@ -437,57 +432,107 @@ const deliverPO = async (req, res) => {
     });
     if (notFull) return res.status(400).json({ success: false, message: "Deliver the full ordered quantity for all lines" });
 
-    if (useTx) { session = await mongoose.startSession(); session.startTransaction(); }
-    const touched = [];
-    const receivedAt = new Date();
-    for (const n of norm) {
-      const variant = await Variant.findById(n.variant_id).session(session || null);
-      if (!variant) throw new Error("Variant not found");
-      const prev = variant.quantity ?? 0;
-      await Variant.updateOne(
-        { _id: variant._id },
-        {
-          $inc: { quantity: n.qty },
-          $set: {
-            cost_price: Math.max(0, Number(n.item.cost_price) || 0),
-            selling_price: Math.max(0, Number(n.item.sell_price) || 0),
-            expiry_after_delivery: Math.max(0, Number(n.item.expiry_after_delivery) || 0),
-            expiry_after_delivery_unit: n.item.expiry_after_delivery_unit || "days",
-          },
-        },
-        { session },
-      );
-      await StockHistory.create([{
-        variant_id: variant._id, product_id: n.product_id, product_name: n.item.name,
-        sku: n.item.sku || variant.sku || "", variant_title: n.item.variantTitle || variant.title || "",
-        previous_quantity: prev, new_quantity: prev + n.qty, change_quantity: n.qty,
-        adjustment_type: "add", reason: "purchase",
-        explanation: `${explanation} | PO ${po.po_number}${invoice_no ? ` | Inv ${invoice_no}` : " | No invoice provided"}`,
-        performed_by: req.user?._id || null, performed_by_name: req.user?.name || "Admin",
-      }], { session });
-      n.item.received_qty += n.qty;
-      touched.push({ variant_id: variant._id, change: n.qty });
+    let touched = [];
+    let stockApplied = [];
+    const transactional = await supportsTransactions();
+    let deliveredPo;
+    try {
+      ({ result: deliveredPo } = await withTx(async () => {
+        touched = [];
+        stockApplied = [];
+        // Conditional status claim — second concurrent deliver loses on standalone too
+        const claimed = await PurchaseOrder.findOneAndUpdate(
+          { _id: po._id, status: "confirmed" },
+          { $set: { status: "delivered", updatedby: req.user?._id || null } },
+          { returnDocument: "after" },
+        );
+        if (!claimed) {
+          throw new TxAbort(409, {
+            success: false,
+            code: "PO_CHANGED",
+            message: "PO was already delivered or its status changed. Refresh and try again.",
+          });
+        }
+
+        const receivedAt = new Date();
+        for (const n of norm) {
+          const variant = await Variant.findById(n.variant_id);
+          if (!variant) throw new TxAbort(400, { success: false, message: "Variant not found" });
+          const prev = variant.quantity ?? 0;
+          await Variant.updateOne(
+            { _id: variant._id },
+            {
+              $inc: { quantity: n.qty },
+              $set: {
+                cost_price: Math.max(0, Number(n.item.cost_price) || 0),
+                selling_price: Math.max(0, Number(n.item.sell_price) || 0),
+                expiry_after_delivery: Math.max(0, Number(n.item.expiry_after_delivery) || 0),
+                expiry_after_delivery_unit: n.item.expiry_after_delivery_unit || "days",
+              },
+            },
+          );
+          stockApplied.push({ variant_id: variant._id, qty: n.qty });
+          await StockHistory.create([{
+            variant_id: variant._id, product_id: n.product_id, product_name: n.item.name,
+            sku: n.item.sku || variant.sku || "", variant_title: n.item.variantTitle || variant.title || "",
+            previous_quantity: prev, new_quantity: prev + n.qty, change_quantity: n.qty,
+            adjustment_type: "add", reason: "purchase",
+            explanation: `${explanation} | PO ${claimed.po_number}${invoice_no ? ` | Inv ${invoice_no}` : " | No invoice provided"}`,
+            performed_by: req.user?._id || null, performed_by_name: req.user?.name || "Admin",
+          }]);
+          const line = claimed.items.find((i) => String(i.variant_id) === String(n.variant_id));
+          if (line) line.received_qty = (Number(line.received_qty) || 0) + n.qty;
+          touched.push({ variant_id: variant._id, change: n.qty });
+        }
+        claimed.receivings.push({
+          received_at: receivedAt,
+          invoice_no,
+          explanation,
+          items: norm.map((n) => ({ variant_id: n.variant_id, product_id: n.product_id, qty: n.qty })),
+          received_by: req.user?._id || null,
+          received_by_name: req.user?.name || "Admin",
+        });
+        claimed.activity.push(auditEvent(req, "received", [
+          { field: "Status", before: "confirmed", after: "delivered" },
+          ...(invoice_no ? [{ field: "Supplier invoice", before: "—", after: invoice_no }] : []),
+          { field: "Receiving note", before: "—", after: explanation },
+          ...norm.map(({ item, qty, priorReceived }) => ({
+            action: "received",
+            field: "Received quantity",
+            product_name: item.name,
+            variant_title: item.variantTitle || "",
+            sku: item.sku || "",
+            before: String(priorReceived),
+            after: String(priorReceived + qty),
+            from_quantity: priorReceived,
+            to_quantity: priorReceived + qty,
+          })),
+        ]));
+        await claimed.save();
+        return claimed;
+      }));
+    } catch (txError) {
+      if (!transactional && stockApplied.length) {
+        for (const s of stockApplied) {
+          await Variant.updateOne({ _id: s.variant_id }, { $inc: { quantity: -s.qty } }).catch(() => {});
+        }
+        await PurchaseOrder.updateOne(
+          { _id: po._id, status: "delivered" },
+          { $set: { status: "confirmed" } },
+        ).catch(() => {});
+      }
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
     }
-    po.receivings.push({ received_at: receivedAt, invoice_no, explanation, items: norm.map((n) => ({ variant_id: n.variant_id, product_id: n.product_id, qty: n.qty })), received_by: req.user?._id || null, received_by_name: req.user?.name || "Admin" });
-    po.activity.push(auditEvent(req, "received", [
-      { field: "Status", before: "confirmed", after: "delivered" },
-      ...(invoice_no ? [{ field: "Supplier invoice", before: "—", after: invoice_no }] : []),
-      { field: "Receiving note", before: "—", after: explanation },
-      ...norm.map(({ item, qty, priorReceived }) => ({ action: "received", field: "Received quantity", product_name: item.name, variant_title: item.variantTitle || "", sku: item.sku || "", before: String(priorReceived), after: String(priorReceived + qty), from_quantity: priorReceived, to_quantity: priorReceived + qty })),
-    ]));
-    po.status = "delivered";
-    po.updatedby = req.user?._id || null;
-    await po.save({ session });
-    if (session) await session.commitTransaction();
+
     emitStock({ variants: touched, source: "po_delivered" });
-    emitPO("po:delivered", { success: true, data: po });
-    emitPO("po:updated", { success: true, data: po });
-    res.status(200).json({ success: true, message: "PO delivered — inventory, prices, and expiry settings updated", data: po });
+    emitPO("po:delivered", { success: true, data: deliveredPo });
+    emitPO("po:updated", { success: true, data: deliveredPo });
+    res.status(200).json({ success: true, message: "PO delivered — inventory, prices, and expiry settings updated", data: deliveredPo });
   } catch (e) {
-    if (session) { try { await session.abortTransaction(); } catch {} }
     log.error("deliverPO error:", e.message);
     res.status(400).json({ success: false, message: e.message });
-  } finally { if (session) { try { await session.endSession(); } catch {} } }
+  }
 };
 // Legacy alias — the old POST .../receive endpoint maps to the same deliver logic.
 const receivePO = deliverPO;

@@ -6,6 +6,7 @@ const { getIO } = require("../utils/socket");
 const {
   pushGlobalActivity,
 } = require("../utils/activityHelper");
+const { withTx, TxAbort, supportsTransactions } = require("../utils/tx");
 
 /* =========================================================
    SOCKET HELPER
@@ -326,116 +327,115 @@ const adjustStock = async (req, res) => {
       });
     }
 
-    const previousQuantity =
-      variant.quantity ?? 0;
+    const performerName = req.user?.name || "Admin";
+    const performerId = req.user?._id || null;
+    const productId = variant.product_id?._id || variant.product_id || null;
+    const productName = variant.product_id?.name || "";
+    const sku = variant.sku || "";
+    const variantTitle = variant.title || "";
+    const previousSnapshot = variant.quantity ?? 0;
 
-    let newQuantity = previousQuantity;
-
-    if (type === "add") {
-      newQuantity =
-        previousQuantity + qty;
-    } else if (type === "remove") {
-      if (qty > previousQuantity) {
-        return res.status(400).json({
-          message: `Cannot remove ${qty} units. Only ${previousQuantity} in stock.`,
-        });
+    // Conditional $inc / versioned set + history in one withTx (optimizeplan §4.1)
+    let history;
+    let previousQuantity;
+    let newQuantity;
+    const transactional = await supportsTransactions();
+    let stockTouched = null;
+    try {
+      ({ result: { history, previousQuantity, newQuantity } } = await withTx(async () => {
+        stockTouched = null;
+        let updated;
+        let prev;
+        let next;
+        if (type === "add") {
+          updated = await Variant.findOneAndUpdate(
+            { _id: variant._id, is_deleted: { $ne: true } },
+            { $inc: { quantity: qty }, $set: { updatedby: performerId } },
+            { returnDocument: "after" },
+          );
+          if (!updated) throw new TxAbort(404, { message: "Variant not found" });
+          next = updated.quantity ?? 0;
+          prev = next - qty;
+        } else if (type === "remove") {
+          updated = await Variant.findOneAndUpdate(
+            { _id: variant._id, is_deleted: { $ne: true }, quantity: { $gte: qty } },
+            { $inc: { quantity: -qty }, $set: { updatedby: performerId } },
+            { returnDocument: "after" },
+          );
+          if (!updated) {
+            throw new TxAbort(400, {
+              message: `Cannot remove ${qty} units. Only ${previousSnapshot} in stock.`,
+            });
+          }
+          next = updated.quantity ?? 0;
+          prev = next + qty;
+        } else {
+          // set: claim on unchanged __v so concurrent set/add cannot race silently
+          updated = await Variant.findOneAndUpdate(
+            { _id: variant._id, is_deleted: { $ne: true }, __v: variant.__v },
+            { $set: { quantity: qty, updatedby: performerId }, $inc: { __v: 1 } },
+            { returnDocument: "after" },
+          );
+          if (!updated) {
+            throw new TxAbort(409, {
+              code: "STOCK_CHANGED",
+              message: "Stock was changed by someone else. Refresh and try again.",
+            });
+          }
+          prev = previousSnapshot;
+          next = qty;
+        }
+        stockTouched = { variant_id: variant._id, from: prev, to: next };
+        const [row] = await StockHistory.create([{
+          variant_id: variant._id,
+          product_id: productId,
+          product_name: productName,
+          sku,
+          variant_title: variantTitle,
+          previous_quantity: prev,
+          new_quantity: next,
+          change_quantity: next - prev,
+          adjustment_type: type,
+          reason: reasonText,
+          explanation: explanationText,
+          performed_by: performerId,
+          performed_by_name: performerName,
+        }]);
+        return { history: row, previousQuantity: prev, newQuantity: next };
+      }));
+    } catch (txError) {
+      if (!transactional && stockTouched) {
+        await Variant.updateOne(
+          { _id: stockTouched.variant_id },
+          { $set: { quantity: stockTouched.from } },
+        ).catch(() => {});
       }
-
-      newQuantity =
-        previousQuantity - qty;
-    } else {
-      newQuantity = qty;
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
     }
 
-    /* =====================================================
-       UPDATE VARIANT QUANTITY
-    ===================================================== */
-
     variant.quantity = newQuantity;
-
-    variant.updatedby =
-      req.user?._id || null;
-
-    await variant.save();
-
-    /* =====================================================
-       SAVE HISTORY
-    ===================================================== */
-
-    const performerName =
-      req.user?.name || "Admin";
-
-    const performerId =
-      req.user?._id || null;
-
-    const history = await StockHistory.create(
-      {
-        variant_id: variant._id,
-
-        product_id:
-          variant.product_id?._id ||
-          variant.product_id ||
-          null,
-
-        product_name:
-          variant.product_id?.name || "",
-
-        sku: variant.sku || "",
-
-        variant_title: variant.title || "",
-
-        previous_quantity:
-          previousQuantity,
-
-        new_quantity: newQuantity,
-
-        change_quantity:
-          newQuantity - previousQuantity,
-
-        adjustment_type: type,
-
-        reason: reasonText,
-
-        explanation: explanationText,
-
-        performed_by: performerId,
-
-        performed_by_name:
-          performerName,
-      }
-    );
 
     /* =====================================================
        ACTIVITY LOG
     ===================================================== */
 
-    const io = req.io || getIO();
-
+    let io = req.io || null;
+    try { io = io || getIO(); } catch { /* tests / pre-listen */ }
     await pushGlobalActivity(
       io,
       {
         action: `${performerName} adjusted stock for "${variant.product_id?.name || "Unknown Product"} - ${variant.title}" (${type} ${qty})`,
-
         category: "Stock Management",
-
         performedBy: performerId,
-
-        performedByName:
-          performerName,
-
+        performedByName: performerName,
         details: {
           variantId: variant._id,
-
           sku: variant.sku,
-
           previousQuantity,
-
           newQuantity,
-
           adjustmentType: type,
-
           reason: reasonText,
-
           explanation: explanationText,
         },
       },

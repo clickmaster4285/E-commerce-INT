@@ -17,12 +17,13 @@ function discountApplies(disc, { productId, categoryId, brandId }) {
 }
 
 /**
- * @returns {{ hasDiscount, originalPrice, discountedPrice, savings, discountName }}
+ * @returns {{ hasDiscount, originalPrice, discountedPrice, savings, discountName, discountId }}
  */
 function bestRegularDiscount(regularPrice, discounts, target) {
   const originalPrice = Number(regularPrice) || 0;
   let bestPrice = originalPrice;
   let bestName = null;
+  let bestId = null;
   for (const disc of Array.isArray(discounts) ? discounts : []) {
     if (!disc || !disc.isActive) continue;
     if (!discountApplies(disc, target)) continue;
@@ -35,6 +36,7 @@ function bestRegularDiscount(regularPrice, discounts, target) {
     if (finalPrice < bestPrice) {
       bestPrice = finalPrice;
       bestName = disc.name || "Discount";
+      bestId = disc._id || null;
     }
   }
   const hasDiscount = bestPrice < originalPrice;
@@ -44,6 +46,7 @@ function bestRegularDiscount(regularPrice, discounts, target) {
     discountedPrice: Math.round(hasDiscount ? bestPrice : originalPrice),
     savings: hasDiscount ? Math.round(originalPrice - bestPrice) : 0,
     discountName: bestName,
+    discountId: bestId,
   };
 }
 

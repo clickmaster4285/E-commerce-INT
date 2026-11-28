@@ -14,8 +14,8 @@ const { findApplicationForToken, INVALID_SETUP_LINK } = require("../utils/seller
 
 const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 
-// Store-setup documents — base64 data URLs (PDF / JPG / PNG / WEBP) saved under uploads/documents/
-const DOCUMENTS_DIR = path.join(__dirname, "..", "uploads", "documents");
+// Store-setup documents — base64 data URLs via uploadDirFor (platform: uploads/documents/)
+const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
 const DOCUMENT_MIME_EXT = {
   "application/pdf": "pdf",
   "image/jpeg": "jpg",
@@ -26,7 +26,7 @@ const DOCUMENT_MIME_EXT = {
 const MAX_DOCUMENTS = 4;
 const MAX_DOCUMENT_BYTES = 1.5 * 1024 * 1024;
 
-const saveDocumentFromBase64 = async (raw, displayName) => {
+const saveDocumentFromBase64 = async (raw, displayName, req = null) => {
   const match = /^data:([a-z0-9/+.-]+);base64,([A-Za-z0-9+/=\r\n]+)$/i.exec(String(raw || "").trim());
   if (!match) return null;
   const mime = match[1].toLowerCase();
@@ -34,11 +34,13 @@ const saveDocumentFromBase64 = async (raw, displayName) => {
   if (!ext) return null;
   const buffer = Buffer.from(match[2], "base64");
   if (!buffer.length || buffer.length > MAX_DOCUMENT_BYTES) return null;
-  if (!fs.existsSync(DOCUMENTS_DIR)) fs.mkdirSync(DOCUMENTS_DIR, { recursive: true });
+  const documentsDir = uploadDirFor(req, "documents");
+  if (!fs.existsSync(documentsDir)) fs.mkdirSync(documentsDir, { recursive: true });
   const fileName = `doc-${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
-  await fs.promises.writeFile(path.join(DOCUMENTS_DIR, fileName), buffer);
+  const abs = path.join(documentsDir, fileName);
+  await fs.promises.writeFile(abs, buffer);
   const cleanName = String(displayName || fileName).replace(/[\r\n<>"'&]/g, "").slice(0, 160).trim() || fileName;
-  return { name: cleanName, url: `/uploads/documents/${fileName}`, public_id: "" };
+  return { name: cleanName, url: uploadUrlFor(abs), public_id: "" };
 };
 
 // Public endpoint — a seller requests to open a store. The account is created
@@ -254,7 +256,7 @@ const completeSetup = async (req, res) => {
     const savedDocuments = [];
     for (const doc of rawDocuments) {
       // eslint-disable-next-line no-await-in-loop
-      const saved = await saveDocumentFromBase64(doc?.data, doc?.name);
+      const saved = await saveDocumentFromBase64(doc?.data, doc?.name, req);
       if (!saved) {
         return res.status(400).json({
           success: false,
@@ -289,15 +291,16 @@ const completeSetup = async (req, res) => {
       if (!buffer.length || buffer.length > 4 * 1024 * 1024) {
         return res.status(400).json({ success: false, message: "Store logo must be under 4MB." });
       }
-      const logoDir = path.join(__dirname, "..", "uploads", "store-logos");
+      const logoDir = uploadDirFor(req, "store-logos");
       if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true });
       const fileName = `logo-${Date.now()}-${crypto.randomBytes(6).toString("hex")}.webp`;
+      const abs = path.join(logoDir, fileName);
       await sharp(buffer, { limitInputPixels: 20_000_000 })
         .rotate()
         .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
         .webp({ quality: 86 })
-        .toFile(path.join(logoDir, fileName));
-      logoUrl = `/uploads/store-logos/${fileName}`;
+        .toFile(abs);
+      logoUrl = uploadUrlFor(abs);
     }
 
     application.store_name = storeName;

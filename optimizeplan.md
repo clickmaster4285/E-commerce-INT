@@ -155,7 +155,7 @@ So:
 ### 2.4 Uploads
 - [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **partly done:** the store logo (socket and HTTP) and deal images accept only png/jpeg/webp/gif, and the extension now comes from the MIME type. The socket logo is re-encoded to WebP, with no raw fallback. Still open: `nosniff`/helmet and full re-encoding in the upload factory (§5.6)
 - [x] Review upload: 50MB memory storage × 6 files, about 300MB of RAM per request, and it runs **before** the rate limiter (`reviewUploadMiddleware.js:41-49`, `reviewRoutes.js:57-59`). Rate-limit first, then cap images at about 8MB and use disk or stream storage for video. — **done:** `limiters.reviewCreate` runs before multer on create/update; images capped at 8MB in `saveReviewMedia`. Video still memory/50MB (stream/disk storage still open). `test/schemaAndPublicP0.test.js`
-- [ ] Store logos and KYC documents bypass `uploadDirFor` and go to global folders (`userController.js:48`, `sellerApplicationController.js:18,292`).
+- [x] Store logos and KYC documents bypass `uploadDirFor` and go to global folders (`userController.js:48`, `sellerApplicationController.js:18,292`). — **done:** both use `uploadDirFor`/`uploadUrlFor` (platform host → `uploads/store-logos` / `uploads/documents`). `test/integrityPhaseP0.test.js`
 
 ### 2.5 Code that crashes or silently does nothing
 - [x] `approveRequest` calls `uniqueUsername`, which is not in scope (it is only required inside `createSellerStore`, `superAdminController.js:525` vs `:815`). The call throws **after** the application is marked approved. — **done:** imported at module level
@@ -172,8 +172,8 @@ So:
   - [x] Category `category_type`, `image_url`, `sort_order` (the sort on `sort_order` does nothing); Attribute `filterable`/`searchable`/`visible`; Tag `deleted_at`; Banner `altText`, `backgroundColor`, `displayRules`.
   - [x] `pushGlobalActivity` queries `User.role in [admin, staff, manager]`, but User.role only allows `"user"`. It scans the whole collection on **every** login and mutation, and pushes to a field that does not exist (`utils/activityHelper.js:44-61`). **Delete it.** §3.5 replaces it. — **done:** no-op stub kept so call sites stay safe until removed
 - [x] `editOrder` recalculates tax from `item.tax`, which order items never store, so tax becomes 0. It also changes quantities with no stock adjustment (`orderController.js:1086-1106`). — **done:** checkout stores `items.tax_rate` (product tax snapshot). Edit recomputes tax from that rate, or from `Product.tax` when the snapshot is missing, or scales the existing tax if the product is gone. Quantity changes (paid + free) adjust stock with a conditional decrement inside `withTx`; a concurrent edit gets 409 `ORDER_CHANGED`. Address-only edits leave tax and stock alone. `test/editOrder.test.js`
-- [ ] `deleteStore` hard-deletes the store and its employees, but orphans every product, order and other store document (`superAdminController.js:1019-1021`). Replace it with soft delete plus an offline purge job (§3.7).
-- [ ] Dashboard day buckets use server-local `setHours` but group by UTC `$dateToString` (`dashboardController.js:72-75,104`). Use the store's timezone in both.
+- [x] `deleteStore` hard-deletes the store and its employees, but orphans every product, order and other store document (`superAdminController.js:1019-1021`). Replace it with soft delete plus an offline purge job (§3.7). — **done:** Store soft-delete (`is_deleted`/`deleted_at`/`deletedby`), status closed, subdomain/customDomain cleared for reuse, employees inactivated (not deleted), resolveStore ignores deleted stores. Offline purge job still §3.7. `test/integrityPhaseP0.test.js`
+- [x] Dashboard day buckets use server-local `setHours` but group by UTC `$dateToString` (`dashboardController.js:72-75,104`). Use the store's timezone in both. — **done:** `Store.timezone` (default `UTC`); range bounds and `$dateToString.timezone` use it. `test/integrityPhaseP0.test.js`
 
 ---
 
@@ -205,7 +205,7 @@ A replica set enables transactions, retryable writes, change streams and `majori
   - The tenant ALS context must be kept inside the callback, so add a test for that.
   - Pass `{ session }` to every read and write inside it.
 - [ ] Delete the fallbacks: `supportsTx()` (`purchaseOrderController.js:402-408`), the "standalone" manual compensations (`posController.js:576`, `createProduct`'s rollback at `productController.js:1917`, `createSellerStore`'s manual rollback), and every "if transactions unsupported" branch.
-- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **partly done:** checkout (`placeOrder`), order edit (optimistic lock on `updated_at`), POS sale/edit (optimistic lock on `updated_at`), POS return, invoice create/update/return (conditional `__v` / amount claim; standalone still compensates), PO payment. Still open: manual stock adjust, signup/approval, store purge, and moving PO delivery fully onto `withTx`
+- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **partly done:** checkout (`placeOrder`), order edit (optimistic lock on `updated_at`), POS sale/edit (optimistic lock on `updated_at`), POS return, invoice create/update/return (conditional `__v` / amount claim; standalone still compensates), PO payment, **manual stock adjust**, **PO deliver** (conditional status claim + stock in `withTx`). Still open: signup/approval, store purge
 - [ ] Tests: `MongoMemoryReplSet` (from `mongodb-memory-server`) so tests run against a real replica set.
 - [ ] Later uses of the replica set: **change streams** for cross-instance cache invalidation (`store:changed`, `publicCache` namespaces), socket fan-out of admin events, and the read-model refresh (§3.4). They can replace some Redis pub/sub.
 - [ ] Connection options: `maxPoolSize` (for example 50), `minPoolSize`, `serverSelectionTimeoutMS: 5000`, `socketTimeoutMS`, and **`autoIndex: false` in production**. Build indexes through a migration script, not on boot.
@@ -341,7 +341,7 @@ Per collection (add ✚, drop ✖):
 - [ ] **SuperAdminActivity**: ✚ `{"actor.id", created_at:-1}`, ✚ `{entityType, entityId, created_at:-1}`, plus a retention TTL
 - [ ] **Wishlist**: ✚ unique `{storeId, user_id}`. **ShippingConfig**: ✚ unique `{storeId}` (concurrent `getConfig()` calls currently create duplicates).
 - [ ] **Otp**: ✖ `{email}` (covered by `{email, purpose, created_at}`)
-- [ ] Soft-delete unique indexes `{storeId, code, is_deleted}` on Attribute, Category, Brand and Vendor fail with E11000 the second time the same code is deleted. Convert them to a **partial unique index on `is_deleted:false`**.
+- [x] Soft-delete unique indexes `{storeId, code, is_deleted}` on Attribute, Category, Brand and Vendor fail with E11000 the second time the same code is deleted. Convert them to a **partial unique index on `is_deleted:false`**. — **done:** schema partial uniques; `migrateTenantIndexes.js` drops the legacy compounds before `createIndexes`. `test/integrityPhaseP0.test.js`
 - [ ] **Plugin change**: stop auto-adding the single `storeId` index when the schema already declares a compound index starting with `storeId` (an option such as `tenantScope(schema, { index: false })`). It is pure write overhead.
 - [ ] Update `scripts/migrateTenantIndexes.js` to read the desired indexes from the models, diff them against the live database, then drop and create (dry run by default). Verify with `explain()` that each hot query does an `IXSCAN` with no `SORT` stage.
 - [ ] Partial-filter check: confirm with `explain()` that `Store.findOne({subdomain})` uses the partial unique index (`Store.js:84-91`).
@@ -568,10 +568,10 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   - `commit`, `release`, `receive`, `adjust`, `countSet`
 
   Every call writes a `stock_movements` row with an idempotency key and calls `productSummary.refresh` in the **same `withTx` transaction** (§3.1).
-  - *Before §3.9 lands*, the quick fix on the current model is `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`. **Done for `placeOrder`, `editOrder`, and invoice create/update/return** (a conditional decrement per line; `test/counterAndStock.test.js`: 20 parallel orders for stock 5 → exactly 5; edit adjusts paid + free and returns 409 `ORDER_CHANGED`; `test/invoiceStockTx.test.js`: concurrent creates for stock 3 → 3, concurrent update/return → one winner). Still open: POS create path (sale already uses conditional `$inc` inside `withTx`), PO receive, and manual adjust
+  - *Before §3.9 lands*, the quick fix on the current model is `findOneAndUpdate({_id, quantity: {$gte: n}}, {$inc: {quantity: -n}})`. **Done for `placeOrder`, `editOrder`, invoice create/update/return, manual `adjustStock`, and PO deliver** (conditional decrement / status claim; `test/counterAndStock.test.js`, `test/invoiceStockTx.test.js`, `test/integrityPhaseP0.test.js`). Still open: POS create path (sale already uses conditional `$inc` inside `withTx`) and product/variant quantity overwrites
 - [ ] Replace every direct `quantity` write in controllers, including `updateVariant`/`updateProduct` (`variantController.js:170-177`, `productController.js:1860,2137`), which overwrite quantity with no history.
 - [x] Order cancel and delete: use a conditional status transition, `findOneAndUpdate({_id, status: {$ne: "cancelled"}}, ...)`, so two concurrent cancels cannot restore stock twice (`orderController.js:1016-1048,1183-1198`). — **done:** cancel claims the transition with `updateOne({status:{$ne:"cancelled"}})`; delete uses an atomic `findOneAndDelete({user_id, status:"pending"})` before restoring
-- [ ] PO delivery: do the status transition plus stock in one transaction, so it is idempotent (`purchaseOrderController.js:411-482`). — **partly done:** it already used a manual session transaction (a concurrent duplicate aborts on a write conflict); `supportsTx` now uses the cached check (no `admin.hello()` per delivery). Still open: protection on standalone servers, and a move to `withTx`
+- [x] PO delivery: do the status transition plus stock in one transaction, so it is idempotent (`purchaseOrderController.js:411-482`). — **done:** `withTx` + conditional `status:"confirmed"→"delivered"` claim (409 `PO_CHANGED`); standalone compensates stock + status. `test/integrityPhaseP0.test.js`
 - [x] POS returns: do the return-quantity check plus stock inside one transaction (`posController.js:311-349`). — **done:** `returnPosSaleItems` runs in `withTx` (5 concurrent returns on 2 sold → exactly 2); manual compensation only on standalone servers
 
 ### 4.2 Checkout and pricing (P1)
@@ -581,7 +581,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   2. compute prices on the server
   3. `stock.reserve`
   4. enforce deal `usageLimit`/`perUserLimit` and increment `usedCount` atomically (today never enforced)
-  5. record discount usage (today never recorded; schema now has `usageCount`, §2.5)
+  5. record discount usage — **done:** conditional `$inc` on `Discount.usageCount` under `usageLimit` inside the same `withTx` (409/`DISCOUNT_LIMIT_REACHED`); standalone compensation. `test/integrityPhaseP0.test.js`
   6. `counter.next("order")`
   7. `Order.create`
   8. complete the draft

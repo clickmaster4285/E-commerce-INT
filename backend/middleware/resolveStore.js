@@ -86,11 +86,15 @@ function hostFromRequest(req) {
 }
 
 async function findStoreForTenant(tenant) {
+  const alive = { is_deleted: { $ne: true } };
   if (tenant.type === "subdomain") {
-    return Store.findOne({ subdomain: tenant.subdomain }).lean();
+    return Store.findOne({ subdomain: tenant.subdomain, ...alive }).lean();
   }
   if (tenant.type === "custom") {
-    const filter = { customDomain: { $in: [tenant.domain, tenant.domain.replace(/^www\./, "")] } };
+    const filter = {
+      ...alive,
+      customDomain: { $in: [tenant.domain, tenant.domain.replace(/^www\./, "")] },
+    };
     // Development me hosts-file wale domains (eastore.test) bina DNS verification ke chalne do
     if (process.env.NODE_ENV === "production") filter.domainVerified = true;
     return Store.findOne(filter).lean();

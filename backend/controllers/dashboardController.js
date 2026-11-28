@@ -23,30 +23,93 @@ const pctChange = (current, previous) => {
   return current > 0 ? 100 : 0;
 };
 
-const dayKey = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const IANA_TZ = /^[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)+$|^UTC$/;
 
-const buildBuckets = (start, end, bucket) => {
+/** Resolve store IANA timezone (fallback UTC). */
+const storeTimezone = (req) => {
+  const raw = String(req.store?.timezone || "UTC").trim() || "UTC";
+  return IANA_TZ.test(raw) ? raw : "UTC";
+};
+
+/** Calendar Y-M-D (and optional H:M:S) parts in a timezone. */
+const zonedParts = (date, timeZone) => {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const map = Object.fromEntries(
+    fmt.formatToParts(date).filter((p) => p.type !== "literal").map((p) => [p.type, p.value]),
+  );
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+    second: Number(map.second),
+  };
+};
+
+/** Instant that is y-m-d h:m:s.ms in `timeZone`. */
+const zonedWallTimeToUtc = (y, m, d, h, min, s, ms, timeZone) => {
+  const utcGuess = Date.UTC(y, m - 1, d, h, min, s, ms);
+  const asZoned = zonedParts(new Date(utcGuess), timeZone);
+  const asIfUtc = Date.UTC(asZoned.year, asZoned.month - 1, asZoned.day, asZoned.hour, asZoned.minute, asZoned.second, ms);
+  return new Date(utcGuess - (asIfUtc - utcGuess));
+};
+
+const dayKeyInTz = (date, timeZone) => {
+  const p = zonedParts(date, timeZone);
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+};
+
+const startOfZonedDay = (date, timeZone) => {
+  const p = zonedParts(date, timeZone);
+  return zonedWallTimeToUtc(p.year, p.month, p.day, 0, 0, 0, 0, timeZone);
+};
+
+const endOfZonedDay = (date, timeZone) => {
+  const p = zonedParts(date, timeZone);
+  return zonedWallTimeToUtc(p.year, p.month, p.day, 23, 59, 59, 999, timeZone);
+};
+
+const addZonedDays = (date, days, timeZone) => {
+  const p = zonedParts(date, timeZone);
+  // Noon UTC-ish via wall clock to avoid DST edge when shifting calendar days
+  const noon = zonedWallTimeToUtc(p.year, p.month, p.day, 12, 0, 0, 0, timeZone);
+  return new Date(noon.getTime() + days * 86400000);
+};
+
+const buildBuckets = (start, end, bucket, timeZone) => {
   const buckets = [];
-  const cursor = new Date(start);
-  while (cursor <= end) {
+  let cursor = startOfZonedDay(start, timeZone);
+  const endBound = endOfZonedDay(end, timeZone);
+  while (cursor <= endBound) {
+    const p = zonedParts(cursor, timeZone);
     if (bucket === "day") {
       buckets.push({
-        key: dayKey(cursor),
-        label: `${MONTHS[cursor.getMonth()]} ${cursor.getDate()}`,
+        key: dayKeyInTz(cursor, timeZone),
+        label: `${MONTHS[p.month - 1]} ${p.day}`,
         revenue: 0,
         orders: 0,
       });
-      cursor.setDate(cursor.getDate() + 1);
+      cursor = startOfZonedDay(addZonedDays(cursor, 1, timeZone), timeZone);
     } else {
       buckets.push({
-        key: `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`,
-        label: MONTHS[cursor.getMonth()],
+        key: `${p.year}-${String(p.month).padStart(2, "0")}`,
+        label: MONTHS[p.month - 1],
         revenue: 0,
         orders: 0,
       });
-      cursor.setMonth(cursor.getMonth() + 1);
-      cursor.setDate(1);
+      const nextMonth = p.month === 12 ? 1 : p.month + 1;
+      const nextYear = p.month === 12 ? p.year + 1 : p.year;
+      cursor = zonedWallTimeToUtc(nextYear, nextMonth, 1, 0, 0, 0, 0, timeZone);
     }
   }
   return buckets;
@@ -66,22 +129,15 @@ const getDashboardStats = async (req, res) => {
       return { page, limit, total, pages, skip: (page - 1) * limit };
     };
     const { days, format, bucket } = RANGES[rangeKey];
+    const tz = storeTimezone(req);
 
     const now = new Date();
-    const end = new Date(now);
-    end.setHours(23, 59, 59, 999);
-    const start = new Date(end);
-    start.setDate(start.getDate() - (days - 1));
-    start.setHours(0, 0, 0, 0);
-    const prevEnd = new Date(start);
-    prevEnd.setMilliseconds(prevEnd.getMilliseconds() - 1);
-    const prevStart = new Date(start);
-    prevStart.setDate(prevStart.getDate() - days);
-    const weekStart = new Date(end);
-    weekStart.setDate(weekStart.getDate() - 6);
-    weekStart.setHours(0, 0, 0, 0);
-    const prevWeekStart = new Date(weekStart);
-    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const end = endOfZonedDay(now, tz);
+    const start = startOfZonedDay(addZonedDays(end, -(days - 1), tz), tz);
+    const prevEnd = new Date(start.getTime() - 1);
+    const prevStart = startOfZonedDay(addZonedDays(start, -days, tz), tz);
+    const weekStart = startOfZonedDay(addZonedDays(end, -6, tz), tz);
+    const prevWeekStart = startOfZonedDay(addZonedDays(weekStart, -7, tz), tz);
 
     const baseMatch = { created_at: { $gte: start, $lte: end }, status: { $ne: "cancelled" } };
     const prevMatch = { created_at: { $gte: prevStart, $lte: prevEnd }, status: { $ne: "cancelled" } };
@@ -101,14 +157,14 @@ const getDashboardStats = async (req, res) => {
       { $match: baseMatch },
       {
         $group: {
-          _id: { k: { $dateToString: { format, date: "$created_at" } } },
+          _id: { k: { $dateToString: { format, date: "$created_at", timezone: tz } } },
           revenue: { $sum: "$total" },
           orders: { $sum: 1 },
         },
       },
     ]);
     const seriesMap = new Map(seriesRows.map((r) => [r._id.k, r]));
-    const series = buildBuckets(start, end, bucket).map((b) => {
+    const series = buildBuckets(start, end, bucket, tz).map((b) => {
       const row = seriesMap.get(b.key);
       return { label: b.label, revenue: Math.round(row?.revenue || 0), orders: row?.orders || 0 };
     });
@@ -139,7 +195,7 @@ const getDashboardStats = async (req, res) => {
     const creationSpark = (Model) =>
       Model.aggregate([
         { $match: { created_at: { $gte: weekStart } } },
-        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } }, n: { $sum: 1 } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at", timezone: tz } }, n: { $sum: 1 } } },
       ]);
     const [prodSpark, brandSpark, catSpark, revenueSparkRows, featuredSparkRows] = await Promise.all([
       creationSpark(Product),
@@ -147,16 +203,16 @@ const getDashboardStats = async (req, res) => {
       creationSpark(Category),
       Order.aggregate([
         { $match: { created_at: { $gte: weekStart }, status: { $ne: "cancelled" } } },
-        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at" } }, revenue: { $sum: "$total" } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$created_at", timezone: tz } }, revenue: { $sum: "$total" } } },
       ]),
       Product.aggregate([
         { $match: { featured_at: { $gte: weekStart } } },
-        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$featured_at" } }, n: { $sum: 1 } } },
+        { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$featured_at", timezone: tz } }, n: { $sum: 1 } } },
       ]),
     ]);
     const toSpark = (rows) => {
       const map = new Map(rows.map((r) => [r._id, r.n]));
-      return buildBuckets(weekStart, end, "day").map((b) => map.get(b.key) || 0);
+      return buildBuckets(weekStart, end, "day", tz).map((b) => map.get(b.key) || 0);
     };
     const revenueSpark = toSpark(revenueSparkRows.map((r) => ({ _id: r._id, n: r.revenue })));
     const featuredSpark = toSpark(featuredSparkRows);

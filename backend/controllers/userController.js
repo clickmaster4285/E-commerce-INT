@@ -30,7 +30,7 @@ const checkStoreSubdomain = async (raw, email) => {
   const formatError = validateStoreAddress(sub);
   if (formatError) return { error: formatError, suggestion: "" };
   const taken =
-    (await Store.exists({ subdomain: sub }).setOptions({ skipTenantScope: true })) ||
+    (await Store.exists({ subdomain: sub, is_deleted: { $ne: true } }).setOptions({ skipTenantScope: true })) ||
     (await PendingRegistration.exists({ subdomain: sub, email: { $ne: email || "" }, expiresAt: { $gt: new Date() } }));
   if (!taken) return { error: null, suggestion: "" };
   return { error: "This store address is already taken.", suggestion: await Store.generateUniqueSubdomain(sub) };
@@ -44,21 +44,23 @@ const normalizeEmail = (email) => String(email || "").toLowerCase().trim();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const generateOtpCode = () => String(crypto.randomInt(0, 10 ** 6)).padStart(6, "0");
 
-// Decode a base64 data URL (image) → sharp → uploads/store-logos/<name>.webp
-const STORE_LOGO_DIR = path.join(__dirname, "..", "uploads", "store-logos");
-const saveStoreLogoFromBase64 = async (raw) => {
+// Decode a base64 data URL (image) → sharp → uploadDirFor(req, "store-logos")
+const { uploadDirFor, uploadUrlFor } = require("../utils/uploadPaths");
+const saveStoreLogoFromBase64 = async (raw, req = null) => {
   const match = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(raw || "").trim());
   if (!match) return null;
   const buffer = Buffer.from(match[2], "base64");
   if (!buffer.length || buffer.length > 4 * 1024 * 1024) return null;
-  if (!fs.existsSync(STORE_LOGO_DIR)) fs.mkdirSync(STORE_LOGO_DIR, { recursive: true });
+  const logoDir = uploadDirFor(req, "store-logos");
+  if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true });
   const fileName = `logo-${Date.now()}-${crypto.randomBytes(6).toString("hex")}.webp`;
+  const abs = path.join(logoDir, fileName);
   await sharp(buffer, { limitInputPixels: 20_000_000 })
     .rotate()
     .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
     .webp({ quality: 86 })
-    .toFile(path.join(STORE_LOGO_DIR, fileName));
-  return `/uploads/store-logos/${fileName}`;
+    .toFile(abs);
+  return uploadUrlFor(abs);
 };
 
 // ✅ Tokens / cookies / sessions — har audience (user | admin) ke alag secrets,
@@ -312,7 +314,7 @@ const createUser = async (req, res) => {
     let storeLogoUrl = "";
     if (wantsStore && storeLogo) {
       try {
-        storeLogoUrl = await saveStoreLogoFromBase64(storeLogo);
+        storeLogoUrl = await saveStoreLogoFromBase64(storeLogo, req);
       } catch (logoError) {
         return res.status(400).json({ success: false, message: "Store logo could not be processed. Please upload a smaller JPG, PNG or WEBP image." });
       }

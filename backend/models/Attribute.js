@@ -71,6 +71,9 @@ const attributeSchema = new mongoose.Schema(
 // store admin dusre stores ke attributes badal / delete kar sakta tha).
 // Purane global docs: node scripts/migrateAttributesPerStore.js
 attributeSchema.plugin(tenantScope);
-attributeSchema.index({ storeId: 1, code: 1, is_deleted: 1 }, { unique: true });
+attributeSchema.index(
+  { storeId: 1, code: 1 },
+  { unique: true, partialFilterExpression: { is_deleted: false } },
+);
 
 module.exports = mongoose.model("Attribute", attributeSchema);

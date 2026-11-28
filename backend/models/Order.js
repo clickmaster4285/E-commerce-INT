@@ -28,6 +28,7 @@ const orderSchema = new mongoose.Schema(
         tax_rate: { type: Number, min: 0, max: 100 },
         original_price: { type: Number, default: 0 },
         discount_name: { type: String, default: "" },
+        discount_id: { type: mongoose.Schema.Types.ObjectId, ref: "Discount", default: null },
         savings: { type: Number, default: 0 },
         qty: { type: Number, required: true, min: 1 },
         

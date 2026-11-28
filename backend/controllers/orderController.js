@@ -121,7 +121,7 @@ const placeOrder = async (req, res) => {
       status: "active",
       startDate: { $lte: now },
       endDate: { $gte: now },
-    }).select("type value discountValue applyTo selectedProducts selectedCategories selectedBrands isActive name").lean();
+    }).select("type value discountValue applyTo selectedProducts selectedCategories selectedBrands isActive name usageLimit usageCount").lean();
 
     const DEAL_PRICING_FIELDS = "name type applyTo productIds categoryIds brandIds discountValue buyQuantity getQuantity minQuantity isActive startDate endDate freeShippingMethods usageLimit perUserLimit";
     const BUNDLE_DEAL_FIELDS = "name type isActive startDate endDate bundleRule bundlePrice bundleProducts";
@@ -298,6 +298,7 @@ const placeOrder = async (req, res) => {
       oi.price = unit;
       oi.free_items = free;
       oi.discount_name = p.discountName || "";
+      oi.discount_id = p.discountId || null;
       oi.savings = p.perItemSavings;
       oi.deal_savings = p.dealSavings;
       oi.bundle_savings = p.bundleSavings;
@@ -380,12 +381,17 @@ const placeOrder = async (req, res) => {
 
     let stockTouchedOnOrder = [];
     let dealsIncremented = [];
+    let discountsIncremented = [];
+    const uniqueDiscountIds = new Set(
+      orderItems.map((oi) => oi.discount_id).filter(Boolean).map(String),
+    );
     let order;
     const transactional = await supportsTransactions();
     try {
       ({ result: order } = await withTx(async () => {
         stockTouchedOnOrder = []; // driver retry par callback dobara chalta hai
         dealsIncremented = [];
+        discountsIncremented = [];
 
         // 1) Stock — conditional decrement (PAID + FREE)
         for (const oi of orderItems) {
@@ -424,6 +430,30 @@ const placeOrder = async (req, res) => {
           if (inc.matchedCount) dealsIncremented.push(dId);
           if (!inc.matchedCount) {
             throw new TxAbort(400, { success: false, code: "DEAL_LIMIT_REACHED", message: `The deal "${dealDoc?.name || ""}" has reached its usage limit. Please update your cart.` });
+          }
+        }
+
+        // 2b) Discount usage — usageLimit via conditional $inc on usageCount (§4.2 step 5)
+        for (const discId of uniqueDiscountIds) {
+          const discDoc = activeDiscounts.find((d) => String(d._id) === String(discId));
+          const inc = await Discount.updateOne(
+            {
+              _id: discId,
+              $or: [
+                { usageLimit: null },
+                { usageLimit: { $lte: 0 } },
+                { $expr: { $lt: [{ $ifNull: ["$usageCount", 0] }, "$usageLimit"] } },
+              ],
+            },
+            { $inc: { usageCount: 1 } },
+          );
+          if (inc.matchedCount) discountsIncremented.push(discId);
+          if (!inc.matchedCount) {
+            throw new TxAbort(400, {
+              success: false,
+              code: "DISCOUNT_LIMIT_REACHED",
+              message: `The discount "${discDoc?.name || ""}" has reached its usage limit. Please update your cart.`,
+            });
           }
         }
 
@@ -482,6 +512,9 @@ const placeOrder = async (req, res) => {
         }
         for (const dId of dealsIncremented) {
           await Deal.updateOne({ _id: dId, usedCount: { $gt: 0 } }, { $inc: { usedCount: -1 } }).catch(() => {});
+        }
+        for (const discId of discountsIncremented) {
+          await Discount.updateOne({ _id: discId, usageCount: { $gt: 0 } }, { $inc: { usageCount: -1 } }).catch(() => {});
         }
       }
       if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);

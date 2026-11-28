@@ -64,7 +64,10 @@ const vendorSchema = new mongoose.Schema(
   { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } }
 );
 
-vendorSchema.index({ storeId: 1, vendor_code: 1, is_deleted: 1 }, { unique: true });
+vendorSchema.index(
+  { storeId: 1, vendor_code: 1 },
+  { unique: true, partialFilterExpression: { is_deleted: false } },
+);
 vendorSchema.index({ name: 1, is_deleted: 1 });
 vendorSchema.index({ city: 1, is_deleted: 1 });
 

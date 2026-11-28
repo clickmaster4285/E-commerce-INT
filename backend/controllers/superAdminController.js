@@ -656,7 +656,7 @@ const listStores = async (req, res) => {
     const { status, search, page = 1, limit = 10 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
-    const filter = {};
+    const filter = { is_deleted: { $ne: true } };
     if (["open", "closed", "maintenance"].includes(String(status || ""))) {
       filter.store_status = String(status);
     }
@@ -1016,11 +1016,38 @@ const deleteStore = async (req, res) => {
   try {
     const store = await Store.findById(req.params.id);
     if (!store) return res.status(404).json({ success: false, message: "Store not found." });
+    if (store.is_deleted) {
+      return res.json({ success: true, message: "Store already deleted." });
+    }
     const storeName = store.store_name;
-    await Store.deleteOne({ _id: store._id });
-    await User.updateMany({ storeId: store._id }, { $unset: { storeId: 1 }, status: "inactive" });
-    await Employee.deleteMany({ storeId: store._id }).setOptions(CROSS_STORE);
-    await logActivity({ action: `Store deleted: ${storeName}`, actor: req.superAdmin, entityType: "store", entityId: String(store._id), details: {} });
+    const freedSubdomain = store.subdomain;
+    // Soft delete — keep products/orders/employees for offline purge (§3.7).
+    // Clear host fields so subdomain/custom domain can be reused.
+    store.is_deleted = true;
+    store.deleted_at = new Date();
+    store.deletedby = req.superAdmin?._id || null;
+    store.store_status = "closed";
+    store.subdomain = undefined;
+    store.customDomain = undefined;
+    store.domainVerified = false;
+    await store.save();
+    await Employee.updateMany(
+      { storeId: store._id, status: { $ne: "inactive" } },
+      { status: "inactive" },
+    ).setOptions(CROSS_STORE);
+    try {
+      require("../middleware/resolveStore").clearStoreHostCache();
+    } catch { /* cache optional */ }
+    await pushStoreActivity(store._id, req, "deleted", "Store soft-deleted by Super Admin", {
+      freedSubdomain: freedSubdomain || null,
+    });
+    await logActivity({
+      action: `Store deleted: ${storeName}`,
+      actor: req.superAdmin,
+      entityType: "store",
+      entityId: String(store._id),
+      details: { soft: true, freedSubdomain: freedSubdomain || null },
+    });
     return res.json({ success: true, message: "Store deleted." });
   } catch (error) {
     return res.status(500).json({ success: false, message: "Failed to delete store." });

@@ -32,8 +32,15 @@ const storeSchema = new mongoose.Schema({
   currency: { type: String, default: "PKR" },
   tax_rate: { type: Number, default: 0 },
   weight_unit: { type: String, default: "kg" },
+  // IANA timezone for dashboard day buckets ($dateToString + range bounds)
+  timezone: { type: String, default: "UTC", trim: true },
   store_status: { type: String, default: "open" }, // open, closed, maintenance
   maintenance_message: { type: String, default: "" },
+
+  // Soft delete (optimizeplan.md §2.5) — hard delete orphans products/orders
+  is_deleted: { type: Boolean, default: false, index: true },
+  deleted_at: { type: Date, default: null },
+  deletedby: { type: mongoose.Schema.Types.ObjectId, ref: "SuperAdmin", default: null },
 
   // Platform subscription plan (super-admin Plans module) — optional
   planId: { type: mongoose.Schema.Types.ObjectId, ref: "Plan", default: null, index: true },

@@ -116,7 +116,11 @@ const tenantScope = require("../utils/tenantScopePlugin");
 
   // ✅ Compound Unique Index: brand_code + is_deleted
   // Is se same brand_code wala naya brand ban sakta hai agar purana soft deleted ho
-  brandSchema.index({ storeId: 1, brand_code: 1, is_deleted: 1 }, { unique: true });
+  // Partial unique: same code can be re-used after soft-delete (optimizeplan.md §3.3)
+  brandSchema.index(
+    { storeId: 1, brand_code: 1 },
+    { unique: true, partialFilterExpression: { is_deleted: false } },
+  );
 
   // ✅ Static: Sirf active (non-deleted) brands fetch karein
   brandSchema.statics.findActive = function (filter = {}) {

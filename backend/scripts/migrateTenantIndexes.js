@@ -75,6 +75,27 @@ const ASSIGN_TO = assignIdx > -1 ? process.argv[assignIdx + 1] : null;
     }
   }
 
+  // Soft-delete unique compounds `{storeId, code, is_deleted}` → partial unique
+  // on `is_deleted:false` (optimizeplan.md §3.3). Drop the old key so createIndexes
+  // can build the new partial index.
+  const SOFT_UNIQUE_LEGACY = {
+    Brand: { storeId: 1, brand_code: 1, is_deleted: 1 },
+    Attribute: { storeId: 1, code: 1, is_deleted: 1 },
+    Category: { storeId: 1, category_code: 1, is_deleted: 1 },
+    Vendor: { storeId: 1, vendor_code: 1, is_deleted: 1 },
+  };
+  for (const [name, key] of Object.entries(SOFT_UNIQUE_LEGACY)) {
+    if (!mongoose.modelNames().includes(name)) continue;
+    const Model = mongoose.model(name);
+    const existing = await Model.collection.indexes().catch(() => []);
+    const stale = existing.find(
+      (ix) => ix.unique && JSON.stringify(ix.key) === JSON.stringify(key),
+    );
+    if (!stale) continue;
+    console.log(`\n${name}: drop soft-delete unique ${stale.name} ${JSON.stringify(stale.key)}`);
+    if (APPLY) await Model.collection.dropIndex(stale.name);
+  }
+
   if (APPLY) {
     for (const name of mongoose.modelNames()) await mongoose.model(name).createIndexes();
     console.log("\nPer-store indexes created.");

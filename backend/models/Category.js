@@ -98,8 +98,8 @@ const categorySchema = new mongoose.Schema(
 
 // ✅ UPDATED: Index no longer requires tenant_id for uniqueness (Global Code Uniqueness)
 categorySchema.index(
-  { storeId: 1, category_code: 1, is_deleted: 1 },
-  { unique: true }
+  { storeId: 1, category_code: 1 },
+  { unique: true, partialFilterExpression: { is_deleted: false } },
 );
 
 // ✅ UPDATED: General search index without mandatory tenant filter
