@@ -77,6 +77,9 @@ const categorySchema = new mongoose.Schema(
       default: null,
     },
 
+    // §4.4: [root ... direct parent] — subtree filter { ancestors: id } (utils/categoryAncestors.js)
+    ancestors: { type: [mongoose.Schema.Types.ObjectId], default: [] },
+
     // Persist fields the admin UI already sends (strict mode used to drop them)
     category_type: { type: String, trim: true, default: "" },
     image_url: { type: String, trim: true, default: "" },
@@ -103,6 +106,7 @@ categorySchema.index(
 );
 
 categorySchema.index({ storeId: 1, parent_category_id: 1, is_deleted: 1 });
+categorySchema.index({ storeId: 1, ancestors: 1 });
 categorySchema.index({ storeId: 1, "attributes.attribute_id": 1 });
 
 

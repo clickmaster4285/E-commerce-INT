@@ -52,16 +52,11 @@ const TRANSLATABLE_FIELDS = {
   Deal: ["name", "description"],
   Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
   Variant: ["title"],
-  StockHistory: ["product_name", "variant_title", "reason", "explanation"],
   Order: ["notes", "cancel_reason"],
   PurchaseOrder: ["notes", "cancel_reason"],
   Vendor: ["name", "company_name", "address", "city", "state", "country"],
   ShippingMethod: ["name"],
-  Customer: ["name", "address"],
-  Lead: ["name", "company_name"],
-  Quote: ["customer_name"],
-  Invoice: ["customer_name"],
-  Employee: ["name"],
+  // Customer/Lead/Quote/Invoice/Employee/StockHistory: people naam / log fields translate NAHI hote (plan §3.6)
   StorePage: ["title"],
 };
 
@@ -79,16 +74,11 @@ const CONTENT_FIELDS = {
   Deal: ["name", "description"],
   Banner: ["title", "eyebrow", "heading", "description", "altText", "primaryButton.text", "secondaryButton.text"],
   Variant: ["title"],
-  StockHistory: ["product_name", "variant_title", "reason", "explanation"],
   Order: ["notes", "cancel_reason"],
   PurchaseOrder: ["notes", "cancel_reason"],
   Vendor: ["name", "company_name", "address", "city", "state", "country"],
   ShippingMethod: ["name"],
-  Customer: ["name", "address"],
-  Lead: ["name", "company_name"],
-  Quote: ["customer_name"],
-  Invoice: ["customer_name"],
-  Employee: ["name"],
+  // Customer/Lead/Quote/Invoice/Employee/StockHistory: people naam / log fields translate NAHI hote (plan §3.6)
   // content (HTML) abhi skipped — LibreTranslate markup tod sakta hai
   StorePage: ["title", "content"],
 };

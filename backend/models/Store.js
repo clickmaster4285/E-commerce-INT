@@ -108,7 +108,7 @@ storeSchema.statics.generateUniqueSubdomain = async function (name, excludeId = 
     const filter = { subdomain: candidate };
     if (excludeId) filter._id = { $ne: excludeId };
     // eslint-disable-next-line no-await-in-loop
-    const taken = await this.exists(filter).setOptions({ skipTenantScope: true });
+    const taken = await this.exists(filter).setOptions({ skipTenantScope: true }); // subdomain uniqueness: saare stores me check
     if (!taken) return candidate;
   }
   return `${base}-${Date.now().toString(36)}`;
@@ -138,7 +138,7 @@ storeSchema.post("save", function (doc) {
   const storeId = doc?._id || this._id;
   if (!created || !storeId) return;
   setImmediate(() => {
-    const { seedAttributesForStore } = require("../scripts/seedAttributes");
+    const { seedAttributesForStore } = require("../services/seedAttributes");
     seedAttributesForStore(storeId)
       .then((result) => {
         console.log(`🌍 Attributes seeded for new store ${storeId} — created ${result?.created ?? 0}, updated ${result?.updated ?? 0}.`);

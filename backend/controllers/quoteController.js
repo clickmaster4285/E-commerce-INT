@@ -1,3 +1,4 @@
+const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const mongoose = require("mongoose");
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const { randomUUID } = require("crypto");
@@ -149,18 +150,20 @@ exports.listQuotes = async (req, res) => {
     const filteredTotal = await Quote.countDocuments(filter);
     const pages = Math.max(1, Math.ceil(filteredTotal / limit));
     const page = Math.min(requestedPage, pages);
-    const [quotes, total, sent, accepted, rejected] = await Promise.all([
+    // ✅ 4 countDocuments ki jagah ek $group (§4.3)
+    const [quotes, statusMap] = await Promise.all([
       Quote.find(filter)
         .select(listFields)
         .sort({ created_at: -1, _id: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
-      Quote.countDocuments({ is_deleted: false }),
-      Quote.countDocuments({ is_deleted: false, status: "Sent" }),
-      Quote.countDocuments({ is_deleted: false, status: "Accepted" }),
-      Quote.countDocuments({ is_deleted: false, status: "Rejected" }),
+      statusCounts(Quote, { match: { is_deleted: false } }),
     ]);
+    const total = sumCounts(statusMap);
+    const sent = statusMap.Sent || 0;
+    const accepted = statusMap.Accepted || 0;
+    const rejected = statusMap.Rejected || 0;
     return res.json({
       success: true,
       data: quotes.map(localizeQuote),

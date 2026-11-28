@@ -1,3 +1,4 @@
+const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const mongoose = require("mongoose");
 const Invoice = require("../models/Invoice");
 const { nextSeq, peekSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
@@ -241,13 +242,17 @@ exports.listInvoices = async (req, res) => {
     const page = Math.min(requestedPage, pages);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [invoices, total, paid, unpaid, overdue] = await Promise.all([
+    // ✅ 4 countDocuments ki jagah ek $facet (§4.3)
+    const [invoices, statCounts] = await Promise.all([
       Invoice.find(filter).select(listFields).sort({ created_at: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
-      Invoice.countDocuments({ is_deleted: false }),
-      Invoice.countDocuments({ is_deleted: false, status: "Paid" }),
-      Invoice.countDocuments({ is_deleted: false, status: "Unpaid", due_date: { $gte: today } }),
-      Invoice.countDocuments({ is_deleted: false, status: { $in: ["Unpaid", "Partially Paid"] }, due_date: { $lt: today } }),
+      facetCounts(Invoice, {
+        total: {},
+        paid: { status: "Paid" },
+        unpaid: { status: "Unpaid", due_date: { $gte: today } },
+        overdue: { status: { $in: ["Unpaid", "Partially Paid"] }, due_date: { $lt: today } },
+      }, { match: { is_deleted: false } }),
     ]);
+    const { total, paid, unpaid, overdue } = statCounts;
     const locale = String(req.query.locale || "en").toLowerCase();
     const localizedInvoices = invoices.map((invoice) => {
       const values = invoice.translations?.customer_name;

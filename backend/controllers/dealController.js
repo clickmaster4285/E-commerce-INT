@@ -1,3 +1,4 @@
+const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const Deal = require("../models/Deal");
 const log = require("../utils/logger");
 const User = require("../models/User");
@@ -247,7 +248,8 @@ const getDeals = async (req, res) => {
     // GET DATA (+ server-side stats)
     // ==========================================
 
-    const [deals, total, baseTotal, activeCount, inactiveCount, scheduledCount, expiredCount, disabledCount] =
+    // ✅ 7 countDocuments ki jagah ek $facet (§4.3)
+    const [deals, dealCounts] =
       await Promise.all([
         (adminList
           ? Deal.find(query).select(["name", "code", "translations.name." + locale, "type", "applyTo", "discountValue", "buyQuantity", "getQuantity", "getDiscountValue", "bundlePrice", "bundleRule.rewardType", "bundleRule.value", "bundleRule.buyQuantity", "bundleRule.freeQuantity", "bundleRule.freeProduct", "isActive", "startDate", "endDate", "isFeatured", "priority", "createdAt"].join(" "))
@@ -267,14 +269,23 @@ const getDeals = async (req, res) => {
           .limit(perPage)
           .lean(),
 
-        Deal.countDocuments(query),
-        Deal.countDocuments(buildQuery()),
-        Deal.countDocuments(buildQuery(statusClauses.active)),
-        Deal.countDocuments(buildQuery(statusClauses.inactive)),
-        Deal.countDocuments(buildQuery(statusClauses.upcoming)),
-        Deal.countDocuments(buildQuery(statusClauses.expired)),
-        Deal.countDocuments(buildQuery(statusClauses.disabled)),
+        facetCounts(Deal, {
+          filtered: query,
+          base: buildQuery(),
+          active: buildQuery(statusClauses.active),
+          inactive: buildQuery(statusClauses.inactive),
+          upcoming: buildQuery(statusClauses.upcoming),
+          expired: buildQuery(statusClauses.expired),
+          disabled: buildQuery(statusClauses.disabled),
+        }),
       ]);
+    const total = dealCounts.filtered;
+    const baseTotal = dealCounts.base;
+    const activeCount = dealCounts.active;
+    const inactiveCount = dealCounts.inactive;
+    const scheduledCount = dealCounts.upcoming;
+    const expiredCount = dealCounts.expired;
+    const disabledCount = dealCounts.disabled;
 
     const pageDeals = adminList ? deals.map((deal) => ({
       _id: deal._id,

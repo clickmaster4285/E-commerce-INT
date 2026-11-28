@@ -142,7 +142,7 @@ async function syncThemeTranslations(storeId) {
     const StoreTheme = require("../models/StoreTheme");
     if (!isEnabled()) return;
 
-    const doc = await StoreTheme.findOne({ storeId }).setOptions({ skipTenantScope: true }).select("published publishedVersion translations").lean();
+    const doc = await StoreTheme.findOne({ storeId }).setOptions({ skipTenantScope: true }).select("published publishedVersion translations").lean(); // background translation job: explicit storeId, request context nahi
     if (!doc?.published) return;
 
     const { next, pending } = planTranslations(collectThemeTexts(doc.published), doc.translations, TARGET_LOCALES, hashText);
@@ -161,7 +161,7 @@ async function syncThemeTranslations(storeId) {
     await StoreTheme.updateOne(
       { storeId, publishedVersion: doc.publishedVersion },
       { $set: { translations: next, translationsUpdatedAt: new Date() } },
-    ).setOptions({ skipTenantScope: true });
+    ).setOptions({ skipTenantScope: true }); // background translation job: explicit storeId, request context nahi
 
     try {
       require("./publicCache").invalidate(["theme"]);

@@ -38,7 +38,7 @@ const APPLY = process.argv.includes("--apply");
   const userIds = [...new Set(orphans.map((a) => String(a.user_id)).filter(Boolean))];
   const users = await User.find({ _id: { $in: userIds } })
     .select("_id storeId")
-    .setOptions({ skipTenantScope: true })
+    .setOptions({ skipTenantScope: true }) // migration/backfill script: saare stores
     .lean();
   const storeByUser = new Map(users.map((u) => [String(u._id), u.storeId]));
 
@@ -68,7 +68,7 @@ const APPLY = process.argv.includes("--apply");
       const res = await Address.updateMany(
         { _id: { $in: ids } },
         { $set: { storeId } },
-      ).setOptions({ skipTenantScope: true });
+      ).setOptions({ skipTenantScope: true }); // migration/backfill script: saare stores
       modified += res.modifiedCount;
     }
     console.log(`  modified: ${modified}`);

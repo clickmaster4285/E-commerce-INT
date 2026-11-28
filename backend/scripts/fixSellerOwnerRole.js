@@ -20,7 +20,7 @@ const Employee = require("../models/Employee");
 const SellerApplication = require("../models/SellerApplication");
 
 const APPLY = process.argv.includes("--apply");
-const CROSS_STORE = { skipTenantScope: true };
+const CROSS_STORE = { skipTenantScope: true }; // one-off fix script: cross-store
 
 (async () => {
   await connectDB();

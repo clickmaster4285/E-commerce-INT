@@ -1,3 +1,4 @@
+const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const Vendor = require("../models/Vendor");
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const PurchaseOrder = require("../models/PurchaseOrder");
@@ -132,18 +133,19 @@ const getVendorsAdmin = async (req, res) => {
     const rawOrder = String(req.query.order || "").trim().toLowerCase();
     const sortOrder = hasSort ? (rawOrder === "asc" ? 1 : -1) : -1;
 
-    const purchaseTotalAgg = await Vendor.aggregate([
-      { $match: { is_deleted: false } },
-      { $group: { _id: null, sum: { $sum: "$total_purchased" } } },
-    ]);
-
-    const [total, vendors, totalAll, activeCount, cities] = await Promise.all([
+    // ✅ total/active + purchase sum ek hi $group mein (pehle 2 count + 1 aggregate) (§4.3)
+    const [total, vendors, statRows, cities] = await Promise.all([
       Vendor.countDocuments(filter),
       Vendor.find(filter).sort({ [sortField]: sortOrder, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
-      Vendor.countDocuments({ is_deleted: false }),
-      Vendor.countDocuments({ is_deleted: false, is_active: true }),
+      Vendor.aggregate([
+        { $match: { is_deleted: false } },
+        { $group: { _id: "$is_active", n: { $sum: 1 }, sum: { $sum: "$total_purchased" } } },
+      ]),
       Vendor.distinct("city", { is_deleted: false }),
     ]);
+    const totalAll = statRows.reduce((a, r) => a + r.n, 0);
+    const activeCount = statRows.filter((r) => r._id === true).reduce((a, r) => a + r.n, 0);
+    const purchaseTotalAgg = [{ sum: statRows.reduce((a, r) => a + (r.sum || 0), 0) }];
     const pages = Math.max(1, Math.ceil(total / limit));
     const safePage = Math.min(page, pages);
 

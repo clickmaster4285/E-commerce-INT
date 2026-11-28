@@ -25,7 +25,7 @@ async function runOnce({ now = new Date(), publish } = {}) {
     const due = await runUnscoped(() =>
       StoreTheme.find({ "scheduled.at": { $lte: now } })
         .select("_id storeId")
-        .setOptions({ skipTenantScope: true })
+        .setOptions({ skipTenantScope: true }) // scheduler job: saare stores ke themes (runUnscoped)
         .lean(),
     );
 
@@ -38,7 +38,7 @@ async function runOnce({ now = new Date(), publish } = {}) {
           { $set: { scheduled: null } },
           { returnDocument: "before" },
         )
-          .setOptions({ skipTenantScope: true })
+          .setOptions({ skipTenantScope: true }) // scheduler job: saare stores ke themes (runUnscoped)
           .lean(),
       );
       const snapshot = claimed?.scheduled;

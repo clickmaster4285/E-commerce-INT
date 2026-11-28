@@ -256,7 +256,7 @@ const getDashboard = async (req, res) => {
    ========================================== */
 
 // Platform host par tenant context nahi hota, phir bhi cross-store queries explicit rakho
-const CROSS_STORE = { skipTenantScope: true };
+const CROSS_STORE = { skipTenantScope: true }; // super admin platform-level: saare stores par kaam
 const REQUEST_STATUSES = ["pending", "approved", "rejected"];
 
 const listRequests = async (req, res) => {
@@ -509,7 +509,7 @@ const approveRequest = async (req, res) => {
         await Employee.findOneAndUpdate(
           sellerEmployeeFilter(application),
           { seller_pending: false, status: "active", role: OWNER_ROLE, ...(openStore ? { storeId: openStore._id } : {}) },
-        ).setOptions({ skipTenantScope: true });
+        ).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
 
         if (!openStore) {
           const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
@@ -523,7 +523,7 @@ const approveRequest = async (req, res) => {
 
         await SellerApplication.updateOne({ _id: application._id }, { store_id: openStore._id, user_id: null });
 
-        let sellerEmployee = await Employee.findOne(sellerEmployeeFilter(application)).setOptions({ skipTenantScope: true });
+        let sellerEmployee = await Employee.findOne(sellerEmployeeFilter(application)).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
         if (!sellerEmployee) {
           const username = String(application.username || "").trim().toLowerCase() || (await uniqueUsername(application.name, application.email));
           sellerEmployee = await Employee.create({
@@ -541,8 +541,11 @@ const approveRequest = async (req, res) => {
           await Employee.updateOne(
             { _id: sellerEmployee._id },
             { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: openStore._id },
-          ).setOptions({ skipTenantScope: true });
+          ).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
         }
+
+        // Employee ban gaya — ab application par bcrypt hash rakhne ki zaroorat nahi (§3.6)
+        await SellerApplication.updateOne({ _id: application._id }, { $unset: { passwordHash: "" } });
 
         return {
           openStoreId: openStore._id,
@@ -652,7 +655,7 @@ const rejectRequest = async (req, res) => {
       await Employee.findOneAndUpdate(
         sellerEmployeeFilter(application),
         { seller_pending: true, status: "inactive", storeId: application.store_id }
-      ).setOptions({ skipTenantScope: true });
+      ).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
     }
 
     const storedReason = reason.slice(0, 500);
@@ -1971,7 +1974,7 @@ const listPlans = async (req, res) => {
       ? await Store.aggregate([
           { $match: { planId: { $in: planIds } } },
           { $group: { _id: "$planId", count: { $sum: 1 } } },
-        ]).option({ skipTenantScope: true })
+        ]).option({ skipTenantScope: true }) // super admin platform-level: saare stores par kaam
       : [];
     const countByPlan = new Map(storeCounts.map((r) => [String(r._id), r.count]));
 
@@ -2018,12 +2021,12 @@ const getPlan = async (req, res) => {
     if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
 
     const [storeCount, stores, activityTotal, activityWeek] = await Promise.all([
-      Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }),
+      Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }), // super admin platform-level: saare stores par kaam
       Store.find({ planId: plan._id })
         .select("store_name subdomain store_status logo createdAt")
         .sort({ createdAt: -1 })
         .limit(12)
-        .setOptions({ skipTenantScope: true })
+        .setOptions({ skipTenantScope: true }) // super admin platform-level: saare stores par kaam
         .lean(),
       SuperAdminActivity.countDocuments({ entityType: "plan", entityId: String(plan._id) }),
       SuperAdminActivity.countDocuments({
@@ -2104,7 +2107,7 @@ const updatePlan = async (req, res) => {
     const before = plan.name;
     Object.assign(plan, parsed.data);
     await plan.save();
-    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
     await logActivity({
       action: `Plan updated: ${plan.name}`,
       actor: req.superAdmin,
@@ -2131,12 +2134,12 @@ const setPlanStatus = async (req, res) => {
     if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
     const previous = plan.status;
     if (previous === status) {
-      const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+      const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
       return res.json({ success: true, message: "No change.", data: publicPlan(plan.toObject(), storeCount) });
     }
     plan.status = status;
     await plan.save();
-    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
     await logActivity({
       action: `Plan ${previous} → ${status}: ${plan.name}`,
       actor: req.superAdmin,
@@ -2154,7 +2157,7 @@ const deletePlan = async (req, res) => {
   try {
     const plan = await Plan.findById(req.params.id);
     if (!plan) return res.status(404).json({ success: false, message: "Plan not found." });
-    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true });
+    const storeCount = await Store.countDocuments({ planId: plan._id }).setOptions({ skipTenantScope: true }); // super admin platform-level: saare stores par kaam
     if (storeCount > 0) {
       return res.status(409).json({
         success: false,

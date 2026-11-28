@@ -215,10 +215,13 @@ const getAllPOs = async (req, res) => {
     }
 
     const [pos, total] = await Promise.all([
-      PurchaseOrder.find(q).select("po_number vendor_id vendor_snapshot status payment_status total expected_date created_at items.qty_ordered items.received_qty")
-        .populate("vendor_id", "name vendor_code translations.name")
-        .sort({ [sortField]: sortOrder, _id: 1 })
-        .skip((page - 1) * limit).limit(limit).lean(),
+      // vendor_snapshot.name pehle se PO mein hai — "en" mein vendor populate ki zaroorat nahi (§4.5).
+      // Sirf non-en locale mein translated naam ke liye minimal populate.
+      (() => {
+        let qy = PurchaseOrder.find(q).select("po_number vendor_id vendor_snapshot status payment_status total expected_date created_at items.qty_ordered items.received_qty");
+        if (locale !== "en") qy = qy.populate("vendor_id", "name vendor_code translations.name");
+        return qy.sort({ [sortField]: sortOrder, _id: 1 }).skip((page - 1) * limit).limit(limit).lean();
+      })(),
       PurchaseOrder.countDocuments(q),
     ]);
     const pages = Math.max(1, Math.ceil(total / limit));

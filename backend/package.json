@@ -18,6 +18,7 @@
     "backfill:product-summary": "node scripts/backfillProductSummary.js",
     "backfill:stock-levels": "node scripts/backfillStockLevels.js",
     "backfill:ledger-seed": "node scripts/backfillLedgerSeed.js",
+    "backfill:category-ancestors": "node scripts/backfillCategoryAncestors.js",
     "migrate:run": "node scripts/migrations/run.js",
     "backfillSubdomains": "node scripts/backfillSubdomains.js --apply",
     "backfill:translations": "node scripts/backfillTranslations.js",
@@ -48,7 +49,8 @@
     "pino-http": "^11.0.0",
     "rate-limit-redis": "^6.0.2",
     "sharp": "^0.35.5",
-    "socket.io": "^4.8.4"
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.4.0",

@@ -378,22 +378,19 @@ const getPosReturns = async (req, res) => {
     const returnDate = {};
     if (dateFrom && !Number.isNaN(dateFrom.getTime())) returnDate.$gte = dateFrom;
     if (dateTo && !Number.isNaN(dateTo.getTime())) returnDate.$lte = dateTo;
+    // ✅ Pehle document-level pre-$match (sirf wo sales jin mein returns hain) — poori collection unwind nahi hoti (§4.5).
+    //    Ye superset hai; asal per-return filter unwind ke baad wahi rehta hai.
+    const preMatch = { "returns.0": { $exists: true }, ...match };
+    if (Object.keys(returnDate).length) preMatch["returns.returned_at"] = returnDate;
     const pipeline = [
+      { $match: preMatch },
       { $unwind: "$returns" },
       ...(Object.keys(match).length ? [{ $match: match }] : []),
       ...(Object.keys(returnDate).length ? [{ $match: { "returns.returned_at": returnDate } }] : []),
     ];
-    const [countRows, summaryRows] = await Promise.all([
-      PosSale.aggregate([...pipeline, { $count: "total" }]),
-      PosSale.aggregate([...pipeline, { $group: { _id: null, totalRefunded: { $sum: "$returns.refund_total" } } }]),
-    ]);
-    const total = countRows[0]?.total || 0;
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    const safePage = Math.min(page, totalPages);
-    const rows = await PosSale.aggregate([
-      ...pipeline,
-      { $sort: { "returns.returned_at": -1 } },
-      { $skip: (safePage - 1) * limit },
+    const rowStages = (pageNo) => [
+      { $sort: { "returns.returned_at": -1, _id: 1 } },
+      { $skip: (pageNo - 1) * limit },
       { $limit: limit },
       { $project: {
         _id: "$returns._id", returned_at: "$returns.returned_at", returned_by_name: "$returns.returned_by_name",
@@ -401,8 +398,23 @@ const getPosReturns = async (req, res) => {
         _saleId: "$_id", _saleNumber: "$sale_number", _saleTotal: "$total", _salePayment: "$payment.method",
         _customer: "$customer_snapshot", _cashier: { $ifNull: ["$returns.returned_by_name", "$cashier_name"] },
       } },
+    ];
+    // Ek hi pass: rows + count + refund sum ($facet) — pehle 3 alag unwind pipelines the
+    const [facetRow] = await PosSale.aggregate([
+      ...pipeline,
+      { $facet: {
+        rows: rowStages(page),
+        meta: [{ $group: { _id: null, total: { $sum: 1 }, totalRefunded: { $sum: "$returns.refund_total" } } }],
+      } },
     ]);
-    res.status(200).json({ success: true, data: rows, pagination: { total, page: safePage, limit, totalPages }, summary: { totalRefunded: summaryRows[0]?.totalRefunded || 0 } });
+    const total = facetRow?.meta?.[0]?.total || 0;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    // Page range se bahar ho to clamp karke sirf rows dobara (kam hi hota hai)
+    const rows = safePage === page
+      ? (facetRow?.rows || [])
+      : await PosSale.aggregate([...pipeline, ...rowStages(safePage)]);
+    res.status(200).json({ success: true, data: rows, pagination: { total, page: safePage, limit, totalPages }, summary: { totalRefunded: facetRow?.meta?.[0]?.totalRefunded || 0 } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

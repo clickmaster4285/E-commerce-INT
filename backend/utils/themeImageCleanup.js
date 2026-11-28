@@ -44,8 +44,8 @@ async function cleanupStore(storeId, { now = Date.now(), dryRun = false } = {}) 
     return { deleted: [], kept: 0 }; // folder hi nahi
   }
 
-  const theme = await StoreTheme.findOne({ storeId }).select("draft published").setOptions({ skipTenantScope: true }).lean();
-  const versions = await StoreThemeVersion.find({ storeId }).select("data").setOptions({ skipTenantScope: true }).lean();
+  const theme = await StoreTheme.findOne({ storeId }).select("draft published").setOptions({ skipTenantScope: true }).lean(); // cleanup job: explicit storeId, saare stores sweep
+  const versions = await StoreThemeVersion.find({ storeId }).select("data").setOptions({ skipTenantScope: true }).lean(); // cleanup job: explicit storeId, saare stores sweep
   const used = collectThemeFiles([theme?.draft, theme?.published, ...versions.map((v) => v.data)], id);
 
   const deleted = [];
@@ -73,7 +73,7 @@ async function runOnce(opts = {}) {
   running = true;
   try {
     return await runUnscoped(async () => {
-      const storeIds = await StoreTheme.distinct("storeId").setOptions({ skipTenantScope: true });
+      const storeIds = await StoreTheme.distinct("storeId").setOptions({ skipTenantScope: true }); // cleanup job: explicit storeId, saare stores sweep
       let total = 0;
       for (const storeId of storeIds) {
         // eslint-disable-next-line no-await-in-loop

@@ -13,7 +13,7 @@ const {
 // Sirf admin/employee session (a_at) — customer token yahan 401
 const authMiddleware = require("../middleware/authMiddleware").requireAdmin;
 const { checkPermission } = require("../middleware/checkPermission");
-const upload = require("../middleware/uploadConfig");
+const upload = require("../config/uploadConfig");
 const processBrandLogo = require("../middleware/imageMiddleware");
 const { publicCache, invalidate } = require("../utils/publicCache");
 const router = express.Router();

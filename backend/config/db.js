@@ -26,6 +26,12 @@ const connectDB = async () => {
   }
 
   const isProd = process.env.NODE_ENV === "production";
+  // Mongoose query debug bohot shor karta hai → sirf LOG_LEVEL=debug ya MONGO_DEBUG=1 par
+  if (process.env.LOG_LEVEL === "debug" || process.env.MONGO_DEBUG === "1") {
+    mongoose.set("debug", (collection, method, ...args) => {
+      log.debug({ collection, method, args }, "mongoose query");
+    });
+  }
   try {
     await mongoose.connect(mongoUri, {
       maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE) || 50,

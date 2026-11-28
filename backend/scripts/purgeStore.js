@@ -38,7 +38,7 @@ const STORE_ID_RAW = idIdx > -1 ? process.argv[idIdx + 1] : null;
   }
 
   const Store = mongoose.model("Store");
-  const store = await Store.findById(storeId).setOptions({ skipTenantScope: true }).lean();
+  const store = await Store.findById(storeId).setOptions({ skipTenantScope: true }).lean(); // ops script: ek store ka data explicitly purge
   if (!store) {
     console.error(`Store ${storeId} not found.`);
     process.exit(1);
@@ -58,7 +58,7 @@ const STORE_ID_RAW = idIdx > -1 ? process.argv[idIdx + 1] : null;
     if (name === "Store") continue;
     const Model = mongoose.model(name);
     if (Model.schema.$tenantScopeField !== "storeId") continue;
-    const count = await Model.countDocuments(filter).setOptions({ skipTenantScope: true });
+    const count = await Model.countDocuments(filter).setOptions({ skipTenantScope: true }); // ops script: ek store ka data explicitly purge
     if (!count) continue;
     summary.push({ name, collection: Model.collection.name, count, Model });
   }
@@ -76,11 +76,11 @@ const STORE_ID_RAW = idIdx > -1 ? process.argv[idIdx + 1] : null;
       for (const row of summary) {
         const result = row.skipTenant
           ? await row.Model.deleteMany(filter)
-          : await row.Model.deleteMany(filter).setOptions({ skipTenantScope: true });
+          : await row.Model.deleteMany(filter).setOptions({ skipTenantScope: true }); // ops script: ek store ka data explicitly purge
         console.log(`  deleted ${result.deletedCount} from ${row.name} (${row.collection})`);
       }
       if (HARD_STORE) {
-        await Store.deleteOne({ _id: storeId }).setOptions({ skipTenantScope: true });
+        await Store.deleteOne({ _id: storeId }).setOptions({ skipTenantScope: true }); // ops script: ek store ka data explicitly purge
         console.log("  hard-deleted Store document");
       }
     });

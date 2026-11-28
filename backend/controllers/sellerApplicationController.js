@@ -96,7 +96,7 @@ const sellerApply = async (req, res) => {
     const requested = String(username || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20).toLowerCase();
     let finalUsername = requested;
     const usernameTaken = async (value) =>
-      (await Employee.exists({ username: value }).setOptions({ skipTenantScope: true })) ||
+      (await Employee.exists({ username: value }).setOptions({ skipTenantScope: true })) || // seller signup (platform): username saare stores me unique check
       (await SellerApplication.exists({ username: value }));
     for (let i = 1; finalUsername && (await usernameTaken(finalUsername)) && i < 100; i += 1) {
       finalUsername = `${requested}${i}`;

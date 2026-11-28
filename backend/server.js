@@ -11,6 +11,14 @@ const fs = require("fs");
 const dotenv = require("dotenv");
 dotenv.config({ path: path.join(__dirname, ".env"), quiet: true });
 
+// Fail fast — invalid/missing critical env par clear message ke saath band (config/env.js, §5.5)
+try {
+  require("./config/env").loadEnv();
+} catch (envError) {
+  console.error(`❌ ${envError.message}`);
+  process.exit(1);
+}
+
 const http = require("http");
 const os = require("os");
 const bcrypt = require("bcryptjs");

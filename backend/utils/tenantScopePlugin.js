@@ -13,8 +13,11 @@
 //   • doc.deleteOne() / doc.updateOne() → Mongoose andar se query chalata hai,
 //     wahi query hook scope karta hai
 //
-// Platform host (super admin, signup) aur scripts par context nahi hota →
-// koi filter nahi lagta (saare stores).
+// FAIL-CLOSED (§6.5): context hi na ho (na store, na runUnscoped) aur skipTenantScope
+// bhi na ho → query chalne se pehle THROW (galti se saare stores ka data nahi aayega).
+// Jaan boojh kar cross-store: runUnscoped(fn) ya .setOptions({ skipTenantScope: true }).
+// Platform host par resolveStore khud runUnscoped lagata hai.
+// Emergency rollback: TENANT_FAIL_CLOSED=false (sirf temporary).
 //
 // Use:
 //   schema.plugin(tenantScope)                                 // field: storeId
@@ -22,7 +25,7 @@
 // ==========================================================
 
 const mongoose = require("mongoose");
-const { getStoreId } = require("./tenantContext");
+const { getStoreId, hasContext } = require("./tenantContext");
 
 const QUERY_OPS = [
   "find", "findOne", "countDocuments", "distinct",
@@ -34,16 +37,34 @@ const REPLACE_OPS = new Set(["findOneAndReplace", "replaceOne"]);
 
 const toId = (id) => (mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(String(id)) : id);
 
+// storeId do; ya null (skipTenantScope / runUnscoped); context na ho to THROW (fail-closed)
+function resolveScope(options, what) {
+  if (options?.skipTenantScope) return null;
+  const storeId = getStoreId();
+  if (storeId) return storeId;
+  if (hasContext() || process.env.TENANT_FAIL_CLOSED === "false") return null;
+  throw new Error(
+    `Tenant scope missing for ${what}: no store context. Use runWithStore/runUnscoped or setOptions({ skipTenantScope: true }).`,
+  );
+}
+
 // ── Sub-pipelines ($lookup / $unionWith / $graphLookup) ──
-// Collection name → scope field (sirf un collections ke liye jin par ye plugin laga hai)
+// Collection name → scope field (module-level cache; naya model aaye to size badalne par rebuild)
+let scopeFieldCache = null;
+let scopeFieldCacheModelCount = -1;
 function scopeFieldForCollection(collectionName) {
-  for (const name of mongoose.modelNames()) {
-    const model = mongoose.model(name);
-    if (model.collection?.collectionName === collectionName && model.schema.$tenantScopeField) {
-      return model.schema.$tenantScopeField;
+  const names = mongoose.modelNames();
+  if (!scopeFieldCache || scopeFieldCacheModelCount !== names.length) {
+    const map = new Map();
+    for (const name of names) {
+      const model = mongoose.model(name);
+      const coll = model.collection?.collectionName;
+      if (coll && model.schema.$tenantScopeField && !map.has(coll)) map.set(coll, model.schema.$tenantScopeField);
     }
+    scopeFieldCache = map;
+    scopeFieldCacheModelCount = names.length;
   }
-  return null;
+  return scopeFieldCache.get(collectionName) || null;
 }
 
 /** Pipeline ke andar dusre store-owned collections me jaane wale stages ko bhi isi store tak rakho */
@@ -155,17 +176,17 @@ function tenantScope(schema, { field = "storeId", stamp = true, index = true } =
   });
 
   schema.pre("bulkWrite", function tenantScopeBulkWrite(...args) {
-    const storeId = getStoreId();
     const ops = args.find(Array.isArray);
     const options = args.find((a) => a && typeof a === "object" && !Array.isArray(a));
-    if (!storeId || !ops || options?.skipTenantScope) return;
+    const storeId = resolveScope(options, "bulkWrite");
+    if (!storeId || !ops) return;
     scopeBulkOps(ops, field, storeId);
   });
 
   // ── Queries ──
   schema.pre(QUERY_OPS, { query: true, document: false }, function tenantQueryFilter() {
-    const storeId = getStoreId();
-    if (!storeId || this.getOptions()?.skipTenantScope) return;
+    const storeId = resolveScope(this.getOptions(), `${this.model?.modelName || "model"}.${this.op}`);
+    if (!storeId) return;
 
     // $and se — agar query me pehle se storeId/_id ho to dono shart lagengi
     this.and([{ [field]: toId(storeId) }]);
@@ -189,8 +210,8 @@ function tenantScope(schema, { field = "storeId", stamp = true, index = true } =
 
   // ── Aggregate ──
   schema.pre("aggregate", function tenantAggregateFilter() {
-    const storeId = getStoreId();
-    if (!storeId || this.options?.skipTenantScope) return;
+    const storeId = resolveScope(this.options, "aggregate");
+    if (!storeId) return;
     const pipeline = this.pipeline();
     const match = { $match: { [field]: toId(storeId) } };
     // $geoNear / $search ko pehli stage rehna zaroori hai
@@ -220,7 +241,12 @@ function tenantScope(schema, { field = "storeId", stamp = true, index = true } =
     if (!storeId) return;
     const docs = args.find(Array.isArray) || [];
     for (const doc of docs) {
-      if (doc && typeof doc === "object" && !doc[field]) doc[field] = toId(storeId);
+      if (!doc || typeof doc !== "object") continue;
+      if (!doc[field]) doc[field] = toId(storeId);
+      else if (String(doc[field]) !== String(storeId)) {
+        // validate hook jaisa hi: dusre store ka storeId → block
+        throw new Error(`Cross-store write blocked on ${this.modelName || "model"} (insertMany).`);
+      }
     }
   });
 }

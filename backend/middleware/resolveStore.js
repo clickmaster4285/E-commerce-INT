@@ -22,14 +22,14 @@
 
 const Store = require("../models/Store");
 const { parseTenantHost } = require("../utils/tenantHost");
-const { runWithStore } = require("../utils/tenantContext");
+const { runWithStore, runUnscoped } = require("../utils/tenantContext");
 
 const CACHE_TTL_MS = 60 * 1000;
 const cache = new Map(); // host → { store, expires }
 
 const crypto = require("crypto");
 
-const ALWAYS_OPEN = new Set(["/health", "/store/resolve"]);
+const ALWAYS_OPEN = new Set(["/health", "/ready", "/store/resolve"]);
 
 // ── PLATFORM host par sirf yehi APIs khuli hain ──
 // Baaki har store-owned API (products, orders, customers ...) platform par
@@ -37,6 +37,7 @@ const ALWAYS_OPEN = new Set(["/health", "/store/resolve"]);
 // platform par woh 404 STORE_REQUIRED deti hain.
 const PLATFORM_EXACT = new Set([
   "/health",
+  "/ready",
   "/store/resolve",
   "/store/check-subdomain",
   // Seller signup (landing/signup)
@@ -110,7 +111,8 @@ async function resolveStoreByHost(rawHost) {
   const hit = cache.get(tenant.host);
   if (hit && hit.expires > Date.now()) return { tenant, store: hit.store };
 
-  const store = await findStoreForTenant(tenant);
+  // host se store dhoondna: abhi store context bana hi nahi → jaan boojh kar unscoped
+  const store = await runUnscoped(() => findStoreForTenant(tenant));
   cache.set(tenant.host, { store, expires: Date.now() + CACHE_TTL_MS });
   return { tenant, store };
 }
@@ -141,7 +143,8 @@ async function resolveStore(req, res, next) {
   req.storeMissing = tenant.type !== "platform" && !store;
 
   if (tenant.type === "platform") {
-    if (isPlatformRoute(req.path)) return next();
+    // platform: jaan boojh kar unscoped (tenantScope fail-closed isi se khulta hai)
+    if (isPlatformRoute(req.path)) return runUnscoped(next);
     return res.status(404).json({
       success: false,
       code: "STORE_REQUIRED",

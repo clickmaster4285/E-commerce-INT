@@ -1,3 +1,4 @@
+const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const Banner = require("../models/Banner");
 const fs = require("fs");
 const { uploadUrlFor, localPathForUrl } = require("../utils/uploadPaths");
@@ -162,22 +163,24 @@ exports.getAllBanners = async (req, res) => {
     const { pages } = paginationMeta(requestedPage, limitNum, total);
     const safePage = Math.min(requestedPage, pages);
 
-    const [banners, totalBanners, activeBanners, inactiveBanners, scheduledBanners, expiredBanners, draftBanners, typeList, positionList] =
+    // ✅ 6 countDocuments ki jagah ek $group (§4.3)
+    const [banners, bannerStatusMap, typeList, positionList] =
       await Promise.all([
         Banner.find(buildFilter())
           .sort({ [sortField]: sortOrder, _id: 1 })
           .skip((safePage - 1) * limitNum)
           .limit(limitNum)
           .lean(),
-        Banner.countDocuments({}),
-        Banner.countDocuments({ status: "active" }),
-        Banner.countDocuments({ status: "inactive" }),
-        Banner.countDocuments({ status: "scheduled" }),
-        Banner.countDocuments({ status: "expired" }),
-        Banner.countDocuments({ status: "draft" }),
+        statusCounts(Banner),
         Banner.distinct("bannerType"),
         Banner.distinct("position"),
       ]);
+    const totalBanners = sumCounts(bannerStatusMap);
+    const activeBanners = bannerStatusMap.active || 0;
+    const inactiveBanners = bannerStatusMap.inactive || 0;
+    const scheduledBanners = bannerStatusMap.scheduled || 0;
+    const expiredBanners = bannerStatusMap.expired || 0;
+    const draftBanners = bannerStatusMap.draft || 0;
 
     // Har row sirf front-visible fields — edit modal ki form fields + list columns
     // (bilkul wahi shape jo brand paginated response rakhta hai).

@@ -65,7 +65,7 @@ const pushStoreActivity = async (storeId, req, action, summary, details = null) 
   await Store.updateOne(
     { _id: storeId },
     { $push: { activity: { $each: [{ action, summary, actorType, actorId: actor?._id || actor?.id || null, actorName, at: new Date(), details }], $position: 0, $slice: 100 } } },
-  ).setOptions({ skipTenantScope: true });
+  ).setOptions({ skipTenantScope: true }); // activity log: employee lookup cross-store (background helper)
 };
 
 /**

@@ -12,7 +12,6 @@ const pendingRegistrationSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -47,6 +46,8 @@ const pendingRegistrationSchema = new mongoose.Schema(
 
 // ✅ TTL — expiresAt ke baad MongoDB khud document delete kar dega
 pendingRegistrationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Email ab store ke andar unique hai (storeId null = platform seller signup)
+pendingRegistrationSchema.index({ storeId: 1, email: 1 }, { unique: true });
 pendingRegistrationSchema.index({ username: 1 });
 pendingRegistrationSchema.index({ phone: 1 });
 

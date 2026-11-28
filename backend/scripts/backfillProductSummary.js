@@ -23,14 +23,14 @@ const BATCH = 50;
 (async () => {
   await connectDB();
   const Product = mongoose.model("Product");
-  const total = await Product.countDocuments({}).setOptions({ skipTenantScope: true });
+  const total = await Product.countDocuments({}).setOptions({ skipTenantScope: true }); // migration/backfill script: saare stores
   console.log(APPLY ? "APPLY mode" : "DRY RUN (add --apply to write)");
   console.log(`Products: ${total}`);
 
   let done = 0;
   let cursor = Product.find({})
     .select("_id storeId")
-    .setOptions({ skipTenantScope: true })
+    .setOptions({ skipTenantScope: true }) // migration/backfill script: saare stores
     .lean()
     .cursor();
 

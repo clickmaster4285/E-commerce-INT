@@ -42,7 +42,7 @@ const GLOBAL = { $or: [{ storeId: null }, { storeId: { $exists: false } }] };
 
   // Koi tenant context nahi → plugin filter nahi lagata (jaan boojh kar saare docs)
   const globals = await Attribute.find(GLOBAL).lean();
-  const stores = await Store.find({}).select("_id subdomain").setOptions({ skipTenantScope: true }).lean();
+  const stores = await Store.find({}).select("_id subdomain").setOptions({ skipTenantScope: true }).lean(); // migration script: saare stores
   console.log(`${globals.length} global attribute(s), ${stores.length} store(s)`);
   if (!globals.length) return;
 

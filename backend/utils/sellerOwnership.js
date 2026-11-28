@@ -21,7 +21,7 @@ async function sellerEmailTaken(email) {
   const e = normalize(email);
   if (await SellerApplication.exists({ email: e, status: LIVE_APPLICATION })) return true;
   const admin = await Employee.exists({ email: e, role: "admin", is_deleted: { $ne: true } })
-    .setOptions({ skipTenantScope: true });
+    .setOptions({ skipTenantScope: true }); // seller/owner platform-level lookup: cross-store
   return Boolean(admin);
 }
 
@@ -40,13 +40,13 @@ async function findPlatformEmployee(email) {
   if (app) {
     const employee = await Employee.findOne({ email: e, storeId: app.store_id })
       .select("+password -activities")
-      .setOptions({ skipTenantScope: true });
+      .setOptions({ skipTenantScope: true }); // seller/owner platform-level lookup: cross-store
     return { employee };
   }
 
   const admins = await Employee.find({ email: e, role: "admin", is_deleted: { $ne: true } })
     .select("+password -activities")
-    .setOptions({ skipTenantScope: true })
+    .setOptions({ skipTenantScope: true }) // seller/owner platform-level lookup: cross-store
     .limit(2);
   if (admins.length > 1) return { employee: null, ambiguous: true };
   return { employee: admins[0] || null };

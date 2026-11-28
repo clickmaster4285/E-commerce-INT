@@ -202,6 +202,33 @@ const collectIds = (value) => {
 // aur category-tiles bhi is_active: true filter karte hain).
 const expandCategorySubtrees = async (rootIds) => {
   if (!rootIds.length) return [];
+
+  // §4.4 fast path: ancestors se ek indexed query. Agar koi legacy child category (ancestors khali,
+  // backfillCategoryAncestors.js abhi nahi chali) maujood ho to purane tree-walk par wapas.
+  const legacyChild = await Category.exists({
+    is_deleted: false,
+    parent_category_id: { $ne: null },
+    $or: [{ ancestors: { $exists: false } }, { ancestors: { $size: 0 } }],
+  });
+  if (!legacyChild) {
+    const roots = new Set(rootIds.map(String));
+    const rows = await Category.find({
+      is_deleted: false,
+      is_active: true,
+      ancestors: { $in: [...roots].filter((r) => mongoose.isValidObjectId(r)).map((r) => new mongoose.Types.ObjectId(r)) },
+    }).select("_id ancestors").lean();
+    const activeSet = new Set([...roots, ...rows.map((r) => String(r._id))]);
+    const out = new Set(roots);
+    for (const row of rows) {
+      const anc = (row.ancestors || []).map(String);
+      let lastRoot = -1;
+      anc.forEach((a, i) => { if (roots.has(a)) lastRoot = i; });
+      // root ke neeche ki saari intermediate categories active honi chahiye (purane walk jaisa)
+      if (anc.slice(lastRoot + 1).every((a) => activeSet.has(a))) out.add(String(row._id));
+    }
+    return [...out];
+  }
+
   const cats = await Category.find({ is_deleted: false, is_active: true }).select("parent_category_id").lean();
   const childrenOf = new Map();
   cats.forEach((c) => {

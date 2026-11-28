@@ -49,8 +49,6 @@ router.put("/:id", authMiddleware, checkPermission("deals"), dropDealsCache, upd
 router.delete("/:id", authMiddleware, checkPermission("deals"), dropDealsCache, deleteDeal);
 router.patch("/:id/toggle-status", authMiddleware, checkPermission("deals"), dropDealsCache, toggleDealStatus);
 
-router.use((req, res) => {
-  res.status(404).json({ success: false, message: `Deal API endpoint not found: ${req.method} ${req.originalUrl}` });
-});
+// 404 global handler (app.js) sambhalta hai
 
 module.exports = router;

@@ -12,6 +12,7 @@ require("dotenv").config({ path: path.join(__dirname, ".env"), quiet: true });
 
 const crypto = require("crypto");
 const express = require("express");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const compression = require("compression");
 const cookieParser = require("cookie-parser");
@@ -45,6 +46,7 @@ if (String(process.env.TRUST_PROXY || "").trim()) {
 // Har request ka `req.id` (X-Request-Id) — error responses aur logs me same id.
 // Access log "info" level par: production me dikhta hai, dev (warn) me khamosh.
 // ==========================================
+app.use(require("./utils/metrics").middleware); // request/error counters (stub)
 app.use(pinoHttp({
   logger: log.pino,
   genReqId: (req, res) => {
@@ -53,7 +55,7 @@ app.use(pinoHttp({
     res.setHeader("X-Request-Id", id);
     return id;
   },
-  autoLogging: { ignore: (req) => req.url === `${API_PREFIX}/health` || String(req.url || "").startsWith("/socket.io") },
+  autoLogging: { ignore: (req) => req.url === `${API_PREFIX}/health` || req.url === `${API_PREFIX}/ready` || String(req.url || "").startsWith("/socket.io") },
   // 4xx (expired token 401, validation) roz ka maamla hai → "info" (dev me khamosh);
   // sirf 5xx "error" — wahi asal problem hai.
   customLogLevel: (req, res, err) => (err || res.statusCode >= 500 ? "error" : "info"),
@@ -105,6 +107,19 @@ const buildAllowedOrigins = () => {
   return [...origins];
 };
 
+// Preflight par har baar DB lookup (resolveStoreByHost) na ho — chhota TTL cache.
+// Size bounded (CORS_HOST_CACHE_MAX) taake random Origin spam se memory na barhe.
+const CORS_HOST_CACHE_TTL_MS = 45 * 1000;
+const CORS_HOST_CACHE_MAX = 500;
+const corsHostCache = new Map(); // host -> { ok, exp }
+const corsHostCacheSet = (host, ok) => {
+  if (corsHostCache.size >= CORS_HOST_CACHE_MAX) {
+    const oldest = corsHostCache.keys().next().value; // insertion order = sabse purani entry
+    corsHostCache.delete(oldest);
+  }
+  corsHostCache.set(host, { ok, exp: Date.now() + CORS_HOST_CACHE_TTL_MS });
+};
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
@@ -132,9 +147,16 @@ app.use(cors({
     let originHost;
     try { originHost = new URL(origin).hostname; } catch (error) { return callback(new Error("Invalid request origin")); }
     if (isPlatformFamilyHost(originHost)) return callback(null, true);
+    const cached = corsHostCache.get(originHost);
+    if (cached && cached.exp > Date.now()) {
+      return cached.ok ? callback(null, true) : callback(new Error("Not allowed by CORS"));
+    }
     return resolveStoreByHost(originHost)
-      .then(({ store }) => (store ? callback(null, true) : callback(new Error("Not allowed by CORS"))))
-      .catch(() => callback(new Error("Not allowed by CORS")));
+      .then(({ store }) => {
+        corsHostCacheSet(originHost, Boolean(store));
+        return store ? callback(null, true) : callback(new Error("Not allowed by CORS"));
+      })
+      .catch(() => callback(new Error("Not allowed by CORS"))); // DB error cache nahi hota
   },
   credentials: true,
 }));
@@ -171,7 +193,7 @@ app.use(cookieParser());
 // ✅ GLOBAL RATE LIMIT before resolveStore — unknown Hosts cannot hammer Mongo (§5.5)
 const { limiters } = require("./middleware/rateLimit");
 app.use(API_PREFIX, (req, res, next) => {
-  if (req.path === "/health") return next();
+  if (req.path === "/health" || req.path === "/ready") return next();
   // Chat has a dedicated limiter so storefront browsing cannot exhaust its API budget.
   if (req.path === "/chats" || req.path.startsWith("/chats/")) return next();
   return limiters.global(req, res, next);
@@ -270,6 +292,22 @@ app.use(`${API_PREFIX}/seller`, require("./routes/sellerApplicationRoutes"));
 app.get("/", (req, res) => res.send(STARTUP_MESSAGE));
 app.get(`${API_PREFIX}/health`, (req, res) => {
   res.status(200).json({ success: true, message: "API is running", environment: NODE_ENV, timestamp: new Date() });
+});
+app.get(`${API_PREFIX}/ready`, async (req, res) => {
+  // READINESS: Mongo connected + (REDIS_URL ho to) Redis ping. Liveness /health alag aur halka rehta hai.
+  const checks = { mongo: mongoose.connection.readyState === 1, redis: null };
+  if (String(process.env.REDIS_URL || "").trim()) {
+    try {
+      const client = require("./middleware/rateLimit").getRedisClient();
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error("redis ping timeout")), 1500));
+      checks.redis = client ? (await Promise.race([client.ping(), timeout])) === "PONG" : false;
+    } catch {
+      checks.redis = false;
+    }
+  }
+  const ok = checks.mongo && checks.redis !== false;
+  if (ok) return res.status(200).json({ ok: true });
+  return res.status(503).json({ ok: false, checks });
 });
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Route not found", path: req.originalUrl });

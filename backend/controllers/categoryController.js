@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const log = require("../utils/logger");
 const { withoutProtected } = require("../utils/sanitizeBody"); // mass assignment guard
 const Category = require("../models/Category");
+const { computeAncestors, rebuildDescendantAncestors } = require("../utils/categoryAncestors");
 const Attribute = require("../models/Attribute");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
@@ -466,6 +467,7 @@ const createCategory = async (req, res) => {
       name: name.trim(),
       description: description.trim(),
       parent_category_id: normalizeObjectId(parent_category_id),
+      ancestors: await computeAncestors(Category, normalizeObjectId(parent_category_id)), // §4.4
       category_type: String(category_type || "").trim(),
       image_url: image_url.trim(),
       sort_order,
@@ -578,6 +580,7 @@ const updateCategory = async (req, res) => {
     const updateData = withoutProtected(req.body);
 
     delete updateData._id;
+    delete updateData.ancestors; // sirf server maintain karta hai (§4.4)
     delete updateData.created_at;
     delete updateData.createdby;
     delete updateData.updatedby;
@@ -597,6 +600,7 @@ const updateCategory = async (req, res) => {
     const nameChanged =
       String(effectiveName || "").trim() !== String(existingCategory.name || "").trim();
 
+    let nextAncestors = null; // parent badalne par hi set hota hai (§4.4)
     if (parentProvided) {
       const nextParentId = req.body.parent_category_id || null;
       const currentParentId = existingCategory.parent_category_id
@@ -621,6 +625,7 @@ const updateCategory = async (req, res) => {
           categoryId: existingCategory._id,
           parentId: nextParentId,
         });
+        nextAncestors = await computeAncestors(Category, normalizeObjectId(nextParentId));
       }
 
       updateData.parent_category_id = normalizeObjectId(nextParentId);
@@ -678,6 +683,7 @@ const updateCategory = async (req, res) => {
 
     // Only set updatedby when there are actual changes
     updateData.updatedby = req.user?._id || null;
+    if (nextAncestors) updateData.ancestors = nextAncestors;
 
     const updatedCategory = await Category.findByIdAndUpdate(
       req.params.id,
@@ -687,6 +693,11 @@ const updateCategory = async (req, res) => {
 
     if (!updatedCategory) {
       return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    // Parent badla to descendants ki ancestors bhi dobara set karo
+    if (nextAncestors) {
+      await rebuildDescendantAncestors(Category, updatedCategory._id, nextAncestors);
     }
 
     // 🌍 English change → hash badla → translation dobara generate hogi

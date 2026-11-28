@@ -91,7 +91,7 @@ Your instinct is mostly right. The professional rule has one important exception
 | **Hot read-model counter** (expensive to compute on each read) | Keep a **denormalized aggregate** on the parent and update it on write. | Product `price_from`, `stock_total`, `variant_count`, `rating_avg`, `rating_count`; Vendor balances (computed correctly); daily store stats |
 
 So:
-- [ ] **P2** Keep the snapshots on Order, Invoice, Quote, PosSale, PurchaseOrder and StockHistory. An invoice must not change when a customer renames themself. **Do stop populating the live refs next to the snapshot** (`orderController.js:831-833,1218-1220`, `purchaseOrderController.js:218`). That is paying twice.
+- [x] **P2** Keep the snapshots on Order, Invoice, Quote, PosSale, PurchaseOrder and StockHistory. An invoice must not change when a customer renames themself. **Do stop populating the live refs next to the snapshot** (`orderController.js:831-833,1218-1220`, `purchaseOrderController.js:218`). That is paying twice. — **partly done:** admin orders populate `user_id` email only; PO list skips vendor populate for `en`. More list paths still open.
 - [ ] **P2** Replace stale-prone copies with references:
   - [ ] `Variant.tags: [String]` holds tag names that never update on rename or delete. Move it to `tag_ids: [ObjectId]`, like Product (`models/Variant.js:115`).
   - [ ] `Attribute.category` holds a legacy category-name string. Drop it (`models/Attribute.js:27`).
@@ -379,10 +379,10 @@ The `activitySchema`/`auditChangeSchema` definition is copy-pasted into Customer
 Current: **User** (storefront login) and **Customer** (admin/POS CRM record) have **no link**, so one buyer has two separate histories (orders use `user_id`, POS and invoices use `customer_id`). **Lead** converts to Customer through a notes text marker. **SellerApplication** and **PendingRegistration** repeat name, email, phone, username and `passwordHash`, and the application keeps a stale password hash forever.
 - [x] Add `Customer.user_id` (optional, unique per store, partial). On customer signup or checkout, upsert the matching Customer by `{storeId, email|phone}`, so admin "customer history" covers orders, POS, invoices and quotes through one id. — **done:** partial unique + `linkUserCustomer` on OTP/Google/order. `test/productSummaryP1.test.js`
 - [x] Add `Lead.customer_id` as the real link, and drop `syncLeadCustomer`'s regex lookup and the **write-on-read** (`customerController.js:14-18` re-syncs every converted lead on every list request). — **done:** convert sets `customer_id`; getLead write-on-read removed. `test/adminContractsP1.test.js`
-- [ ] `SellerApplication`: keep application-only fields (KYC, status, reviewer, reason) plus `store_id`/`employee_id` refs. Remove the copies of store profile fields and `passwordHash` once the employee exists.
-- [ ] `PendingRegistration`: scope it by store (`{storeId, email}` unique instead of a global `email`), and add the tenant plugin or an explicit storeId filter.
+- [x] `SellerApplication`: keep application-only fields (KYC, status, reviewer, reason) plus `store_id`/`employee_id` refs. Remove the copies of store profile fields and `passwordHash` once the employee exists. — **partly done:** `approveRequest` `$unset`s `passwordHash` after employee create; profile field trim still open.
+- [x] `PendingRegistration`: scope it by store (`{storeId, email}` unique instead of a global `email`), and add the tenant plugin or an explicit storeId filter. — **done:** compound unique + storeId filters on OTP/user paths. Drop old `email_1` index on deploy. `test/envPeopleConfigP1.test.js`
 - [x] `Address`: add `tenantScope` and backfill `storeId` from the user. It currently has no `storeId` at all. — **done:** `tenantScope` + `{storeId, user_id}` index; new creates stamp via plugin; legacy backfill `scripts/backfillAddressStoreId.js`. `test/hardeningP0.test.js`
-- [ ] **Stop machine-translating people's names and addresses**: `Customer.translations.name/address`, `Invoice/Quote.translations.customer_name`, `Employee.translations.name`, `Lead.translations.name/company_name`. Also remove the unused `StockHistory.translations` (product name, reason, explanation), which is dead weight on the highest-volume collection.
+- [x] **Stop machine-translating people's names and addresses**: `Customer.translations.name/address`, `Invoice/Quote.translations.customer_name`, `Employee.translations.name`, `Lead.translations.name/company_name`. Also remove the unused `StockHistory.translations` (product name, reason, explanation), which is dead weight on the highest-volume collection. — **done:** removed from TRANSLATABLE/CONTENT_FIELDS (existing DB data left). Schema field drop later. `test/envPeopleConfigP1.test.js`
 - [ ] `Employee.avatar` and `User.avatar` hold **base64 data URLs inside the document**, loaded by the auth middleware on every request. Move them to files (`uploadDirFor(req, "avatars")`) and store only the URL. Migrate existing data URLs.
 - [x] `Employee.permissions` has both `order` and `orders`. Merge them, and migrate the routes that use `"order"` (chat). — **done:** canonical `orders` + legacy alias in checkPermission; chat/order routes use `orders`.
 
@@ -591,16 +591,16 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 - [ ] Shipping config and active rules: cache per store (Redis, invalidated on write), since every quote currently re-reads them (`shippingController.js:14,40`). Remove `supportsTx()`'s `admin.hello()` call on every PO delivery.
 
 ### 4.3 Dashboard, finance and stats (P3)
-- [x] Dashboard: `Order.find({})`, `Product.find({})`, `Discount.find({})` and `Brand.find({})` load **whole collections** to show 10 recent activities (`dashboardController.js:271-276`). Read them from `audit_events` with `{storeId, at:-1}` and `limit 10`. — **partly done:** AuditEvent exists; dashboard still uses collection finds.
-- [x] Dashboard: about 20 aggregations per load (`:97-253`). Read `store_daily_stats` for the range, and cache for 60s in Redis by `{storeId, range}`. — **partly done:** StoreDailyStats + bump on order; dashboard read path still open.
+- [x] Dashboard: `Order.find({})`, `Product.find({})`, `Discount.find({})` and `Brand.find({})` load **whole collections** to show 10 recent activities (`dashboardController.js:271-276`). Read them from `audit_events` with `{storeId, at:-1}` and `limit 10`. — **done:** AuditEvent feed with legacy fallback. `test/queryPerfP1.test.js`
+- [x] Dashboard: about 20 aggregations per load (`:97-253`). Read `store_daily_stats` for the range, and cache for 60s in Redis by `{storeId, range}`. — **partly done:** dual-read behind `DASHBOARD_USE_DAILY_STATS=1`; Redis cache still open.
 - [ ] Finance overview loads **5 entire collections** (with items, activity, returns and payments) and then filters, searches and pages in JS. It also runs `purchaseOrders.find` inside the payments loop, which is O(P×PO) (`financeController.js:96-274`). Replace this with reads from `ledger_entries`/`account_balances`/`payments` (§3.9), using an indexed `$match` on a `{storeId, at}` range. The sort parameter is currently ignored.
 - [ ] Super-admin dashboard and `listUsers`: read cached platform stats instead of running platform-wide `countDocuments` and unanchored regex on every request (`superAdminController.js:177-209,1052-1066`). `activityFeed` runs 6 queries on an unindexed `actor.id` (`:1693`).
-- [ ] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`.
+- [x] Per-list status counts: orders (6 counts), deals (7), invoices (5), quotes (5), discounts (4), vendors (4 plus aggregate plus distinct), banners (6 plus 2 distinct). Replace each with **one** `$group` by status, or a `$facet`. — **done:** `utils/statusCounts.js` wired on those admin lists. `test/queryPerfP1.test.js`
 
 ### 4.4 Catalog (P3)
 - [x] `getProducts` (310 lines, 5 response paths) becomes a `productQueryService` with one paginated path. The public endpoint always paginates and has a max limit. — **partly done:** public always paginates; summary fields reduce aggregates; full service extract still open.
-- [ ] Keyset (cursor) pagination on `{created_at, _id}` for large admin lists, instead of `skip`. Keep `skip` only for the first few pages if the UI needs page numbers.
-- [ ] Category subtree: compute the tree once per store and cache it (Redis, invalidated on category write). Today it is loaded and walked on every filtered request and copy-pasted 3 times (`productController.js:237,1207,1356`). Alternatively, store `ancestors: [ObjectId]` on Category and filter with `{storeId, ancestors: id}`.
+- [x] Keyset (cursor) pagination on `{created_at, _id}` for large admin lists, instead of `skip`. Keep `skip` only for the first few pages if the UI needs page numbers. — **partly done:** `utils/keysetPaginate.js` + admin orders `?cursor=` pilot; other lists still skip.
+- [x] Category subtree: compute the tree once per store and cache it (Redis, invalidated on category write). Today it is loaded and walked on every filtered request and copy-pasted 3 times (`productController.js:237,1207,1356`). Alternatively, store `ancestors: [ObjectId]` on Category and filter with `{storeId, ancestors: id}`. — **partly done:** `ancestors` on Category + maintain/rebuild + product filter fast path; Redis tree cache still open. `scripts/backfillCategoryAncestors.js`
 - [x] Search: build a `search_text` field (name, brand, category, SKUs, lowercased) on Product, maintained by `productSummary`. Use **prefix-anchored** `^term` matching on it, or a `{storeId:1, search_text:"text"}` text index. Move to Atlas Search later if you go to Atlas. This replaces the 4-branch unanchored `$or` (`:286-304`). — **done:** prefix on `search_text` + legacy fallback.
 - [x] `getProductById` (public): — **mostly done:** ratings from Product summary fields; PO history already admin-only.
   - remove the "legacy tag healing" writes (`:1563-1597`)
@@ -619,7 +619,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
 
 ### 4.5 Sales, CRM and the rest (P3)
 - [x] Add `.lean()` to every read-only query. There are 211 `find(` calls and 353 `.lean()` calls, but `placeOrder`, brand, variant and bundle reads, and the theme admin are missing it. — **mostly done:** hot paths touched this phase use lean; full sweep still open.
-- [ ] Drop populates that duplicate snapshots (orders, POs). Use `$slice` projections for `edit_history` instead of slicing in JS (`posController.js:196-208`).
+- [x] Drop populates that duplicate snapshots (orders, POs). Use `$slice` projections for `edit_history` instead of slicing in JS (`posController.js:196-208`). — **done:** trim populates + POS `edit_history` already `$slice`; `getPosReturns` single `$facet`.
 - [x] Remove the remaining unbounded "legacy mode" lists, or put a hard cap of 50 on them: — **done:** `utils/legacyListCap.js`; caps on getMyOrders, listInvoices (also uses filters), getDiscounts, getActiveDeals, listQuotes, getVendorsAdmin, getShippingRules, getCustomerPosHistory, getVariants (+is_deleted, no cost_price), getCategories, chat listMine, getMyReviews, customers legacy list + customer detail history (50). Socket `getProducts` still open.
   - [x] `getMyOrders`
   - [x] `listInvoices` (also ignores filters)
@@ -675,7 +675,7 @@ backend/
 ```
 - [x] Split `app.js` from `server.js`. Today `server.js` calls `listen` on import, so the app cannot be tested. — **done:** `app.js` builds the app (exported, used by `test/app.test.js` through supertest); `server.js` owns HTTP, sockets (`app.set("io")`), DB, seeding, schedulers and listen
 - [ ] Move all route-file logic into controllers or services: `categoryRoutes.js:38-256` (about 220 lines of handlers), `variantRoutes.js:41-59`, and the multer config in `storeRoutes.js:18-53`.
-- [ ] Move `scripts/seedAttributes.js` (required at runtime by `models/Store.js:134`) into `services/`.
+- [x] Move `scripts/seedAttributes.js` (required at runtime by `models/Store.js:134`) into `services/`. — **done:** `services/seedAttributes.js`; script is thin wrapper; Store requires service.
 - [ ] `socket.js` (1050 lines) re-implements REST controllers using fake req/res objects, in 4 different variants. Keep sockets for **push notifications and chat only**, and move writes back to REST. Remove the permission migration that runs inside `getProfile`.
 
 ### 5.2 Errors and responses
@@ -691,10 +691,10 @@ backend/
   - Pagination `meta`: always `{ page, limit, total, totalPages }`, or `{ nextCursor }`
 
   Today you have bare arrays, `pages`/`totalPages`/`hasNextPage`, and 400s used for server errors. Coordinate with `frontend/src/apis/**`.
-- [x] Remove the per-router 404 handlers (bundle, deal, user) and keep the global one. — **deferred** (verify routes still).
+- [x] Remove the per-router 404 handlers (bundle, deal, user) and keep the global one. — **done:** removed from deal/bundle/user routes; global `app.js` handler.
 
 ### 5.3 Validation
-- [x] Add **zod** (or joi) and a `validate({ body, query, params })` middleware. — **deferred** (deps + per-route schemas).
+- [x] Add **zod** (or joi) and a `validate({ body, query, params })` middleware. — **done:** zod + `middleware/validate.js` (unit-tested; route wiring gradual). `test/envPeopleConfigP1.test.js`
   - Every write endpoint gets a whitelisted schema. That fixes mass assignment, NaN numbers and missing `newPassword` validation.
   - Query schemas enforce `limit <= 100`, sort whitelists and ObjectId params, which fixes 500s on bad ids such as `getCustomerPosHistory`.
 - [x] Reuse `phoneValidator.validatePhoneField`, which is currently unused, instead of the phone message ladder copy-pasted 4 times. — **n/a earlier:** helper was deleted as unused; phoneValidator core still used.
@@ -720,11 +720,11 @@ backend/
 - [x] Signup and seller approval: wrap Store → SellerApplication → Employee in a transaction. Today a failure partway leaves an orphaned Store that blocks the retry, `approveRequest` updates the employee twice, and `createSellerStore` does a manual rollback. — **done:** both use `withTx` (standalone still compensates). `test/hardeningP0.test.js`
 
 ### 5.5 Config and server hardening
-- [ ] `config/env.js`: validate every variable with zod at boot and fail fast with a clear message. Today a missing variable becomes `NaN`, for example in the limiter `max`/`WINDOW_MS` and `SOCKET_MAX_BUFFER_MB`. Remove the duplicate `TRANSLATION_MODEL_DOWNLOAD_CHUNK_BYTES` line in `.env`. Add a `.env.example`.
+- [x] `config/env.js`: validate every variable with zod at boot and fail fast with a clear message. Today a missing variable becomes `NaN`, for example in the limiter `max`/`WINDOW_MS` and `SOCKET_MAX_BUFFER_MB`. Remove the duplicate `TRANSLATION_MODEL_DOWNLOAD_CHUNK_BYTES` line in `.env`. Add a `.env.example`. — **done:** `config/env.js` + zod; `server.js` `loadEnv()`; `.env.example` placeholders. `test/envPeopleConfigP1.test.js`
 - [x] Add `helmet()`, `app.disable("x-powered-by")`, and per-route body limits instead of one large global `REQUEST_SIZE_LIMIT` (which was raised only for base64 KYC; send KYC as multipart). — **done:** default JSON `256kb`; only `POST /seller/apply/complete-setup` keeps `REQUEST_SIZE_LIMIT`. Multipart KYC still open.
 - [x] Mount the global rate limiter **before** `resolveStore`, so unknown hosts cannot hit the DB unthrottled. Add limits for chat GET polling, staff sends and `/translation/page`. — **done:** global limiter now runs before `resolveStore` (chat still skipped). Dedicated chat/translation limits still open. `test/hardeningP0.test.js`
 - [x] Graceful shutdown: on SIGTERM, `server.close()`, `io.close()`, drain the queues, `mongoose.disconnect()`. Add `unhandledRejection`/`uncaughtException` handlers that log and exit. — **done**
-- [ ] Cache CORS origin checks, since they call `resolveStoreByHost` on every preflight (`server.js:126`).
+- [x] Cache CORS origin checks, since they call `resolveStoreByHost` on every preflight (`server.js:126`). — **done:** Map TTL ~45s, max 500 hosts in `app.js`.
 - [ ] Use one router-import style. `server.js` currently mixes top-level imports with inline requires at lines 271-280.
 
 ### 5.6 Uploads: one factory
@@ -734,7 +734,7 @@ backend/
   - One multer-error mapper.
   - Clean up the written files if the controller fails.
 - [ ] Replace the 8 copies: `imageMiddleware`, `productImageMiddleware` + `saveProductImages` (which **store the original unprocessed**, against the webp rule), `bundleImageMiddleware`, `dealImageMiddleware` (no sharp), `themeImageMiddleware`, `reviewUploadMiddleware`, `uploadMiddleware` (banners), and the inline logo multer in `storeRoutes.js`.
-- [ ] Delete `middleware/uploadConfig.js`, a duplicate of `config/uploadConfig.js`.
+- [x] Delete `middleware/uploadConfig.js`, a duplicate of `config/uploadConfig.js`. — **done:** brandRoutes uses `config/uploadConfig.js`.
 - [ ] Delete files **after** a successful DB write, not before. Today `variantController.js:215-220,268-272` and `brandController.js:313-320` lose images when the save fails.
 - [ ] Run sharp off the event loop where it is used inside socket handlers (`socket.js:81,105` use `writeFileSync`), or move those uploads to REST.
 
@@ -773,10 +773,10 @@ backend/
 - [ ] Migrate the legacy root folders (`uploads/banners`, `bundles`, `deals`, `reviews`, `store`, `store-logos`) into `uploads/stores/<id>/...`, and stop creating them at startup (`server.js:80-82,293-302`).
 
 ### 6.5 Tenant-isolation hardening
-- [ ] The plugin **fails open**: with no ALS context it applies no filter. Make store-owned models **throw** when there is no context and no `runUnscoped`/`skipTenantScope`. This turns silent cross-store leaks into loud errors.
-- [ ] `insertMany` should reject a mismatched `storeId`, the same way `validate` does (`tenantScopePlugin.js:210-217`).
-- [ ] Review all 36 `skipTenantScope` call sites, and add a comment on each explaining why.
-- [ ] `scopeFieldForCollection` loops over every model for each `$lookup`. Build the Map once.
+- [x] The plugin **fails open**: with no ALS context it applies no filter. Make store-owned models **throw** when there is no context and no `runUnscoped`/`skipTenantScope`. This turns silent cross-store leaks into loud errors. — **done:** fail-closed (+ `TENANT_FAIL_CLOSED=false` escape). Platform host uses `runUnscoped`. `test/tenantFailClosedP1.test.js`
+- [x] `insertMany` should reject a mismatched `storeId`, the same way `validate` does (`tenantScopePlugin.js:210-217`). — **done.** `test/tenantFailClosedP1.test.js`
+- [x] Review all 36 `skipTenantScope` call sites, and add a comment on each explaining why. — **done:** one-line reasons on call sites (behavior unchanged).
+- [x] `scopeFieldForCollection` loops over every model for each `$lookup`. Build the Map once. — **done:** module-level Map, rebuild on model-count change.
 
 ---
 
@@ -785,19 +785,19 @@ backend/
 ### 7.1 Logging and monitoring
 - [x] Replace the no-op logger with **pino**: JSON logs with `reqId`, `storeId`, `userId`, route and duration, and `pino-http` for access logs. Keep the `log.*` interface so the 164 existing calls start working. Set the level per environment. — **done:** `utils/logger.js` (same `log.*` interface; `LOG_LEVEL`, default warn in dev / info in prod / silent in tests; pino-pretty in dev; secrets redacted), plus `pino-http` with `X-Request-Id`
 - [ ] Error tracking (Sentry or similar) from the central error handler.
-- [ ] Log slow queries: Mongoose `debug` in dev, the profiler in staging.
-- [ ] `/health` (liveness) and `/ready` (Mongo, Redis and queue reachable).
-- [ ] Basic metrics: request rate, latency p95, error rate per route, queue depth.
+- [x] Log slow queries: Mongoose `debug` in dev, the profiler in staging. — **partly done:** mongoose debug only when `LOG_LEVEL=debug` or `MONGO_DEBUG=1`; profiler via `MONGO_PROFILE_SLOWMS`.
+- [x] `/health` (liveness) and `/ready` (Mongo, Redis and queue reachable). — **done:** `/ready` checks mongo + optional Redis ping. Queue check when workers land. `test/healthReadyP1.test.js`
+- [x] Basic metrics: request rate, latency p95, error rate per route, queue depth. — **partly done:** `utils/metrics.js` in-process counters + middleware; p95/queue later.
 
 ### 7.2 Tests (a safety net before the refactor)
-- [ ] `mongodb-memory-server` (replica-set mode) plus `supertest` against `app.js`.
+- [x] `mongodb-memory-server` (replica-set mode) plus `supertest` against `app.js`. — **partly done:** memory replset + app supertest used across many tests; expand coverage ongoing.
 - [ ] **Permission matrix test:** for every route × {anonymous, customer, staff without permission, staff with permission, admin, other store's admin} → expected status. This would have caught every finding in §2.3 and the public/admin leaks in §2.1.
-- [ ] **Cross-store isolation:** two stores, then `findById`, `populate`, `$lookup`, `bulkWrite`, `insertMany` and sockets, all confirming nothing crosses.
+- [x] **Cross-store isolation:** two stores, then `findById`, `populate`, `$lookup`, `bulkWrite`, `insertMany` and sockets, all confirming nothing crosses. — **partly done:** fail-closed + tenantIsolation + insertMany mismatch tests; socket cross-store still open.
 - [ ] **Concurrency:** 20 parallel orders for a stock of 5 → exactly 5 succeed. Parallel cancel → stock is restored once. Parallel counter → no duplicates. Parallel OTP guesses → the limit holds.
 - [ ] **Pricing:** golden tests for `services/pricing.js` (deals, BOGO, bundles, tax, rounding) shared by order, POS, invoice and quote.
 - [ ] Upload middleware: the type whitelist, size limits, and cleanup on failure.
 - [ ] Rate-limiter mount test: every auth, OTP and email route has a limiter.
-- [ ] Config validation test: a missing env variable fails boot with a clear error.
+- [x] Config validation test: a missing env variable fails boot with a clear error. — **done:** `test/envPeopleConfigP1.test.js`
 - [ ] CI: `npm test` plus lint on every PR.
 
 ---

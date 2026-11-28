@@ -171,7 +171,7 @@ const withDebugOtp = (payload, debugOtp) =>
 // PendingRegistration flow: User tabhi banega jab OTP verify hoga.
 // Isliye resend sabse pehle Pending me dekhta hai.
 // ==========================================
-const sendVerificationOtpForEmail = async (rawEmail) => {
+const sendVerificationOtpForEmail = async (rawEmail, storeId = null) => {
   const email = normalizeEmail(rawEmail);
   if (!email || !isValidEmail(email)) {
     const error = new Error("Please provide a valid email address");
@@ -184,7 +184,8 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
   if (user && user.emailVerified !== false) return { alreadyVerified: true, email };
 
   // ✅ Pending registration hai to wahi par naya OTP issue karo (throttle ke saath)
-  const pending = await PendingRegistration.findOne({ email });
+  // storeId se scope: store A ka pending store B / platform par nahi dikhna chahiye (null = platform signup)
+  const pending = await PendingRegistration.findOne({ email, storeId: storeId || null });
   if (pending) {
     if (new Date(pending.expiresAt).getTime() < Date.now()) {
       await PendingRegistration.deleteOne({ _id: pending._id });
@@ -245,7 +246,7 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
 // ==========================================
 const sendEmailVerificationOtp = async (req, res) => {
   try {
-    const result = await sendVerificationOtpForEmail(req.body?.email);
+    const result = await sendVerificationOtpForEmail(req.body?.email, req.store?._id || null);
 
     if (result.alreadyVerified)
       return res.json({
@@ -295,7 +296,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: "Please enter the code" });
 
     // ✅ Naya flow: PendingRegistration se verify -> User create
-    const pending = await PendingRegistration.findOne({ email });
+    const pending = await PendingRegistration.findOne({ email, storeId: req.store?._id || null });
     if (pending) {
       if (new Date(pending.expiresAt).getTime() < Date.now()) {
         await PendingRegistration.deleteOne({ _id: pending._id });
@@ -356,7 +357,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
         const uname = String(pending.username).toLowerCase().trim();
         const clash = pending.storeId
           ? await User.findOne({ username: uname })
-          : await Employee.findOne({ username: uname }).setOptions({ skipTenantScope: true });
+          : await Employee.findOne({ username: uname }).setOptions({ skipTenantScope: true }); // platform/signup flow: store context abhi nahi — cross-store lookup
         if (clash) {
           return res
             .status(400)
@@ -367,7 +368,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
         const phone = String(pending.phone).trim();
         const phoneClash = pending.storeId
           ? await User.findOne({ phone })
-          : await Employee.findOne({ phone }).setOptions({ skipTenantScope: true });
+          : await Employee.findOne({ phone }).setOptions({ skipTenantScope: true }); // platform/signup flow: store context abhi nahi — cross-store lookup
         if (phoneClash) {
           return res
             .status(400)
@@ -444,7 +445,7 @@ const verifyEmailVerificationOtp = async (req, res) => {
       if (isSeller) {
         // Seller ka chuna hua address — beech me kisi ne le liya ho to us se milta-julta free address
         let subdomain = String(pending.subdomain || "").trim().toLowerCase();
-        if (!subdomain || (await Store.exists({ subdomain }).setOptions({ skipTenantScope: true }))) {
+        if (!subdomain || (await Store.exists({ subdomain }).setOptions({ skipTenantScope: true }))) { // platform/signup flow: store context abhi nahi — cross-store lookup
           subdomain = await Store.generateUniqueSubdomain(subdomain || pending.storeName);
         }
         store = await Store.create({

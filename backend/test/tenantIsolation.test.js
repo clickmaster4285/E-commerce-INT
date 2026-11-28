@@ -9,7 +9,7 @@ const assert = require("node:assert/strict");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const tenantScope = require("../utils/tenantScopePlugin");
-const { runWithStore } = require("../utils/tenantContext");
+const { runWithStore, runUnscoped } = require("../utils/tenantContext");
 
 mongoose.set("bufferTimeoutMS", 200);
 
@@ -162,7 +162,8 @@ test("aggregate: $lookup / $unionWith / $graphLookup into store-owned collection
 });
 
 test("no store context (platform / scripts) → pipelines untouched", async () => {
-  await stopped(Thing.aggregate([{ $lookup: { from: "test_others", localField: "code", foreignField: "code", as: "o" } }]));
+  // fail-closed ke baad "no context" ka matlab explicit runUnscoped (platform host jaisa)
+  await stopped(runUnscoped(async () => await Thing.aggregate([{ $lookup: { from: "test_others", localField: "code", foreignField: "code", as: "o" } }])));
   assert.equal(captured.aggregate.length, 1);
   assert.equal(captured.aggregate[0].$lookup.pipeline, undefined);
 });

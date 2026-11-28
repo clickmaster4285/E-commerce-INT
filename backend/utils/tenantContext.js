@@ -31,6 +31,14 @@ function getStoreId() {
 }
 
 /**
+ * Kya koi ALS context (store ya runUnscoped) active hai? Plugin isse fail-closed
+ * decide karta hai: context hi na ho → query chalne se pehle error.
+ */
+function hasContext() {
+  return Boolean(als.getStore());
+}
+
+/**
  * Callback ko current context ke saath bind karo. Stream-based libraries
  * (multer/busboy) apna callback alag async chain se bulate hain jahan
  * AsyncLocalStorage ka context kho jata hai — ye usay wapas laata hai.
@@ -41,4 +49,4 @@ function bindToContext(fn) {
   return (...args) => als.run(ctx, () => fn(...args));
 }
 
-module.exports = { runWithStore, runUnscoped, getStoreId, bindToContext };
+module.exports = { runWithStore, runUnscoped, getStoreId, hasContext, bindToContext };

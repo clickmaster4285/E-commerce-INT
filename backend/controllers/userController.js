@@ -31,7 +31,7 @@ const checkStoreSubdomain = async (raw, email) => {
   const formatError = validateStoreAddress(sub);
   if (formatError) return { error: formatError, suggestion: "" };
   const taken =
-    (await Store.exists({ subdomain: sub, is_deleted: { $ne: true } }).setOptions({ skipTenantScope: true })) ||
+    (await Store.exists({ subdomain: sub, is_deleted: { $ne: true } }).setOptions({ skipTenantScope: true })) || // lookup store resolve se pehle / platform par — cross-store
     (await PendingRegistration.exists({ subdomain: sub, email: { $ne: email || "" }, expiresAt: { $gt: new Date() } }));
   if (!taken) return { error: null, suggestion: "" };
   return { error: "This store address is already taken.", suggestion: await Store.generateUniqueSubdomain(sub) };
@@ -240,7 +240,7 @@ const createUser = async (req, res) => {
     if (pendingApp) {
       const employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
         .select("+password")
-        .setOptions({ skipTenantScope: true });
+        .setOptions({ skipTenantScope: true }); // lookup store resolve se pehle / platform par — cross-store
       if (employee) {
         const passwordMatches = await bcrypt.compare(String(password), employee.password || "");
         if (passwordMatches) {
@@ -296,7 +296,7 @@ const createUser = async (req, res) => {
       return res.status(400).json({ success: false, message: "Registration failed", errors: dupErrors });
 
     // ✅ Same email se dobara Create: sirf pending hai to error nahi — naya OTP bhej ke update karo
-    const existingPending = await PendingRegistration.findOne({ email });
+    const existingPending = await PendingRegistration.findOne({ email, storeId: signupStoreId || null });
     if (existingPending && new Date(existingPending.expiresAt).getTime() > Date.now()) {
       const elapsed = (Date.now() - new Date(existingPending.lastSentAt).getTime()) / 1000;
       if (elapsed < REGISTER_OTP_RESEND_SECONDS) {
@@ -384,7 +384,7 @@ const createUser = async (req, res) => {
         expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
       });
     } catch (emailError) {
-      await PendingRegistration.deleteOne({ email }).catch(() => {});
+      await PendingRegistration.deleteOne({ email, storeId: signupStoreId || null }).catch(() => {});
       log.error("createUser otp error:", emailError.cause || emailError);
       return res.status(500).json({ success: false, message: emailError.message });
     }

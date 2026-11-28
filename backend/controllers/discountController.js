@@ -1,3 +1,4 @@
+const { statusCounts, sumCounts, facetCounts } = require("../utils/statusCounts"); // status tabs ke liye ek aggregate (§4.3)
 const Discount = require("../models/Discount");
 const User = require("../models/User");
 const Employee = require("../models/Employee");
@@ -421,10 +422,13 @@ exports.getDiscounts = async (req, res) => {
     const safePage = Math.min(page, pages || 1);
     const skip = (safePage - 1) * limit;
 
-    const [baseTotal, activeCount, inactiveCount, discounts] = await Promise.all([
-      Discount.countDocuments(baseQuery),
-      Discount.countDocuments(withStatus("active")),
-      Discount.countDocuments(withStatus("inactive")),
+    // ✅ 3 countDocuments ki jagah ek $facet (§4.3)
+    const [statCounts, discounts] = await Promise.all([
+      facetCounts(Discount, {
+        total: baseQuery,
+        active: withStatus("active"),
+        inactive: withStatus("inactive"),
+      }),
       (() => {
         const query = Discount.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit);
         if (req.query.admin_list === "1") {
@@ -438,6 +442,10 @@ exports.getDiscounts = async (req, res) => {
           .populate("updatedBy", "name email");
       })(),
     ]);
+
+    const baseTotal = statCounts.total;
+    const activeCount = statCounts.active;
+    const inactiveCount = statCounts.inactive;
 
     return res.status(200).json({
       success: true,

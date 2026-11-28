@@ -282,7 +282,7 @@ const updateStoreDomain = async (req, res) => {
       const clean = slugifySubdomain(subdomain);
       const error = validateSubdomain(clean);
       if (error) return res.status(400).json({ success: false, message: error });
-      if (await Store.exists({ subdomain: clean, _id: { $ne: store._id } }).setOptions({ skipTenantScope: true })) {
+      if (await Store.exists({ subdomain: clean, _id: { $ne: store._id } }).setOptions({ skipTenantScope: true })) { // subdomain/domain uniqueness saare stores me check (cross-store)
         return res.status(409).json({ success: false, message: "This subdomain is already taken." });
       }
       store.subdomain = clean;
@@ -301,7 +301,7 @@ const updateStoreDomain = async (req, res) => {
         if (isPlatformFamilyHost(domain)) {
           return res.status(400).json({ success: false, message: "Use the subdomain field for platform addresses." });
         }
-        if (await Store.exists({ customDomain: domain, _id: { $ne: store._id } }).setOptions({ skipTenantScope: true })) {
+        if (await Store.exists({ customDomain: domain, _id: { $ne: store._id } }).setOptions({ skipTenantScope: true })) { // subdomain/domain uniqueness saare stores me check (cross-store)
           return res.status(409).json({ success: false, message: "This domain is already connected to another store." });
         }
         if (store.customDomain !== domain) {

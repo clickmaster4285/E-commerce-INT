@@ -8,6 +8,8 @@ const Discount = require("../models/Discount");
 const Deal = require("../models/Deal");
 const Bundle = require("../models/Bundle");
 const log = require("../utils/logger");
+const { statusCounts, sumCounts } = require("../utils/statusCounts");
+const { keysetFilter, encodeCursor } = require("../utils/keysetPaginate");
 const { nextSeq, ensureSeeded, formatNumber, maxNumericSuffix } = require("../utils/counter");
 const { priceCheckout } = require("../services/pricing/checkout"); // server-side cart pricing
 const { withTx, TxAbort } = require("../utils/tx"); // one transaction per checkout
@@ -887,26 +889,35 @@ const getAllOrders = async (req, res) => {
     //    sirf status + product filter, baaki filters counts me nahi lagte
     const countsQuery = buildAdminOrderFilter({ productId: req.query.productId });
 
-    const [orders, totalOrders, pendingOrders, shippedOrders, deliveredOrders, cancelledOrders] =
+    // ✅ Keyset pilot (§4.4): ?cursor= sirf default sort (created_at desc) par chalta hai;
+    //    page/skip wala path waise hi rahta hai. Response mein extra `nextCursor` aata hai.
+    const cursorFilter = !hasSort ? keysetFilter(req.query.cursor, "created_at") : null;
+    const findQuery = cursorFilter ? { $and: [query, cursorFilter] } : query;
+
+    // user_id se sirf email — naam/phone address_snapshot mein pehle se hai (§4.5 duplicate populate)
+    const [orders, statusMap] =
       await Promise.all([
-        Order.find(query)
-          .populate("user_id", "name email phone")
+        Order.find(findQuery)
+          .populate("user_id", "email")
           .populate("items.product_id", "name translations")
           .populate("items.variant_id", "title translations")
-          .sort({ [sortField]: sortOrder, _id: 1 })
-          .skip((safePage - 1) * limitNum)
+          .sort(cursorFilter ? { created_at: -1, _id: -1 } : { [sortField]: sortOrder, _id: 1 })
+          .skip(cursorFilter ? 0 : (safePage - 1) * limitNum)
           .limit(limitNum)
           .lean(),
-        Order.countDocuments(countsQuery),
-        Order.countDocuments({ ...countsQuery, status: "pending" }),
-        Order.countDocuments({ ...countsQuery, status: "shipped" }),
-        Order.countDocuments({ ...countsQuery, status: "delivered" }),
-        Order.countDocuments({ ...countsQuery, status: "cancelled" }),
+        // ✅ Ek hi $group — pehle 5 countDocuments (§4.3)
+        statusCounts(Order, { match: countsQuery }),
       ]);
+    const totalOrders = sumCounts(statusMap);
+    const pendingOrders = statusMap.pending || 0;
+    const shippedOrders = statusMap.shipped || 0;
+    const deliveredOrders = statusMap.delivered || 0;
+    const cancelledOrders = statusMap.cancelled || 0;
 
     res.status(200).json({
       success: true,
       data: orders.map((order) => mapFrontOrder(order, locale)),
+      ...(!hasSort && { nextCursor: orders.length === limitNum ? encodeCursor(orders[orders.length - 1], "created_at") : null }),
       counts: {
         total: totalOrders,
         pending: pendingOrders,

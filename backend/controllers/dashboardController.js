@@ -3,7 +3,15 @@ const Product = require("../models/Product");
 const Brand = require("../models/Brand");
 const Category = require("../models/Category");
 const Discount = require("../models/Discount");
+const AuditEvent = require("../models/AuditEvent");
 const log = require("../utils/logger");
+
+// AuditEvent entityType -> dashboard activity category/label
+const AUDIT_CATEGORY = {
+  order: "Order Management", product: "Product Management", discount: "Coupon Management",
+  brand: "Brand Management", category: "Category Management", customer: "Customer Management",
+};
+const prettyType = (t) => { const s = String(t || "").replace(/[_-]/g, " ").trim(); return s ? s[0].toUpperCase() + s.slice(1) : ""; };
 
 // ==========================================
 // RANGE CONFIG — 7d/30d grouped per day, 3m/6m/1y per month
@@ -115,6 +123,42 @@ const buildBuckets = (start, end, bucket, timeZone) => {
   return buckets;
 };
 
+// StoreDailyStats se range read — sirf tab jab safe ho:
+//  • env DASHBOARD_USE_DAILY_STATS=1 (abhi stats sirf placeOrder par bump hote hain, cancel/edit par
+//    adjust nahi — is liye default OFF; backfill/reconcile ke baad on karein)
+//  • store timezone UTC (stats day key UTC hai)
+//  • stats ki sab se purani day previous-range start ko cover kare (partial history se galat totals na aayein)
+// Warna null => caller purani Order aggregations chalata hai.
+const readDailyStats = async ({ prevStart, start, end, prevEnd, bucket, tz }) => {
+  if (process.env.DASHBOARD_USE_DAILY_STATS !== "1" || tz !== "UTC") return null;
+  const { dayKey } = require("../services/storeStats");
+  const StoreDailyStats = require("../models/StoreDailyStats");
+  const earliest = await StoreDailyStats.findOne({}).sort({ day: 1 }).select("day").lean();
+  if (!earliest || earliest.day > dayKey(prevStart)) return null;
+  const docs = await StoreDailyStats.find({ day: { $gte: dayKey(prevStart), $lte: dayKey(end) } })
+    .select("day revenue orders").lean();
+  const startKey = dayKey(start);
+  const prevEndKey = dayKey(prevEnd);
+  const cur = { revenue: 0, orders: 0 };
+  const prev = { revenue: 0, orders: 0 };
+  const bySeries = new Map();
+  for (const d of docs) {
+    if (d.day >= startKey) {
+      cur.revenue += d.revenue || 0;
+      cur.orders += d.orders || 0;
+      const k = bucket === "day" ? d.day : d.day.slice(0, 7);
+      const row = bySeries.get(k) || { _id: { k }, revenue: 0, orders: 0 };
+      row.revenue += d.revenue || 0;
+      row.orders += d.orders || 0;
+      bySeries.set(k, row);
+    } else if (d.day <= prevEndKey) {
+      prev.revenue += d.revenue || 0;
+      prev.orders += d.orders || 0;
+    }
+  }
+  return { cur, prev, seriesRows: [...bySeries.values()] };
+};
+
 // ==========================================
 // GET /api/dashboard/stats?range=7d|30d|3m|6m|1y
 // ==========================================
@@ -150,10 +194,15 @@ const getDashboardStats = async (req, res) => {
       return rows[0] || { revenue: 0, orders: 0 };
     };
 
-    const [curTotals, prevTotals] = await Promise.all([totalsAgg(baseMatch), totalsAgg(prevMatch)]);
+    // ---- Dual-read (§4.3): StoreDailyStats mile to wahin se, warna purani aggregations ----
+    const daily = await readDailyStats({ prevStart, start, end, prevEnd, bucket, tz });
+
+    const [curTotals, prevTotals] = daily
+      ? [daily.cur, daily.prev]
+      : await Promise.all([totalsAgg(baseMatch), totalsAgg(prevMatch)]);
 
     // ---- Revenue / Orders series ----
-    const seriesRows = await Order.aggregate([
+    const seriesRows = daily ? daily.seriesRows : await Order.aggregate([
       { $match: baseMatch },
       {
         $group: {
@@ -327,7 +376,29 @@ const getDashboardStats = async (req, res) => {
     // ---- Recent activity — synthesized from real collection changes ----
     // Cap each source — activity panel only shows a short feed (§9.3)
     const actLimit = Math.min(40, Math.max(limit * 2, 20));
-    const [actOrders, actProducts, actDiscounts, actBrands] = await Promise.all([
+
+    // §4.3: pehle AuditEvent (indexed {storeId, at:-1}, limit) — khali ho to purana synthesized feed
+    const auditTotal = await AuditEvent.countDocuments({});
+    let auditActivities = null;
+    let auditPagination = null;
+    if (auditTotal > 0) {
+      auditPagination = makePage(auditTotal, req.query.activitiesPage);
+      const events = await AuditEvent.find({})
+        .sort({ at: -1 })
+        .skip(auditPagination.skip)
+        .limit(limit)
+        .select("entityType entityId action actorName at")
+        .lean();
+      auditActivities = events.map((e) => ({
+        key: `audit-${e._id}`,
+        title: `${prettyType(e.entityType)} ${String(e.action || "").replace(/_/g, " ")}`.trim(),
+        subtitle: e.actorName ? `by ${e.actorName}` : "",
+        category: AUDIT_CATEGORY[e.entityType] || "Activity",
+        timestamp: e.at,
+      }));
+    }
+
+    const [actOrders, actProducts, actDiscounts, actBrands] = auditActivities ? [[], [], [], []] : await Promise.all([
       Order.find({}).sort({ created_at: -1 }).select("order_number address_snapshot.full_name created_at").limit(actLimit).lean(),
       Product.find({}).sort({ created_at: -1 }).select("name created_at").limit(actLimit).lean(),
       Discount.find({}).sort({ createdAt: -1 }).select("name createdAt").limit(actLimit).lean(),
@@ -364,8 +435,8 @@ const getDashboardStats = async (req, res) => {
       })),
     ]
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    const activitiesPagination = makePage(activities.length, req.query.activitiesPage);
-    const visibleActivities = activities.slice(activitiesPagination.skip, activitiesPagination.skip + limit);
+    const activitiesPagination = auditPagination || makePage(activities.length, req.query.activitiesPage);
+    const visibleActivities = auditActivities || activities.slice(activitiesPagination.skip, activitiesPagination.skip + limit);
 
     // ---- Response ----
     res.status(200).json({

@@ -111,16 +111,7 @@ router.get("/wishlist/ids", authMiddleware.requireUser, getWishlistIds);
 router.get("/wishlist", authMiddleware.requireUser, getWishlist);
 router.put("/wishlist/toggle", authMiddleware.requireUser, toggleWishlist);
 router.post("/change-password", authMiddleware.requireUser, changePasswordREST);
-// ==========================================
-// 🛡️ 404 HANDLER
-// ==========================================
-router.use((req, res) => {
-  res
-    .status(404)
-    .json({
-      success: false,
-      message: `User API endpoint not found: ${req.method} ${req.originalUrl}`,
-    });
-});
+
+// 404 global handler (app.js) sambhalta hai
 
 module.exports = router;
