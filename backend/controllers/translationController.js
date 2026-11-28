@@ -1,4 +1,4 @@
-const Brand = require("../models/brand");
+const Brand = require("../models/Brand");
 const { OWNER_ROLE, ADMIN_ROLES, STAFF_ROLES, ASSIGNABLE_ROLES, isOwnerRole, isAdminRole, isStaffRole } = require("../utils/roles");
 const Category = require("../models/Category");
 const Product = require("../models/Product");

@@ -105,9 +105,9 @@ So:
 ## 2. P0: Security and broken code (do first, small PRs)
 
 ### 2.1 Data leaks
-- [ ] Public `GET /products` (the no-limit branch) returns full variants with **`cost_price`**, populates `createdby`/`updatedby` **name and email**, and honours `?status=` from the query, so inactive products are public too (`productController.js:919-935`, `routes/productRoutes.js:39`). Add a public projection, force `status:"active"`, remove the creator populates, and require pagination. — **partly done:** `GET /products` and `/products/:id` now go through `optionalAdmin` + `redactPublic()` (cost/threshold/actor/translation-internal fields are stripped for non-admin requests, test `test/publicRedaction.test.js`), and the detail requires `status:"active"` for shoppers. Still open: the list status filter, required pagination and a real DTO (§9.2)
+- [x] Public `GET /products` (the no-limit branch) returns full variants with **`cost_price`**, populates `createdby`/`updatedby` **name and email**, and honours `?status=` from the query, so inactive products are public too (`productController.js:919-935`, `routes/productRoutes.js:39`). Add a public projection, force `status:"active"`, remove the creator populates, and require pagination. — **done:** `optionalAdmin` + `redactPublic()`; shoppers always get `status:"active"` (query `?status=` ignored) and a default `limit` of 24 with pagination. Real DTO still §9.2. `test/publicRedaction.test.js`, `test/schemaAndPublicP0.test.js`
 - [x] Public `GET /banners` and `GET /banners/:id` run the **admin** handler, which returns every status plus creator and updater emails (`routes/bannerRoutes.js:17,21`, `bannerController.js:148-152`). — **done:** both now need `requireAdmin` + `checkPermission("banners")`; the storefront uses only `/banners/active`
-- [ ] Public `GET /products/:id` and `GET /brands/:id/details` expose creator emails.
+- [x] Public `GET /products/:id` and `GET /brands/:id/details` expose creator emails. — **done:** product detail uses `redactPublic`; `GET /brands/:id` and `/:id/details` no longer select/populate creators. `test/schemaAndPublicP0.test.js`
 - [x] `getPublicStoreInfo` returns the whole Store, **including the `activity` log** (`storeController.js:182-184`). Return an explicit public field list. — **done:** `activity`, `planId`, `domainVerifyToken` and `__v` are excluded
 - [x] `createEmployee` deletes the password only from `result.userId`, so **`result.password` (the bcrypt hash) is returned and broadcast to the store room** (`employeeController.js:498-509`). `updateEmployee` and `toggleStatus` broadcast the full doc too (`:721-732`, `:909-923`). — **done:** password and activities are stripped from the create, update and status-toggle responses and broadcasts. `select:false` on the schema is still open (§9.3)
 - [x] **Every socket on a store host, including anonymous storefront visitors, joins `store:<id>`** (`utils/socket.js:444`). `io.emit` therefore sends full orders (address and phone), vendors (bank details), POs and discounts to the public. Split rooms into `store:<id>:admin` (staff only) and `store:<id>:public` (storefront-safe events), and audit every `req.io.emit`. — **done:** employee sockets join `store:<id>:admin` and everyone else `store:<id>`. In store context `io.emit` sends the full payload to the admin room only; `PUBLIC_EVENTS` reach the storefront as `{_id}` / `{changed:true}`; order events go only to the owner (`customer:<userId>`) as `{_id}` (`utils/socket.js`, `test/socketRooms.test.js`)
@@ -154,7 +154,7 @@ So:
 
 ### 2.4 Uploads
 - [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **partly done:** the store logo (socket and HTTP) and deal images accept only png/jpeg/webp/gif, and the extension now comes from the MIME type. The socket logo is re-encoded to WebP, with no raw fallback. Still open: `nosniff`/helmet and full re-encoding in the upload factory (§5.6)
-- [ ] Review upload: 50MB memory storage × 6 files, about 300MB of RAM per request, and it runs **before** the rate limiter (`reviewUploadMiddleware.js:41-49`, `reviewRoutes.js:57-59`). Rate-limit first, then cap images at about 8MB and use disk or stream storage for video.
+- [x] Review upload: 50MB memory storage × 6 files, about 300MB of RAM per request, and it runs **before** the rate limiter (`reviewUploadMiddleware.js:41-49`, `reviewRoutes.js:57-59`). Rate-limit first, then cap images at about 8MB and use disk or stream storage for video. — **done:** `limiters.reviewCreate` runs before multer on create/update; images capped at 8MB in `saveReviewMedia`. Video still memory/50MB (stream/disk storage still open). `test/schemaAndPublicP0.test.js`
 - [ ] Store logos and KYC documents bypass `uploadDirFor` and go to global folders (`userController.js:48`, `sellerApplicationController.js:18,292`).
 
 ### 2.5 Code that crashes or silently does nothing
@@ -162,15 +162,15 @@ So:
 - [x] `utils/translationService.js:200` uses `izedName`, which is undefined (should be `localizedName`), so it throws a ReferenceError. — **done**
 - [x] `reviewController.js` calls `log.error` 6 times but never requires `log`, so every catch block throws again. — **done**
 - [x] `getActiveDeals` paginated mode uses `page`, which is never defined, so it always throws (`dealController.js:627`). — **done**
-- [ ] `require("../models/Brand")` but the file is `models/brand.js`, which crashes on Linux (`dealController.js:409`; the `loadBrandModel` hack in `productController.js:18-34`). Rename the file to `Brand.js` and fix every import. — **partly done:** `dealController` now requires `../models/brand`. The file rename and `loadBrandModel` cleanup are still open
+- [x] `require("../models/Brand")` but the file is `models/brand.js`, which crashes on Linux (`dealController.js:409`; the `loadBrandModel` hack in `productController.js:18-34`). Rename the file to `Brand.js` and fix every import. — **done:** file is `models/Brand.js`; all requires use `../models/Brand`; `loadBrandModel` removed. `test/schemaAndPublicP0.test.js`
 - [x] Duplicate `PUT /users/profile` (`userRoutes.js:88` and `:111`), so the second handler can never run. — **done:** the unreachable route was removed (the `updateProfileREST` handler is left for §8.1)
-- [ ] Fields written or read that **are not in the schema** (strict mode drops them silently):
-  - [ ] **Variant `is_deleted`**: missing entirely. Every `is_deleted:{$ne:true}` filter on Variant does nothing, and `deleteProduct` never soft-deletes variants (`productController.js:2388-2400`). Add the field and backfill it.
-  - [ ] Discount `priceMin`, `priceMax`, `maxDiscountAmount`, `priority`, `usageCount`: price-range discounts and `max_discount` never work.
-  - [ ] Deal `priority` and `code` are sorted and searched but do not exist.
-  - [ ] PosSale `customer_snapshot.email/address/notes`; PurchaseOrder item `topup`.
-  - [ ] Category `category_type`, `image_url`, `sort_order` (the sort on `sort_order` does nothing); Attribute `filterable`/`searchable`/`visible`; Tag `deleted_at`; Banner `altText`, `backgroundColor`, `displayRules`.
-  - [ ] `pushGlobalActivity` queries `User.role in [admin, staff, manager]`, but User.role only allows `"user"`. It scans the whole collection on **every** login and mutation, and pushes to a field that does not exist (`utils/activityHelper.js:44-61`). **Delete it.** §3.5 replaces it.
+- [x] Fields written or read that **are not in the schema** (strict mode drops them silently): — **done:** schemas updated; `deleteProduct` soft-deletes variants via `is_deleted`/`deleted_at`/`deletedby`. `test/schemaAndPublicP0.test.js`
+  - [x] **Variant `is_deleted`**: missing entirely. Every `is_deleted:{$ne:true}` filter on Variant does nothing, and `deleteProduct` never soft-deletes variants (`productController.js:2388-2400`). Add the field and backfill it.
+  - [x] Discount `priceMin`, `priceMax`, `maxDiscountAmount`, `priority`, `usageCount`: price-range discounts and `max_discount` never work.
+  - [x] Deal `priority` and `code` are sorted and searched but do not exist.
+  - [x] PosSale `customer_snapshot.email/address/notes`; PurchaseOrder item `topup`.
+  - [x] Category `category_type`, `image_url`, `sort_order` (the sort on `sort_order` does nothing); Attribute `filterable`/`searchable`/`visible`; Tag `deleted_at`; Banner `altText`, `backgroundColor`, `displayRules`.
+  - [x] `pushGlobalActivity` queries `User.role in [admin, staff, manager]`, but User.role only allows `"user"`. It scans the whole collection on **every** login and mutation, and pushes to a field that does not exist (`utils/activityHelper.js:44-61`). **Delete it.** §3.5 replaces it. — **done:** no-op stub kept so call sites stay safe until removed
 - [x] `editOrder` recalculates tax from `item.tax`, which order items never store, so tax becomes 0. It also changes quantities with no stock adjustment (`orderController.js:1086-1106`). — **done:** checkout stores `items.tax_rate` (product tax snapshot). Edit recomputes tax from that rate, or from `Product.tax` when the snapshot is missing, or scales the existing tax if the product is gone. Quantity changes (paid + free) adjust stock with a conditional decrement inside `withTx`; a concurrent edit gets 409 `ORDER_CHANGED`. Address-only edits leave tax and stock alone. `test/editOrder.test.js`
 - [ ] `deleteStore` hard-deletes the store and its employees, but orphans every product, order and other store document (`superAdminController.js:1019-1021`). Replace it with soft delete plus an offline purge job (§3.7).
 - [ ] Dashboard day buckets use server-local `setHours` but group by UTC `$dateToString` (`dashboardController.js:72-75,104`). Use the store's timezone in both.
@@ -581,7 +581,7 @@ Today stock is changed in about 8 copy-pasted places (order, cancel, delete, POS
   2. compute prices on the server
   3. `stock.reserve`
   4. enforce deal `usageLimit`/`perUserLimit` and increment `usedCount` atomically (today never enforced)
-  5. record discount usage (today never recorded)
+  5. record discount usage (today never recorded; schema now has `usageCount`, §2.5)
   6. `counter.next("order")`
   7. `Order.create`
   8. complete the draft

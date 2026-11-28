@@ -12,6 +12,7 @@ const tagSchema = new mongoose.Schema({
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updatedby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     is_deleted: { type: Boolean, default: false },
+    deleted_at: { type: Date, default: null },
   },
   { timestamps: true }
 );

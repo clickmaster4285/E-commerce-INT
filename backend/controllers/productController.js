@@ -14,24 +14,7 @@ const PurchaseOrder = require("../models/PurchaseOrder");
 const PosSale = require("../models/PosSale");
 const Quote = require("../models/Quote");
 const Invoice = require("../models/Invoice");
-// ✅ Safe Brand model loader (file name case-sensitive ho sakti hai)
-const loadBrandModel = () => {
-  const paths = [
-    "../models/Brand",
-    "../models/brand",
-    "../models/Brands",
-    "../models/brands",
-  ];
-  for (const p of paths) {
-    try {
-      return require(p);
-    } catch (e) {
-      // agla path try karo
-    }
-  }
-  return null;
-};
-const Brand = loadBrandModel();
+const Brand = require("../models/Brand");
 
 const { getNextSku } = require("../utils/skuHelper");
 const { deleteProductUploadFolder } = require("../utils/uploadHelpers");
@@ -843,9 +826,12 @@ const toAdminProductListRow = (product, variantSummary, locale, context = "produ
 // ======================================================
 const getProducts = async (req, res) => {
   try {
+    const isAdminView = req.authAud === "admin";
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limitRaw = parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0; // 0 = legacy mode (cap 50; admin 20 bhejta hai)
+    // Public: always paginate (default 24). Admin may omit limit for legacy full list.
+    let limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 50) : 0;
+    if (!isAdminView && !limit) limit = 24;
     const sort = String(req.query.sort || "newest");
     const adminList = String(req.query.admin_list || "") === "1";
     const adminInventory = adminList && String(req.query.admin_inventory || "") === "1";
@@ -859,6 +845,8 @@ const getProducts = async (req, res) => {
     // ---- Filter build ----
     // ✅ Shared helper — same filter summary stats endpoint (/products/stats) bhi use karta hai.
     const { filter } = await buildProductFilter(req.query);
+    // Shoppers: force active only — ignore ?status=inactive (optimizeplan.md §2.1)
+    if (!isAdminView) filter.status = "active";
     const brandDetailList = String(req.query.brand_detail || "") === "1" && Boolean(req.query.brand_id);
     const hasLocaleProjection = typeof req.query.locale === "string" && req.query.locale.trim().length > 0;
     const requestedBrandLocale = String(req.query.locale || "en").trim().toLowerCase();
@@ -915,7 +903,7 @@ const getProducts = async (req, res) => {
     const isFeaturedRecent = sort === "featured-recent";
     const listSort = isFeaturedRecent ? FEATURED_RECENT_SORT : PRODUCT_LIST_SORT;
 
-    // ---- LEGACY MODE (no limit) → exact old behavior ----
+    // ---- LEGACY MODE (no limit, admin only) → exact old behavior ----
     if (!limit) {
       const products = await Product.find(filter)
         .populate("category_id", CATEGORY_BRAND_POPULATE)

@@ -1,4 +1,4 @@
-const Brand = require("../models/brand");
+const Brand = require("../models/Brand");
 const Product = require("../models/Product");
 const path = require("path");
 const fs = require("fs-extra");
@@ -190,10 +190,9 @@ const getBrandById = async (req, res) => {
   try {
     const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
     const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+    // Public route — no creator/updater emails (optimizeplan.md §2.1)
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
-      .select("brand_code name description translations logo country is_active created_at updated_at createdby updatedby")
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email")
+      .select("brand_code name description translations logo country is_active created_at updated_at")
       .lean();
 
     if (!brand) {
@@ -217,9 +216,7 @@ const getBrandById = async (req, res) => {
       country: brand.country,
       is_active: brand.is_active,
       created_at: brand.created_at,
-      createdby: brand.createdby ? { _id: brand.createdby._id, name: brand.createdby.name, email: brand.createdby.email } : null,
       updated_at: brand.updated_at,
-      updatedby: brand.updatedby ? { _id: brand.updatedby._id, name: brand.updatedby.name, email: brand.updatedby.email } : null,
     };
 
     res.status(200).json({
@@ -238,18 +235,19 @@ const getBrandWithProducts = async (req, res) => {
   try {
     const requestedLocale = String(req.query.locale || "en").trim().toLowerCase();
     const locale = /^[a-z]{2}$/.test(requestedLocale) ? requestedLocale : "en";
+    // Public route — no creator/updater emails (optimizeplan.md §2.1)
     const brand = await Brand.findOne({ _id: req.params.id, is_deleted: false })
-      .select("brand_code name description translations logo country is_active created_at updated_at createdby updatedby")
-      .populate("createdby", "name email")
-      .populate("updatedby", "name email");
+      .select("brand_code name description translations logo country is_active created_at updated_at")
+      .lean();
 
     if (!brand) {
       return res.status(404).json({ success: false, message: "Brand not found" });
     }
 
-    const products = await Product.find({ brand_id: brand._id })
+    const products = await Product.find({ brand_id: brand._id, is_deleted: { $ne: true }, status: "active" })
       .select("name product_code sku description status category_id translations")
-      .populate("category_id", "name translations");
+      .populate("category_id", "name translations")
+      .lean();
 
     const nameTranslation = locale === "en" ? "" : brand.translations?.name?.[locale];
     const descriptionTranslation = locale === "en" ? "" : brand.translations?.description?.[locale];
@@ -268,9 +266,7 @@ const getBrandWithProducts = async (req, res) => {
       country: brand.country,
       is_active: brand.is_active,
       created_at: brand.created_at,
-      createdby: brand.createdby ? { _id: brand.createdby._id, name: brand.createdby.name, email: brand.createdby.email } : null,
       updated_at: brand.updated_at,
-      updatedby: brand.updatedby ? { _id: brand.updatedby._id, name: brand.updatedby.name, email: brand.updatedby.email } : null,
     };
 
     res.status(200).json({

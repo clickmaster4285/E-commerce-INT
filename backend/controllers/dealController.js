@@ -409,7 +409,7 @@ const getDealTargets = async (req, res) => {
     const config = {
       products: { ids: deal.productIds, Model: require("../models/Product"), fields: ["name", `translations.name.${locale}`, "variants.images.img_url"].join(" ") },
       categories: { ids: deal.categoryIds, Model: require("../models/Category"), fields: ["name", `translations.name.${locale}`].join(" ") },
-      brands: { ids: deal.brandIds, Model: require("../models/brand"), fields: ["name", `translations.name.${locale}`, "logo.img_url"].join(" ") },
+      brands: { ids: deal.brandIds, Model: require("../models/Brand"), fields: ["name", `translations.name.${locale}`, "logo.img_url"].join(" ") },
     }[type];
     if (!config || type !== `${deal.applyTo}s` && !(type === "products" && deal.applyTo === "product") && !(type === "categories" && deal.applyTo === "category") && !(type === "brands" && deal.applyTo === "brand")) {
       return res.status(400).json({ success: false, message: "Invalid deal target type" });

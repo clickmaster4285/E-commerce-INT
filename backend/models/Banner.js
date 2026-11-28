@@ -81,13 +81,15 @@ const bannerSchema = new mongoose.Schema(
     eyebrow: { type: String, default: "" },
     heading: { type: String, default: "" },
     description: { type: String, default: "" },
-    
+    altText: { type: String, default: "" },
+    backgroundColor: { type: String, default: "" },
+    displayRules: { type: displayRulesSchema, default: () => ({}) },
+
     primaryButton: { type: buttonSchema, default: () => ({}) },
 
     startDate: { type: Date },
     endDate: { type: Date },
-   
-   
+
     storeId: { type: mongoose.Schema.Types.ObjectId, ref: "Store" },
 
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },

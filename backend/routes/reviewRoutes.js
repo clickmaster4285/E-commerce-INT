@@ -51,17 +51,19 @@ const handleMulterError = (err, req, res, next) => {
   return res.status(400).json({ success: false, message: msg });
 };
 
+// Rate-limit BEFORE multer so a flood cannot pin 50MB×6 of RAM first (§2.4)
 router.post(
   "/",
   authMiddleware.requireUser,
+  limiters.reviewCreate,
   (req, res, next) => reviewMediaUpload(req, res, (err) => handleMulterError(err, req, res, next)),
   saveReviewMedia,
-  limiters.reviewCreate,
   createReview,
 );
 router.put(
   "/:id",
   authMiddleware.requireUser,
+  limiters.reviewCreate,
   (req, res, next) => reviewMediaUpload(req, res, (err) => handleMulterError(err, req, res, next)),
   saveReviewMedia,
   updateReview,

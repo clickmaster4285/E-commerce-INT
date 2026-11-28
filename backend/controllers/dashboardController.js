@@ -1,6 +1,6 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
-const Brand = require("../models/brand");
+const Brand = require("../models/Brand");
 const Category = require("../models/Category");
 const Discount = require("../models/Discount");
 const log = require("../utils/logger");

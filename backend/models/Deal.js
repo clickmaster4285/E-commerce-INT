@@ -13,6 +13,10 @@ const dealSchema = new mongoose.Schema(
       maxlength: 100,
     },
 
+    // Search / sort pehle in fields ko use karte the — schema me nahi the
+    code: { type: String, trim: true, uppercase: true, default: "" },
+    priority: { type: Number, default: 0 },
+
     description: {
       type: String,
       trim: true,

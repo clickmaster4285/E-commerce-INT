@@ -96,6 +96,9 @@ const posSaleSchema = new mongoose.Schema(
     customer_snapshot: {
       name: { type: String, default: "", trim: true },
       phone: { type: String, default: "", trim: true },
+      email: { type: String, default: "", trim: true },
+      address: { type: String, default: "", trim: true },
+      notes: { type: String, default: "", trim: true },
     },
 
     cashier_id: {

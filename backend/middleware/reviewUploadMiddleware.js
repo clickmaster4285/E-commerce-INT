@@ -14,7 +14,7 @@ const Review = require("../models/Review");
 
 const MAX_IMAGES = 5;
 const MAX_VIDEOS = 1;
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB per image
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024; // 8MB per image (optimizeplan.md §2.4)
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB per video
 
 const IMAGE_MIMES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
@@ -117,7 +117,7 @@ const saveReviewMedia = async (req, res, next) => {
       if (file.size > MAX_IMAGE_SIZE) {
         return res.status(400).json({
           success: false,
-          message: `Image "${file.originalname}" exceeds the 10MB limit`,
+          message: `Image "${file.originalname}" exceeds the 8MB limit`,
         });
       }
       const base = path

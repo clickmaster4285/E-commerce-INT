@@ -35,6 +35,9 @@ const attributeSchema = new mongoose.Schema(
 
     values: { type: [attributeValueSchema], default: [] },
     variant_allowed: { type: Boolean, default: true },
+    filterable: { type: Boolean, default: false },
+    searchable: { type: Boolean, default: false },
+    visible: { type: Boolean, default: true },
     is_active: { type: Boolean, default: true },
     is_deleted: { type: Boolean, default: false },
     createdby: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

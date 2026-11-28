@@ -26,7 +26,7 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
-const Brand = require("../models/brand");
+const Brand = require("../models/Brand");
 const Category = require("../models/Category");
 const Product = require("../models/Product");
 const Attribute = require("../models/Attribute");

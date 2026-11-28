@@ -129,10 +129,15 @@ const discountSchema = new mongoose.Schema(
     ],
 
     // =====================================================
-    // PRICE RANGE
+    // PRICE RANGE (applyTo: price_range) — pehle controller/UI
+    // ye fields bhejte the lekin schema me nahi thin (strict drop)
     // =====================================================
+    priceMin: { type: Number, default: null, min: 0 },
+    priceMax: { type: Number, default: null, min: 0 },
+    maxDiscountAmount: { type: Number, default: null, min: 0 },
+    priority: { type: Number, default: 0 },
+    usageCount: { type: Number, default: 0, min: 0 },
 
-  
     // =====================================================
     // CONDITIONS
     // =====================================================

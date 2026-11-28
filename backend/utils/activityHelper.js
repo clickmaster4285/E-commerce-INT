@@ -34,49 +34,12 @@ const pushActivityToUser = async (userId, activityData) => {
 };
 
 /**
- * Pushes activity to ALL admin/staff users and broadcasts via Socket
+ * REMOVED (optimizeplan.md §2.5): scanned User.role in [admin,staff,manager]
+ * (User.role only allows "user"), wrote to a non-existent activities field on
+ * every login/mutation, and leaked work into the hot path. §3.5 audit_events
+ * replaces this. Kept as a no-op so existing call sites stay safe until removed.
  */
-const pushGlobalActivity = async (io, activityData, performerId) => {
-  try {
-    const { action, category, performedBy, performedByName, details } = activityData;
-
-    // 1. Find all staff/admin users
-    const users = await User.find({
-      role: { $in: ["admin", "staff", "manager"] },
-      is_deleted: false,
-    }).select("_id");
-
-    // 2. Save to their DB arrays (Atomic Update)
-    await User.updateMany(
-      { _id: { $in: users.map((u) => u._id) } },
-      {
-        $push: {
-          activities: {
-            $each: [{ action, category, performedBy, performedByName, details, timestamp: new Date() }],
-            $position: 0,
-            $slice: 100,
-          },
-        },
-      }
-    );
-
-    // 3. Broadcast to everyone connected via Socket
-    if (io) {
-      io.emit("activity:new", {
-        action,
-        category,
-        performedBy,
-        performedByName,
-        details,
-        timestamp: new Date(),
-        _id: Date.now().toString(), // Temp ID for React key
-      });
-    }
-    
-  } catch (err) {
-    log.error("⚠️ pushGlobalActivity error:", err.message);
-  }
-};
+const pushGlobalActivity = async () => {};
 
 /**
  * Helper to compare old vs new data

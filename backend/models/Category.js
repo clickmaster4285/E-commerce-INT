@@ -77,12 +77,13 @@ const categorySchema = new mongoose.Schema(
       default: null,
     },
 
-    // ✅ FIX: Persist category_type (Mobile / PC / Clothing) sent from frontend
-  
+    // Persist fields the admin UI already sends (strict mode used to drop them)
+    category_type: { type: String, trim: true, default: "" },
+    image_url: { type: String, trim: true, default: "" },
+    sort_order: { type: Number, default: 0 },
 
-       attributes: { type: [categoryAttributeSchema], default: [] },
-   
- 
+    attributes: { type: [categoryAttributeSchema], default: [] },
+
     is_active: { type: Boolean, default: true },
 
     is_deleted: { type: Boolean, default: false },

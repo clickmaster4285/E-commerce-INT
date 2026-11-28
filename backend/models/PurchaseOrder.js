@@ -23,6 +23,7 @@ const poItemSchema = new mongoose.Schema(
     expiry_date: { type: Date, default: null },
     expiry_after_delivery: { type: Number, default: 0, min: 0 },
     expiry_after_delivery_unit: { type: String, enum: ["days", "months", "years"], default: "days" },
+    topup: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );

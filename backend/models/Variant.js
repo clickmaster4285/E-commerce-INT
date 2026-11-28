@@ -135,6 +135,10 @@ const variantSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    // Soft-delete (optimizeplan.md §2.5) — pehle field missing thi, is liye
+    // is_deleted:{$ne:true} filters kuch nahi karti thin.
+    is_deleted: { type: Boolean, default: false, index: true },
+    deleted_at: { type: Date, default: null },
   },
   {
     timestamps: {
