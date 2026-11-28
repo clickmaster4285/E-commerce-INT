@@ -60,9 +60,11 @@ const quoteNumberReservationSchema = new mongoose.Schema({
   token: { type: String, required: true, unique: true, index: true },
   quote_number: { type: String, required: true, index: true },
   createdby: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
-  expires_at: { type: Date, required: true, index: true },
+  expires_at: { type: Date, required: true },
   consumed_at: { type: Date, default: null },
 }, { timestamps: { createdAt: "created_at", updatedAt: "updated_at" } });
+// MongoTTL — stale reservations auto-drop (optimizeplan.md §3.2)
+quoteNumberReservationSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 
 
 // ── Multi-tenant ──

@@ -151,9 +151,32 @@ app.use(
   }),
 );
 
-app.use(express.json({ limit: REQUEST_SIZE_LIMIT }));
-app.use(express.urlencoded({ extended: true, limit: REQUEST_SIZE_LIMIT }));
+// Default JSON body is small; KYC complete-setup keeps the large limit (§5.5).
+const DEFAULT_JSON_LIMIT = process.env.DEFAULT_JSON_LIMIT || "256kb";
+const LARGE_JSON_LIMIT = REQUEST_SIZE_LIMIT || "6mb";
+app.use((req, res, next) => {
+  const large =
+    req.method === "POST" &&
+    String(req.originalUrl || "").includes("/seller/apply/complete-setup");
+  return express.json({ limit: large ? LARGE_JSON_LIMIT : DEFAULT_JSON_LIMIT })(req, res, next);
+});
+app.use((req, res, next) => {
+  const large =
+    req.method === "POST" &&
+    String(req.originalUrl || "").includes("/seller/apply/complete-setup");
+  return express.urlencoded({ extended: true, limit: large ? LARGE_JSON_LIMIT : DEFAULT_JSON_LIMIT })(req, res, next);
+});
 app.use(cookieParser());
+
+// ✅ GLOBAL RATE LIMIT before resolveStore — unknown Hosts cannot hammer Mongo (§5.5)
+const { limiters } = require("./middleware/rateLimit");
+app.use(API_PREFIX, (req, res, next) => {
+  if (req.path === "/health") return next();
+  // Chat has a dedicated limiter so storefront browsing cannot exhaust its API budget.
+  if (req.path === "/chats" || req.path.startsWith("/chats/")) return next();
+  return limiters.global(req, res, next);
+});
+
 // Multi-tenant: Host header → req.tenant / req.store (block nahi karta)
 app.use(API_PREFIX, resolveStore);
 
@@ -198,15 +221,6 @@ app.use(
 
 // Socket.IO instance (server.js set karta hai) — controllers req.io se emit karte hain
 app.use((req, res, next) => { req.io = app.get("io") || null; next(); });
-
-// ✅ GLOBAL RATE LIMIT — poori /api par (health check skip, static /uploads waise hi bahar)
-const { limiters } = require("./middleware/rateLimit");
-app.use(API_PREFIX, (req, res, next) => {
-  if (req.path === "/health") return next();
-  // Chat has a dedicated limiter so storefront browsing cannot exhaust its API budget.
-  if (req.path === "/chats" || req.path.startsWith("/chats/")) return next();
-  return limiters.global(req, res, next);
-});
 
 // ==========================================
 // ROUTES

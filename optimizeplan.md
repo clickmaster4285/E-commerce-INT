@@ -113,7 +113,7 @@ So:
 - [x] **Every socket on a store host, including anonymous storefront visitors, joins `store:<id>`** (`utils/socket.js:444`). `io.emit` therefore sends full orders (address and phone), vendors (bank details), POs and discounts to the public. Split rooms into `store:<id>:admin` (staff only) and `store:<id>:public` (storefront-safe events), and audit every `req.io.emit`. — **done:** employee sockets join `store:<id>:admin` and everyone else `store:<id>`. In store context `io.emit` sends the full payload to the admin room only; `PUBLIC_EVENTS` reach the storefront as `{_id}` / `{changed:true}`; order events go only to the owner (`customer:<userId>`) as `{_id}` (`utils/socket.js`, `test/socketRooms.test.js`)
 - [x] Remove the client relay events. Any socket, guests included, can emit `productCreated` or `employeeRelay*` to the whole store (`utils/socket.js:1026-1032`). Only the server should emit. — **done**
 - [x] `sellerApplyStatus` is public and unthrottled, so anyone can look up an email's application status (`sellerApplicationController.js:138`). — **done:** `limiters.sellerApplyStatus` (IP, default 20/window) mounted on `GET /seller/apply/status`
-- [ ] 500 responses return raw `error.message`, which leaks Mongo internals. The central error handler (§5.2) fixes this.
+- [ ] 500 responses return raw `error.message`, which leaks Mongo internals. The central error handler (§5.2) fixes this. — **partly done:** central handler already sanitizes; ~100 controller catch blocks still return `error.message` directly (sweep still open)
 
 ### 2.2 Money and trust
 - [x] **Checkout trusts client prices.** `displayPrice`, `savings`, `freeItems`, `payableItems`, `dealSavings` and the shipping `brandId`/`categoryId` all come from the request body (`orderController.js:235-246,320,406`). Recompute price, deal, bundle, tax and shipping on the server from DB data. The client sends only `{variant_id, qty}`. — **done:** `services/pricing/{dealRules,discountRules,bundleRules,checkout}.js` price every line from DB data (variant price, active Discounts, Deal/Bundle docs, gift validation, shipping category/brand from the product). A mismatch with the client price returns **409 `PRICE_CHANGED`** (the storefront refreshes prices and shows a message). Parity with the storefront rules is enforced by `test/pricingParity.test.js` (3,500 randomized cases against the real frontend source); the end-to-end test `test/placeOrderPricing.test.js` covers tamper → 409, honest → server prices, over-stock → 400. `PRICING_MODE=log` is an emergency switch only
@@ -153,7 +153,7 @@ So:
   Use one shared `escapeRegex` (§8).
 
 ### 2.4 Uploads
-- [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **partly done:** the store logo (socket and HTTP) and deal images accept only png/jpeg/webp/gif, and the extension now comes from the MIME type. The socket logo is re-encoded to WebP, with no raw fallback. Still open: `nosniff`/helmet and full re-encoding in the upload factory (§5.6)
+- [ ] SVG and any `image/*` are stored **with the client's extension** and served from the API origin, which is stored XSS (`routes/storeRoutes.js:32-37`, `dealImageMiddleware.js:19-22`). Re-encode everything through sharp to webp, whitelist `jpeg|png|webp|gif`, and add `X-Content-Type-Options: nosniff` (helmet). — **partly done:** MIME whitelist + nosniff via helmet (`test/app.test.js`). Still open: full sharp re-encode factory for deal/store/product originals (§5.6)
 - [x] Review upload: 50MB memory storage × 6 files, about 300MB of RAM per request, and it runs **before** the rate limiter (`reviewUploadMiddleware.js:41-49`, `reviewRoutes.js:57-59`). Rate-limit first, then cap images at about 8MB and use disk or stream storage for video. — **done:** `limiters.reviewCreate` runs before multer on create/update; images capped at 8MB in `saveReviewMedia`. Video still memory/50MB (stream/disk storage still open). `test/schemaAndPublicP0.test.js`
 - [x] Store logos and KYC documents bypass `uploadDirFor` and go to global folders (`userController.js:48`, `sellerApplicationController.js:18,292`). — **done:** both use `uploadDirFor`/`uploadUrlFor` (platform host → `uploads/store-logos` / `uploads/documents`). `test/integrityPhaseP0.test.js`
 
@@ -205,7 +205,7 @@ A replica set enables transactions, retryable writes, change streams and `majori
   - The tenant ALS context must be kept inside the callback, so add a test for that.
   - Pass `{ session }` to every read and write inside it.
 - [ ] Delete the fallbacks: `supportsTx()` (`purchaseOrderController.js:402-408`), the "standalone" manual compensations (`posController.js:576`, `createProduct`'s rollback at `productController.js:1917`, `createSellerStore`'s manual rollback), and every "if transactions unsupported" branch.
-- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **partly done:** checkout (`placeOrder`), order edit (optimistic lock on `updated_at`), POS sale/edit (optimistic lock on `updated_at`), POS return, invoice create/update/return (conditional `__v` / amount claim; standalone still compensates), PO payment, **manual stock adjust**, **PO deliver** (conditional status claim + stock in `withTx`). Still open: signup/approval, store purge
+- [ ] Wrap every multi-document money/stock write in `withTx`: checkout, order cancel/edit, POS sale/edit/return, invoice create/edit/payment/return, PO deliver/payment, manual stock adjust, seller signup/approval, and store purge. — **partly done:** checkout, order edit, POS, invoice, PO payment/deliver, manual stock adjust, **`createSellerStore` + `approveRequest`**. Still open: store purge
 - [ ] Tests: `MongoMemoryReplSet` (from `mongodb-memory-server`) so tests run against a real replica set.
 - [ ] Later uses of the replica set: **change streams** for cross-instance cache invalidation (`store:changed`, `publicCache` namespaces), socket fan-out of admin events, and the read-model refresh (§3.4). They can replace some Redis pub/sub.
 - [ ] Connection options: `maxPoolSize` (for example 50), `minPoolSize`, `serverSelectionTimeoutMS: 5000`, `socketTimeoutMS`, and **`autoIndex: false` in production**. Build indexes through a migration script, not on boot.
@@ -230,7 +230,7 @@ The order generator also sorts **lexically**: once the store passes ORD-99999, `
 - [x] New collection `counters { storeId, key, seq }` with unique `{storeId, key}`. — **done:** `models/Counter.js`
 - [ ] `utils/counter.js`: `next(key)` = `findOneAndUpdate({storeId, key}, {$inc:{seq:1}}, {upsert:true, new:true})`, formatted as `ORD-000123`. — **partly done:** `nextSeq`/`peekSeq`/`formatNumber` are used by order, invoice, POS sale, PO, vendor code, quote and lead numbers; the `next-code` previews use `peekSeq`, so they consume nothing. Still open: SKU, category code, brand code, employee code
 - [x] A migration seeds each counter from the current max per store. — **done differently:** lazy seed. On first use per store, `nextSeq` seeds from the numeric max of existing data (`maxNumericSuffix`, not a lexical sort), so no migration script is needed. Tested, including ORD-99999 → ORD-100000
-- [ ] Delete `QuoteNumberReservation`, or give it a TTL (`Quote.js:63`).
+- [x] Delete `QuoteNumberReservation`, or give it a TTL (`Quote.js:63`). — **done:** TTL index `expires_at` with `expireAfterSeconds: 0`. `test/hardeningP0.test.js`
 
 ### 3.3 Index rebuild (P2): the biggest single speed-up
 The rule follows from how the tenant plugin works: **every store-owned index starts with `storeId`**, then equality fields, then sort fields, then range fields (the ESR rule). Replace the `is_deleted: {$ne: true}` filters with `is_deleted: false` so index bounds stay tight (backfill `false` first).
@@ -339,7 +339,7 @@ Per collection (add ✚, drop ✖):
   - ✚ `{username}`, `{phone}`, `{status, created_at}`
   - ✖ the duplicate `index:true` next to `unique:true` (SuperAdmin, SellerApplication, PendingRegistration)
 - [ ] **SuperAdminActivity**: ✚ `{"actor.id", created_at:-1}`, ✚ `{entityType, entityId, created_at:-1}`, plus a retention TTL
-- [ ] **Wishlist**: ✚ unique `{storeId, user_id}`. **ShippingConfig**: ✚ unique `{storeId}` (concurrent `getConfig()` calls currently create duplicates).
+- [x] **Wishlist**: ✚ unique `{storeId, user_id}`. **ShippingConfig**: ✚ unique `{storeId}` (concurrent `getConfig()` calls currently create duplicates). — **done:** both unique indexes; `getConfig` upserts safely on E11000. `test/hardeningP0.test.js`
 - [ ] **Otp**: ✖ `{email}` (covered by `{email, purpose, created_at}`)
 - [x] Soft-delete unique indexes `{storeId, code, is_deleted}` on Attribute, Category, Brand and Vendor fail with E11000 the second time the same code is deleted. Convert them to a **partial unique index on `is_deleted:false`**. — **done:** schema partial uniques; `migrateTenantIndexes.js` drops the legacy compounds before `createIndexes`. `test/integrityPhaseP0.test.js`
 - [ ] **Plugin change**: stop auto-adding the single `storeId` index when the schema already declares a compound index starting with `storeId` (an option such as `tenantScope(schema, { index: false })`). It is pure write overhead.
@@ -381,7 +381,7 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
 - [ ] Add `Lead.customer_id` as the real link, and drop `syncLeadCustomer`'s regex lookup and the **write-on-read** (`customerController.js:14-18` re-syncs every converted lead on every list request).
 - [ ] `SellerApplication`: keep application-only fields (KYC, status, reviewer, reason) plus `store_id`/`employee_id` refs. Remove the copies of store profile fields and `passwordHash` once the employee exists.
 - [ ] `PendingRegistration`: scope it by store (`{storeId, email}` unique instead of a global `email`), and add the tenant plugin or an explicit storeId filter.
-- [ ] `Address`: add `tenantScope` and backfill `storeId` from the user. It currently has no `storeId` at all.
+- [x] `Address`: add `tenantScope` and backfill `storeId` from the user. It currently has no `storeId` at all. — **done:** `tenantScope` + `{storeId, user_id}` index; new creates stamp via plugin. Backfill of legacy rows still a migration. `test/hardeningP0.test.js`
 - [ ] **Stop machine-translating people's names and addresses**: `Customer.translations.name/address`, `Invoice/Quote.translations.customer_name`, `Employee.translations.name`, `Lead.translations.name/company_name`. Also remove the unused `StockHistory.translations` (product name, reason, explanation), which is dead weight on the highest-volume collection.
 - [ ] `Employee.avatar` and `User.avatar` hold **base64 data URLs inside the document**, loaded by the auth middleware on every request. Move them to files (`uploadDirFor(req, "avatars")`) and store only the URL. Migrate existing data URLs.
 - [ ] `Employee.permissions` has both `order` and `orders`. Merge them, and migrate the routes that use `"order"` (chat).
@@ -400,7 +400,7 @@ Current: **User** (storefront login) and **Customer** (admin/POS CRM record) hav
   - product → Bundle/Deal/Discount/cart references
   - brand/category delete → block while products reference them
 - [ ] Store deletion: `store.status = "deleted"`, then an offline `scripts/purgeStore.js` that deletes every store-owned collection by `storeId` and the `uploads/stores/<id>` folder.
-- [ ] Store suspension: `resolveStore` should check `store_status` (closed, suspended, maintenance) **once**, instead of looping over every user and employee to block them (`superAdminController.js:780-786`). The current approach also wrongly unblocks individually blocked accounts.
+- [x] Store suspension: `resolveStore` should check `store_status` (closed, suspended, maintenance) **once**, instead of looping over every user and employee to block them (`superAdminController.js:780-786`). The current approach also wrongly unblocks individually blocked accounts. — **done:** non-open stores return 503 `STORE_CLOSED`/`STORE_MAINTENANCE` for storefront; `/store/public` and `X-Auth-Aud: admin` bypass. Employee mass inactive/active on status change can still be simplified later. `test/hardeningP0.test.js`
 - [ ] Retention TTLs:
   - RefreshSession: on revoke, set `expiresAt` to now plus grace (today revoked sessions live 30 days, about 720 docs per admin per month)
   - abandoned guest chats
@@ -706,7 +706,7 @@ backend/
   - the controller re-check in `storeController.js:25`
   - `staffPermissionCheck`
   - unused `adminMiddleware`
-- [ ] Use consistent permission keys (`chat`, `categories`, `newsletter`) and migrate the existing Employee docs.
+- [ ] Use consistent permission keys (`chat`, `categories`, `newsletter`) and migrate the existing Employee docs. — **partly done:** schema dropped duplicate `orders` (keep `order`); `fixPermissions` merges `orders → order`
 - [ ] Use audience-specific middleware: `requireUser` or `requireAdmin` on every route instead of the generic `authMiddleware`, which accepts either (chat, shipping quote, `/users/me|profile|password`, `sellerApplicationRoutes`).
 - [ ] Auth cost per request: select only the fields auth needs (`_id storeId role permissions status is_deleted seller_pending name`), and cache the principal for 30–60s in Redis, invalidated on employee update or status change. The global limiter currently **verifies the JWT up to 4 times** per request before auth verifies it again (`rateLimit.js:164-251`). Verify once and put the result on `req`.
 - [ ] Merge the duplicated auth flows into `services/auth.js`:
@@ -717,12 +717,12 @@ backend/
   - 3 profile readers
   - the `user:{...}` response object built 7 times
   - a duplicate seller onboarding path (the OTP-free `sellerApply`)
-- [ ] Signup and seller approval: wrap Store → SellerApplication → Employee in a transaction. Today a failure partway leaves an orphaned Store that blocks the retry, `approveRequest` updates the employee twice, and `createSellerStore` does a manual rollback.
+- [x] Signup and seller approval: wrap Store → SellerApplication → Employee in a transaction. Today a failure partway leaves an orphaned Store that blocks the retry, `approveRequest` updates the employee twice, and `createSellerStore` does a manual rollback. — **done:** both use `withTx` (standalone still compensates). `test/hardeningP0.test.js`
 
 ### 5.5 Config and server hardening
 - [ ] `config/env.js`: validate every variable with zod at boot and fail fast with a clear message. Today a missing variable becomes `NaN`, for example in the limiter `max`/`WINDOW_MS` and `SOCKET_MAX_BUFFER_MB`. Remove the duplicate `TRANSLATION_MODEL_DOWNLOAD_CHUNK_BYTES` line in `.env`. Add a `.env.example`.
-- [ ] Add `helmet()`, `app.disable("x-powered-by")`, and per-route body limits instead of one large global `REQUEST_SIZE_LIMIT` (which was raised only for base64 KYC; send KYC as multipart). — **partly done:** helmet (CORP cross-origin for `/uploads`, HSTS production only), `x-powered-by` off, `default-src none; frame-ancestors none` on API responses, and a sandboxed CSP on `/uploads` (KYC excluded). Still open: per-route body limits
-- [ ] Mount the global rate limiter **before** `resolveStore`, so unknown hosts cannot hit the DB unthrottled. Add limits for chat GET polling, staff sends and `/translation/page`.
+- [x] Add `helmet()`, `app.disable("x-powered-by")`, and per-route body limits instead of one large global `REQUEST_SIZE_LIMIT` (which was raised only for base64 KYC; send KYC as multipart). — **done:** default JSON `256kb`; only `POST /seller/apply/complete-setup` keeps `REQUEST_SIZE_LIMIT`. Multipart KYC still open.
+- [x] Mount the global rate limiter **before** `resolveStore`, so unknown hosts cannot hit the DB unthrottled. Add limits for chat GET polling, staff sends and `/translation/page`. — **done:** global limiter now runs before `resolveStore` (chat still skipped). Dedicated chat/translation limits still open. `test/hardeningP0.test.js`
 - [x] Graceful shutdown: on SIGTERM, `server.close()`, `io.close()`, drain the queues, `mongoose.disconnect()`. Add `unhandledRejection`/`uncaughtException` handlers that log and exit. — **done**
 - [ ] Cache CORS origin checks, since they call `resolveStoreByHost` on every preflight (`server.js:126`).
 - [ ] Use one router-import style. `server.js` currently mixes top-level imports with inline requires at lines 271-280.
@@ -908,7 +908,7 @@ Translations are **sliced to the active locale on the server**: send `name` alre
   - Public reads also have **no `status:"active"` filter** (`buildProductFilter`, `productController.js:261-283`), and `getProductById` does not check status.
 - [x] `GET /users/profile` (customer) runs `.populate("storeId")`, which sends the **whole Store document including `domainVerifyToken`**, `activity[]` and `planId` (`userController.js:668-670`). It also sends `google_id`, `provider` and `status`. — **done:** it populates only `store_name logo email phone currency subdomain customDomain`
 - [ ] `GET /store/public` sends `activity[]`, `planId`, `logo.public_id`, quote/invoice terms and their translations, and `__v` (`storeController.js:169-181`).
-- [ ] `GET /deals/active/:id` returns the full Deal (`createdBy`, `usageLimit`, `usedCount`, `perUserLimit`), full products and variants (`cost_price`), and has **no active/date check**, so expired deals can be read by id (`dealController.js:673-756`).
+- [x] `GET /deals/active/:id` returns the full Deal (`createdBy`, `usageLimit`, `usedCount`, `perUserLimit`), full products and variants (`cost_price`), and has **no active/date check**, so expired deals can be read by id (`dealController.js:673-756`). — **done:** requires active + date window; strips usage/createdBy; variants omit `cost_price`. `test/hardeningP0.test.js`
 - [ ] `GET /discounts/public` sends every active discount's `code`, `usageLimit`, `perUserLimit` and `minOrderValue` (`discountController.js:837-848`). Send only what the badge shows, and validate codes at checkout.
 - [ ] `GET /reviews/product/:id` sends `storeResponse.responded_by_name` and other customers' `user_id` (`reviewController.js:131-137`).
 - [x] Socket `productCreated`/`productUpdated` events carry full variants (`cost_price`) and staff emails to every storefront visitor (`productController.js:1893-1905,2336-2350`). Socket events should carry **`{ _id, changed: true }` only** and let the client refetch its own DTO. Today `useUserSocketSync.js:86-89` also *replaces* the detail cache with that partial payload, so after any admin edit the product page loses its description, category and brand. — **done:** storefront payloads are id-only, and `useUserSocketSync` now invalidates by id instead of writing payloads into the cache
@@ -963,15 +963,15 @@ Translations are **sliced to the active locale on the server**: send `name` alre
 
 ### 9.3 Send only what the page renders: admin and super-admin data contracts (P0/P1)
 **P0: socket events and admin responses that leak.** Every socket on a store host, including anonymous visitors, joins `store:<id>` (`utils/socket.js:444`), so each of these reaches the public. Fix them together with the admin/public room split (§2.1). An admin event carries `{ _id, changed_fields?, status? }`, and the admin client refetches its own DTO.
-- [ ] `employeeCreated`/`employeeUpdated`/`employeeStatusToggled` include the **password hash** (`employeeController.js:497-508,720-732,911-923`; `Employee.password` has no `select:false`). Add `select:false` to `password` in Employee, User and SuperAdmin.
+- [x] `employeeCreated`/`employeeUpdated`/`employeeStatusToggled` include the **password hash** (`employeeController.js:497-508,720-732,911-923`; `Employee.password` has no `select:false`). Add `select:false` to `password` in Employee, User and SuperAdmin. — **done:** `select:false` on Employee/User `password` and SuperAdmin `passwordHash`; login/change-password use `+password`. `test/hardeningP0.test.js`
 - [x] `storeUpdated` sends the full Store (activity, `domainVerifyToken`) (`storeController.js:134`, `socket.js:664,690`). The public socket `getStoreInfo` returns the raw document (`socket.js:621`). `profileUpdated` with the populated store goes to the room (`socket.js:749`). — **done:** `storeUpdated` is admin room only (public gets `{changed:true}`), and the socket `getStoreInfo` returns the public projection to non-employee sockets
 - [x] Order events send the raw Order with `address_snapshot` (name, phone, city) and `payment` (`orderController.js:14-18,495,1050,1153,1256`). The admin hook reads only `_id` (`hooks/admin/useOrderSocketSync.js:22-33`). — **done** (admin room plus the owner's room only)
-- [ ] `vendorCreated` sends `bank_details.account_no` (`vendorController.js:95`). `bank_details` is also in both vendor list modes (`:48,108`); keep it on the detail page only. — **done for the socket** (admin room only); the list endpoints still include `bank_details`
+- [x] `vendorCreated` sends `bank_details.account_no` (`vendorController.js:95`). `bank_details` is also in both vendor list modes (`:48,108`); keep it on the detail page only. — **done:** socket admin-only; list/legacy omit `bank_details`. `test/hardeningP0.test.js`
 - [x] Product events send variants with `cost_price` and staff emails (`productController.js:1898,2340`). — **done** (admin room only; public gets `{_id}`)
 - [ ] **Split the product endpoints:** `GET /products/admin/:id` (auth, current payload) and the public `GET /products/:id` (`ProductDetail`, §9.2). The admin edit page reuses the public endpoint today (`app/admin/products/[id]/page.js:1146`).
 - [ ] Lead detail embeds full PosSale, Quote and Invoice documents in `customer_history`, which no screen reads (`leadController.js:268-276`). Delete it.
-- [ ] The super-admin applications list sends `documents[]` (KYC), phone, address and rejection text (`superAdminController.js:276-281`). Whitelist `_id, name, email, store_name, business_category, city, country, logo, status, created_at`.
-- [ ] `GET /employees` has no permission check, so any staff member lists every employee's email and phone (§2.3).
+- [x] The super-admin applications list sends `documents[]` (KYC), phone, address and rejection text (`superAdminController.js:276-281`). Whitelist `_id, name, email, store_name, business_category, city, country, logo, status, created_at`. — **done:** list select whitelist (no documents/address/passwordHash). `test/hardeningP0.test.js`
+- [x] `GET /employees` has no permission check, so any staff member lists every employee's email and phone (§2.3). — **done earlier** (§2.3)
 
 **P1: replace "load the whole collection into a dropdown" with search-as-you-type option endpoints.** Each option endpoint is `?search=&limit=20`, prefix match, indexed, and returns only label fields. React Query uses one key per option type.
 

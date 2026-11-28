@@ -11,8 +11,8 @@ const superAdminSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    // bcrypt hash — never plain text
-    passwordHash: { type: String, required: true },
+    // bcrypt hash — never plain text; omit from default queries (§9.3)
+    passwordHash: { type: String, required: true, select: false },
     // superadmin = full control incl. Team management; staff = sab sections, Team nahi
     role: { type: String, enum: ["superadmin", "staff"], default: "superadmin" },
     status: { type: String, enum: ["active", "inactive"], default: "active" },

@@ -22,7 +22,7 @@ const employeeSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    password: { type: String, required: true, minlength: 6 },
+    password: { type: String, required: true, minlength: 6, select: false },
     phone: { type: String, default: "", trim: true },
     // storehandler = store owner (seller signup). Dekho utils/roles.js
     role: {
@@ -46,7 +46,6 @@ const employeeSchema = new mongoose.Schema(
       brands: { type: Boolean, default: true },
       categories: { type: Boolean, default: true },
       users: { type: Boolean, default: true },
-      orders: { type: Boolean, default: true },
       settings: { type: Boolean, default: true },
       profile: { type: Boolean, default: true },
       employees: { type: Boolean, default: true },
@@ -57,6 +56,7 @@ const employeeSchema = new mongoose.Schema(
       banners: { type: Boolean, default: true },
       manageStock: { type: Boolean, default: true },
       shipping: { type: Boolean, default: true },
+      // Single key — legacy `orders` merged via fixPermissions (§5.4)
       order: { type: Boolean, default: true },
       attribute: { type: Boolean, default: true },
       vendors: { type: Boolean, default: true },

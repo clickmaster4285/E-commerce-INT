@@ -263,7 +263,7 @@ const fixPermissions = (oldPerms) => {
     banners: oldPerms?.banners ?? defaults.banners,
     manageStock: oldPerms?.manageStock ?? defaults.manageStock,
     shipping: oldPerms?.shipping ?? defaults.shipping,
-    order: oldPerms?.order ?? defaults.order,
+    order: oldPerms?.order ?? oldPerms?.orders ?? defaults.order,
     attribute: oldPerms?.attribute ?? defaults.attribute,
     vendors: oldPerms?.vendors ?? defaults.vendors,
     purchaseOrders: oldPerms?.purchaseOrders ?? defaults.purchaseOrders,

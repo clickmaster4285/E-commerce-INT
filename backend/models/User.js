@@ -11,7 +11,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
-    password: { type: String, required: false, minlength: 6 },
+    password: { type: String, required: false, minlength: 6, select: false },
     // ✅ EMAIL VERIFICATION (OTP) — register ke baad OTP verify hone par true
     // Purane users ke liye undefined rehta hai jise login par verified maana jata hai
     emailVerified: { type: Boolean, default: false },

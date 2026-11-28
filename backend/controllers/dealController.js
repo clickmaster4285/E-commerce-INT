@@ -676,14 +676,21 @@ const getActiveDealById = async (req, res) => {
 
     log.debug("🔍 Fetching deal with ID:", id);
 
-    const deal = await Deal.findById(id)
+    const now = new Date();
+    const deal = await Deal.findOne({
+      _id: id,
+      isActive: true,
+      startDate: { $lte: now },
+      endDate: { $gte: now },
+    })
+      .select("-createdBy -usageLimit -usedCount -perUserLimit")
       .populate("productIds", "name sku images selling_price variants brand_id category_id price discount")
       .populate("categoryIds", "name code")
       .populate("brandIds", "name")
       .populate("bundleRule.freeProduct", BUNDLE_FREE_PRODUCT_FIELDS);
 
     if (!deal) {
-      log.debug("❌ Deal not found in database");
+      log.debug("❌ Deal not found / not active");
       return res.status(404).json({ success: false, message: "Deal not found" });
     }
 
@@ -729,6 +736,7 @@ const getActiveDealById = async (req, res) => {
       product_id: { $in: variantProductIds },
       is_deleted: { $ne: true },
     })
+      .select("-cost_price -createdby -updatedby -deletedby -min_qnt -max_qnt -topup")
       .sort({ created_at: 1, _id: 1 })
       .lean();
     const variantsMap = {};

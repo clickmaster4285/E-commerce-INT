@@ -238,6 +238,7 @@ const createUser = async (req, res) => {
       .lean();
     if (pendingApp) {
       const employee = await Employee.findOne({ email, storeId: pendingApp.store_id || null })
+        .select("+password")
         .setOptions({ skipTenantScope: true });
       if (employee) {
         const passwordMatches = await bcrypt.compare(String(password), employee.password || "");
@@ -440,7 +441,7 @@ const loginUser = async (req, res) => {
         message: "Customer login must be on a store host.",
       });
     }
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).select("+password");
     if (!user)
       return res
         .status(401)
@@ -539,7 +540,7 @@ const loginAdmin = async (req, res) => {
     // Platform host: koi store nahi → sirf seller OWNER (Option A: ek email ek store).
     let employee;
     if (req.store) {
-      employee = await Employee.findOne({ email: String(email).toLowerCase().trim() }).select("-activities");
+      employee = await Employee.findOne({ email: String(email).toLowerCase().trim() }).select("+password -activities");
     } else {
       const found = await findPlatformEmployee(email);
       if (found.ambiguous) {
@@ -815,7 +816,7 @@ const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findById(req.user._id);
+    const user = await Model.findById(req.user._id).select("+password");
     if (!user)
       return res
         .status(404)
@@ -1025,7 +1026,7 @@ const changePasswordSocket = async (req, res) => {
         .status(400)
         .json({ success: false, message: "All password fields are required" });
     const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findById(userId);
+    const user = await Model.findById(userId).select("+password");
     if (!user)
       return res
         .status(404)
@@ -1590,7 +1591,7 @@ const changePasswordREST = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const Model = req.userType === "employee" ? Employee : User;
-    const user = await Model.findById(req.user._id);
+    const user = await Model.findById(req.user._id).select("+password");
     const match = await bcrypt.compare(currentPassword, user.password);
     if (!match) return res.status(400).json({ success: false, message: "Current password is incorrect" });
     const salt = await bcrypt.genSalt(10);

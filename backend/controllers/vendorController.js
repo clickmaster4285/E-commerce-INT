@@ -49,7 +49,7 @@ const frontVendorFields = (vendor) => ({
   ...(vendor.country && { country: vendor.country }),
   ...(vendor.zip_code && { zip_code: vendor.zip_code }),
   ...(vendor.tax_id && { tax_id: vendor.tax_id }),
-  ...(vendor.bank_details && { bank_details: vendor.bank_details }),
+  // bank_details only on detail endpoint (§9.3)
   ...(vendor.lead_time_days !== undefined && { lead_time_days: vendor.lead_time_days }),
   ...(vendor.rating !== undefined && { rating: vendor.rating }),
   is_active: vendor.is_active,
@@ -104,7 +104,7 @@ const getVendorsAdmin = async (req, res) => {
     if (req.query.page === undefined && req.query.limit === undefined) {
       // ---- LEGACY MODE (no page/limit) -> exact old behavior ----
       // (purchase-orders pages vendor dropdown isi par depend karte hain)
-      const vendors = await Vendor.find({ is_deleted: false }).select("-activity").sort({ created_at: -1 }).lean();
+      const vendors = await Vendor.find({ is_deleted: false }).select("-activity -bank_details").sort({ created_at: -1 }).lean();
       return res.status(200).json({ success: true, data: vendors });
     }
     // ---- SERVER SIDE PAGINATION (brand admin list ka exact pattern) ----

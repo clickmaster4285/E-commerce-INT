@@ -17,5 +17,6 @@ const wishlistSchema = new mongoose.Schema(
 
 // ── Multi-tenant ──
 wishlistSchema.plugin(tenantScope); // har store ka data alag (storeId)
+wishlistSchema.index({ storeId: 1, user_id: 1 }, { unique: true });
 
 module.exports = mongoose.model("Wishlist", wishlistSchema);

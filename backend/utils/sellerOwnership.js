@@ -39,13 +39,13 @@ async function findPlatformEmployee(email) {
     .lean();
   if (app) {
     const employee = await Employee.findOne({ email: e, storeId: app.store_id })
-      .select("-activities")
+      .select("+password -activities")
       .setOptions({ skipTenantScope: true });
     return { employee };
   }
 
   const admins = await Employee.find({ email: e, role: "admin", is_deleted: { $ne: true } })
-    .select("-activities")
+    .select("+password -activities")
     .setOptions({ skipTenantScope: true })
     .limit(2);
   if (admins.length > 1) return { employee: null, ambiguous: true };

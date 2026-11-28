@@ -158,6 +158,37 @@ async function resolveStore(req, res, next) {
     return notFound(res, tenant);
   }
 
+  // Soft-deleted stores already excluded in findStoreForTenant. Closed /
+  // maintenance: block storefront + customer APIs once here (§3.7) instead of
+  // looping employees. Staff (X-Auth-Aud: admin) and public store info stay open.
+  const status = String(store.store_status || "open");
+  if (status !== "open") {
+    const aud = String(req.headers["x-auth-aud"] || "").trim().toLowerCase();
+    const path = req.path || "";
+    const bypass =
+      ALWAYS_OPEN.has(path) ||
+      path === "/store/public" ||
+      path === "/store" ||
+      path.startsWith("/users/admin") ||
+      path === "/users/login" ||
+      path === "/users/google-login" ||
+      path === "/users/refresh-token" ||
+      path === "/users/logout" ||
+      aud === "admin";
+    if (!bypass) {
+      const code = status === "maintenance" ? "STORE_MAINTENANCE" : "STORE_CLOSED";
+      return res.status(503).json({
+        success: false,
+        code,
+        message:
+          status === "maintenance"
+            ? (store.maintenance_message || "This store is under maintenance.")
+            : "This store is currently closed.",
+        store_status: status,
+      });
+    }
+  }
+
   return runWithStore(store._id, next);
 }
 

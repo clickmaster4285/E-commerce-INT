@@ -28,6 +28,7 @@ const log = require("../utils/logger");
 const { pushStoreActivity, getChanges } = require("../utils/activityHelper");
 // approveRequest aur createSellerStore dono ko chahiye (pehle sirf createSellerStore ke andar tha → approve par ReferenceError)
 const { uniqueUsername } = require("../utils/username");
+const { withTx, TxAbort, supportsTransactions } = require("../utils/tx");
 
 // Best-effort seller notification — delivery failure must never reverse a decision
 const notifySeller = async (sendFn, payload, action, entityId) => {
@@ -60,7 +61,7 @@ const loginSuperAdmin = async (req, res) => {
       return res.status(400).json({ success: false, message: "Email and password are required." });
     }
     const normalizedEmail = String(email).toLowerCase().trim();
-    const superAdmin = await SuperAdmin.findOne({ email: normalizedEmail });
+    const superAdmin = await SuperAdmin.findOne({ email: normalizedEmail }).select("+passwordHash");
     if (!superAdmin) {
       return res.status(401).json({ success: false, message: "Invalid email or password." });
     }
@@ -283,7 +284,7 @@ const listRequests = async (req, res) => {
         .sort({ created_at: sort === "oldest" ? 1 : -1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum)
-        .select("-passwordHash")
+        .select("_id name email store_name business_category city country logo status created_at phone username")
         .lean(),
       SellerApplication.countDocuments(filter),
       // Status tabs ke counts (search/filter se independent)
@@ -480,80 +481,106 @@ const deleteRequest = async (req, res) => {
 
 const approveRequest = async (req, res) => {
   try {
-    // Atomic guard: only flip pending → approved once
-    const application = await SellerApplication.findOneAndUpdate(
-      { _id: req.params.id, status: "pending" },
-      {
-        status: "approved",
-        reviewed_by: req.superAdmin._id,
-        reviewed_at: new Date(),
-      },
-      { returnDocument: "after" }
-    );
-    if (!application) {
-      return res
-        .status(409)
-        .json({ success: false, message: "This application is not pending (already reviewed)." });
+    let openStoreId = null;
+    let applicationSnap = null;
+    const transactional = await supportsTransactions();
+    let claimedAppId = null;
+    try {
+      ({ result: { openStoreId, applicationSnap } } = await withTx(async () => {
+        // Atomic guard: only flip pending → approved once (inside withTx, §5.4)
+        const application = await SellerApplication.findOneAndUpdate(
+          { _id: req.params.id, status: "pending" },
+          {
+            status: "approved",
+            reviewed_by: req.superAdmin._id,
+            reviewed_at: new Date(),
+          },
+          { returnDocument: "after" },
+        );
+        if (!application) {
+          throw new TxAbort(409, { success: false, message: "This application is not pending (already reviewed)." });
+        }
+        claimedAppId = application._id;
+
+        const storeId = application.store_id;
+        let openStore = storeId
+          ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { returnDocument: "after" }).setOptions(CROSS_STORE)
+          : null;
+
+        await Employee.findOneAndUpdate(
+          sellerEmployeeFilter(application),
+          { seller_pending: false, status: "active", role: OWNER_ROLE, ...(openStore ? { storeId: openStore._id } : {}) },
+        ).setOptions({ skipTenantScope: true });
+
+        if (!openStore) {
+          const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
+          openStore = await Store.create({
+            store_name: storeName0,
+            email: application.email,
+            phone: application.phone || "",
+            store_status: "open",
+          });
+        }
+
+        await SellerApplication.updateOne({ _id: application._id }, { store_id: openStore._id, user_id: null });
+
+        let sellerEmployee = await Employee.findOne(sellerEmployeeFilter(application)).setOptions({ skipTenantScope: true });
+        if (!sellerEmployee) {
+          const username = String(application.username || "").trim().toLowerCase() || (await uniqueUsername(application.name, application.email));
+          sellerEmployee = await Employee.create({
+            name: application.name,
+            username,
+            email: application.email,
+            phone: application.phone || "",
+            password: application.passwordHash,
+            role: OWNER_ROLE,
+            status: "active",
+            storeId: openStore._id,
+            seller_pending: false,
+          });
+        } else {
+          await Employee.updateOne(
+            { _id: sellerEmployee._id },
+            { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: openStore._id },
+          ).setOptions({ skipTenantScope: true });
+        }
+
+        return {
+          openStoreId: openStore._id,
+          applicationSnap: {
+            _id: application._id,
+            name: application.name,
+            email: application.email,
+            store_name: application.store_name,
+            subdomain: openStore.subdomain,
+          },
+        };
+      }));
+    } catch (txError) {
+      if (!transactional && claimedAppId) {
+        await SellerApplication.updateOne({ _id: claimedAppId, status: "approved" }, { status: "pending" }).catch(() => {});
+      }
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
     }
 
-    // Store is provisioned at signup time; open it and unblock the pending seller employee.
-    const storeId = application.store_id;
-    const store = storeId
-      ? await Store.findByIdAndUpdate(storeId, { store_status: "open" }, { returnDocument: "after" })
-      : null;
-    // Email ab sirf store ke andar unique — isi application ke store ka seller employee
-    await Employee.findOneAndUpdate(
-      sellerEmployeeFilter(application),
-      { seller_pending: false, status: "active", role: OWNER_ROLE, ...(store ? { storeId: store._id } : {}) }
-    ).setOptions({ skipTenantScope: true });
-
-    // Store signup time pe already provision hota hai; nahi ho to ab banao.
-    let openStore = store;
-    if (!openStore) {
-      const storeName0 = application.store_name || [application.name, "Store"].filter(Boolean).join(" ");
-      openStore = await Store.create({
-        store_name: storeName0,
-        email: application.email,
-        phone: application.phone || "",
-        store_status: "open",
-      });
-    }
-
-    await SellerApplication.updateOne({ _id: application._id }, { store_id: openStore._id, user_id: null });
-
-    // Seller ka identity sirf Employee (admin_users) — na ho to ab banao.
-    let sellerEmployee = await Employee.findOne(sellerEmployeeFilter(application)).setOptions({ skipTenantScope: true });
-    if (!sellerEmployee) {
-      const username = String(application.username || "").trim().toLowerCase() || (await uniqueUsername(application.name, application.email));
-      sellerEmployee = await Employee.create({
-        name: application.name,
-        username,
-        email: application.email,
-        phone: application.phone || "",
-        password: application.passwordHash,
-        role: OWNER_ROLE,
-        status: "active",
-        storeId: openStore._id,
-        seller_pending: false,
-      });
-    } else {
-      await Employee.updateOne(
-        { _id: sellerEmployee._id },
-        { seller_pending: false, status: "active", role: OWNER_ROLE, storeId: openStore._id }
-      ).setOptions({ skipTenantScope: true });
-    }
-
+    const openStore = await Store.findById(openStoreId).setOptions(CROSS_STORE).lean();
     await notifySeller(
       sendApplicationApprovedEmail,
-      { name: application.name, email: application.email, storeName: application.store_name, storeUrl: storeAdminBaseUrl(openStore) },
+      {
+        name: applicationSnap.name,
+        email: applicationSnap.email,
+        storeName: applicationSnap.store_name,
+        storeUrl: storeAdminBaseUrl(openStore),
+      },
       "Approval",
-      application._id
+      applicationSnap._id,
     );
 
     return res.json({
       success: true,
       message: "Seller approved and store opened.",
-      data: { storeId: openStore._id },
+      data: { storeId: openStoreId },
     });
   } catch (error) {
     log.error("[super-admin] approve error:", error.message);
@@ -868,50 +895,56 @@ const createSellerStore = async (req, res) => {
 
     const username = usernameIn || (await uniqueUsername(name, email, { excludeEmail: email }));
     const passwordHash = await bcrypt.hash(password, 10);
-    const created = {};
+    const transactional = await supportsTransactions();
+    let created = {};
     try {
-      created.store = await Store.create({
-        store_name: storeName,
-        subdomain,
-        tagline: "Welcome to our store",
-        description: storeDescription,
-        business_category: businessCategory,
-        business_type: "individual",
-        email,
-        phone,
-        country,
-        city,
-        address,
-        zip_code: zipCode,
-        store_status: "open",
-        currency: "PKR",
-        tax_rate: 17,
-        weight_unit: "kg",
-      });
-      created.employee = await Employee.create({
-        name, username, email, phone, password: passwordHash,
-        role: OWNER_ROLE, status: "active", storeId: created.store._id, seller_pending: false,
-      });
-      created.application = await SellerApplication.create({
-        name, email, phone, username, passwordHash,
-        store_name: storeName,
-        store_description: storeDescription,
-        business_category: businessCategory,
-        business_type: "individual",
-        country, city, address, zip_code: zipCode,
-        status: "approved",
-        reviewed_by: req.superAdmin._id,
-        reviewed_at: new Date(),
-        user_id: null,
-        store_id: created.store._id,
-      });
+      ({ result: created } = await withTx(async () => {
+        created = {};
+        created.store = await Store.create({
+          store_name: storeName,
+          subdomain,
+          tagline: "Welcome to our store",
+          description: storeDescription,
+          business_category: businessCategory,
+          business_type: "individual",
+          email,
+          phone,
+          country,
+          city,
+          address,
+          zip_code: zipCode,
+          store_status: "open",
+          currency: "PKR",
+          tax_rate: 17,
+          weight_unit: "kg",
+        });
+        created.employee = await Employee.create({
+          name, username, email, phone, password: passwordHash,
+          role: OWNER_ROLE, status: "active", storeId: created.store._id, seller_pending: false,
+        });
+        created.application = await SellerApplication.create({
+          name, email, phone, username, passwordHash,
+          store_name: storeName,
+          store_description: storeDescription,
+          business_category: businessCategory,
+          business_type: "individual",
+          country, city, address, zip_code: zipCode,
+          status: "approved",
+          reviewed_by: req.superAdmin._id,
+          reviewed_at: new Date(),
+          user_id: null,
+          store_id: created.store._id,
+        });
+        return created;
+      }));
     } catch (err) {
-      // Aadha bana hua data na rahe
-      await Promise.allSettled([
-        created.application && SellerApplication.deleteOne({ _id: created.application._id }),
-        created.employee && Employee.deleteOne({ _id: created.employee._id }).setOptions(CROSS_STORE),
-        created.store && Store.deleteOne({ _id: created.store._id }).setOptions(CROSS_STORE),
-      ]);
+      if (!transactional) {
+        await Promise.allSettled([
+          created.application && SellerApplication.deleteOne({ _id: created.application._id }),
+          created.employee && Employee.deleteOne({ _id: created.employee._id }).setOptions(CROSS_STORE),
+          created.store && Store.deleteOne({ _id: created.store._id }).setOptions(CROSS_STORE),
+        ]);
+      }
       if (err?.code === 11000) {
         const key = Object.keys(err.keyPattern || err.keyValue || {}).find((k) => k !== "storeId") || "";
         const field = key === "subdomain" ? "subdomain" : key === "username" ? "username" : key === "phone" ? "phone" : "email";
@@ -1658,7 +1691,7 @@ const resetTeamMemberPassword = async (req, res) => {
     if (password.length < TEAM_PASSWORD_MIN) {
       return res.status(400).json({ success: false, message: `Password must be at least ${TEAM_PASSWORD_MIN} characters.`, errors: { password: `Password must be at least ${TEAM_PASSWORD_MIN} characters.` } });
     }
-    const member = await SuperAdmin.findById(req.params.id);
+    const member = await SuperAdmin.findById(req.params.id).select("+passwordHash");
     if (!member) return res.status(404).json({ success: false, message: "Team member not found." });
     const blocked = manageBlockReason(member, req.superAdmin);
     if (blocked) return res.status(403).json({ success: false, message: blocked });
