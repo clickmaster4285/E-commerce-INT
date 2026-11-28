@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   MousePointerClick,
   Phone,
@@ -25,7 +26,7 @@ export default function Footer() {
         <div className="grid gap-10 md:grid-cols-12">
           {/* Brand */}
           <div className="md:col-span-4">
-            <a href="/" className="flex min-h-[44px] items-center gap-2" aria-label="Click Master Store — home">
+            <Link href="/" className="flex min-h-[44px] items-center gap-2" aria-label="Click Master Store — home">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-user-accent text-user-accent-fg">
                 <MousePointerClick size={20} aria-hidden="true" />
               </span>
@@ -33,7 +34,7 @@ export default function Footer() {
                 <span className="block text-lg font-extrabold text-white">Click Master</span>
                 <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-[#f57224]">Store</span>
               </span>
-            </a>
+            </Link>
             <p className="mt-3 max-w-xs text-sm leading-6 text-[#a1aab6]">
               The complete commerce operating system for Pakistan — orders, quotes, invoices, shipping, inventory, POS, CRM and finance in one dashboard.
             </p>

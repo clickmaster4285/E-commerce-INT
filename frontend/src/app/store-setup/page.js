@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Store,
   FileText,
@@ -322,9 +323,9 @@ function StoreSetupInner() {
         <p className="mt-2 text-[13px] leading-6 text-slate-400">
           A Super Admin is reviewing your application. We&apos;ll email you as soon as it&apos;s approved.
         </p>
-        <a href="/" className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110">
+        <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center rounded-xl bg-[#f57224] px-6 text-[13px] font-bold text-white transition hover:brightness-110">
           Back to home
-        </a>
+        </Link>
       </div>
     );
   }

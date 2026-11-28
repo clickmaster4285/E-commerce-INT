@@ -405,7 +405,7 @@ export default function AdminReviewsPage() {
                               style={{ backgroundColor: "var(--accent-soft)", color: "var(--accent)" }}
                             >
                               {user?.avatar ? (
-                                // eslint-disable-next-line @next/next/no-img-element
+                                 
                                 <FallbackImage src={mediaUrl(user.avatar) || user.avatar} alt={user?.name || t("admin.reviews.ui.customer")} className="h-full w-full object-cover" />
                               ) : (
                                 String(user?.name || "U").charAt(0).toUpperCase()

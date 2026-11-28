@@ -21,6 +21,16 @@ const eslintConfig = defineConfig([
         { selector: `Literal[value=${ARBITRARY_COLOR_VAR}]`, message: tokenMessage },
         { selector: `TemplateElement[value.raw=${ARBITRARY_COLOR_VAR}]`, message: tokenMessage },
       ],
+      // React Compiler / eslint-plugin-react-hooks (Next 16) — ~100 baseline hits across
+      // legacy effects. Warn during gradual migration; keep `npm run lint` green for CI.
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+      "react-hooks/static-components": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/error-boundaries": "warn",
+      "react-hooks/purity": "warn",
+      "react-hooks/incompatible-library": "warn",
     },
   },
   // Override default ignores of eslint-config-next.

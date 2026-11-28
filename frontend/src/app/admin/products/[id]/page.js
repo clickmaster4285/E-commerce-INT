@@ -756,7 +756,7 @@ function VariantDetailsDrawer({ variant, productName, attributeLabelOf, onClose,
           <div className="animate-in fade-in slide-in-from-bottom-2 fill-mode-both duration-300 flex items-start gap-3.5">
               {primaryImage ? (
                 <button type="button" onClick={() => setPreviewImage(0)} aria-label={t("admin.productDetail.page.openImagePreview")} className="group relative w-[84px] h-[84px] rounded-xl overflow-hidden shrink-0 transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-card)" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <FallbackImage src={getImageUrl(primaryImage.img_url)} alt={variantLabelOf(variant, t)} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.08]" />
                   <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100" style={{ backgroundColor: "rgba(2,6,23,0.45)" }}>
                     <ZoomIn className="w-4 h-4 text-white" />
@@ -877,7 +877,7 @@ function VariantDetailsDrawer({ variant, productName, attributeLabelOf, onClose,
               <div className="grid grid-cols-4 gap-2.5">
                 {images.map((image, index) => (
                   <button key={`${image.img_url}-${index}`} type="button" onClick={() => setPreviewImage(index)} aria-label={t("admin.productDetail.page.openImage", { number: index + 1 })} className="group relative aspect-square rounded-xl overflow-hidden transition hover:-translate-y-0.5" style={{ border: "1px solid var(--border-color)", backgroundColor: "var(--bg-tertiary)" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    { }
                     <FallbackImage src={getImageUrl(image.img_url)} alt={`${variantLabelOf(variant, t)} ${index + 1}`} className="w-full h-full object-cover transition duration-300 group-hover:scale-[1.06]" />
                     <span className="absolute inset-0 flex items-center justify-center opacity-0 transition group-hover:opacity-100" style={{ backgroundColor: "rgba(2,6,23,0.5)" }}>
                       <ZoomIn className="w-4 h-4 text-white" />

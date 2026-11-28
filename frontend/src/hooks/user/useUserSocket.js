@@ -108,14 +108,17 @@ export function reconnectUserSocket() {
 
 export function useUserSocket({ enabled = true } = {}) {
   const [connected, setConnected] = useState(false);
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
     if (!enabled) {
-      socketRef.current = null;
-      setConnected(false);
+      queueMicrotask(() => {
+        if (!isMounted.current) return;
+        setSocket(null);
+        setConnected(false);
+      });
       return () => {
         isMounted.current = false;
       };
@@ -124,12 +127,21 @@ export function useUserSocket({ enabled = true } = {}) {
     const s = getUserSocket();
 
     if (!s) {
-      setConnected(false);
-      return () => {};
+      queueMicrotask(() => {
+        if (!isMounted.current) return;
+        setSocket(null);
+        setConnected(false);
+      });
+      return () => {
+        isMounted.current = false;
+      };
     }
 
-    socketRef.current = s;
-    setConnected(s.connected);
+    queueMicrotask(() => {
+      if (!isMounted.current) return;
+      setSocket(s);
+      setConnected(s.connected);
+    });
 
     const onConnect = () => {
       if (isMounted.current) setConnected(true);
@@ -140,8 +152,6 @@ export function useUserSocket({ enabled = true } = {}) {
 
     s.on("connect", onConnect);
     s.on("disconnect", onDisconnect);
-
-    if (s.connected) setConnected(true);
 
     return () => {
       isMounted.current = false;
@@ -154,5 +164,5 @@ export function useUserSocket({ enabled = true } = {}) {
     };
   }, [enabled]);
 
-  return { socket: enabled ? socketRef.current : null, isConnected: connected };
+  return { socket: enabled ? socket : null, isConnected: connected };
 }

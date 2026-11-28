@@ -120,7 +120,7 @@ export function reconnectAdminSocket() {
 
 export function useAdminSocket() {
   const [connected, setConnected] = useState(false);
-  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -128,12 +128,21 @@ export function useAdminSocket() {
     const s = getAdminSocket();
 
     if (!s) {
-      setConnected(false);
-      return () => {};
+      queueMicrotask(() => {
+        if (!isMounted.current) return;
+        setSocket(null);
+        setConnected(false);
+      });
+      return () => {
+        isMounted.current = false;
+      };
     }
 
-    socketRef.current = s;
-    setConnected(s.connected);
+    queueMicrotask(() => {
+      if (!isMounted.current) return;
+      setSocket(s);
+      setConnected(s.connected);
+    });
 
     const onConnect = () => {
       if (isMounted.current) setConnected(true);
@@ -144,8 +153,6 @@ export function useAdminSocket() {
 
     s.on("connect", onConnect);
     s.on("disconnect", onDisconnect);
-
-    if (s.connected) setConnected(true);
 
     return () => {
       isMounted.current = false;
@@ -158,7 +165,7 @@ export function useAdminSocket() {
     };
   }, []);
 
-  return { socket: socketRef.current, isConnected: connected };
+  return { socket, isConnected: connected };
 }
 
 /* ==========================================================

@@ -559,7 +559,7 @@ export default function CartPage() {
             </div>
             <h2 className="text-2xl font-black text-user-fg mb-2">Your cart is empty</h2>
             <p className="text-sm text-user-fg-muted mb-8 max-w-sm mx-auto">
-              Looks like you haven't added anything yet. Explore our deals and start shopping!
+              Looks like you haven&apos;t added anything yet. Explore our deals and start shopping!
             </p>
             <Link
               href="/"
@@ -584,7 +584,7 @@ export default function CartPage() {
                     </p>
                   ) : (
                     <p className="text-sm font-black text-user-success flex items-center gap-1.5">
-                      <Check size={16} /> You've unlocked FREE shipping!
+                      <Check size={16} /> You&apos;ve unlocked FREE shipping!
                     </p>
                   )}
                 </div>
