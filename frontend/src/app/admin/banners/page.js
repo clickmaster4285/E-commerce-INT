@@ -855,9 +855,9 @@ export default function BannersPage() {
   // --- End Deal Form State ---
 
   // --- Data Queries ---
-  const { data: productsResponse = [] } = useQuery({ queryKey: ["admin-products"], queryFn: productApi.getAll, staleTime: 60000 });
+  const { data: productsResponse = [] } = useQuery({ queryKey: ["admin-product-options"], queryFn: () => productApi.getOptions({ limit: 50 }), staleTime: 60000 });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse = [] } = useQuery({ queryKey: ["admin-categories-list"], queryFn: categoryApi.getAll, staleTime: 60000 });
+  const { data: categoriesResponse = [] } = useQuery({ queryKey: ["admin-category-options"], queryFn: () => categoryApi.getOptions(), staleTime: 60000 });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
   const { data: brandsResponse = [] } = useQuery({ queryKey: ["admin-brands-list"], queryFn: () => brandApi.getOptions(), staleTime: 60000 });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);

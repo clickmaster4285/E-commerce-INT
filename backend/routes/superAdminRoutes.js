@@ -59,6 +59,7 @@ router.delete("/team/:id", requireSuperAdminRole, superAdminController.deleteTea
 
 /* Plans — platform subscription catalog (limits + feature tiers) */
 router.get("/plans", superAdminController.listPlans);
+router.get("/plans/options", superAdminController.listPlanOptions);
 router.post("/plans", superAdminController.createPlan);
 router.get("/plans/:id/activity", superAdminController.planActivity);
 router.get("/plans/:id", superAdminController.getPlan);

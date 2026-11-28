@@ -29,6 +29,11 @@ function relativeTime(value) {
 export default function AdminChatsPage() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
   const [selectedId, setSelectedId] = useState(null);
   const { t } = useTranslation();
   const FILTERS = FILTER_KEYS.map((key) => ({ key, label: t(`chat.admin.${key}`) }));
@@ -36,8 +41,8 @@ export default function AdminChatsPage() {
   const socket = getAdminSocket();
 
   const conversationsQuery = useQuery({
-    queryKey: ["chat-conversations", filter, search],
-    queryFn: () => adminChatApi.list({ status: filter, search: search.trim(), limit: 50 }),
+    queryKey: ["chat-conversations", filter, debouncedSearch],
+    queryFn: () => adminChatApi.list({ status: filter, search: debouncedSearch.trim(), limit: 50 }),
   });
   const conversations = useMemo(() => conversationsQuery.data?.data || [], [conversationsQuery.data]);
   const countsQuery = useQuery({
@@ -55,9 +60,13 @@ export default function AdminChatsPage() {
   useEffect(() => {
     if (!socket) return undefined;
     const joinInbox = () => socket.emit("chat:inbox:join");
+    let refreshTimer = null;
     const refresh = () => {
-      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["chat-counts"] });
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["chat-counts"] });
+      }, 500);
     };
     socket.on("connect", joinInbox);
     socket.on("chat:conversation-created", refresh);

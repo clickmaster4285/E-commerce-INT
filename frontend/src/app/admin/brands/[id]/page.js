@@ -9,7 +9,6 @@ import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
 import { usePageTranslations } from "@/hooks/admin/usePageTranslations";
 import { useLocalized } from "@/i18n/localize";
 import { useTranslation } from "@/i18n/LanguageProvider";
-import { Country } from "country-state-city";
 import { toast } from "sonner";
 
 /* =========================================================
@@ -349,12 +348,18 @@ export default function BrandDetailPage() {
 
   const backPath = pathname.substring(0, pathname.lastIndexOf("/")) || "/admin/brands";
 
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import("country-state-city").then((m) => { if (alive) setGeo(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const [tab, setTab] = useState("overview");
   const [showEdit, setShowEdit] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const localizedCountryName = (value) => {
-    const country = Country.getAllCountries().find(
+    const country = (geo?.Country ? geo.Country.getAllCountries() : []).find(
       (item) => item.name === value || item.isoCode === value
     );
     if (!country) return value;
@@ -383,7 +388,7 @@ export default function BrandDetailPage() {
   const fileInputRef = useRef(null);
 
   // Country Data
-  const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
+  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []).map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
 
   const { data: brand, isLoading: loading } = useQuery({
     queryKey: ["brand", brandId, locale],

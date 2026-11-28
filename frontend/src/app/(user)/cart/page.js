@@ -1,7 +1,7 @@
 "use client";
 
 import FallbackImage from "@/components/common/FallbackImage";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -240,12 +240,19 @@ export default function CartPage() {
     return { subtotal, totalSavings, tax, hasFreeShippingDeal: hasFreeShippingDealFlag, freeShippingActiveForDefault, allItems };
   }, [groupedItems, selectedItems, isLineSelected, dealsList, activeFreeShippingDeal, shippingMethod]);
 
+  const shipItemsKey = totals.allItems.map((i) => `${i.raw.productId || i.raw.id}:${i.raw.qty || i.qty || 1}`).join(",");
+  const [debouncedShipKey, setDebouncedShipKey] = useState(shipItemsKey);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedShipKey(shipItemsKey), 300);
+    return () => window.clearTimeout(t);
+  }, [shipItemsKey]);
+
   // ✅ SHIPPING QUOTE — database se accurate calculation (selected items only)
   const { data: shipQuote } = useQuery({
     queryKey: [
       "shippingQuote",
       shippingMethod,
-      totals.allItems.map((i) => `${i.raw.productId || i.raw.id}:${i.raw.qty || i.qty || 1}`).join(","),
+      debouncedShipKey,
     ],
     queryFn: () =>
       shippingApi.quote({

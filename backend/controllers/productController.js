@@ -2799,6 +2799,52 @@ const bulkProductFeatured = async (req, res) => {
   }
 };
 
+// GET /products/options — banner/deal/discount/store-editor dropdowns (§9.3)
+const getProductOptions = async (req, res) => {
+  try {
+    const { legacyCap } = require("../utils/legacyListCap");
+    const search = String(req.query.search || "").trim();
+    const limit = legacyCap(req.query.limit, 50);
+    const filter = { is_deleted: { $ne: true }, status: { $ne: "inactive" } };
+    if (search) {
+      filter.name = { $regex: escapeRegex(search), $options: "i" };
+    }
+    const products = await Product.find(filter)
+      .select("_id name")
+      .sort({ updated_at: -1, _id: -1 })
+      .limit(limit)
+      .lean();
+    const ids = products.map((p) => p._id);
+    const variants = ids.length
+      ? await Variant.find({
+          product_id: { $in: ids },
+          is_deleted: { $ne: true },
+          status: { $ne: "inactive" },
+        })
+          .select("product_id selling_price images")
+          .sort({ created_at: 1 })
+          .lean()
+      : [];
+    const firstByProduct = new Map();
+    for (const v of variants) {
+      const key = String(v.product_id);
+      if (!firstByProduct.has(key)) firstByProduct.set(key, v);
+    }
+    const data = products.map((p) => {
+      const v = firstByProduct.get(String(p._id));
+      return {
+        _id: p._id,
+        name: p.name || "",
+        price: Number(v?.selling_price) || 0,
+        image: v?.images?.[0]?.img_url || "",
+      };
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Failed to fetch product options" });
+  }
+};
+
 // ======================================================
 // EXPORTS
 // ======================================================
@@ -2810,6 +2856,7 @@ module.exports = {
   getCategoryTiles,
   getProductById,
   getProductDocumentHistory,
+  getProductOptions,
   updateProduct,
   deleteProduct,
   toggleProductStatus,

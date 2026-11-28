@@ -214,16 +214,27 @@ export default function ChatThread({ conversation: initialConversation, api, soc
     const join = () => socket.emit(guestToken ? "chat:guest:join" : "chat:conversation:join", guestToken ? { conversationId: id, guestToken } : { conversationId: id }, (result) => setSocketReady(Boolean(result?.success)));
     const onMessage = (event) => {
       if (String(event?.conversation_id) !== String(id)) return;
-      queryClient.invalidateQueries({ queryKey: ["chat-messages", id] });
+      const msg = event.message;
+      if (msg) {
+        queryClient.setQueryData(["chat-messages", id], (old) => {
+          if (!old) return old;
+          const items = Array.isArray(old.items) ? old.items : [];
+          if (items.some((m) => String(m._id) === String(msg._id))) return old;
+          return { ...old, items: [...items, msg] };
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["chat-messages", id] });
+      }
       if (event.message?.sender_type !== (isAdmin ? "admin" : "customer")) api.markRead(id).catch(() => {});
     };
     const onUpdate = () => {
-      queryClient.invalidateQueries({ queryKey: ["chat-messages", id] });
       queryClient.invalidateQueries({ queryKey: ["chat-conversation-details", id] });
-      queryClient.invalidateQueries({ queryKey: ["chat-order"] });
-      queryClient.invalidateQueries({ queryKey: ["customer-chat-conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["guest-chat-conversation"] });
-      queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      if (isAdmin) {
+        queryClient.invalidateQueries({ queryKey: ["chat-conversations"] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["customer-chat-conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["guest-chat-conversation"] });
+      }
     };
     const onTyping = (event) => {
       if (String(event?.conversation_id) !== String(id)) return;

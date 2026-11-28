@@ -270,13 +270,18 @@ export default function FinancePage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
   const [kind, setKind] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selected, setSelected] = useState(null);
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["admin-finance-overview", period, startDate, endDate, search, kind, page, pageSize, locale],
-    queryFn: () => financeApi.getOverview({ period, startDate, endDate, search, kind, page, limit: pageSize, locale }),
+    queryKey: ["admin-finance-overview", period, startDate, endDate, debouncedSearch, kind, page, pageSize, locale],
+    queryFn: () => financeApi.getOverview({ period, startDate, endDate, search: debouncedSearch, kind, page, limit: pageSize, locale }),
     staleTime: 30_000,
   });
   const summary = data?.summary || {};

@@ -327,9 +327,9 @@ export default function DiscountDetailPage() {
     queryFn: () => discountApi.getById(discountId, { compact: true, locale }),
     enabled: !!discountId,
   });
-  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showEdit });
+  const { data: productsResponse } = useQuery({ queryKey: ["discount-product-options"], queryFn: () => productApi.getOptions({ limit: 50 }), staleTime: 60000, enabled: showEdit });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showEdit });
+  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-category-options"], queryFn: () => categoryApi.getOptions(), staleTime: 60000, enabled: showEdit });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
   const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: () => brandApi.getOptions(), staleTime: 60000, enabled: showEdit });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);

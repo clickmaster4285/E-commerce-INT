@@ -341,8 +341,8 @@ export default function DealDetailPage() {
     retry: false,
   });
 
-  const { data: allProductsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
-  const { data: allCategoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: allProductsResponse } = useQuery({ queryKey: ["deal-product-options"], queryFn: () => productApi.getOptions({ limit: 50 }), staleTime: 60000, enabled: showModal });
+  const { data: allCategoriesResponse } = useQuery({ queryKey: ["deal-category-options"], queryFn: () => categoryApi.getOptions(), staleTime: 60000, enabled: showModal });
   const { data: allBrandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: () => brandApi.getOptions(), staleTime: 60000, enabled: showModal });
   const allProducts = Array.isArray(allProductsResponse) ? allProductsResponse : Array.isArray(allProductsResponse?.data) ? allProductsResponse.data : [];
   const allCategories = Array.isArray(allCategoriesResponse) ? allCategoriesResponse : Array.isArray(allCategoriesResponse?.data) ? allCategoriesResponse.data : [];

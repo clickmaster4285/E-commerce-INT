@@ -553,9 +553,9 @@ export default function DiscountsPage() {
   const untranslatedDiscountNameCount = discounts.filter((discount) => !discount?.translations?.name?.[locale]?.trim()).length;
   const showDiscountTranslationSkeletons = locale !== "en" && discounts.length > 0 && untranslatedDiscountNameCount / discounts.length >= 0.8 && !pageTranslationsReady;
   const pagination = paginatedDiscountsData?.pagination || { total: 0, page: currentPage, limit: itemsPerPage, pages: 1, hasNext: false, hasPrev: false };
-  const { data: productsResponse } = useQuery({ queryKey: ["discount-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: productsResponse } = useQuery({ queryKey: ["discount-product-options"], queryFn: () => productApi.getOptions({ limit: 50 }), staleTime: 60000, enabled: showModal });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: categoriesResponse } = useQuery({ queryKey: ["discount-category-options"], queryFn: () => categoryApi.getOptions(), staleTime: 60000, enabled: showModal });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
   const { data: brandsResponse } = useQuery({ queryKey: ["discount-brands"], queryFn: () => brandApi.getOptions(), staleTime: 60000, enabled: showModal });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);

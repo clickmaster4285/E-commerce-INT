@@ -1170,7 +1170,7 @@ export default function ProductDetailPage() {
     enabled: Boolean(id && product),
   });
 
-  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: categoryApi.getAll });
+  const { data: categories = [] } = useQuery({ queryKey: ["categories"], queryFn: () => categoryApi.getOptions() });
   const { data: brands = [] } = useQuery({ queryKey: ["brand-options"], queryFn: () => brandApi.getOptions() });
   const { data: rawAttributes = [] } = useQuery({ queryKey: ["attributes"], queryFn: () => attributeApi.getAll(), retry: false });
 

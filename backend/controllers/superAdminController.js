@@ -2000,6 +2000,31 @@ const listPlans = async (req, res) => {
   }
 };
 
+// GET /super-admin/plans/options — store form dropdown (§9.3)
+const listPlanOptions = async (req, res) => {
+  try {
+    const { legacyCap } = require("../utils/legacyListCap");
+    const search = String(req.query.search || "").trim();
+    const limit = legacyCap(req.query.limit, 50);
+    const filter = {};
+    if (search) {
+      const pattern = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: pattern }, { slug: pattern }];
+    }
+    const plans = await Plan.find(filter)
+      .select("_id name status")
+      .sort({ sortOrder: 1, name: 1 })
+      .limit(limit)
+      .lean();
+    return res.json({
+      success: true,
+      data: plans.map((p) => ({ id: p._id, _id: p._id, name: p.name || "", status: p.status || "inactive" })),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to load plan options." });
+  }
+};
+
 const getPlan = async (req, res) => {
   try {
     const plan = await Plan.findById(req.params.id).populate("createdBy", "name email").lean();
@@ -2211,6 +2236,7 @@ module.exports = {
   setStoreAdminStatus,
   // plans
   listPlans,
+  listPlanOptions,
   getPlan,
   planActivity,
   createPlan,

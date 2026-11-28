@@ -259,8 +259,9 @@ function QuoteEditor({ quoteId, quote, customerId }) {
     notes: "",
   });
   const { data: customersRaw = [] } = useQuery({
-    queryKey: ["quote-customers"],
-    queryFn: () => customerApi.getAll({ limit: 500 }),
+    queryKey: ["quote-customers", customerSearch],
+    queryFn: () => customerApi.search(customerSearch.trim().length >= 2 ? customerSearch.trim() : ""),
+    staleTime: 30 * 1000,
   });
   const { data: prefilledCustomer } = useQuery({
     queryKey: ["quote-customer-prefill", customerId],

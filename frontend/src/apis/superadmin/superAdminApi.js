@@ -141,6 +141,8 @@ export const superAdminApi = {
   // Plans (platform subscription catalog)
   listPlans: (params = {}) =>
     superAdminHttp.get("/super-admin/plans", { params }).then((r) => r.data),
+  listPlanOptions: (params = {}) =>
+    superAdminHttp.get("/super-admin/plans/options", { params }).then((r) => r.data),
   getPlan: (id) => superAdminHttp.get(`/super-admin/plans/${id}`).then((r) => r.data),
   planActivity: (id, params = {}) =>
     superAdminHttp.get(`/super-admin/plans/${id}/activity`, { params }).then((r) => r.data),

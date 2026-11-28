@@ -331,9 +331,9 @@ export default function DealsPage() {
     hasNextPage: false,
     hasPreviousPage: false,
   };
-  const { data: productsResponse } = useQuery({ queryKey: ["deal-products"], queryFn: productApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: productsResponse } = useQuery({ queryKey: ["deal-product-options"], queryFn: () => productApi.getOptions({ limit: 50 }), staleTime: 60000, enabled: showModal });
   const products = useMemo(() => normalizeArrayResponse(productsResponse), [productsResponse]);
-  const { data: categoriesResponse } = useQuery({ queryKey: ["deal-categories"], queryFn: categoryApi.getAll, staleTime: 60000, enabled: showModal });
+  const { data: categoriesResponse } = useQuery({ queryKey: ["deal-category-options"], queryFn: () => categoryApi.getOptions(), staleTime: 60000, enabled: showModal });
   const categories = useMemo(() => normalizeArrayResponse(categoriesResponse), [categoriesResponse]);
   const { data: brandsResponse } = useQuery({ queryKey: ["deal-brands"], queryFn: () => brandApi.getOptions(), staleTime: 60000, enabled: showModal });
   const brands = useMemo(() => normalizeArrayResponse(brandsResponse), [brandsResponse]);

@@ -236,6 +236,11 @@ export default function PosPage() {
   const customerBoxRef = useRef(null);
   const filtersPanelRef = useRef(null);
   const [search, setSearch] = useState("");
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedProductSearch(search), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedStock, setSelectedStock] = useState("");
@@ -243,6 +248,11 @@ export default function PosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [productPageSize, setProductPageSize] = useState(PAGE_SIZE);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedCustomerSearch(customerSearch), 300);
+    return () => window.clearTimeout(t);
+  }, [customerSearch]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
@@ -263,6 +273,11 @@ export default function PosPage() {
   const [heldCarts, setHeldCarts] = useState([]);
   const heldCartsLoaded = useRef(false);
   const [historySearch, setHistorySearch] = useState("");
+  const [debouncedHistorySearch, setDebouncedHistorySearch] = useState("");
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedHistorySearch(historySearch), 300);
+    return () => window.clearTimeout(t);
+  }, [historySearch]);
   const [historyPayment, setHistoryPayment] = useState("all");
   const [historyRange, setHistoryRange] = useState("all");
   const [historyPage, setHistoryPage] = useState(1);
@@ -314,9 +329,9 @@ export default function PosPage() {
     return { dateFrom: from.toISOString(), dateTo: now.toISOString() };
   }, [historyRange]);
   const historyQuery = useQuery({
-    queryKey: ["pos-sales-history", historySearch, historyPayment, historyRange, historyPage, historyPageSize, locale],
+    queryKey: ["pos-sales-history", debouncedHistorySearch, historyPayment, historyRange, historyPage, historyPageSize, locale],
     queryFn: () => posApi.getSales({
-      page: historyPage, limit: historyPageSize, search: historySearch.trim(),
+      page: historyPage, limit: historyPageSize, search: debouncedHistorySearch.trim(),
       paymentMethod: historyPayment === "all" ? "" : historyPayment, ...historyDateFilters, locale,
     }),
     enabled: activeView === "history",
@@ -444,9 +459,9 @@ export default function PosPage() {
   };
 
   const { data: productsPayload = {}, isLoading: productsLoading, isError: productsError, isPlaceholderData: productsPlaceholder } = useQuery({
-    queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale],
+    queryKey: ["pos-products", debouncedProductSearch, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale],
     queryFn: () => posApi.getProducts({
-      search: search.trim(),
+      search: debouncedProductSearch.trim(),
       category: selectedCategory,
       brand: selectedBrand,
       stock: selectedStock,
@@ -461,8 +476,8 @@ export default function PosPage() {
   const variantCards = products.flatMap((product) =>
     (Array.isArray(product.variants) ? product.variants : []).map((variant) => ({ product, variant })),
   );
-  const posTranslationsReady = usePageTranslations({ model: "Product", records: products, locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (products.length > 0 && products.every((product) => Boolean(product.translations?.name?.[locale]?.trim()))), fallbackAfterRetries: true });
-  const posVariantsTranslationsReady = usePageTranslations({ model: "Variant", records: variantCards.map(({ variant }) => variant), locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", search, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (variantCards.length > 0 && variantCards.every(({ variant }) => !variant.title?.trim() || variant.title === "Default" || Boolean(variant.translations?.title?.[locale]?.trim()))), fallbackAfterRetries: true });
+  const posTranslationsReady = usePageTranslations({ model: "Product", records: products, locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", debouncedProductSearch, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (products.length > 0 && products.every((product) => Boolean(product.translations?.name?.[locale]?.trim()))), fallbackAfterRetries: true });
+  const posVariantsTranslationsReady = usePageTranslations({ model: "Variant", records: variantCards.map(({ variant }) => variant), locale, ready: !productsLoading && !productsPlaceholder, queryKey: ["pos-products", debouncedProductSearch, selectedCategory, selectedBrand, selectedStock, selectedSort, currentPage, productPageSize, locale], queryClient, alreadyTranslated: locale === "en" || (variantCards.length > 0 && variantCards.every(({ variant }) => !variant.title?.trim() || variant.title === "Default" || Boolean(variant.translations?.title?.[locale]?.trim()))), fallbackAfterRetries: true });
   const posTranslationFields = variantCards.flatMap(({ product, variant }) => [
     { source: product.name, translated: product.translations?.name?.[locale] },
     { source: variant.title === "Default" ? "" : variant.title, translated: variant.translations?.title?.[locale] },
@@ -480,8 +495,8 @@ export default function PosPage() {
   }, [productsPayload.pagination?.page, currentPage, productsPlaceholder]);
 
   const customerResults = useQuery({
-    queryKey: ["pos-customer-picker", customerSearch],
-    queryFn: () => customerApi.search(customerSearch.trim()),
+    queryKey: ["pos-customer-picker", debouncedCustomerSearch],
+    queryFn: () => customerApi.search(debouncedCustomerSearch.trim()),
     enabled: customerOpen,
   });
 

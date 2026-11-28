@@ -12,6 +12,11 @@ const list = (res) => {
 // 🛡️ ADMIN PRODUCT API
 // ==========================================
 export const adminProductApi = {
+  getOptions: ({ search = "", limit = 50 } = {}) =>
+    adminHttp
+      .get("/products/options", { params: { search: search || undefined, limit } })
+      .then((res) => (Array.isArray(res.data?.data) ? res.data.data : [])),
+
   // ✅ Ab /products use karo (admin/all exist nahi karta)
   getAll: () => adminHttp.get("/products").then(list),
 

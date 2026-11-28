@@ -31,13 +31,13 @@ export default function StoreFormDialog({ store, onClose, onSaved }) {
 
   const { data: plansData } = useQuery({
     queryKey: ["superadmin-plans"],
-    queryFn: () => superAdminApi.listPlans(),
+    queryFn: () => superAdminApi.listPlanOptions(),
     staleTime: 60_000,
   });
   const planOptions = useMemo(() => {
-    const items = plansData?.data?.items || [];
+    const items = Array.isArray(plansData?.data) ? plansData.data : (plansData?.data?.items || []);
     // Inactive plans bhi dikhao agar store pe already assigned ho
-    return items.filter((p) => p.status === "active" || String(p.id) === String(form.planId));
+    return items.filter((p) => p.status === "active" || String(p.id || p._id) === String(form.planId));
   }, [plansData, form.planId]);
 
   // Country + city list signup wali library se — dialog khulne par lazy load

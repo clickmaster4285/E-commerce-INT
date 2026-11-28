@@ -760,8 +760,14 @@ function CheckoutContent() {
     retry: false,
   });
 
+  const shipItemsKey = activeItems.map((i) => `${i.productId || i.id}:${i.qty || 1}`).join(",");
+  const [debouncedShipKey, setDebouncedShipKey] = useState(shipItemsKey);
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedShipKey(shipItemsKey), 300);
+    return () => window.clearTimeout(t);
+  }, [shipItemsKey]);
   const { data: shipQuote } = useQuery({
-    queryKey: ["shippingQuote", shippingMethod, activeItems.map((i) => `${i.productId || i.id}:${i.qty || 1}`).join(",")],
+    queryKey: ["shippingQuote", shippingMethod, debouncedShipKey],
     queryFn: () => shippingApi.quote({
       items: activeItems.map((i) => ({ productId: i.productId || i.id, brandId: i.brandId, categoryId: i.categoryId })),
       method: shippingMethod, subtotal,

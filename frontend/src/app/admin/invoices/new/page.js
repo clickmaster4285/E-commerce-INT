@@ -64,7 +64,7 @@ export default function NewInvoicePage() {const { t } = useTranslation();
   const [productPage, setProductPage] = useState(1);
   const [pickedVariants, setPickedVariants] = useState([]);
 
-  const { data: rawCustomers = [] } = useQuery({ queryKey: ["invoice-customers"], queryFn: () => customerApi.getAll({ limit: 500 }) });
+  const { data: rawCustomers = [] } = useQuery({ queryKey: ["invoice-customers"], queryFn: () => customerApi.search("") });
   const { data: nextInvoiceNumber } = useQuery({ queryKey: ["invoice-next-number"], queryFn: invoiceApi.getNextNumber, enabled: !editInvoiceId });
   const { data: editingInvoice, isLoading: isLoadingInvoice } = useQuery({ queryKey: ["invoice-admin", editInvoiceId], queryFn: () => invoiceApi.getById(editInvoiceId), enabled: Boolean(editInvoiceId) });
   const { data: prefilledCustomer } = useQuery({ queryKey: ["invoice-customer-prefill", prefillCustomerId], queryFn: () => customerApi.getById(prefillCustomerId), enabled: Boolean(prefillCustomerId && !prefillQuoteId) });

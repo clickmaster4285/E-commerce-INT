@@ -8,6 +8,7 @@ const {
   getCategoryTiles,
   getProductById,
   getProductDocumentHistory,
+  getProductOptions,
   updateProduct,
   deleteProduct,
   toggleProductStatus,
@@ -59,6 +60,7 @@ router.get("/stats", getProductStats);
 //    liye conditional GET deta hai (cheap), aur fresh data hamesha server se aata hai.
 router.get("/facets", publicCache(30 * 1000), getProductFacets);
 router.get("/category-tiles", publicCache(60 * 1000), getCategoryTiles);
+router.get("/options", authMiddleware, checkPermission("products"), getProductOptions);
 router.get("/admin/:id/history", authMiddleware, checkPermission("products"), getProductDocumentHistory);
 // Dedicated admin detail (§9.3) — always admin DTO (cost, PO history, actors)
 router.get("/admin/:id", authMiddleware, checkPermission("products"), (req, res, next) => {

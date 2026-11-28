@@ -1062,9 +1062,18 @@ export default function Dashboard() {
   // Realtime refresh via socket
   useEffect(() => {
     if (!socket) return undefined;
-    const invalidate = () => queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    let timer = null;
+    const invalidate = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      }, 5000);
+    };
     LIVE_EVENTS.forEach((e) => socket.on(e, invalidate));
-    return () => LIVE_EVENTS.forEach((e) => socket.off(e, invalidate));
+    return () => {
+      if (timer) clearTimeout(timer);
+      LIVE_EVENTS.forEach((e) => socket.off(e, invalidate));
+    };
   }, [socket, queryClient]);
 
   // Close the range dropdown on outside click

@@ -2,7 +2,6 @@
 import FallbackImage from "@/components/common/FallbackImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Country } from "country-state-city";
 import { toast } from "sonner";
 import { Check, ChevronDown, Clock3, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { useTranslation } from "@/i18n/LanguageProvider";
@@ -178,7 +177,14 @@ export default function ProductFormModal({ open, initialProduct = null, onClose,
   const [brandIsDragging, setBrandIsDragging] = useState(false);
   const brandFileInputRef = useRef(null);
 
-  const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    let alive = true;
+    import("country-state-city").then((m) => { if (alive) setGeo(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, [open]);
+  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []).map((c) => ({ name: c.name, isoCode: c.isoCode })), [geo]);
 
   const { data: categories = [] } = useQuery({ queryKey: ["category-options"], queryFn: () => categoryApi.getOptions(), retry: false, enabled: open });
   const { data: brands = [] } = useQuery({ queryKey: ["brand-options"], queryFn: () => brandApi.getOptions(), retry: false, enabled: open });

@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter, usePathname } from "next/navigation";
 import { adminBrandApi } from "@/apis/admin/brandApi";
-import { Country } from "country-state-city";
 import { useBrandSocketSync } from "@/hooks/admin/useBrandSocketSync";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
@@ -286,7 +285,13 @@ export default function BrandsPage() {
   const [autoBrandCode, setAutoBrandCode] = useState("");
   const [loadingCode, setLoadingCode] = useState(false);
 
-  const allCountries = useMemo(() => Country.getAllCountries().map((c) => ({ name: c.name, isoCode: c.isoCode })), []);
+  const [geo, setGeo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    import("country-state-city").then((m) => { if (alive) setGeo(m); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const allCountries = useMemo(() => (geo?.Country ? geo.Country.getAllCountries() : []).map((c) => ({ name: c.name, isoCode: c.isoCode })), [geo]);
 
   const [formData, setFormData] = useState({ brand_code: "", name: "", description: "", country: "", is_active: true });
   const [logoFile, setLogoFile] = useState(null);

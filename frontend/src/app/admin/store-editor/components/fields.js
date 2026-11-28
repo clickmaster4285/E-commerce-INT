@@ -87,7 +87,7 @@ const humanize = (key) => String(key).replace(/([A-Z])/g, " $1").replace(/^./, (
 
 // ── Resource lists (cached, editor me baar baar use) ──
 function useCategories() {
-  return useQuery({ queryKey: ["storeEditor", "categories"], queryFn: adminCategoryApi.getAll, staleTime: 5 * 60 * 1000 });
+  return useQuery({ queryKey: ["storeEditor", "categories"], queryFn: () => adminCategoryApi.getOptions(), staleTime: 5 * 60 * 1000 });
 }
 function useBrands() {
   return useQuery({ queryKey: ["storeEditor", "brands"], queryFn: () => adminBrandApi.getOptions(), staleTime: 5 * 60 * 1000 });
@@ -102,9 +102,9 @@ const listOf = (v) => (Array.isArray(v) ? v : Array.isArray(v?.items) ? v.items 
 const REMOTE_LIMIT = 20;
 const REMOTE = {
   product: {
-    list: (search) => adminProductApi.getPaginated({ page: 1, limit: REMOTE_LIMIT, search }),
-    items: (data) => listOf(data?.products || data),
-    total: (data) => data?.pagination?.total ?? data?.total ?? null,
+    list: (search) => adminProductApi.getOptions({ limit: REMOTE_LIMIT, search }),
+    items: (data) => listOf(data),
+    total: () => null,
     one: (id) => adminProductApi.getById(id),
   },
   deal: {
