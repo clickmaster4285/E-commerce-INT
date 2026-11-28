@@ -1409,7 +1409,7 @@ const deleteUser = async (req, res) => {
 };
 
 /* Store admin panel — super admin ko store owner ke taur par one-time sign-in link
-   (same store_handoff token jo seller login handoff use karta hai, 2 min, ek baar) */
+   (same store_handoff token jo seller login handoff use karta hai, 10 min, ek baar) */
 const openStoreAdmin = async (req, res) => {
   try {
     const store = await Store.findById(req.params.id).select("store_name subdomain").setOptions(CROSS_STORE).lean();
@@ -1426,7 +1426,7 @@ const openStoreAdmin = async (req, res) => {
     const token = jwt.sign(
       { type: "store_handoff", employeeId: String(target._id), storeId: String(store._id), jti: require("crypto").randomUUID(), via: "superadmin", by: String(req.superAdmin._id) },
       process.env.JWT_SECRET,
-      { expiresIn: 120 },
+      { expiresIn: 10 * 60 },
     );
     return res.json({ success: true, data: { url: `${baseUrl}/admin-handoff#token=${encodeURIComponent(token)}` } });
   } catch (error) {

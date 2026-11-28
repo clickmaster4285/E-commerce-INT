@@ -563,3 +563,18 @@ html.dark .super-admin-theme .sa-btn--primary:hover:not(:disabled) {
 @media (prefers-reduced-motion: reduce) {
   .super-login-card, .super-login-field-wrap, .super-login-glow, .super-login-shake { animation: none !important; }
 }
+
+/*
+ * Link-buttons (<a class="sa-btn">) ke text colors.
+ * globals.css ka unlayered `a { color: inherit }` @layer components ko beat karta hai,
+ * is liye primary/danger/success links par text black dikhta tha. Ye rules bhi unlayered hain.
+ */
+a.sa-btn--primary,
+a.sa-btn--danger,
+a.sa-btn--success { color: #ffffff; }
+a.sa-btn--secondary { color: var(--text-primary); }
+a.sa-btn--ghost { color: var(--text-secondary); }
+a.sa-btn--ghost:hover { color: var(--text-primary); }
+a.sa-btn--danger-outline { color: var(--danger-text); }
+a.sa-btn--link { color: var(--accent); }
+a.sa-btn--link:hover { color: var(--accent-hover); }

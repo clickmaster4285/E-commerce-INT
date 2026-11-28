@@ -69,6 +69,7 @@ const employeeSchema = new mongoose.Schema(
       pos: { type: Boolean, default: true },
       featuredProducts: { type: Boolean, default: true },
       reviews: { type: Boolean, default: true },
+      loyalty: { type: Boolean, default: false },
     },
 
     preferences: {

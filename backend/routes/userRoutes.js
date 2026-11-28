@@ -1,31 +1,9 @@
-const express = require("express");
-const {
-  checkRegistration,
-  createUser,
-  loginUser,
-  loginAdmin,
-  refreshAccessToken,
-  refreshAdminAccessToken,
-  logoutUser,
-  getProfile,
-  getMe,
-  updateProfile,
-  changePassword,
-  googleLogin,
-  googleCustomerLogin,
-  updatePhone,
-  createCheckoutDraft,
-  getCheckoutDrafts,
-  getCheckoutDraft,
-  updateCheckoutDraft,
-  deleteCheckoutDraft,
-  getWishlist,
-  toggleWishlist,
-  updateProfileREST,
-  changePasswordREST,
-  createStoreHandoff,
-  exchangeStoreHandoff,
-} = require("../controllers/userController");
+﻿const express = require("express");
+const { checkRegistration, createUser, loginUser, googleCustomerLogin, refreshAccessToken, logoutUser, updatePhone } = require("../controllers/customerAuthController");
+const { loginAdmin, refreshAdminAccessToken, googleLogin, createStoreHandoff, exchangeStoreHandoff } = require("../controllers/adminAuthController");
+const { getProfile, getMe, updateProfile, changePassword, getProfileInfo, updateProfileInfo, changePasswordSocket, updateProfileREST, changePasswordREST } = require("../controllers/profileController");
+const { getWishlist, toggleWishlist } = require("../controllers/wishlistController");
+const { createCheckoutDraft, getCheckoutDrafts, getCheckoutDraft, updateCheckoutDraft, deleteCheckoutDraft } = require("../controllers/checkoutDraftController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { allowPendingSeller } = require("../middleware/allowPendingSeller");
 const { checkPermission } = require("../middleware/checkPermission");
@@ -45,17 +23,11 @@ const router = express.Router();
 //  PUBLIC ROUTES
 // ==========================================
 router.post("/register", createUser);
-// Signup step 1 — email/username/phone pehle se liye hue? (same limiter as register)
 router.post("/register/check", limiters.registerCheck, checkRegistration);
 router.post("/login", limiters.login, loginUser);
 router.post("/admin/login", limiters.adminLogin, loginAdmin);
 router.post("/refresh-token", refreshAccessToken);
-// ✅ ADMIN refresh alias — purana endpoint untouched (compat). Sirf
-// employee-type refresh token accept karta hai (user going admin panel
-// ke liye nahi). Shape/logic purani jaisi.
 router.post("/admin/refresh-token", refreshAdminAccessToken);
-// Multi-tenant: platform par login ke baad store subdomain ke admin panel me bhejna
-// Pending sellers need this right after signup to reach their (view-only) admin panel
 router.post("/admin/handoff", allowPendingSeller, authMiddleware.requireAdmin, createStoreHandoff);
 router.post("/admin/handoff/exchange", limiters.adminLogin, exchangeStoreHandoff);
 router.post("/logout", logoutUser);
@@ -63,25 +35,25 @@ router.post("/google-login", limiters.adminLogin, googleLogin);
 router.post("/google-customer-login", limiters.googleLogin, googleCustomerLogin);
 
 // ==========================================
-// 📧 EMAIL HEALTH (SMTP diagnose — bina DB ke bhi chalega)
+// EMAIL HEALTH
 // ==========================================
 router.get("/email-health", getEmailHealth);
 
 // ==========================================
-// 📧 EMAIL VERIFICATION (OTP — 5 min expiry)
+// EMAIL VERIFICATION (OTP)
 // ==========================================
 router.post("/send-email-otp", sendEmailVerificationOtp);
 router.post("/verify-email-otp", verifyEmailVerificationOtp);
 
 // ==========================================
-// 🔐 FORGOT PASSWORD (OTP — 5 min expiry)
+// FORGOT PASSWORD (OTP)
 // ==========================================
 router.post("/forgot-password", limiters.forgotPassword, sendForgotPasswordOtp);
 router.post("/verify-reset-otp", limiters.verifyResetOtp, verifyForgotPasswordOtp);
 router.post("/reset-password", limiters.resetPassword, resetPasswordWithOtp);
 
 // ==========================================
-// 🔒 PROTECTED ROUTES
+// PROTECTED ROUTES
 // ==========================================
 router.get("/me", authMiddleware, getMe);
 router.get("/profile", authMiddleware, getProfile);
@@ -99,19 +71,18 @@ router.put(
 );
 router.put("/phone", authMiddleware.requireUser, updatePhone);
 
-// ✅ MULTIPLE CHECKOUT DRAFTS
+// MULTIPLE CHECKOUT DRAFTS
 router.post("/checkout-drafts", authMiddleware.requireUser, createCheckoutDraft);
 router.get("/checkout-drafts", authMiddleware.requireUser, getCheckoutDrafts);
 router.get("/checkout-drafts/:id", authMiddleware.requireUser, getCheckoutDraft);
 router.put("/checkout-drafts/:id", authMiddleware.requireUser, updateCheckoutDraft);
 router.delete("/checkout-drafts/:id", authMiddleware.requireUser, deleteCheckoutDraft);
-// ✅ NEW: Wishlist routes
+// Wishlist routes
 router.get("/wishlist", authMiddleware.requireUser, getWishlist);
 router.put("/wishlist/toggle", authMiddleware.requireUser, toggleWishlist);
-router.put("/profile", authMiddleware.requireUser, updateProfileREST);
 router.post("/change-password", authMiddleware.requireUser, changePasswordREST);
 // ==========================================
-// 🛡️ 404 HANDLER
+// 404 HANDLER
 // ==========================================
 router.use((req, res) => {
   res

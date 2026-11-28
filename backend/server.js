@@ -267,6 +267,7 @@ app.use(`${API_PREFIX}/pos`, posRoutes);
 app.use(`${API_PREFIX}/finance`, financeRoutes);
 app.use(`${API_PREFIX}/translations`, translationRoutes);
 app.use(`${API_PREFIX}/chats`, chatRoutes);
+app.use(`${API_PREFIX}/loyalty`, require("./routes/loyaltyRoutes"));
 // ── Super Admin module (separate namespace + auth) ──
 app.use(`${API_PREFIX}/super-admin`, require("./routes/superAdminRoutes"));
 // ── Public seller application (pending-review queue) ──
@@ -353,17 +354,6 @@ const startServer = async () => {
     
     if (typeof bannerScheduler === 'function') bannerScheduler();
     else if (bannerScheduler?.start) bannerScheduler.start();
-
-    // 📧 SMTP check (chalta rehta hai, par print nahi — extra info nahi chahiye)
-    try {
-      const { isSmtpConfigured, verifySmtpConnection, getSmtpConfig } = require("./utils/sendEmail");
-      if (isSmtpConfigured()) {
-        await verifySmtpConnection();
-      }
-    } catch (smtpError) {
-      log.error("❌ SMTP check failed:", smtpError.message);
-    }
-    
     const portAvailable = await checkPortAvailable(PORT);
     if (!portAvailable) {
       startupLog.error(`Port ${PORT} already in use — stop the existing service or configure a different PORT.`);
@@ -388,6 +378,19 @@ const startServer = async () => {
       console.log(`🔌 Socket ${socketStatus === "connected" ? "connected" : "not connected"}`);
       if (ROOT_DOMAIN) {
         console.log(`🏬 Platform: http://${ROOT_DOMAIN}  ·  Stores: http://<subdomain>.${ROOT_DOMAIN}`);
+      }
+
+      // SMTP is optional for serving pages and APIs. Verify it after the HTTP
+      // server is listening so a slow mail provider cannot delay startup.
+      try {
+        const { isSmtpConfigured, verifySmtpConnection } = require("./utils/sendEmail");
+        if (isSmtpConfigured()) {
+          verifySmtpConnection().catch((smtpError) => {
+            log.error("❌ SMTP check failed:", smtpError.message);
+          });
+        }
+      } catch (smtpError) {
+        log.error("❌ SMTP check failed:", smtpError.message);
       }
     });
   } catch (error) {

@@ -1220,3 +1220,35 @@ html:has([lang="ar"])
     background: color-mix(in srgb, var(--user-text-muted) 65%, transparent);
   }
 }
+
+/* ==========================================================
+   Checkout rewards wallet — checkout ka grey theme rang hata deta hai,
+   lekin points wala hissa pehchana jaye is liye yahan apne rang.
+   (.checkout-premium ke attribute rules se zyada specific selectors)
+   ========================================================== */
+.checkout-rewards .rw-coin,
+.checkout-premium .checkout-rewards .rw-coin {
+  background-image: linear-gradient(135deg, #f59e0b, #f97316) !important;
+  background-color: #f59e0b !important;
+  color: #ffffff !important;
+}
+.checkout-rewards .rw-tick,
+.checkout-premium .checkout-rewards .rw-tick { background-color: #10b981 !important; color: #ffffff !important; box-shadow: 0 0 0 2px var(--user-bg-card); }
+.checkout-rewards .rw-switch,
+.checkout-premium .checkout-rewards .rw-switch { background-color: var(--user-border) !important; }
+.checkout-rewards .rw-switch[aria-checked="true"],
+.checkout-premium .checkout-rewards .rw-switch[aria-checked="true"] { background-color: #10b981 !important; }
+.checkout-rewards.rw-on,
+.checkout-premium .checkout-rewards.rw-on { border-color: rgba(16, 185, 129, 0.45) !important; background-color: rgba(16, 185, 129, 0.06) !important; }
+.checkout-rewards .rw-save,
+.checkout-premium .checkout-rewards .rw-save { color: #059669 !important; }
+.checkout-rewards .rw-max,
+.checkout-premium .checkout-rewards .rw-max { color: #059669 !important; box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.45); }
+.checkout-rewards .rw-step:not(:disabled):hover,
+.checkout-premium .checkout-rewards .rw-step:not(:disabled):hover { background-color: var(--user-bg-hover) !important; }
+.checkout-rewards .rw-bar,
+.checkout-premium .checkout-rewards .rw-bar { background-color: #f59e0b !important; }
+.checkout-rewards .rw-spark,
+.checkout-premium .checkout-rewards .rw-spark { color: #f59e0b !important; }
+:root.user-dark .checkout-rewards .rw-save,
+:root.user-dark .checkout-rewards .rw-max { color: #34d399 !important; }

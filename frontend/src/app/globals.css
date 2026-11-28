@@ -109,6 +109,34 @@
   --radius-lg: 14px;
   --sidebar-width: 220px;
   --topbar-height: 64px;
+
+  /* ---- Sidebar: super-admin wala dark navy theme ---- */
+  --sidebar-bg: var(--bg-sidebar);
+  --sidebar-bg-gradient: var(--sidebar-bg);
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-divider: rgba(255, 255, 255, 0.07);
+  --sidebar-text: var(--text-sidebar);
+  --sidebar-text-hover: var(--text-inverse);
+  --sidebar-muted: var(--text-sidebar-muted);
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+  --sidebar-pill-bg: var(--sidebar-hover-bg);
+  --sidebar-active-bg: rgba(255, 255, 255, 0.09);
+  --sidebar-active-soft: rgba(255, 255, 255, 0.09);
+  --sidebar-accent: var(--indigo-text);
+  --sidebar-badge: var(--warning);
+  --sidebar-focus: color-mix(in srgb, var(--sidebar-accent) 70%, transparent);
+  --sidebar-overlay: rgba(0, 0, 0, 0.5);
+}
+
+.admin-panel {
+  --primary: var(--accent);
+  --card: var(--bg-card);
+  --background: var(--bg-primary);
+  --border: var(--border-color);
+  --foreground: var(--text-primary);
+  --muted: var(--bg-tertiary);
+  --muted-foreground: var(--text-muted);
+  --ring: var(--accent);
 }
 
 /* ============================================================
@@ -121,7 +149,7 @@ html.dark {
   --bg-sidebar: #0b1220;
   --bg-sidebar-hover: #16223a;
   --bg-sidebar-active: #2563eb;
-  --sidebar-divider: rgba(255, 255, 255, 0.10);
+  --sidebar-divider: rgba(255, 255, 255, 0.12);
   --bg-navbar: #0e1626;
   --bg-card: #101b2e;
   --bg-card-alt: #16233b;

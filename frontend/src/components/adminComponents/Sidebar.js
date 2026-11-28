@@ -27,6 +27,17 @@ import {
   Menu,
   ChevronsLeft,
   ChevronsRight,
+  ChevronRight,
+  LayoutGrid,
+  Package,
+  Megaphone,
+  Gift,
+  Settings2,
+  ShoppingCart,
+  Users,
+  Wallet,
+  Store,
+  UsersRound,
 } from "lucide-react";
 import { getNavModules, getSidebarSections } from "@/lib/adminModules";
 
@@ -44,21 +55,19 @@ function StoreMark({
   logoUrl,
   name,
   letter,
-  color = "var(--accent)",
   sizeClass = "h-8 w-8",
   roundedClass = "rounded-lg",
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => setImageFailed(false), [logoUrl]);
   const showLogo = Boolean(logoUrl && !imageFailed);
 
   return (
     <span
       aria-label={name}
       className={`${sizeClass} ${roundedClass} flex shrink-0 items-center justify-center overflow-hidden shadow-sm ${
-        showLogo ? "bg-white ring-1 ring-black/10" : "text-white ring-1 ring-white/20"
+        showLogo ? "bg-[var(--sidebar-text-hover)] ring-1 ring-[var(--sidebar-border)]" : "text-[var(--sidebar-text-hover)] ring-1 ring-[var(--sidebar-border)]"
       }`}
-      style={showLogo ? undefined : { background: `linear-gradient(135deg, ${color}, #4338ca)` }}
+      style={showLogo ? undefined : { background: "linear-gradient(135deg, var(--sidebar-accent), var(--sidebar-bg))" }}
     >
       {showLogo ? (
         <FallbackImage
@@ -80,6 +89,18 @@ function StoreMark({
 // Modules catalog — shared with Super Admin Plans (`@/lib/adminModules`)
 const sidebarSections = getSidebarSections();
 const allMenuItems = getNavModules();
+const sectionIcons = {
+  overview: LayoutGrid,
+  catalog: Package,
+  sales: Megaphone,
+  rewards: Gift,
+  operations: Settings2,
+  purchasing: ShoppingCart,
+  pos: Users,
+  finance: Wallet,
+  store: Store,
+  team: UsersRound,
+};
 
 // ============================================================
 // SIDEBAR SOCKET
@@ -198,6 +219,17 @@ export default function Sidebar({ onNavigate, userData }) {
   const toggleCollapse = useCallback(() => {
     setCollapsed(!getCollapsedSnapshot());
   }, []);
+
+  const routeSectionId = sidebarSections.find((section) =>
+    allMenuItems.some((item) => section.items.includes(item.name) &&
+      (pathname === item.path || pathname.startsWith(`${item.path}/`)))
+  )?.id || null;
+  const [openSection, setOpenSection] = useState(routeSectionId);
+  const [lastRouteSectionId, setLastRouteSectionId] = useState(routeSectionId);
+  if (routeSectionId && routeSectionId !== lastRouteSectionId) {
+    setLastRouteSectionId(routeSectionId);
+    setOpenSection(routeSectionId);
+  }
 
   // Icon-only mode applies to desktop only — the mobile drawer always stays expanded
   const iconOnly = isCollapsed && !isMobileOpen;
@@ -522,7 +554,6 @@ export default function Sidebar({ onNavigate, userData }) {
   // ============================================================
 
   const displayName = storeName || "My Store";
-  const displayColor = "var(--accent)";
   const firstLetter = displayName?.charAt(0)?.toUpperCase() || "S";
   const logoUrl = storeLogo?.img_url
     ? storeLogo.img_url.startsWith("http")
@@ -557,12 +588,13 @@ export default function Sidebar({ onNavigate, userData }) {
             fixed top-4 ${dir === "rtl" ? "right-4 left-auto" : "left-4 right-auto"} z-[60]
             flex h-10 w-10 items-center justify-center
             rounded-lg
-            bg-[var(--bg-sidebar)]
-            text-[var(--text-sidebar)]
+            bg-[var(--sidebar-bg)]
+            text-[var(--sidebar-text)]
             shadow-md
             transition-all duration-300
-            hover:bg-[var(--bg-sidebar-hover)]
-            md:hidden
+            focus:outline-none
+            hover:bg-[var(--sidebar-hover-bg)]
+          lg:hidden
           `}
         >
           <Menu size={20} />
@@ -576,10 +608,10 @@ export default function Sidebar({ onNavigate, userData }) {
         <div
           className="
             fixed inset-0 z-40
-            bg-black/50
             backdrop-blur-sm
-            md:hidden
+            lg:hidden
           "
+          style={{ background: "var(--sidebar-overlay)" }}
           onClick={handleCloseMobile}
         />
       )}
@@ -593,22 +625,22 @@ export default function Sidebar({ onNavigate, userData }) {
         className={`
           fixed inset-y-0 ${dir === "rtl" ? "right-0 left-auto border-l border-r-0" : "left-0 right-auto border-r border-l-0"} z-50
           flex h-screen w-[280px] flex-col
-          border-[var(--border-sidebar)]
-          bg-[var(--bg-sidebar)]
-          text-[var(--text-sidebar)]
-          transition-[width,transform] duration-300 ease-in-out
-          md:relative md:translate-x-0
-          ${iconOnly ? "md:w-[64px]" : "md:w-[var(--sidebar-width)]"}
+          border-r border-[var(--sidebar-border)]
+          text-[var(--sidebar-text)]
+          transition-[width,transform] duration-200 ease-in-out
+          lg:relative lg:translate-x-0
+          ${iconOnly ? "lg:w-[72px]" : "lg:w-[248px]"}
           ${isMobileOpen ? "translate-x-0" : dir === "rtl" ? "translate-x-full" : "-translate-x-full"}
         `}
+        style={{ background: "var(--sidebar-bg-gradient)" }}
       >
         {/* ==================================================
             HEADER
         ================================================== */}
         <div
           className={`
-            flex h-16 shrink-0 items-center
-            gap-2 border-b border-[var(--border-sidebar)]
+            flex h-[72px] shrink-0 items-center
+            gap-2 border-b border-[var(--sidebar-border)]
             px-3
             ${iconOnly ? "flex-col justify-center gap-0.5" : "justify-between"}
           `}
@@ -621,17 +653,19 @@ export default function Sidebar({ onNavigate, userData }) {
             aria-label={iconOnly ? displayName : undefined}
           >
             <StoreMark
+              key={logoUrl || displayName}
               logoUrl={logoUrl}
               name={displayName}
               letter={firstLetter}
-              color={displayColor}
+              sizeClass="h-9 w-9"
+              roundedClass="rounded-lg"
             />
             {!iconOnly && (
               <span className="flex min-w-0 flex-col leading-tight">
-                <span className="truncate text-[13.5px] font-semibold tracking-tight text-[var(--text-sidebar)]">
+                <span className="truncate text-[15px] font-semibold tracking-tight text-[var(--sidebar-text)]">
                   {displayName}
                 </span>
-                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
+                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sidebar-muted)]">
                   {t("admin.sidebar.adminPanel")}
                 </span>
               </span>
@@ -645,11 +679,12 @@ export default function Sidebar({ onNavigate, userData }) {
             aria-label={t("admin.sidebar.close")}
             className="
               shrink-0 rounded-md p-1
-              text-[var(--text-sidebar-muted)]
+              text-[var(--sidebar-text]]
               transition-colors
-              hover:bg-[var(--bg-sidebar-hover)]
-              hover:text-[var(--text-sidebar)]
-              md:hidden
+              focus:outline-none
+              hover:bg-[var(--sidebar-hover-bg)]
+              hover:text-[var(--sidebar-text-hover)]
+              lg:hidden
             "
           >
             <X size={18} />
@@ -664,11 +699,12 @@ export default function Sidebar({ onNavigate, userData }) {
             className="
               hidden h-7 w-7 shrink-0 items-center justify-center
               rounded-lg
-              text-[var(--text-sidebar-muted)]
+              text-[var(--sidebar-muted)]
               transition-colors duration-150
-              hover:bg-[var(--bg-sidebar-hover)]
-              hover:text-[var(--text-sidebar)]
-              md:inline-flex
+              focus:outline-none
+              hover:bg-[var(--sidebar-hover-bg)]
+              hover:text-[var(--sidebar-text-hover)]
+              lg:inline-flex
             "
           >
             {iconOnly ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
@@ -680,30 +716,40 @@ export default function Sidebar({ onNavigate, userData }) {
         ================================================== */}
         <nav
           aria-label={t("admin.sidebar.navigation")}
-          className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-2"}`}
+          className={`sidebar-wrapper flex-1 overflow-y-auto py-3 transition-colors ${iconOnly ? "px-1.5" : "px-3"}`}
         >
           {sidebarSections.map((section) => {
-            const sectionTitle = section.sidebarTitle || section.title;
+            const sectionTitle = section.title;
             const sectionItems = visibleMenuItems.filter((item) => section.items.includes(item.name));
             if (sectionItems.length === 0) return null;
             return (
-              <div key={section.id || sectionTitle} className="mb-1.5">
-                {iconOnly ? (
-                  <div
-                    aria-hidden="true"
-                    className="mx-auto my-2 h-px w-6 rounded-full"
-                    style={{ backgroundColor: "var(--sidebar-divider)" }}
-                  />
-                ) : !section.hideSidebarHeading ? (
-                  <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[9.5px] font-semibold uppercase tracking-[0.14em] text-[var(--text-sidebar-muted)]">
-                      {navLabel("section", sectionTitle)}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="space-y-0.5">
+              <div key={section.id || sectionTitle} className="mb-0.5">
+                {(() => {
+                  const SectionIcon = sectionIcons[section.id] || Package;
+                  return (
+                    <button
+                      type="button"
+                      aria-expanded={!iconOnly && openSection === section.id}
+                      aria-label={sectionTitle}
+                      title={sectionTitle}
+                      onClick={() => {
+                        if (iconOnly) { toggleCollapse(); setOpenSection(section.id); return; }
+                        setOpenSection((current) => current === section.id ? null : section.id);
+                      }}
+                      className={`group relative flex h-10 w-full items-center gap-3 rounded-lg border px-3 text-left text-sm font-medium tracking-normal transition-colors duration-150 focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--sidebar-focus)] focus-visible:outline-offset-[-2px] ${iconOnly ? "justify-center px-0" : "justify-between"} border-transparent text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-hover)]`}
+                    >
+                      <span className={`flex min-w-0 items-center gap-3 ${iconOnly ? "justify-center" : ""}`}>
+                        <SectionIcon size={18} strokeWidth={1.75} className="shrink-0 text-[var(--sidebar-text)] transition-colors group-hover:text-[var(--sidebar-text-hover)]" />
+                        {!iconOnly && <span className="flex-1 min-w-0 truncate text-sm font-medium tracking-normal">{sectionTitle}</span>}
+                      </span>
+                      {!iconOnly && <ChevronRight size={16} className={`shrink-0 text-[var(--sidebar-muted)] transition-all duration-200 ease-out group-hover:text-[var(--sidebar-text-hover)] ${openSection === section.id ? "rotate-90" : ""}`} />}
+                    </button>
+                  );
+                })()}
+                {!iconOnly && <div className={`grid transition-[grid-template-rows,opacity] duration-[180ms] ease-out ${openSection === section.id ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+                <div className="min-h-0 overflow-hidden pt-1">
+                <div className="ml-[21px] space-y-1 border-l border-[var(--sidebar-divider)] pl-3">
                   {sectionItems.map((item) => {
-                    const Icon = item.icon;
                     const active =
                       pathname === item.path ||
                       pathname.startsWith(`${item.path}/`);
@@ -720,34 +766,26 @@ export default function Sidebar({ onNavigate, userData }) {
                           group relative flex h-9
                           items-center gap-2.5
                           rounded-lg
-                          text-xs font-medium
+                          text-[13px] font-normal tracking-normal
                           transition-all duration-150
-                          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/40
-                          ${iconOnly ? "justify-center px-0" : "px-2.5"}
+                          focus:outline-none focus-visible:outline-2 focus-visible:outline-[var(--sidebar-focus)] focus-visible:outline-offset-[-2px]
+                          h-9 px-2
                           ${
                             active
-                              ? "bg-[var(--bg-sidebar-active)] text-white"
-                              : "text-[var(--text-sidebar-muted)] hover:bg-[var(--bg-sidebar-hover)] hover:text-[var(--text-sidebar)]"
+                              ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text-hover)]"
+                              : "text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-hover)]"
                           }
                         `}
                       >
-                        {active && !iconOnly && (
+                        {active && (
                           <span
                             aria-hidden="true"
-                            className="absolute -left-2 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-white/90"
+                            className="absolute -left-[13px] bottom-2 top-2 w-[3px] rounded-full bg-[var(--sidebar-accent)]"
                           />
                         )}
-                        <Icon
-                          size={16}
-                          className={`shrink-0 transition-colors ${
-                            active
-                              ? "text-white"
-                              : "text-[var(--text-sidebar-muted)] group-hover:text-[var(--text-sidebar)]"
-                          }`}
-                        />
-                        {!iconOnly && <span className="min-w-0 flex-1 truncate">{navLabel("item", item.name)}</span>}
+                        <span className="min-w-0 flex-1 truncate">{navLabel("item", item.name)}</span>
                         {item.name === "Chats" && isStaffRole(socketRole) && (isAdminRole(socketRole) || socketPermissions?.order !== false) && unreadChats > 0 && (
-                          <span className={`flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ${iconOnly ? "absolute -right-0.5 -top-0.5" : "ml-auto"}`}>
+                          <span className={`flex min-w-5 items-center justify-center rounded-full bg-[var(--sidebar-badge)] px-1.5 py-0.5 text-[10px] font-bold leading-none text-[var(--sidebar-text-hover)] ${iconOnly ? "absolute -right-0.5 -top-0.5" : "ml-auto"}`}>
                             {unreadChats > 99 ? "99+" : unreadChats}
                           </span>
                         )}
@@ -755,6 +793,7 @@ export default function Sidebar({ onNavigate, userData }) {
                     );
                   })}
                 </div>
+                </div></div>}
               </div>
             );
           })}
@@ -763,15 +802,15 @@ export default function Sidebar({ onNavigate, userData }) {
         {/* ==================================================
             FOOTER
         ================================================== */}
-        <div className="shrink-0 border-t border-[var(--border-sidebar)] px-3 py-2.5">
+        <div className="shrink-0 border-t border-[var(--sidebar-border)] px-3.5 py-3.5">
           {iconOnly ? (
-            <p className="text-center text-[9px] font-semibold text-[var(--text-sidebar-muted)]">
+            <p className="text-center text-[9px] font-semibold text-[var(--sidebar-muted)]">
               v1.0
             </p>
           ) : (
-            <p className="text-center text-[10px] text-[var(--text-sidebar-muted)]">
-              {t("admin.sidebar.poweredBy")}{" "}
-              <span className="font-semibold text-[var(--text-sidebar)]">ClickMaster</span> {t("admin.sidebar.version")}
+          <p className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--sidebar-muted)]">
+              {t("admin.sidebar.poweredBy")} <span className="font-semibold text-[var(--sidebar-text)]">Click Master</span>
+              <span className="rounded-full bg-[var(--sidebar-pill-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--sidebar-muted)]">V1.0</span>
             </p>
           )}
         </div>

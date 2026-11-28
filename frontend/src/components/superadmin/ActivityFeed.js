@@ -34,7 +34,7 @@ const dayLabel = (iso) => {
  * `fetcher(params)` → { data: { items, counts, total, pages, stats } }
  * `onStats(stats)` optional — parent stat cards ke liye.
  */
-export default function ActivityFeed({ queryKey, fetcher, title, description, who = "you", onStats }) {
+export default function ActivityFeed({ queryKey, fetcher, title, description, who = "you", onStats, className, hideLinks = false }) {
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
@@ -66,13 +66,15 @@ export default function ActivityFeed({ queryKey, fetcher, title, description, wh
 
   const filtered = Boolean(debounced);
   return (
-    <Card>
+    <Card className={`flex flex-col ${className || ""}`}>
       {title && <CardHeader title={title} description={description} icon={Activity} />}
       <CardToolbar>
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search activity…" label="Search activity" />
         {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
       </CardToolbar>
 
+      {/* List area grows — pagination hamesha neeche */}
+      <div className="flex-1">
       {isLoading ? (
         <ul className="divide-y divide-[var(--border-color)]">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -96,7 +98,7 @@ export default function ActivityFeed({ queryKey, fetcher, title, description, wh
                 {rows.map((a) => {
                   const meta = ENTITY[a.entityType] || ENTITY.system;
                   const Icon = isSignOut(a) ? LogOut : meta.icon;
-                  const href = meta.href && a.entityId ? meta.href(a.entityId) : null;
+                  const href = !hideLinks && meta.href && a.entityId ? meta.href(a.entityId) : null;
                   return (
                     <li key={a.id} className="flex items-start gap-3.5 px-5 py-3.5">
                       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)]"><Icon size={16} aria-hidden="true" /></span>
@@ -123,6 +125,7 @@ export default function ActivityFeed({ queryKey, fetcher, title, description, wh
           ))}
         </div>
       )}
+      </div>
       <Pagination page={page} pages={pages} total={total} pageSize={PAGE_SIZE} onChange={setPage} itemLabel="entries" />
     </Card>
   );

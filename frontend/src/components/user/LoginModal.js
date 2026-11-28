@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import LazyGoogleLogin from "./LazyGoogleLogin";
 import {
   Mail, Lock, LogIn, Loader2, User, Phone, ShieldCheck, X, AlertCircle,
@@ -186,19 +187,20 @@ export default function LoginModal({ isOpen, onClose }) {
       }
 
       // ✅ REGISTER → OTP email jata hai, phir verify screen
-      const res = await authApi.register({ name, username, phone, email, password });
+      const referralCode = String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24);
+      const res = await authApi.register({ name, username, phone, email, password, referralCode });
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      setLoading(false);
+      if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen
       if (err.response?.data?.needsVerification) {
         setOtpEmail(err.response.data.email || email);
         setStep("verify-email");
-        setLoading(false);
         return;
       }
       parseBackendError(err);
+    } finally {
       setLoading(false);
     }
   };
@@ -206,6 +208,7 @@ export default function LoginModal({ isOpen, onClose }) {
   // ==========================================
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
+  // Referral program on ho to naya customer setup page par jata hai.
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     queryClient.invalidateQueries({ queryKey: ["userProfile"] });
@@ -214,7 +217,8 @@ export default function LoginModal({ isOpen, onClose }) {
   };
 
   const handleResendEmailOtp = async () => {
-    await authApi.sendEmailOtp(otpEmail);
+    const res = await authApi.sendEmailOtp(otpEmail);
+    if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
   };
 
   // ==========================================
@@ -266,7 +270,8 @@ export default function LoginModal({ isOpen, onClose }) {
     setGeneralError("");
     setLoading(true);
     try {
-      await authApi.googleCustomerLogin(credential);
+      const referralCode = String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24);
+      await authApi.googleCustomerLogin(credential, referralCode);
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       resetForm();
       onClose();
@@ -354,11 +359,11 @@ export default function LoginModal({ isOpen, onClose }) {
                 <div className="mb-6 pr-8">
                   <div className="flex items-center gap-2 mb-3">
                     <KeyRound size={16} className="text-[var(--user-accent)]" />
-                    <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                    <span className="text-[var(--user-accent)] text-[0.625rem] font-semibold uppercase tracking-widest">
                       {t("auth.login.forgotPassword")}
                     </span>
                   </div>
-                  <h2 className="text-xl font-black text-[var(--user-text)] mb-1">{t("auth.login.resetPassword")}</h2>
+                  <h2 className="text-xl font-semibold text-[var(--user-text)] mb-1">{t("auth.login.resetPassword")}</h2>
                   <p className="text-[var(--user-text-muted)] text-sm">
                     {t("auth.login.resetEmailHelp")}
                   </p>
@@ -439,11 +444,11 @@ export default function LoginModal({ isOpen, onClose }) {
             <div className="mb-6 pr-8">
               <div className="flex items-center gap-2 mb-3">
                 <ShieldCheck size={16} className="text-[var(--user-accent)]" />
-                <span className="text-[var(--user-accent)] text-[0.625rem] font-bold uppercase tracking-widest">
+                <span className="text-[var(--user-accent)] text-[0.625rem] font-semibold uppercase tracking-widest">
                   {isLogin ? t("auth.login.userSignIn") : t("auth.login.createAccount")}
                 </span>
               </div>
-              <h2 className="text-2xl font-black text-[var(--user-text)] mb-1">
+              <h2 className="text-2xl font-semibold text-[var(--user-text)] mb-1">
                 {isLogin ? t("auth.login.welcomeBack") : t("auth.login.createAccount")}
               </h2>
               <p className="text-[var(--user-text-muted)] text-sm">
@@ -582,7 +587,7 @@ export default function LoginModal({ isOpen, onClose }) {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-1"
+                className="w-full h-11 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] font-semibold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 mt-1"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
                 {loading ? (isLogin ? t("auth.login.loggingIn") : t("auth.login.creatingAccount")) : isLogin ? t("auth.login.login") : t("auth.login.createAccount")}

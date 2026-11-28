@@ -69,4 +69,5 @@ Backend isolation:
 
 - `src/app/(user)`: storefront. `src/app/admin`: store admin panel, including POS. `src/app/super-admin`: platform admin. Also `landing`, `store-setup`, `admin-handoff`, and `store-not-found`.
 - API calls are grouped by audience in `src/apis/{admin,user,superadmin}/*Api.js` on top of the shared `axiosInstance`. Hooks wrapping them live in `src/hooks/{admin,user}`.
+- Rewards visibility: `src/hooks/user/useRewardPrograms.js` is the single gate for reward UI. Admin loyalty `enabled` off ho to header points badge, account Rewards/Refer a Friend tabs, reward popups, aur referral pages sab hide/off-state ho jate hain (details: `docs/19-rewards-visibility.md`).
 - i18n: `src/i18n/config.js` defines the locales (en default/fallback, plus `ur` and `ar` as RTL). The language is stored in the `lang` cookie and provided by `LanguageProvider`. Admin and storefront use separate theme cookies (`theme` and `user-theme`).

@@ -17,6 +17,7 @@ import { useUserSocketSync } from "../../hooks/user/useUserSocketSync";
 import { initThemeFromCookie } from "@/lib/theme";
 import { useTranslation } from "@/i18n/LanguageProvider";
 import SupportChatWidget from "@/components/chat/SupportChatWidget";
+import WelcomeRewardModal from "@/components/user/WelcomeRewardModal";
 
 /* ============ ✅ MOBILE BOTTOM NAV — polished (mobile-only) ============ */
 function MobileNav() {
@@ -158,6 +159,7 @@ export default function UserLayoutClient({ children }) {
           <VariantQuickBuyDrawer />
           <SupportChatWidget />
           <MobileNav />
+          <WelcomeRewardModal />
         </div>
         </QuickBuyProvider>
       </CartProvider>

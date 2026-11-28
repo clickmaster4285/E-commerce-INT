@@ -4,19 +4,25 @@
 // ADMIN HANDOFF — platform se store subdomain par sign-in
 // ----------------------------------------------------------
 // Platform (192.168.88.35.nip.io) par login/signup ke baad backend ek
-// 2-minute, ek-baar wala token deta hai aur yahan bhejta hai:
+// 10-minute, ek-baar wala token deta hai aur yahan bhejta hai:
 //   http://<store>.192.168.88.35.nip.io:3000/admin-handoff#token=...
 // Ye page token exchange karke ISI store host par session cookies set
 // karta hai, phir admin dashboard khol deta hai. (/admin ke bahar hai
 // taake admin layout ka login-guard isay na roke.)
 // ==========================================================
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axiosInstance from "@/apis/axiosInstance";
 
 export default function AdminHandoffPage() {
   const [error, setError] = useState("");
+  const exchangeStarted = useRef(false);
 
   useEffect(() => {
+    // React Strict Mode replays effects in development. This token is
+    // intentionally single-use, so don't exchange it twice in one page load.
+    if (exchangeStarted.current) return;
+    exchangeStarted.current = true;
+
     const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
     // Token URL/history se foran hatao
     window.history.replaceState(null, "", window.location.pathname);
@@ -35,7 +41,7 @@ export default function AdminHandoffPage() {
       <div className="w-full max-w-sm">
         {error ? (
           <>
-            <h1 className="text-[20px] font-extrabold text-white">Sign-in link expired</h1>
+            <h1 className="text-[20px] font-extrabold text-white">Could not open your store admin</h1>
             <p className="mt-3 text-[14px] text-slate-300">{error}</p>
             <a
               href="/admin/login"

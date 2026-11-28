@@ -3,42 +3,39 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeDollarSign, Plus, Pencil, Ban, CircleCheck, Trash2, Package, Users, Loader2, Eye } from "lucide-react";
-import { PageHeader, Card, CardToolbar, SearchInput, DataTable, EntityCell, StatusBadge, Badge, Alert, Button, DropdownMenu, ConfirmDialog, StatCard } from "@/components/superadmin/ui";
-import { BILLING_INTERVALS } from "@/components/superadmin/PlanForm";
+import { BadgeDollarSign, Plus, Pencil, Ban, CircleCheck, Trash2, Loader2, Eye } from "lucide-react";
+import { PageHeader, Card, CardToolbar, Tabs, SearchInput, DataTable, EntityCell, StatusBadge, Badge, Alert, Button, DropdownMenu, ConfirmDialog } from "@/components/superadmin/ui";
+import { LIMIT_FIELDS } from "@/components/superadmin/PlanForm";
 import { superAdminApi } from "@/apis/superadmin/superAdminApi";
 import { formatDate } from "@/lib/superadminFormat";
+import { formatPlanPrice } from "@/lib/planModules";
 
-const INTERVAL_SHORT = {
-  weekly: "/wk",
-  biweekly: "/2wk",
-  monthly: "/mo",
-  quarterly: "/qtr",
-  semiannual: "/6mo",
-  yearly: "/yr",
-  biennial: "/2yr",
-  lifetime: " · lifetime",
-  one_time: " · one-time",
-  custom: "",
-};
-
-const formatMoney = (price, currency, interval) => {
-  const amount = Number(price) || 0;
-  const cur = currency || "PKR";
-  const label = amount === 0 ? "Free" : `${cur} ${amount.toLocaleString()}`;
-  if (amount === 0) return label;
-  const suffix = INTERVAL_SHORT[interval] ?? "";
-  const intervalLabel = BILLING_INTERVALS.find((i) => i.value === interval)?.label;
-  if (interval === "custom" && intervalLabel) return `${label} · custom`;
-  return `${label}${suffix}`;
-};
-
-const limitLabel = (n) => (n == null ? "Unlimited" : String(n));
+/** Limits ek line me — sirf capped wale dikhate hain, baaki "unlimited". */
+function LimitsSummary({ limits }) {
+  const capped = LIMIT_FIELDS.filter(({ key }) => limits?.[key] != null);
+  if (!capped.length) return <span className="text-[var(--text-muted)]">All unlimited</span>;
+  const shown = capped.slice(0, 3);
+  const rest = capped.length - shown.length;
+  return (
+    <span
+      className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-[var(--text-secondary)]"
+      title={LIMIT_FIELDS.map(({ key, label }) => `${label}: ${limits?.[key] ?? "Unlimited"}`).join("\n")}
+    >
+      {shown.map(({ key, label }) => (
+        <span key={key} className="whitespace-nowrap">
+          <span className="font-medium tabular-nums text-[var(--text-primary)]">{Number(limits[key]).toLocaleString()}</span> {label.toLowerCase()}
+        </span>
+      ))}
+      {rest > 0 && <span className="text-[var(--text-muted)]">+{rest} more</span>}
+    </span>
+  );
+}
 
 export default function PlansPage() {
   const qc = useQueryClient();
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
   const [dialog, setDialog] = useState(null); // { type: status|delete, plan?, next? }
   const [notice, setNotice] = useState(null);
 
@@ -53,10 +50,11 @@ export default function PlansPage() {
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return plans.filter((p) => {
+      if (status && p.status !== status) return false;
       if (!q) return true;
       return [p.name, p.slug, p.description].some((v) => String(v || "").toLowerCase().includes(q));
     });
-  }, [plans, search]);
+  }, [plans, search, status]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["superadmin-plans"] });
   const close = () => setDialog(null);
@@ -64,7 +62,7 @@ export default function PlansPage() {
   const fail = (fallback) => (err) => { close(); setNotice({ tone: "danger", text: err?.response?.data?.message || fallback }); };
 
   const statusMut = useMutation({
-    mutationFn: ({ id, status }) => superAdminApi.setPlanStatus(id, status),
+    mutationFn: ({ id, status: next }) => superAdminApi.setPlanStatus(id, next),
     onSuccess: ok("Plan status updated."),
     onError: fail("Could not update the plan status."),
   });
@@ -78,39 +76,21 @@ export default function PlansPage() {
     {
       key: "plan",
       header: "Plan",
-      cell: (p) => (
-        <EntityCell
-          primary={p.name}
-          secondary={p.description || p.slug}
-          maxWidth={320}
-        />
-      ),
+      cell: (p) => <EntityCell primary={p.name} secondary={p.description || p.slug} maxWidth={300} />,
     },
     {
       key: "price",
       header: "Price",
       className: "whitespace-nowrap",
-      cell: (p) => <span className="font-medium tabular-nums text-[var(--text-primary)]">{formatMoney(p.price, p.currency, p.billingInterval)}</span>,
+      cell: (p) => <span className="font-medium tabular-nums text-[var(--text-primary)]">{formatPlanPrice(p.price, p.currency, p.billingInterval)}</span>,
     },
-    {
-      key: "limits",
-      header: "Limits",
-      cell: (p) => (
-        <div className="space-y-1 text-[12.5px] text-[var(--text-secondary)]">
-          <p className="inline-flex items-center gap-1.5"><Package size={13} className="text-[var(--text-muted)]" aria-hidden="true" />{limitLabel(p.limits?.maxProducts)} products · {limitLabel(p.limits?.maxOrders)} orders</p>
-          <p className="inline-flex items-center gap-1.5"><Users size={13} className="text-[var(--text-muted)]" aria-hidden="true" />{limitLabel(p.limits?.maxStaffAccounts)} staff · {limitLabel(p.limits?.maxChats)} chats</p>
-          <p className="text-[11.5px] text-[var(--text-muted)]">
-            Leads {limitLabel(p.limits?.maxLeads)} · Quotes {limitLabel(p.limits?.maxQuotes)} · Invoices {limitLabel(p.limits?.maxInvoices)}
-          </p>
-        </div>
-      ),
-    },
+    { key: "limits", header: "Limits", cell: (p) => <LimitsSummary limits={p.limits} /> },
     {
       key: "pos",
       header: "POS",
       cell: (p) => (p.features?.pos
         ? <Badge tone="accent" dot={false}>Included</Badge>
-        : <span className="text-[var(--text-muted)]">Not included</span>),
+        : <span className="text-[var(--text-muted)]">—</span>),
     },
     {
       key: "stores",
@@ -155,25 +135,31 @@ export default function PlansPage() {
     },
   ];
 
+  const filtered = Boolean(search || status);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Plans"
-        description="Browse subscription plans, open a plan for full detail and activity, or create a new one."
+        description="Subscription plans stores can be assigned to."
         actions={<Button variant="primary" icon={Plus} href="/super-admin/plans/new">Create plan</Button>}
       />
 
       {notice && <Alert tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Alert>}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="All plans" value={counts.all ?? 0} icon={BadgeDollarSign} tone="accent" hint="Platform catalog" loading={isLoading} />
-        <StatCard label="Active" value={counts.active ?? 0} icon={CircleCheck} tone="success" hint="Assignable to stores" loading={isLoading} />
-        <StatCard label="Inactive" value={counts.inactive ?? 0} icon={Ban} tone={counts.inactive ? "danger" : "neutral"} hint={counts.inactive ? "Hidden from preferred picks" : "None deactivated"} loading={isLoading} />
-      </div>
-
       <Card>
+        <Tabs
+          label="Filter plans by status"
+          value={status}
+          onChange={setStatus}
+          items={[
+            { value: "", label: "All", count: isLoading ? undefined : counts.all ?? 0 },
+            { value: "active", label: "Active", count: isLoading ? undefined : counts.active ?? 0 },
+            { value: "inactive", label: "Inactive", count: isLoading ? undefined : counts.inactive ?? 0 },
+          ]}
+        />
         <CardToolbar>
-          <SearchInput value={search} onChange={setSearch} placeholder="Search by name or description…" label="Search plans" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search by name or description…" label="Search plans" className="max-w-md" />
           {isFetching && !isLoading && <Loader2 size={16} className="animate-spin text-[var(--text-muted)]" aria-label="Refreshing" />}
         </CardToolbar>
         <DataTable
@@ -186,9 +172,9 @@ export default function PlansPage() {
           error={isError ? { title: "Couldn't load plans", action: <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button> } : null}
           empty={{
             icon: BadgeDollarSign,
-            title: search ? "No plans match your search" : "No plans yet",
-            description: search ? "Try a different name." : "Create a starter, growth or enterprise plan for your stores.",
-            action: !search && <Button size="sm" variant="primary" icon={Plus} href="/super-admin/plans/new">Create plan</Button>,
+            title: filtered ? "No plans match" : "No plans yet",
+            description: filtered ? "Try a different name or status." : "Create a starter, growth or enterprise plan for your stores.",
+            action: !filtered && <Button size="sm" variant="primary" icon={Plus} href="/super-admin/plans/new">Create plan</Button>,
           }}
         />
       </Card>

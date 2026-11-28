@@ -131,9 +131,9 @@ function scopeBulkOps(ops, field, storeId) {
   }
 }
 
-function tenantScope(schema, { field = "storeId", stamp = true } = {}) {
+function tenantScope(schema, { field = "storeId", stamp = true, index = true } = {}) {
   if (field !== "_id" && !schema.path(field)) {
-    schema.add({ [field]: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null, index: true } });
+    schema.add({ [field]: { type: mongoose.Schema.Types.ObjectId, ref: "Store", default: null, index } });
   }
   // Sub-pipeline scoping ke liye pehchan (scopeFieldForCollection)
   schema.$tenantScopeField = field;

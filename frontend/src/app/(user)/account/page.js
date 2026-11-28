@@ -39,11 +39,15 @@ const AddressForm = dynamic(() => import("@/components/user/AddressForm"), {
 import OrdersView from "../orders/page";
 import WishlistView from "../wishlist/page";
 import MyReviews from "@/components/user/MyReviews";
+import RewardsView from "@/components/user/RewardsView";
+import ReferralProgramView from "@/components/user/ReferralProgramView";
+import AccountPageHeader from "@/components/user/AccountPageHeader";
+import { useRewardPrograms } from "@/hooks/user/useRewardPrograms";
 import {
   User, Package, Heart, MapPin, Settings, LogOut, Phone, Mail, Calendar,
   Plus, Pencil, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Loader2, X,
-  CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Star, Save,
-  ChevronRight, SlidersHorizontal, KeyRound, Globe,
+  CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Star, Save, UserRoundPlus,
+  ChevronRight, SlidersHorizontal, KeyRound, Globe, Gift,
 } from "lucide-react";
 
 /* ============ HELPERS ============ */
@@ -74,6 +78,8 @@ const NAV_ITEMS = [
   { id: "profile", label: "My Profile", icon: User },
   { id: "orders", label: "My Orders", icon: Package },
   { id: "reviews", label: "My Reviews", icon: Star },
+  { id: "rewards", label: "Rewards", icon: Gift },
+  { id: "referrals", label: "Refer a Friend", icon: UserRoundPlus },
   { id: "wishlist", label: "Wishlist", icon: Heart },
   { id: "address", label: "Address", icon: MapPin },
   { id: "settings", label: "Setting", icon: Settings },
@@ -83,9 +89,20 @@ const TAB_TITLES = {
   profile: "My Profile",
   orders: "My Orders",
   reviews: "My Reviews",
+  rewards: "Rewards",
+  referrals: "Refer a Friend",
   wishlist: "Wishlist",
   address: "Address",
   settings: "Setting",
+};
+
+/* Reviews aur Rewards apna header khud render karte hain (shared component se). */
+const TAB_HEADERS = {
+  profile: { title: "My Profile", subtitle: "account.header.profile.subtitle" },
+  orders: { title: "My Orders", subtitle: "account.header.orders.subtitle" },
+  wishlist: { title: "Wishlist", subtitle: "account.header.wishlist.subtitle" },
+  address: { title: "Address", subtitle: "account.header.address.subtitle" },
+  settings: { title: "Setting", subtitle: "account.header.settings.subtitle" },
 };
 
 /* purane URL tabs (overview / addresses) bhi kaam karte rahen */
@@ -122,7 +139,7 @@ function CardHeader({ icon: Icon, title, subtitle, action, tone = "accent" }) {
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="text-[0.9375rem] font-black text-[var(--user-text)] truncate">
+          <h2 className="text-[0.9375rem] font-semibold text-[var(--user-text)] truncate">
             {title}
           </h2>
           {subtitle && (
@@ -150,7 +167,7 @@ function StatusPill({ status, size = "md" }) {
   const active = status === "Active";
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-bold border ${
+      className={`inline-flex items-center gap-1 rounded-full font-medium border ${
         size === "sm" ? "text-[0.5625rem] px-1.5 py-0.5" : "text-[0.625rem] px-2 py-0.5"
       } ${
         active
@@ -169,7 +186,7 @@ function EmptyBlock({ icon: Icon, title, text, action }) {
       <div className="w-14 h-14 mx-auto rounded-2xl bg-[var(--user-bg-hover)] flex items-center justify-center mb-3">
         <Icon size={24} className="text-[var(--user-text-subtle)]" />
       </div>
-      <p className="text-sm font-bold text-[var(--user-text)] mb-1">{title}</p>
+      <p className="text-sm font-medium text-[var(--user-text)] mb-1">{title}</p>
       {text && <p className="text-xs text-[var(--user-text-muted)] mb-4">{text}</p>}
       {action}
     </div>
@@ -179,7 +196,7 @@ function EmptyBlock({ icon: Icon, title, text, action }) {
 
 /* ============ SIDEBAR (DESKTOP) ============ */
 function navItemCls(active) {
-  return `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold transition-all duration-200 ${
+  return `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-medium transition-all duration-200 ${
     active
       ? "bg-[var(--user-accent)] text-[var(--user-accent-text)] shadow-md"
       : "text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)]"
@@ -187,14 +204,14 @@ function navItemCls(active) {
 }
 
 function navBadgeCls(active) {
-  return `ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+  return `ml-auto text-[0.625rem] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
     active
       ? "bg-[var(--user-accent-text)]/15 text-[var(--user-accent-text)]"
       : "bg-[var(--user-bg-hover)] text-[var(--user-text-muted)]"
   }`;
 }
 
-function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
+function SidebarNav({ user, status, tab, counts, items, onNavigate, onLogout }) {
   return (
     <div className="space-y-4">
     <Card className="overflow-hidden rounded-l-none border-l-0">
@@ -211,7 +228,7 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
             />
           </div>
           <div className="min-w-0">
-            <p className="text-[0.8125rem] font-black text-[var(--user-text)] truncate capitalize">
+            <p className="text-[0.8125rem] font-semibold text-[var(--user-text)] truncate capitalize">
               {user.name || user.username}
             </p>
             <p className="text-[0.625rem] text-[var(--user-text-muted)] truncate">{user.email}</p>
@@ -225,7 +242,7 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
 
       {/* nav — sirf 5 tabs + logout */}
       <nav className="p-2 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           const active = tab === item.id;
           const count = counts?.[item.id] || 0;
@@ -246,7 +263,7 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
 
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.8125rem] font-medium text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
         >
           <LogOut size={16} className="shrink-0" /> Logout
         </button>
@@ -267,7 +284,7 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
                 <Icon size={14} />
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[0.75rem] font-bold text-[var(--user-text)]">
+                <span className="block truncate text-[0.75rem] font-medium text-[var(--user-text)]">
                   {perk.title}
                 </span>
                 <span className="block truncate text-[0.625rem] text-[var(--user-text-muted)]">
@@ -291,6 +308,7 @@ function MobileMenu({
   memberSince,
   stats,
   counts,
+  items,
   onNavigate,
   onLogout,
 }) {
@@ -306,7 +324,7 @@ function MobileMenu({
           <div className="flex items-center gap-4">
             <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0" />
             <div className="min-w-0 flex-1">
-              <h1 className="text-base font-black text-[var(--user-text)] capitalize truncate">
+              <h1 className="text-base font-semibold text-[var(--user-text)] capitalize truncate">
                 {user.name || user.username}
               </h1>
               <p className="text-[0.6875rem] text-[var(--user-text-muted)] truncate mt-0.5">
@@ -332,7 +350,7 @@ function MobileMenu({
                 className="rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-hover)]/60 px-3 py-2.5 text-left active:scale-[0.98] transition"
               >
                 <s.icon size={14} className="text-[var(--user-accent)]" />
-                <p className="text-base font-black text-[var(--user-text)] mt-1.5">{s.value}</p>
+                <p className="text-base font-semibold text-[var(--user-text)] mt-1.5">{s.value}</p>
                 <p className="text-[0.5625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
                   {s.label}
                 </p>
@@ -345,26 +363,26 @@ function MobileMenu({
       {/* nav list */}
       <Card className="overflow-hidden">
         <div className="px-4 py-3 border-b border-[var(--user-border)]">
-          <p className="text-[0.625rem] font-black text-[var(--user-text-muted)] uppercase tracking-widest">
+          <p className="text-[0.625rem] font-semibold text-[var(--user-text-muted)] uppercase tracking-widest">
             Account Menu
           </p>
         </div>
         <nav className="p-2 space-y-0.5">
-          {NAV_ITEMS.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const count = counts?.[item.id] || 0;
             return (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:bg-[var(--user-bg-hover)] transition-colors duration-200"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-medium text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:bg-[var(--user-bg-hover)] transition-colors duration-200"
               >
                 <span className="w-9 h-9 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center shrink-0">
                   <Icon size={16} />
                 </span>
                 <span className="truncate">{item.label}</span>
                 {count > 0 && (
-                  <span className="ml-auto text-[0.625rem] font-black px-1.5 py-0.5 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] shrink-0">
+                  <span className="ml-auto text-[0.625rem] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-muted)] shrink-0">
                     {count}
                   </span>
                 )}
@@ -377,7 +395,7 @@ function MobileMenu({
 
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[0.8125rem] font-medium text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition-colors duration-200"
           >
             <span className="w-9 h-9 rounded-lg bg-[var(--user-danger)]/10 flex items-center justify-center shrink-0">
               <LogOut size={16} />
@@ -403,7 +421,7 @@ function MobileTopBar({ title, onBack }) {
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-base font-black text-[var(--user-text)] flex-1 truncate">{title}</h1>
+        <h1 className="text-base font-semibold text-[var(--user-text)] flex-1 truncate">{title}</h1>
       </div>
     </div>
   );
@@ -413,7 +431,7 @@ function MobileTopBar({ title, onBack }) {
    ACCOUNT PAGE
    ========================================================== */
 export default function AccountPage() {
-  const { dir } = useTranslation();
+  const { dir, t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { count: wishlistCount } = useWishlist();
@@ -516,6 +534,35 @@ export default function AccountPage() {
     enabled: !!user,
   });
 
+  /* ---------- rewards visibility (admin master switch) ---------- */
+  const { rewardsEnabled, referralEnabled, isLoading: programsLoading } = useRewardPrograms({
+    enabled: Boolean(user),
+  });
+
+  const navItems = useMemo(
+    () =>
+      NAV_ITEMS.filter((item) => {
+        if (item.id === "rewards") return rewardsEnabled;
+        if (item.id === "referrals") return referralEnabled;
+        return true;
+      }),
+    [rewardsEnabled, referralEnabled],
+  );
+
+  // Rewards off ho to chhupi hui tab par na rukein — profile dikhao.
+  const tabHidden =
+    !programsLoading &&
+    ((tab === "rewards" && !rewardsEnabled) ||
+      (tab === "referrals" && !referralEnabled));
+  const activeTab = tabHidden ? "profile" : tab;
+
+  useEffect(() => {
+    if (!tabHidden) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "profile");
+    window.history.replaceState({}, "", url);
+  }, [tabHidden]);
+
   if (userLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -530,13 +577,13 @@ export default function AccountPage() {
         <div className="w-16 h-16 mx-auto rounded-full bg-[var(--user-bg-card)] border border-[var(--user-border)] flex items-center justify-center mb-5">
           <User size={28} className="text-[var(--user-accent)] opacity-60" />
         </div>
-        <h1 className="text-lg font-bold text-[var(--user-text)] mb-2">Login Required</h1>
+        <h1 className="text-lg font-medium text-[var(--user-text)] mb-2">Login Required</h1>
         <p className="text-sm text-[var(--user-text-muted)] mb-6">
           Please login to view your account.
         </p>
         <Link
           href="/login?redirect=/account"
-          className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition"
+          className="inline-block bg-[var(--user-accent)] text-[var(--user-accent-text)] px-6 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition"
         >
           Login to Your Account
         </Link>
@@ -683,19 +730,20 @@ export default function AccountPage() {
       editable ? "" : "cursor-default opacity-80 focus:ring-0 focus:border-[var(--user-border)]"
     }`;
   const labelCls =
-    "block text-[0.6875rem] font-bold text-[var(--user-text-muted)] mb-1.5 uppercase tracking-wider";
+    "block text-[0.6875rem] font-medium text-[var(--user-text-muted)] mb-1.5 uppercase tracking-wider";
   const btnPrimary =
-    "h-10 px-3.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50 active:scale-[0.98]";
+    "h-10 px-3.5 rounded-xl bg-[var(--user-accent)] text-[var(--user-accent-text)] text-xs font-medium flex items-center justify-center gap-1.5 hover:opacity-90 transition disabled:opacity-50 active:scale-[0.98]";
   const btnSecondary =
-    "h-10 px-3.5 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-[0.98]";
+    "h-10 px-3.5 rounded-xl border border-[var(--user-border)] bg-[var(--user-bg-card)] text-xs font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] hover:border-[var(--user-accent)]/40 transition disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-[0.98]";
 
 
   /* ---------- shared sidebar props ---------- */
   const sidebarProps = {
     user,
     status: accountStatus,
-    tab,
+    tab: activeTab,
     counts,
+    items: navItems,
     onNavigate: navigate,
     onLogout: handleLogout,
   };
@@ -722,10 +770,19 @@ export default function AccountPage() {
             />
           ) : (
             <div style={{ animation: "fadeUp .25s ease" }}>
-              <MobileTopBar title={TAB_TITLES[tab]} onBack={() => setMobileMenu(true)} />
+              <MobileTopBar title={TAB_TITLES[activeTab]} onBack={() => setMobileMenu(true)} />
+
+              {TAB_HEADERS[activeTab] && (
+                <div className="mb-5">
+                  <AccountPageHeader
+                    title={TAB_HEADERS[activeTab].title}
+                    subtitle={t(TAB_HEADERS[activeTab].subtitle)}
+                  />
+                </div>
+              )}
 
               {/* ============ MY PROFILE ============ */}
-              {tab === "profile" && (
+              {activeTab === "profile" && (
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
                   <div className="space-y-4 min-w-0">
                     {/* identity */}
@@ -738,7 +795,7 @@ export default function AccountPage() {
                         <FallbackImage src={user.avatar} alt={user.name || user.username} className="w-16 h-16 rounded-2xl object-cover border border-[var(--user-border)] shadow-lg shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h1 className="text-lg font-black text-[var(--user-text)] capitalize truncate">
+                            <h1 className="text-lg font-semibold text-[var(--user-text)] capitalize truncate">
                               {user.name || user.username}
                             </h1>
                             <StatusPill status={accountStatus} />
@@ -872,7 +929,7 @@ export default function AccountPage() {
                             <KeyRound size={16} />
                           </span>
                           <span className="flex-1 min-w-0">
-                            <span className="block text-[0.8125rem] font-bold text-[var(--user-text)]">
+                            <span className="block text-[0.8125rem] font-medium text-[var(--user-text)]">
                               Change Password
                             </span>
                             <span className="block text-[0.6875rem] text-[var(--user-text-muted)] truncate">
@@ -903,7 +960,7 @@ export default function AccountPage() {
                               <span className="w-8 h-8 rounded-lg bg-[var(--user-accent)]/10 text-[var(--user-accent)] flex items-center justify-center mb-2">
                                 <Icon size={15} />
                               </span>
-                              <p className="text-base font-black text-[var(--user-text)]">
+                              <p className="text-base font-semibold text-[var(--user-text)]">
                                 {s.value}
                               </p>
                               <p className="text-[0.5625rem] text-[var(--user-text-muted)] uppercase tracking-wider">
@@ -919,15 +976,19 @@ export default function AccountPage() {
               )}
 
               {/* ============ MY ORDERS — orders page wala hi design (reuse) ============ */}
-              {tab === "orders" && <OrdersView compact />}
+              {activeTab === "orders" && <OrdersView compact />}
 
-              {tab === "reviews" && <MyReviews />}
+              {activeTab === "reviews" && <MyReviews />}
+
+              {/* ============ REWARDS — loyalty points ============ */}
+              {activeTab === "rewards" && rewardsEnabled && <RewardsView />}
+              {activeTab === "referrals" && referralEnabled && <ReferralProgramView showContinue={false} />}
 
               {/* ============ WISHLIST — wishlist page wala hi design (reuse) ============ */}
-              {tab === "wishlist" && <WishlistView compact />}
+              {activeTab === "wishlist" && <WishlistView compact />}
 
               {/* ============ ADDRESS ============ */}
-              {tab === "address" && (
+              {activeTab === "address" && (
                 <Card className="overflow-hidden">
                   <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                   <CardHeader
@@ -976,11 +1037,11 @@ export default function AccountPage() {
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <p className="text-sm font-bold text-[var(--user-text)] capitalize">
+                              <p className="text-sm font-medium text-[var(--user-text)] capitalize">
                                 {a.full_name}
                               </p>
                               {a.is_default && (
-                                <span className="text-[0.5rem] font-black text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">
+                                <span className="text-[0.5rem] font-semibold text-[var(--user-accent)] bg-[var(--user-accent)]/10 border border-[var(--user-accent)]/30 px-1.5 py-0.5 rounded shrink-0">
                                   DEFAULT
                                 </span>
                               )}
@@ -1007,7 +1068,7 @@ export default function AccountPage() {
                               {!a.is_default && (
                                 <button
                                   onClick={() => setDefaultAddress(a)}
-                                  className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center gap-1 active:scale-95"
+                                  className="flex-1 h-8 rounded-md text-[0.625rem] font-medium text-[var(--user-accent)] hover:bg-[var(--user-accent)]/10 transition flex items-center justify-center gap-1 active:scale-95"
                                 >
                                   <Star size={11} /> Default
                                 </button>
@@ -1017,13 +1078,13 @@ export default function AccountPage() {
                                   setEditAddress(a);
                                   setShowAddressModal(true);
                                 }}
-                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-1 active:scale-95"
+                                className="flex-1 h-8 rounded-md text-[0.625rem] font-medium text-[var(--user-text-secondary)] hover:bg-[var(--user-bg-hover)] transition flex items-center justify-center gap-1 active:scale-95"
                               >
                                 <Pencil size={11} /> Edit
                               </button>
                               <button
                                 onClick={() => setDeleteAddressId(a._id)}
-                                className="flex-1 h-8 rounded-md text-[0.625rem] font-bold text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-1 active:scale-95"
+                                className="flex-1 h-8 rounded-md text-[0.625rem] font-medium text-[var(--user-danger)] hover:bg-[var(--user-danger)]/10 transition flex items-center justify-center gap-1 active:scale-95"
                               >
                                 <Trash2 size={11} /> Delete
                               </button>
@@ -1038,7 +1099,7 @@ export default function AccountPage() {
 
 
               {/* ============ SETTING ============ */}
-              {tab === "settings" && (
+              {activeTab === "settings" && (
                 <div className="space-y-4">
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
                   <div className="space-y-4 min-w-0">
@@ -1115,11 +1176,11 @@ export default function AccountPage() {
                         {pwForm.next ? (
                           <div>
                             <div className="mb-1.5 flex items-center justify-between">
-                              <span className="text-[0.625rem] font-bold uppercase tracking-wider text-[var(--user-text-subtle)]">
+                              <span className="text-[0.625rem] font-medium uppercase tracking-wider text-[var(--user-text-subtle)]">
                                 Password strength
                               </span>
                               <span
-                                className={`text-[0.625rem] font-black uppercase tracking-wider ${
+                                className={`text-[0.625rem] font-semibold uppercase tracking-wider ${
                                   pwStrength >= 3
                                     ? "text-emerald-500"
                                     : pwStrength === 2
@@ -1253,7 +1314,7 @@ export default function AccountPage() {
                         action={
                           <button
                             onClick={() => navigate("address")}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--user-border)] px-3 py-1.5 text-[0.6875rem] font-medium uppercase tracking-wider text-[var(--user-text-muted)] transition-colors hover:border-[var(--user-accent)] hover:text-[var(--user-accent)]"
                           >
                             Manage
                             <ChevronRight size={12} />
@@ -1268,7 +1329,7 @@ export default function AccountPage() {
                               <span className="mx-auto mb-2.5 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--user-bg-hover)] text-[var(--user-text-subtle)]">
                                 <MapPin size={18} />
                               </span>
-                              <p className="text-[0.8125rem] font-bold text-[var(--user-text)]">
+                              <p className="text-[0.8125rem] font-medium text-[var(--user-text)]">
                                 {addresses.length ? "No default address set" : "No saved addresses"}
                               </p>
                               <p className="mt-1 text-[0.6875rem] text-[var(--user-text-muted)]">
@@ -1278,7 +1339,7 @@ export default function AccountPage() {
                               </p>
                               <button
                                 onClick={() => navigate("address")}
-                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-bold uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
+                                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[var(--user-accent)] px-4 py-2 text-[0.6875rem] font-medium uppercase tracking-wider text-[var(--user-accent-text)] transition-opacity hover:opacity-90"
                               >
                                 {addresses.length ? "Choose Default" : "Add Address"}
                               </button>
@@ -1289,10 +1350,10 @@ export default function AccountPage() {
                           <div className="px-4 sm:px-5 py-4">
                             <div className="rounded-xl border-2 border-[var(--user-accent)] bg-[var(--user-accent)]/5 p-3.5">
                               <div className="mb-1.5 flex items-start justify-between gap-2">
-                                <p className="text-[0.8125rem] font-bold capitalize text-[var(--user-text)]">
+                                <p className="text-[0.8125rem] font-medium capitalize text-[var(--user-text)]">
                                   {defaultAddress.full_name}
                                 </p>
-                                <span className="shrink-0 rounded border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[0.5rem] font-black text-[var(--user-accent)]">
+                                <span className="shrink-0 rounded border border-[var(--user-accent)]/30 bg-[var(--user-accent)]/10 px-1.5 py-0.5 text-[0.5rem] font-semibold text-[var(--user-accent)]">
                                   DEFAULT
                                 </span>
                               </div>
@@ -1333,11 +1394,11 @@ export default function AccountPage() {
                               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--user-bg-hover)] text-[var(--user-accent)]">
                                 <Icon size={14} />
                               </span>
-                              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-bold text-[var(--user-text)]">
+                              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium text-[var(--user-text)]">
                                 {item.label}
                               </span>
                               {item.count > 0 ? (
-                                <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-bold text-[var(--user-text-subtle)]">
+                                <span className="shrink-0 rounded-full bg-[var(--user-bg-hover)] px-1.5 py-0.5 text-[0.625rem] font-medium text-[var(--user-text-subtle)]">
                                   {item.count}
                                 </span>
                               ) : null}
@@ -1377,7 +1438,7 @@ export default function AccountPage() {
             className="w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl border-t-2 sm:border border-[var(--user-border)] bg-[var(--user-bg-card)] shadow-2xl p-5"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-black text-[var(--user-text)] mb-2">
+            <h3 className="text-sm font-semibold text-[var(--user-text)] mb-2">
               Delete this address?
             </h3>
             <p className="text-xs text-[var(--user-text-muted)] mb-5">
@@ -1386,13 +1447,13 @@ export default function AccountPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteAddressId(null)}
-                className="flex-1 h-10 sm:h-9 rounded-xl border border-[var(--user-border)] text-xs font-bold text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"
+                className="flex-1 h-10 sm:h-9 rounded-xl border border-[var(--user-border)] text-xs font-medium text-[var(--user-text)] hover:bg-[var(--user-bg-hover)] transition"
               >
                 Cancel
               </button>
               <button
                 onClick={removeAddress}
-                className="flex-1 h-10 sm:h-9 rounded-xl bg-[var(--user-danger)] text-white text-xs font-bold hover:opacity-90 transition"
+                className="flex-1 h-10 sm:h-9 rounded-xl bg-[var(--user-danger)] text-white text-xs font-medium hover:opacity-90 transition"
               >
                 Delete
               </button>
