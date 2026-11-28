@@ -23,6 +23,9 @@ const orderSchema = new mongoose.Schema(
         variantTitle: { type: String, default: "" },
         image: { type: String, default: "" },
         price: { type: Number, required: true },
+        // Checkout par product.tax ka snapshot (percent). Default nahi: purane
+        // orders me field missing rehti hai, taake edit "0%" aur "pata nahi" alag rakhe.
+        tax_rate: { type: Number, min: 0, max: 100 },
         original_price: { type: Number, default: 0 },
         discount_name: { type: String, default: "" },
         savings: { type: Number, default: 0 },

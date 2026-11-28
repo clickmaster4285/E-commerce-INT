@@ -340,6 +340,7 @@ const placeOrder = async (req, res) => {
         variantTitle: variant.title || "",
         image: variant.images?.[0]?.img_url || "",
         price: 0,
+        tax_rate: Number(product.tax) || 0,
         original_price: Number(variant.selling_price) || 0,
         discount_name: "",
         savings: 0,
@@ -356,7 +357,6 @@ const placeOrder = async (req, res) => {
         bundle_name: bundleDealDoc?.name || bundleDoc?.name || "",
         bundle_price: 0,
         bundle_savings: 0,
-        _taxRate: Number(product.tax || 0),
       });
     }
 
@@ -401,8 +401,7 @@ const placeOrder = async (req, res) => {
       oi.bundle_savings = p.bundleSavings;
       oi.bundle_price = oi.bundle_id ? unit : 0;
       subtotal += unit * oi.qty;
-      taxTotal += unit * oi.qty * (oi._taxRate / 100);
-      delete oi._taxRate;
+      taxTotal += unit * oi.qty * ((Number(oi.tax_rate) || 0) / 100);
     });
     subtotal = Math.round(subtotal * 100) / 100;
 
@@ -1174,6 +1173,9 @@ const updateOrderStatus = async (req, res) => {
 // PUT /api/orders/:id/edit — Edit Pending Order (Qty + Address)
 // ✅ FIXED: Supports address_override for "order only" mode
 // ==========================================
+// Paid + free units. Stock isi farq se chalta hai (free paid qty ke UPAR hai).
+const lineUnits = (item) => (Number(item.qty) || 0) + (Number(item.free_items) || 0);
+
 const editOrder = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1192,42 +1194,90 @@ const editOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: "Only pending orders can be edited" });
     }
 
-    // ✅ Update Quantities
+    const $set = {};
+    // delta > 0 matlab shelf se aur units chahiye
+    const stockDeltas = [];
+
+    // ✅ Update Quantities. Tax product.tax se snapshot (tax_rate) par. Pehle
+    // item.tax padha jata tha jo schema me hai hi nahi, is liye tax 0 ho jata tha,
+    // aur qty badalne par stock bilkul nahi hilta tha.
     if (Array.isArray(items) && items.length) {
+      const missingProductIds = [];
+      for (const item of order.items) {
+        if (item.tax_rate == null && item.product_id) missingProductIds.push(item.product_id);
+      }
+      const rateByProduct = new Map();
+      if (missingProductIds.length) {
+        const products = await Product.find({ _id: { $in: missingProductIds } }).select("tax").lean();
+        for (const product of products) rateByProduct.set(String(product._id), Number(product.tax) || 0);
+      }
+
+      const oldUnits = new Map();
+      for (const item of order.items) {
+        if (!item.variant_id) continue;
+        const key = String(item.variant_id);
+        oldUnits.set(key, (oldUnits.get(key) || 0) + lineUnits(item));
+      }
+
       let subtotal = 0;
-      let taxTotal = 0;
-
-      order.items = order.items.map((item) => {
+      let knownTax = 0;
+      let unresolved = false;
+      const nextItems = order.items.map((item) => {
+        const plain = item.toObject();
         const updated = items.find((i) => String(i._id || i.id) === String(item._id));
-        const newQty = updated ? Math.max(1, Number(updated.qty) || 1) : item.qty;
+        const newQty = updated ? Math.max(1, Math.floor(Number(updated.qty) || 1)) : item.qty;
 
-        // ✅ Free items recalc (paid qty se UPAR se)
-        let freeItems = 0;
+        let freeItems = Number(item.free_items) || 0;
         if (item.deal_type === "buy_x_get_y" && item.deal_buy_quantity && item.deal_get_quantity) {
           freeItems = Math.floor(newQty / item.deal_buy_quantity) * item.deal_get_quantity;
-          item.deal_savings = freeItems * item.price;
+          plain.deal_savings = freeItems * item.price;
         }
 
-        item.qty = newQty;          // ✅ paid qty
-        item.payable_items = newQty; // ✅ poora payment
-        item.free_items = freeItems; // ✅ free UPAR se
+        plain.qty = newQty;
+        plain.payable_items = newQty;
+        plain.free_items = freeItems;
 
+        let rate = item.tax_rate == null ? null : Number(item.tax_rate);
+        if (rate == null && item.product_id && rateByProduct.has(String(item.product_id))) {
+          rate = rateByProduct.get(String(item.product_id));
+          plain.tax_rate = rate;
+        }
+        if (plain.tax_rate == null) delete plain.tax_rate;
         const lineTotal = item.price * newQty;
         subtotal += lineTotal;
-        taxTotal += lineTotal * (Number(item.tax || 0) / 100);
-
-        return item;
+        if (rate == null) unresolved = true;
+        else knownTax += lineTotal * (rate / 100);
+        return plain;
       });
 
-      order.subtotal = Math.round(subtotal);
-      order.tax = Math.round(taxTotal);
-      order.total = order.subtotal + order.shipping + order.tax;
+      subtotal = Math.round(subtotal * 100) / 100;
+      const tax = unresolved
+        ? (order.subtotal > 0 ? Math.round(order.tax * (subtotal / order.subtotal)) : order.tax)
+        : Math.round(knownTax);
+
+      const newUnits = new Map();
+      const names = new Map();
+      for (const item of nextItems) {
+        if (!item.variant_id) continue;
+        const key = String(item.variant_id);
+        newUnits.set(key, (newUnits.get(key) || 0) + lineUnits(item));
+        if (!names.has(key)) names.set(key, item.name || "item");
+      }
+      for (const key of new Set([...oldUnits.keys(), ...newUnits.keys()])) {
+        const delta = (newUnits.get(key) || 0) - (oldUnits.get(key) || 0);
+        if (delta !== 0) stockDeltas.push({ variant_id: key, delta, name: names.get(key) || "item" });
+      }
+
+      $set.items = nextItems;
+      $set.subtotal = subtotal;
+      $set.tax = tax;
+      $set.total = subtotal + order.shipping + tax;
+      $set.total_deal_savings = nextItems.reduce((sum, item) => sum + (Number(item.deal_savings) || 0), 0);
     }
 
-    // ✅ Update Address — FIXED: supports address_override
+    // ✅ Update Address — address book untouched when the customer sends an override
     if (address_override && typeof address_override === "object") {
-      // 🆕 Custom snapshot — address book UNTOUCHED (order-only mode)
-      order.address_snapshot = {
+      $set.address_snapshot = {
         full_name: address_override.full_name || "",
         phone: address_override.phone || "",
         country: address_override.country || "",
@@ -1238,18 +1288,14 @@ const editOrder = async (req, res) => {
         zip_code: address_override.zip_code || "",
         delivery_instructions: address_override.delivery_instructions || "",
       };
-      // Optional: link to address_id if provided (for reference)
-      if (address_id) {
-        order.address_id = address_id;
-      }
+      if (address_id) $set.address_id = address_id;
     } else if (address_id) {
-      // ✅ Existing: use saved address
       const address = await Address.findOne({ _id: address_id, user_id: req.user._id });
       if (!address) {
         return res.status(400).json({ success: false, message: "Address not found" });
       }
-      order.address_id = address._id;
-      order.address_snapshot = {
+      $set.address_id = address._id;
+      $set.address_snapshot = {
         full_name: address.full_name,
         phone: address.phone,
         country: address.country,
@@ -1262,10 +1308,57 @@ const editOrder = async (req, res) => {
       };
     }
 
-    await order.save();
+    if (!Object.keys($set).length) {
+      return res.status(200).json({ success: true, message: "Order updated successfully", data: order });
+    }
 
-    emitOrderEvent("order:updated", { success: true, data: order });
-    res.status(200).json({ success: true, message: "Order updated successfully", data: order });
+    // 🔒 Stock delta + order update ek transaction. Doosri request same updated_at
+    // par fail (409) — warna dono qty barha kar stock do dafa kaat leti.
+    const seenUpdatedAt = order.updated_at;
+    const transactional = await supportsTransactions();
+    const applied = [];
+    let saved;
+    try {
+      ({ result: saved } = await withTx(async () => {
+        applied.length = 0;
+        for (const change of stockDeltas) {
+          const inc = -change.delta;
+          const result = change.delta > 0
+            ? await Variant.updateOne(
+              { _id: change.variant_id, quantity: { $gte: change.delta } },
+              { $inc: { quantity: inc } },
+            )
+            : await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: inc } });
+          if (change.delta > 0 && !result.modifiedCount) {
+            throw new TxAbort(400, { success: false, message: `Insufficient stock for "${change.name}". Please refresh and try again.` });
+          }
+          if (result.modifiedCount) applied.push({ variant_id: change.variant_id, change: inc });
+        }
+        const updated = await Order.findOneAndUpdate(
+          { _id: order._id, user_id: req.user._id, status: "pending", updated_at: seenUpdatedAt },
+          { $set },
+          { returnDocument: "after", runValidators: true },
+        );
+        if (!updated) {
+          throw new TxAbort(409, { success: false, code: "ORDER_CHANGED", message: "This order was changed at the same time. Refresh and try again." });
+        }
+        return updated;
+      }));
+    } catch (txError) {
+      if (!transactional) {
+        for (const row of applied) {
+          await Variant.updateOne({ _id: row.variant_id }, { $inc: { quantity: -row.change } }).catch(() => {});
+        }
+      }
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
+    }
+
+    if (applied.length) {
+      emitStockEvent({ variants: applied.map((row) => ({ variant_id: row.variant_id, change: row.change })), source: "order_edited" });
+    }
+    emitOrderEvent("order:updated", { success: true, data: saved });
+    res.status(200).json({ success: true, message: "Order updated successfully", data: saved });
   } catch (error) {
     log.error("❌ [editOrder] Error:", error);
     res.status(500).json({ success: false, message: error.message });
