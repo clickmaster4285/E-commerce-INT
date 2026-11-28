@@ -135,6 +135,8 @@ Idempotent via unique index + status guard + sourceKey dedup in loyalty credit.
 - After signup + email verify → customer can open `/referrals` or `/referrals/setup`.
 - `ReferralProgramView` shows link, copy button, enabled/disabled banner, stats.
 - `WelcomeRewardModal` CTA → `/referrals/setup`.
+- Visibility: rewards master switc off hho to account menu se Refer a Friend hat jata hai aur
+  `/referrals` off-state dikhata hai — dekho [19-rewards-visibility.md](19-rewards-visibility.md).
 
 ## 7. Admin flow
 - Sidebar → Sales → Referrals (`/admin/referrals`).

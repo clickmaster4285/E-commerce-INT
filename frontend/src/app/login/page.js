@@ -208,8 +208,11 @@ export default function UserLoginPage() {
   const goAfterSignup = async (isNewUser = true) => {
     if (isNewUser) {
       try {
-        const referral = await loyaltyApi.referrals();
-        if (referral?.enabled) { window.location.href = "/referrals/setup"; return; }
+        const [referral, program] = await Promise.all([
+          loyaltyApi.referrals(),
+          loyaltyApi.program(),
+        ]);
+        if (referral?.enabled && program?.enabled) { window.location.href = "/referrals/setup"; return; }
       } catch { /* status na mile to home par bhej do */ }
     }
     window.location.href = "/";

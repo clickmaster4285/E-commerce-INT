@@ -18,7 +18,7 @@ const SellerApplication = require("../models/SellerApplication");
 const Store = require("../models/Store");
 const { getIO } = require("../utils/socket");
 const { pushGlobalActivity, getChanges } = require("../utils/activityHelper");
-const { sendOtpEmail } = require("../utils/sendEmail");
+const { queueOtpEmail, isSmtpConfigured } = require("../utils/sendEmail");
 const log = require("../utils/logger");
 const { normalizePhone, isValidPhone } = require("../utils/phoneValidator");
 const { suggestUsernames, uniqueUsername } = require("../utils/username");
@@ -387,29 +387,24 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 📧 Verification OTP bhejo. Nodemailer transport ke bounded SMTP timeouts
-    // dev aur production dono me apply hote hain.
+    // 📧 Verification OTP background me bhejo — SMTP slow/down ho to bhi
+    // signup request block na ho. Pending record pehle hi save ho chuka hai.
     const emailArgs = {
       to: email,
       otp: code,
       purpose: "email_verification",
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
     };
-    let delivery;
-    try {
-      delivery = await sendOtpEmail(emailArgs);
-    } catch (emailError) {
-      log.error("createUser otp error:", emailError.cause || emailError);
-      if (process.env.NODE_ENV === "production") {
-        const retryAfter = await allowSignupOtpRetry(email);
-        return res.status(503).json({ success: false, message: emailError.message, retryAfter });
-      }
-      delivery = { delivered: false, reason: emailError?.code || "smtp_failed" };
-    }
-    if (!delivery.delivered && process.env.NODE_ENV === "production") {
+    const smtpConfigured = isSmtpConfigured();
+    if (!smtpConfigured && process.env.NODE_ENV === "production") {
       const retryAfter = await allowSignupOtpRetry(email);
-      return res.status(503).json({ success: false, message: "The email server did not accept the verification email. Please retry shortly.", retryAfter });
+      return res.status(503).json({
+        success: false,
+        message: "The email service is not configured. Please try again later.",
+        retryAfter,
+      });
     }
+    queueOtpEmail(emailArgs);
 
     pendingRegistration.otpHash = otpHash;
     pendingRegistration.expiresAt = expiresAt;
@@ -417,24 +412,20 @@ const createUser = async (req, res) => {
     pendingRegistration.lastSentAt = new Date();
     await pendingRegistration.save();
 
-    // 🧪 DEV ONLY — logger no-op hai, isliye seedha console (prod me OTP kabhi print nahi hota).
-    const debugOtp =
-      !delivery.delivered && process.env.NODE_ENV !== "production" ? code : undefined;
+    // 🧪 DEV ONLY — code hamesha response me, taake SMTP down ho to bhi test ho sake.
+    // Production me kabhi OTP print/expose nahi hota.
+    const debugOtp = process.env.NODE_ENV !== "production" ? code : undefined;
     if (debugOtp) {
-      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code} — SMTP set karne par real email jayegi`);
+      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code}`);
     }
 
     // ⚠️ Is step par User NAHI bana — sirf pending + OTP. Cookies verify ke baad milenge.
     return res.status(201).json({
       success: true,
-      message: delivery.delivered
-        ? `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
-        : debugOtp
-          ? `Email is unavailable in development. Use the development verification code shown in the app. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`
-          : `We couldn't email your verification code right now. Please try "Resend code" in a moment.`,
+      message: `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`,
       requireVerification: true,
-      otpSent: Boolean(delivery.delivered),
-      delivered: delivery.delivered,
+      otpSent: smtpConfigured,
+      delivered: smtpConfigured,
       email,
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
       resendAfterSeconds: REGISTER_OTP_RESEND_SECONDS,

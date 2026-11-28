@@ -75,9 +75,9 @@ async function getReferralSummary(user) {
     ReferralProgram.findOne().lean(),
     Referral.countDocuments({ referrerId: user._id, status: "rewarded" }),
     Referral.find({ referrerId: user._id }).sort({ created_at: -1 }).limit(10).select("status friendPoints created_at").lean(),
-    Referral.aggregate([
-      { $match: { referrerId: user._id, status: "rewarded" } },
-      { $group: { _id: null, points: { $sum: "$referrerPoints" } } },
+    LoyaltyTransaction.aggregate([
+      { $match: { user_id: user._id, type: "referral", status: "available" } },
+      { $group: { _id: null, points: { $sum: "$points" } } },
     ]),
   ]);
   const { ROOT_DOMAIN } = require("./tenantHost");

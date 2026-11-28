@@ -91,6 +91,8 @@ Service (idempotent ledger, `source_key` unique):
 - Admin adjust (no negative), unseen notices.
 
 Frontend: `lib/loyalty.js` client mirror, `LoyaltyCheckout`, `PointsBadge`, `RewardsView`.
+- Visibility: admin `enabled` off ho to header badge, account nav aur reward popups chhup jate hain
+  (`useRewardPrograms` hook) — dekho [19-rewards-visibility.md](19-rewards-visibility.md).
 
 ## 8. Referrals
 
@@ -99,6 +101,8 @@ Frontend: `lib/loyalty.js` client mirror, `LoyaltyCheckout`, `PointsBadge`, `Rew
   `rewardReferralSale` on delivered order, reverse/restore on cancel.
 - Share URL: `${protocol}://<subdomain>.<root>/login?mode=register&ref=<code>`.
 - Admin: `GET/PUT /loyalty/admin/referrals`. Customer: `GET /loyalty/referrals/me`.
+- Visibility: Refer a Friend tab sirf tab dikhta hai jab rewards + referrals dono on hon —
+  dekho [19-rewards-visibility.md](19-rewards-visibility.md).
 
 ## 9. Plans & Limits
 

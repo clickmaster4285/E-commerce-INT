@@ -51,6 +51,7 @@ Tech stack:
 | [09-configuration-and-ops.md](09-configuration-and-ops.md) | Env vars, commands, production checklist, scripts, tests |
 | [10-notes-and-issues.md](10-notes-and-issues.md) | Jo bugs/gaps mile, observations aur suggestions |`n| [11-controllers.md](11-controllers.md) | Har controller ka function-by-function reference |`n| [12-routes.md](12-routes.md) | Har endpoint (method + path + handler + middleware) |`n| [13-models.md](13-models.md) | Har Mongoose model ka schema field reference |`n| [14-referral-system.md](14-referral-system.md) | Referral system complete guide (files, flow, APIs) |`n| [15-otp-system.md](15-otp-system.md) | OTP system complete guide (email verification + password reset) |`n| [16-server-js.md](16-server-js.md) | server.js entry point complete guide (startup, middleware, routes, seeding) |`n| [17-postman-testing.md](17-postman-testing.md) | Postman testing guide + `postman_collection.json` (317 requests) |
 | [18-admin-referrals-redesign.md](18-admin-referrals-redesign.md) | Admin referral two-page redesign, related signup/reward/sidebar changes, controller aur file-by-file guide |
+| [19-rewards-visibility.md](19-rewards-visibility.md) | Rewards/Referrals off switch — header badge, account menu, referral pages aur popups ki visibility, files aur flow |
 
 ---
 

@@ -42,6 +42,7 @@ import MyReviews from "@/components/user/MyReviews";
 import RewardsView from "@/components/user/RewardsView";
 import ReferralProgramView from "@/components/user/ReferralProgramView";
 import AccountPageHeader from "@/components/user/AccountPageHeader";
+import { useRewardPrograms } from "@/hooks/user/useRewardPrograms";
 import {
   User, Package, Heart, MapPin, Settings, LogOut, Phone, Mail, Calendar,
   Plus, Pencil, Trash2, ShoppingBag, ArrowRight, ArrowLeft, Loader2, X,
@@ -210,7 +211,7 @@ function navBadgeCls(active) {
   }`;
 }
 
-function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
+function SidebarNav({ user, status, tab, counts, items, onNavigate, onLogout }) {
   return (
     <div className="space-y-4">
     <Card className="overflow-hidden rounded-l-none border-l-0">
@@ -241,7 +242,7 @@ function SidebarNav({ user, status, tab, counts, onNavigate, onLogout }) {
 
       {/* nav — sirf 5 tabs + logout */}
       <nav className="p-2 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           const active = tab === item.id;
           const count = counts?.[item.id] || 0;
@@ -307,6 +308,7 @@ function MobileMenu({
   memberSince,
   stats,
   counts,
+  items,
   onNavigate,
   onLogout,
 }) {
@@ -366,7 +368,7 @@ function MobileMenu({
           </p>
         </div>
         <nav className="p-2 space-y-0.5">
-          {NAV_ITEMS.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const count = counts?.[item.id] || 0;
             return (
@@ -531,6 +533,35 @@ export default function AccountPage() {
     queryFn: addressApi.getAll,
     enabled: !!user,
   });
+
+  /* ---------- rewards visibility (admin master switch) ---------- */
+  const { rewardsEnabled, referralEnabled, isLoading: programsLoading } = useRewardPrograms({
+    enabled: Boolean(user),
+  });
+
+  const navItems = useMemo(
+    () =>
+      NAV_ITEMS.filter((item) => {
+        if (item.id === "rewards") return rewardsEnabled;
+        if (item.id === "referrals") return referralEnabled;
+        return true;
+      }),
+    [rewardsEnabled, referralEnabled],
+  );
+
+  // Rewards off ho to chhupi hui tab par na rukein — profile dikhao.
+  const tabHidden =
+    !programsLoading &&
+    ((tab === "rewards" && !rewardsEnabled) ||
+      (tab === "referrals" && !referralEnabled));
+  const activeTab = tabHidden ? "profile" : tab;
+
+  useEffect(() => {
+    if (!tabHidden) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "profile");
+    window.history.replaceState({}, "", url);
+  }, [tabHidden]);
 
   if (userLoading) {
     return (
@@ -710,8 +741,9 @@ export default function AccountPage() {
   const sidebarProps = {
     user,
     status: accountStatus,
-    tab,
+    tab: activeTab,
     counts,
+    items: navItems,
     onNavigate: navigate,
     onLogout: handleLogout,
   };
@@ -738,19 +770,19 @@ export default function AccountPage() {
             />
           ) : (
             <div style={{ animation: "fadeUp .25s ease" }}>
-              <MobileTopBar title={TAB_TITLES[tab]} onBack={() => setMobileMenu(true)} />
+              <MobileTopBar title={TAB_TITLES[activeTab]} onBack={() => setMobileMenu(true)} />
 
-              {TAB_HEADERS[tab] && (
+              {TAB_HEADERS[activeTab] && (
                 <div className="mb-5">
                   <AccountPageHeader
-                    title={TAB_HEADERS[tab].title}
-                    subtitle={t(TAB_HEADERS[tab].subtitle)}
+                    title={TAB_HEADERS[activeTab].title}
+                    subtitle={t(TAB_HEADERS[activeTab].subtitle)}
                   />
                 </div>
               )}
 
               {/* ============ MY PROFILE ============ */}
-              {tab === "profile" && (
+              {activeTab === "profile" && (
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
                   <div className="space-y-4 min-w-0">
                     {/* identity */}
@@ -944,19 +976,19 @@ export default function AccountPage() {
               )}
 
               {/* ============ MY ORDERS — orders page wala hi design (reuse) ============ */}
-              {tab === "orders" && <OrdersView compact />}
+              {activeTab === "orders" && <OrdersView compact />}
 
-              {tab === "reviews" && <MyReviews />}
+              {activeTab === "reviews" && <MyReviews />}
 
               {/* ============ REWARDS — loyalty points ============ */}
-              {tab === "rewards" && <RewardsView />}
-              {tab === "referrals" && <ReferralProgramView showContinue={false} />}
+              {activeTab === "rewards" && rewardsEnabled && <RewardsView />}
+              {activeTab === "referrals" && referralEnabled && <ReferralProgramView showContinue={false} />}
 
               {/* ============ WISHLIST — wishlist page wala hi design (reuse) ============ */}
-              {tab === "wishlist" && <WishlistView compact />}
+              {activeTab === "wishlist" && <WishlistView compact />}
 
               {/* ============ ADDRESS ============ */}
-              {tab === "address" && (
+              {activeTab === "address" && (
                 <Card className="overflow-hidden">
                   <div className="h-1 bg-gradient-to-r from-[var(--user-accent)] via-[var(--user-accent-hover)] to-transparent" />
                   <CardHeader
@@ -1067,7 +1099,7 @@ export default function AccountPage() {
 
 
               {/* ============ SETTING ============ */}
-              {tab === "settings" && (
+              {activeTab === "settings" && (
                 <div className="space-y-4">
                 <div className="grid xl:grid-cols-[minmax(0,1fr)_19rem] gap-4 items-start">
                   <div className="space-y-4 min-w-0">

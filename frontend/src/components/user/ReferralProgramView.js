@@ -53,8 +53,12 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
   const { t, dir } = useTranslation();
   const referralInputRef = useRef(null);
   const query = useQuery({ queryKey: ["my-referrals"], queryFn: loyaltyApi.referrals, retry: false });
+  // Rewards master switch off ho to referral bhi band.
+  const programQuery = useQuery({ queryKey: ["loyaltyProgram"], queryFn: loyaltyApi.program, staleTime: 60 * 1000, retry: false });
   const data = query.data;
-  const programOn = Boolean(data?.enabled);
+  const rewardsEnabled = Boolean(programQuery.data?.enabled);
+  const programOn = rewardsEnabled && Boolean(data?.enabled);
+  const loading = query.isLoading || programQuery.isLoading;
 
   useEffect(() => {
     if (query.error?.response?.status === 401) router.replace("/login");
@@ -110,7 +114,7 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
             <p id="referral-setup-description" className="mt-2 max-w-lg text-sm leading-6 text-white/85">{programOn ? "Share it with friends. When they join and verify their account, you both earn points toward future orders." : t("referral.offText")}</p>
           </div>
 
-          {query.isLoading ? (
+          {loading ? (
             <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-2" aria-label="Loading referral link">
               <div className="space-y-3">
                 <div className="h-4 w-32 animate-pulse rounded bg-[var(--user-bg-hover)]" />
@@ -202,7 +206,7 @@ export default function ReferralProgramView({ showContinue = true, onboarding = 
     );
   }
 
-  if (query.isLoading) return <main dir={dir} className="mx-auto flex min-h-[45vh] max-w-3xl items-center justify-center text-[var(--user-text-muted)]"><LoaderCircle className="animate-spin" /></main>;
+  if (loading) return <main dir={dir} className="mx-auto flex min-h-[45vh] max-w-3xl items-center justify-center text-[var(--user-text-muted)]"><LoaderCircle className="animate-spin" /></main>;
   if (query.isError) return <main dir={dir} className="mx-auto max-w-3xl px-4 py-12 text-center text-[var(--user-text)]"><p>We couldn’t load your referral details.</p><button className="mt-4 rounded-xl bg-[var(--user-accent)] px-4 py-2 font-semibold text-white" onClick={() => query.refetch()}>Try again</button></main>;
 
   return (

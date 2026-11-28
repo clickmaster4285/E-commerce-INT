@@ -315,19 +315,16 @@ export default function Header() {
   });
 
   // Loyalty balance for the header coin indicator (checkout redemption refreshes this key).
-  const { data: coinBalance = null, isLoading: coinsLoading } = useQuery({
+  const { data: rewardsInfo, isLoading: coinsLoading } = useQuery({
     queryKey: ["myRewards", "header"],
     queryFn: () => loyaltyApi.me({ limit: 1 }),
     enabled: Boolean(user),
     retry: false,
     staleTime: 60 * 1000,
-    // Referral points rewards program band hone par bhi credit hote hain,
-    // is liye balance > 0 ho to badge dikhao (warna off par chhupa rahe).
-    select: (d) => {
-      const balance = Number(d?.account?.balance) || 0;
-      return d?.program?.enabled || balance > 0 ? balance : null;
-    },
   });
+  // Rewards program admin se off ho to header me badge/entry bilkul na dikhe.
+  const rewardsEnabled = Boolean(rewardsInfo?.program?.enabled);
+  const coinBalance = rewardsEnabled ? Number(rewardsInfo?.account?.balance) || 0 : null;
 
   // Reward modal ke coins yahan pahunchte hain; badge khud count-up aur chip sambhalta hai.
   useEffect(() => {
@@ -458,7 +455,7 @@ export default function Header() {
 
   const storeName = store?.store_name || "";
   const n = (v) => Number(v || 0).toLocaleString(locale);
-  const showCoins = Boolean(user) && (coinBalance !== null || coinsLoading);
+  const showCoins = Boolean(user) && rewardsEnabled && coinBalance !== null;
 
   const iconBtn =
     "relative flex h-9 w-9 items-center justify-center rounded-xl text-[var(--user-text-secondary)] transition-colors hover:bg-[var(--user-bg-hover)] hover:text-[var(--user-text)] active:scale-[0.96] lg:h-10 lg:w-10";
@@ -808,28 +805,30 @@ export default function Header() {
                   </span>
                 </Link>
 
-                <Link
-                  href="/account?tab=rewards"
-                  onClick={() => {
-                    setOpen(false);
-                    window.dispatchEvent(
-                      new CustomEvent("account:tab", { detail: "rewards" }),
-                    );
-                  }}
-                  className="sidebar-item relative flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
-                    <Gift size={18} className="text-[var(--user-accent)]" />
-                  </div>
-                  {coinBalance !== null && (
-                    <span className="absolute end-2 top-2 rounded-full bg-[var(--user-accent)] px-1.5 py-0.5 text-[0.625rem] font-medium leading-none text-[var(--user-accent-text)]">
-                      {n(coinBalance)}
+                {rewardsEnabled && (
+                  <Link
+                    href="/account?tab=rewards"
+                    onClick={() => {
+                      setOpen(false);
+                      window.dispatchEvent(
+                        new CustomEvent("account:tab", { detail: "rewards" }),
+                      );
+                    }}
+                    className="sidebar-item relative flex flex-col items-center gap-2 p-3 rounded-xl bg-[var(--user-bg-card)] border border-[var(--user-border)] hover:border-[var(--user-accent)] hover:shadow-lg hover:shadow-[var(--user-accent)]/10 transition-all duration-300 hover:-translate-y-0.5 active:scale-95"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-[var(--user-accent)]/10 flex items-center justify-center">
+                      <Gift size={18} className="text-[var(--user-accent)]" />
+                    </div>
+                    {coinBalance !== null && (
+                      <span className="absolute end-2 top-2 rounded-full bg-[var(--user-accent)] px-1.5 py-0.5 text-[0.625rem] font-medium leading-none text-[var(--user-accent-text)]">
+                        {n(coinBalance)}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-[var(--user-text)]">
+                      {t("header.rewards")}
                     </span>
-                  )}
-                  <span className="text-xs font-medium text-[var(--user-text)]">
-                    {t("header.rewards")}
-                  </span>
-                </Link>
+                  </Link>
+                )}
 
                 <Link
                   href="/account?tab=settings"

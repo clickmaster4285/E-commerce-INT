@@ -207,4 +207,30 @@ const sendOtpEmail = async ({ to, otp, purpose = "email_verification", expiresIn
   return sendEmail({ to, subject: `${copy.subject} — ${storeName}`, html, text });
 };
 
-module.exports = { sendEmail, sendOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig, SMTP_TIMEOUTS };
+/**
+ * Fire-and-forget OTP email.
+ * Signup / resend request ko SMTP par block nahi karta — response foran jata hai
+ * aur delivery background me hoti hai. Failure console par log hoti hai.
+ * @returns {{ queued: boolean }} queued = SMTP configured hai.
+ */
+const queueOtpEmail = (args) => {
+  const queued = isSmtpConfigured();
+  Promise.resolve()
+    .then(() => sendOtpEmail(args))
+    .then((result) => {
+      if (!result?.delivered) {
+        console.warn(
+          `[email] OTP (${args?.purpose || "email_verification"}) to ${args?.to} not delivered: ${result?.reason || "unknown"}`,
+        );
+      }
+    })
+    .catch((error) => {
+      console.error(
+        `[email] OTP (${args?.purpose || "email_verification"}) to ${args?.to} failed:`,
+        error?.cause || error,
+      );
+    });
+  return { queued };
+};
+
+module.exports = { sendEmail, sendOtpEmail, queueOtpEmail, isSmtpConfigured, verifySmtpConnection, getSmtpConfig, SMTP_TIMEOUTS };

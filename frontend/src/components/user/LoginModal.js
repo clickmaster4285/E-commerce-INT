@@ -214,8 +214,11 @@ export default function LoginModal({ isOpen, onClose }) {
   // Referral program on ho to naya customer setup page par jata hai.
   const openReferralSetupIfEnabled = async () => {
     try {
-      const referral = await loyaltyApi.referrals();
-      if (referral?.enabled) { router.push("/referrals/setup"); return; }
+      const [referral, program] = await Promise.all([
+        loyaltyApi.referrals(),
+        loyaltyApi.program(),
+      ]);
+      if (referral?.enabled && program?.enabled) { router.push("/referrals/setup"); return; }
     } catch { /* status na mile to current page par reh do */ }
   };
 

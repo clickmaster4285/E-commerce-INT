@@ -156,12 +156,14 @@ export default function WelcomeRewardModal() {
     select: (d) => {
       const txns = d?.transactions || [];
       const isFresh = (x) => Boolean(x) && Date.now() - new Date(x.created_at).getTime() <= FRESH_MS;
-      // Signup bonus sirf tab jab rewards program on ho.
-      const signup = d?.program?.enabled
+      // Rewards master switch off ho to koi reward popup na dikhe.
+      const rewardsOn = Boolean(d?.program?.enabled);
+      const signup = rewardsOn
         ? txns.find((x) => x.type === "signup" && x.status === "available")
         : null;
-      // Referral points program se independent credit hote hain — hamesha check karo.
-      const referral = txns.find((x) => x.type === "referral" && x.status === "available");
+      const referral = rewardsOn
+        ? txns.find((x) => x.type === "referral" && x.status === "available")
+        : null;
       return { ...d, welcomeTxn: isFresh(signup) ? signup : null, referralTxn: isFresh(referral) ? referral : null };
     },
   });
