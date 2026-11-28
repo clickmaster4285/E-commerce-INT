@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
+const { withTx, TxAbort, supportsTransactions } = require("../utils/tx");
 const PurchaseOrder = require("../models/PurchaseOrder");
 const PurchasePayment = require("../models/PurchasePayment");
 const Vendor = require("../models/Vendor");
@@ -398,10 +399,8 @@ const closePO = async (req, res) => {
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 
-const supportsTx = async () => {
-  try { const admin = mongoose.connection.db.admin(); const hello = await admin.hello(); return !!hello.setName; }
-  catch { return false; }
-};
+// Replica set check ab utils/tx.js me cached hai (pehle har delivery par admin.hello() chalta tha)
+const supportsTx = supportsTransactions;
 
 const deliverPO = async (req, res) => {
   const useTx = await supportsTx();
@@ -504,31 +503,59 @@ const recordPOPayment = async (req, res) => {
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: "amount must be > 0" });
     if (!["bank", "cash", "cod", "credit", "advance_adjust"].includes(method)) return res.status(400).json({ success: false, message: "Invalid method" });
     if (po.paid_amount + amount > po.total + 0.001) return res.status(400).json({ success: false, message: `Over-pay: due is ${po.total - po.paid_amount}` });
-    const pay = await PurchasePayment.create({
-      po_id: po._id, vendor_id: po.vendor_id, amount, method,
-      paid_at: req.body?.paid_at || new Date(), createdby: req.user?._id || null,
-    });
+    // 🔒 PO update CONDITIONAL (paid_amount wahi jo padha) + payment record — ek
+    // transaction me. Pehle payment pehle create hota tha aur PO read→check→save:
+    // do concurrent payments over-pay kar deti thin.
     const oldPaidAmount = po.paid_amount;
     const oldDueAmount = po.due_amount;
     const oldStatus = po.status;
-    po.paid_amount = Math.round((po.paid_amount + amount) * 100) / 100;
-    po.due_amount = Math.max(0, Math.round((po.total - po.paid_amount) * 100) / 100);
-    po.payment_status = po.paid_amount <= 0 ? "unpaid" : po.paid_amount >= po.total ? "paid" : "partial";
-    if (po.payment_status === "paid") po.status = "closed";
-    po.activity.push(auditEvent(req, "payment", [
+    const newPaid = Math.round((po.paid_amount + amount) * 100) / 100;
+    const newDue = Math.max(0, Math.round((po.total - newPaid) * 100) / 100);
+    const newPaymentStatus = newPaid <= 0 ? "unpaid" : newPaid >= po.total ? "paid" : "partial";
+    const newStatus = newPaymentStatus === "paid" ? "closed" : po.status;
+    const activityEntry = auditEvent(req, "payment", [
       { field: "Payment", before: "—", after: `${method} · ${amount} · ${new Date(req.body?.paid_at || Date.now()).toISOString().slice(0, 10)}` },
-      ...(oldPaidAmount !== po.paid_amount ? [{ field: "Paid amount", before: String(oldPaidAmount), after: String(po.paid_amount) }] : []),
-      ...(oldDueAmount !== po.due_amount ? [{ field: "Due amount", before: String(oldDueAmount), after: String(po.due_amount) }] : []),
-      ...(oldStatus !== po.status ? [{ field: "Status", before: oldStatus, after: po.status }] : []),
-    ]));
-    po.updatedby = req.user?._id || null;
-    await po.save();
-    await Vendor.updateOne({ _id: po.vendor_id }, { $inc: { total_paid: amount }, $set: { balance_payable: Math.max(0, po.total - po.paid_amount) } }).catch(() => {});
+      ...(oldPaidAmount !== newPaid ? [{ field: "Paid amount", before: String(oldPaidAmount), after: String(newPaid) }] : []),
+      ...(oldDueAmount !== newDue ? [{ field: "Due amount", before: String(oldDueAmount), after: String(newDue) }] : []),
+      ...(oldStatus !== newStatus ? [{ field: "Status", before: oldStatus, after: newStatus }] : []),
+    ]);
+    const transactional = await supportsTransactions();
+    let updatedPO = null;
+    let pay = null;
+    try {
+      ({ result: { updatedPO, pay } } = await withTx(async () => {
+        const nextPO = await PurchaseOrder.findOneAndUpdate(
+          { _id: po._id, paid_amount: po.paid_amount, status: { $in: ["delivered", "closed"] } },
+          {
+            $set: { paid_amount: newPaid, due_amount: newDue, payment_status: newPaymentStatus, status: newStatus, updatedby: req.user?._id || null },
+            $push: { activity: activityEntry },
+          },
+          { returnDocument: "after" },
+        );
+        if (!nextPO) throw new TxAbort(409, { success: false, code: "PO_CHANGED", message: "Another payment was recorded at the same time. Refresh and try again." });
+        const [created] = await PurchasePayment.create([{
+          po_id: po._id, vendor_id: po.vendor_id, amount, method,
+          paid_at: req.body?.paid_at || new Date(), createdby: req.user?._id || null,
+        }]);
+        return { updatedPO: nextPO, pay: created };
+      }));
+    } catch (txError) {
+      // Standalone MongoDB: PO update ho gaya lekin payment create fail → PO wapas
+      if (!transactional && !pay && !(txError instanceof TxAbort)) {
+        await PurchaseOrder.updateOne(
+          { _id: po._id, paid_amount: newPaid },
+          { $set: { paid_amount: oldPaidAmount, due_amount: oldDueAmount, status: oldStatus, payment_status: po.payment_status } },
+        ).catch(() => {});
+      }
+      if (txError instanceof TxAbort) return res.status(txError.status).json(txError.body);
+      throw txError;
+    }
+    // Vendor balance: sirf poore recompute se (pehle ek $inc + phir overwrite hota tha)
     const sums = await PurchasePayment.aggregate([{ $match: { vendor_id: po.vendor_id } }, { $group: { _id: null, paid: { $sum: "$amount" } } }]);
     const poSums = await PurchaseOrder.aggregate([{ $match: { vendor_id: po.vendor_id, is_deleted: { $ne: true } } }, { $group: { _id: null, purchased: { $sum: "$total" } } }]);
     await Vendor.updateOne({ _id: po.vendor_id }, { $set: { total_paid: sums[0]?.paid || 0, total_purchased: poSums[0]?.purchased || 0, balance_payable: Math.max(0, (poSums[0]?.purchased || 0) - (sums[0]?.paid || 0)) } }).catch(() => {});
-    emitPO("po:paymentUpdated", { success: true, data: po });
-    res.status(200).json({ success: true, data: { po, payment: pay } });
+    emitPO("po:paymentUpdated", { success: true, data: updatedPO });
+    res.status(200).json({ success: true, data: { po: updatedPO, payment: pay } });
   } catch (e) { res.status(400).json({ success: false, message: e.message }); }
 };
 

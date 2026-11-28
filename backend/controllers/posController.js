@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { withTx, supportsTransactions } = require("../utils/tx"); // POS sale / return transactions
 const { nextSeq, peekSeq, formatNumber, maxNumericSuffix } = require("../utils/counter"); // atomic per-store numbers
 const Product = require("../models/Product");
 const Variant = require("../models/Variant");
@@ -287,6 +288,7 @@ const getPosReturns = async (req, res) => {
 };
 
 const returnPosSaleItems = async (req, res) => {
+  let transactional = false;
   const stockChanges = [];
   let insertedHistory = false;
   let saleId = null;
@@ -299,8 +301,14 @@ const returnPosSaleItems = async (req, res) => {
     const reason = String(note || "").trim();
     if (!reason) return res.status(400).json({ success: false, message: "A return reason is required" });
     if (reason.length > 300) return res.status(400).json({ success: false, message: "Return reason must be 300 characters or fewer" });
+    // 🔒 Ek transaction: return check + stock + history + sale save. Do concurrent
+    // returns pehle dono check pass kar ke zyada wapas kar sakte the; ab doosri
+    // WriteConflict par retry hoti hai aur taaza returns dekh kar ruk jati hai.
+    transactional = await supportsTransactions();
+    const { result } = await withTx(async () => {
+    stockChanges.length = 0; insertedHistory = false; // retry par reset
     const sale = await PosSale.findById(req.params.id);
-    if (!sale || sale.status !== "completed") return res.status(404).json({ success: false, message: "Completed sale not found" });
+    if (!sale || sale.status !== "completed") throw Object.assign(new Error("Completed sale not found"), { status: 404 });
     saleId = sale._id;
     const returnedSoFar = new Map();
     for (const ret of sale.returns || []) for (const line of ret.items || []) {
@@ -341,8 +349,12 @@ const returnPosSaleItems = async (req, res) => {
     insertedHistory = true;
     sale.returns.push({ _id: returnRecordId, returned_by: req.user?._id || null, returned_by_name: req.user?.name || "Administrator", reason, refund_method: "cash", refund_total: refundTotal, items: returnLines });
     await sale.save();
-    return res.status(201).json({ success: true, data: { sale, refund_total: refundTotal } });
+    return { sale, refundTotal };
+    });
+    return res.status(201).json({ success: true, data: { sale: result.sale, refund_total: result.refundTotal } });
   } catch (error) {
+    // Transaction me sab khud rollback; sirf standalone MongoDB par manual compensation
+    if (transactional) return res.status(error.status || 400).json({ success: false, message: error.message || "Unable to return POS sale items" });
     if (insertedHistory) await StockHistory.deleteMany({ reason: "POS sale return", explanation: historyExplanation }).catch(() => {});
     if (returnRecordId && saleId) await PosSale.updateOne({ _id: saleId }, { $pull: { returns: { _id: returnRecordId } } }).catch(() => {});
     for (const change of stockChanges.reverse()) await Variant.updateOne({ _id: change.variant_id }, { $inc: { quantity: -change.quantity } }).catch(() => {});
@@ -567,9 +579,9 @@ const savePosSale = async (req, res, existingSale = null) => {
       notes: String(notes || "").trim(),
     };
 
-    // This deployment is a standalone MongoDB server, so multi-document
-    // transactions are unavailable. Use atomic stock decrements and compensate
-    // completed writes if any later step fails.
+    // 🔒 Replica set par ek transaction (stock + sale + history ek saath). Standalone
+    // MongoDB par neeche wala manual compensation hi chalta hai (utils/tx.js).
+    const transactional = await supportsTransactions();
     const stockChanges = [];
     const historyRows = [];
     const saleId = existingSale?._id || new mongoose.Types.ObjectId();
@@ -578,6 +590,8 @@ const savePosSale = async (req, res, existingSale = null) => {
     const historyExplanation = originalSale ? `POS sale edit ${saleNumber}` : `POS sale ${saleNumber}`;
 
     try {
+      const { result: savedSaleResult } = await withTx(async () => {
+      stockChanges.length = 0; historyRows.length = 0; saleWriteAttempted = false; // retry par reset
       const affectedVariantIds = new Set([...originalQuantities.keys(), ...requestedQuantities.keys()]);
       for (const variantId of affectedVariantIds) {
         const previousSold = originalQuantities.get(variantId) || 0;
@@ -619,13 +633,21 @@ const savePosSale = async (req, res, existingSale = null) => {
       }
 
       saleWriteAttempted = true;
+      // Edit: sirf tab jab sale hamare padhne ke baad kisi aur ne nahi badli (optimistic lock)
       const savedSale = existingSale
-        ? await PosSale.findByIdAndUpdate(saleId, { $set: saleData }, { returnDocument: "after", runValidators: true })
-        : await PosSale.create({ ...saleData, _id: saleId });
-      if (!savedSale) throw new Error("Sale could not be saved.");
+        ? await PosSale.findOneAndUpdate(
+          { _id: saleId, ...(originalSale?.updated_at ? { updated_at: originalSale.updated_at } : {}) },
+          { $set: saleData },
+          { returnDocument: "after", runValidators: true },
+        )
+        : (await PosSale.create([{ ...saleData, _id: saleId }]))[0];
+      if (!savedSale) throw new Error(existingSale ? "This sale was changed by someone else. Please reload and try again." : "Sale could not be saved.");
       if (historyRows.length) await StockHistory.insertMany(historyRows);
-      return res.status(existingSale ? 200 : 201).json({ success: true, data: savedSale });
+      return savedSale;
+      });
+      return res.status(existingSale ? 200 : 201).json({ success: true, data: savedSaleResult });
     } catch (error) {
+      if (transactional) throw error; // transaction ne sab rollback kar diya
       const rollbackErrors = [];
       if (saleWriteAttempted) {
         try {

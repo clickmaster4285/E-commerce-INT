@@ -454,20 +454,36 @@ exports.recordPayment = async (req, res) => {
     }
     const paymentTime = String(req.body.payment_time || "").trim();
     if (paymentTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(paymentTime)) return res.status(400).json({ success: false, message: "Enter a valid payment time" });
-    invoice.payments.push({ amount, payment_date: paymentDate, payment_time: paymentTime, payment_method: method, note: String(req.body.note || "").trim() });
-    invoice.amount_paid = paid;
-    invoice.remaining_balance = remaining;
-    invoice.status = remaining <= 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid";
-    invoice.paid_at = remaining <= 0 ? paymentDate : null;
-    invoice.updatedby = req.user?._id || null;
-    invoice.activity.push(invoiceActivity(req, "payment", [{
+    // 🔒 Conditional write: sirf tab jab amount_paid abhi bhi wahi hai jo humne padha.
+    // Pehle read → check → save tha: do concurrent payments dono "remaining" check
+    // pass kar ke invoice overpay kar deti thi. Ab doosri 409 paati hai (refresh).
+    const activityEntry = invoiceActivity(req, "payment", [{
       action: "payment_recorded",
       field: "Payment",
       before: "—",
       after: `${method} · ${amount} · ${paymentDate.toISOString().slice(0, 10)}${paymentTime ? ` ${paymentTime}` : ""}${String(req.body.note || "").trim() ? ` · ${String(req.body.note).trim()}` : ""}`,
-    }, { action: "balance", field: "Remaining balance", before: priorRemaining, after: remaining }]));
-    await invoice.save();
-    res.json({ success: true, data: invoice });
+    }, { action: "balance", field: "Remaining balance", before: priorRemaining, after: remaining }]);
+    const updated = await Invoice.findOneAndUpdate(
+      { _id: invoice._id, is_deleted: false, amount_paid: invoice.amount_paid },
+      {
+        $push: {
+          payments: { amount, payment_date: paymentDate, payment_time: paymentTime, payment_method: method, note: String(req.body.note || "").trim() },
+          activity: activityEntry,
+        },
+        $set: {
+          amount_paid: paid,
+          remaining_balance: remaining,
+          status: remaining <= 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid",
+          paid_at: remaining <= 0 ? paymentDate : null,
+          updatedby: req.user?._id || null,
+        },
+      },
+      { returnDocument: "after", runValidators: true },
+    );
+    if (!updated) {
+      return res.status(409).json({ success: false, code: "INVOICE_CHANGED", message: "Another payment was recorded at the same time. Refresh the invoice and try again." });
+    }
+    res.json({ success: true, data: updated });
   } catch (error) { res.status(400).json({ success: false, message: error.message }); }
 };
 
