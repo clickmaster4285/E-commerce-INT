@@ -259,8 +259,8 @@ export default function SettingsTab({ onHeaderActions }) {
                 <p className="text-[12.5px] text-[var(--text-muted)]">{t("admin.loyalty.settings.programText")}</p>
               </div>
             </div>
-            <div className="flex items-end gap-3">
-              <div className="w-full lg:w-48">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+              <div className="min-w-0 lg:w-48">
                 <p className="mb-1 text-[12px] font-medium text-[var(--text-muted)]">{t("admin.loyalty.settings.name")}</p>
                 <input value={form.programName} onChange={(e) => set("programName", e.target.value)} maxLength={40} aria-label={t("admin.loyalty.settings.name")}
                   className={`${inputCls} ${errors.programName ? "!border-[var(--danger)]" : ""}`} />

@@ -387,49 +387,47 @@ const createUser = async (req, res) => {
       });
     }
 
-    // 📧 Verification OTP background me bhejo — SMTP slow/down ho to bhi
-    // signup request block na ho. Pending record pehle hi save ho chuka hai.
     const emailArgs = {
       to: email,
       otp: code,
       purpose: "email_verification",
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
     };
-    const smtpConfigured = isSmtpConfigured();
-    if (!smtpConfigured && process.env.NODE_ENV === "production") {
-      const retryAfter = await allowSignupOtpRetry(email);
-      return res.status(503).json({
-        success: false,
-        message: "The email service is not configured. Please try again later.",
-        retryAfter,
-      });
-    }
-    queueOtpEmail(emailArgs);
-
     pendingRegistration.otpHash = otpHash;
     pendingRegistration.expiresAt = expiresAt;
     pendingRegistration.attempts = 0;
     pendingRegistration.lastSentAt = new Date();
     await pendingRegistration.save();
 
-    // 🧪 DEV ONLY — code hamesha response me, taake SMTP down ho to bhi test ho sake.
-    // Production me kabhi OTP print/expose nahi hota.
-    const debugOtp = process.env.NODE_ENV !== "production" ? code : undefined;
-    if (debugOtp) {
-      console.warn(`🧪 [DEV] OTP for ${email} (email_verification): ${code}`);
+    if (!isSmtpConfigured()) {
+      const retryAfter = await allowSignupOtpRetry(email);
+      return res.status(503).json({
+        success: false,
+        message: "Email delivery is unavailable. No account has been created; please try again shortly.",
+        retryAfter,
+      });
+    }
+    const { queued } = queueOtpEmail(emailArgs);
+    if (!queued) {
+      const retryAfter = await allowSignupOtpRetry(email);
+      return res.status(503).json({
+        success: false,
+        message: "Email delivery is unavailable. No account has been created; please try again shortly.",
+        retryAfter,
+      });
     }
 
     // ⚠️ Is step par User NAHI bana — sirf pending + OTP. Cookies verify ke baad milenge.
     return res.status(201).json({
       success: true,
-      message: `Verification code sent to ${email}. It expires in ${REGISTER_OTP_EXPIRE_MINUTES} minutes.`,
+      message: `We’re sending a verification code to ${email}. Check your inbox and spam folder.`,
       requireVerification: true,
-      otpSent: smtpConfigured,
-      delivered: smtpConfigured,
+      otpSent: true,
+      deliveryPending: true,
+      delivered: false,
       email,
       expiresInMinutes: REGISTER_OTP_EXPIRE_MINUTES,
       resendAfterSeconds: REGISTER_OTP_RESEND_SECONDS,
-      ...(debugOtp ? { debugOtp } : {}),
       user: { name: cleanName, username: finalUsername, phone: cleanPhone, email },
     });
   } catch (error) {

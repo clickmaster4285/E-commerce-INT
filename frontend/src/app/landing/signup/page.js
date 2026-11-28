@@ -504,17 +504,15 @@ export default function SignupPage() {
           return;
         }
       const target = res?.email || email.trim().toLowerCase();
-      if (!res?.delivered && !res?.debugOtp && !res?.requireVerification) {
+      if (!res?.delivered && !res?.requireVerification) {
           setGeneralError(res?.message || "Verification code could not be sent. Please try again later.");
           setLoading(false);
           return;
         }
         setOtpEmail(target);
         setStep("otp");
-        if (res?.debugOtp) {
-          toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
-        } else if (!res?.delivered) {
-          toast.info(res?.message || "Email is unavailable. Check the backend terminal for the development verification code.");
+        if (!res?.delivered) {
+          toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
         } else {
           toast.success(t("auth.login.verificationSent", { email: target }));
         }

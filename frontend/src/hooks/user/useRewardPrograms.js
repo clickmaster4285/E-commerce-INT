@@ -3,10 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { loyaltyApi } from "@/apis/user/loyaltyApi";
 
-/**
- * Rewards visibility — admin ka master "Rewards" switch off ho to
- * badge, nav aur referral samet saari reward UI chhup jati hai.
- */
+/** Rewards and referral visibility use their own admin switches. */
 export function useRewardPrograms({ enabled = true } = {}) {
   const programQuery = useQuery({
     queryKey: ["loyaltyProgram"],
@@ -21,14 +18,14 @@ export function useRewardPrograms({ enabled = true } = {}) {
   const referralQuery = useQuery({
     queryKey: ["my-referrals"],
     queryFn: loyaltyApi.referrals,
-    enabled: enabled && rewardsEnabled,
-    staleTime: 60 * 1000,
+    enabled,
+    staleTime: 0,
     retry: false,
   });
 
   return {
     rewardsEnabled,
-    referralEnabled: rewardsEnabled && Boolean(referralQuery.data?.enabled),
-    isLoading: programQuery.isLoading || (rewardsEnabled && referralQuery.isLoading),
+    referralEnabled: Boolean(referralQuery.data?.enabled),
+    isLoading: programQuery.isLoading || referralQuery.isLoading,
   };
 }

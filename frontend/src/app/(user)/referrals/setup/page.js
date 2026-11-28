@@ -1,7 +1,5 @@
-"use client";
-
-import ReferralProgramView from "@/components/user/ReferralProgramView";
+import { redirect } from "next/navigation";
 
 export default function ReferralSetupPage() {
-  return <ReferralProgramView onboarding />;
+  redirect("/account?tab=referrals");
 }

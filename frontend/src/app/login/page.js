@@ -181,10 +181,10 @@ export default function UserLoginPage() {
 
       // ✅ REGISTER → User NAHI banta, sirf pending + OTP jata hai, phir verify screen
       const res = await authApi.register({ name, username, phone, email, password, referralCode });
-      if (!res?.delivered && res?.debugOtp) toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
       setOtpEmail(res?.email || email);
       setStep("verify-email");
-      toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
+      if (res?.delivered) toast.success(t("auth.login.verificationSent", { email: res?.email || email }));
+      else toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen dikhao
       if (err.response?.data?.needsVerification) {
@@ -203,18 +203,8 @@ export default function UserLoginPage() {
   // ==========================================
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
-  // Naya customer: referral program on ho to pehle referral setup page,
-  // warna normal storefront home.
-  const goAfterSignup = async (isNewUser = true) => {
-    if (isNewUser) {
-      try {
-        const [referral, program] = await Promise.all([
-          loyaltyApi.referrals(),
-          loyaltyApi.program(),
-        ]);
-        if (referral?.enabled && program?.enabled) { window.location.href = "/referrals/setup"; return; }
-      } catch { /* status na mile to home par bhej do */ }
-    }
+  // Verification ke baad storefront par bhejein; referral setup account section me available hai.
+  const goAfterSignup = () => {
     window.location.href = "/";
   };
 
@@ -226,7 +216,7 @@ export default function UserLoginPage() {
 
   const handleResendEmailOtp = async () => {
     const res = await authApi.sendEmailOtp(otpEmail);
-    if (!res?.delivered && res?.debugOtp) toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
+    if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     else toast.success(t("auth.login.verificationResent"));
   };
 

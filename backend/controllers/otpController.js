@@ -162,8 +162,11 @@ const sendError = (res, error) => {
 };
 
 // ðŸ§ª DEV ONLY helper â€” prod mein debugOtp kabhi response mein nahi jata
-const withDebugOtp = (payload, debugOtp) =>
-  debugOtp ? { ...payload, debugOtp } : payload;
+// OTPs must never be included in API responses, including development responses.
+const withDebugOtp = (payload) => {
+  const { debugOtp, ...safePayload } = payload;
+  return safePayload;
+};
 
 // ==========================================
 // 1ï¸âƒ£ EMAIL VERIFICATION â€” SEND OTP (reusable helper)
@@ -219,17 +222,17 @@ const sendVerificationOtpForEmail = async (rawEmail) => {
       emailError.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
       throw emailError;
     }
-    if (!delivery.delivered && process.env.NODE_ENV === "production") {
+    if (!delivery.delivered) {
       const cooldown = Number.isFinite(OTP_RESEND_SECONDS) && OTP_RESEND_SECONDS > 0 ? OTP_RESEND_SECONDS : 60;
       pending.lastSentAt = new Date(Date.now() - Math.max(0, cooldown - Math.min(SMTP_RETRY_SECONDS, cooldown)) * 1000);
       await pending.save();
-      const error = new Error("The email server did not accept the verification email. Please retry shortly.");
+      const error = new Error("Email delivery is unavailable. The verification code was not sent. Please retry shortly.");
       error.statusCode = 503;
       error.retryAfter = Math.min(SMTP_RETRY_SECONDS, cooldown);
       throw error;
     }
-    // Sirf email successfully queued (ya dev fallback code tayyar) hone par
-    // naya OTP active karein; SMTP failure purane valid code ko revoke na kare.
+    // Sirf email successfully delivered hone par naya OTP active karein;
+    // SMTP failure purane valid code ko revoke na kare.
     pending.otpHash = otpHash;
     pending.expiresAt = new Date(Date.now() + OTP_EXPIRE_MINUTES * 60 * 1000);
     pending.attempts = 0;
@@ -281,7 +284,7 @@ const sendEmailVerificationOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: result.delivered
             ? `Verification code sent to ${result.email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP is not configured â€” the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : "Email delivery is unavailable right now. The code was not sent. Please try again later or contact support.",
         },
         result.debugOtp,
       ),
@@ -678,7 +681,7 @@ const sendForgotPasswordOtp = async (req, res) => {
           resendAfterSeconds: OTP_RESEND_SECONDS,
           message: delivered
             ? `Password reset code sent to ${email}. It expires in ${OTP_EXPIRE_MINUTES} minutes.`
-            : `SMTP is not configured â€” the code was not emailed. Check the backend console for the OTP or configure SMTP. (expires in ${OTP_EXPIRE_MINUTES} min)`,
+            : "Email delivery is unavailable right now. The code was not sent. Please try again later or contact support.",
         },
         debugOtp,
       ),
@@ -827,7 +830,7 @@ const getEmailHealth = async (req, res) => {
       return res.json({
         success: false,
         configured: false,
-        message: "SMTP is not configured â€” OTP will only be printed to the console.",
+        message: "Email delivery is unavailable; verification codes cannot be sent until email is configured.",
         hint: "Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM in .env. For Gmail, use an App Password.",
         config: {
           host: cfg.host || "(empty)",

@@ -156,14 +156,12 @@ export default function WelcomeRewardModal() {
     select: (d) => {
       const txns = d?.transactions || [];
       const isFresh = (x) => Boolean(x) && Date.now() - new Date(x.created_at).getTime() <= FRESH_MS;
-      // Rewards master switch off ho to koi reward popup na dikhe.
+      // Welcome bonuses follow Rewards; referral credits follow the Referral switch.
       const rewardsOn = Boolean(d?.program?.enabled);
       const signup = rewardsOn
         ? txns.find((x) => x.type === "signup" && x.status === "available")
         : null;
-      const referral = rewardsOn
-        ? txns.find((x) => x.type === "referral" && x.status === "available")
-        : null;
+      const referral = txns.find((x) => x.type === "referral" && x.status === "available");
       return { ...d, welcomeTxn: isFresh(signup) ? signup : null, referralTxn: isFresh(referral) ? referral : null };
     },
   });
@@ -353,6 +351,25 @@ export default function WelcomeRewardModal() {
 
   const busy = phase === "claiming" || phase === "flying";
 
+  if (mode === "referral") {
+    return createPortal(
+      <div className="user-theme fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="referral-reward-title" aria-describedby="referral-reward-desc">
+        <button type="button" aria-label={t("rewards.welcome.close")} onClick={close} className="absolute inset-0" />
+        <section ref={dialogRef} className="relative w-full max-w-xs rounded-2xl bg-[var(--user-bg-card)] p-6 text-center shadow-2xl ring-1 ring-black/5 motion-safe:animate-[rewardIn_.4s_cubic-bezier(.16,1.02,.3,1)_both]">
+          <button ref={closeRef} type="button" onClick={close} aria-label={t("rewards.welcome.close")} className="absolute end-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-[var(--user-text-muted)] transition hover:bg-[var(--user-bg-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--user-accent-soft)] text-[var(--user-accent)]"><Coins size={23} strokeWidth={1.8} aria-hidden="true" /></span>
+          <p className="mt-3 text-xs font-medium text-[var(--user-text-muted)]">Referral reward</p>
+          <h2 id="referral-reward-title" className="mt-1 text-lg font-semibold text-[var(--user-text)]">You received</h2>
+          <p id="referral-reward-desc" className="mt-2 text-3xl font-bold tabular-nums text-[var(--user-accent)]">+{n(referralBonus?.points)} <span className="text-base font-semibold text-[var(--user-text-muted)]">coins</span></p>
+          <button type="button" onClick={close} className="mt-5 h-10 w-full rounded-lg bg-[var(--user-accent)] text-sm font-semibold text-[var(--user-accent-text)] transition hover:bg-[var(--user-accent-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">Done</button>
+        </section>
+      </div>,
+      document.body,
+    );
+  }
+
   return createPortal(
     <div className="user-theme fixed inset-0 z-[120] flex items-end justify-center p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-labelledby="welcome-reward-title" aria-describedby="welcome-reward-desc">
       <button type="button" aria-label={t("rewards.welcome.close")} onClick={close} className="absolute inset-0 bg-black/45 backdrop-blur-[3px] motion-safe:animate-[rewardFade_.35s_ease-out]" />
@@ -387,7 +404,7 @@ export default function WelcomeRewardModal() {
                 <Gift size={15} strokeWidth={1.75} />
                 {t("rewards.welcome.view")}
               </a>
-              <a href={mode === "welcome" ? "/referrals/setup" : "/shop"} onClick={markWelcomeSeenForNavigation}
+              <a href="/shop" onClick={markWelcomeSeenForNavigation}
                 className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--user-accent)] text-sm font-medium text-[var(--user-accent-text)] transition-all duration-300 hover:bg-[var(--user-accent-hover)] hover:shadow-md active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--user-accent)]">
                 {t("rewards.welcome.shop")}
                 <ArrowRight size={15} strokeWidth={1.75} />

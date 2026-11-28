@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import LazyGoogleLogin from "./LazyGoogleLogin";
@@ -10,7 +9,6 @@ import {
   KeyRound, MailCheck, ArrowLeft,
 } from "lucide-react";
 import { authApi, getApiErrorMessage, isValidEmail } from "@/apis/user/authApi";
-import { loyaltyApi } from "@/apis/user/loyaltyApi";
 import OtpVerifyCard from "./OtpVerifyCard";
 import ResetPasswordCard from "./ResetPasswordCard";
 import { isValidPhone, normalizePhone, PHONE_MAX, PHONE_MIN } from "@/utils/phoneValidator";
@@ -18,7 +16,6 @@ import { useTranslation } from "@/i18n/LanguageProvider";
 
 export default function LoginModal({ isOpen, onClose }) {
   const { t } = useTranslation();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
@@ -192,9 +189,9 @@ export default function LoginModal({ isOpen, onClose }) {
       // ✅ REGISTER → OTP email jata hai, phir verify screen
       const referralCode = String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24);
       const res = await authApi.register({ name, username, phone, email, password, referralCode });
-      if (!res?.delivered && res?.debugOtp) toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
       setOtpEmail(res?.email || email);
       setStep("verify-email");
+      if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
     } catch (err) {
       // 🔁 Email verify nahi hui — seedha OTP screen
       if (err.response?.data?.needsVerification) {
@@ -212,27 +209,16 @@ export default function LoginModal({ isOpen, onClose }) {
   // 📧 EMAIL VERIFICATION (OTP)
   // ==========================================
   // Referral program on ho to naya customer setup page par jata hai.
-  const openReferralSetupIfEnabled = async () => {
-    try {
-      const [referral, program] = await Promise.all([
-        loyaltyApi.referrals(),
-        loyaltyApi.program(),
-      ]);
-      if (referral?.enabled && program?.enabled) { router.push("/referrals/setup"); return; }
-    } catch { /* status na mile to current page par reh do */ }
-  };
-
   const handleVerifyEmailOtp = async (otp) => {
     await authApi.verifyEmailOtp(otpEmail, otp);
     queryClient.invalidateQueries({ queryKey: ["userProfile"] });
     resetForm();
     onClose();
-    await openReferralSetupIfEnabled();
   };
 
   const handleResendEmailOtp = async () => {
     const res = await authApi.sendEmailOtp(otpEmail);
-    if (!res?.delivered && res?.debugOtp) toast.info(`Development email unavailable. Verification code: ${res.debugOtp}`);
+    if (!res?.delivered) toast.info(res?.message || "Email delivery is unavailable. The verification code was not sent. Please try again later.");
   };
 
   // ==========================================
@@ -285,11 +271,10 @@ export default function LoginModal({ isOpen, onClose }) {
     setLoading(true);
     try {
       const referralCode = String(new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase().slice(0, 24);
-      const res = await authApi.googleCustomerLogin(credential, referralCode);
+      await authApi.googleCustomerLogin(credential, referralCode);
       queryClient.invalidateQueries({ queryKey: ["userProfile"] });
       resetForm();
       onClose();
-      if (res?.isNewUser !== false) await openReferralSetupIfEnabled();
     } catch (err) {
       setGeneralError(getApiErrorMessage(err, "Google login failed."));
       setLoading(false);
